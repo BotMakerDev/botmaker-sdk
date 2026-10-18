@@ -46,7 +46,7 @@
         <botmaker.pluginbasics.version>0.3.6-SNAPSHOT</botmaker.pluginbasics.version>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
-        <javafx.version>25.0.4</javafx.version>
+        <javafx.version>27</javafx.version>
 
         <!--
           The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated

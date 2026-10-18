@@ -375,6 +375,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **JavaFX 27** (2026-10-18), from 25.0.4, the contract's version, for the slot editors. JavaFX 27 needs Java 25.
 - **`edit_map in_strip` is `edit_map group`.** A strip is `group` with kind `strip` (the default) and its notches.
 - **`Screens.java` lists its screens one line each.** A line shows the screen's marker, name, how far Discovery got
   and *Open in 🗺*; its ▸ (or a click on the name) opens the shot, the way back, the looks, each input, the debts and
