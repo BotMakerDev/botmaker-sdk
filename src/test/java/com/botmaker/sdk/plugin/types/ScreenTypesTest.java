@@ -83,6 +83,20 @@ class ScreenTypesTest {
         assertEquals(Setup.named("Home"), Setup.named("Home").fromPick(Pick.first()), "no way in, nothing to pick");
     }
 
+    /** The start screen and its load time, and a way on its own naming the screen it follows, go back together. */
+    @Test
+    void aStartScreenAndAWayOnItsOwnComeApartAndGoBackTogether() {
+        Setup loading = Setup.named("Loading").markers(marks("loading")).start().loads(Duration.ofSeconds(90));
+        assertEquals(loading, roundTrip(ScreenTypes.SETUP_SHAPE, loading));
+        Setup home = Setup.named("Home").after(BotConstants.screen("LOADING"))
+                .alsoFrom(List.of(Way.onItsOwn(BotConstants.screen("SPLASH"))));
+        assertEquals(home, roundTrip(ScreenTypes.SETUP_SHAPE, home));
+        Way own = Way.onItsOwn(BotConstants.screen("LOADING")).when(ScreenTypes.condition("Firestone::eventOn"));
+        assertEquals(own, roundTrip(ScreenTypes.WAY_ON_ITS_OWN_SHAPE, own));
+        assertFalse(ScreenTypes.WAY_SHAPE.writes(own));
+        assertTrue(ScreenTypes.WAY_ON_ITS_OWN_SHAPE.writes(own));
+    }
+
     @Test
     void eachInputIsWrittenByItsOwnFactory() {
         Button click = Button.of(picture("claim")).tried().sometimes().info();

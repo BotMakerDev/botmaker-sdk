@@ -172,12 +172,18 @@ public final class MapReport {
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
         // The tree's way in, then every other: a first screen has no tree's way in and may have others.
         List<String> ins = new ArrayList<>();
-        if (screen.from() != null && screen.from().via() != null) {
-            ins.add("in from " + graph.parent(constant).map(graph::shown).orElse("?") + " by "
-                    + way(graph, screen.from()));
+        if (screen.isStart()) ins.add("the game opens on it");
+        List<String> next = graph.followers(constant);
+        if (!next.isEmpty()) {
+            ins.add(graph.shown(next.getFirst()) + " follows it on its own, given " + graph.loadMs(constant) / 1000
+                    + " s to show");
         }
-        screen.alsoFrom().forEach(way -> ins.add("also from " + graph.nameOf(way.via())
-                .map(n -> graph.shown(n.screen())).orElse("?") + " by " + way(graph, way)));
+        if (screen.from() != null && (screen.from().via() != null || screen.from().isOnItsOwn())) {
+            ins.add("in " + (screen.from().isOnItsOwn() ? "after " : "from ")
+                    + graph.parent(constant).map(graph::shown).orElse("?") + " " + way(graph, screen.from()));
+        }
+        screen.alsoFrom().forEach(way -> ins.add("also " + (way.isOnItsOwn() ? "after " : "from ")
+                + graph.onScreen(way).map(graph::shown).orElse("?") + " " + way(graph, way)));
         if (!ins.isEmpty()) out.append(indent).append("  ").append(String.join("; ", ins)).append('\n');
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());
@@ -254,17 +260,21 @@ public final class MapReport {
     }
 
     /**
-     * How a way in reads: its input's field, and the copy, the look and the method it needs: {@code shop (badge,
-     * while F::on)}.
+     * How a way in reads: by its input's field, and the copy, the look and the method it needs: {@code by shop (badge,
+     * while F::on)}; {@code on its own} for one with no input.
      */
     private static String way(ScreenGraph graph, Way way) {
+        if (way.isOnItsOwn()) {
+            String when = ScreenTypes.sourceOf(way.when());
+            return "on its own" + (when.isEmpty() ? "" : " (while " + when + ")");
+        }
         List<String> needs = new ArrayList<>();
         if (way.pick() != null) needs.add(way.pick().label());
         if (way.state() != null) needs.add(way.state().id());
         String when = ScreenTypes.sourceOf(way.when());
         if (!when.isEmpty()) needs.add("while " + when);
         String via = graph.nameOf(way.via()).map(n -> n.field()).orElse(way.via() == null ? "?" : way.via().label());
-        return via + (needs.isEmpty() ? "" : " (" + String.join(", ", needs) + ")");
+        return "by " + via + (needs.isEmpty() ? "" : " (" + String.join(", ", needs) + ")");
     }
 
     /** What the map cannot do, one line each. */

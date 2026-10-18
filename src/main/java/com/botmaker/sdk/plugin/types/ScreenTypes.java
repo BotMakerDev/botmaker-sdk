@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
@@ -44,15 +45,16 @@ public final class ScreenTypes {
     /**
      * {@code Setup.named(String)} and its links, each written only when the screen has it:
      * {@code .markers(List.of(…))}, {@code .absent(List.of(…))}, {@code .from(…)} (then {@code .fromPick(…)},
-     * {@code .fromLooks(…)}, {@code .fromWhen(…)} when its way needs them), {@code .alsoFrom(List.of(…))},
-     * {@code .back(…)}, {@code .variants(List.of(…))}, {@code .popup()}, … and {@code .at(new Point(…))} once its card
-     * was moved on 🗺 Screens' map.
+     * {@code .fromLooks(…)}, {@code .fromWhen(…)} when its way needs them) or {@code .after(…)} on its own,
+     * {@code .alsoFrom(List.of(…))}, {@code .back(…)}, {@code .variants(List.of(…))}, {@code .popup()},
+     * {@code .start()}, {@code .loads(…)}, … and {@code .at(new Point(…))} once its card was moved on 🗺 Screens' map.
      */
     public static final DeclaredCall<Setup> SETUP_SHAPE = ComponentType.part(Setup.class)
             .<String, Setup>writtenAs(Setup::named, Setup::name)
             .<List<ImageTemplate>>with(Setup::markers, Setup::markers)
             .<List<ImageTemplate>>with(Setup::absent, Setup::absent)
             .<Input>with(Setup::from, Setup::fromInput)
+            .<Screen>with(Setup::after, Setup::fromAfter)
             .<Pick>with(Setup::fromPick, setup -> setup.from() == null ? null : setup.from().pick())
             .<State>with(Setup::fromLooks, setup -> setup.from() == null ? null : setup.from().state())
             .<BooleanSupplier>with(Setup::fromWhen, Parts.SETUP_FROM_WHEN.part(ScreenTypes::condition))
@@ -60,6 +62,8 @@ public final class ScreenTypes {
             .<Input>with(Setup::back, Setup::back)
             .<List<ScreenVariant>>with(Setup::variants, Setup::variants)
             .flag(Setup::popup, Setup::isPopup)
+            .flag(Setup::start, Setup::isStart)
+            .<Duration>with(Setup::loads, Setup::loads)
             .<String>with(Setup::notes, Setup::notes)
             .<Reached>with(Setup::reached, Setup::reached)
             .<List<String>>with(Setup::owes, Setup::owes)
@@ -88,7 +92,14 @@ public final class ScreenTypes {
             .<Input, Way>writtenAs(Way::of, Way::via)
             .<Pick>with(Way::pick, Way::pick)
             .<State>with(Way::whenLooks, Way::state)
-            .<BooleanSupplier>with(Way::when, Parts.WAY_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Way::when, Parts.WAY_WHEN.part(ScreenTypes::condition))
+            .when(way -> !way.isOnItsOwn());
+
+    /** {@code Way.onItsOwn(Screen)}: the screen follows that one by itself, and {@code .when(…)} when it needs it. */
+    public static final DeclaredCall<Way> WAY_ON_ITS_OWN_SHAPE = ComponentType.part(Way.class)
+            .<Screen, Way>writtenAs(Way::onItsOwn, Way::after)
+            .<BooleanSupplier>with(Way::when, Parts.WAY_WHEN.part(ScreenTypes::condition))
+            .when(Way::isOnItsOwn);
 
     /**
      * {@code ScreenVariant.named(String)} and its links: {@code .markers(List.of(…))}, {@code .absent(List.of(…))},
@@ -222,7 +233,7 @@ public final class ScreenTypes {
             .when(pick -> pick.mode() == Pick.Mode.UNTIL);
 
     /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
-    public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
+    public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
             BUTTON_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE,
             SCROLL_SHAPE, SCROLL_DRAG_SHAPE,
             PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE, PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE);

@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -246,8 +247,11 @@ final class ScreenPanel {
     /** A way in, said: from the screen it leaves by its input, and the method it is open only while. */
     private String wayText(Way way) {
         String when = ScreenTypes.sourceOf(way.when());
-        return graph.nameOf(way.via()).map(n -> "from " + graph.shown(n.screen()) + " by " + n.field())
-                .orElse("by " + way.via().label()) + (when.isEmpty() ? "" : " · while " + when);
+        String how = way.isOnItsOwn() ? "after " + graph.onScreen(way).map(graph::shown).orElse("a screen not in "
+                + "the map") + ", on its own"
+                : graph.nameOf(way.via()).map(n -> "from " + graph.shown(n.screen()) + " by " + n.field())
+                .orElse("by " + way.via().label());
+        return how + (when.isEmpty() ? "" : " · while " + when);
     }
 
     /**
@@ -323,6 +327,7 @@ final class ScreenPanel {
         name.getStyleClass().add("screen-panel-name");
         name.setWrapText(true);
         Label path = new Label(card.popup() ? "a popup, opened by the game itself"
+                : card.start() ? "the start screen: the game opens on it"
                 : String.join(" › ", ScreenCards.path(graph, selected)));
         path.getStyleClass().add("screen-panel-path");
         path.setWrapText(true);
@@ -598,7 +603,8 @@ final class ScreenPanel {
     private Node waysIn(String constant, MapScreen screen, boolean popup) {
         VBox ways = new VBox(6);
         if (screen.ways().isEmpty()) {
-            ways.getChildren().add(text(popup ? "None: the game opens it on its own." : "None: the first screen."));
+            ways.getChildren().add(text(popup ? "None: the game opens it on its own."
+                    : screen.isStart() ? "None: the game opens on it." : "None: the first screen."));
         }
         for (Way way : screen.ways()) {
             Label said = new Label(wayText(way));
@@ -608,7 +614,9 @@ final class ScreenPanel {
             HBox.setHgrow(said, Priority.ALWAYS);
             HBox line = new HBox(8, said);
             if (way == screen.from()) line.getChildren().add(pill("how it was found", "screen-pill-plain"));
-            graph.nameOf(way.via()).ifPresent(n -> {
+            // A way on its own is named by the screen it follows, with no field.
+            (way.isOnItsOwn() ? graph.onScreen(way).map(after -> new InputName(after, null))
+                    : graph.nameOf(way.via())).ifPresent(n -> {
                 Node menu = hands.wayMenu(constant, n.screen(), n.field(), ScreenTypes.sourceOf(way.when()));
                 menu.setDisable(busy);
                 line.getChildren().add(menu);
@@ -616,6 +624,12 @@ final class ScreenPanel {
             line.setAlignment(Pos.CENTER_LEFT);
             line.getStyleClass().add("screen-row");
             ways.getChildren().add(line);
+        }
+        if (!popup && !screen.isStart()) {
+            Button after = action("＋ After a screen, on its own…", MapGuide.ON_ITS_OWN,
+                    () -> hands.addWayOnItsOwn(constant));
+            after.setDisable(busy);
+            ways.getChildren().add(after);
         }
         return ways;
     }
@@ -702,8 +716,10 @@ final class ScreenPanel {
         canvas.select(link.from());
         Optional<Row> row = link.field() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
                 .filter(r -> r.field().equals(link.field())).findFirst();
-        row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(link.via() == null
-                ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
+        row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(!link.back() && link.via() == null
+                ? graph.shown(link.to()) + " shows by itself once " + graph.shown(link.from()) + " is done: nothing "
+                + "is pressed, and a walk waits up to " + graph.loadMs(link.from()) / 1000 + " s for it."
+                : link.via() == null ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
                 + "else Escape."
                 : link.label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
                 + "picture shows in 🖼 Manage Pictures."));

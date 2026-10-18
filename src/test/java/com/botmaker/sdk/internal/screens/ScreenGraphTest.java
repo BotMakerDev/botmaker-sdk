@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -440,5 +441,66 @@ class ScreenGraphTest {
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map")),
                 click("x").tried()));
         return ScreenGraph.of(screens);
+    }
+
+    /**
+     * The game opens on Loading, which Home follows on its own; Home's fight opens Entering battle, a transition that
+     * Battle follows on its own in 30 s at most.
+     */
+    static Map<String, MapScreen> loading() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("LOADING", screen(Setup.named("Loading").markers(marks("loading")).start()));
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")).after(BotConstants.screen("LOADING")),
+                click("fight")));
+        screens.put("ENTERING", screen(Setup.named("Entering battle").markers(marks("entering"))
+                .from(ref("HOME", "fight")).loads(Duration.ofSeconds(30))));
+        screens.put("BATTLE", screen(Setup.named("Battle").markers(marks("battle"))
+                .after(BotConstants.screen("ENTERING"))));
+        return screens;
+    }
+
+    @Test
+    void theStartScreenIsTheRootAndTheScreenAfterItFollowsOnItsOwn() {
+        ScreenGraph graph = ScreenGraph.of(loading());
+        assertEquals(Optional.of("LOADING"), graph.root(), "the start screen, though Home is declared without a way");
+        assertEquals(Optional.of("LOADING"), graph.parent("HOME"));
+        assertEquals(OptionalInt.of(1), graph.depth("HOME"));
+        assertTrue(graph.followsOnItsOwn("HOME"));
+        assertEquals(List.of("HOME"), graph.followers("LOADING"));
+        assertEquals(List.of("BATTLE"), graph.followers("ENTERING"));
+        assertEquals(ScreenGraph.Presence.ALWAYS, graph.presence("BATTLE"));
+        assertFalse(graph.noneCut("LOADING"), "a start screen has nothing to cut but its marker");
+        assertFalse(graph.unfinished("LOADING"));
+    }
+
+    @Test
+    void aWayOnItsOwnIsAnEdgeWithNoInputAndNoWayBack() {
+        ScreenGraph graph = ScreenGraph.of(loading());
+        ScreenGraph.Edge own = new ScreenGraph.Edge("LOADING", "HOME", null, null, false);
+        assertTrue(own.onItsOwn());
+        assertEquals("on its own", own.label());
+        assertTrue(graph.edges().contains(own));
+        assertTrue(graph.edges().stream().noneMatch(e -> e.back() && (e.to().equals("LOADING")
+                || e.to().equals("ENTERING"))), "the game never shows a loading screen again by going back");
+        assertEquals(List.of("HOME", "ENTERING", "BATTLE"), graph.pathTo("LOADING", "BATTLE", e -> true)
+                .orElseThrow().stream().map(ScreenGraph.Edge::to).toList());
+        assertEquals(30_000, graph.loadMs("ENTERING"));
+        assertEquals(60_000, graph.loadMs("LOADING"), "the default");
+    }
+
+    /** Past a transition the way back skips it, and home is where loading ends, never the start screen. */
+    @Test
+    void aScreenAfterATransitionGoesBackAboveItAndHomeIsWhereLoadingEnds() {
+        ScreenGraph graph = ScreenGraph.of(loading());
+        assertTrue(graph.edges().contains(new ScreenGraph.Edge("BATTLE", "HOME", null, null, true)),
+                "Battle goes back to Home, which opened Entering battle");
+        assertEquals(Optional.of("HOME"), graph.home());
+        Map<String, MapScreen> splash = loading();
+        splash.put("SPLASH", screen(Setup.named("Splash").markers(marks("splash"))
+                .after(BotConstants.screen("LOADING"))));
+        splash.put("HOME", screen(Setup.named("Home").markers(marks("home")).after(BotConstants.screen("SPLASH")),
+                click("fight")));
+        assertEquals(Optional.of("HOME"), ScreenGraph.of(splash).home(), "through Splash");
+        assertEquals(Optional.of("HOME"), ScreenGraph.of(firestone()).home(), "no start screen: the root");
     }
 }

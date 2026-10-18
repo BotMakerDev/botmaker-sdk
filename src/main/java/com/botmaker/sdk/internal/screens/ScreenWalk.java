@@ -32,6 +32,10 @@ import java.util.function.Predicate;
  * planned anew from there.
  * A way back with no input is the game's usual close button when the walk is given one, else Escape.
  *
+ * <p>A way on its own presses nothing: the walk waits for the screen after a loading screen or a transition, up to the
+ * time that one {@link ScreenGraph#loadMs loads in}, and ends {@link Outcome#STUCK} "stuck loading" when it is still
+ * shown then. A game just opened, showing no screen yet, is waited for as long as its start screen loads.
+ *
  * <p>What is not always there decides the answer when no way is open now: one only through an input that comes and
  * goes is {@link Outcome#NOT_NOW}, one only through a locked input {@link Outcome#LOCKED}, and none at all — the map
  * names a picture the game no longer shows — {@link Outcome#MISSING}, the sign the bot needs its Upkeep. Steps that
@@ -227,6 +231,7 @@ public final class ScreenWalk {
         String left = null;        // the screen the step to it was done on
         String uncovered = null;   // what cleared an overlay the map lacks, said once arrived
         boolean lookedAgain = false;
+        boolean waited = false;    // for a game still opening, once
         // Each step that misses may be tried once more before it counts as landing elsewhere.
         int most = graph.screens().size() * 2 + MOST_REPLANS * 2 + 1;
         for (int step = 0; step < most; step++) {
@@ -249,6 +254,16 @@ public final class ScreenWalk {
                 if (cleared.isPresent()) {
                     uncovered = covered(at, cleared.get());
                     continue;    // planned from a fresh look: this one is the covered frame
+                }
+            }
+            if (here.isEmpty() && at == null && !waited && graph.start().isPresent()) {
+                // A game just opened shows nothing of the map until it draws, nothing to clear: waited for, up to its
+                // start screen's load, once nothing else brought a screen of the map back.
+                waited = true;
+                Optional<BufferedImage> loaded = shows(graph.loadMs(graph.start().get()));
+                if (loaded.isPresent()) {
+                    frame = loaded;
+                    here = whereOn(loaded.get(), null);
                 }
             }
             if (here.isEmpty()) {
@@ -286,6 +301,14 @@ public final class ScreenWalk {
                     left = from;
                 }
                 continue;
+            }
+            // Nothing followed a loading screen or a transition in its time: the server or the connection, not the map.
+            // A loading screen with no marker is where the game still is while no screen of the map shows.
+            boolean marked = graph.screens().get(from).hasMarker();
+            if (next.onItsOwn() && reach.look().map(f -> whereOn(f, from)).filter(on -> on.isEmpty() && !marked
+                    || on.filter(from::equals).isPresent()).isPresent()) {
+                return new Result(Outcome.STUCK, from, walked, "Stuck loading on " + graph.shown(from) + ": "
+                        + graph.shown(next.to()) + " did not show in " + graph.loadMs(from) / 1000 + " s.");
             }
             // Planned once more from a fresh look before it counts as landing elsewhere: a click lost to lag, or one
             // the game took to pan its view (Firestone's Town, its first Tavern click after a start, 2026-10-17).
@@ -522,7 +545,7 @@ public final class ScreenWalk {
      */
     private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame, boolean search) {
         Input via = edge.via();
-        if (via == null) return true;
+        if (via == null) return Conditions.holds(edge.when());    // a way on its own may be open only while
         if (via.lock() != null) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
@@ -569,6 +592,7 @@ public final class ScreenWalk {
      * picture is not on {@code frame}.
      */
     private boolean perform(ScreenGraph.Edge edge, BufferedImage frame) {
+        if (edge.onItsOwn()) return true;    // nothing to press: arrives waits for it
         if (edge.via() == null) {
             if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
             return true;
@@ -600,7 +624,9 @@ public final class ScreenWalk {
      * Whether {@code edge} got somewhere within a step's time, a popup that shows meanwhile closed. A way in arrives
      * once its screen's markers show. A way back arrives once the screen left is gone and another of the map shows:
      * a panel's parent stays in view under it, and a screen opened from another than its parent in the tree (an
-     * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15).
+     * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15). A way on its
+     * own is given the time the screen it leaves {@link ScreenGraph#loadMs loads in}, not a step's. A way into a
+     * transition arrives too once a screen after it shows: the game may have shown the transition too briefly to see.
      */
     private boolean arrives(ScreenGraph.Edge edge) {
         MapScreen screen = graph.screens().get(edge.to());
@@ -610,17 +636,30 @@ public final class ScreenWalk {
             reach.pause(POLL_MS);
             return true;    // a screen with no marker cannot be told: the walk takes it as reached, or left
         }
-        long deadline = reach.nowMs() + stepMs;
+        List<Markers> after = edge.back() ? List.of() : graph.followers(edge.to()).stream()
+                .map(c -> Markers.of(graph.screens().get(c))).filter(Markers::any).toList();
+        long deadline = reach.nowMs() + (edge.onItsOwn() ? graph.loadMs(edge.from()) : stepMs);
         do {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isPresent() && (edge.back() ? !left.on(reach, frame.get()) && (!screen.hasMarker()
                     || whereOn(frame.get(), edge.to()).filter(c -> !c.equals(edge.from())).isPresent())
-                    : shows.on(reach, frame.get()))) {
+                    : shows.on(reach, frame.get()) || after.stream().anyMatch(m -> m.on(reach, frame.get())))) {
                 return true;
             }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
         return false;
+    }
+
+    /** The first look within {@code ms} that shows a screen of the map, popups closed; empty when none did. */
+    private Optional<BufferedImage> shows(long ms) {
+        long deadline = reach.nowMs() + ms;
+        do {
+            reach.pause(POLL_MS);
+            Optional<BufferedImage> frame = closePopups(reach.look());
+            if (frame.isPresent() && whereOn(frame.get(), null).isPresent()) return frame;
+        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        return Optional.empty();
     }
 
     /** The popup whose marker {@code frame} shows, if any: what {@link #whereOn} leaves out. */

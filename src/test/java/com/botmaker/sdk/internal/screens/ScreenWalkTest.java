@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
@@ -83,7 +84,9 @@ class ScreenWalkTest {
 
     /** The game: which screen shows, a popup over it, and what each input on each screen leads to. */
     private static final class Game implements Reach {
-        final ScreenGraph map = map();
+        final ScreenGraph map;
+        /** What the game shows on its own from a time on: Home once loading is done. */
+        final TreeMap<Long, String> timeline = new TreeMap<>();
         final Map<String, Set<String>> shows = new HashMap<>();
         final Map<String, String> leads = new HashMap<>();
         /** What an input brings into view on the screen it is done on: a list scrolled. */
@@ -105,6 +108,11 @@ class ScreenWalkTest {
         int deaf;
 
         Game(String screen) {
+            this(screen, map());
+        }
+
+        Game(String screen, ScreenGraph map) {
+            this.map = map;
             this.screen = screen;
             map.screens().forEach((c, s) -> {
                 Set<String> on = new HashSet<>();
@@ -131,6 +139,7 @@ class ScreenWalkTest {
         }
 
         private String showing() {
+            while (!timeline.isEmpty() && timeline.firstKey() <= now) screen = timeline.pollFirstEntry().getValue();
             return overlay ? OVERLAY : popup != null ? popup : screen;
         }
 
@@ -947,5 +956,75 @@ class ScreenWalkTest {
         assertEquals(List.of(true, false, false), on);
         // Each marker once near its place, then each absent picture once anywhere.
         assertEquals(List.of("a", "b", "b"), looked);
+    }
+
+    /** The game over {@link ScreenGraphTest#loading}: Loading, Home on its own, Home's fight to a transition. */
+    private static Game loading(String on) {
+        Game game = new Game(on, ScreenGraph.of(ScreenGraphTest.loading()));
+        game.leads.put("HOME click fight", "ENTERING");
+        return game;
+    }
+
+    @Test
+    void aWalkWaitsOnTheStartScreenForTheScreenAfterItPressingNothing() {
+        Game game = loading("LOADING");
+        game.timeline.put(20_000L, "HOME");
+        List<String> reached = new ArrayList<>();
+        ScreenWalk.Result result = go(game, "HOME", reached);
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of(), game.done, "nothing pressed");
+        assertEquals(List.of("LOADING", "HOME"), reached);
+        assertTrue(game.now >= 20_000 && game.now < 60_000, "waited past a step's time: " + game.now);
+    }
+
+    @Test
+    void aStartScreenStillShownOnceItsTimeIsUpIsStuckLoading() {
+        Game game = loading("LOADING");
+        ScreenWalk.Result result = go(game, "HOME", new ArrayList<>());
+        assertEquals(ScreenWalk.Outcome.STUCK, result.outcome());
+        assertEquals("Stuck loading on Loading: Home did not show in 60 s.", result.why());
+        assertEquals(List.of(), game.done);
+    }
+
+    @Test
+    void aTransitionTheGameShowedTooBrieflyToSeeIsPassed() {
+        Game game = loading("HOME");
+        game.leads.put("HOME click fight", "BATTLE");    // Entering battle came and went between two looks
+        ScreenWalk.Result result = go(game, "BATTLE", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of("click fight"), game.done);
+    }
+
+    @Test
+    void aTransitionIsWaitedForAsLongAsItSays() {
+        Game game = loading("HOME");
+        game.timeline.put(25_000L, "BATTLE");
+        ScreenWalk.Result result = go(game, "BATTLE", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        Game slow = loading("ENTERING");
+        ScreenWalk.Result stuck = go(slow, "BATTLE", new ArrayList<>());
+        assertEquals("Stuck loading on Entering battle: Battle did not show in 30 s.", stuck.why());
+    }
+
+    @Test
+    void aWayOnItsOwnWhoseMethodSaysNoIsNotTaken() {
+        Map<String, MapScreen> screens = ScreenGraphTest.loading();
+        screens.put("HOME", screens.get("HOME").setup(s -> s.fromWay(Way.onItsOwn(BotConstants.screen("LOADING"))
+                .when(() -> false))));
+        Game game = new Game("LOADING", ScreenGraph.of(screens));
+        game.timeline.put(1_000L, "HOME");
+        ScreenWalk.Result result = go(game, "HOME", new ArrayList<>());
+        assertFalse(result.arrived(), result.why());
+        assertTrue(game.now < 1_000, "nothing waited for: " + game.now);
+    }
+
+    @Test
+    void aGameJustOpenedIsWaitedForUntilItsStartScreenShows() {
+        Game game = loading("NOTHING");    // drawing nothing of the map yet
+        game.timeline.put(5_000L, "LOADING");
+        game.timeline.put(15_000L, "HOME");
+        ScreenWalk.Result result = go(game, "HOME", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of(), game.done);
     }
 }

@@ -109,6 +109,10 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         return setup.isPopup();
     }
 
+    public boolean isStart() {
+        return setup.isStart();
+    }
+
     public String notes() {
         return setup.notes();
     }

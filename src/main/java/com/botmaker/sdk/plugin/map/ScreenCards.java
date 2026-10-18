@@ -60,7 +60,7 @@ final class ScreenCards {
      * @param at        where its card was moved to, null for where the layout puts it
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
-                ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
+                boolean start, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
 
         /** Whether it shows only at times, or is locked: drawn dashed. */
         boolean conditional() {
@@ -78,6 +78,7 @@ final class ScreenCards {
         /** How the link's input reads; a way back with none of its own reads as the default one. */
         String label() {
             if (field != null) return field;
+            if (!back && via == null) return "on its own, once " + from + " is done loading";
             return via == null ? "the default way back (a close button, then Escape)" : via.label();
         }
     }
@@ -191,19 +192,21 @@ final class ScreenCards {
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
         return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
-                said, shape, screen.isPopup(), graph.presence(constant), tried, fields.size(),
+                said, shape, screen.isPopup(), screen.isStart(), graph.presence(constant), tried, fields.size(),
                 stage == null ? "" : stage, screen.at());
     }
 
     /**
      * {@code card}'s pills, as its card, the side panel, the constant view and read_map all say them: how far it got,
-     * its shape, popup, whether it is reached only at times or is locked, and the stage its notes say it reached.
+     * its shape, popup or start screen, whether it is reached only at times or is locked, and the stage its notes say
+     * it reached.
      */
     static List<Pill> pills(Card card) {
         List<Pill> pills = new ArrayList<>();
         pills.add(new Pill(card.said(), "screen-pill-" + card.state().name().toLowerCase(Locale.ROOT)));
         if (!card.shape().isEmpty()) pills.add(new Pill(card.shape(), "screen-pill-plain"));
         if (card.popup()) pills.add(new Pill("popup", "screen-pill-plain"));
+        if (card.start()) pills.add(new Pill("start screen", "screen-pill-plain"));
         if (card.conditional()) pills.add(new Pill(card.presence().name().toLowerCase(Locale.ROOT), "screen-pill-plain"));
         if (!card.stage().isEmpty()) pills.add(new Pill(card.stage(), "screen-pill-stage"));
         return pills;
@@ -216,8 +219,11 @@ final class ScreenCards {
         for (ScreenGraph.Edge edge : graph.edges()) {
             MapScreen to = graph.screens().get(edge.to());
             Optional<InputName> tree = graph.nameOf(to.fromInput());
-            boolean entrance = !edge.back() && edge.input() != null
-                    && tree.filter(n -> n.screen().equals(edge.from()) && n.field().equals(edge.input())).isPresent()
+            // A screen that follows another on its own is entered by that edge, which has no input.
+            boolean own = edge.onItsOwn() && graph.followsOnItsOwn(edge.to())
+                    && graph.parent(edge.to()).filter(edge.from()::equals).isPresent();
+            boolean entrance = (own || !edge.back() && edge.input() != null
+                    && tree.filter(n -> n.screen().equals(edge.from()) && n.field().equals(edge.input())).isPresent())
                     && entered.add(edge.to());
             links.add(new Link(edge.from(), edge.to(), edge.input(), edge.via(), entrance, edge.back(),
                     edge.when() == null ? "" : ScreenTypes.sourceOf(edge.when()),

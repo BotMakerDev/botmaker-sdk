@@ -27,6 +27,7 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -309,6 +310,93 @@ public final class ScreenEdits {
                 popup ? "A popup now." : "No longer a popup.");
     }
 
+    /**
+     * Makes {@code constant} the screen the game opens on, its loading screen ({@code start} true), or no start screen
+     * any more. Refused for one with a way in: the game opens on it, so nothing leads into it. Another start screen
+     * loses its mark in the same step of Studio's undo: the map has one.
+     */
+    public static String setStart(StudioServices services, String constant, boolean start) {
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen screen = graph.screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        if (!start) return said(ScreenBook.update(services, constant, s -> s.setup(Setup::notStart)),
+                "No longer the start screen.");
+        if (screen.isPopup()) {
+            return NOT_WRITTEN + graph.shown(constant) + " is a popup, opened over any screen: make it a screen of "
+                    + "the tree first.";
+        }
+        if (!screen.ways().isEmpty()) {
+            return NOT_WRITTEN + "the game opens on a start screen, so no way leads into it: take "
+                    + graph.shown(constant) + "'s ways in off first.";
+        }
+        Optional<String> was = graph.start().filter(c -> !c.equals(constant));
+        Optional<String> failed = ScreenBook.step(services, "Make " + graph.shown(constant) + " the start screen",
+                () -> was.flatMap(c -> ScreenBook.update(services, c, s -> s.setup(Setup::notStart)))
+                        .or(() -> ScreenBook.update(services, constant, s -> s.setup(Setup::start))));
+        return said(failed, "The game opens on " + graph.shown(constant) + " now"
+                + was.map(c -> "; " + graph.shown(c) + " is no start screen any more.").orElse(".")
+                + " Give the screen after it a way on its own.");
+    }
+
+    /**
+     * Gives the screen that follows {@code constant} on its own {@code seconds} to show before a walk calls the game
+     * stuck loading; 0 for the default, {@link Setup#LOADS}.
+     */
+    public static String setLoads(StudioServices services, String constant, int seconds) {
+        if (seconds < 0 || seconds > 3600) return NOT_WRITTEN + "give it 1 to 3600 seconds, or 0 for the default.";
+        Duration loads = seconds == 0 ? null : Duration.ofSeconds(seconds);
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.loads(loads))),
+                "The screen after it is given " + (loads == null ? Setup.LOADS : loads).toSeconds() + " s to show.");
+    }
+
+    /** Adds the screen the game opens on, called {@code name}: a start screen with no way in, owing its marker. */
+    public static String newStartScreen(StudioServices services, String name) {
+        if (name == null || !MapTools.isName(name.strip())) return NOT_WRITTEN + "name it in plain words, on one line.";
+        ScreenGraph graph = ScreenBook.read(services);
+        if (ScreenBook.find(graph, name.strip()).isPresent()) {
+            return NOT_WRITTEN + "the map has " + name.strip() + " already.";
+        }
+        Optional<String> was = graph.start();
+        if (was.isPresent()) return NOT_WRITTEN + "the game opens on " + graph.shown(was.get()) + " already.";
+        String constant = ScreenBook.constantFor(graph, name.strip());
+        return said(ScreenBook.add(services, constant, MapScreen.of(Setup.named(name.strip()).start())),
+                "Added " + name.strip() + " as Screens." + constant + ", the screen the game opens on: it owes its "
+                        + "marker.");
+    }
+
+    /**
+     * Records that {@code to} follows {@code after} on its own, nothing pressed: Home once the loading screen is done.
+     * Its way in, when it has none, else one more.
+     */
+    public static String addWayOnItsOwn(StudioServices services, String to, String after) {
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen target = graph.screens().get(to);
+        MapScreen before = graph.screens().get(after);
+        if (target == null || before == null) {
+            return NOT_WRITTEN + "no screen " + (target == null ? to : after) + " in the map.";
+        }
+        if (to.equals(after)) return NOT_WRITTEN + "a screen does not follow itself.";
+        if (target.isPopup() || before.isPopup()) {
+            return NOT_WRITTEN + graph.shown(target.isPopup() ? to : after) + " is a popup, opened by the game "
+                    + "itself: it is followed by no screen of the tree.";
+        }
+        if (target.isStart()) return NOT_WRITTEN + graph.shown(to) + " is the start screen: nothing leads into it.";
+        if (graph.dependsOn(after).contains(to)) {
+            return NOT_WRITTEN + graph.shown(after) + " is reached through " + graph.shown(to) + ".";
+        }
+        if (target.ways().stream().anyMatch(way -> wayFrom(graph, way, after, null))) {
+            return NOT_WRITTEN + graph.shown(to) + " follows " + graph.shown(after) + " on its own already.";
+        }
+        Way way = Way.onItsOwn(BotConstants.screen(after));
+        return said(ScreenBook.update(services, to, s -> s.setup(x -> {
+                    if (x.from() == null) return x.fromWay(way);
+                    List<Way> also = new ArrayList<>(x.alsoFrom());
+                    also.add(way);
+                    return x.alsoFrom(also);
+                })),
+                graph.shown(to) + " follows " + graph.shown(after) + " on its own.");
+    }
+
     /** Puts {@code notes} on {@code constant}, over what it had; blank removes them. */
     public static String setNotes(StudioServices services, String constant, String notes) {
         return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.notes(notes == null ? null
@@ -499,6 +587,9 @@ public final class ScreenEdits {
         if (target.isPopup()) {
             return Optional.of(graph.shown(to) + " is a popup, opened by the game itself: no way leads into it.");
         }
+        if (target.isStart()) {
+            return Optional.of(graph.shown(to) + " is the screen the game opens on: no way leads into it.");
+        }
         if (graph.parent(from).filter(to::equals).isPresent()) {
             return Optional.of(graph.shown(to) + " is the screen above it: use " + viaField + " as its way back.");
         }
@@ -523,7 +614,8 @@ public final class ScreenEdits {
 
     /**
      * Takes {@code to}'s way in through {@code from}'s field {@code viaField} off the map: its next way in becomes the
-     * tree's when it was the tree's. Refused for a screen's only way in: the screen is deleted instead.
+     * tree's when it was the tree's. Refused for a screen's only way in through an input: the screen is deleted
+     * instead. A way on its own ({@code viaField} null) may go last: the screen is the first one again.
      */
     public static String removeWay(StudioServices services, String to, String from, String viaField) {
         ScreenGraph graph = ScreenBook.read(services);
@@ -531,13 +623,13 @@ public final class ScreenEdits {
         if (ways(screen).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
             return noWay(graph, to, from, viaField);
         }
-        if (screen.from() != null && withoutWay(graph, screen, from, viaField).ways().isEmpty()) {
+        if (viaField != null && screen.from() != null && withoutWay(graph, screen, from, viaField).ways().isEmpty()) {
             return NOT_WRITTEN + "that is " + graph.shown(to) + "'s only way in: delete " + graph.shown(to)
                     + " instead, or take it for a change of " + graph.shown(from) + " in place (not a screen).";
         }
         return said(ScreenBook.update(services, to, s -> withoutWay(graph, s, from, viaField)),
-                "Took " + graph.shown(to) + "'s way in from " + graph.shown(from) + " by " + viaField + " off the "
-                        + "map.");
+                "Took " + graph.shown(to) + "'s way in from " + graph.shown(from)
+                        + (viaField == null ? " on its own" : " by " + viaField) + " off the map.");
     }
 
     /** {@code screen} without its ways in through {@code from}'s {@code viaField}; the tree's is its next one. */
@@ -556,10 +648,13 @@ public final class ScreenEdits {
     }
 
     private static String noWay(ScreenGraph graph, String to, String from, String viaField) {
-        return NOT_WRITTEN + graph.shown(to) + " has no way in from " + graph.shown(from) + " by " + viaField + ".";
+        return NOT_WRITTEN + graph.shown(to) + " has no way in from " + graph.shown(from)
+                + (viaField == null ? " on its own." : " by " + viaField + ".");
     }
 
+    /** Whether {@code way} leaves {@code from} by its field {@code viaField}, or on its own ({@code viaField} null). */
     private static boolean wayFrom(ScreenGraph graph, Way way, String from, String viaField) {
+        if (viaField == null) return way.isOnItsOwn() && graph.onScreen(way).filter(from::equals).isPresent();
         return graph.nameOf(way.via()).filter(new InputName(from, viaField)::equals).isPresent();
     }
 

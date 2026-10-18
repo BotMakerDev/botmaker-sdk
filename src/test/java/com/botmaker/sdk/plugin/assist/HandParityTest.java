@@ -39,6 +39,7 @@ class HandParityTest {
             entry("Rename", Hand.now("⋯ Screen ▸ Rename…")),
             entry("Delete", Hand.now("⋯ Screen ▸ Delete…")),
             entry("Popup", Hand.now("⋯ Screen ▸ Popup")),
+            entry("Start", Hand.now("⋯ Screen ▸ Start screen; a new one: New screen… ▸ None: the game opens on it")),
             entry("NewScreen", Hand.now("⋯ input ▸ Result ▸ Opens a new screen…, ⋯ Screen ▸ New screen from here…")),
             entry("SetInput", Hand.now("the picked input's editors: result, information only, comes and goes, "
                     + "never, locked, a button's looks, repeated and cycles, a hotkey's key; ⋯ input")),
@@ -47,7 +48,8 @@ class HandParityTest {
             entry("UseAsBack", Hand.now("⋯ input ▸ Use as the way back")),
             entry("RemoveBack", Hand.now("the panel's Way back ✕")),
             entry("AddWay", Hand.now("⋯ input ▸ Result ▸ Leads to a screen on the map…, the picked input's Leads "
-                    + "to…")),
+                    + "to…; with no input, the panel's Ways in ▸ ＋ After a screen, on its own…, and its seconds the "
+                    + "followed screen's ⋯ Screen ▸ The next screen shows within…")),
             entry("RemoveWay", Hand.now("the panel's Ways in ⋯ ▸ Remove this way in")),
             entry("WayWhen", Hand.now("an arrow's menu ▸ Open only while")),
             entry("InputWhen", Hand.now("⋯ input ▸ Only there while")),

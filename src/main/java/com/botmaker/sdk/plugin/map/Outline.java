@@ -20,8 +20,9 @@ import java.util.stream.Stream;
 
 /**
  * 🗺 Screens' outline decided apart from JavaFX: the map as a text tree, each screen with its inputs under it and the
- * screen an input is the entrance of under that input, from the first screen; popups and screens the tree does not
- * reach in a group each (the user's call, 2026-10-18). A filter keeps what matches and the way down to it.
+ * screen an input is the entrance of under that input, from the first screen; a screen that follows another on its own
+ * (after the start screen, after a transition) next to it; popups and screens the tree does not reach in a group each (the user's call, 2026-10-18). A
+ * filter keeps what matches and the way down to it.
  */
 final class Outline {
 
@@ -110,41 +111,58 @@ final class Outline {
         Map<String, Card> byConstant = new HashMap<>();
         for (Card card : cards) byConstant.put(card.constant(), card);
         Map<String, String> entered = new HashMap<>();
+        // A screen that follows another on its own has no input to sit under: it comes next, beside it.
+        Map<String, List<String>> follow = new HashMap<>();
         for (Link link : links) {
             if (link.entrance() && link.field() != null) entered.put(link.from() + "." + link.field(), link.to());
+            if (link.entrance() && link.field() == null && !link.back()) {
+                follow.computeIfAbsent(link.from(), f -> new ArrayList<>()).add(link.to());
+            }
         }
-        Set<String> placed = new HashSet<>();
+        Layout tree = new Layout(graph, byConstant, entered, follow, new HashSet<>());
         List<Entry> top = new ArrayList<>();
         Optional<String> root = ScreenCards.root(graph).filter(byConstant::containsKey);
         root.ifPresent(r -> {
-            placed.add(r);
-            top.add(screen(graph, r, byConstant, entered, placed));
+            tree.placed().add(r);
+            top.addAll(tree.screens(r));
         });
         List<Entry> popups = new ArrayList<>();
         for (Card card : cards) {
-            if (card.popup() && placed.add(card.constant())) {
-                popups.add(screen(graph, card.constant(), byConstant, entered, placed));
-            }
+            if (card.popup() && tree.placed().add(card.constant())) popups.addAll(tree.screens(card.constant()));
         }
         List<Entry> unreached = new ArrayList<>();
         for (Card card : cards) {
-            if (placed.add(card.constant())) unreached.add(screen(graph, card.constant(), byConstant, entered, placed));
+            if (tree.placed().add(card.constant())) unreached.addAll(tree.screens(card.constant()));
         }
         if (!popups.isEmpty()) top.add(Entry.group(POPUPS, popups));
         if (!unreached.isEmpty()) top.add(Entry.group(UNREACHED, unreached));
         return List.copyOf(top);
     }
 
-    private static Entry screen(ScreenGraph graph, String constant, Map<String, Card> cards,
-                                Map<String, String> entered, Set<String> placed) {
-        List<Entry> inputs = new ArrayList<>();
-        for (Row row : ScreenCards.rows(graph, constant)) {
-            String to = entered.get(constant + "." + row.field());
-            List<Entry> under = to != null && cards.containsKey(to) && placed.add(to)
-                    ? List.of(screen(graph, to, cards, entered, placed)) : List.of();
-            inputs.add(Entry.input(constant, row, under));
+    /**
+     * The outline being laid out: the cards by constant, the screen each input is the entrance of, the screens that
+     * follow each on its own, and those placed so far.
+     */
+    private record Layout(ScreenGraph graph, Map<String, Card> cards, Map<String, String> entered,
+                        Map<String, List<String>> follow, Set<String> placed) {
+
+        /**
+         * {@code constant}, placed already, with its inputs and what they open under it, then each screen that follows
+         * it on its own, beside it: Battle after Entering battle.
+         */
+        List<Entry> screens(String constant) {
+            List<Entry> inputs = new ArrayList<>();
+            for (Row row : ScreenCards.rows(graph, constant)) {
+                String to = entered.get(constant + "." + row.field());
+                List<Entry> under = to != null && cards.containsKey(to) && placed.add(to) ? screens(to) : List.of();
+                inputs.add(Entry.input(constant, row, under));
+            }
+            List<Entry> all = new ArrayList<>(List.of(Entry.screen(cards.get(constant), inputs)));
+            for (String next : follow.getOrDefault(constant, List.of())) {
+                if (cards.containsKey(next) && placed.add(next)) all.addAll(screens(next));
+            }
+            return all;
         }
-        return Entry.screen(cards.get(constant), inputs);
     }
 
     /**

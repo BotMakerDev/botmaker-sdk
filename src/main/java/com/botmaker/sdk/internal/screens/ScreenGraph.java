@@ -64,7 +64,8 @@ public final class ScreenGraph {
      * back} edge with no input is the default way out: a close button, then Escape; one whose input is no field of
      * the screen has no {@code input}. {@code pick} is the copy of a repeated button it goes through, null for the
      * first; {@code state} the look of {@code via}'s button the edge needs ({@link Way#whenLooks}), null for any;
-     * {@code when} the method answering whether it leads there now ({@link Way#when}), null for always.
+     * {@code when} the method answering whether it leads there now ({@link Way#when}), null for always. A way in with
+     * no input is {@link #onItsOwn}: {@code to} follows {@code from} by itself, after a load ({@link Way#onItsOwn}).
      */
     public record Edge(String from, String to, String input, Input via, boolean back, Pick pick, State state,
                        BooleanSupplier when) {
@@ -73,9 +74,15 @@ public final class ScreenGraph {
             this(from, to, input, via, back, null, null, null);
         }
 
+        /** Whether it is taken by waiting: {@code to} follows {@code from} by itself, nothing pressed. */
+        public boolean onItsOwn() {
+            return !back && input == null && via == null;
+        }
+
         /** How it reads in a sentence: its field, else what its input acts on, else the way back. */
         public String label() {
             if (input != null) return pick == null ? input : input + " " + pick.label();
+            if (onItsOwn()) return "on its own";
             return via == null ? "the way back" : via.label();
         }
     }
@@ -126,12 +133,48 @@ public final class ScreenGraph {
     }
 
     /**
-     * The map's root: the first screen declared that is reached from none and is no popup — the game's home, which a
-     * run with no home method of its own walks to (2026-10-16). Empty for a map with none.
+     * The map's root: its {@link #start} screen, else the first screen declared that is reached from none and is no
+     * popup — the game's home, which a run with no home method of its own walks to (2026-10-16). Empty for a map with
+     * none.
      */
     public Optional<String> root() {
-        return screens.entrySet().stream().filter(e -> e.getValue().from() == null && !e.getValue().isPopup())
+        return start().or(() -> screens.entrySet().stream()
+                .filter(e -> e.getValue().from() == null && !e.getValue().isPopup())
+                .map(Map.Entry::getKey).findFirst());
+    }
+
+    /**
+     * The game's home, which a run with no home method of its own walks to: the {@link #root}, or, past a start
+     * screen, the screen its loading ends on (Home after Loading and Splash). Nothing leads back to a start screen.
+     */
+    public Optional<String> home() {
+        Optional<String> start = start();
+        if (start.isEmpty()) return root();
+        String at = start.get();
+        Set<String> seen = new HashSet<>(Set.of(at));
+        for (Optional<String> next = after(at); next.isPresent() && seen.add(next.get()); next = after(at)) {
+            at = next.get();
+        }
+        return Optional.of(at);
+    }
+
+    /** The first screen made known by following {@code constant} on its own, its tree's way in. */
+    private Optional<String> after(String constant) {
+        return screens.keySet().stream().filter(c -> followsOnItsOwn(c) && parent(c).filter(constant::equals)
+                .isPresent()).findFirst();
+    }
+
+    /** The screen the game opens on, its loading screen ({@link Setup#start}): the first declared so. */
+    public Optional<String> start() {
+        return screens.entrySet().stream().filter(e -> e.getValue().isStart() && !e.getValue().isPopup())
                 .map(Map.Entry::getKey).findFirst();
+    }
+
+    /** The screen {@code way} is on: the one its input is a field of, or the one it follows on its own. */
+    public Optional<String> onScreen(Way way) {
+        if (way == null) return Optional.empty();
+        if (way.isOnItsOwn()) return constantOf(way.after());
+        return nameOf(way.via()).map(InputName::screen);
     }
 
     /** The name the game shows for {@code constant}, or the constant when it has none. */
@@ -176,17 +219,50 @@ public final class ScreenGraph {
         return Optional.empty();
     }
 
-    /** The screen {@code constant} was made known from: the screen its {@code from} is an input of. */
+    /**
+     * The screen {@code constant} was made known from: the screen its {@code from} is an input of, or the one it
+     * follows on its own.
+     */
     public Optional<String> parent(String constant) {
-        return screen(constant).map(MapScreen::fromInput).flatMap(this::nameOf).map(InputName::screen);
+        return screen(constant).map(MapScreen::from).flatMap(this::onScreen);
     }
 
     /** Every screen a way into {@code constant} is on: its {@code from}'s, then each {@code alsoFrom}'s. */
     public Set<String> opensFrom(String constant) {
         Set<String> from = new LinkedHashSet<>();
-        screen(constant).ifPresent(screen -> screen.ways().forEach(way -> nameOf(way.via())
-                .ifPresent(name -> from.add(name.screen()))));
+        screen(constant).ifPresent(screen -> screen.ways().forEach(way -> onScreen(way).ifPresent(from::add)));
         return from;
+    }
+
+    /** Whether {@code constant} follows the screen it was made known from on its own: Home after the loading screen. */
+    public boolean followsOnItsOwn(String constant) {
+        return screen(constant).map(MapScreen::from).filter(Way::isOnItsOwn).isPresent();
+    }
+
+    /**
+     * How long the screen after {@code constant} may take to show when it follows on its own: the start screen's load,
+     * or a transition's ({@link Setup#loadTime}).
+     */
+    public long loadMs(String constant) {
+        return screen(constant).map(s -> s.setup().loadTime()).orElse(Setup.LOADS).toMillis();
+    }
+
+    /**
+     * The screens that follow {@code constant} on its own, and those that follow them in turn, nearest first: what the
+     * game shows once a transition is done, Battle after Entering battle (the user's call, 2026-10-18).
+     */
+    public List<String> followers(String constant) {
+        Set<String> found = new LinkedHashSet<>();
+        Deque<String> next = new ArrayDeque<>(List.of(constant));
+        while (!next.isEmpty() && found.size() < DEEPEST) {
+            String at = next.poll();
+            screens.forEach((c, screen) -> {
+                boolean follows = screen.ways().stream()
+                        .anyMatch(way -> way.isOnItsOwn() && onScreen(way).filter(at::equals).isPresent());
+                if (follows && !c.equals(constant) && found.add(c)) next.add(c);
+            });
+        }
+        return List.copyOf(found);
     }
 
     /** The screens {@code constant}'s ways in are on, and theirs in turn: every screen it is reached through. */
@@ -301,11 +377,13 @@ public final class ScreenGraph {
 
     /**
      * Whether {@code constant} has nothing cut on it: no input and no way back. A popup is never so: the game opens
-     * it, and its default way back (a close button, then Escape) is its way out.
+     * it, and its default way back (a close button, then Escape) is its way out. Nor is a start screen: the screen
+     * after it follows on its own.
      */
     public boolean noneCut(String constant) {
         MapScreen screen = screens.get(constant);
-        return fields(constant).isEmpty() && (screen == null || screen.back() == null && !screen.isPopup());
+        return fields(constant).isEmpty()
+                && (screen == null || screen.back() == null && !screen.isPopup() && !screen.isStart());
     }
 
     /**
@@ -415,10 +493,12 @@ public final class ScreenGraph {
             for (Map.Entry<String, MapScreen> e : screens.entrySet()) {
                 if (e.getValue().isPopup()) continue;
                 for (Way way : e.getValue().ways()) {
+                    Optional<String> on = onScreen(way);
+                    if (on.isEmpty()) continue;
                     Optional<InputName> via = nameOf(way.via());
-                    if (via.isEmpty()) continue;
-                    Presence through = worst(of(input(via.get().screen(), via.get().field()).orElse(null)),
-                            known.get(via.get().screen()));
+                    // A way on its own is as good as the screen it follows.
+                    Presence through = worst(of(via.flatMap(v -> input(v.screen(), v.field())).orElse(null)),
+                            known.get(on.get()));
                     if (through.ordinal() < known.get(e.getKey()).ordinal()) {
                         known.put(e.getKey(), through);
                         changed = true;
@@ -438,17 +518,37 @@ public final class ScreenGraph {
         return a.ordinal() >= b.ordinal() ? a : b;
     }
 
-    /** Every edge: each way in, then each way back to the screen a screen was made known from. */
+    /**
+     * Every edge: each way in, then each way back to the screen a screen was made known from. A way on its own is an
+     * edge with no input, and its way back skips what it followed: the game never shows a loading screen or a
+     * transition again, so Battle after Entering battle goes back to Home, which opened the transition, and Home after
+     * Loading has none.
+     */
     public List<Edge> edges() {
         List<Edge> edges = new ArrayList<>();
         screens.forEach((c, screen) -> {
             for (Way way : screen.ways()) {
+                if (way.isOnItsOwn()) {
+                    onScreen(way).ifPresent(after -> edges.add(new Edge(after, c, null, null, false, null, null,
+                            way.when())));
+                    continue;
+                }
                 nameOf(way.via()).ifPresent(via -> edges.add(new Edge(via.screen(), c, via.field(),
                         input(via.screen(), via.field()).orElseThrow(), false, way.pick(), way.state(), way.when())));
             }
-            if (!screen.isPopup()) parent(c).ifPresent(p -> edges.add(back(c, p)));
+            if (!screen.isPopup()) backTo(c).ifPresent(p -> edges.add(back(c, p)));
         });
         return edges;
+    }
+
+    /** Where {@code constant}'s way back leads: its parent, past each screen it followed on its own. */
+    private Optional<String> backTo(String constant) {
+        Optional<String> up = parent(constant);
+        Set<String> seen = new HashSet<>();
+        for (String at = constant; followsOnItsOwn(at) && up.isPresent() && seen.add(at); up = parent(at)) {
+            at = up.get();
+        }
+        return up;
     }
 
     /**

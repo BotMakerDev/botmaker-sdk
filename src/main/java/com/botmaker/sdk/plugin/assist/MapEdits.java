@@ -34,9 +34,9 @@ import java.util.stream.Stream;
  */
 final class MapEdits {
 
-    private static final String SCREEN = "the screen edited (Home or HOME); for new_screen the one it opens from";
+    private static final String SCREEN = "Home or HOME; new_screen: the one it opens from";
     private static final String PICTURE = "the input: its field (beerBuy) or picture";
-    private static final String SCROLL = "with picture, a strip scrolled over it by these notches";
+    private static final String SCROLL = "with picture: a strip's notches to it";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
     private static final String METHOD = "the bot's method true while it holds (Firestone::eventOn); blank: always";
@@ -65,37 +65,37 @@ final class MapEdits {
 
     @Describe("rename the screen")
     record Rename(@Describe(SCREEN) String screen,
-                  @Describe("the new name, or new_screen's, as the game shows it") String name) implements Edit {
+                  @Describe("the new name, or new_screen's, as shown") String name) implements Edit {
     }
 
     @Describe("delete the screen")
     record Delete(String screen) implements Edit {
     }
 
-    @Describe("a popup the game opens on its own, or a screen of the tree again")
+    @Describe("a popup the game opens itself, or not")
     record Popup(String screen, boolean popup)
             implements Edit {
     }
 
-    @Describe("set an input's result, info, never, lock, sometimes or repeated")
+    @Describe("the game opens on it (new if none so called), or not")
+    record Start(String screen, boolean start) implements Edit {
+    }
+
+    @Describe("an input's result, info, never, lock, sometimes, repeated")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
                     @Describe(value = KEY, optional = true) String key,
-                    @Describe(value = "what it does, opening nothing (one opening a new screen: new_screen)",
-                            optional = true) Result did,
-                    @Describe(value = "true when it only tells (help, rules): tried last",
-                            optional = true) Boolean info,
-                    @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
-                    @Describe(value = "the picture proving it locked; blank to clear it", optional = true)
-                    String locked,
-                    @Describe(value = "true when it shows only at times", optional = true) Boolean sometimes,
-                    @Describe(value = "true for a button shown more than once", optional = true)
-                    Boolean repeated)
+                    @Describe(value = "what it does, opening nothing (else new_screen)", optional = true) Result did,
+                    @Describe(value = "true: it only tells (help, rules), tried last", optional = true) Boolean info,
+                    @Describe(value = "why never clicked; blank clears", optional = true) String never,
+                    @Describe(value = "the picture proving it locked; blank clears", optional = true) String locked,
+                    @Describe(value = "true: shows only at times", optional = true) Boolean sometimes,
+                    @Describe(value = "true: a button shown more than once", optional = true) Boolean repeated)
             implements Edit, OfInput {
     }
 
-    @Describe("make an input untried again")
+    @Describe("an input untried again")
     record ResetInput(String screen, @Describe(value = "", optional = true) String picture,
                       @Describe(value = "", optional = true) Integer scroll,
                       @Describe(value = "", optional = true) String key) implements Edit, OfInput {
@@ -107,31 +107,32 @@ final class MapEdits {
                        @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("make an input the screen's way back")
+    @Describe("an input as its way back")
     record UseAsBack(String screen, @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("its way back made an untried input again")
+    @Describe("its way back an untried input again")
     record RemoveBack(String screen) implements Edit {
     }
 
-    @Describe("remove a way in: from, and its input")
+    @Describe("remove a way in: from, its input")
     record RemoveWay(String screen, @Describe(FROM) String from,
                      @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("add a way in: from's input leads here")
+    @Describe("a way in by from's input; or none + seconds (from's load, 0: 60): shows by itself after from")
     record AddWay(String screen, String from,
                   @Describe(value = "", optional = true) String picture,
                   @Describe(value = "", optional = true) Integer scroll,
-                  @Describe(value = "", optional = true) String key) implements Edit, OfInput {
+                  @Describe(value = "", optional = true) String key,
+                  @Describe(value = "", optional = true) Integer seconds) implements Edit, OfInput {
     }
 
-    @Describe("a way in (from, and its input) taken only while method holds")
+    @Describe("a way in (from, its input) open only while method holds")
     record WayWhen(String screen, String from,
                    @Describe(value = "", optional = true) String picture,
                    @Describe(value = "", optional = true) Integer scroll,
@@ -160,7 +161,7 @@ final class MapEdits {
     record Group(String screen, @Describe(value = "", optional = true) GroupKind kind,
                  @Describe(value = "its buttons' pictures, in order", optional = true) List<String> members,
                  @Describe(value = "drag: a tree only", optional = true) GroupScroll by,
-                 @Describe(value = "wheel notches a scroll, negative down", optional = true) Integer notches)
+                 @Describe(value = "wheel notches a scroll, - down", optional = true) Integer notches)
             implements Edit {
     }
 
@@ -170,13 +171,12 @@ final class MapEdits {
             implements Edit {
     }
 
-    @Describe("a look of the screen that shows only while method holds")
+    @Describe("a look shown only while method holds")
     record LookWhen(String screen, @Describe("the look's name") String look,
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a marker (all show), or with absent one it never shows where a look-alike does; refused when "
-            + "another shot shows the set")
+    @Describe("add a marker (all show), or absent: one it never shows; refused if another shot shows the set")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
                      @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
@@ -185,7 +185,7 @@ final class MapEdits {
     record RemoveMarker(String screen, String picture) implements Edit {
     }
 
-    @Describe("a screen the map lacks, opened by an input of screen (added untried)")
+    @Describe("a new screen, opened by an input of screen (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
@@ -223,6 +223,10 @@ final class MapEdits {
         StudioServices services = context.services();
         ScreenGraph graph = ScreenBook.read(services);
         Optional<String> found = ScreenBook.find(graph, edit.screen());
+        // A start screen the map lacks is added.
+        if (found.isEmpty() && edit instanceof Start start && start.start()) {
+            return said(ScreenEdits.newStartScreen(services, start.screen()));
+        }
         if (found.isEmpty()) {
             return AgentReply.refused("No screen " + edit.screen() + " in the bot's Screens. Nothing was written.");
         }
@@ -232,6 +236,7 @@ final class MapEdits {
             case Rename rename -> said(ScreenEdits.rename(services, screen, rename.name()));
             case Delete ignored -> said(ScreenEdits.delete(services, screen));
             case Popup popup -> said(ScreenEdits.setPopup(services, screen, popup.popup()));
+            case Start start -> said(ScreenEdits.setStart(services, screen, start.start()));
             case RemoveBack ignored -> said(ScreenEdits.removeBack(services, screen));
             case LookWhen look -> said(ScreenEdits.setLookWhen(services, screen, look.look(), method(look.method())));
             case AddWay way -> addWay(way, graph, screen, services);
@@ -322,6 +327,26 @@ final class MapEdits {
                 absent));
     }
 
+    /**
+     * add_way with no input: {@code screen} follows {@code after} by itself, a way in added unless it has it, then
+     * {@code way.seconds()} as how long {@code after} gives it.
+     */
+    private static AgentReply onItsOwn(AddWay way, ScreenGraph graph, String screen, String after,
+                                       StudioServices services) {
+        boolean follows = graph.screens().get(screen).ways().stream()
+                .anyMatch(w -> w.isOnItsOwn() && graph.onScreen(w).filter(after::equals).isPresent());
+        List<String> said = new ArrayList<>();
+        if (!follows) {
+            String added = ScreenEdits.addWayOnItsOwn(services, screen, after);
+            if (added.startsWith(ScreenEdits.NOT_WRITTEN)) return said(added);
+            said.add(added);
+        }
+        String loads = ScreenEdits.setLoads(services, after, way.seconds());
+        if (loads.startsWith(ScreenEdits.NOT_WRITTEN)) return said(loads);
+        said.add(loads);
+        return said(String.join(" ", said));
+    }
+
     /** {@code then} on the field of {@code on} that {@code named} names; refused when it names none. */
     private static AgentReply onInput(OfInput named, ScreenGraph graph, String screen, MapScreen on,
                                       Function<String, AgentReply> then) {
@@ -401,9 +426,14 @@ final class MapEdits {
             return AgentReply.refused((has(typedFrom) ? "No screen " + typedFrom.strip() + " in the bot's "
                     + "Screens" : "Give from, the screen the way in leaves") + ". Nothing was written.");
         }
+        List<Way> ways = graph.screens().get(screen).ways();
+        // A way on its own is named by its screen alone.
+        if (method == null && !has(named.picture()) && !has(named.key()) && ways.stream()
+                .anyMatch(w -> w.isOnItsOwn() && graph.onScreen(w).filter(from.get()::equals).isPresent())) {
+            return said(ScreenEdits.removeWay(services, screen, from.get(), null));
+        }
         String unnamed = unnamed(named);
         if (unnamed != null) return AgentReply.refused(unnamed);
-        List<Way> ways = graph.screens().get(screen).ways();
         List<InputName> leaving = ways.stream().map(w -> graph.nameOf(w.via())).flatMap(Optional::stream)
                 .filter(n -> n.screen().equals(from.get())).toList();
         Optional<String> via = leaving.stream()
@@ -426,6 +456,13 @@ final class MapEdits {
         if (from.isEmpty()) {
             return AgentReply.refused((has(edit.from()) ? "No screen " + edit.from().strip() + " in the bot's "
                     + "Screens" : "Give from, the screen the input is on") + ". Nothing was written.");
+        }
+        // No input, its seconds given: the screen shows by itself after from, a loading screen or a transition. With
+        // no seconds either, it is an input left out, refused below.
+        boolean input = has(edit.picture()) || has(edit.key()) || edit.scroll() != null;
+        if (!input && edit.seconds() != null) return onItsOwn(edit, graph, screen, from.get(), services);
+        if (input && edit.seconds() != null) {
+            return AgentReply.refused("seconds go with no input: a way that shows by itself. Nothing was written.");
         }
         return onInput(edit, graph, from.get(), graph.screens().get(from.get()),
                 field -> said(ScreenEdits.addWay(services, screen, from.get(), field)));

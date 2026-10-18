@@ -48,7 +48,9 @@ final class MapGuide {
     static final String ADD_MARKER = "One more marker from a picture the bot has, or a picture this screen never "
             + "shows where a look-alike does";
     static final String LEADS_TO = "Pick the screen of the map this input opens: one more way into it";
-    static final String REMOVE_BACK = "Take its own way back off: a walk then closes it by its close button, else "
+    static final String ON_ITS_OWN = "Pick the screen this one follows by itself, nothing pressed: Home after the "
+            + "loading screen, Battle after Entering battle. A walk waits for it, up to the time that screen loads in";
+    static final String REMOVE_BACK ="Take its own way back off: a walk then closes it by its close button, else "
             + "Escape";
 
     // --- the board, live ---

@@ -17,6 +17,38 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Added
+
+- **The start screen, and screens that follow on their own.** `Setup.start()` marks the screen the game opens on,
+  its loading screen: it has no way in, and the map's root is it. `.after(LOADING)` (`Way.onItsOwn`) is a way in
+  with no input: Home shows by itself once loading is done, and so does the screen after a transition (Battle
+  `.after(ENTERING_BATTLE)`, Entering battle opened by Map's Fight). A walk presses nothing on such a way: it waits
+  for the next screen, up to the screen it follows' `.loads(Duration)` (60 s by default), and a screen still
+  shown then ends it stuck: "Stuck loading on Loading: Home did not show in 60 s", server or connection trouble. A
+  transition the game shows too briefly to see is passed, and a game just opened, showing nothing of the map yet,
+  is waited for as long as its start screen loads.
+  - **🗺 Screens**: New screen… offers "None: the game opens on it"; ⋯ Screen has Start screen and The next screen
+    shows within…; Ways in has ＋ After a screen, on its own…. The card says "start screen", the outline puts a
+    screen that follows another on its own next to it, and read_map says who follows whom and in how long.
+  - **edit_map**: `start` (a new start screen when none is called so), and `add_way` with no input, given `seconds`.
+    `remove_way` from that screen with no input takes it off.
+
+### Changed
+
+- **🗺 Screens' cuts close, move and say why.**
+  - **A free shape** closes on a click on its first corner (drawn as a ring), on ✓ Close shape, a double-click or
+    Enter. The line under the board says how.
+  - **A drawn cut** is picked by a click (on its number, for a free shape): a drag moves it, its corners resize a
+    box or an oval, and Delete or ✕ Take it off removes it.
+  - **A save says what it answered** on the board itself, red when refused. A refused cut stays drawn to fix and
+    save again, and the cuts that saved are dropped.
+  - **The cut form and New screen** open again with the reason at the top instead of closing silently.
+- **🗺 Screens' ❄ Freeze names a new screen first.** A frame that shows no screen of the map offers New screen…
+  first; once it is written, the frame is that screen's and cutting starts on it, its marker first, so the cut form
+  offers it. New screen from here… on a known screen does the same.
+
 ## [1.5.0] — 2026-10-18
 
 ### Added
@@ -422,17 +454,6 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
-- **🗺 Screens' cuts close, move and say why.**
-  - **A free shape** closes on a click on its first corner (drawn as a ring), on ✓ Close shape, a double-click or
-    Enter. The line under the board says how.
-  - **A drawn cut** is picked by a click (on its number, for a free shape): a drag moves it, its corners resize a
-    box or an oval, and Delete or ✕ Take it off removes it.
-  - **A save says what it answered** on the board itself, red when refused. A refused cut stays drawn to fix and
-    save again, and the cuts that saved are dropped.
-  - **The cut form and New screen** open again with the reason at the top instead of closing silently.
-- **🗺 Screens' ❄ Freeze names a new screen first.** A frame that shows no screen of the map offers New screen…
-  first; once it is written, the frame is that screen's and cutting starts on it, its marker first, so the cut form
-  offers it. New screen from here… on a known screen does the same.
 - **🗺 Screens' picture window shows a picture or a tree's drawing, never a screen's shot**: a shot is shown big on
   the Screen tab's board, and a picture's "← <screen>" goes back there. The screens doc (`docs/architecture/screens.md`)
   has a *By hand* section: the outline, the board, Live and ❄ Freeze, the cuts and each input's editor.

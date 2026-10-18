@@ -60,14 +60,15 @@ public final class InstalledRun {
     }
 
     /**
-     * What gets the game home: the run's {@link Run#home()}, else a {@code Navigate.to} the map's root screen
-     * (2026-10-16), else {@code null} for nothing. Read at each call, so a map installed later counts. A walk to the
-     * root that does not arrive throws, so the run's recovery restarts the game rather than taking it as home.
+     * What gets the game home: the run's {@link Run#home()}, else a {@code Navigate.to} the map's home screen
+     * (2026-10-16; past a start screen, the one its loading ends on), else {@code null} for nothing. Read at each
+     * call, so a map installed later counts. A walk home that does not arrive throws, so the run's recovery restarts
+     * the game rather than taking it as home.
      */
     public static Runnable home() {
         if (current.home() != null) return current.home();
         ScreenGraph map = ScreenMaps.installed();
-        return map.root().flatMap(root -> map.instance(root).<Runnable>map(screen -> () -> {
+        return map.home().flatMap(root -> map.instance(root).<Runnable>map(screen -> () -> {
             if (!Navigate.to(screen)) {
                 throw new BotStuckException("The run could not walk home to " + map.shown(root) + ".");
             }

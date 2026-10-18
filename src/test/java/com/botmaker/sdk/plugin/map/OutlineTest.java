@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.map.Outline.Entry;
@@ -60,6 +61,24 @@ class OutlineTest {
             out.append("  ".repeat(depth)).append(entry.key()).append('\n');
             lines(entry.children(), depth + 1, out);
         }
+    }
+
+    /** A screen that follows another on its own sits beside it: Home after Loading, Battle after Entering battle. */
+    @Test
+    void aScreenThatFollowsOnItsOwnComesNextToTheOneItFollows() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")).after(BotConstants.screen("LOADING")),
+                click("fight")));
+        screens.put("LOADING", screen(Setup.named("Loading").markers(marks("loading")).start()));
+        screens.put("ENTERING", screen(Setup.named("Entering battle").from(ref("HOME", "fight"))));
+        screens.put("BATTLE", screen(Setup.named("Battle").after(BotConstants.screen("ENTERING"))));
+        assertEquals("""
+                LOADING
+                HOME
+                  HOME.fight
+                    ENTERING
+                    BATTLE
+                """, lines(outline(ScreenGraph.of(screens))));
     }
 
     @Test

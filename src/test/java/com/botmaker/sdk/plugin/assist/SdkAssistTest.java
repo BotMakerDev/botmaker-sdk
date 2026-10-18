@@ -69,6 +69,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -1645,6 +1646,47 @@ class SdkAssistTest {
         assertFalse(host.set("screen_map").containsKey("FORGE"));
         run("edit_map", "screen", "Home", "action", "remove_input", "picture", "tab");
         assertEquals(List.of("gem", "key_q", "keyW"), fields("HOME"));
+    }
+
+    /** edit_map's start screen, the screen after it on its own, and how long it may take (2026-10-18). */
+    @Test
+    void editMapMakesTheStartScreenAndTheScreenAfterIt() {
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("gem"))));
+        put("MINE", MapScreen.of(Setup.named("Mine").from(BotConstants.input("HOME", "gem"))));
+
+        assertTrue(text(run("edit_map", "action", "start", "screen", "Loading", "start", true))
+                .startsWith("Added Loading as Screens.LOADING, the screen the game opens on"));
+        assertTrue(screen("LOADING").isStart());
+        assertTrue(run("edit_map", "action", "start", "screen", "Splash", "start", true).isRefused(),
+                "one start screen");
+        assertTrue(run("edit_map", "action", "start", "screen", "Splash", "start", false).isRefused(),
+                "no screen called so");
+        AgentReply opened = run("edit_map", "screen", "Mine", "action", "start", "start", true);
+        assertTrue(opened.isRefused() && text(opened).contains("no way leads into it"), text(opened));
+
+        assertTrue(run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading").isRefused(),
+                "no input and no seconds: an input left out");
+        run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading", "seconds", 0);
+        assertEquals(BotConstants.screen("LOADING"), screen("HOME").setup().fromAfter());
+        assertTrue(run("edit_map", "screen", "Loading", "action", "add_way", "from", "Home", "seconds", 0)
+                .isRefused(), "nothing leads into the start screen");
+        assertTrue(run("edit_map", "screen", "Mine", "action", "add_way", "from", "Home", "picture", "gem",
+                "seconds", 5).isRefused(), "seconds go with no input");
+        assertTrue(run("edit_map", "screen", "Mine", "action", "add_way", "from", "Home", "picture", "gem")
+                .isRefused());
+
+        AgentReply slower = run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading",
+                "seconds", 90);
+        assertFalse(slower.isRefused(), "it follows it already: only its time is set");
+        assertEquals(Duration.ofSeconds(90), screen("LOADING").setup().loads());
+        run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading", "seconds", 0);
+        assertNull(screen("LOADING").setup().loads(), "the default");
+
+        assertTrue(text(run("edit_map", "screen", "Home", "action", "remove_way", "from", "Loading"))
+                .startsWith("Took Home's way in from Loading on its own off the map."));
+        assertNull(screen("HOME").from(), "the first screen again");
+        run("edit_map", "screen", "Loading", "action", "start", "start", false);
+        assertFalse(screen("LOADING").isStart());
     }
 
     /** edit_map group: a strip named by the screen's buttons in it, scrolled over a member that shows. */

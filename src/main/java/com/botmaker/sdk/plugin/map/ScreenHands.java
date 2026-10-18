@@ -11,7 +11,9 @@ import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
@@ -120,6 +122,21 @@ final class ScreenHands {
                     }
                     done.accept(ScreenEdits.addWay(services, to.getValue(), from, field));
                 });
+    }
+
+    /** Asks which screen {@code to} follows on its own, nothing pressed, and records that way in. */
+    void addWayOnItsOwn(String to) {
+        ScreenGraph map = graph.get();
+        ComboBox<String> after = screenPick(map, c -> !c.equals(to));
+        map.start().filter(c -> !c.equals(to)).ifPresent(after::setValue);
+        Modals.form(services, "After a screen, on its own", new VBox(8,
+                new Label(map.shown(to) + " shows by itself after"), after), () -> {
+            if (after.getValue() == null) {
+                done.accept("Pick the screen it follows.");
+                return;
+            }
+            done.accept(ScreenEdits.addWayOnItsOwn(services, to, after.getValue()));
+        });
     }
 
     // --- a screen's ways in, looks and markers ---
@@ -253,6 +270,16 @@ final class ScreenHands {
         CheckMenuItem popup = new CheckMenuItem("Popup (opens on its own)");
         popup.setSelected(screen != null && screen.isPopup());
         popup.setOnAction(e -> done.accept(ScreenEdits.setPopup(services, constant, popup.isSelected())));
+        CheckMenuItem start = new CheckMenuItem("Start screen (the game opens on it)");
+        start.setSelected(screen != null && screen.isStart());
+        start.setOnAction(e -> done.accept(ScreenEdits.setStart(services, constant, start.isSelected())));
+        MenuItem loads = item("The next screen shows within…", () -> askText("The next screen shows within",
+                "Seconds the screen following " + shown + " on its own may take (0: 60)",
+                screen == null || screen.setup().loads() == null ? "0"
+                        : String.valueOf(screen.setup().loads().toSeconds()),
+                typed -> done.accept(typed.matches("\\d{1,4}")
+                        ? ScreenEdits.setLoads(services, constant, Integer.parseInt(typed))
+                        : ScreenEdits.NOT_WRITTEN + "give a whole number of seconds.")));
         MenuItem shot = item("Retake its shot from the game", () -> retake.accept(constant));
         MenuItem place = item("Add pictures the bot has…", () -> placePictures(constant));
         MenuItem child = item("New screen from here…", () -> newScreen(constant, null));
@@ -260,7 +287,7 @@ final class ScreenHands {
                 ScreenEdits.notAScreen(new PanelContext(services, CaptureValue.current(services)), constant)));
         MenuItem delete = item("Delete…", () -> confirm("Delete " + shown, "Delete " + shown + " from the map? Its "
                 + "pictures stay.", () -> done.accept(ScreenEdits.delete(services, constant))));
-        return List.of(rename, popup, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
+        return List.of(rename, popup, start, loads, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
                 notScreen, delete);
     }
 
@@ -291,8 +318,9 @@ final class ScreenHands {
 
     /**
      * Asks for a new screen's name and the input of {@code parent} that opens it — {@code parent} null asks which
-     * screen that is too — and writes it; {@code proposed} is the input offered first, fixed when {@code fixed}.
-     * {@code made} gets the new screen's name once written: the live board keeps its frozen frame as its shot.
+     * screen that is too, or none: the game opens on it — and writes it; {@code proposed} is the input offered first,
+     * fixed when {@code fixed}. {@code made} gets the new screen's name once written: the live board keeps its frozen
+     * frame as its shot.
      */
     void newScreen(String parent, String proposed, boolean fixed, Consumer<String> made) {
         ScreenGraph map = graph.get();
@@ -300,23 +328,34 @@ final class ScreenHands {
         name.setPromptText("its name, as the game shows it");
         ComboBox<String> from = screenPick(map, c -> true);
         from.setValue(parent);
-        from.setDisable(parent != null);
         ComboBox<String> input = new ComboBox<>();
         // Its looks' inputs too: a button only one look of the screen has opens screens as well.
         Consumer<String> fields = on -> input.getItems().setAll(on == null ? List.of() : map.fields(on));
         fields.accept(parent);
         from.valueProperty().addListener((o, was, is) -> fields.accept(is));
         input.setValue(proposed);
-        input.setDisable(fixed);
         Label wrong = new Label();
         wrong.setWrapText(true);
         wrong.setStyle("-fx-text-fill: -bm-severity-error;");
         wrong.managedProperty().bind(wrong.visibleProperty());
         wrong.setVisible(false);
-        VBox body = new VBox(8, wrong, new Label("Name"), name, new Label("Opened from"), from, new Label("by"), input);
+        // The screen the game opens on is opened from none: only offered while no screen is picked for it.
+        CheckBox opensOn = new CheckBox("None: the game opens on it");
+        opensOn.setDisable(parent != null || map.start().isPresent());
+        from.disableProperty().bind(opensOn.selectedProperty().or(new SimpleBooleanProperty(parent != null)));
+        input.disableProperty().bind(opensOn.selectedProperty().or(new SimpleBooleanProperty(fixed)));
+        VBox body = new VBox(8, wrong, new Label("Name"), name, new Label("Opened from"), opensOn, from,
+                new Label("by"), input);
         askNewScreen(body, wrong, () -> {
             if (name.getText().isBlank()) return "Give it a name, as the game shows it.";
-            if (from.getValue() == null) return "Pick the screen it is opened from.";
+            if (opensOn.isSelected()) {
+                String said = ScreenEdits.newStartScreen(services, name.getText());
+                if (said.startsWith(ScreenEdits.NOT_WRITTEN)) return said;
+                done.accept(said);
+                made.accept(name.getText().strip());
+                return null;
+            }
+            if (from.getValue() == null) return "Pick the screen it is opened from, or none: the game opens on it.";
             if (input.getValue() == null) return "Pick the input that opens it.";
             String said = ScreenEdits.newScreen(services, from.getValue(), name.getText(), input.getValue(), null);
             if (said.startsWith(ScreenEdits.NOT_WRITTEN)) return said;
