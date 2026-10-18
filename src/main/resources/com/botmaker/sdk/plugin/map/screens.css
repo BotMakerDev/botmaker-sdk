@@ -117,6 +117,19 @@
     -fx-stroke-width: 3;
 }
 
+/* The live board: the inputs of the screen the game shows, boxed thin over the game; the screen it shows in the outline. */
+.screen-live-box {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-screen-here;
+    -fx-stroke-width: 1;
+    -fx-stroke-dash-array: 4 3;
+}
+
+.screen-outline-screen:here {
+    -fx-text-fill: -bm-screen-here;
+    -fx-font-weight: bold;
+}
+
 /* A list drawn whole over the place it sits on the shot: every member's picture, the wheel scrolling it. */
 .screen-strip,
 .screen-strip > .viewport {

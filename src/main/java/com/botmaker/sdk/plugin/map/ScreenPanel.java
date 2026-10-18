@@ -94,6 +94,8 @@ final class ScreenPanel {
     private final Map<String, Audit> audits = new HashMap<>();
     /** The selected screen big, in the window's Screen tab; the panel draws it as it draws itself. */
     private final ScreenBoard board = new ScreenBoard();
+    /** The game live on the board, and frames frozen off it. */
+    private final LiveBoard live;
     private final Runnable showBoard;
     private final BiConsumer<String, String> inputPicked;
     /** The field of the selected screen's input picked on the board or the outline; null for none. */
@@ -103,9 +105,10 @@ final class ScreenPanel {
      * @param changed     run once an action wrote the map, so the window reads it at once rather than at its next poll
      * @param showBoard   brings the Screen tab to the front
      * @param inputPicked an input picked here, by its screen's constant and its field
+     * @param liveOn      the screen the live board sees the game on, to light; null for none
      */
     ScreenPanel(StudioServices services, ScreenCanvas canvas, Supplier<Window> owner, Runnable changed,
-                Runnable showBoard, BiConsumer<String, String> inputPicked) {
+                Runnable showBoard, BiConsumer<String, String> inputPicked, Consumer<String> liveOn) {
         this.services = services;
         this.canvas = canvas;
         this.owner = owner;
@@ -114,6 +117,7 @@ final class ScreenPanel {
         this.inputPicked = inputPicked;
         viewer = new PictureView(services, owner);
         hands = new ScreenHands(services, () -> graph, this::wrote);
+        live = new LiveBoard(services, board, hands, () -> graph, this::wrote, canvas::select, liveOn);
         content.getStyleClass().add("screen-panel");
         content.setPadding(new Insets(PADDING));
         content.setFillWidth(true);
@@ -138,6 +142,17 @@ final class ScreenPanel {
     /** The project this panel was of is closed: nothing on it acts any more. */
     void closed() {
         root.setDisable(true);
+        live.close();
+    }
+
+    /** The Screen tab was left: the live board stops reading the game. */
+    void boardHidden() {
+        live.pause();
+    }
+
+    /** The window closed: the live board stops reading the game and lets its input thread go. */
+    void stopLive() {
+        live.close();
     }
 
     Node node() {

@@ -8,9 +8,11 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
+import java.awt.image.BufferedImage;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -87,6 +89,37 @@ public final class ScreenDesk {
         Optional<Markers> before = marker ? MapTools.markers(services, constant) : Optional.empty();
         String noted = MapTools.noteCut(services, at, picture, marker ? MapTools.Mark.ADD : null, false, false);
         return (noted + before.map(b -> MapTools.unique(services, constant, b)).orElse("")).strip();
+    }
+
+    /** Which screen of the map a frame shows, by its markers, and the popup over it; each null for none. */
+    public record Here(String screen, String popup) {}
+
+    /**
+     * What the game shows now, as the look tools read it and in their pixels: the private display, the emulator, else
+     * the screen Studio watches. Lossless. Off the FX thread: it reads the game.
+     */
+    public static Optional<BufferedImage> look(AgentContext context) {
+        return Frames.look(context);
+    }
+
+    /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */
+    public static Optional<Here> here(AgentContext context, BufferedImage frame) {
+        return MapTools.here(context, frame);
+    }
+
+    /** The hands for where {@link #look} reads: the click, key and scroll tools' own. */
+    public static Hands hands(AgentContext context) {
+        return ActTools.hands(context);
+    }
+
+    /** The screen {@code typed} names, by its constant or its name; empty when the map has none. */
+    public static Optional<String> find(ScreenGraph graph, String typed) {
+        return ScreenBook.find(graph, typed);
+    }
+
+    /** Saves {@code frame} as {@code constant}'s shot, over the one it had. Off the FX thread: it writes a file. */
+    public static void keepShot(StudioServices services, String constant, BufferedImage frame) {
+        ScreenShots.save(services.resourcesDir(), constant, frame);
     }
 
     /** A reply's text, its pictures aside: what the window says of a tool it ran. */

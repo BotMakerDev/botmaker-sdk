@@ -51,6 +51,14 @@ final class MapGuide {
     static final String REMOVE_BACK = "Take its own way back off: a walk then closes it by its close button, else "
             + "Escape";
 
+    // --- the board, live ---
+    static final String LIVE = "Draw the game here, live: a click, a drag, the wheel or a key on it goes to the game";
+    static final String FREEZE = "Keep the frame shown, lossless, to take a screen's shot or make a new screen of it";
+    static final String MISSED = "A frame the latest run saved when a wait timed out, opened frozen";
+    static final String RETAKE_FROZEN = "This frame as the screen's shot, while its markers show on it";
+    static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked";
+    static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";
+
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
 
@@ -83,7 +91,15 @@ final class MapGuide {
                             + "to (→ picks one) and Leads to…; ✕ picks none."),
                     new Entry("Leads to…", null, LEADS_TO + ", as try_input records an input that led to a screen "
                             + "mapped already."),
-                    new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."))),
+                    new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."),
+                    new Entry("● Live", null, LIVE + ", as the click, key and scroll tools give it. The line under "
+                            + "the bar names the screen it shows, by its markers, which the graph and the outline "
+                            + "light; its inputs are boxed."),
+                    new Entry("Record: A · input → B", null, RECORD_WAY + "."),
+                    new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
+                            + "screen: " + NEW_FROM_FROZEN + " on the screen last recognised."),
+                    new Entry("Missed frames", null, MISSED + ", to make it a screen's shot or a new screen."),
+                    new Entry("▶ Launch", null, "Starts the game the bot launches, when it is not up."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),
                     new Entry("owes its marker", "screen-pill-owes", "Nothing tells this screen yet: cut its marker, "

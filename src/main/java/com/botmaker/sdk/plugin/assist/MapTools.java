@@ -1190,6 +1190,27 @@ final class MapTools {
 
     /** Which screen of the map {@code frame} shows, as which_screen says it first; empty with no map. */
     static Optional<String> where(AgentContext context, BufferedImage frame) {
+        return read(context, frame).map(seen -> {
+            ScreenGraph graph = seen.graph();
+            String popup = seen.over().map(c -> "The popup " + graph.shown(c) + " (Screens." + c + ") shows over "
+                    + "it: go_to_screen closes it on the way.").orElse("");
+            return seen.here().map(c -> "On " + graph.shown(c) + " (Screens." + c + "): its marker shows."
+                            + looks(graph, c, seen.walk(), frame) + (popup.isEmpty() ? "" : " " + popup))
+                    .orElse(popup.isEmpty() ? "No screen of the bot's Screens shows: none of their markers is found."
+                            : popup.replace(" over it", ""));
+        });
+    }
+
+    /** Which screen of the map {@code frame} shows and the popup over it, as {@link #where} reads them; empty with no map. */
+    static Optional<ScreenDesk.Here> here(AgentContext context, BufferedImage frame) {
+        return read(context, frame).map(seen -> new ScreenDesk.Here(seen.here().orElse(null),
+                seen.over().orElse(null)));
+    }
+
+    /** A frame read against the map: the screen whose markers it shows, and the popup over it. */
+    private record Seen(ScreenGraph graph, ScreenWalk walk, Optional<String> here, Optional<String> over) {}
+
+    private static Optional<Seen> read(AgentContext context, BufferedImage frame) {
         ScreenGraph graph;
         try {
             graph = FxCall.call(() -> ScreenBook.read(context.services()));
@@ -1204,12 +1225,7 @@ final class MapTools {
         Optional<String> over = walk.popupOn(frame);
         // A screen mapped before shots were kept gets one the first time it is seen with nothing over it.
         if (over.isEmpty()) here.ifPresent(c -> ScreenShots.saveIfMissing(context.services().resourcesDir(), c, frame));
-        String popup = over.map(c -> "The popup " + graph.shown(c) + " (Screens." + c + ") shows over "
-                + "it: go_to_screen closes it on the way.").orElse("");
-        return Optional.of(here.map(c -> "On " + graph.shown(c) + " (Screens." + c + "): its marker shows."
-                        + looks(graph, c, walk, frame) + (popup.isEmpty() ? "" : " " + popup))
-                .orElse(popup.isEmpty() ? "No screen of the bot's Screens shows: none of their markers is found."
-                        : popup.replace(" over it", "")));
+        return Optional.of(new Seen(graph, walk, here, over));
     }
 
     /**

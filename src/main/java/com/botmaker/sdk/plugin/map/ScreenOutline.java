@@ -12,6 +12,7 @@ import com.botmaker.sdk.plugin.map.Outline.Kind;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -31,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -45,6 +47,8 @@ import java.util.function.Predicate;
  */
 final class ScreenOutline {
 
+    private static final PseudoClass HERE = PseudoClass.getPseudoClass("here");
+
     private final TreeView<Entry> tree = new TreeView<>();
     private final TextField filterText = new TextField();
     private final ToggleButton owes = new ToggleButton("Owes");
@@ -56,6 +60,8 @@ final class ScreenOutline {
     private List<Entry> entries = List.of();
     /** Set while the outline picks a line itself, so the pick is not handed back to the graph. */
     private boolean picking;
+    /** The screen the live board sees the game on, lit; null for none. */
+    private String here;
 
     /**
      * @param picked     a screen picked here, by its constant, and the field of its input picked (null: none)
@@ -114,6 +120,13 @@ final class ScreenOutline {
                 && constant.equals(e.constant())).orElse(null);
         pick(at);
         if (at != null) tree.scrollTo(tree.getRow(at));
+    }
+
+    /** Lights {@code constant}'s line as the screen the game shows; null lights none. */
+    void setHere(String constant) {
+        if (Objects.equals(constant, here)) return;
+        here = constant;
+        tree.refresh();
     }
 
     /** Picks {@code constant}'s input {@code field}'s line, as the board picked it; null {@code field}: the screen's. */
@@ -190,7 +203,7 @@ final class ScreenOutline {
     }
 
     /** One line: a group's name, a screen's name and how far it got, or an input and what it did. */
-    private static final class Line extends TreeCell<Entry> {
+    private final class Line extends TreeCell<Entry> {
 
         Line(Function<String, ContextMenu> screenMenu, BiFunction<String, Row, ContextMenu> inputMenu) {
             // Made when asked, so it marks the input as it is now.
@@ -214,13 +227,14 @@ final class ScreenOutline {
             }
             setGraphic(switch (entry.kind()) {
                 case GROUP -> styled(new Label(entry.label()), "screen-outline-group");
-                case SCREEN -> screen(entry.card());
+                case SCREEN -> screen(entry.card(), entry.constant().equals(here));
                 case INPUT -> input(entry.row());
             });
         }
 
-        private static Node screen(Card card) {
+        private static Node screen(Card card, boolean lit) {
             Label name = styled(new Label(card.name()), "screen-outline-screen");
+            name.pseudoClassStateChanged(HERE, lit);
             HBox line = new HBox(6, name);
             for (ScreenCards.Pill pill : ScreenCards.pills(card)) {
                 line.getChildren().add(styled(new Label(pill.text()), "screen-outline-pill", pill.style()));

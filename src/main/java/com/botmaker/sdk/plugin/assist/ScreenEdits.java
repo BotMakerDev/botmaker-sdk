@@ -305,10 +305,14 @@ public final class ScreenEdits {
      * found. Off the FX thread: it reads the game.
      */
     public static String retakeShot(AgentContext context, String constant) {
+        Optional<BufferedImage> frame = Frames.look(context);
+        return frame.isEmpty() ? Frames.noScreen() : retakeShot(context, constant, frame.get());
+    }
+
+    /** As {@link #retakeShot(AgentContext, String)}, from {@code frame}: the live board's frozen frame. */
+    public static String retakeShot(AgentContext context, String constant, BufferedImage frame) {
         Optional<ToolReach> reach = ToolReach.of(context);
         if (reach.isEmpty()) return Frames.noProject();
-        Optional<BufferedImage> frame = Frames.look(context);
-        if (frame.isEmpty()) return Frames.noScreen();
         ScreenGraph graph;
         try {
             graph = FxCall.call(() -> ScreenBook.read(context.services()));
@@ -321,11 +325,11 @@ public final class ScreenEdits {
             return graph.shown(constant) + " has no marker yet, so nothing tells it from the frame: cut its marker, "
                     + "which takes its shot.";
         }
-        if (!ScreenFit.shows(reach.get(), graph, constant, frame.get())) {
+        if (!ScreenFit.shows(reach.get(), graph, constant, frame)) {
             return "The game does not show " + graph.shown(constant) + " now: its markers are not found. The shot was "
                     + "kept; go there first.";
         }
-        ScreenShots.save(context.services().resourcesDir(), constant, frame.get());
+        ScreenShots.save(context.services().resourcesDir(), constant, frame);
         return "Shot taken.";
     }
 
@@ -405,7 +409,7 @@ public final class ScreenEdits {
     }
 
     /** Why {@code from}'s {@code viaField} may not be made a way into {@code to}; empty when it may. */
-    static Optional<String> wayRefused(ScreenGraph graph, String to, String from, String viaField) {
+    public static Optional<String> wayRefused(ScreenGraph graph, String to, String from, String viaField) {
         MapScreen target = graph.screens().get(to);
         MapScreen on = graph.screens().get(from);
         if (target == null || on == null) {

@@ -33,6 +33,7 @@ import javafx.util.StringConverter;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -110,21 +111,7 @@ final class ScreenHands {
      */
     void addWay(String from, String field) {
         ScreenGraph map = graph.get();
-        List<String> screens = map.screens().keySet().stream()
-                .filter(c -> !c.equals(from) && !map.screens().get(c).isPopup()).toList();
-        ComboBox<String> to = new ComboBox<>(FXCollections.observableArrayList(screens));
-        to.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(String constant) {
-                return constant == null ? "" : map.shown(constant);
-            }
-
-            @Override
-            public String fromString(String shown) {
-                return screens.stream().filter(c -> map.shown(c).equals(shown)).findFirst().orElse(null);
-            }
-        });
-        to.setVisibleRowCount(16);
+        ComboBox<String> to = screenPick(map, c -> !c.equals(from));
         Modals.form(services, "Leads to…", new VBox(8, new Label(map.shown(from) + "'s " + field + " opens"), to),
                 () -> {
                     if (to.getValue() == null) {
@@ -299,21 +286,59 @@ final class ScreenHands {
 
     /** A screen under {@code parent}, opened by its field {@code via}, or by one of its inputs picked when null. */
     private void newScreen(String parent, String via) {
+        newScreen(parent, via, via != null, made -> {});
+    }
+
+    /**
+     * Asks for a new screen's name and the input of {@code parent} that opens it — {@code parent} null asks which
+     * screen that is too — and writes it; {@code proposed} is the input offered first, fixed when {@code fixed}.
+     * {@code made} gets the new screen's name once written: the live board keeps its frozen frame as its shot.
+     */
+    void newScreen(String parent, String proposed, boolean fixed, Consumer<String> made) {
+        ScreenGraph map = graph.get();
         TextField name = new TextField();
         name.setPromptText("its name, as the game shows it");
+        ComboBox<String> from = screenPick(map, c -> true);
+        from.setValue(parent);
+        from.setDisable(parent != null);
+        ComboBox<String> input = new ComboBox<>();
         // Its looks' inputs too: a button only one look of the screen has opens screens as well.
-        ComboBox<String> input = new ComboBox<>(FXCollections.observableArrayList(graph.get().fields(parent)));
-        input.setValue(via);
-        input.setDisable(via != null);
-        VBox body = new VBox(8, new Label("Name"), name, new Label("Opened from " + graph.get().shown(parent)
-                + " by"), input);
+        Consumer<String> fields = on -> input.getItems().setAll(on == null ? List.of() : map.fields(on));
+        fields.accept(parent);
+        from.valueProperty().addListener((o, was, is) -> fields.accept(is));
+        input.setValue(proposed);
+        input.setDisable(fixed);
+        VBox body = new VBox(8, new Label("Name"), name, new Label("Opened from"), from, new Label("by"), input);
         Modals.form(services, "New screen", body, () -> {
-            if (input.getValue() == null) {
-                done.accept("Pick the input that opens it.");
+            if (from.getValue() == null || input.getValue() == null) {
+                done.accept(from.getValue() == null ? "Pick the screen it is opened from." : "Pick the input that "
+                        + "opens it.");
                 return;
             }
-            done.accept(ScreenEdits.newScreen(services, parent, name.getText(), input.getValue(), null));
+            String said = ScreenEdits.newScreen(services, from.getValue(), name.getText(), input.getValue(), null);
+            done.accept(said);
+            if (!said.startsWith(ScreenEdits.NOT_WRITTEN)) made.accept(name.getText().strip());
         });
+    }
+
+    /** The map's screens {@code offered} takes, popups aside, each by its name. */
+    private static ComboBox<String> screenPick(ScreenGraph map, Predicate<String> offered) {
+        List<String> screens = map.screens().keySet().stream()
+                .filter(c -> offered.test(c) && !map.screens().get(c).isPopup()).toList();
+        ComboBox<String> pick = new ComboBox<>(FXCollections.observableArrayList(screens));
+        pick.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(String constant) {
+                return constant == null ? "" : map.shown(constant);
+            }
+
+            @Override
+            public String fromString(String shown) {
+                return screens.stream().filter(c -> map.shown(c).equals(shown)).findFirst().orElse(null);
+            }
+        });
+        pick.setVisibleRowCount(16);
+        return pick;
     }
 
     // --- pieces ---

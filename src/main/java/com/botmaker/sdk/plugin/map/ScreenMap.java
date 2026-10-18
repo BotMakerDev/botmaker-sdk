@@ -115,7 +115,7 @@ public final class ScreenMap {
         project = services.projectDir();
         canvas = new ScreenCanvas(services.resourcesDir());
         panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh,
-                () -> tabs.getSelectionModel().select(screenTab), this::inputPicked) : null;
+                () -> tabs.getSelectionModel().select(screenTab), this::inputPicked, this::liveOn) : null;
         root.getStyleClass().add("screen-map");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setTop(toolbar(withPanel));
@@ -131,6 +131,9 @@ public final class ScreenMap {
             screenTab.setContent(panel.board());
             for (Tab tab : List.of(graphTab, screenTab)) tab.setClosable(false);
             tabs.getTabs().setAll(graphTab, screenTab);
+            screenTab.selectedProperty().addListener((o, was, is) -> {
+                if (!is) panel.boardHidden();
+            });
             SplitPane split = new SplitPane(outline.node(), tabs);
             split.setDividerPositions(0.26);
             SplitPane.setResizableWithParent(outline.node(), false);
@@ -165,6 +168,12 @@ public final class ScreenMap {
     /** An input picked on the board or in the panel, its line picked in the outline; null {@code field}: none. */
     private void inputPicked(String constant, String field) {
         if (outline != null) outline.selectInput(constant, field);
+    }
+
+    /** The screen the live board sees the game on, lit on the graph and in the outline; null lights none. */
+    private void liveOn(String constant) {
+        canvas.setHere(constant);
+        if (outline != null) outline.setHere(constant);
     }
 
     /**
@@ -263,6 +272,7 @@ public final class ScreenMap {
     void stop() {
         stopped = true;
         poll.stop();
+        if (panel != null) panel.stopLive();
         for (AutoCloseable subscription : subscriptions) {
             try {
                 subscription.close();

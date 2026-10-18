@@ -68,18 +68,18 @@ class HandParityTest {
             entry("go_to_screen", Hand.now("🧭 Go here")),
             entry("edit_map", Hand.now("its actions, each above")),
             // look, act, picture, notes and setup
-            entry("which_screen", Hand.in(3, "the live board's screen label")),
-            entry("missed_frames", Hand.in(3, "the board's missed frames list")),
-            entry("click", Hand.in(3, "a click on the live board")),
-            entry("key", Hand.in(3, "a key on the live board")),
-            entry("scroll", Hand.in(3, "the wheel or a drag on the live board")),
-            entry("describe", Hand.in(3, "the live board itself")),
+            entry("which_screen", Hand.now("● Live's line: On <screen>, lit on the graph and in the outline")),
+            entry("missed_frames", Hand.now("the board's Missed frames, opened frozen")),
+            entry("click", Hand.now("a click on the live board")),
+            entry("key", Hand.now("a key on the live board")),
+            entry("scroll", Hand.now("the wheel or a drag on the live board")),
+            entry("describe", Hand.now("the live board itself")),
             entry("crop_pictures", Hand.in(4, "✂ on the frozen board, with the cut form")),
             entry("edit_pictures", Hand.in(4, "🖼 Manage Pictures; recut on the board")),
             entry("save_region", Hand.in(4, "a zone cut on the board")),
             entry("save_digits", Hand.in(4, "a digits cut on the board")),
             entry("write_notes", Hand.now("the panel's Notes, Save notes")),
-            entry("launch_game", Hand.in(3, "▶ Launch on the board")));
+            entry("launch_game", Hand.now("▶ Launch on the board")));
 
     /** Every action the parity covers: edit_map's actions by their record, then the tools by name. */
     private static Set<String> actions() {

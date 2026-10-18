@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens drives the game live.** ● Live on the Screen tab draws the game about 8 times a second, as the
+  assistant's look tools read it (the private display, the emulator, else the watched window); a click, a drag, the
+  wheel or a key on it goes to the game through the click, key and scroll tools' own input. The line under the bar
+  names the screen the game shows, by its markers, lit on the graph and in the outline, with its inputs boxed; a
+  click on one of its inputs that opens another screen mapped already offers *Record: A · input → B*. ❄ Freeze keeps
+  the frame, lossless: *Retake its shot*, or *New screen* with the frame as its shot, under the screen last
+  recognised and opened by the input last clicked there. *Missed frames* opens a frame a run saved the same way, and
+  ▶ Launch starts the game from the board.
 - **🗺 Screens has an outline.** The map as a text tree sits left of the graph: each screen with its inputs under
   it, and under an input the screen it opens; popups and screens not reached are grouped below. A filter keeps
   the screens and inputs whose words match, and *Owes* / *Untried* keep only what is left to do. Picking a line
