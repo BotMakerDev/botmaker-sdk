@@ -8,6 +8,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.RowState;
 import com.botmaker.sdk.plugin.map.ScreenCards.State;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -16,13 +17,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.ToLongFunction;
 import java.util.stream.Stream;
 
 /**
  * 🗺 Screens' outline decided apart from JavaFX: the map as a text tree, each screen with its inputs under it and the
  * screen an input is the entrance of under that input, from the first screen; a screen that follows another on its own
  * (after the start screen, after a transition) next to it; popups and screens the tree does not reach in a group each (the user's call, 2026-10-18). A
- * filter keeps what matches and the way down to it.
+ * filter keeps what matches and the way down to it. Above it all, the screens whose shot was taken last.
  */
 final class Outline {
 
@@ -30,42 +32,57 @@ final class Outline {
     enum Kind { GROUP, SCREEN, INPUT }
 
     /** A group's name. */
+    static final String RECENT = "Recent";
     static final String POPUPS = "Popups";
     static final String UNREACHED = "Not reached from the first screen";
+
+    /** How many screens {@link #RECENT} lists. */
+    static final int RECENT_COUNT = 10;
 
     /**
      * One line of the outline.
      *
      * @param kind     what it is
-     * @param label    a group's name; empty otherwise
+     * @param label    a group's name, and {@link #RECENT} for a screen listed there; empty otherwise
      * @param constant the screen it is or is an input of; null for a group
      * @param card     a screen's card; null otherwise
      * @param row      an input's row; null otherwise
+     * @param opens    whether an input opens a screen, or may: tried and leading nowhere, it does not
      * @param children what is under it: a screen's inputs, the screen an input enters, a group's screens
      */
-    record Entry(Kind kind, String label, String constant, Card card, Row row, List<Entry> children) {
+    record Entry(Kind kind, String label, String constant, Card card, Row row, boolean opens, List<Entry> children) {
 
         static Entry group(String label, List<Entry> screens) {
-            return new Entry(Kind.GROUP, label, null, null, null, List.copyOf(screens));
+            return new Entry(Kind.GROUP, label, null, null, null, false, List.copyOf(screens));
         }
 
         static Entry screen(Card card, List<Entry> inputs) {
-            return new Entry(Kind.SCREEN, "", card.constant(), card, null, List.copyOf(inputs));
+            return new Entry(Kind.SCREEN, "", card.constant(), card, null, false, List.copyOf(inputs));
         }
 
-        static Entry input(String constant, Row row, List<Entry> entered) {
-            return new Entry(Kind.INPUT, "", constant, null, row, List.copyOf(entered));
+        /** A screen in {@link #RECENT}: its line alone, its inputs being under it in the tree below. */
+        static Entry recent(Card card) {
+            return new Entry(Kind.SCREEN, RECENT, card.constant(), card, null, false, List.of());
+        }
+
+        static Entry input(String constant, Row row, boolean opens, List<Entry> entered) {
+            return new Entry(Kind.INPUT, "", constant, null, row, opens, List.copyOf(entered));
         }
 
         Entry with(List<Entry> now) {
-            return new Entry(kind, label, constant, card, row, List.copyOf(now));
+            return new Entry(kind, label, constant, card, row, opens, List.copyOf(now));
+        }
+
+        /** Whether it is a screen's own line in the tree, not its line in {@link #RECENT}. */
+        boolean inTree() {
+            return kind != Kind.SCREEN || label.isEmpty();
         }
 
         /** What keeps it open or shut across redraws: its screen, and its input's field. */
         String key() {
             return switch (kind) {
                 case GROUP -> "group " + label;
-                case SCREEN -> constant;
+                case SCREEN -> inTree() ? constant : "recent " + constant;
                 case INPUT -> constant + "." + row.field();
             };
         }
@@ -106,21 +123,29 @@ final class Outline {
 
     private Outline() {}
 
-    /** The whole map's outline, from the cards and links 🗺 drew. */
-    static List<Entry> entries(ScreenGraph graph, List<Card> cards, List<Link> links) {
+    /**
+     * The whole map's outline, from the cards and links 🗺 drew; {@code shotTime} says when a screen's shot was
+     * written, 0 for none.
+     */
+    static List<Entry> entries(ScreenGraph graph, List<Card> cards, List<Link> links, ToLongFunction<String> shotTime) {
         Map<String, Card> byConstant = new HashMap<>();
         for (Card card : cards) byConstant.put(card.constant(), card);
         Map<String, String> entered = new HashMap<>();
         // A screen that follows another on its own has no input to sit under: it comes next, beside it.
         Map<String, List<String>> follow = new HashMap<>();
+        Set<String> leading = new HashSet<>();
         for (Link link : links) {
             if (link.entrance() && link.field() != null) entered.put(link.from() + "." + link.field(), link.to());
             if (link.entrance() && link.field() == null && !link.back()) {
                 follow.computeIfAbsent(link.from(), f -> new ArrayList<>()).add(link.to());
             }
+            // A way back leads somewhere too: a popup's close stays.
+            if (link.field() != null) leading.add(link.from() + "." + link.field());
         }
-        Layout tree = new Layout(graph, byConstant, entered, follow, new HashSet<>());
+        Layout tree = new Layout(graph, byConstant, entered, follow, leading, new HashSet<>());
         List<Entry> top = new ArrayList<>();
+        List<Entry> recent = recent(cards, shotTime);
+        if (!recent.isEmpty()) top.add(Entry.group(RECENT, recent));
         Optional<String> root = ScreenCards.root(graph).filter(byConstant::containsKey);
         root.ifPresent(r -> {
             tree.placed().add(r);
@@ -139,12 +164,21 @@ final class Outline {
         return List.copyOf(top);
     }
 
+    /** The {@link #RECENT_COUNT} screens whose shot was written last, the newest first; a screen with none is not. */
+    private static List<Entry> recent(List<Card> cards, ToLongFunction<String> shotTime) {
+        Map<String, Long> times = new HashMap<>();
+        for (Card card : cards) times.put(card.constant(), shotTime.applyAsLong(card.constant()));
+        return cards.stream().filter(c -> times.get(c.constant()) > 0)
+                .sorted(Comparator.comparingLong((Card c) -> times.get(c.constant())).reversed())
+                .limit(RECENT_COUNT).map(Entry::recent).toList();
+    }
+
     /**
      * The outline being laid out: the cards by constant, the screen each input is the entrance of, the screens that
-     * follow each on its own, and those placed so far.
+     * follow each on its own, the inputs some way leads by, and the screens placed so far.
      */
     private record Layout(ScreenGraph graph, Map<String, Card> cards, Map<String, String> entered,
-                        Map<String, List<String>> follow, Set<String> placed) {
+                        Map<String, List<String>> follow, Set<String> leading, Set<String> placed) {
 
         /**
          * {@code constant}, placed already, with its inputs and what they open under it, then each screen that follows
@@ -155,7 +189,10 @@ final class Outline {
             for (Row row : ScreenCards.rows(graph, constant)) {
                 String to = entered.get(constant + "." + row.field());
                 List<Entry> under = to != null && cards.containsKey(to) && placed.add(to) ? screens(to) : List.of();
-                inputs.add(Entry.input(constant, row, under));
+                // Tried and no way leads by it: it opens nothing. Not tried yet, it may.
+                boolean opens = row.state() != RowState.TRIED || leading.contains(constant + "." + row.field())
+                        || !under.isEmpty();
+                inputs.add(Entry.input(constant, row, opens, under));
             }
             List<Entry> all = new ArrayList<>(List.of(Entry.screen(cards.get(constant), inputs)));
             for (String next : follow.getOrDefault(constant, List.of())) {
@@ -193,6 +230,12 @@ final class Outline {
             }
             case INPUT -> filter.input(entry.row()) ? Optional.of(entry) : Optional.empty();
         };
+    }
+
+    /** {@code entries} without the inputs that open nothing ({@link Entry#opens}), down the tree. */
+    static List<Entry> opening(List<Entry> entries) {
+        return entries.stream().filter(e -> e.kind() != Kind.INPUT || e.opens())
+                .map(e -> e.with(opening(e.children()))).toList();
     }
 
     /** The keys of every entry, down the tree. */

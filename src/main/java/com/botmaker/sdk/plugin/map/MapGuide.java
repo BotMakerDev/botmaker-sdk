@@ -37,6 +37,10 @@ final class MapGuide {
     // --- the outline ---
     static final String FILTER_OWES = "Only screens owing their marker or with nothing cut";
     static final String FILTER_UNTRIED = "Only screens and inputs left to try";
+    static final String OPENING_ONLY = "Every input, or only those that open a screen or are not tried yet: an input "
+            + "tried that opened nothing is folded away";
+    static final String COLLAPSE_ALL = "Shut every line, down to the screens at the top";
+    static final String EXPAND_ALL = "Open every line";
 
     // --- a card's badges ---
     static final String LOCKED = "Every way in is locked on this account";
@@ -118,6 +122,11 @@ final class MapGuide {
                     new Entry("◻ ⌨ ☰ 🌳", null, "A button, a hotkey, a strip, a tree."),
                     new Entry("Owes", null, FILTER_OWES + "."),
                     new Entry("Untried", null, FILTER_UNTRIED + "."),
+                    new Entry("⊟ Collapse all ⊞ Expand all", null, COLLAPSE_ALL + ", or open every "
+                            + "line; a line shut stays shut as the map changes."),
+                    new Entry("All inputs | Inputs that open a screen", null, OPENING_ONLY + "."),
+                    new Entry("Recent", null, "The " + Outline.RECENT_COUNT + " screens whose shot was taken last, "
+                            + "the newest first; a click picks the screen as its line below does."),
                     new Entry("a click", null, "Picks the screen and shows it big in the Screen tab; an input's line "
                             + "picks that input too; a right-click opens its ⋯ menu."))),
             new Section("The Screen tab", List.of(

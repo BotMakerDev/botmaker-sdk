@@ -38,6 +38,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   inside Home: a screen of its own, walked as any screen Home opens, and found over Home while Home's markers still
   show, however it is opened. Its class stays beside Home's in `Screens` (`HomeUpgrade`, `Screens.HOME_UPGRADE`).
   ⋯ Screen ▸ A panel of Home marks it; its card, the outline and read_map say "panel of Home".
+- **🗺 Screens' outline folds, and lists the screens shot last.** ⊟ Collapse all and ⊞ Expand all shut or open every
+  line; Inputs that open a screen folds away each input tried that opened nothing (All inputs shows them again).
+  Recent, at the top, lists the 10 screens whose shot was taken last, the newest first, and moves as a shot is
+  retaken.
 
 ### Changed
 

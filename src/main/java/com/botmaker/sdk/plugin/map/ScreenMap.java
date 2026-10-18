@@ -142,7 +142,7 @@ public final class ScreenMap {
             canvas.select(constant);
             panel.pickInput(field);
             tabs.getSelectionModel().select(screenTab);
-        }, panel::menuFor, panel::rowMenuFor) : null;
+        }, panel::menuFor, panel::rowMenuFor, canvas::shotTime) : null;
         if (outline != null) {
             Tab graphTab = new Tab("Graph", canvas.graph());
             screenTab.setContent(panel.board());
@@ -388,7 +388,11 @@ public final class ScreenMap {
                 Platform.runLater(() -> {
                     reading = false;
                     if (stopped || !stillOpen() || asked != reads) return;
-                    if (canvas.filesChanged()) canvas.redraw();
+                    if (canvas.filesChanged()) {
+                        canvas.redraw();
+                        // A shot retaken moves its screen to the top of Recent.
+                        if (outline != null) outline.show(graph, cards, links);
+                    }
                     if (panel != null) panel.show(graph, selected);
                 });
                 return;

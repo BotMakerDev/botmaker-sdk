@@ -22,6 +22,7 @@ import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
 import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
 import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 🗺 Screens' outline: the map as a text tree, and what a filter keeps of it. */
 class OutlineTest {
@@ -46,7 +47,13 @@ class OutlineTest {
     }
 
     private static List<Entry> outline(ScreenGraph graph) {
-        return Outline.entries(graph, ScreenCards.cards(graph, Map.of()), ScreenCards.links(graph));
+        return outline(graph, Map.of());
+    }
+
+    /** The outline with each screen's shot written at {@code shots}' time, none for a screen it leaves out. */
+    private static List<Entry> outline(ScreenGraph graph, Map<String, Long> shots) {
+        return Outline.entries(graph, ScreenCards.cards(graph, Map.of()), ScreenCards.links(graph),
+                c -> shots.getOrDefault(c, 0L));
     }
 
     /** Each line's key, indented two spaces a level. */
@@ -145,6 +152,56 @@ class OutlineTest {
                     LOST.ok
                 """, lines(kept));
         assertEquals(Kind.GROUP, kept.getFirst().kind());
+    }
+
+    /** Recent tops the outline, newest shot first; a screen with no shot is not in it, and it holds ten at most. */
+    @Test
+    void recentListsTheScreensWhoseShotWasTakenLast() {
+        List<Entry> entries = outline(map(), Map.of("MAP", 300L, "HOME", 100L, "LOST", 200L));
+        Entry recent = entries.getFirst();
+        assertEquals("group Recent", recent.key());
+        assertEquals(List.of("recent MAP", "recent LOST", "recent HOME"),
+                recent.children().stream().map(Entry::key).toList());
+        assertTrue(recent.children().stream().allMatch(e -> e.children().isEmpty() && !e.inTree()),
+                "a screen's inputs stay under its own line in the tree");
+        assertEquals("HOME", entries.get(1).key(), "the tree follows, as without shots");
+
+        Map<String, MapScreen> many = new LinkedHashMap<>();
+        Map<String, Long> shots = new LinkedHashMap<>();
+        for (int i = 0; i < 12; i++) {
+            many.put("S" + i, screen(Setup.named("Screen " + i).markers(marks("s" + i))));
+            shots.put("S" + i, 1L + i);
+        }
+        List<Entry> twelve = outline(ScreenGraph.of(many), shots).getFirst().children();
+        assertEquals(Outline.RECENT_COUNT, twelve.size());
+        assertEquals("recent S11", twelve.getFirst().key());
+        assertEquals("recent S2", twelve.getLast().key());
+    }
+
+    /** Inputs that open a screen: one tried that leads nowhere is folded away, a way in by another keeps one. */
+    @Test
+    void openingFoldsAwayTheInputsTriedThatOpenNothing() {
+        assertEquals("""
+                HOME
+                  HOME.campaign
+                    CAMPAIGN
+                      CAMPAIGN.map
+                        MAP
+                  HOME.engineer
+                    ENGINEER
+                  HOME.gold
+                  HOME.key_m
+                  HOME.arena
+                    ARENA
+                  HOME.event
+                group Popups
+                  REWARD
+                group Not reached from the first screen
+                  LOST
+                    LOST.ok
+                """, lines(Outline.opening(outline(map()))),
+                "Campaign's claim and Map's Escape were tried and opened nothing; Home's M leads to Map; the rest "
+                        + "are not tried yet");
     }
 
     @Test
