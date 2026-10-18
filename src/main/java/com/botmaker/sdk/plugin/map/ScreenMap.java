@@ -24,6 +24,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyEvent;
@@ -70,6 +71,7 @@ public final class ScreenMap {
     private final StudioServices services;
     private final ScreenCanvas canvas;
     private final ScreenPanel panel;
+    private final ScreenOutline outline;
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
     /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
@@ -111,13 +113,23 @@ public final class ScreenMap {
         root.getStyleClass().add("screen-map");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setTop(toolbar(withPanel));
-        root.setCenter(canvas.graph());
+        // The full window's outline beside the graph; the overlay's narrow pane keeps the graph alone.
+        outline = withPanel ? new ScreenOutline(canvas::select, panel::menuFor, panel::rowMenuFor) : null;
+        if (outline != null) {
+            SplitPane split = new SplitPane(outline.node(), canvas.graph());
+            split.setDividerPositions(0.26);
+            SplitPane.setResizableWithParent(outline.node(), false);
+            root.setCenter(split);
+        } else {
+            root.setCenter(canvas.graph());
+        }
         if (panel != null) root.setRight(panel.node());
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
             // A screen picked, on the map or through an input that opens it: the panel shows its shot, inputs boxed.
             if (panel != null) panel.show(graph, selected);
+            if (outline != null) outline.select(selected);
         });
         if (panel != null) {
             canvas.setMenus(panel::menuFor, panel::linkMenu);
@@ -358,6 +370,8 @@ public final class ScreenMap {
         } else if (canvas.filesChanged()) {
             canvas.redraw();
         }
+        // Its lines hold each input's row, which an edit changes with no card or link changing; it redraws on a change.
+        if (outline != null) outline.show(read, cards, links);
         if (!saidOnce) said.setText(summary(nowCards));
         saidOnce = false;
         if (selected != null && !read.screens().containsKey(selected)) selected = null;

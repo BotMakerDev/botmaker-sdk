@@ -1,0 +1,138 @@
+package com.botmaker.sdk.plugin.map;
+
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.map.Outline.Entry;
+import com.botmaker.sdk.plugin.map.Outline.Filter;
+import com.botmaker.sdk.plugin.map.Outline.Kind;
+import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
+import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+/** 🗺 Screens' outline: the map as a text tree, and what a filter keeps of it. */
+class OutlineTest {
+
+    /**
+     * Home opens Campaign and Engineer (owing its marker); Campaign's map opens Map, which Home also reaches by a
+     * hotkey; Arena is behind a locked input; Reward is a popup; Lost is reached from nowhere.
+     */
+    private static ScreenGraph map() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), click("engineer"),
+                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").sometimes()));
+        screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
+                .from(ref("HOME", "campaign")), click("claim").tried(), click("map")));
+        screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))
+                .alsoFrom(List.of(Way.of(ref("HOME", "key_m")))), Hotkey.of(Key.ESCAPE).tried()));
+        screens.put("ENGINEER", screen(Setup.named("Engineer").from(ref("HOME", "engineer"))));
+        screens.put("ARENA", screen(Setup.named("Arena").markers(marks("arena_title")).from(ref("HOME", "arena"))));
+        screens.put("REWARD", screen(Setup.named("Reward").markers(marks("reward")).back(click("close_x")).popup()));
+        screens.put("LOST", screen(Setup.named("Lost").markers(marks("lost")), click("ok")));
+        return ScreenGraph.of(screens);
+    }
+
+    private static List<Entry> outline(ScreenGraph graph) {
+        return Outline.entries(graph, ScreenCards.cards(graph, Map.of()), ScreenCards.links(graph));
+    }
+
+    /** Each line's key, indented two spaces a level. */
+    private static String lines(List<Entry> entries) {
+        StringBuilder out = new StringBuilder();
+        lines(entries, 0, out);
+        return out.toString();
+    }
+
+    private static void lines(List<Entry> entries, int depth, StringBuilder out) {
+        for (Entry entry : entries) {
+            out.append("  ".repeat(depth)).append(entry.key()).append('\n');
+            lines(entry.children(), depth + 1, out);
+        }
+    }
+
+    @Test
+    void eachScreenSitsUnderTheInputItsEntranceIsAndTheRestInGroups() {
+        assertEquals("""
+                HOME
+                  HOME.campaign
+                    CAMPAIGN
+                      CAMPAIGN.claim
+                      CAMPAIGN.map
+                        MAP
+                          MAP.key_escape
+                  HOME.engineer
+                    ENGINEER
+                  HOME.gold
+                  HOME.key_m
+                  HOME.arena
+                    ARENA
+                  HOME.event
+                group Popups
+                  REWARD
+                group Not reached from the first screen
+                  LOST
+                    LOST.ok
+                """, lines(outline(map())), "a way in that is no entrance (Home's M) leads nowhere in the tree");
+    }
+
+    @Test
+    void aFilterKeepsWhatMatchesAndTheWayDownToIt() {
+        ScreenGraph graph = map();
+        assertEquals("""
+                HOME
+                  HOME.campaign
+                    CAMPAIGN
+                      CAMPAIGN.claim
+                      CAMPAIGN.map
+                        MAP
+                          MAP.key_escape
+                  HOME.key_m
+                """, lines(Outline.filter(graph, outline(graph), new Filter("MAP", false, false))),
+                "Campaign has an input map, so all its inputs stay; Home's M leads to Map; the case is ignored");
+    }
+
+    @Test
+    void owesKeepsOnlyTheScreensOwingSomething() {
+        ScreenGraph graph = map();
+        assertEquals("""
+                HOME
+                  HOME.engineer
+                    ENGINEER
+                  HOME.arena
+                    ARENA
+                """, lines(Outline.filter(graph, outline(graph), new Filter("", true, false))),
+                "Engineer owes its marker, Arena has nothing cut");
+    }
+
+    @Test
+    void untriedKeepsTheInputsLeftToTryOnAScreenDone() {
+        ScreenGraph graph = map();
+        List<Entry> kept = Outline.filter(graph, outline(graph), new Filter("ok", false, true));
+        assertEquals("""
+                group Not reached from the first screen
+                  LOST
+                    LOST.ok
+                """, lines(kept));
+        assertEquals(Kind.GROUP, kept.getFirst().kind());
+    }
+
+    @Test
+    void noFilterKeepsTheOutlineAsItIs() {
+        ScreenGraph graph = map();
+        List<Entry> whole = outline(graph);
+        assertEquals(whole, Outline.filter(graph, whole, Filter.NONE));
+        assertEquals(Filter.NONE, new Filter("  ", false, false));
+    }
+}

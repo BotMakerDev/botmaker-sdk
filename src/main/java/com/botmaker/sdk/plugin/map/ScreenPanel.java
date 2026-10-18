@@ -445,6 +445,13 @@ final class ScreenPanel {
         return menu;
     }
 
+    /** The right-click menu of {@code row}, an input of {@code constant}: its ⋯ menu's edits. */
+    ContextMenu rowMenuFor(String constant, Row row) {
+        ContextMenu menu = new ContextMenu(hands.rowMenu(constant, row).getItems().toArray(MenuItem[]::new));
+        menu.getItems().forEach(item -> item.setDisable(busy));
+        return menu;
+    }
+
     /** The right-click menu of {@code link}: its picture, and when its way is open. */
     ContextMenu linkMenu(ScreenCards.Link link) {
         ContextMenu menu = hands.linkMenu(link, () -> showLink(link));

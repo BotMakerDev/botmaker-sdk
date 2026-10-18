@@ -337,3 +337,32 @@
     -fx-font-size: 0.8em;
     -fx-text-fill: -bm-screen-plain;
 }
+
+/* --- the outline: the map as a text tree --- */
+
+.screen-outline-group {
+    -fx-font-weight: bold;
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.screen-outline-screen {
+    -fx-font-weight: bold;
+}
+
+/* A pill's colour, as words beside the name: its class (screen-pill-owes…) adds the colour. */
+.screen-outline-pill {
+    -fx-font-size: 0.85em;
+}
+
+.screen-outline-result {
+    -fx-font-size: 0.85em;
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.screen-outline-untried { -fx-text-fill: -bm-screen-untried; }
+.screen-outline-tried { -fx-text-fill: -bm-screen-finished; }
+
+/* A picked line reads in the selection's own colour, whatever its words' state colour. */
+.screen-outline .tree-cell:selected .label {
+    -fx-text-fill: -fx-selection-bar-text;
+}

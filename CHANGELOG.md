@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens has an outline.** The map as a text tree sits left of the graph: each screen with its inputs under
+  it, and under an input the screen it opens; popups and screens not reached are grouped below. A filter keeps
+  the screens and inputs whose words match, and *Owes* / *Untried* keep only what is left to do. Picking a line
+  picks the screen on the graph, and a right-click gives the screen's or the input's ⋯ menu.
 - **A tree of nodes is an input.** A research or skill tree is a `Tree` field of its screen:
   `Tree.of(List.of(Node.of(Pictures.DAMAGE), Node.of(Pictures.HEALTH).after(List.of(Pictures.DAMAGE))
   .beside(List.of(Beside.of(Pictures.DAMAGE, 1.2, -0.6))))).dragged()`. Each node is one of the screen's buttons.

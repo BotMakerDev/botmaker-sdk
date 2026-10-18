@@ -31,6 +31,10 @@ final class MapGuide {
     static final String OPEN = "Open 🗺 Screens, with each screen's inputs and actions";
     static final String GUIDE = "What each sign on the map means";
 
+    // --- the outline ---
+    static final String FILTER_OWES = "Only screens owing their marker or with nothing cut";
+    static final String FILTER_UNTRIED = "Only screens and inputs left to try";
+
     // --- a card's badges ---
     static final String LOCKED = "Every way in is locked on this account";
     static final String FOLDED = "Folded: double-click to unfold";
@@ -59,6 +63,13 @@ final class MapGuide {
                     new Entry("Tidy", null, TIDY + "."),
                     new Entry("⤓ PNG", null, PNG + ". ↶ ↷, Tidy and ⤓ PNG are in the 🗺 Screens window, not "
                             + "the overlay's tab."))),
+            new Section("The outline", List.of(
+                    new Entry("Filter screens and inputs…", null, "Keeps the screens and inputs whose words have the "
+                            + "text, and the lines down to them. Under each screen are its inputs, and under an "
+                            + "input the screen it opens first; popups and screens not reached sit in groups below."),
+                    new Entry("◻ ⌨ ☰ 🌳", null, "A button, a hotkey, a strip, a tree."),
+                    new Entry("Owes", null, FILTER_OWES + "."),
+                    new Entry("Untried", null, FILTER_UNTRIED + "."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),
                     new Entry("owes its marker", "screen-pill-owes", "Nothing tells this screen yet: cut its marker, "
