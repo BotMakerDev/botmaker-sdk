@@ -2,7 +2,10 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -17,6 +20,7 @@ import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -44,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -87,21 +92,28 @@ final class ScreenPanel {
     private String notesRead;
     /** Each screen's shot as last checked ({@link MapAudit}), by constant: made off the FX thread, kept on it. */
     private final Map<String, Audit> audits = new HashMap<>();
+    /** The selected screen big, in the window's Screen tab; the panel draws it as it draws itself. */
+    private final ScreenBoard board = new ScreenBoard();
+    private final Runnable showBoard;
+    private final BiConsumer<String, String> inputPicked;
+    /** The field of the selected screen's input picked on the board or the outline; null for none. */
+    private String picked;
 
     /**
-     * @param changed run once an action wrote the map, so the window reads it at once rather than at its next poll
+     * @param changed     run once an action wrote the map, so the window reads it at once rather than at its next poll
+     * @param showBoard   brings the Screen tab to the front
+     * @param inputPicked an input picked here, by its screen's constant and its field
      */
-    ScreenPanel(StudioServices services, ScreenCanvas canvas, Supplier<Window> owner, Runnable changed) {
+    ScreenPanel(StudioServices services, ScreenCanvas canvas, Supplier<Window> owner, Runnable changed,
+                Runnable showBoard, BiConsumer<String, String> inputPicked) {
         this.services = services;
         this.canvas = canvas;
         this.owner = owner;
         this.changed = changed;
+        this.showBoard = showBoard;
+        this.inputPicked = inputPicked;
         viewer = new PictureView(services, owner);
-        hands = new ScreenHands(services, () -> graph, said -> {
-            drawn = null;
-            say(said);
-            changed.run();
-        });
+        hands = new ScreenHands(services, () -> graph, this::wrote);
         content.getStyleClass().add("screen-panel");
         content.setPadding(new Insets(PADDING));
         content.setFillWidth(true);
@@ -132,11 +144,34 @@ final class ScreenPanel {
         return root;
     }
 
+    /** The Screen tab's board, which the panel keeps showing the selected screen. */
+    Node board() {
+        return board.node();
+    }
+
     /** Shows {@code constant} of {@code graph}; null for none. Draws again only when something it shows changed. */
     void show(ScreenGraph graph, String constant) {
         this.graph = graph;
-        this.selected = constant != null && graph.screens().containsKey(constant) ? constant : null;
+        String now = constant != null && graph.screens().containsKey(constant) ? constant : null;
+        // Another screen picks none of its inputs; an input gone from the screen is picked no more.
+        if (now == null || !now.equals(selected) || picked != null && graph.input(now, picked).isEmpty()) {
+            picked = null;
+        }
+        this.selected = now;
         draw();
+    }
+
+    /** Picks the selected screen's input {@code field} (null: none), as a box clicked on the board does. */
+    void pickInput(String field) {
+        if (Objects.equals(field, picked)) return;
+        picked = selected == null || field == null || graph.input(selected, field).isEmpty() ? null : field;
+        draw();
+    }
+
+    /** A box clicked on a shot: its input picked, here, on the board and in the outline. */
+    private void picked(String constant, Row row) {
+        pickInput(row.field());
+        inputPicked.accept(constant, row.field());
     }
 
     private void draw() {
@@ -144,17 +179,48 @@ final class ScreenPanel {
         String notes = at == null || at.notes() == null ? "" : at.notes();
         Map<String, FrameCut> cuts = selected == null ? Map.of() : cutsOf(selected);
         double width = shotWidth();
-        // Everything the panel shows: the screen itself (its back, looks, notes and debts), its card and rows, where
-        // its inputs were cut, when its shot was taken and how wide it is drawn.
+        // Everything the board shows: the screen, its rows, where its inputs were cut and are found on its shot, when
+        // the shot and its pictures were written, and the input picked.
+        List<Object> shown = selected == null ? List.of() : List.of(at, ScreenCards.rows(graph, selected), cuts,
+                canvas.shotTime(selected), pictureTimes(), Optional.ofNullable(audits.get(selected)),
+                Optional.ofNullable(picked));
+        drawBoard(shown, cuts);
+        // Everything the panel shows: that, its card, its way from the first screen, its ways in, how wide it is
+        // drawn, and whether a try runs.
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
-                : List.of(at, card(selected), ScreenCards.rows(graph, selected), ScreenCards.path(graph, selected),
-                cuts, canvas.shotTime(selected), pictureTimes(), width, busy,
-                Optional.ofNullable(audits.get(selected)));
+                : List.of(shown, card(selected), ScreenCards.path(graph, selected), ways(selected), width, busy);
         if (now.equals(drawn)) return;
         drawn = now;
         content.getChildren().setAll(selected == null ? none() : screen(notes, cuts, width));
         content.getChildren().add(status);
         if (at != null) audit(selected, at, cuts);
+    }
+
+    /** The board, drawn again only when {@code shown} changed. */
+    private void drawBoard(Object shown, Map<String, FrameCut> cuts) {
+        if (selected == null) {
+            board.show(null, null, null, null);
+            return;
+        }
+        String constant = selected;
+        String field = picked;
+        List<Row> rows = ScreenCards.rows(graph, constant);
+        List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
+        Audit audit = audits.get(constant);
+        board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
+                strips, cuts, audit, field, row -> picked(constant, row), null));
+    }
+
+    /** {@code constant}'s ways in, each as the panel says it: the screen it leaves, by its name now. */
+    private List<String> ways(String constant) {
+        return graph.screens().get(constant).ways().stream().map(this::wayText).toList();
+    }
+
+    /** A way in, said: from the screen it leaves by its input, and the method it is open only while. */
+    private String wayText(Way way) {
+        String when = ScreenTypes.sourceOf(way.when());
+        return graph.nameOf(way.via()).map(n -> "from " + graph.shown(n.screen()) + " by " + n.field())
+                .orElse("by " + way.via().label()) + (when.isEmpty() ? "" : " · while " + when);
     }
 
     /**
@@ -270,14 +336,30 @@ final class ScreenPanel {
         if (!screen.hasMarker()) markers.getChildren().add(text("None yet: ✂ Cut marker."));
         screen.markers().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "shows", busy)));
         screen.absent().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "never shows", busy)));
+        // Off the FX thread, as ✕: the new set is matched over every other screen's shot.
+        Button addMarker = action("＋ Marker from a picture…", MapGuide.ADD_MARKER, () -> hands.askMarker(shown,
+                (picture, absent) -> {
+                    ImageTemplate template = ScreenEdits.picture(services, picture);
+                    run("Adding " + picture + "…", shown, () -> ScreenEdits.addMarker(services, shown, template,
+                            absent));
+                }));
+        addMarker.setDisable(busy);
+        markers.getChildren().add(addMarker);
 
-        VBox all = new VBox(12, head, pills, actions, heading("Markers"), markers, heading("Inputs"), inputs);
+        VBox all = new VBox(12, head, pills, actions);
+        rows.stream().filter(r -> r.field().equals(picked)).findFirst()
+                .ifPresent(r -> all.getChildren().addAll(pickedInput(shown, r)));
+        all.getChildren().addAll(heading("Markers"), markers, heading("Inputs"), inputs);
         canvas.shotWithInputs(shown, shotWidth, rows, ScreenCards.strips(graph, shown, rows), cuts, audits.get(shown),
-                        row -> pick(shown, row),
-                        () -> showScreen(shown))
+                        picked, row -> picked(shown, row), () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
-        all.getChildren().add(text("Way back: " + (screen.back() == null ? "the default one, a close button, then "
-                + "Escape" : screen.back().label()) + "."));
+        all.getChildren().addAll(heading("Ways in"), waysIn(shown, screen, card.popup()));
+        if (!screen.variants().isEmpty()) {
+            VBox looks = new VBox(6);
+            for (ScreenVariant look : screen.variants()) looks.getChildren().add(lookRow(shown, look));
+            all.getChildren().addAll(heading("Looks"), looks);
+        }
+        all.getChildren().addAll(heading("Way back"), backRow(shown, screen));
         if (!screen.owes().isEmpty()) {
             all.getChildren().addAll(heading("Owes"), text("• " + String.join("\n• ", screen.owes())));
         }
@@ -350,7 +432,7 @@ final class ScreenPanel {
             Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
             if (picture != null) {
                 Tooltip.install(one, new Tooltip("Show " + picture + " at its own size"));
-                one.setOnMouseClicked(e -> showPicture(constant, row, null));
+                one.setOnMouseClicked(e -> showPicture(constant, row));
             }
             return one;
         }, result, row.result());
@@ -396,37 +478,97 @@ final class ScreenPanel {
         return line;
     }
 
+    /**
+     * The input picked on the board, first in the panel: its row, the screens it leads to (each picked by a press),
+     * Leads to… for one more, and ✕ to pick none.
+     */
+    private List<Node> pickedInput(String constant, Row row) {
+        FlowPane acts = new FlowPane(8, 8);
+        for (ScreenGraph.Lead lead : graph.leads(constant, row.field())) {
+            acts.getChildren().add(action("→ " + graph.shown(lead.to()), "Pick " + graph.shown(lead.to()),
+                    () -> canvas.select(lead.to())));
+        }
+        Button leadsTo = action("Leads to…", MapGuide.LEADS_TO, () -> hands.addWay(constant, row.field()));
+        leadsTo.setDisable(busy);
+        Button unpick = action("✕", "Pick no input", () -> {
+            pickInput(null);
+            inputPicked.accept(constant, null);
+        });
+        acts.getChildren().addAll(leadsTo, unpick);
+        return List.of(heading("Picked input"), row(constant, row), acts);
+    }
+
+    /** {@code constant}'s ways in, each with its ⋯: when it is open, and taking it off. */
+    private Node waysIn(String constant, MapScreen screen, boolean popup) {
+        VBox ways = new VBox(6);
+        if (screen.ways().isEmpty()) {
+            ways.getChildren().add(text(popup ? "None: the game opens it on its own." : "None: the first screen."));
+        }
+        for (Way way : screen.ways()) {
+            Label said = new Label(wayText(way));
+            said.getStyleClass().add("screen-row-label");
+            said.setMinWidth(0);
+            said.setWrapText(true);
+            HBox.setHgrow(said, Priority.ALWAYS);
+            HBox line = new HBox(8, said);
+            if (way == screen.from()) line.getChildren().add(pill("how it was found", "screen-pill-plain"));
+            graph.nameOf(way.via()).ifPresent(n -> {
+                Node menu = hands.wayMenu(constant, n.screen(), n.field(), ScreenTypes.sourceOf(way.when()));
+                menu.setDisable(busy);
+                line.getChildren().add(menu);
+            });
+            line.setAlignment(Pos.CENTER_LEFT);
+            line.getStyleClass().add("screen-row");
+            ways.getChildren().add(line);
+        }
+        return ways;
+    }
+
+    /** One look of {@code constant}: its name, the method it shows only while, and its ⋯. */
+    private Node lookRow(String constant, ScreenVariant look) {
+        String when = ScreenTypes.sourceOf(look.when());
+        Label said = new Label(look.name() + (when.isEmpty() ? "" : " · while " + when));
+        said.getStyleClass().add("screen-row-label");
+        said.setMinWidth(0);
+        HBox.setHgrow(said, Priority.ALWAYS);
+        Node menu = hands.lookMenu(constant, look.name(), when);
+        menu.setDisable(busy);
+        HBox line = new HBox(8, said, menu);
+        line.setAlignment(Pos.CENTER_LEFT);
+        line.getStyleClass().add("screen-row");
+        return line;
+    }
+
+    /** {@code constant}'s way back, and ✕ taking its own off. */
+    private Node backRow(String constant, MapScreen screen) {
+        Label said = text(screen.back() == null ? "The default one: a close button, then Escape."
+                : screen.back().label());
+        HBox.setHgrow(said, Priority.ALWAYS);
+        HBox line = new HBox(8, said);
+        if (screen.back() != null) {
+            Button off = action("✕", MapGuide.REMOVE_BACK, () -> wrote(ScreenEdits.removeBack(services, constant)));
+            off.setDisable(busy);
+            line.getChildren().add(off);
+        }
+        line.setAlignment(Pos.CENTER_LEFT);
+        return line;
+    }
+
     // --- actions ---
 
-    /**
-     * A boxed input of {@code constant} clicked on the panel's shot: the screen it opens, selected on the map; else
-     * its picture.
-     */
-    private void pick(String constant, ScreenCards.Row row) {
-        Optional<String> opens = graph.opens(constant, row.field());
-        if (opens.isPresent()) canvas.select(opens.get());
-        else showPicture(constant, row, null);
+    /** What an edit answered: said, and the map read again. */
+    private void wrote(String said) {
+        drawn = null;
+        say(said);
+        changed.run();
     }
 
-    /**
-     * A boxed input of {@code constant} clicked in the big view: the screen it opens, selected and shown big in its
-     * place, its ← going back to {@code constant}; else its picture. {@code back} is the big view's own ←.
-     */
-    private void pickBig(String constant, ScreenCards.Row row, PictureView.Back back) {
-        Optional<String> opens = graph.opens(constant, row.field());
-        if (opens.isEmpty()) {
-            showPicture(constant, row, back);
-            return;
-        }
-        canvas.select(opens.get());
-        if (!bigShot(opens.get(), new PictureView.Back(graph.shown(constant), () -> bigShot(constant, back)))) {
-            say(graph.shown(opens.get()) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
-        }
-    }
-
-    private void showPicture(String constant, ScreenCards.Row row, PictureView.Back from) {
+    private void showPicture(String constant, ScreenCards.Row row) {
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
-        PictureView.Back back = new PictureView.Back(graph.shown(constant), () -> bigShot(constant, from));
+        PictureView.Back back = new PictureView.Back(graph.shown(constant), () -> {
+            showScreen(constant);
+            return true;
+        });
         viewer.showPicture(row, back, untried && !busy ? () -> tryRow(constant, row) : null, () -> {
             drawn = null;
             canvas.forgetPictures();
@@ -464,46 +606,32 @@ final class ScreenPanel {
         canvas.select(link.from());
         Optional<Row> row = link.field() == null ? Optional.empty() : ScreenCards.rows(graph, link.from()).stream()
                 .filter(r -> r.field().equals(link.field())).findFirst();
-        row.ifPresentOrElse(r -> showPicture(link.from(), r, null), () -> say(link.via() == null
+        row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(link.via() == null
                 ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
                 + "else Escape."
                 : link.label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
                 + "picture shows in 🖼 Manage Pictures."));
     }
 
-    /** {@code constant}'s shot in the picture window, big, its inputs boxed: the wheel zooms it. */
+    /** {@code constant} picked and shown big, in the Screen tab: the wheel zooms it. */
     void showScreen(String constant) {
-        if (!bigShot(constant, null)) {
-            say(graph.shown(constant) + " has no shot yet: ⋯ Screen ▸ take it again while the game shows it.");
-        }
-    }
-
-    /**
-     * {@code constant}'s shot in the picture window, {@code back} its ← (null for none); false, and nothing shown,
-     * when it has none.
-     */
-    private boolean bigShot(String constant, PictureView.Back back) {
-        Map<String, FrameCut> cuts = cutsOf(constant);
-        List<Row> rows = ScreenCards.rows(graph, constant);
-        List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
-        return viewer.showScreen(graph.shown(constant), back, width -> canvas.shotWithInputs(constant, width, rows,
-                strips, cuts, audits.get(constant), row -> pickBig(constant, row, back), null));
+        canvas.select(constant);
+        showBoard.run();
     }
 
     /**
      * {@code constant}'s tree {@code field} drawn big in the picture window ({@link TreeView}): a node clicked is
-     * picked as a boxed input of the shot is, its ← coming back to the drawing. False when the screen has no such tree.
+     * picked as a boxed input of the shot is. False when the screen has no such tree.
      */
     private boolean showTree(String constant, String field) {
         MapScreen screen = graph.screens().get(constant);
         Tree tree = screen == null ? null : screen.trees().get(field);
         if (tree == null) return false;
-        PictureView.Back back = new PictureView.Back(field, () -> showTree(constant, field));
         return viewer.showScreen(graph.shown(constant) + " · " + field, null, width -> Optional.of(TreeView.drawing(tree,
                 canvas::pictureSize, width, (id, side) -> canvas.thumb(id, side, "screen-row-thumb"),
                 id -> ScreenCards.rows(graph, constant).stream()
                         .filter(r -> r.input() instanceof com.botmaker.sdk.api.screens.Button && id.equals(r.picture()))
-                        .findFirst().ifPresentOrElse(r -> pickBig(constant, r, back), () -> say(id + " is in "
+                        .findFirst().ifPresentOrElse(r -> picked(constant, r), () -> say(id + " is in "
                                 + field + " but is no button of " + graph.shown(constant) + ": crop_pictures it with "
                                 + "screen " + graph.shown(constant) + ".")))));
     }

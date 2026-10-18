@@ -113,6 +113,36 @@ class MapToolsTest {
                 eventOn).from(), "no way from Home by the map: nothing changes");
     }
 
+    /**
+     * An input that leads to a screen mapped already is one more way into it, by hand as try_input records it; not
+     * into itself, a popup, the screen above it (its way back) or one it is reached through, nor twice.
+     */
+    @Test
+    void aWayIntoAScreenMappedAlreadyIsAddedOnceAndOnlyWhereItCanBe() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen("Home", MapFixtures.click("campaign"), MapFixtures.click("m_key")));
+        screens.put("CAMPAIGN", MapFixtures.screen(Setup.named("Campaign").from(BotConstants.input("HOME",
+                "campaign")), MapFixtures.click("map"), MapFixtures.click("home")));
+        screens.put("MAP", MapFixtures.screen(Setup.named("Map").from(BotConstants.input("CAMPAIGN", "map")),
+                MapFixtures.click("up")));
+        screens.put("REWARD", MapFixtures.screen(Setup.named("Reward").popup()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(Optional.empty(), ScreenEdits.wayRefused(graph, "MAP", "HOME", "m_key"));
+        MapScreen map = ScreenEdits.withWay(screens.get("MAP"), "HOME", "m_key");
+        assertEquals(screens.get("MAP").from(), map.from(), "the way it was found stays first");
+        assertEquals(List.of(Way.of(BotConstants.input("HOME", "m_key"))), map.alsoFrom());
+
+        screens.put("MAP", map);
+        ScreenGraph added = ScreenGraph.of(screens);
+        assertTrue(ScreenEdits.wayRefused(added, "MAP", "HOME", "m_key").isPresent(), "once");
+        assertTrue(ScreenEdits.wayRefused(added, "MAP", "HOME", "nothing").isPresent(), "no such input");
+        assertTrue(ScreenEdits.wayRefused(added, "HOME", "HOME", "m_key").isPresent(), "into itself");
+        assertTrue(ScreenEdits.wayRefused(added, "REWARD", "HOME", "m_key").isPresent(), "a popup");
+        assertTrue(ScreenEdits.wayRefused(added, "HOME", "CAMPAIGN", "home").isPresent(), "its way back");
+        assertTrue(ScreenEdits.wayRefused(added, "HOME", "MAP", "up").isPresent(), "a screen it is reached through");
+    }
+
     /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */
     private static BufferedImage filled(Color color, int corner) {
         BufferedImage image = new BufferedImage(320, 180, BufferedImage.TYPE_INT_RGB);

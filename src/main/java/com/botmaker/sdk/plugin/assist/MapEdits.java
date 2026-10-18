@@ -34,8 +34,7 @@ import java.util.stream.Stream;
  */
 final class MapEdits {
 
-    private static final String SCREEN = "the screen edited, by name or constant (Home, HOME); for new_screen the "
-            + "one it opens from";
+    private static final String SCREEN = "the screen edited (Home or HOME); for new_screen the one it opens from";
     private static final String PICTURE = "the input: its field (beerBuy) or picture";
     private static final String SCROLL = "with picture, a strip scrolled over it by these notches";
     private static final String KEY = "the input, by its hotkey: Q";
@@ -73,7 +72,7 @@ final class MapEdits {
     record Delete(String screen) implements Edit {
     }
 
-    @Describe("make the screen a popup the game opens on its own, or a screen of the tree again")
+    @Describe("a popup the game opens on its own, or a screen of the tree again")
     record Popup(String screen, boolean popup)
             implements Edit {
     }
@@ -83,8 +82,8 @@ final class MapEdits {
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
                     @Describe(value = KEY, optional = true) String key,
-                    @Describe(value = "what it does, opening nothing (one that opens a screen the "
-                            + "map lacks: new_screen)", optional = true) Result did,
+                    @Describe(value = "what it does, opening nothing (one opening a new screen: new_screen)",
+                            optional = true) Result did,
                     @Describe(value = "true when it only tells (help, rules): tried last",
                             optional = true) Boolean info,
                     @Describe(value = "why it is never clicked; blank to clear it", optional = true) String never,
@@ -125,6 +124,13 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
+    @Describe("add a way in: from's input leads here")
+    record AddWay(String screen, String from,
+                  @Describe(value = "", optional = true) String picture,
+                  @Describe(value = "", optional = true) Integer scroll,
+                  @Describe(value = "", optional = true) String key) implements Edit, OfInput {
+    }
+
     @Describe("a way in (from, and its input) taken only while method holds")
     record WayWhen(String screen, String from,
                    @Describe(value = "", optional = true) String picture,
@@ -158,7 +164,7 @@ final class MapEdits {
             implements Edit {
     }
 
-    @Describe("a tree node's parents, whose lines lead to it")
+    @Describe("a tree node's parents (lines lead to it)")
     record Link(String screen, String picture,
                 @Describe(value = "their pictures; none clears them", optional = true) List<String> after)
             implements Edit {
@@ -169,13 +175,13 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a marker (all show), or with absent true one the screen never shows where one like it does; "
-            + "refused when another screen's shot shows the set")
+    @Describe("add a marker (all show), or with absent one it never shows where a look-alike does; refused when "
+            + "another shot shows the set")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
                      @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
 
-    @Describe("take a marker, or a picture it never shows, off the screen")
+    @Describe("take a marker, or one it never shows, off")
     record RemoveMarker(String screen, String picture) implements Edit {
     }
 
@@ -187,8 +193,8 @@ final class MapEdits {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            ToolTiming.actions("edit_map", "Fixes the bot's Screens by hand, as 🗺 Screens' menus do, when try_input "
-                    + "recorded something wrong or the game changed; clicks nothing", Edit.class,
+            ToolTiming.actions("edit_map", "Fixes the bot's Screens by hand when try_input recorded something "
+                    + "wrong or the game changed; clicks nothing", Edit.class,
                     MapEdits::edit));
 
     private MapEdits() {}
@@ -228,6 +234,7 @@ final class MapEdits {
             case Popup popup -> said(ScreenEdits.setPopup(services, screen, popup.popup()));
             case RemoveBack ignored -> said(ScreenEdits.removeBack(services, screen));
             case LookWhen look -> said(ScreenEdits.setLookWhen(services, screen, look.look(), method(look.method())));
+            case AddWay way -> addWay(way, graph, screen, services);
             case RemoveWay way -> way(way, way.from(), null, graph, screen, services);
             case WayWhen way -> way(way, way.from(), method(way.method()), graph, screen, services);
             case NewScreen opened -> newScreen(opened, graph, screen, context);
@@ -411,6 +418,17 @@ final class MapEdits {
         }
         return said(method == null ? ScreenEdits.removeWay(services, screen, from.get(), via.get())
                 : ScreenEdits.setWayWhen(services, screen, from.get(), via.get(), method));
+    }
+
+    /** add_way: {@code screen} reached from {@code from} by the input of {@code from} named. */
+    private static AgentReply addWay(AddWay edit, ScreenGraph graph, String screen, StudioServices services) {
+        Optional<String> from = ScreenBook.find(graph, edit.from());
+        if (from.isEmpty()) {
+            return AgentReply.refused((has(edit.from()) ? "No screen " + edit.from().strip() + " in the bot's "
+                    + "Screens" : "Give from, the screen the input is on") + ". Nothing was written.");
+        }
+        return onInput(edit, graph, from.get(), graph.screens().get(from.get()),
+                field -> said(ScreenEdits.addWay(services, screen, from.get(), field)));
     }
 
     /** new_screen: a screen under {@code parent}, opened by the input named, put on {@code parent} when it lacks it. */

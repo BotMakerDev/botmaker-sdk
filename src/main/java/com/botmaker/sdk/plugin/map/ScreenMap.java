@@ -25,6 +25,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyEvent;
@@ -72,6 +74,9 @@ public final class ScreenMap {
     private final ScreenCanvas canvas;
     private final ScreenPanel panel;
     private final ScreenOutline outline;
+    /** The full window's centre: the graph, or the picked screen big. */
+    private final TabPane tabs = new TabPane();
+    private final Tab screenTab = new Tab("Screen");
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
     /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
@@ -109,14 +114,24 @@ public final class ScreenMap {
         this.services = services;
         project = services.projectDir();
         canvas = new ScreenCanvas(services.resourcesDir());
-        panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh) : null;
+        panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh,
+                () -> tabs.getSelectionModel().select(screenTab), this::inputPicked) : null;
         root.getStyleClass().add("screen-map");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setTop(toolbar(withPanel));
-        // The full window's outline beside the graph; the overlay's narrow pane keeps the graph alone.
-        outline = withPanel ? new ScreenOutline(canvas::select, panel::menuFor, panel::rowMenuFor) : null;
+        // The full window's outline beside the graph and the picked screen big; the overlay's narrow pane keeps the
+        // graph alone. A line picked shows its screen big, and its input picked on it.
+        outline = withPanel ? new ScreenOutline((constant, field) -> {
+            canvas.select(constant);
+            panel.pickInput(field);
+            tabs.getSelectionModel().select(screenTab);
+        }, panel::menuFor, panel::rowMenuFor) : null;
         if (outline != null) {
-            SplitPane split = new SplitPane(outline.node(), canvas.graph());
+            Tab graphTab = new Tab("Graph", canvas.graph());
+            screenTab.setContent(panel.board());
+            for (Tab tab : List.of(graphTab, screenTab)) tab.setClosable(false);
+            tabs.getTabs().setAll(graphTab, screenTab);
+            SplitPane split = new SplitPane(outline.node(), tabs);
             split.setDividerPositions(0.26);
             SplitPane.setResizableWithParent(outline.node(), false);
             root.setCenter(split);
@@ -145,6 +160,11 @@ public final class ScreenMap {
         });
         poll = new Timeline(new KeyFrame(POLL, e -> readLater()));
         poll.setCycleCount(Timeline.INDEFINITE);
+    }
+
+    /** An input picked on the board or in the panel, its line picked in the outline; null {@code field}: none. */
+    private void inputPicked(String constant, String field) {
+        if (outline != null) outline.selectInput(constant, field);
     }
 
     /**

@@ -50,14 +50,16 @@ class HandParityTest {
             entry("ResetInput", Hand.now("⋯ input ▸ Result ▸ Untried")),
             entry("RemoveInput", Hand.now("⋯ input ▸ Remove from this screen")),
             entry("UseAsBack", Hand.now("⋯ input ▸ Use as the way back")),
-            entry("RemoveBack", Hand.in(2, "the screen inspector's way back")),
-            entry("RemoveWay", Hand.in(2, "the screen inspector's ways in")),
+            entry("RemoveBack", Hand.now("the panel's Way back ✕")),
+            entry("AddWay", Hand.now("⋯ input ▸ Result ▸ Leads to a screen on the map…, the picked input's Leads "
+                    + "to…")),
+            entry("RemoveWay", Hand.now("the panel's Ways in ⋯ ▸ Remove this way in")),
             entry("WayWhen", Hand.now("an arrow's menu ▸ Open only while")),
             entry("InputWhen", Hand.now("⋯ input ▸ Only there while")),
             entry("Group", Hand.in(6, "the strip and tree inspectors")),
             entry("Link", Hand.in(7, "the tree inspector")),
-            entry("LookWhen", Hand.in(2, "the screen inspector's looks")),
-            entry("AddMarker", Hand.in(2, "✂ Cut marker; absent ones in the screen inspector's markers")),
+            entry("LookWhen", Hand.now("the panel's Looks ⋯ ▸ Shows only while")),
+            entry("AddMarker", Hand.now("✂ Cut marker, ＋ Marker from a picture… (shows it or never does)")),
             entry("RemoveMarker", Hand.now("the panel's markers ✕")),
             // the map tools
             entry("not_a_screen", Hand.now("⋯ Screen ▸ Not a screen")),
@@ -76,7 +78,7 @@ class HandParityTest {
             entry("edit_pictures", Hand.in(4, "🖼 Manage Pictures; recut on the board")),
             entry("save_region", Hand.in(4, "a zone cut on the board")),
             entry("save_digits", Hand.in(4, "a digits cut on the board")),
-            entry("write_notes", Hand.in(2, "the screen inspector's notes")),
+            entry("write_notes", Hand.now("the panel's Notes, Save notes")),
             entry("launch_game", Hand.in(3, "▶ Launch on the board")));
 
     /** Every action the parity covers: edit_map's actions by their record, then the tools by name. */

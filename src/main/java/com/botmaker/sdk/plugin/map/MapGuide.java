@@ -45,6 +45,11 @@ final class MapGuide {
     static final String CUT_MARKER = "Draw a box around a part only this screen shows; on a screen with markers, one "
             + "more of them: it shows where all of them are found";
     static final String GO_HERE = "Walk the game here by the map, as Navigate.to does in a run";
+    static final String ADD_MARKER = "One more marker from a picture the bot has, or a picture this screen never "
+            + "shows where a look-alike does";
+    static final String LEADS_TO = "Pick the screen of the map this input opens: one more way into it";
+    static final String REMOVE_BACK = "Take its own way back off: a walk then closes it by its close button, else "
+            + "Escape";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
@@ -69,7 +74,16 @@ final class MapGuide {
                             + "input the screen it opens first; popups and screens not reached sit in groups below."),
                     new Entry("◻ ⌨ ☰ 🌳", null, "A button, a hotkey, a strip, a tree."),
                     new Entry("Owes", null, FILTER_OWES + "."),
-                    new Entry("Untried", null, FILTER_UNTRIED + "."))),
+                    new Entry("Untried", null, FILTER_UNTRIED + "."),
+                    new Entry("a click", null, "Picks the screen and shows it big in the Screen tab; an input's line "
+                            + "picks that input too."))),
+            new Section("The Screen tab", List.of(
+                    new Entry("Graph | Screen", null, "The map, or the picked screen's shot as big as the tab."),
+                    new Entry("a box", null, "Picks its input: the panel shows it first, with the screens it leads "
+                            + "to (→ picks one) and Leads to…; ✕ picks none."),
+                    new Entry("Leads to…", null, LEADS_TO + ", as try_input records an input that led to a screen "
+                            + "mapped already."),
+                    new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),
                     new Entry("owes its marker", "screen-pill-owes", "Nothing tells this screen yet: cut its marker, "
@@ -97,12 +111,18 @@ final class MapGuide {
                     new Entry("✂ Cut inputs", null, CUT_INPUTS + "."),
                     new Entry("✂ Cut marker", null, CUT_MARKER + ". Markers lists them, and the pictures it never "
                             + "shows; ✕ takes one off."),
+                    new Entry("＋ Marker from a picture…", null, ADD_MARKER + "."),
+                    new Entry("Ways in", null, "Each screen and input it is reached from; its ⋯ says when the way is "
+                            + "open, or takes it off. The first is how it was found."),
+                    new Entry("Looks", null, "The looks the screen has; each one's ⋯ names the method it shows only "
+                            + "while."),
+                    new Entry("Way back ✕", null, REMOVE_BACK + "; the input it was stays, untried."),
                     new Entry("🧭 Go here", null, GO_HERE + "."),
                     new Entry("⋯ Screen", null, "Rename; Popup, for a screen the game opens on its own; retake the "
                             + "shot; add pictures the bot has; a new screen from here; not a screen, when its way in "
                             + "only changes the screen above; delete. A card's right-click opens the same menu."),
-                    new Entry("the shot", null, "Click it to see it big; click a box for what that input opens, "
-                            + "else its picture. A picture shows ← to go back to its screen. Each box is where its "
+                    new Entry("the shot", null, "Click it to see it big in the Screen tab; click a box to pick its "
+                            + "input. A picture shows ← to go back to its screen. Each box is where its "
                             + "picture is on the shot; a dashed one is away from its picture's place (placed again "
                             + "while the game shows the screen, it gets a copy of its own there); one not on the shot "
                             + "is listed under it, and its row says not on shot."))),

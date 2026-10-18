@@ -389,6 +389,59 @@ public final class ScreenEdits {
     }
 
     /**
+     * Records that {@code from}'s field {@code viaField} leads to {@code to}, a screen mapped already: one more way into
+     * it, the input untried again so its result is the screen it opens — what try_input writes for an input that led
+     * to one mapped already, done by hand.
+     */
+    public static String addWay(StudioServices services, String to, String from, String viaField) {
+        ScreenGraph graph = ScreenBook.read(services);
+        Optional<String> refused = wayRefused(graph, to, from, viaField);
+        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
+        Input via = graph.screens().get(from).input(viaField).orElseThrow();
+        Optional<String> failed = ScreenBook.step(services, "Add a way into " + graph.shown(to),
+                () -> ScreenBook.update(services, from, s -> s.withInput(viaField, untried(via)))
+                        .or(() -> ScreenBook.update(services, to, s -> withWay(s, from, viaField))));
+        return said(failed, graph.shown(from) + "'s " + viaField + " leads to " + graph.shown(to) + ".");
+    }
+
+    /** Why {@code from}'s {@code viaField} may not be made a way into {@code to}; empty when it may. */
+    static Optional<String> wayRefused(ScreenGraph graph, String to, String from, String viaField) {
+        MapScreen target = graph.screens().get(to);
+        MapScreen on = graph.screens().get(from);
+        if (target == null || on == null) {
+            return Optional.of("no screen " + (target == null ? to : from) + " in the map.");
+        }
+        if (on.input(viaField).isEmpty()) return Optional.of(graph.shown(from) + " has no input " + viaField + ".");
+        if (to.equals(from)) {
+            return Optional.of("an input that stays on its own screen changes it in place: set it tried, opening "
+                    + "nothing.");
+        }
+        if (target.isPopup()) {
+            return Optional.of(graph.shown(to) + " is a popup, opened by the game itself: no way leads into it.");
+        }
+        if (graph.parent(from).filter(to::equals).isPresent()) {
+            return Optional.of(graph.shown(to) + " is the screen above it: use " + viaField + " as its way back.");
+        }
+        if (graph.above(from).contains(to)) {
+            return Optional.of(graph.shown(from) + " is reached through " + graph.shown(to) + ": set " + viaField
+                    + " as leaving for a screen reached otherwise.");
+        }
+        if (target.ways().stream().anyMatch(way -> wayFrom(graph, way, from, viaField))) {
+            return Optional.of(viaField + " leads to " + graph.shown(to) + " already.");
+        }
+        return Optional.empty();
+    }
+
+    /** {@code screen} with one more way in, through {@code from}'s field {@code viaField}. */
+    static MapScreen withWay(MapScreen screen, String from, String viaField) {
+        return screen.setup(s -> {
+            List<Way> ways = new ArrayList<>(s.alsoFrom());
+            ways.add(Way.of(BotConstants.input(from, viaField)));
+            return s.alsoFrom(ways);
+        });
+    }
+
+    /**
      * Takes {@code to}'s way in through {@code from}'s field {@code viaField} off the map: its next way in becomes the
      * tree's when it was the tree's. Refused for a screen's only way in: the screen is deleted instead.
      */

@@ -28,8 +28,10 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
+import javafx.util.StringConverter;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -39,6 +41,9 @@ import java.util.function.Supplier;
  * to {@code done}, which says it and reads the map again.
  */
 final class ScreenHands {
+
+    private static final String SHOWS = "shows it (one more marker)";
+    private static final String NEVER_SHOWS = "never shows it (where a look-alike does)";
 
     private final StudioServices services;
     private final Supplier<ScreenGraph> graph;
@@ -68,7 +73,8 @@ final class ScreenHands {
                         ScreenEdits.untried(input).tried())),
                 pick("Leaves for a screen reached otherwise", did, !opens && input.isLeaving(), () -> set(constant,
                         field, ScreenEdits.untried(input).leaves())),
-                pick("Opens a new screen…", did, opens, () -> newScreen(constant, field)));
+                pick("Opens a new screen…", did, opens, () -> newScreen(constant, field)),
+                item("Leads to a screen on the map…", () -> addWay(constant, field)));
         CheckMenuItem info = new CheckMenuItem("Information only");
         info.setSelected(input.isInfo());
         info.setOnAction(e -> set(constant, field, ScreenEdits.info(input, info.isSelected())));
@@ -96,6 +102,78 @@ final class ScreenHands {
                 method -> done.accept(ScreenEdits.setInputWhen(services, constant, field, method)));
         menu.getItems().addAll(result, info, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
         return menu;
+    }
+
+    /**
+     * Asks which screen of the map {@code from}'s field {@code field} leads to, and records it as one more way into
+     * that screen: what try_input writes for an input that led to a screen mapped already.
+     */
+    void addWay(String from, String field) {
+        ScreenGraph map = graph.get();
+        List<String> screens = map.screens().keySet().stream()
+                .filter(c -> !c.equals(from) && !map.screens().get(c).isPopup()).toList();
+        ComboBox<String> to = new ComboBox<>(FXCollections.observableArrayList(screens));
+        to.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(String constant) {
+                return constant == null ? "" : map.shown(constant);
+            }
+
+            @Override
+            public String fromString(String shown) {
+                return screens.stream().filter(c -> map.shown(c).equals(shown)).findFirst().orElse(null);
+            }
+        });
+        to.setVisibleRowCount(16);
+        Modals.form(services, "Leads to…", new VBox(8, new Label(map.shown(from) + "'s " + field + " opens"), to),
+                () -> {
+                    if (to.getValue() == null) {
+                        done.accept("Pick the screen it opens.");
+                        return;
+                    }
+                    done.accept(ScreenEdits.addWay(services, to.getValue(), from, field));
+                });
+    }
+
+    // --- a screen's ways in, looks and markers ---
+
+    /**
+     * The ⋯ menu of {@code to}'s way in from {@code from} by its field {@code field}, open only while {@code when}
+     * (blank: always): when it is open, and taking it off the map.
+     */
+    MenuButton wayMenu(String to, String from, String field, String when) {
+        MenuButton menu = new MenuButton("⋯");
+        menu.setTooltip(new Tooltip("Edit this way in"));
+        menu.getItems().addAll(whileMenu("Open only while", when, method -> done.accept(
+                        ScreenEdits.setWayWhen(services, to, from, field, method))),
+                item("Remove this way in", () -> done.accept(ScreenEdits.removeWay(services, to, from, field))));
+        return menu;
+    }
+
+    /** The ⋯ menu of {@code constant}'s look {@code look}, shown only while {@code when} (blank: no method says). */
+    MenuButton lookMenu(String constant, String look, String when) {
+        MenuButton menu = new MenuButton("⋯");
+        menu.setTooltip(new Tooltip("When " + look + " shows"));
+        menu.getItems().add(whileMenu("Shows only while", when, method -> done.accept(
+                ScreenEdits.setLookWhen(services, constant, look, method))));
+        return menu;
+    }
+
+    /**
+     * Asks for a picture the bot has and whether {@code constant} shows it or never does, then hands both to
+     * {@code chosen}: the marker is matched over every other shot, off the FX thread, by its caller.
+     */
+    void askMarker(String constant, BiConsumer<String, Boolean> chosen) {
+        // Only a picture the bot has: none is cut here.
+        ComboBox<String> pick = new ComboBox<>(FXCollections.observableArrayList(ScreenEdits.pictures(services)));
+        ChoiceBox<String> shows = new ChoiceBox<>(FXCollections.observableArrayList(SHOWS, NEVER_SHOWS));
+        shows.setValue(SHOWS);
+        Modals.form(services, "Add a marker to " + graph.get().shown(constant), new VBox(8,
+                new Label("A picture the bot has"), pick, new Label("The screen"), shows), () -> {
+            if (pick.getValue() != null && !pick.getValue().isBlank()) {
+                chosen.accept(pick.getValue().strip(), NEVER_SHOWS.equals(shows.getValue()));
+            }
+        });
     }
 
     // --- a link ---

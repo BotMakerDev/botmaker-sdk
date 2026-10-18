@@ -602,10 +602,12 @@ final class ScreenCanvas {
      * audit is made or for a picture it has not checked, where it was cut ({@code cuts}, by picture); each box hands its
      * row to {@code onPick} when clicked. A box away from its picture's place is dashed; a picture not on the shot is
      * listed under it. A member of one of {@code strips} is drawn in its strip instead, every member of the list in
-     * it, over the place the list sits. {@code onShot} runs on a click elsewhere on the shot (null: none).
+     * it, over the place the list sits. {@code onShot} runs on a click elsewhere on the shot (null: none). The input
+     * whose field is {@code picked} is drawn picked (null: none).
      */
     Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<Strip> strips,
-                                  Map<String, FrameCut> cuts, Audit audit, Consumer<Row> onPick, Runnable onShot) {
+                                  Map<String, FrameCut> cuts, Audit audit, String picked, Consumer<Row> onPick,
+                                  Runnable onShot) {
         int shotWidth = resources == null ? 0 : ScreenShots.size(ScreenShots.file(resources, constant)).width();
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
         return image(constant, width, false).map(image -> {
@@ -649,6 +651,7 @@ final class ScreenCanvas {
                 Rectangle box = new Rectangle(at.x(), at.y(), at.width(), at.height());
                 box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
                         .toLowerCase(Locale.ROOT));
+                if (row.field().equals(picked)) box.getStyleClass().add("screen-shot-box-picked");
                 String tip = row.label() + ": " + row.result();
                 if (spot.isPresent() && spot.get().where() == Where.ELSEWHERE) {
                     box.getStyleClass().add("screen-shot-box-away");
@@ -665,7 +668,7 @@ final class ScreenCanvas {
             }
             for (Strip strip : drawn) {
                 boxes.getChildren().add(strip(strip, boxOn(strip.place(), shotWidth, shotHeight, width, height),
-                        onPick));
+                        picked, onPick));
             }
             StackPane layered = new StackPane(shot, boxes);
             layered.setMaxSize(width, height);
@@ -686,14 +689,16 @@ final class ScreenCanvas {
 
     /**
      * {@code strip} drawn {@code at} its place on a shot: each member's picture, the list's own order, as wide as the
-     * strip (tall, across), the wheel scrolling it; each picture hands its row to {@code onPick} when clicked.
+     * strip (tall, across), the wheel scrolling it; each picture hands its row to {@code onPick} when clicked, the one
+     * of field {@code picked} drawn picked.
      */
-    private Node strip(Strip strip, Box at, Consumer<Row> onPick) {
+    private Node strip(Strip strip, Box at, String picked, Consumer<Row> onPick) {
         double size = Math.max(16, (strip.down() ? at.width() : at.height()) - 4);
         Pane line = strip.down() ? new VBox(2) : new HBox(2);
         for (Row row : strip.members()) {
             Node picture = thumb(row.picture(), size, "screen-strip-member");
             picture.getStyleClass().add("screen-strip-member-" + row.state().name().toLowerCase(Locale.ROOT));
+            if (row.field().equals(picked)) picture.getStyleClass().add("screen-strip-member-picked");
             // Not on the screen at every time: drawn faint, as the game shows it only at times.
             if (row.input().comesAndGoes()) picture.setOpacity(0.45);
             Tooltip.install(picture, new Tooltip(row.label() + ": " + row.result()));

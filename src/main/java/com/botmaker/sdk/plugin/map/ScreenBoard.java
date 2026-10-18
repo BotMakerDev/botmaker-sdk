@@ -1,0 +1,138 @@
+package com.botmaker.sdk.plugin.map;
+
+import javafx.beans.binding.Bindings;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.DoubleFunction;
+
+/**
+ * The 🗺 Screens window's Screen tab: the picked screen's shot as big as the tab, each input boxed where it is, the
+ * picked one drawn picked (the user's call, 2026-10-18). A box clicked picks its input, which the side panel then
+ * shows. The wheel zooms, a drag moves it; Fit draws it as wide as the tab again.
+ */
+final class ScreenBoard {
+
+    private static final double PADDING = 12;
+    private static final double LEAST = 0.25;
+    private static final double MOST = 6;
+    private static final double STEP = 1.2;
+    /** A mouse wheel's notch, in scroll pixels. */
+    private static final double NOTCH = 40;
+
+    private final StackPane holder = new StackPane();
+    private final ScrollPane scroller = new ScrollPane(holder);
+    private final Label title = new Label();
+    private final BorderPane root = new BorderPane(scroller);
+    /** The shot at a width, its inputs boxed; null while no screen is picked. */
+    private DoubleFunction<Optional<Node>> shotAt;
+    private String constant;
+    /** What the board shows, so a poll that changed nothing draws nothing. */
+    private Object drawn;
+    /** How much wider than the tab the shot is drawn: 1 fits it. */
+    private double zoom = 1;
+    private double drawnWidth;
+
+    ScreenBoard() {
+        holder.setPadding(new Insets(PADDING));
+        holder.setAlignment(Pos.TOP_CENTER);
+        scroller.setPannable(true);
+        // Always there: a scrollbar coming and going with the shot's height would change its width, and so its height.
+        scroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
+        // At least as wide as the tab, so a fitted shot is centred, and wider once zoomed in, so it scrolls.
+        holder.minWidthProperty().bind(Bindings.createDoubleBinding(() -> scroller.getViewportBounds() == null ? 0
+                : scroller.getViewportBounds().getWidth(), scroller.viewportBoundsProperty()));
+        scroller.getStyleClass().add("screen-panel-scroller");
+        scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
+            if (e.getDeltaY() == 0 || shotAt == null) return;
+            // The wheel over a strip drawn on the shot scrolls the strip.
+            for (Node at = e.getTarget() instanceof Node n ? n : null; at != null && at != scroller;
+                 at = at.getParent()) {
+                if (at instanceof ScrollPane) return;
+            }
+            e.consume();
+            zoom = Math.clamp(zoom * Math.pow(STEP, e.getDeltaY() / NOTCH), LEAST, MOST);
+            draw(true);
+        });
+        // The tab made wider or narrower: the shot is drawn again to fit it.
+        scroller.viewportBoundsProperty().addListener((o, was, is) -> {
+            if (was == null || Math.abs(was.getWidth() - is.getWidth()) >= 8) draw(true);
+        });
+        title.getStyleClass().add("screen-panel-name");
+        title.setMinWidth(0);
+        HBox.setHgrow(title, Priority.ALWAYS);
+        Button fit = new Button("Fit");
+        fit.setTooltip(new Tooltip("Draw the shot as wide as the tab"));
+        fit.setOnAction(e -> {
+            zoom = 1;
+            draw(true);
+        });
+        Label hint = new Label("Click a box to pick its input · the wheel zooms · a drag moves it");
+        hint.getStyleClass().add("screen-panel-path");
+        HBox bar = new HBox(10, title, hint, fit);
+        bar.setAlignment(Pos.CENTER_LEFT);
+        bar.setPadding(new Insets(6, 10, 6, 10));
+        bar.getStyleClass().add("screen-map-bar");
+        root.setTop(bar);
+        root.getStyleClass().add("screen-map");
+        root.getStylesheets().add(ScreenCanvas.SHEET);
+        show(null, null, null, null);
+    }
+
+    Node node() {
+        return root;
+    }
+
+    /**
+     * Shows {@code constant}, called {@code name}, drawn by {@code shotAt}; {@code key} is everything the drawing is
+     * made of, so a call with the same key draws nothing. Another screen is drawn fitted. Null {@code constant}: none.
+     */
+    void show(String constant, String name, Object key, DoubleFunction<Optional<Node>> shotAt) {
+        if (!Objects.equals(constant, this.constant)) zoom = 1;
+        this.constant = constant;
+        this.shotAt = shotAt;
+        title.setText(constant == null ? "No screen picked" : name);
+        if (Objects.equals(key, drawn) && (constant != null || !holder.getChildren().isEmpty())) return;
+        drawn = key;
+        draw(false);
+    }
+
+    /** Draws the shot again; {@code resized} only when its width changed. */
+    private void draw(boolean resized) {
+        double width = width();
+        if (resized && Math.abs(width - drawnWidth) < 1) return;
+        drawnWidth = width;
+        if (shotAt == null) {
+            holder.getChildren().setAll(said("Pick a screen in the outline or on the graph to see it big here."));
+            return;
+        }
+        holder.getChildren().setAll(shotAt.apply(width).orElseGet(() -> said("It has no shot yet: ⋯ Screen ▸ "
+                + "Retake its shot from the game, while the game shows it.")));
+    }
+
+    /** How wide the shot is drawn: the tab's width less its padding, at the zoom. */
+    private double width() {
+        double seen = scroller.getViewportBounds() == null ? 0 : scroller.getViewportBounds().getWidth();
+        return Math.max(160, Math.floor(((seen > 0 ? seen : 800) - 2 * PADDING) * zoom));
+    }
+
+    private static Label said(String text) {
+        Label label = new Label(text);
+        label.setWrapText(true);
+        label.setMinHeight(Region.USE_PREF_SIZE);
+        return label;
+    }
+}

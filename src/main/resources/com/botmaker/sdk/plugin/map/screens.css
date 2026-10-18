@@ -111,6 +111,12 @@
     -fx-stroke-dash-array: 6 4;
 }
 
+/* The input picked on the board: the accent, thick, whatever its state. */
+.screen-shot-box-picked {
+    -fx-stroke: -bm-screen-here;
+    -fx-stroke-width: 3;
+}
+
 /* A list drawn whole over the place it sits on the shot: every member's picture, the wheel scrolling it. */
 .screen-strip,
 .screen-strip > .viewport {
@@ -140,6 +146,11 @@
 .screen-strip-member-locked,
 .screen-strip-member-unseen {
     -fx-border-color: -bm-screen-plain;
+}
+
+.screen-strip-member-picked {
+    -fx-border-color: -bm-screen-here;
+    -fx-border-width: 3;
 }
 
 .screen-strip-member:hover {

@@ -33,8 +33,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -50,7 +50,6 @@ final class ScreenOutline {
     private final ToggleButton owes = new ToggleButton("Owes");
     private final ToggleButton untried = new ToggleButton("Untried");
     private final VBox root;
-    private final Consumer<String> picked;
     /** Lines shut by hand, by {@link Entry#key}: kept shut across reads. */
     private final Set<String> shut = new HashSet<>();
     private ScreenGraph graph = ScreenGraph.of(Map.of());
@@ -59,13 +58,12 @@ final class ScreenOutline {
     private boolean picking;
 
     /**
-     * @param picked     a screen picked here, by its constant
+     * @param picked     a screen picked here, by its constant, and the field of its input picked (null: none)
      * @param screenMenu a screen's right-click menu
      * @param inputMenu  an input's right-click menu
      */
-    ScreenOutline(Consumer<String> picked, Function<String, ContextMenu> screenMenu,
+    ScreenOutline(BiConsumer<String, String> picked, Function<String, ContextMenu> screenMenu,
                   BiFunction<String, Row, ContextMenu> inputMenu) {
-        this.picked = picked;
         filterText.setPromptText("Filter screens and inputs…");
         HBox.setHgrow(filterText, Priority.ALWAYS);
         owes.setTooltip(new Tooltip(MapGuide.FILTER_OWES));
@@ -81,7 +79,8 @@ final class ScreenOutline {
         tree.setCellFactory(view -> new Line(screenMenu, inputMenu));
         tree.getSelectionModel().selectedItemProperty().addListener((o, was, is) -> {
             if (picking || is == null || is.getValue().constant() == null) return;
-            picked.accept(is.getValue().constant());
+            Entry entry = is.getValue();
+            picked.accept(entry.constant(), entry.kind() == Kind.INPUT ? entry.row().field() : null);
         });
         VBox.setVgrow(tree, Priority.ALWAYS);
         root = new VBox(bar, tree);
@@ -115,6 +114,15 @@ final class ScreenOutline {
                 && constant.equals(e.constant())).orElse(null);
         pick(at);
         if (at != null) tree.scrollTo(tree.getRow(at));
+    }
+
+    /** Picks {@code constant}'s input {@code field}'s line, as the board picked it; null {@code field}: the screen's. */
+    void selectInput(String constant, String field) {
+        TreeItem<Entry> at = find(tree.getRoot(), e -> constant.equals(e.constant()) && (field == null
+                ? e.kind() == Kind.SCREEN : e.kind() == Kind.INPUT && field.equals(e.row().field()))).orElse(null);
+        if (at == null) return;
+        pick(at);
+        tree.scrollTo(tree.getRow(at));
     }
 
     private void pick(TreeItem<Entry> at) {

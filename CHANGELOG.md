@@ -25,6 +25,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   it, and under an input the screen it opens; popups and screens not reached are grouped below. A filter keeps
   the screens and inputs whose words match, and *Owes* / *Untried* keep only what is left to do. Picking a line
   picks the screen on the graph, and a right-click gives the screen's or the input's ⋯ menu.
+- **🗺 Screens shows a screen big.** The centre is now *Graph | Screen*: a line picked in the outline shows its
+  screen's shot as big as the tab, each input boxed; a box clicked picks its input, which the panel shows first
+  with the screens it leads to. The wheel zooms, *Fit* fits it again. *🔍 Show the screen big* opens the tab.
+- **A way into a screen mapped already, by hand.** An input's ⋯ ▸ Result ▸ *Leads to a screen on the map…* (and
+  the picked input's *Leads to…*) records what try_input records for an input that led to one mapped already;
+  edit_map's `add_way` does the same for the assistant.
+- **The panel edits all of a screen.** *Ways in* lists each way, its ⋯ setting when it is open or taking it off;
+  *Looks* sets the method each look shows only while; *Way back* ✕ takes its own way back off; *＋ Marker from a
+  picture…* adds a marker, or a picture the screen never shows, from the pictures the bot has.
 - **A tree of nodes is an input.** A research or skill tree is a `Tree` field of its screen:
   `Tree.of(List.of(Node.of(Pictures.DAMAGE), Node.of(Pictures.HEALTH).after(List.of(Pictures.DAMAGE))
   .beside(List.of(Beside.of(Pictures.DAMAGE, 1.2, -0.6))))).dragged()`. Each node is one of the screen's buttons.
