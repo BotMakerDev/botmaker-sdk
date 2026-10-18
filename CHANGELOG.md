@@ -46,6 +46,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **🗺 Screens goes full screen, and its live game runs at about 30 frames a second.** ☰ Outline and ▤ Panel hide
+  either side, and this computer remembers which; ⛶ or F11 makes the window full screen (Esc leaves it). ● Live
+  reads the game every 33 ms, not 125, and draws each frame into the same image; the line under the board says how
+  many frames a second it draws and what a read of the game takes, "the capture is the limit" when a read takes
+  longer than a frame. ❄ Freeze still keeps the frame lossless.
 - **🗺 Screens' cuts close, move and say why.**
   - **A free shape** closes on a click on its first corner (drawn as a ring), on ✓ Close shape, a double-click or
     Enter. The line under the board says how.

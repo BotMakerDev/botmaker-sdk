@@ -28,7 +28,9 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -49,6 +51,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.prefs.Preferences;
 
 /**
  * 🗺 Screens: the bot's screen map, its {@code Screens} class, drawn as a graph — the SDK plugin's own window, and a
@@ -66,6 +70,12 @@ public final class ScreenMap {
     private static final int READ_ANYWAY = 20;
     /** A search hit's marker. */
     private static final double HIT_THUMB = 26;
+    /** The outline's share of the window's width, beside the centre. */
+    private static final double OUTLINE_SHARE = 0.26;
+    /** Whether the outline and the panel show: per viewer, not per project. */
+    private static final Preferences PREFS = Preferences.userNodeForPackage(ScreenMap.class);
+    private static final String OUTLINE_KEY = "map.outline";
+    private static final String PANEL_KEY = "map.panel";
 
     /** The window open on each project, by its folder. On the FX thread. */
     private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
@@ -82,6 +92,13 @@ public final class ScreenMap {
     /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
     private final Button undo = new Button("↶");
     private final Button redo = new Button("↷");
+    /** Whether the outline and the side panel show, in the full window; remembered on this computer. */
+    private final ToggleButton outlineShown = new ToggleButton("☰ Outline");
+    private final ToggleButton panelShown = new ToggleButton("▤ Panel");
+    /** The outline beside the centre; null in the overlay's pane. */
+    private SplitPane split;
+    /** The outline's share of the window's width, as last shown. */
+    private double outlineShare = OUTLINE_SHARE;
     private final Timeline poll;
     private final List<AutoCloseable> subscriptions = new ArrayList<>();
     private Window window;
@@ -134,14 +151,15 @@ public final class ScreenMap {
             screenTab.selectedProperty().addListener((o, was, is) -> {
                 if (!is) panel.boardHidden();
             });
-            SplitPane split = new SplitPane(outline.node(), tabs);
-            split.setDividerPositions(0.26);
+            split = new SplitPane(outline.node(), tabs);
+            split.setDividerPositions(OUTLINE_SHARE);
             SplitPane.setResizableWithParent(outline.node(), false);
             root.setCenter(split);
+            remembered(outlineShown, OUTLINE_KEY, this::showOutline);
         } else {
             root.setCenter(canvas.graph());
         }
-        if (panel != null) root.setRight(panel.node());
+        if (panel != null) remembered(panelShown, PANEL_KEY, is -> root.setRight(is ? panel.node() : null));
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
@@ -163,6 +181,34 @@ public final class ScreenMap {
         });
         poll = new Timeline(new KeyFrame(POLL, e -> readLater()));
         poll.setCycleCount(Timeline.INDEFINITE);
+    }
+
+    /** {@code toggle} shown as this computer last left it, and each change applied and kept. */
+    private static void remembered(ToggleButton toggle, String key, Consumer<Boolean> apply) {
+        toggle.setSelected(PREFS.getBoolean(key, true));
+        apply.accept(toggle.isSelected());
+        toggle.selectedProperty().addListener((o, was, is) -> {
+            PREFS.putBoolean(key, is);
+            apply.accept(is);
+        });
+    }
+
+    /** The outline beside the centre, or the centre alone. */
+    private void showOutline(boolean shown) {
+        boolean there = split.getItems().contains(outline.node());
+        if (shown && !there) {
+            split.getItems().addFirst(outline.node());
+            split.setDividerPositions(outlineShare);
+        } else if (!shown && there) {
+            // The width the user dragged it to comes back with it.
+            outlineShare = split.getDividerPositions()[0];
+            split.getItems().remove(outline.node());
+        }
+    }
+
+    /** The window full screen, or back: ⛶ and F11. */
+    private void fullScreen() {
+        if (window instanceof Stage stage) stage.setFullScreen(!stage.isFullScreen());
     }
 
     /** An input picked on the board or in the panel, its line picked in the outline; null {@code field}: none. */
@@ -231,6 +277,12 @@ public final class ScreenMap {
         map.window = stage;
         // On the window, so the keys work wherever its focus is; the overlay's pane leaves them to Studio's.
         stage.addEventHandler(KeyEvent.KEY_PRESSED, key -> HistoryKeys.handle(key, map::step));
+        stage.addEventHandler(KeyEvent.KEY_PRESSED, key -> {
+            if (key.getCode() != KeyCode.F11) return;
+            key.consume();
+            map.fullScreen();
+        });
+        stage.setFullScreenExitHint("F11 or Esc leaves full screen");
         if (project != null) OPEN.put(project, map);
         stage.setOnHidden(e -> {
             map.stop();
@@ -485,7 +537,12 @@ public final class ScreenMap {
             Button png = new Button("⤓ PNG");
             png.setTooltip(new Tooltip(MapGuide.PNG));
             png.setOnAction(e -> savePng());
-            bar.getChildren().addAll(tidy, png);
+            outlineShown.setTooltip(new Tooltip(MapGuide.OUTLINE));
+            panelShown.setTooltip(new Tooltip(MapGuide.PANEL));
+            Button whole = new Button("⛶");
+            whole.setTooltip(new Tooltip(MapGuide.FULL_SCREEN));
+            whole.setOnAction(e -> fullScreen());
+            bar.getChildren().addAll(tidy, png, outlineShown, panelShown, whole);
         } else {
             Button open = new Button("🗺 Open");
             open.setTooltip(new Tooltip(MapGuide.OPEN));

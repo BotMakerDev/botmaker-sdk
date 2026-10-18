@@ -30,6 +30,9 @@ final class MapGuide {
     static final String PNG = "Save the whole map as a picture, at full size";
     static final String OPEN = "Open 🗺 Screens, with each screen's inputs and actions";
     static final String GUIDE = "What each sign on the map means";
+    static final String OUTLINE = "Show or hide the outline of screens, on the left";
+    static final String PANEL = "Show or hide the side panel of the screen picked, on the right";
+    static final String FULL_SCREEN = "The window full screen, or back (F11; Esc leaves it too)";
 
     // --- the outline ---
     static final String FILTER_OWES = "Only screens owing their marker or with nothing cut";
@@ -103,8 +106,11 @@ final class MapGuide {
                     new Entry("↶ ↷", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y): a map edit "
                             + "and a code edit are undone in the order they were made."),
                     new Entry("Tidy", null, TIDY + "."),
-                    new Entry("⤓ PNG", null, PNG + ". ↶ ↷, Tidy and ⤓ PNG are in the 🗺 Screens window, not "
-                            + "the overlay's tab."))),
+                    new Entry("⤓ PNG", null, PNG + "."),
+                    new Entry("☰ Outline ▤ Panel", null, "Show or hide the outline and the side panel; this "
+                            + "computer remembers which."),
+                    new Entry("⛶", null, FULL_SCREEN + ". ↶ ↷, Tidy, ⤓ PNG, ☰ ▤ and ⛶ are in the 🗺 Screens "
+                            + "window, not the overlay's tab."))),
             new Section("The outline", List.of(
                     new Entry("Filter screens and inputs…", null, "Keeps the screens and inputs whose words have the "
                             + "text, and the lines down to them. Under each screen are its inputs, and under an "

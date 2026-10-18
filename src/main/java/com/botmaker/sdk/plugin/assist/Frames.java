@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * What the assistant's tools share: the last screenshot it was shown, the screen as a source in screenshot
@@ -81,20 +82,33 @@ final class Frames {
     }
 
     private static Optional<BufferedImage> lookNow(AgentContext context) {
+        return feed(context).get();
+    }
+
+    /**
+     * Where {@link #look} reads, found once: each call of the answer reads a frame there, without finding the
+     * private display or reading the capture source again. A feed of many frames finds it again now and then, since
+     * a launch may bring a private display up. Blocking.
+     */
+    static Supplier<Optional<BufferedImage>> feed(AgentContext context) {
         PrivateSession session = session(context);
         if (session != null) {
-            try {
-                // The game's window, as a run's SessionSource grabs it: gamescope never paints its root, so the
-                // whole screen is black there; the screen only until a window is attached.
-                BufferedImage window = session.capture();
-                return Optional.ofNullable(window != null ? window : session.captureScreen());
-            } catch (RuntimeException closing) {
-                return Optional.empty();
-            }
+            return () -> {
+                try {
+                    // The game's window, as a run's SessionSource grabs it: gamescope never paints its root, so the
+                    // whole screen is black there; the screen only until a window is attached.
+                    BufferedImage window = session.capture();
+                    return Optional.ofNullable(window != null ? window : session.captureScreen());
+                } catch (RuntimeException closing) {
+                    return Optional.empty();
+                }
+            };
         }
         CaptureSource emulator = emulator(context);
-        if (emulator != null) return emulator.isPresent() ? Optional.ofNullable(emulator.capture()) : Optional.empty();
-        return context.frame();
+        if (emulator != null) {
+            return () -> emulator.isPresent() ? Optional.ofNullable(emulator.capture()) : Optional.empty();
+        }
+        return context::frame;
     }
 
     /**

@@ -28,6 +28,7 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
@@ -35,6 +36,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.Stage;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -55,7 +57,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * The Screen tab's game, live (the user's call, 2026-10-18): ● Live draws the game on the board about 8 times a
+ * The Screen tab's game, live (the user's call, 2026-10-18): ● Live draws the game on the board about 30 times a
  * second, as the look tools read it, and a click, a drag, the wheel or a key on it goes to the game through the
  * click, key and scroll tools' own hands. The board says which screen the game shows, by its markers, once a second
  * at most, and lights it on the graph and in the outline; a click on one of its inputs that led to another screen
@@ -70,8 +72,10 @@ import java.util.function.Supplier;
  */
 final class LiveBoard {
 
-    /** How often a live frame is read: about 8 a second. */
-    private static final long FRAME_MS = 125;
+    /** How often a live frame is read: about 30 a second. */
+    static final long FRAME_MS = 33;
+    /** How often the frame rate shown is counted again. */
+    private static final long RATE_MS = 1_000;
     /** How often the screen a live frame shows is read: matching every marker is too dear for each frame. */
     private static final long HERE_MS = 1_000;
     /** A press that moved less than this, in the frame's pixels, is a click; more is a drag. */
@@ -105,6 +109,10 @@ final class LiveBoard {
     private final AtomicBoolean reading = new AtomicBoolean();
     /** The last live frame, lossless: what ❄ Freeze keeps. */
     private volatile BufferedImage latest;
+    /** The game as the board draws it, one image drawn again in place. */
+    private final LiveImage frames = new LiveImage();
+    /** How many frames a second the board draws, and what a read of the game takes. */
+    private final Label rate = new Label();
 
     // On the FX thread from here.
     /** The inputs given to the game, one at a time and in order, off the FX thread; made when first needed. */
@@ -222,6 +230,7 @@ final class LiveBoard {
         blind = null;
         // Nothing of the last time shows until the first frame comes.
         view.setImage(null);
+        rate.setText("");
         frameWidth = 0;
         frameHeight = 0;
         on = null;
@@ -253,13 +262,36 @@ final class LiveBoard {
             showLine();
         });
         long lastHere = 0;
+        long lastRate = System.currentTimeMillis();
+        long lookMs = 0;
+        int looks = 0;
+        int drawn = 0;
+        Supplier<Optional<BufferedImage>> feed = null;
+        long fedAt = 0;
         while (generation.get() == mine) {
             long began = System.currentTimeMillis();
             Optional<BufferedImage> got;
             try {
-                got = ScreenDesk.look(reads);
+                // Where the game is read, found again each second: finding it reads the bot on the FX thread.
+                if (feed == null || began - fedAt >= HERE_MS) {
+                    feed = ScreenDesk.feed(reads);
+                    fedAt = began;
+                }
+                got = feed.get();
             } catch (RuntimeException unreadable) {
                 got = Optional.empty();
+            }
+            lookMs += System.currentTimeMillis() - began;
+            looks++;
+            if (began - lastRate >= RATE_MS) {
+                String now = rate(drawn, looks, lookMs, began - lastRate);
+                Platform.runLater(() -> {
+                    if (generation.get() == mine) rate.setText(now);
+                });
+                lastRate = began;
+                lookMs = 0;
+                looks = 0;
+                drawn = 0;
             }
             // Stopped or started again while the game was read: this loop's frame is not the board's any more.
             if (generation.get() != mine) return;
@@ -268,10 +300,14 @@ final class LiveBoard {
                 latest = image;
                 if (drawing.compareAndSet(false, true)) {
                     try {
-                        Image shown = ScreenCapture.toFxImage(image);
+                        frames.take(image);
+                        drawn++;
                         Platform.runLater(() -> {
-                            drawing.set(false);
-                            if (generation.get() == mine) shown(shown, image.getWidth(), image.getHeight());
+                            try {
+                                if (generation.get() == mine) shown(frames.show(), image.getWidth(), image.getHeight());
+                            } finally {
+                                drawing.set(false);
+                            }
                         });
                     } catch (RuntimeException undrawn) {
                         drawing.set(false);
@@ -298,6 +334,16 @@ final class LiveBoard {
                 return;
             }
         }
+    }
+
+    /**
+     * The frames drawn a second over {@code spanMs}, and what a read of the game took: the capture, not the board,
+     * is what holds the rate down when a read takes longer than a frame.
+     */
+    static String rate(int drawn, int looks, long lookMs, long spanMs) {
+        long fps = Math.round(drawn * 1000.0 / Math.max(1, spanMs));
+        long each = looks == 0 ? 0 : Math.round((double) lookMs / looks);
+        return "· " + fps + " fps, " + each + " ms a read" + (each > FRAME_MS ? ": the capture is the limit" : "");
     }
 
     /** Which screen {@code image}, taken at {@code takenMs}, shows, handed to the FX thread; one read at a time. */
@@ -405,6 +451,10 @@ final class LiveBoard {
 
     private void keyed(KeyEvent e) {
         if (!liveButton.isSelected()) return;
+        // F11 is the window's full screen, and Esc leaves it while there: neither goes to the game then.
+        boolean whole = game.getScene() != null && game.getScene().getWindow() instanceof Stage stage
+                && stage.isFullScreen();
+        if (e.getCode() == KeyCode.F11 || e.getCode() == KeyCode.ESCAPE && whole) return;
         Optional<Key> key = Key.named(e.getCode().name()).or(() -> Key.named(e.getCode().getName()));
         if (key.isEmpty()) return;
         e.consume();
@@ -511,6 +561,7 @@ final class LiveBoard {
                 said.add(at);
             }
             if (popup != null) said.add(new Label("· the popup " + map.shown(popup) + " shows over it"));
+            if (blind == null) said.add(rate);
             if (onDesktop) {
                 Label mouse = new Label("· the game is on your desktop: an input here takes your mouse");
                 mouse.getStyleClass().add("screen-panel-path");

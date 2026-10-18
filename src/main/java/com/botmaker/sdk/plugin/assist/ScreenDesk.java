@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -138,6 +139,14 @@ public final class ScreenDesk {
      */
     public static Optional<BufferedImage> look(AgentContext context) {
         return Frames.look(context);
+    }
+
+    /**
+     * {@link #look} for many frames: where it reads is found once, each call of the answer reads one frame there. A
+     * live feed asks again now and then, so a private display brought up since is read. Off the FX thread.
+     */
+    public static Supplier<Optional<BufferedImage>> feed(AgentContext context) {
+        return Frames.feed(context);
     }
 
     /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */

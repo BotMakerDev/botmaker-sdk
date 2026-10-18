@@ -1560,7 +1560,8 @@ class SdkAssistTest {
         put("MINE", MapScreen.of(Setup.named("Mine").from(BotConstants.input("HOME", "gem"))
                 .alsoFrom(List.of(Way.of(BotConstants.input("SHOP", "coin"))))));
 
-        assertTrue(text(run("edit_map", "screen", "Home", "action", "fly")).contains("rename, delete"));
+        String fly = text(run("edit_map", "screen", "Home", "action", "fly"));
+        assertTrue(fly.contains("rename") && fly.contains("delete") && fly.contains("set_kind"), fly);
         assertTrue(run("edit_map", "screen", "Nowhere", "action", "delete").isRefused());
 
         // An input: its result, whether it only tells, never, lock, coming and going, and when it is there.
