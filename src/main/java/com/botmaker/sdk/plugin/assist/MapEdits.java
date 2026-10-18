@@ -72,13 +72,14 @@ final class MapEdits {
     record Delete(String screen) implements Edit {
     }
 
-    @Describe("a popup the game opens itself, or not")
-    record Popup(String screen, boolean popup)
-            implements Edit {
+    /** What kind of screen set_kind makes it: one of the tree, a popup, the start screen, or a panel. */
+    enum Kind {
+        SCREEN, POPUP, START, PANEL
     }
 
-    @Describe("the game opens on it (new if none so called), or not")
-    record Start(String screen, boolean start) implements Edit {
+    @Describe("screen; popup, the game opens it; start, it opens on it (new if none so called); panel, in the screen "
+            + "it opens from")
+    record SetKind(String screen, Kind as) implements Edit {
     }
 
     @Describe("an input's result, info, never, lock, sometimes, repeated")
@@ -224,8 +225,8 @@ final class MapEdits {
         ScreenGraph graph = ScreenBook.read(services);
         Optional<String> found = ScreenBook.find(graph, edit.screen());
         // A start screen the map lacks is added.
-        if (found.isEmpty() && edit instanceof Start start && start.start()) {
-            return said(ScreenEdits.newStartScreen(services, start.screen()));
+        if (found.isEmpty() && edit instanceof SetKind set && set.as() == Kind.START) {
+            return said(ScreenEdits.newStartScreen(services, set.screen()));
         }
         if (found.isEmpty()) {
             return AgentReply.refused("No screen " + edit.screen() + " in the bot's Screens. Nothing was written.");
@@ -235,8 +236,7 @@ final class MapEdits {
         return switch (edit) {
             case Rename rename -> said(ScreenEdits.rename(services, screen, rename.name()));
             case Delete ignored -> said(ScreenEdits.delete(services, screen));
-            case Popup popup -> said(ScreenEdits.setPopup(services, screen, popup.popup()));
-            case Start start -> said(ScreenEdits.setStart(services, screen, start.start()));
+            case SetKind set -> said(kind(services, screen, set.as()));
             case RemoveBack ignored -> said(ScreenEdits.removeBack(services, screen));
             case LookWhen look -> said(ScreenEdits.setLookWhen(services, screen, look.look(), method(look.method())));
             case AddWay way -> addWay(way, graph, screen, services);
@@ -529,6 +529,16 @@ final class MapEdits {
                 + edit.picture().strip() + (edit.scroll() == null ? "" : " " + edit.scroll());
         return graph.shown(screen) + " has no input " + asked + (all.isEmpty() ? "" : "; its inputs: "
                 + String.join(", ", all)) + ". Nothing was written.";
+    }
+
+    /** {@code screen} made a screen of {@code kind}: a screen of the tree takes off whichever marks it had. */
+    private static String kind(StudioServices services, String screen, Kind kind) {
+        return switch (kind) {
+            case POPUP -> ScreenEdits.setPopup(services, screen, true);
+            case START -> ScreenEdits.setStart(services, screen, true);
+            case PANEL -> ScreenEdits.setPanel(services, screen, true);
+            case SCREEN -> ScreenEdits.ofTheTree(services, screen);
+        };
     }
 
     /** What {@link ScreenEdits} answered: refused when Studio would not write it. */

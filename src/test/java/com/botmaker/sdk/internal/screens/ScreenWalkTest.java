@@ -895,6 +895,24 @@ class ScreenWalkTest {
                         + "shows too");
     }
 
+    /** A panel hides the screen it is in, its markers still in view, though its way in is on another screen. */
+    @Test
+    void aPanelHidesTheScreenItIsIn() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(named("Home", "home", null, null), click("upgrade")));
+        screens.put("MARKET", screen(named("Market", "market", null, null), click("deal")));
+        screens.put("UPGRADE", screen(named("Upgrade", "upgrade_title", "MARKET", "deal")
+                .panelOf(BotConstants.screen("HOME"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        assertEquals(Optional.of("UPGRADE"),
+                new ScreenWalk(map, new Shows("home", "upgrade_title"), STEP_MS, null).whereOn(frame, null));
+        assertEquals(Optional.of("UPGRADE"),
+                new ScreenWalk(map, new Shows("home", "upgrade_title"), STEP_MS, null).whereOn(frame, "HOME"),
+                "near the screen it is in");
+    }
+
     @Test
     void anAbsentPictureTellsTwoScreensWithOneTitleApart() {
         ScreenGraph map = tabs();

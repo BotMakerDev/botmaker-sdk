@@ -97,6 +97,17 @@ class ScreenTypesTest {
         assertTrue(ScreenTypes.WAY_ON_ITS_OWN_SHAPE.writes(own));
     }
 
+    /** A panel names the screen it is in, before its way in through that screen's input. */
+    @Test
+    void aPanelNamesTheScreenItIsIn() {
+        Setup upgrade = Setup.named("Upgrade").panelOf(BotConstants.screen("HOME"))
+                .from(BotConstants.input("HOME", "upgrade"));
+        assertEquals(upgrade, roundTrip(ScreenTypes.SETUP_SHAPE, upgrade));
+        assertFalse(upgrade.popup().isPanel(), "a popup is in no screen");
+        assertFalse(upgrade.panelOf(BotConstants.screen("HOME")).start().isPanel());
+        assertTrue(Setup.named("Offer").popup().panelOf(null).isPopup(), "taking no panel off keeps the popup");
+    }
+
     @Test
     void eachInputIsWrittenByItsOwnFactory() {
         Button click = Button.of(picture("claim")).tried().sometimes().info();

@@ -33,6 +33,7 @@ import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -273,6 +274,14 @@ final class ScreenHands {
         CheckMenuItem start = new CheckMenuItem("Start screen (the game opens on it)");
         start.setSelected(screen != null && screen.isStart());
         start.setOnAction(e -> done.accept(ScreenEdits.setStart(services, constant, start.isSelected())));
+        // A panel of the screen its way in is on: only a screen an input of another opens can be one.
+        Optional<String> in = graph.get().panelOf(constant)
+                .or(() -> graph.get().parent(constant).filter(p -> !graph.get().followsOnItsOwn(constant)));
+        CheckMenuItem panel = new CheckMenuItem("A panel of " + in.map(graph.get()::shown).orElse("the screen it "
+                + "opens from") + " (shown inside it)");
+        panel.setSelected(screen != null && screen.isPanel());
+        panel.setDisable(in.isEmpty() || screen == null || screen.isPopup() || screen.isStart());
+        panel.setOnAction(e -> done.accept(ScreenEdits.setPanel(services, constant, panel.isSelected())));
         MenuItem loads = item("The next screen shows within…", () -> askText("The next screen shows within",
                 "Seconds the screen following " + shown + " on its own may take (0: 60)",
                 screen == null || screen.setup().loads() == null ? "0"
@@ -287,7 +296,7 @@ final class ScreenHands {
                 ScreenEdits.notAScreen(new PanelContext(services, CaptureValue.current(services)), constant)));
         MenuItem delete = item("Delete…", () -> confirm("Delete " + shown, "Delete " + shown + " from the map? Its "
                 + "pictures stay.", () -> done.accept(ScreenEdits.delete(services, constant))));
-        return List.of(rename, popup, start, loads, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
+        return List.of(rename, popup, start, panel, loads, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
                 notScreen, delete);
     }
 

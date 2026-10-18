@@ -227,6 +227,12 @@ public final class ScreenGraph {
         return screen(constant).map(MapScreen::from).flatMap(this::onScreen);
     }
 
+    /** The screen {@code constant} is a panel of ({@link Setup#panelOf}); empty for a screen of its own. */
+    public Optional<String> panelOf(String constant) {
+        return screen(constant).map(s -> s.setup().panelOf()).flatMap(this::constantOf)
+                .filter(c -> !c.equals(constant));
+    }
+
     /** Every screen a way into {@code constant} is on: its {@code from}'s, then each {@code alsoFrom}'s. */
     public Set<String> opensFrom(String constant) {
         Set<String> from = new LinkedHashSet<>();

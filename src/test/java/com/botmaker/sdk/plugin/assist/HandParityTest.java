@@ -38,8 +38,8 @@ class HandParityTest {
             // edit_map's actions
             entry("Rename", Hand.now("⋯ Screen ▸ Rename…")),
             entry("Delete", Hand.now("⋯ Screen ▸ Delete…")),
-            entry("Popup", Hand.now("⋯ Screen ▸ Popup")),
-            entry("Start", Hand.now("⋯ Screen ▸ Start screen; a new one: New screen… ▸ None: the game opens on it")),
+            entry("SetKind", Hand.now("⋯ Screen ▸ Popup, Start screen, A panel of <screen>; a new start screen: New "
+                    + "screen… ▸ None: the game opens on it")),
             entry("NewScreen", Hand.now("⋯ input ▸ Result ▸ Opens a new screen…, ⋯ Screen ▸ New screen from here…")),
             entry("SetInput", Hand.now("the picked input's editors: result, information only, comes and goes, "
                     + "never, locked, a button's looks, repeated and cycles, a hotkey's key; ⋯ input")),

@@ -32,8 +32,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - **🗺 Screens**: New screen… offers "None: the game opens on it"; ⋯ Screen has Start screen and The next screen
     shows within…; Ways in has ＋ After a screen, on its own…. The card says "start screen", the outline puts a
     screen that follows another on its own next to it, and read_map says who follows whom and in how long.
-  - **edit_map**: `start` (a new start screen when none is called so), and `add_way` with no input, given `seconds`.
-    `remove_way` from that screen with no input takes it off.
+  - **edit_map**: `set_kind` `start` (a new start screen when none is called so), and `add_way` with no input, given
+    `seconds`. `remove_way` from that screen with no input takes it off.
+- **Panels.** `Setup.named("Upgrade").panelOf(HOME).from(HOME.upgrade)` says, in the code, that Upgrade is shown
+  inside Home: a screen of its own, walked as any screen Home opens, and found over Home while Home's markers still
+  show, however it is opened. Its class stays beside Home's in `Screens` (`HomeUpgrade`, `Screens.HOME_UPGRADE`).
+  ⋯ Screen ▸ A panel of Home marks it; its card, the outline and read_map say "panel of Home".
+
+### Changed
+
+- **edit_map's `popup` and `start` are one action, `set_kind`**, `as` `screen`, `popup`, `start` or `panel`.
+  `screen` takes whichever mark the screen had off.
 
 ### Changed
 

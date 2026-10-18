@@ -113,6 +113,10 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         return setup.isStart();
     }
 
+    public boolean isPanel() {
+        return setup.isPanel();
+    }
+
     public String notes() {
         return setup.notes();
     }

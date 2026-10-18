@@ -53,6 +53,8 @@ final class ScreenCards {
      * @param said      the state in words: {@code 3 untried}, {@code owes its marker}
      * @param shape     {@code menu} or {@code activity} once finished, else empty
      * @param popup     whether it opens on its own
+     * @param start     whether the game opens on it
+     * @param panelOf   the name of the screen it is a panel of, null for a screen of its own
      * @param presence  whether it can be reached now
      * @param tried     its inputs tried
      * @param inputs    its inputs
@@ -60,7 +62,7 @@ final class ScreenCards {
      * @param at        where its card was moved to, null for where the layout puts it
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
-                boolean start, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
+                boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
 
         /** Whether it shows only at times, or is locked: drawn dashed. */
         boolean conditional() {
@@ -192,7 +194,8 @@ final class ScreenCards {
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
         return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
-                said, shape, screen.isPopup(), screen.isStart(), graph.presence(constant), tried, fields.size(),
+                said, shape, screen.isPopup(), screen.isStart(), graph.panelOf(constant).map(graph::shown).orElse(null),
+                graph.presence(constant), tried, fields.size(),
                 stage == null ? "" : stage, screen.at());
     }
 
@@ -207,6 +210,7 @@ final class ScreenCards {
         if (!card.shape().isEmpty()) pills.add(new Pill(card.shape(), "screen-pill-plain"));
         if (card.popup()) pills.add(new Pill("popup", "screen-pill-plain"));
         if (card.start()) pills.add(new Pill("start screen", "screen-pill-plain"));
+        if (card.panelOf() != null) pills.add(new Pill("panel of " + card.panelOf(), "screen-pill-plain"));
         if (card.conditional()) pills.add(new Pill(card.presence().name().toLowerCase(Locale.ROOT), "screen-pill-plain"));
         if (!card.stage().isEmpty()) pills.add(new Pill(card.stage(), "screen-pill-stage"));
         return pills;

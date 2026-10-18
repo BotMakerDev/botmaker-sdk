@@ -328,7 +328,8 @@ final class ScreenPanel {
         name.setWrapText(true);
         Label path = new Label(card.popup() ? "a popup, opened by the game itself"
                 : card.start() ? "the start screen: the game opens on it"
-                : String.join(" › ", ScreenCards.path(graph, selected)));
+                : (card.panelOf() == null ? "" : "a panel, shown inside " + card.panelOf() + ": ")
+                        + String.join(" › ", ScreenCards.path(graph, selected)));
         path.getStyleClass().add("screen-panel-path");
         path.setWrapText(true);
         Label constant = new Label("Screens." + selected);

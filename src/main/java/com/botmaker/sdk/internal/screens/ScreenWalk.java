@@ -172,6 +172,7 @@ public final class ScreenWalk {
                 .map(ImageTemplate::id).toList());
         List<String> its = Markers.of(graph.screens().get(over)).shown().stream().map(ImageTemplate::id).toList();
         if (its.size() > marks.size() && its.containsAll(marks)) return true;
+        if (graph.panelOf(over).filter(under::equals).isPresent()) return true;
         for (String from : graph.opensFrom(over)) {
             if (from.equals(over)) continue;
             for (Optional<String> up = Optional.of(from); up.isPresent(); up = graph.parent(up.get())) {
@@ -186,6 +187,8 @@ public final class ScreenWalk {
     private Optional<String> shownTop(List<String> shown) {
         Set<String> under = new HashSet<>();
         for (String c : shown) {
+            // A panel hides the screen it is in, however it was opened.
+            graph.panelOf(c).ifPresent(under::add);
             for (String from : graph.opensFrom(c)) {
                 if (from.equals(c)) continue;
                 for (Optional<String> up = Optional.of(from); up.isPresent() && under.add(up.get()); ) {

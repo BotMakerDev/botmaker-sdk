@@ -306,8 +306,20 @@ public final class ScreenEdits {
 
     /** Makes {@code constant} a popup, or a screen of the tree again ({@code popup} false). */
     public static String setPopup(StudioServices services, String constant, boolean popup) {
+        boolean panel = ScreenBook.read(services).screen(constant).filter(MapScreen::isPanel).isPresent();
         return said(ScreenBook.update(services, constant, s -> s.setup(x -> popup ? x.popup() : x.notPopup())),
-                popup ? "A popup now." : "No longer a popup.");
+                popup ? "A popup now" + (panel ? ", no longer a panel." : ".") : "No longer a popup.");
+    }
+
+    /** Makes {@code constant} a screen of the tree: no popup, start screen or panel, whichever marks it had. */
+    public static String ofTheTree(StudioServices services, String constant) {
+        MapScreen screen = ScreenBook.read(services).screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        if (!screen.isPopup() && !screen.isStart() && !screen.isPanel()) {
+            return "A screen of the tree already: nothing to change.";
+        }
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.notPopup().notStart().panelOf(null))),
+                "A screen of the tree now.");
     }
 
     /**
@@ -325,6 +337,10 @@ public final class ScreenEdits {
             return NOT_WRITTEN + graph.shown(constant) + " is a popup, opened over any screen: make it a screen of "
                     + "the tree first.";
         }
+        if (screen.isPanel()) {
+            return NOT_WRITTEN + graph.shown(constant) + " is a panel, shown inside another screen: make it a screen "
+                    + "of its own first.";
+        }
         if (!screen.ways().isEmpty()) {
             return NOT_WRITTEN + "the game opens on a start screen, so no way leads into it: take "
                     + graph.shown(constant) + "'s ways in off first.";
@@ -336,6 +352,30 @@ public final class ScreenEdits {
         return said(failed, "The game opens on " + graph.shown(constant) + " now"
                 + was.map(c -> "; " + graph.shown(c) + " is no start screen any more.").orElse(".")
                 + " Give the screen after it a way on its own.");
+    }
+
+    /**
+     * Makes {@code constant} a panel of the screen its way in is on ({@code panel} true), Upgrade shown inside Home, or
+     * a screen of its own again. Refused for a popup, a start screen, and a screen no input of another opens.
+     */
+    public static String setPanel(StudioServices services, String constant, boolean panel) {
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen screen = graph.screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        if (!panel) return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.panelOf(null))),
+                "A screen of its own now.");
+        if (screen.isPopup() || screen.isStart()) {
+            return NOT_WRITTEN + graph.shown(constant) + " is " + (screen.isPopup() ? "a popup, opened over any screen"
+                    : "the start screen, in no other") + ": a panel is opened by an input of the screen it is in.";
+        }
+        Optional<String> parent = graph.parent(constant).filter(c -> !graph.followsOnItsOwn(constant));
+        if (parent.isEmpty()) {
+            return NOT_WRITTEN + "a panel is opened by an input of the screen it is in, and no input opens "
+                    + graph.shown(constant) + ": give it a way in first.";
+        }
+        return said(ScreenBook.update(services, constant,
+                        s -> s.setup(x -> x.panelOf(BotConstants.screen(parent.get())))),
+                "A panel of " + graph.shown(parent.get()) + " now.");
     }
 
     /**
@@ -413,9 +453,11 @@ public final class ScreenEdits {
     public static String delete(StudioServices services, String constant) {
         ScreenGraph graph = ScreenBook.read(services);
         List<String> after = graph.screens().keySet().stream()
-                .filter(c -> !c.equals(constant) && graph.opensFrom(c).contains(constant)).map(graph::shown).toList();
+                .filter(c -> !c.equals(constant) && (graph.opensFrom(c).contains(constant)
+                        || graph.panelOf(c).filter(constant::equals).isPresent())).map(graph::shown).toList();
         if (!after.isEmpty()) {
-            return NOT_WRITTEN + String.join(", ", after) + " is reached from it: delete those first.";
+            return NOT_WRITTEN + String.join(", ", after) + " is reached from it or a panel of it: delete those "
+                    + "first.";
         }
         Optional<String> failed = ScreenBook.step(services, "Delete " + graph.shown(constant),
                 () -> ScreenBook.remove(services, constant));

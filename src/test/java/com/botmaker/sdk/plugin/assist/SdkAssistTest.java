@@ -1640,7 +1640,7 @@ class SdkAssistTest {
         assertTrue(run("edit_map", "screen", "Home", "action", "new_screen", "name", "Cave", "picture", "nothing")
                 .isRefused());
         run("edit_map", "screen", "Forge", "action", "rename", "name", "Big forge");
-        run("edit_map", "screen", "Big forge", "action", "popup", "popup", true);
+        run("edit_map", "screen", "Big forge", "action", "set_kind", "as", "popup");
         assertTrue(screen("FORGE").isPopup());
         assertEquals("Deleted Big forge.", text(run("edit_map", "screen", "FORGE", "action", "delete")));
         assertFalse(host.set("screen_map").containsKey("FORGE"));
@@ -1654,14 +1654,14 @@ class SdkAssistTest {
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("gem"))));
         put("MINE", MapScreen.of(Setup.named("Mine").from(BotConstants.input("HOME", "gem"))));
 
-        assertTrue(text(run("edit_map", "action", "start", "screen", "Loading", "start", true))
+        assertTrue(text(run("edit_map", "action", "set_kind", "screen", "Loading", "as", "start"))
                 .startsWith("Added Loading as Screens.LOADING, the screen the game opens on"));
         assertTrue(screen("LOADING").isStart());
-        assertTrue(run("edit_map", "action", "start", "screen", "Splash", "start", true).isRefused(),
+        assertTrue(run("edit_map", "action", "set_kind", "screen", "Splash", "as", "start").isRefused(),
                 "one start screen");
-        assertTrue(run("edit_map", "action", "start", "screen", "Splash", "start", false).isRefused(),
+        assertTrue(run("edit_map", "action", "set_kind", "screen", "Splash", "as", "screen").isRefused(),
                 "no screen called so");
-        AgentReply opened = run("edit_map", "screen", "Mine", "action", "start", "start", true);
+        AgentReply opened = run("edit_map", "screen", "Mine", "action", "set_kind", "as", "start");
         assertTrue(opened.isRefused() && text(opened).contains("no way leads into it"), text(opened));
 
         assertTrue(run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading").isRefused(),
@@ -1685,8 +1685,38 @@ class SdkAssistTest {
         assertTrue(text(run("edit_map", "screen", "Home", "action", "remove_way", "from", "Loading"))
                 .startsWith("Took Home's way in from Loading on its own off the map."));
         assertNull(screen("HOME").from(), "the first screen again");
-        run("edit_map", "screen", "Loading", "action", "start", "start", false);
+        run("edit_map", "screen", "Loading", "action", "set_kind", "as", "screen");
         assertFalse(screen("LOADING").isStart());
+    }
+
+    /** edit_map set_kind panel: a screen opened by an input of another, shown inside it (2026-10-18). */
+    @Test
+    void editMapMakesAPanelOfTheScreenItOpensFrom() {
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("gem"))));
+        put("UPGRADE", MapScreen.of(Setup.named("Upgrade").from(BotConstants.input("HOME", "gem"))));
+
+        assertEquals("A panel of Home now.", text(run("edit_map", "screen", "Upgrade", "action", "set_kind",
+                "as", "panel")));
+        assertEquals(BotConstants.screen("HOME"), screen("UPGRADE").setup().panelOf());
+        AgentReply first = run("edit_map", "screen", "Home", "action", "set_kind", "as", "panel");
+        assertTrue(first.isRefused() && text(first).contains("no input opens Home"), text(first));
+
+        run("edit_map", "screen", "Upgrade", "action", "set_kind", "as", "popup");
+        assertTrue(screen("UPGRADE").isPopup());
+        assertFalse(screen("UPGRADE").isPanel(), "a popup is in no screen");
+        assertTrue(run("edit_map", "screen", "Upgrade", "action", "set_kind", "as", "panel").isRefused());
+        run("edit_map", "screen", "Upgrade", "action", "set_kind", "as", "screen");
+        run("edit_map", "screen", "Upgrade", "action", "set_kind", "as", "panel");
+        run("edit_map", "screen", "Upgrade", "action", "set_kind", "as", "screen");
+        assertNull(screen("UPGRADE").setup().panelOf(), "a screen of its own again");
+
+        put("BADGE", MapScreen.of(Setup.named("Badge").panelOf(BotConstants.screen("UPGRADE"))));
+        AgentReply deleted = run("edit_map", "screen", "Upgrade", "action", "delete");
+        assertTrue(deleted.isRefused() && text(deleted).contains("Badge"), "a panel of it would name nothing");
+        assertTrue(run("edit_map", "screen", "Badge", "action", "set_kind", "as", "start").isRefused());
+        assertEquals("A screen of the tree now.", text(run("edit_map", "screen", "Badge", "action", "set_kind",
+                "as", "screen")));
+        assertFalse(screen("BADGE").isPanel());
     }
 
     /** edit_map group: a strip named by the screen's buttons in it, scrolled over a member that shows. */

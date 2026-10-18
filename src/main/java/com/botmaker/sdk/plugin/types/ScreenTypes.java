@@ -43,7 +43,7 @@ public final class ScreenTypes {
     private ScreenTypes() {}
 
     /**
-     * {@code Setup.named(String)} and its links, each written only when the screen has it:
+     * {@code Setup.named(String)} and its links, each written only when the screen has it: {@code .panelOf(…)},
      * {@code .markers(List.of(…))}, {@code .absent(List.of(…))}, {@code .from(…)} (then {@code .fromPick(…)},
      * {@code .fromLooks(…)}, {@code .fromWhen(…)} when its way needs them) or {@code .after(…)} on its own,
      * {@code .alsoFrom(List.of(…))}, {@code .back(…)}, {@code .variants(List.of(…))}, {@code .popup()},
@@ -51,6 +51,7 @@ public final class ScreenTypes {
      */
     public static final DeclaredCall<Setup> SETUP_SHAPE = ComponentType.part(Setup.class)
             .<String, Setup>writtenAs(Setup::named, Setup::name)
+            .<Screen>with(Setup::panelOf, Setup::panelOf)
             .<List<ImageTemplate>>with(Setup::markers, Setup::markers)
             .<List<ImageTemplate>>with(Setup::absent, Setup::absent)
             .<Input>with(Setup::from, Setup::fromInput)

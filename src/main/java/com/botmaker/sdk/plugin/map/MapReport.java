@@ -173,6 +173,8 @@ public final class MapReport {
         // The tree's way in, then every other: a first screen has no tree's way in and may have others.
         List<String> ins = new ArrayList<>();
         if (screen.isStart()) ins.add("the game opens on it");
+        graph.panelOf(constant).filter(p -> !graph.parent(constant).equals(Optional.of(p))).ifPresent(p -> ins.add(
+                "a panel of " + graph.shown(p) + ", though its way in is not an input of it"));
         List<String> next = graph.followers(constant);
         if (!next.isEmpty()) {
             ins.add(graph.shown(next.getFirst()) + " follows it on its own, given " + graph.loadMs(constant) / 1000
