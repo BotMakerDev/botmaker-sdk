@@ -52,9 +52,6 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **edit_map's `popup` and `start` are one action, `set_kind`**, `as` `screen`, `popup`, `start` or `panel`.
   `screen` takes whichever mark the screen had off.
-
-### Changed
-
 - **🗺 Screens goes full screen, and its live game runs at about 30 frames a second.** ☰ Outline and ▤ Panel hide
   either side, and this computer remembers which; ⛶ or F11 makes the window full screen (Esc leaves it). ● Live
   reads the game every 33 ms, not 125, and draws each frame into the same image; the line under the board says how

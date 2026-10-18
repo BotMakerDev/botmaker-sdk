@@ -198,12 +198,16 @@ final class MapGuide {
                     new Entry("＋ Strip… ＋ Tree…", null, ADD_STRIP + "; a tree's nodes the same, linked and placed in "
                             + "its editor after."),
                     new Entry("Ways in", null, "Each screen and input it is reached from; its ⋯ says when the way is "
-                            + "open, or takes it off. The first is how it was found."),
+                            + "open, or takes it off. The first is how it was found. ＋ After a screen, on its "
+                            + "own…: " + ON_ITS_OWN + "."),
                     new Entry("Looks", null, "The looks the screen has; each one's ⋯ names the method it shows only "
                             + "while."),
                     new Entry("Way back ✕", null, REMOVE_BACK + "; the input it was stays, untried."),
                     new Entry("🧭 Go here", null, GO_HERE + "."),
-                    new Entry("⋯ Screen", null, "Rename; Popup, for a screen the game opens on its own; retake the "
+                    new Entry("⋯ Screen", null, "Rename; Popup, for a screen the game opens on its own over any "
+                            + "other; Start screen, the one the game opens on (its loading screen); A panel of the "
+                            + "screen its way in is on, shown inside it; The next screen shows within…, how long a "
+                            + "walk waits on it for the screen after it; retake the "
                             + "shot; add pictures the bot has; a new screen from here; not a screen, when its way in "
                             + "only changes the screen above; delete. A card's right-click opens the same menu."),
                     new Entry("the shot", null, "Click it to see it big in the Screen tab; click a box to pick its "

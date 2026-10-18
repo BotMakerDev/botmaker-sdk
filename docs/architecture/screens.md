@@ -32,6 +32,15 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   screen after. A press that leaves the game on its screen though the map says it leads away is pressed once more
   (lag); a second stay is LEFT. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
   it looks now, nothing walked or scrolled.
+- **The start screen and ways on their own** (the user's calls of 2026-10-18): `Setup.start()` marks the screen the
+  game opens on, its loading screen, with no way in. `Setup.after(X)` (`Way.onItsOwn`) is a way with no input: the
+  screen shows by itself once X is done — Home after Loading, Battle after Entering battle; transitions are screens
+  chained so, not only the start screen. A walk presses nothing on it and waits for the next marker up to X's
+  `loads(Duration)` (60 s by default), then ends STUCK, "stuck loading on X".
+- **A panel** is a screen shown inside another: `Setup.panelOf(HOME)` on a top-level class (`HomeUpgrade`,
+  `Screens.HOME_UPGRADE`), its way in an input of that screen. It walks as any child screen and is found over Home
+  while Home's markers show. Not a class nested in Home's: Studio's open set of classes reads only classes nested
+  directly in `Screens` (the user's pick, 2026-10-18).
 
 ## Trees (`api/screens/Tree`, the user's calls of 2026-10-17)
 
@@ -86,7 +95,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **Activities run on the map** (2026-10-16): a body opens with `Navigate.to(Screens.X)`, which on arrival sets
   `ScreenMaps.reached`. `FlowWalker` clears it as each activity starts; a `BotStuckException` from the body walks back
   there (`Navigate.to`) and runs the body once more, before the run's home. `InstalledRun.home()` is the run's home
-  method, else a walk to `ScreenGraph.root()` (the first screen reached from none, popups aside).
+  method, else a walk to `ScreenGraph.home()`: the `root()` (the start screen, else the first screen reached from
+  none, popups aside), or past a start screen the one its loading ends on. Nothing leads back to a start screen.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done. A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
@@ -112,10 +122,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **Cuts** are a box, a round or a free polygon (`plugin/screen/CutShape`, `PictureCuts.cut/ellipse/polygon`): outside
   the shape is transparent and the matcher masks by alpha, so a small round icon over a moving background is cut
   whole without it. `crop_pictures` and its replace take `shape`/`points`; the Capture window's ✎ toggles the shape.
-- **`edit_map`** (`MapEdits`) fixes a wrong record by hand, nothing clicked: rename, delete, popup, notes, an
-  input's result, kind or copies (`repeated`), reset or remove an input, use one as the way back, remove a way, a
-  way's, input's or look's `when`, a new screen under another. Each action is the `ScreenEdits` method the window's
-  menus call.
+- **`edit_map`** (`MapEdits`) fixes a wrong record by hand, nothing clicked: rename, delete, `set_kind` (screen,
+  popup, start, panel), notes, an input's result, kind or copies (`repeated`), reset or remove an input, use one as
+  the way back, remove a way, a way's, input's or look's `when`, a new screen under another. Each action is the
+  `ScreenEdits` method the window's menus call.
 - **An input is named by its field** in `edit_map` and `try_input` (`picture: beerBuy`), as `read_map` lists it, or
   by its picture as before; a strip's field tries its first member by its notches. `read_map`, the 🗺 rows and the
   constant view say what the class form adds (`ScreenCards.Row.traits`): `repeated`, and a strip's scroll as measured
@@ -175,22 +185,38 @@ map tool against the hand path that covers it, and fails on one with none.
   `Graph | Screen` tabs (full window only). Under a screen are its inputs, under an input the screen it opens first;
   popups and screens not reached sit in groups below. The filter keeps the lines down to a hit; Owes and Untried
   narrow it. A click shows the screen on the Screen tab; a right-click opens the card's or the input's ⋯ menu.
+  ⊟/⊞ fold or open every line; *Inputs that open a screen* folds away each tried input no link uses
+  (`Outline.opening`); **Recent** lists the 10 screens whose shot was taken last (`Entry.recent`, by the shot
+  file's time). A start screen heads the tree, a screen that follows another on its own sits beside it, and a panel
+  says "panel of Home".
+- **The window** hides the outline (☰) or the panel (▤), remembered per computer, and ⛶/F11 makes it full screen.
 - **The board** (`ScreenBoard`, the Screen tab): the picked screen's shot as big as the tab, each input's cut boxed,
   its markers in their own colour; a box clicked picks its input. `ScreenPanel` beside it is the inspector: the
   picked input first, else the screen's markers, looks (each one's `when`), ways in, way back and notes.
   **Leads to…** records a way into a screen already mapped (`ScreenEdits.addWay`, `MapEdits.AddWay` for the tools).
 - **Live** (`LiveBoard`): the game drawn on the board from `ScreenDesk.look` (the tools' own frames, a private
-  session included), a click, drag, wheel or key on it sent through `ScreenDesk.hands`. The line under it names the
+  session included) every 33 ms into one reused image (`LiveImage`, a `PixelBuffer`), a click, drag, wheel or key on
+  it sent through `ScreenDesk.hands`. The line says "N fps, M ms a read", and "the capture is the limit" when a read
+  takes longer than a frame; a lossy display route is left until that line says so. The line under it names the
   screen the game shows (`which_screen`'s matcher, at most once a second); a click inside an input's box that took
   the game from one known screen to another with no way between them offers **Record** (`LiveWays`). **❄ Freeze**
   keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by
-  the input last clicked. Missed frames (`missed_frames`) open frozen. ▶ Launch starts the game when it is not up.
+  the input last clicked. A frame of no screen of the map offers New screen… first (its parent, or "none: the game
+  opens on it", a start screen); once written, the frame is that screen's and cutting starts on its marker.
+  Missed frames (`missed_frames`) open frozen. ▶ Launch starts the game when it is not up.
 - **Cuts on the frozen frame** (`CutLayer`, `CutForm`, `assist/BoardCuts`): a box, an oval or a polygon drawn on the
   board, ▨ the part a run skips, then each cut said what it is — a marker (set, add or absent), a button, the way
   back, a look of a button or of the screen, a strip's button, a zone (`save_region`), digits (`save_digits`) or a
   new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The pixels are the frame's,
   never grabbed again. ✂'s ▾ keeps the cut over the game window (`CaptureTemplates`) as a fallback. An object cut
   (the magic wand) is not on the board: crop_pictures has no shape for it.
+  - A free shape closes on a click on its first corner, ✓ Close shape, a double-click or Enter; a drawn cut is
+    picked by a click, moved by a drag, resized by its corners (a box or an oval) and taken off with Delete.
+  - **Nothing fails silently**: `BoardCuts.save` returns what it said and the places it refused; each refusal shows
+    on the board's line (`ScreenBoard.say`), a refused cut stays drawn, and the form or New screen reopens with the
+    reason.
+  - Every cut of one save marked a new strip makes one strip, in order (`BoardCuts.joined`), and likewise a new
+    tree; *Buttons → one new strip / tree* marks them all.
 - **The input inspector** (`InputInspector`), by the input's class:
   - **a button or a hotkey**: its result, information only, comes and goes, never, locked; a button's looks and
     whether they cycle, repeated and each way's copy (`ScreenEdits.setWayPick`); a hotkey's key. ▶ Try runs
@@ -204,4 +230,9 @@ map tool against the hand path that covers it, and fails on one with none.
     Unlocked by… (`ScreenEdits.link`), Place… by number (`ScreenEdits.placeNode`, `unplaceNode`). Its scroll is a
     drag, the wheel or none; ▶ Scroll and measure is `TreeMeasure` (`ScreenDesk.measureTree`), toward the tree's
     end or its start.
-  - A button's Strip… or Tree… puts it in one of the screen's, or in a new one.
+  - A button's Strip… or Tree… puts it in one of the screen's, or in a new one. The panel's ＋ Strip… and ＋ Tree…
+    (`askNewStrip`, `askNewTree`) make one from a checklist of the screen's buttons in no strip or tree, with its
+    scroll (`ScrollPick`, shared with Set scroll).
+- **A screen's ⋯** also has Start screen, A panel of <parent>, and The next screen shows within…; Ways in has
+  ＋ After a screen, on its own…. edit_map does the same by `set_kind` (`as` screen, popup, start, panel) and an
+  `add_way` with no input, given `seconds`.
