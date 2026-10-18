@@ -358,6 +358,15 @@ final class PictureTools {
      * refuses is said and the rest are cut, and the plain inputs and the way back are noted on the screen together.
      */
     static AgentReply cropPictures(Crops crops, AgentContext context) {
+        return cropPictures(crops, context, Frames.shown(), liveLooks(context));
+    }
+
+    /**
+     * As {@link #cropPictures(Crops, AgentContext)}, the boxes in {@code shown}'s pixels and each watched still on
+     * {@code live} (no frame: not watched): 🗺's board cuts on a frame it froze, never the assistant's screenshot.
+     */
+    static AgentReply cropPictures(Crops crops, AgentContext context, Optional<BufferedImage> shown,
+                                   Supplier<List<BufferedImage>> live) {
         List<Box> boxes = crops.boxes() == null ? List.of() : crops.boxes();
         if (boxes.isEmpty()) return AgentReply.refused("Give the boxes to cut: name, x, y, width and height each.");
         for (Box box : boxes) {
@@ -375,7 +384,7 @@ final class PictureTools {
         if (wrong.isPresent()) return AgentReply.refused(wrong.get() + " Nothing was saved.");
         String fitted = "";
         if (screen != null && context.services() != null && context.services().projectDir() != null) {
-            Checked checked = checked(context, screen, cuts);
+            Checked checked = checked(context, screen, cuts, shown);
             if (checked.refusal() != null) return AgentReply.refused(checked.refusal() + " Nothing was saved.");
             fitted = checked.said();
         }
@@ -384,12 +393,11 @@ final class PictureTools {
                 || context.services().projectDir() == null ? null
                 : MapTools.markers(context.services(), screen).orElse(null);
         if (cuts.size() == 1) {
-            AgentReply one = cropPicture(cuts.getFirst(), context);
+            AgentReply one = cropPicture(cuts.getFirst(), context, live, shown);
             return said(one.isRefused() || !cuts.getFirst().screenMarker() ? one
-                    : said(one, told(context, screen, before, cuts)), fitted);
+                    : said(one, told(context, screen, before, cuts, shown)), fitted);
         }
-        // One watch of the screen for every box: each box watched alone took a second (2026-10-14).
-        Supplier<List<BufferedImage>> live = liveLooks(context);
+        // One watch of the screen for every box (live): each box watched alone took a second (2026-10-14).
         // The markers first: one may start the screen the other boxes are noted on. Of several cut with marker set, the
         // first replaces the set and the rest join it; then the ones added, then the absent ones.
         AgentReply all = null;
@@ -404,7 +412,7 @@ final class PictureTools {
             // A note declined in words (a look of an input already) is no refusal: the set it was to start is read.
             Markers prior = first && crop.screenMarker() ? MapTools.markers(context.services(), screen).orElse(null)
                     : null;
-            AgentReply one = cropPicture(as, context, live);
+            AgentReply one = cropPicture(as, context, live, shown);
             if (!one.isRefused()) {
                 boolean wrote = !first || !crop.screenMarker() || MapTools.markers(context.services(), screen)
                         .filter(now -> prior == null || !now.same(prior)).isPresent();
@@ -413,7 +421,7 @@ final class PictureTools {
             }
             all = joined(all, crop, one);
         }
-        if (marked) all = said(all, told(context, screen, before, cuts));
+        if (marked) all = said(all, told(context, screen, before, cuts, shown));
         // The plain inputs and the way back noted on the screen together: a write of it per box was 0.5 s each.
         MapTools.Placing at = null;
         List<String> inputs = new ArrayList<>();
@@ -430,7 +438,7 @@ final class PictureTools {
                 }
                 if (at.refusal() != null) return or(all, at.refusal());
             }
-            AgentReply one = cropPicture(crop.unplaced(), context, live);
+            AgentReply one = cropPicture(crop.unplaced(), context, live, shown);
             if (!one.isRefused() && at != null) {
                 String name = TemplateLibrary.sanitizeName(crop.name());
                 if (Boolean.TRUE.equals(crop.back())) backCut = name;
@@ -448,7 +456,7 @@ final class PictureTools {
         }
         // Then another look of an input, or one with a when: what it belongs to is noted by now.
         for (Crop crop : cuts) {
-            if (crop.alone() && crop.marker() == null) all = joined(all, crop, cropPicture(crop, context, live));
+            if (crop.alone() && crop.marker() == null) all = joined(all, crop, cropPicture(crop, context, live, shown));
         }
         return said(all, fitted);
     }
@@ -458,13 +466,14 @@ final class PictureTools {
      * too, else the frame they were cut from (the live game, for pictures the bot has) is its shot when it shows them.
      * Said as sentences; blank when there is nothing to say.
      */
-    private static String told(AgentContext context, String screen, Markers before, List<Crop> cuts) {
+    private static String told(AgentContext context, String screen, Markers before, List<Crop> cuts,
+                               Optional<BufferedImage> shown) {
         // Nothing written (each note declined): the shot stays as it is.
         if (before != null && MapTools.markers(context.services(), screen).filter(before::same).isPresent()) return "";
         String clash = before == null ? "" : MapTools.unique(context.services(), screen, before);
         if (!clash.isEmpty()) return clash;
         if (cuts.stream().noneMatch(c -> c.screenMarker() && c.marker().shown())) return "";
-        Optional<BufferedImage> frame = cuts.stream().allMatch(Crop::kept) ? Frames.look(context) : Frames.shown();
+        Optional<BufferedImage> frame = cuts.stream().allMatch(Crop::kept) ? Frames.look(context) : shown;
         return MapTools.markerShot(context, screen, frame.orElse(null));
     }
 
@@ -479,11 +488,11 @@ final class PictureTools {
      * for on the game: one sitting away from its place is replaced in {@code cuts} by its copy for that screen
      * ({@link ScreenFit#fit}), one not there refuses the call.
      */
-    private static Checked checked(AgentContext context, String screen, List<Crop> cuts) {
+    private static Checked checked(AgentContext context, String screen, List<Crop> cuts,
+                                   Optional<BufferedImage> boxed) {
         // A marker may be cut while another screen shows: the screen being started, its markers recut, or a picture
         // only the screen like it shows, cut there as absent.
         boolean recut = cuts.stream().anyMatch(c -> c.marker() != null);
-        Optional<BufferedImage> boxed = Frames.shown();
         if (!recut && boxed.isPresent() && cuts.stream().anyMatch(c -> !c.kept())) {
             Optional<String> other = ScreenFit.otherScreen(context, screen, boxed.get());
             if (other.isPresent()) {
@@ -574,12 +583,9 @@ final class PictureTools {
                 : cut.and(AgentReply.text("\nNothing else was saved: " + plain));
     }
 
-    private static AgentReply cropPicture(Crop crop, AgentContext context) {
-        return cropPicture(crop, context, liveLooks(context));
-    }
-
-    /** One box cut, checked still on {@code live}, the screen watched once for every box of a call. */
-    private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live) {
+    /** One box cut out of {@code shown}, checked still on {@code live}, the screen watched once for every box of a call. */
+    private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live,
+                                          Optional<BufferedImage> shown) {
         if (crop.partial()) {
             return AgentReply.refused(crop.name() + ": give x, y, width and height, or none of them for a picture the "
                     + "bot has. Nothing was saved.");
@@ -594,9 +600,9 @@ final class PictureTools {
             return AgentReply.refused("A picture called \"" + had.get() + "\" already exists: give its name with no "
                     + "box to note it on the screen as it is, edit_pictures' replace to cut it anew, or another name.");
         }
-        Optional<BufferedImage> frame = crop.kept() ? Optional.empty() : Frames.shown();
+        Optional<BufferedImage> frame = crop.kept() ? Optional.empty() : shown;
         if (!crop.kept() && frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
-        Optional<PictureCuts.Piece> picture = frame.flatMap(shown -> PictureCuts.cut(shown, crop.box(), crop.shape(),
+        Optional<PictureCuts.Piece> picture = frame.flatMap(from -> PictureCuts.cut(from, crop.box(), crop.shape(),
                         crop.points()))
                 .map(piece -> crop.ignore() == null ? piece : PictureCuts.masked(piece, crop.ignore().rect()));
         if (!crop.kept() && picture.isEmpty()) return AgentReply.refused("That box is outside the "
@@ -778,11 +784,16 @@ final class PictureTools {
     }
 
     static AgentReply replacePicture(Replace replace, AgentContext context) {
+        return replacePicture(replace, context, Frames.shown(), liveLooks(context));
+    }
+
+    /** As {@link #replacePicture(Replace, AgentContext)}, cut out of {@code frame} and watched still on {@code live}. */
+    static AgentReply replacePicture(Replace replace, AgentContext context, Optional<BufferedImage> frame,
+                                     Supplier<List<BufferedImage>> live) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<String> base = Frames.picture(resources.get(), replace.picture());
         if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(replace.picture()));
-        Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         boolean boxed = replace.x() != null && replace.y() != null && replace.width() != null && replace.height() != null;
         boolean anyBox = replace.x() != null || replace.y() != null || replace.width() != null || replace.height() != null;
@@ -799,7 +810,7 @@ final class PictureTools {
                 .map(piece -> replace.ignore() == null ? piece : PictureCuts.masked(piece, replace.ignore().rect()));
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
-        Optional<String> moving = moving(context, frame.get(), picture.get(), liveLooks(context));
+        Optional<String> moving = moving(context, frame.get(), picture.get(), live);
         if (moving.isPresent()) return AgentReply.refused(moving.get());
         PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
                 picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
@@ -809,9 +820,13 @@ final class PictureTools {
     }
 
     static AgentReply saveRegion(NamedRegion region, AgentContext context) {
+        return saveRegion(region, context, Frames.look(context));
+    }
+
+    /** As {@link #saveRegion(NamedRegion, AgentContext)}, in {@code frame}'s pixels. */
+    static AgentReply saveRegion(NamedRegion region, AgentContext context, Optional<BufferedImage> frame) {
         String constant = FlowNames.constantFor(region.name());
         if (constant == null) return AgentReply.refused("\"" + region.name() + "\" cannot be a constant's name.");
-        Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         Optional<Rect> area = Frames.within(frame.get(), region.x(), region.y(), region.width(), region.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
@@ -828,6 +843,11 @@ final class PictureTools {
     }
 
     static AgentReply saveDigits(NamedDigits digits, AgentContext context) {
+        return saveDigits(digits, context, Frames.shown());
+    }
+
+    /** As {@link #saveDigits(NamedDigits, AgentContext)}, cut out of {@code frame}. */
+    static AgentReply saveDigits(NamedDigits digits, AgentContext context, Optional<BufferedImage> frame) {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         String name = TemplateLibrary.sanitizeName(digits.name());
@@ -839,7 +859,6 @@ final class PictureTools {
         if (shows.chars().noneMatch(Character::isDigit)) {
             return AgentReply.refused("Give the number the box shows, as the game writes it: 12,500.");
         }
-        Optional<BufferedImage> frame = Frames.shown();
         if (frame.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
         Optional<Rect> area = Frames.within(frame.get(), digits.x(), digits.y(), digits.width(), digits.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));

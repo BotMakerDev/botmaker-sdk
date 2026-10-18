@@ -74,10 +74,10 @@ class HandParityTest {
             entry("key", Hand.now("a key on the live board")),
             entry("scroll", Hand.now("the wheel or a drag on the live board")),
             entry("describe", Hand.now("the live board itself")),
-            entry("crop_pictures", Hand.in(4, "✂ on the frozen board, with the cut form")),
-            entry("edit_pictures", Hand.in(4, "🖼 Manage Pictures; recut on the board")),
-            entry("save_region", Hand.in(4, "a zone cut on the board")),
-            entry("save_digits", Hand.in(4, "a digits cut on the board")),
+            entry("crop_pictures", Hand.now("✂ Cut on the frozen board, then the cut form")),
+            entry("edit_pictures", Hand.now("🖼 Manage Pictures; a cut on the board as a new image for a picture")),
+            entry("save_region", Hand.now("a cut on the board as an area (Zones)")),
+            entry("save_digits", Hand.now("a cut on the board as digits of a number")),
             entry("write_notes", Hand.now("the panel's Notes, Save notes")),
             entry("launch_game", Hand.now("▶ Launch on the board")));
 

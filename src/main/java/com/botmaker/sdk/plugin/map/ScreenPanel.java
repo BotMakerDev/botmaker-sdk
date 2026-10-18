@@ -31,6 +31,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.SplitMenuButton;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -117,7 +118,13 @@ final class ScreenPanel {
         this.inputPicked = inputPicked;
         viewer = new PictureView(services, owner);
         hands = new ScreenHands(services, () -> graph, this::wrote);
-        live = new LiveBoard(services, board, hands, () -> graph, this::wrote, canvas::select, liveOn);
+        live = new LiveBoard(services, board, hands, () -> graph, this::wrote, canvas::select, liveOn,
+                (doing, screen, work) -> {
+                    if (busy) return false;
+                    canvas.forgetPictures();
+                    run(doing, screen, work);
+                    return true;
+                });
         content.getStyleClass().add("screen-panel");
         content.setPadding(new Insets(PADDING));
         content.setFillWidth(true);
@@ -296,8 +303,7 @@ final class ScreenPanel {
         }
         TextField first = new TextField("Home");
         first.setPromptText("the first screen's name, as the game shows it");
-        Button cut = action("✂ Cut its marker", MapGuide.CUT_MARKER,
-                () -> cut(first.getText().strip(), true));
+        Node cut = cutButton("✂ Cut its marker", MapGuide.CUT_MARKER, () -> first.getText().strip(), true);
         return List.of(heading("No map yet"), text("The map is the bot's Screens class, one constant per screen. "
                 + "Start it with the first screen's marker: a part only that screen shows. The assistant's "
                 + "Discovery fills in the rest, or cut and try each input here."), first, cut);
@@ -331,9 +337,9 @@ final class ScreenPanel {
                 .orElse("Nothing on it is left to try"), () -> next.ifPresent(r -> tryRow(shown, r)));
         tryNext.setDisable(busy || next.isEmpty());
         tryNext.getStyleClass().add("screen-panel-primary");
-        Button cutInputs = action("✂ Cut inputs", MapGuide.CUT_INPUTS, () -> cut(shown, false));
-        Button cutMarker = action(screen.hasMarker() ? "✂ Add marker" : "✂ Cut marker",
-                MapGuide.CUT_MARKER, () -> cut(shown, true));
+        Node cutInputs = cutButton("✂ Cut inputs", MapGuide.CUT_INPUTS, () -> shown, false);
+        Node cutMarker = cutButton(screen.hasMarker() ? "✂ Add marker" : "✂ Cut marker",
+                MapGuide.CUT_MARKER, () -> shown, true);
         Button go = action("🧭 Go here", MapGuide.GO_HERE, () -> goHere(shown));
         go.setDisable(busy || card.popup());
         cutInputs.setDisable(busy);
@@ -705,6 +711,30 @@ final class ScreenPanel {
                 });
             }
         });
+    }
+
+    /**
+     * A ✂ button: on the board, on the frame frozen there, the game frozen now or the screen's shot ({@link
+     * LiveBoard#cut}); its ▾ cuts over the game window instead, the way it was cut before the board.
+     */
+    private Node cutButton(String text, String tip, Supplier<String> screen, boolean marker) {
+        SplitMenuButton button = new SplitMenuButton();
+        button.setText(text);
+        button.setTooltip(new Tooltip(tip));
+        button.setOnAction(e -> {
+            String on = screen.get();
+            if (on == null || on.isBlank()) {
+                say("Name the screen first.");
+                return;
+            }
+            showBoard.run();
+            live.cut(on, marker);
+        });
+        MenuItem over = new MenuItem("Over the game window instead…");
+        over.setOnAction(e -> cut(screen.get(), marker));
+        button.getItems().add(over);
+        button.setDisable(busy);
+        return button;
     }
 
     /** Cuts pictures over the game with 🎯's tool, each then noted on {@code screen}: its marker, or inputs. */

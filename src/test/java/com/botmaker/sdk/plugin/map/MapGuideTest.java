@@ -18,7 +18,8 @@ class MapGuideTest {
                 MapGuide.FOLDED, MapGuide.FILTER_OWES, MapGuide.FILTER_UNTRIED, MapGuide.TRY_NEXT,
                 MapGuide.CUT_INPUTS, MapGuide.CUT_MARKER, MapGuide.GO_HERE, MapGuide.ADD_MARKER, MapGuide.LEADS_TO,
                 MapGuide.REMOVE_BACK, MapGuide.LIVE, MapGuide.FREEZE, MapGuide.MISSED, MapGuide.RETAKE_FROZEN,
-                MapGuide.NEW_FROM_FROZEN, MapGuide.RECORD_WAY)) {
+                MapGuide.NEW_FROM_FROZEN, MapGuide.RECORD_WAY, MapGuide.CUT_FROZEN, MapGuide.CUT_IGNORE,
+                MapGuide.CUT_SAVE)) {
             assertTrue(said.contains(tip), tip);
         }
     }

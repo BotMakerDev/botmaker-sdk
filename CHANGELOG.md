@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens cuts on the frozen frame.** ✂ Cut on a frozen frame (or a screen's shot) draws pictures on the board
+  itself, no window over the game: a box, an oval or a free shape, several at once, with ▨ a part a run skips. A form
+  then asks what each is — the screen's marker, one more, a picture it never shows, a button (shown at times, while a
+  method holds), its way back, another look of a button, a look of the screen, a button of a strip or a node of a
+  tree, an area (Zones), the digits of a number, or a new image for a picture — with its screen and tags, and saves
+  it by crop_pictures', save_region's, save_digits' and edit_pictures' own code, the frame's pixels as they are. The
+  panel's ✂ buttons cut there; their ▾ cuts over the game window as before.
 - **🗺 Screens drives the game live.** ● Live on the Screen tab draws the game about 8 times a second, as the
   assistant's look tools read it (the private display, the emulator, else the watched window); a click, a drag, the
   wheel or a key on it goes to the game through the click, key and scroll tools' own input. The line under the bar

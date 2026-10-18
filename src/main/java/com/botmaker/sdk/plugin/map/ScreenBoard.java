@@ -50,6 +50,8 @@ final class ScreenBoard {
     private DoubleFunction<Node> cover;
     /** Whether {@link #cover} is the game live, which takes the wheel and the drag. */
     private boolean live;
+    /** Whether a drag draws on the cover, a cut, rather than moving it. */
+    private boolean held;
     private String constant;
     /** What the board shows, so a poll that changed nothing draws nothing. */
     private Object drawn;
@@ -130,8 +132,14 @@ final class ScreenBoard {
         if (drawn != cover || live != this.live) zoom = 1;
         cover = drawn;
         this.live = live;
-        scroller.setPannable(!live);
+        scroller.setPannable(!live && !held);
         draw(false);
+    }
+
+    /** {@code held}: a drag on the cover draws a cut there, and moves nothing; the wheel still zooms. */
+    void holdStill(boolean held) {
+        this.held = held;
+        scroller.setPannable(!live && !held);
     }
 
     /**

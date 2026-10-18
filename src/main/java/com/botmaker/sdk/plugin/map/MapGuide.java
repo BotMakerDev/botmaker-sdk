@@ -58,6 +58,10 @@ final class MapGuide {
     static final String RETAKE_FROZEN = "This frame as the screen's shot, while its markers show on it";
     static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked";
     static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";
+    static final String CUT_FROZEN = "Draw pictures on this frame, then say what each is: a marker, a button, its way "
+            + "back, a look, a strip's button, a zone, digits or a new image for a picture";
+    static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
+    static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
@@ -99,6 +103,8 @@ final class MapGuide {
                     new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
                             + "screen: " + NEW_FROM_FROZEN + " on the screen last recognised."),
                     new Entry("Missed frames", null, MISSED + ", to make it a screen's shot or a new screen."),
+                    new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape; ▨ Skip a part: " + CUT_IGNORE
+                            + "; ✓ Save: " + CUT_SAVE + "."),
                     new Entry("▶ Launch", null, "Starts the game the bot launches, when it is not up."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),
@@ -124,7 +130,8 @@ final class MapGuide {
             new Section("The panel", List.of(
                     new Entry("▶ Try", null, "Clicks one input on the game and records what it did."),
                     new Entry("▶ Try next", null, TRY_NEXT + "."),
-                    new Entry("✂ Cut inputs", null, CUT_INPUTS + "."),
+                    new Entry("✂ Cut inputs", null, CUT_INPUTS + ", on the board: the frame frozen there, the game "
+                            + "frozen now, or the screen's shot. Its ▾ cuts over the game window instead."),
                     new Entry("✂ Cut marker", null, CUT_MARKER + ". Markers lists them, and the pictures it never "
                             + "shows; ✕ takes one off."),
                     new Entry("＋ Marker from a picture…", null, ADD_MARKER + "."),

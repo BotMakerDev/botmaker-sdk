@@ -125,6 +125,34 @@
     -fx-stroke-dash-array: 4 3;
 }
 
+/* --- cuts drawn on a frozen frame --- */
+
+.screen-cut,
+.screen-cut-band {
+    -fx-fill: rgba(128, 128, 128, 0.18);
+    -fx-stroke: -bm-screen-here;
+    -fx-stroke-width: 1.5;
+}
+
+.screen-cut-band {
+    -fx-stroke-dash-array: 4 3;
+}
+
+/* What a run skips: a grey that shows on a dark shot and a light one alike. */
+.screen-cut-ignore {
+    -fx-fill: rgba(128, 128, 128, 0.55);
+    -fx-stroke: -bm-screen-plain;
+    -fx-stroke-width: 1;
+}
+
+.screen-cut-badge {
+    -fx-background-color: -bm-screen-here;
+    -fx-background-radius: 3;
+    -fx-text-fill: -fx-control-inner-background;
+    -fx-padding: 0 4 0 4;
+    -fx-font-size: 11px;
+}
+
 .screen-outline-screen:here {
     -fx-text-fill: -bm-screen-here;
     -fx-font-weight: bold;

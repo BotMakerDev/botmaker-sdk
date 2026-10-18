@@ -7,11 +7,14 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.MissFrames;
+import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.scene.Node;
@@ -21,6 +24,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -35,6 +39,7 @@ import javafx.scene.shape.Rectangle;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +64,9 @@ import java.util.function.Supplier;
  * <p>❄ Freeze keeps the frame shown, lossless: its screen's shot taken from it, or a new screen made of it, under the
  * screen last recognised and opened by the input last clicked there. A frame a run saved when a wait timed out opens
  * frozen the same way. ▶ Launch starts the game when it is not up.
+ *
+ * <p>✂ Cut draws pictures on the frozen frame itself ({@link CutLayer}), each then said what it is ({@link CutForm})
+ * and saved as the tools save it ({@link BoardCuts}); a screen's shot is cut on the same way.
  */
 final class LiveBoard {
 
@@ -88,6 +96,9 @@ final class LiveBoard {
     private final Pane boxes = new Pane();
     private final StackPane game = new StackPane(view, boxes);
     private final ImageView frozenView = new ImageView();
+    /** Cuts drawn on the frozen frame. */
+    private final CutLayer cutter = new CutLayer(frozenView, this::showLine);
+    private final Work work;
     /** Counts each start and stop: a frame loop of an earlier start ends, and what it read is dropped. */
     private final AtomicLong generation = new AtomicLong();
     private final AtomicBoolean drawing = new AtomicBoolean();
@@ -120,17 +131,38 @@ final class LiveBoard {
     private String frozenOn;
     /** Whether {@link #frozenOn} was read off the frozen frame itself yet: until then nothing is offered on it. */
     private boolean frozenRead;
+    /** Whether the game still shows the frozen frame, frozen off it just now: a cut on it is then watched still. */
+    private boolean frozenWatched;
+    private long frozenAtMs;
+    /** The screen cuts are noted on, first offered; null: the frame's. */
+    private String cutScreen;
+    /** What the first cut is, first offered. */
+    private CutForm.Kind cutFirst = CutForm.Kind.BUTTON;
     private Point pressedAt;
     private long pressedMs;
     private double wheel;
 
     /**
+     * Runs {@code work}, said as {@code doing}, off the FX thread, the map read again once it wrote it; false when it
+     * did not start, a try or a walk running.
+     */
+    @FunctionalInterface
+    interface Work {
+        boolean run(String doing, String screen, Supplier<String> work);
+    }
+
+    /** How long after ❄ Freeze the game is taken to show the frame still: a cut is watched still only until then. */
+    private static final long WATCHED_MS = 60_000;
+
+    /**
      * @param done   what an action answered, said on the panel
      * @param select picks a screen on the map
      * @param lit    the screen the game shows, lit on the graph and in the outline; null for none
+     * @param work   runs a save of the cuts
      */
     LiveBoard(StudioServices services, ScreenBoard board, ScreenHands hands, Supplier<ScreenGraph> graph,
-              Consumer<String> done, Consumer<String> select, Consumer<String> lit) {
+              Consumer<String> done, Consumer<String> select, Consumer<String> lit, Work work) {
+        this.work = work;
         this.services = services;
         this.board = board;
         this.hands = hands;
@@ -185,6 +217,8 @@ final class LiveBoard {
         context = new PanelContext(services, CaptureValue.current(services));
         liveButton.setSelected(true);
         frozen = null;
+        cutter.reset(0, 0);
+        board.holdStill(false);
         blind = null;
         // Nothing of the last time shows until the first frame comes.
         view.setImage(null);
@@ -302,7 +336,8 @@ final class LiveBoard {
 
     private Node drawFrozen(double width) {
         frozenView.setFitWidth(width);
-        return frozenView;
+        cutter.redraw();
+        return cutter.node();
     }
 
     private void drawBoxes() {
@@ -444,6 +479,12 @@ final class LiveBoard {
             String shows = !frozenRead ? "reading which screen it is…" : frozenOn == null ? "no screen of the map"
                     : map.shown(frozenOn);
             said.add(new Label("❄ Frozen, " + frozen.getWidth() + "×" + frozen.getHeight() + ": " + shows));
+            if (cutter.isOn()) {
+                said.addAll(cutTools());
+                board.line(said.toArray(Node[]::new));
+                return;
+            }
+            said.add(button("✂ Cut", MapGuide.CUT_FROZEN, () -> beginCut(frozenOn, CutForm.Kind.BUTTON)));
             if (frozenRead && frozenOn != null) {
                 said.add(button("Retake " + map.shown(frozenOn) + "'s shot", MapGuide.RETAKE_FROZEN, this::retake));
             }
@@ -496,7 +537,7 @@ final class LiveBoard {
             done.accept("Nothing to freeze yet: no frame came from the game.");
             return;
         }
-        frozen(image, null, false);
+        frozen(image, null, false, true);
         // Read again off this very frame: the live read may be a second older, of the screen before.
         PanelContext reads = context();
         Thread.ofVirtual().name("live-frozen").start(() -> {
@@ -517,14 +558,21 @@ final class LiveBoard {
         });
     }
 
-    /** Shows {@code image} frozen, as showing {@code shows} once {@code read}; whatever read the game live stops. */
-    private void frozen(BufferedImage image, String shows, boolean read) {
+    /**
+     * Shows {@code image} frozen, as showing {@code shows} once {@code read}, {@code watched} when the game still shows
+     * it; whatever read the game live stops.
+     */
+    private void frozen(BufferedImage image, String shows, boolean read, boolean watched) {
         generation.incrementAndGet();
         liveButton.setSelected(false);
         frozen = image;
         frozenOn = shows;
         frozenRead = read;
+        frozenWatched = watched;
+        frozenAtMs = System.currentTimeMillis();
         frozenView.setImage(ScreenCapture.toFxImage(image));
+        cutter.reset(image.getWidth(), image.getHeight());
+        board.holdStill(false);
         on = null;
         lit.accept(shows);
         board.cover(this::drawFrozen, false);
@@ -536,6 +584,8 @@ final class LiveBoard {
         frozen = null;
         frozenOn = null;
         frozenView.setImage(null);
+        cutter.reset(0, 0);
+        board.holdStill(false);
         lit.accept(null);
         board.cover(null, false);
         showLine();
@@ -598,8 +648,121 @@ final class LiveBoard {
             }
             BufferedImage read = image;
             String shows = ScreenDesk.here(reads, read).map(ScreenDesk.Here::screen).orElse(null);
-            Platform.runLater(() -> frozen(read, shows, true));
+            Platform.runLater(() -> frozen(read, shows, true, false));
         });
+    }
+
+    // --- cutting on the frozen frame ---
+
+    /**
+     * ✂ from the panel, for {@code screen}: cuts on the frame frozen, else on the game frozen now, else on the
+     * screen's shot; {@code marker} when the first cut is its marker.
+     */
+    void cut(String screen, boolean marker) {
+        CutForm.Kind first = marker ? CutForm.Kind.MARKER : CutForm.Kind.BUTTON;
+        if (frozen == null && liveButton.isSelected() && latest != null) freeze();
+        if (frozen == null) {
+            Optional<BufferedImage> shot = shot(screen);
+            if (shot.isEmpty()) {
+                done.accept("Nothing to cut on yet: ● Live, then ❄ Freeze while the game shows "
+                        + graph.get().shown(screen) + ", then ✂ Cut. Or cut over the game window (✂ ▾).");
+                return;
+            }
+            frozen(shot.get(), screen, true, false);
+        }
+        beginCut(screen, first);
+    }
+
+    /** {@code constant}'s shot, lossless; empty when it has none. */
+    private Optional<BufferedImage> shot(String constant) {
+        Path resources = services.resourcesDir();
+        if (resources == null || constant == null || !graph.get().screens().containsKey(constant)) {
+            return Optional.empty();
+        }
+        Path file = ScreenShots.file(resources, constant);
+        try {
+            return Files.isRegularFile(file) ? Optional.ofNullable(ImageIO.read(file.toFile())) : Optional.empty();
+        } catch (IOException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    private void beginCut(String screen, CutForm.Kind first) {
+        cutScreen = screen;
+        cutFirst = first;
+        cutter.setOn(true);
+        board.holdStill(true);
+        showLine();
+    }
+
+    private void endCut() {
+        cutter.clear();
+        cutter.setOn(false);
+        board.holdStill(false);
+        showLine();
+    }
+
+    /** The line while cutting: the shape, ▨ the part skipped, undo, save and stop. */
+    private List<Node> cutTools() {
+        ToggleGroup shapes = new ToggleGroup();
+        List<Node> tools = new ArrayList<>();
+        for (CutShape shape : CutShape.values()) {
+            ToggleButton one = new ToggleButton(switch (shape) {
+                case RECT -> "▢";
+                case ELLIPSE -> "⬭";
+                case POLYGON -> "✎";
+            });
+            one.setTooltip(new Tooltip(switch (shape) {
+                case RECT -> "A box: drag it";
+                case ELLIPSE -> "An oval, transparent outside: drag its box (Shift: a circle)";
+                case POLYGON -> "A free shape, transparent outside: click each corner; a double-click or Enter closes "
+                        + "it, Backspace drops a corner";
+            }));
+            one.setToggleGroup(shapes);
+            one.setSelected(cutter.shape() == shape);
+            one.setOnAction(e -> {
+                one.setSelected(true);
+                cutter.setShape(shape);
+            });
+            tools.add(one);
+        }
+        ToggleButton ignore = new ToggleButton("▨ Skip a part");
+        ignore.setTooltip(new Tooltip(MapGuide.CUT_IGNORE));
+        ignore.setSelected(cutter.ignoring());
+        ignore.setOnAction(e -> cutter.setIgnoring(ignore.isSelected()));
+        tools.add(ignore);
+        int drawn = cutter.cuts().size();
+        Button undo = button("↶", "Take back the last cut", cutter::undo);
+        undo.setDisable(drawn == 0);
+        Button save = button(drawn <= 1 ? "✓ Save it…" : "✓ Save " + drawn + "…", MapGuide.CUT_SAVE, this::askCuts);
+        save.setDisable(drawn == 0);
+        save.setDefaultButton(false);
+        tools.add(undo);
+        tools.add(save);
+        tools.add(button("✕ Stop cutting", "The cuts not saved are dropped", this::endCut));
+        return tools;
+    }
+
+    /** Asks what the cuts are, then saves them as the tools do, off the FX thread. */
+    private void askCuts() {
+        List<CutLayer.Drawn> drawn = cutter.cuts();
+        BufferedImage image = frozen;
+        if (drawn.isEmpty() || image == null) return;
+        String shows = cutScreen != null ? cutScreen : frozenOn;
+        CutForm.ask(services, graph.get(), image, drawn, shows, cutFirst, answer -> {
+            PanelContext reads = context();
+            // Frozen a while ago, the game may show something else by now: the frame is then not watched.
+            boolean watched = frozenWatched && System.currentTimeMillis() - frozenAtMs < WATCHED_MS;
+            ScreenGraph map = graph.get();
+            String where = answer.screen() == null ? "" : " on " + (map.screens().containsKey(answer.screen())
+                    ? map.shown(answer.screen()) : answer.screen());
+            boolean started = work.run("Saving " + answer.cuts().size() + (answer.cuts().size() == 1 ? " cut" : " cuts")
+                    + where + "…", answer.screen(), () -> BoardCuts.save(reads, answer.screen(), answer.tags(),
+                    answer.cuts(), image, watched));
+            // Kept to save again once the map is free.
+            if (started) endCut();
+            else done.accept("A try or a walk is running: the cuts are kept; ✓ Save again once it ends.");
+        }, done);
     }
 
     private PanelContext context() {
