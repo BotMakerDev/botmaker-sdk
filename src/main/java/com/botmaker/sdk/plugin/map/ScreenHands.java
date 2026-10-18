@@ -308,16 +308,33 @@ final class ScreenHands {
         from.valueProperty().addListener((o, was, is) -> fields.accept(is));
         input.setValue(proposed);
         input.setDisable(fixed);
-        VBox body = new VBox(8, new Label("Name"), name, new Label("Opened from"), from, new Label("by"), input);
-        Modals.form(services, "New screen", body, () -> {
-            if (from.getValue() == null || input.getValue() == null) {
-                done.accept(from.getValue() == null ? "Pick the screen it is opened from." : "Pick the input that "
-                        + "opens it.");
-                return;
-            }
+        Label wrong = new Label();
+        wrong.setWrapText(true);
+        wrong.setStyle("-fx-text-fill: -bm-severity-error;");
+        wrong.managedProperty().bind(wrong.visibleProperty());
+        wrong.setVisible(false);
+        VBox body = new VBox(8, wrong, new Label("Name"), name, new Label("Opened from"), from, new Label("by"), input);
+        askNewScreen(body, wrong, () -> {
+            if (name.getText().isBlank()) return "Give it a name, as the game shows it.";
+            if (from.getValue() == null) return "Pick the screen it is opened from.";
+            if (input.getValue() == null) return "Pick the input that opens it.";
             String said = ScreenEdits.newScreen(services, from.getValue(), name.getText(), input.getValue(), null);
+            if (said.startsWith(ScreenEdits.NOT_WRITTEN)) return said;
             done.accept(said);
-            if (!said.startsWith(ScreenEdits.NOT_WRITTEN)) made.accept(name.getText().strip());
+            made.accept(name.getText().strip());
+            return null;
+        });
+    }
+
+    /** The New screen form, opened again with why when {@code write} answers a refusal; null: written. */
+    private void askNewScreen(VBox body, Label wrong, Supplier<String> write) {
+        Modals.form(services, "New screen", body, () -> {
+            String refused = write.get();
+            if (refused == null) return;
+            wrong.setText(refused);
+            wrong.setVisible(true);
+            done.accept(refused);
+            askNewScreen(body, wrong, write);
         });
     }
 

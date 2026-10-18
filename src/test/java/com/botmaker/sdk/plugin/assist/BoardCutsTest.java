@@ -81,4 +81,13 @@ class BoardCutsTest {
         assertEquals(30, replace.width());
         assertEquals(CutShape.RECT, replace.shape());
     }
+
+    @Test
+    void aBoxRefusedAmongOthersSavedIsToldByItsName() {
+        String said = "Saved collect_button.\nNot saved, Shop Button: shop_button is a picture already.";
+        assertTrue(BoardCuts.notSaved(said, "Shop Button"));
+        assertTrue(BoardCuts.notSaved("Not saved, shop_button: taken.", "Shop Button"), "by its sanitised name too");
+        assertFalse(BoardCuts.notSaved(said, "collect_button"));
+        assertFalse(BoardCuts.notSaved(said, null));
+    }
 }

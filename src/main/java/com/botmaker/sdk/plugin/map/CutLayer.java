@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.screen.CutShape;
+import javafx.css.PseudoClass;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
@@ -14,6 +15,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Ellipse;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Polyline;
@@ -27,8 +29,10 @@ import java.util.Optional;
 /**
  * Cuts drawn on a frozen frame on the board itself (the user's call, 2026-10-18): no window over the game, and the
  * pixels are the frame's, never grabbed again. A box or an oval is dragged, a free shape clicked corner by corner (a
- * double-click or Enter closes it, Backspace drops a corner, Esc the shape); with ▨ on, a drag inside a cut is the part
- * of it matching skips. Every cut is kept in the frame's pixels, so the board zooms under it.
+ * click on its first corner, a double-click or Enter closes it, Backspace drops a corner, Esc the shape); with ▨ on, a
+ * drag inside a cut is the part of it matching skips. A cut drawn is picked by a click on it (on its number, for a free
+ * shape), then dragged to move it, its corners dragged to resize a box or an oval, and Delete takes it off. Every cut
+ * is kept in the frame's pixels, so the board zooms under it.
  */
 final class CutLayer {
 
@@ -36,6 +40,14 @@ final class CutLayer {
     private static final int CORNERS = 3;
     /** The smallest cut, in the board's pixels: a click is no cut. */
     private static final double LEAST = 3;
+    /** How near, in the board's pixels, a click on a free shape's first corner closes it. */
+    private static final double CLOSE_NEAR = 8;
+    /** A picked cut's corner handle, in the board's pixels. */
+    private static final double HANDLE = 8;
+    /** A cut's number, in the board's pixels from its box's top left: a click on it picks the cut. */
+    private static final double BADGE_WIDTH = 18;
+    private static final double BADGE_HEIGHT = 16;
+    private static final PseudoClass PICKED = PseudoClass.getPseudoClass("picked");
 
     /** A cut in the frame's pixels: its box, a free shape's corners (else none), and the part skipped (null: none). */
     record Drawn(Rect box, CutShape shape, List<Point> points, Rect ignore) {
@@ -48,6 +60,9 @@ final class CutLayer {
             return new Drawn(box, shape, points, part);
         }
     }
+
+    /** A picked box's or oval's corner, dragged to resize it. */
+    enum Handle { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
 
     private final ImageView view;
     private final Pane marks = new Pane();
@@ -65,8 +80,16 @@ final class CutLayer {
     private CutShape shape = CutShape.RECT;
     private boolean ignoring;
     private double[] origin;
+    /** The cut picked, by its place in {@link #cuts}; -1 for none. */
+    private int picked = -1;
+    /** The picked cut as the press found it, while it is moved or resized; null otherwise. */
+    private Drawn grabbed;
+    /** The handle being dragged; null while the picked cut is moved whole. */
+    private Handle handle;
+    /** Where the move began, in the frame's pixels. */
+    private Point grabbedAt;
 
-    /** @param changed run when a cut is drawn, undone or cleared */
+    /** @param changed run when a cut is drawn, moved, picked, undone or cleared, and as a free shape's corners change */
     CutLayer(ImageView view, Runnable changed) {
         this.view = view;
         this.changed = changed;
@@ -86,7 +109,8 @@ final class CutLayer {
         marks.addEventHandler(MouseEvent.MOUSE_MOVED, e -> {
             if (on && !corners.isEmpty()) drawCorners(e.getX(), e.getY());
         });
-        root.addEventHandler(KeyEvent.KEY_PRESSED, this::keyed);
+        // A filter: the board's scroller around it would take Enter and the arrows first.
+        root.addEventFilter(KeyEvent.KEY_PRESSED, this::keyed);
     }
 
     Node node() {
@@ -99,6 +123,7 @@ final class CutLayer {
         frameHeight = height;
         cuts.clear();
         corners.clear();
+        picked = -1;
         ignoring = false;
         setOn(false);
     }
@@ -109,6 +134,7 @@ final class CutLayer {
         marks.setMouseTransparent(!on);
         marks.setCursor(on ? javafx.scene.Cursor.CROSSHAIR : null);
         origin = null;
+        grabbed = null;
         corners.clear();
         if (on) root.requestFocus();
         redraw();
@@ -122,6 +148,7 @@ final class CutLayer {
         this.shape = shape;
         corners.clear();
         redraw();
+        changed.run();
     }
 
     CutShape shape() {
@@ -143,9 +170,20 @@ final class CutLayer {
         return List.copyOf(cuts);
     }
 
+    /** How many corners of a free shape are clicked, not closed yet. */
+    int corners() {
+        return corners.size();
+    }
+
+    /** Whether a cut is picked, to move, resize or take off. */
+    boolean hasPicked() {
+        return picked >= 0;
+    }
+
     void undo() {
         if (cuts.isEmpty()) return;
         cuts.removeLast();
+        picked = -1;
         redraw();
         changed.run();
     }
@@ -153,6 +191,40 @@ final class CutLayer {
     void clear() {
         cuts.clear();
         corners.clear();
+        picked = -1;
+        redraw();
+        changed.run();
+    }
+
+    /**
+     * Keeps only the cuts at {@code places} of {@code saved}, the list a save was given: the ones it refused, to fix.
+     * Cuts drawn since the save began stay too.
+     */
+    void keepOnly(List<Drawn> saved, List<Integer> places) {
+        List<Drawn> kept = places.stream().filter(i -> i >= 0 && i < saved.size()).map(saved::get).toList();
+        cuts.removeIf(cut -> saved.contains(cut) && !kept.contains(cut));
+        picked = -1;
+        redraw();
+        changed.run();
+    }
+
+    /** Takes the picked cut off. */
+    void removePicked() {
+        if (picked < 0 || picked >= cuts.size()) return;
+        cuts.remove(picked);
+        picked = -1;
+        redraw();
+        changed.run();
+    }
+
+    /** Closes the free shape clicked so far into a cut; one too small is kept drawing. */
+    void closeShape() {
+        if (corners.size() < CORNERS) return;
+        Optional<Rect> around = PictureCuts.bounds(corners);
+        if (around.isEmpty() || around.get().width() < LEAST || around.get().height() < LEAST) return;
+        cuts.add(new Drawn(around.get(), CutShape.POLYGON, corners, null));
+        corners.clear();
+        picked = -1;
         redraw();
         changed.run();
     }
@@ -167,6 +239,7 @@ final class CutLayer {
             Drawn cut = cuts.get(i);
             Shape outline = outline(cut, scale);
             outline.getStyleClass().add("screen-cut");
+            outline.pseudoClassStateChanged(PICKED, i == picked);
             marks.getChildren().add(outline);
             if (cut.ignore() != null) {
                 Rectangle skipped = scaled(cut.ignore(), scale);
@@ -177,6 +250,20 @@ final class CutLayer {
             badge.getStyleClass().add("screen-cut-badge");
             badge.relocate(cut.box().x() * scale + 2, cut.box().y() * scale + 2);
             marks.getChildren().add(badge);
+        }
+        if (picked >= 0 && picked < cuts.size() && cuts.get(picked).shape() != CutShape.POLYGON) {
+            for (Handle h : Handle.values()) {
+                double[] at = handleAt(cuts.get(picked).box(), h, scale);
+                Rectangle grip = new Rectangle(at[0] - HANDLE / 2, at[1] - HANDLE / 2, HANDLE, HANDLE);
+                grip.getStyleClass().add("screen-cut-handle");
+                marks.getChildren().add(grip);
+            }
+        }
+        if (!corners.isEmpty()) {
+            Point first = corners.getFirst();
+            Circle closer = new Circle(first.x() * scale, first.y() * scale, CLOSE_NEAR / 1.5);
+            closer.getStyleClass().add("screen-cut-first");
+            marks.getChildren().add(closer);
         }
         // Drawn only: a press on a cut is a press on the frame under it.
         marks.getChildren().forEach(n -> n.setMouseTransparent(true));
@@ -193,13 +280,35 @@ final class CutLayer {
         if (!on || e.getButton() != MouseButton.PRIMARY) return;
         root.requestFocus();
         e.consume();
+        if (!ignoring && corners.isEmpty() && picked >= 0 && picked < cuts.size()) {
+            Drawn cut = cuts.get(picked);
+            Optional<Handle> grip = cut.shape() == CutShape.POLYGON ? Optional.empty()
+                    : handleHit(cut.box(), e.getX(), e.getY(), scale());
+            Point at = toFrame(e.getX(), e.getY());
+            if (grip.isPresent() || contains(cut.box(), at)) {
+                grabbed = cut;
+                handle = grip.orElse(null);
+                grabbedAt = at;
+                return;
+            }
+        }
         if (shape == CutShape.POLYGON && !ignoring) return;
         origin = new double[] {e.getX(), e.getY()};
         dragged(e);
     }
 
     private void dragged(MouseEvent e) {
-        if (!on || origin == null) return;
+        if (!on) return;
+        if (grabbed != null) {
+            e.consume();
+            Point at = toFrame(e.getX(), e.getY());
+            cuts.set(picked, handle == null
+                    ? moved(grabbed, at.x() - grabbedAt.x(), at.y() - grabbedAt.y(), frameWidth, frameHeight)
+                    : resized(grabbed, handle, at, frameWidth, frameHeight));
+            redraw();
+            return;
+        }
+        if (origin == null) return;
         e.consume();
         double w = Math.abs(e.getX() - origin[0]);
         double h = Math.abs(e.getY() - origin[1]);
@@ -223,7 +332,16 @@ final class CutLayer {
     }
 
     private void released(MouseEvent e) {
-        if (!on || origin == null) return;
+        if (!on) return;
+        if (grabbed != null) {
+            e.consume();
+            boolean changedIt = !grabbed.equals(cuts.get(picked));
+            grabbed = null;
+            handle = null;
+            if (changedIt) changed.run();
+            return;
+        }
+        if (origin == null) return;
         e.consume();
         boolean asOval = shape == CutShape.ELLIPSE && !ignoring;
         double x = asOval ? oval.getCenterX() - oval.getRadiusX() : band.getX();
@@ -246,42 +364,64 @@ final class CutLayer {
             }
         } else {
             cuts.add(new Drawn(drawn, shape, List.of(), null));
+            picked = -1;
         }
         redraw();
         changed.run();
     }
 
     private void clicked(MouseEvent e) {
-        if (!on || shape != CutShape.POLYGON || ignoring || e.getButton() != MouseButton.PRIMARY) return;
+        if (!on || ignoring || e.getButton() != MouseButton.PRIMARY || !e.isStillSincePress()) return;
         e.consume();
+        Point at = toFrame(e.getX(), e.getY());
+        double scale = scale();
+        if (corners.isEmpty()) {
+            // A cut's number picks it whatever the shape; inside a box or an oval does too while not drawing a free one.
+            int hit = badgeHit(cuts, e.getX(), e.getY(), scale);
+            if (hit < 0 && shape != CutShape.POLYGON) hit = hit(cuts, at);
+            if (hit >= 0 || shape != CutShape.POLYGON) {
+                if (hit != picked) {
+                    picked = hit;
+                    redraw();
+                    changed.run();
+                }
+                return;
+            }
+        }
+        if (shape != CutShape.POLYGON) return;
         // The first click of a double-click already added this corner.
-        if (e.getClickCount() >= 2) {
+        if (e.getClickCount() >= 2 || closes(corners, at, CLOSE_NEAR / scale)) {
             closeShape();
             return;
         }
-        corners.add(toFrame(e.getX(), e.getY()));
+        corners.add(at);
+        picked = -1;
+        redraw();
         drawCorners(e.getX(), e.getY());
+        changed.run();
     }
 
     private void keyed(KeyEvent e) {
         if (!on) return;
-        if (e.getCode() == KeyCode.ENTER) closeShape();
-        else if (e.getCode() == KeyCode.BACK_SPACE && !corners.isEmpty()) corners.removeLast();
-        else if (e.getCode() == KeyCode.ESCAPE && !corners.isEmpty()) corners.clear();
-        else return;
+        KeyCode code = e.getCode();
+        if (code == KeyCode.ENTER && !corners.isEmpty()) {
+            closeShape();
+        } else if (code == KeyCode.BACK_SPACE && !corners.isEmpty()) {
+            corners.removeLast();
+            changed.run();
+        } else if (code == KeyCode.ESCAPE && !corners.isEmpty()) {
+            corners.clear();
+            changed.run();
+        } else if ((code == KeyCode.DELETE || code == KeyCode.BACK_SPACE) && picked >= 0) {
+            removePicked();
+        } else if (code == KeyCode.ESCAPE && picked >= 0) {
+            picked = -1;
+            changed.run();
+        } else {
+            return;
+        }
         e.consume();
         redraw();
-    }
-
-    /** Closes the free shape clicked so far into a cut; one too small is kept drawing. */
-    private void closeShape() {
-        if (corners.size() < CORNERS) return;
-        Optional<Rect> around = PictureCuts.bounds(corners);
-        if (around.isEmpty() || around.get().width() < LEAST || around.get().height() < LEAST) return;
-        cuts.add(new Drawn(around.get(), CutShape.POLYGON, corners, null));
-        corners.clear();
-        redraw();
-        changed.run();
     }
 
     /** The corners clicked so far, and a last line to the pointer at ({@code x}, {@code y}) when it is a number. */
@@ -323,6 +463,14 @@ final class CutLayer {
         return new Rectangle(r.x() * scale, r.y() * scale, r.width() * scale, r.height() * scale);
     }
 
+    /** Where {@code h} of {@code box} is on the board at {@code scale}. */
+    private static double[] handleAt(Rect box, Handle h, double scale) {
+        boolean left = h == Handle.TOP_LEFT || h == Handle.BOTTOM_LEFT;
+        boolean top = h == Handle.TOP_LEFT || h == Handle.TOP_RIGHT;
+        return new double[] {(left ? box.x() : box.x() + box.width()) * scale,
+                (top ? box.y() : box.y() + box.height()) * scale};
+    }
+
     // --- plain values ---
 
     /** A box drawn on the board at {@code scale}, in the frame's pixels, kept on the {@code width × height} frame. */
@@ -349,5 +497,79 @@ final class CutLayer {
         double x = part.x() + part.width() / 2.0;
         double y = part.y() + part.height() / 2.0;
         return x >= box.x() && x < box.x() + box.width() && y >= box.y() && y < box.y() + box.height();
+    }
+
+    static boolean contains(Rect box, Point p) {
+        return p.x() >= box.x() && p.x() < box.x() + box.width() && p.y() >= box.y() && p.y() < box.y() + box.height();
+    }
+
+    /** The last of {@code cuts} whose box holds {@code p}, the one drawn on top; -1 for none. */
+    static int hit(List<Drawn> cuts, Point p) {
+        for (int i = cuts.size() - 1; i >= 0; i--) {
+            if (contains(cuts.get(i).box(), p)) return i;
+        }
+        return -1;
+    }
+
+    /** The last of {@code cuts} whose number, drawn at {@code scale}, is under ({@code x}, {@code y}); -1 for none. */
+    static int badgeHit(List<Drawn> cuts, double x, double y, double scale) {
+        for (int i = cuts.size() - 1; i >= 0; i--) {
+            Rect b = cuts.get(i).box();
+            double left = b.x() * scale;
+            double top = b.y() * scale;
+            if (x >= left && x < left + BADGE_WIDTH && y >= top && y < top + BADGE_HEIGHT) return i;
+        }
+        return -1;
+    }
+
+    /** The handle of {@code box}, drawn at {@code scale}, under ({@code x}, {@code y}); empty for none. */
+    static Optional<Handle> handleHit(Rect box, double x, double y, double scale) {
+        for (Handle h : Handle.values()) {
+            double[] at = handleAt(box, h, scale);
+            if (Math.abs(x - at[0]) <= HANDLE && Math.abs(y - at[1]) <= HANDLE) return Optional.of(h);
+        }
+        return Optional.empty();
+    }
+
+    /** Whether a click at {@code at} closes the free shape of {@code corners}: on its first corner, within {@code near}. */
+    static boolean closes(List<Point> corners, Point at, double near) {
+        if (corners.size() < CORNERS) return false;
+        Point first = corners.getFirst();
+        return Math.hypot(at.x() - first.x(), at.y() - first.y()) <= near;
+    }
+
+    /** {@code cut} moved by ({@code dx}, {@code dy}), its corners and skipped part with it, kept on the frame. */
+    static Drawn moved(Drawn cut, int dx, int dy, int width, int height) {
+        Rect b = cut.box();
+        int x = Math.clamp(b.x() + dx, 0, Math.max(0, width - b.width()));
+        int y = Math.clamp(b.y() + dy, 0, Math.max(0, height - b.height()));
+        int mx = x - b.x();
+        int my = y - b.y();
+        return new Drawn(new Rect(x, y, b.width(), b.height()), cut.shape(),
+                cut.points().stream().map(p -> new Point(p.x() + mx, p.y() + my)).toList(),
+                cut.ignore() == null ? null : new Rect(cut.ignore().x() + mx, cut.ignore().y() + my,
+                        cut.ignore().width(), cut.ignore().height()));
+    }
+
+    /**
+     * {@code cut}, a box or an oval, with {@code h} dragged to {@code to} and the opposite corner kept, on the frame
+     * and at least 2 pixels each way; its skipped part keeps what still lies in it. A free shape is not resized.
+     */
+    static Drawn resized(Drawn cut, Handle h, Point to, int width, int height) {
+        if (cut.shape() == CutShape.POLYGON) return cut;
+        Rect b = cut.box();
+        boolean left = h == Handle.TOP_LEFT || h == Handle.BOTTOM_LEFT;
+        boolean top = h == Handle.TOP_LEFT || h == Handle.TOP_RIGHT;
+        int fixedX = left ? b.x() + b.width() : b.x();
+        int fixedY = top ? b.y() + b.height() : b.y();
+        int x = Math.clamp(to.x(), 0, width);
+        int y = Math.clamp(to.y(), 0, height);
+        int x0 = Math.min(fixedX, x);
+        int y0 = Math.min(fixedY, y);
+        int w = Math.max(2, Math.abs(fixedX - x));
+        int ht = Math.max(2, Math.abs(fixedY - y));
+        Rect box = new Rect(Math.min(x0, width - w), Math.min(y0, height - ht), w, ht);
+        Rect ignore = cut.ignore() == null ? null : inside(cut.ignore(), box).orElse(null);
+        return new Drawn(box, cut.shape(), List.of(), ignore);
     }
 }

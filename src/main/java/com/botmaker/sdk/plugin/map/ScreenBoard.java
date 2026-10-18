@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import javafx.beans.binding.Bindings;
+import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -37,12 +39,16 @@ final class ScreenBoard {
     private static final double STEP = 1.2;
     /** A mouse wheel's notch, in scroll pixels. */
     private static final double NOTCH = 40;
+    private static final PseudoClass REFUSED = PseudoClass.getPseudoClass("refused");
 
     private final StackPane holder = new StackPane();
     private final ScrollPane scroller = new ScrollPane(holder);
     private final Label title = new Label();
     private final HBox bar;
     private final HBox line = new HBox(8);
+    /** What the last action answered, under the line: the panel's own status may be scrolled out of view. */
+    private final Label news = new Label();
+    private final HBox newsRow;
     private final BorderPane root = new BorderPane(scroller);
     /** The shot at a width, its inputs boxed; null while no screen is picked. */
     private DoubleFunction<Optional<Node>> shotAt;
@@ -101,7 +107,18 @@ final class ScreenBoard {
         line.setAlignment(Pos.CENTER_LEFT);
         line.managedProperty().bind(line.visibleProperty());
         line.visibleProperty().bind(Bindings.isNotEmpty(line.getChildren()));
-        VBox top = new VBox(6, bar, line);
+        news.setWrapText(true);
+        news.setMinHeight(Region.USE_PREF_SIZE);
+        news.getStyleClass().add("screen-board-news");
+        HBox.setHgrow(news, Priority.ALWAYS);
+        Button dismiss = new Button("✕");
+        dismiss.setTooltip(new Tooltip("Hide this message"));
+        dismiss.setOnAction(e -> say(null));
+        newsRow = new HBox(8, news, dismiss);
+        newsRow.setAlignment(Pos.CENTER_LEFT);
+        newsRow.managedProperty().bind(newsRow.visibleProperty());
+        newsRow.setVisible(false);
+        VBox top = new VBox(6, bar, line, newsRow);
         top.setPadding(new Insets(6, 10, 6, 10));
         top.getStyleClass().add("screen-map-bar");
         root.setTop(top);
@@ -122,6 +139,20 @@ final class ScreenBoard {
     /** What the line under the bar says and offers; nothing hides it. */
     void line(Node... said) {
         line.getChildren().setAll(said);
+    }
+
+    /** What the last action answered, kept until the next one or ✕; null or blank hides it. */
+    void say(String said) {
+        boolean shown = said != null && !said.isBlank();
+        news.setText(shown ? said.strip() : "");
+        news.pseudoClassStateChanged(REFUSED, shown && refused(said));
+        newsRow.setVisible(shown);
+    }
+
+    /** Whether {@code said} is a refusal, as the edits and the tools word one. */
+    static boolean refused(String said) {
+        String s = said.strip();
+        return s.contains(ScreenEdits.NOT_WRITTEN) || s.startsWith("It failed") || s.contains("Nothing was saved");
     }
 
     /**

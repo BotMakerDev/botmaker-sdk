@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
+import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -98,35 +99,69 @@ public final class BoardCuts {
     private BoardCuts() {}
 
     /**
+     * What a save said, in sentences, and the places in its list of the cuts refused: the board keeps those, to fix
+     * and save again, and drops the ones saved.
+     */
+    public record Saved(String said, List<Integer> refused) {
+
+        public Saved {
+            refused = List.copyOf(refused);
+        }
+
+        public boolean anyRefused() {
+            return !refused.isEmpty();
+        }
+    }
+
+    /**
      * {@code cuts}, drawn on {@code frame}, saved: the pictures noted on {@code screen} (null: on none) and tagged
      * {@code tags}. {@code watched} when the game still shows the frame: each picture is then watched still, as
-     * crop_pictures watches it; a frame a run saved or a screen's shot is not. Said in sentences. Off the FX thread.
+     * crop_pictures watches it; a frame a run saved or a screen's shot is not. Off the FX thread.
      */
-    public static String save(AgentContext context, String screen, List<String> tags, List<Cut> cuts,
-                              BufferedImage frame, boolean watched) {
+    public static Saved save(AgentContext context, String screen, List<String> tags, List<Cut> cuts,
+                             BufferedImage frame, boolean watched) {
         Optional<BufferedImage> shown = Optional.of(frame);
         Supplier<List<BufferedImage>> live = watched ? PictureTools.liveLooks(context) : List::of;
         List<String> said = new ArrayList<>();
+        List<Integer> refused = new ArrayList<>();
         List<Box> boxes = cuts.stream().filter(BoardCuts::picture).map(BoardCuts::box).toList();
         if (!boxes.isEmpty()) {
-            said.add(ScreenDesk.text(PictureTools.cropPictures(new PictureTools.Crops(boxes, screen, tags), context,
-                    shown, live)));
+            AgentReply cropped = PictureTools.cropPictures(new PictureTools.Crops(boxes, screen, tags), context, shown,
+                    live);
+            String text = ScreenDesk.text(cropped);
+            for (int i = 0; i < cuts.size(); i++) {
+                // All refused, or each box refused on its own while the others were saved.
+                if (picture(cuts.get(i)) && (cropped.isRefused() || notSaved(text, cuts.get(i).name()))) refused.add(i);
+            }
+            said.add(text);
         }
-        for (Cut cut : cuts) {
+        for (int i = 0; i < cuts.size(); i++) {
+            Cut cut = cuts.get(i);
             Rect b = cut.box();
-            String one = switch (cut.as()) {
-                case Member member -> member(context, screen, cut.name(), member);
-                case Place place -> ScreenDesk.text(PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(),
-                        b.x(), b.y(), b.width(), b.height(), place.anchor()), context, shown));
-                case Digits digits -> ScreenDesk.text(PictureTools.saveDigits(new PictureTools.NamedDigits(cut.name(),
-                        b.x(), b.y(), b.width(), b.height(), digits.shows()), context, shown));
-                case Recut recut -> ScreenDesk.text(PictureTools.replacePicture(replace(cut, recut.picture()), context,
-                        shown, live));
+            AgentReply reply = switch (cut.as()) {
+                case Place place -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
+                        b.width(), b.height(), place.anchor()), context, shown);
+                case Digits digits -> PictureTools.saveDigits(new PictureTools.NamedDigits(cut.name(), b.x(), b.y(),
+                        b.width(), b.height(), digits.shows()), context, shown);
+                case Recut recut -> PictureTools.replacePicture(replace(cut, recut.picture()), context, shown, live);
                 default -> null;
             };
+            String one = cut.as() instanceof Member member ? member(context, screen, cut.name(), member)
+                    : reply == null ? null : ScreenDesk.text(reply);
+            if (reply != null ? reply.isRefused() : one != null && one.startsWith(ScreenEdits.NOT_WRITTEN)) {
+                if (!refused.contains(i)) refused.add(i);
+            }
             if (one != null && !one.isBlank()) said.add(one);
         }
-        return String.join("\n", said);
+        return new Saved(String.join("\n", said), refused.stream().sorted().toList());
+    }
+
+    /** Whether crop_pictures said {@code name} was not saved while it saved the others: "Not saved, name: …". */
+    static boolean notSaved(String said, String name) {
+        if (name == null) return false;
+        String id = TemplateLibrary.sanitizeName(name);
+        return said.lines().anyMatch(l -> l.startsWith("Not saved, " + name + ":")
+                || l.startsWith("Not saved, " + id + ":"));
     }
 
     /** Whether {@code cut} is a picture of a screen, which crop_pictures saves. */
@@ -172,7 +207,9 @@ public final class BoardCuts {
      * members: the strip or tree keeps its field, how it scrolls and what was measured of it.
      */
     private static String member(AgentContext context, String screen, String name, Member member) {
-        if (screen == null) return name + ": a strip's or a tree's button is a screen's: pick the screen.";
+        if (screen == null) {
+            return ScreenEdits.NOT_WRITTEN + name + ": a strip's or a tree's button is a screen's: pick the screen.";
+        }
         String id = TemplateLibrary.sanitizeName(name);
         return FxCall.call(() -> {
             Optional<MapScreen> on = ScreenBook.read(context.services()).screen(screen);

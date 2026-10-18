@@ -849,6 +849,8 @@ final class ScreenPanel {
 
     private void say(String said) {
         status.setText(said == null ? "" : said);
+        // Also on the board: the panel's status sits under all of the screen, often scrolled out of view.
+        board.say(said);
     }
 
     // --- pieces ---

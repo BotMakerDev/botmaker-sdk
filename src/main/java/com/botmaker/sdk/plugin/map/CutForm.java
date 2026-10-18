@@ -94,6 +94,8 @@ final class CutForm {
     private final VBox body;
     private final Consumer<Answer> save;
     private final Consumer<String> say;
+    /** Why OK did not save, at the top of the form opened again. */
+    private final Label wrong = new Label();
 
     /**
      * @param shown  the screen the frame shows, or the one the cut was asked for; null: none
@@ -132,7 +134,12 @@ final class CutForm {
         screen.getEditor().textProperty().addListener((o, was, is) -> lines.forEach(Line::fill));
         HBox top = new HBox(8, new Label("On the screen"), screen, new Label("Tags"), tags);
         top.setAlignment(Pos.CENTER_LEFT);
-        body = new VBox(10, top, grid, hint("A name is lowercase with underscores: collect_button. The first marker "
+        wrong.setWrapText(true);
+        // The form is the toolkit's, without the map's sheet: the theme's own error colour.
+        wrong.setStyle("-fx-text-fill: -bm-severity-error;");
+        wrong.managedProperty().bind(wrong.visibleProperty());
+        wrong.setVisible(false);
+        body = new VBox(10, wrong, top, grid, hint("A name is lowercase with underscores: collect_button. The first marker "
                 + "replaces the screen's; a picture is watched still a second before it is saved when the game still "
                 + "shows the frame."));
     }
@@ -149,9 +156,12 @@ final class CutForm {
     }
 
     private void commit() {
-        Optional<String> wrong = problem();
-        if (wrong.isPresent()) {
-            say.accept(wrong.get());
+        Optional<String> problem = problem();
+        if (problem.isPresent()) {
+            // Said in the form opened again, beside what to fix, and on the board.
+            wrong.setText(problem.get());
+            wrong.setVisible(true);
+            say.accept(problem.get());
             open();
             return;
         }

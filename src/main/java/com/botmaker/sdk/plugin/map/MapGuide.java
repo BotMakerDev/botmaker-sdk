@@ -137,8 +137,10 @@ final class MapGuide {
                     new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
                             + "screen: " + NEW_FROM_FROZEN + " on the screen last recognised."),
                     new Entry("Missed frames", null, MISSED + ", to make it a screen's shot or a new screen."),
-                    new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape; ▨ Skip a part: " + CUT_IGNORE
-                            + "; ✓ Save: " + CUT_SAVE + "."),
+                    new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape (✎: click its corners, then "
+                            + "its first corner again or ✓ Close shape); ▨ Skip a part: " + CUT_IGNORE + "; a click "
+                            + "on a cut (its number, for a free shape) picks it: a drag moves it, its corners resize "
+                            + "it, Delete takes it off; ✓ Save: " + CUT_SAVE + ". A refused cut stays to fix."),
                     new Entry("▶ Launch", null, "Starts the game the bot launches, when it is not up."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),

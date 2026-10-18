@@ -422,6 +422,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **🗺 Screens' cuts close, move and say why.**
+  - **A free shape** closes on a click on its first corner (drawn as a ring), on ✓ Close shape, a double-click or
+    Enter. The line under the board says how.
+  - **A drawn cut** is picked by a click (on its number, for a free shape): a drag moves it, its corners resize a
+    box or an oval, and Delete or ✕ Take it off removes it.
+  - **A save says what it answered** on the board itself, red when refused. A refused cut stays drawn to fix and
+    save again, and the cuts that saved are dropped.
+  - **The cut form and New screen** open again with the reason at the top instead of closing silently.
 - **🗺 Screens' picture window shows a picture or a tree's drawing, never a screen's shot**: a shot is shown big on
   the Screen tab's board, and a picture's "← <screen>" goes back there. The screens doc (`docs/architecture/screens.md`)
   has a *By hand* section: the outline, the board, Live and ❄ Freeze, the cuts and each input's editor.

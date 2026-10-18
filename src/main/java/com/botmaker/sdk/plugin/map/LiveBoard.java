@@ -715,8 +715,8 @@ final class LiveBoard {
             one.setTooltip(new Tooltip(switch (shape) {
                 case RECT -> "A box: drag it";
                 case ELLIPSE -> "An oval, transparent outside: drag its box (Shift: a circle)";
-                case POLYGON -> "A free shape, transparent outside: click each corner; a double-click or Enter closes "
-                        + "it, Backspace drops a corner";
+                case POLYGON -> "A free shape, transparent outside: click each corner; a click on the first corner, a "
+                        + "double-click, Enter or ✓ Close shape closes it, Backspace drops a corner";
             }));
             one.setToggleGroup(shapes);
             one.setSelected(cutter.shape() == shape);
@@ -731,6 +731,20 @@ final class LiveBoard {
         ignore.setSelected(cutter.ignoring());
         ignore.setOnAction(e -> cutter.setIgnoring(ignore.isSelected()));
         tools.add(ignore);
+        if (cutter.corners() > 0) {
+            Button close = button("✓ Close shape", "Ends the free shape at its last corner (Enter)",
+                    cutter::closeShape);
+            close.setDisable(cutter.corners() < 3);
+            tools.add(close);
+            tools.add(hint(cutter.corners() < 3 ? "click its corners: at least 3"
+                    : "click the first corner, or double-click, to close it"));
+        } else if (cutter.hasPicked()) {
+            tools.add(button("✕ Take it off", "Takes the picked cut off (Delete)", cutter::removePicked));
+            tools.add(hint("drag it to move it, its corners to resize it"));
+        } else if (!cutter.cuts().isEmpty()) {
+            tools.add(hint(cutter.shape() == CutShape.POLYGON ? "click a cut's number to pick it"
+                    : "click a cut to pick it"));
+        }
         int drawn = cutter.cuts().size();
         Button undo = button("↶", "Take back the last cut", cutter::undo);
         undo.setDisable(drawn == 0);
@@ -757,17 +771,30 @@ final class LiveBoard {
             String where = answer.screen() == null ? "" : " on " + (map.screens().containsKey(answer.screen())
                     ? map.shown(answer.screen()) : answer.screen());
             boolean started = work.run("Saving " + answer.cuts().size() + (answer.cuts().size() == 1 ? " cut" : " cuts")
-                    + where + "…", answer.screen(), () -> BoardCuts.save(reads, answer.screen(), answer.tags(),
-                    answer.cuts(), image, watched));
-            // Kept to save again once the map is free.
-            if (started) endCut();
-            else done.accept("A try or a walk is running: the cuts are kept; ✓ Save again once it ends.");
+                    + where + "…", answer.screen(), () -> {
+                BoardCuts.Saved saved = BoardCuts.save(reads, answer.screen(), answer.tags(), answer.cuts(), image,
+                        watched);
+                // A refused cut is kept on the board, to fix and ✓ Save again; a saved one is done with.
+                Platform.runLater(() -> {
+                    if (saved.anyRefused()) cutter.keepOnly(drawn, saved.refused());
+                    else endCut();
+                });
+                return saved.said() + (saved.anyRefused() ? "\n" + (saved.refused().size() == 1 ? "The cut refused is"
+                        : "The " + saved.refused().size() + " cuts refused are") + " kept: fix and ✓ Save again." : "");
+            });
+            if (!started) done.accept("A try or a walk is running: the cuts are kept; ✓ Save again once it ends.");
         }, done);
     }
 
     private PanelContext context() {
         if (context == null) context = new PanelContext(services, CaptureValue.current(services));
         return context;
+    }
+
+    private static Label hint(String text) {
+        Label hint = new Label(text);
+        hint.getStyleClass().add("screen-panel-path");
+        return hint;
     }
 
     private static Button button(String text, String tip, Runnable action) {
