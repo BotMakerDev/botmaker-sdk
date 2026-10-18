@@ -430,6 +430,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - **A save says what it answered** on the board itself, red when refused. A refused cut stays drawn to fix and
     save again, and the cuts that saved are dropped.
   - **The cut form and New screen** open again with the reason at the top instead of closing silently.
+- **🗺 Screens' ❄ Freeze names a new screen first.** A frame that shows no screen of the map offers New screen…
+  first; once it is written, the frame is that screen's and cutting starts on it, its marker first, so the cut form
+  offers it. New screen from here… on a known screen does the same.
 - **🗺 Screens' picture window shows a picture or a tree's drawing, never a screen's shot**: a shot is shown big on
   the Screen tab's board, and a picture's "← <screen>" goes back there. The screens doc (`docs/architecture/screens.md`)
   has a *By hand* section: the outline, the board, Live and ❄ Freeze, the cuts and each input's editor.

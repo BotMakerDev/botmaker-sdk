@@ -56,7 +56,8 @@ final class MapGuide {
     static final String FREEZE = "Keep the frame shown, lossless, to take a screen's shot or make a new screen of it";
     static final String MISSED = "A frame the latest run saved when a wait timed out, opened frozen";
     static final String RETAKE_FROZEN = "This frame as the screen's shot, while its markers show on it";
-    static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked";
+    static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked; "
+            + "cutting then starts on it, its marker first";
     static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";
     static final String CUT_FROZEN = "Draw pictures on this frame, then say what each is: a marker, a button, its way "
             + "back, a look, a strip's button, a zone, digits or a new image for a picture";
@@ -135,7 +136,8 @@ final class MapGuide {
                             + "light; its inputs are boxed."),
                     new Entry("Record: A · input → B", null, RECORD_WAY + "."),
                     new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
-                            + "screen: " + NEW_FROM_FROZEN + " on the screen last recognised."),
+                            + "screen: " + NEW_FROM_FROZEN + ". A frame of no screen of the map offers New screen "
+                            + "first: name it, then cut."),
                     new Entry("Missed frames", null, MISSED + ", to make it a screen's shot or a new screen."),
                     new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape (✎: click its corners, then "
                             + "its first corner again or ✓ Close shape); ▨ Skip a part: " + CUT_IGNORE + "; a click "

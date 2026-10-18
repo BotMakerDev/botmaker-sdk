@@ -484,13 +484,17 @@ final class LiveBoard {
                 board.line(said.toArray(Node[]::new));
                 return;
             }
+            // A frame of no screen is named first: its cuts then go to the screen just made.
+            if (frozenRead && frozenOn == null) {
+                Button first = button("New screen…", MapGuide.NEW_FROM_FROZEN, this::newScreen);
+                first.getStyleClass().add("screen-panel-primary");
+                said.add(first);
+                said.add(hint("name it first, then cut its marker"));
+            }
             said.add(button("✂ Cut", MapGuide.CUT_FROZEN, () -> beginCut(frozenOn, CutForm.Kind.BUTTON)));
             if (frozenRead && frozenOn != null) {
                 said.add(button("Retake " + map.shown(frozenOn) + "'s shot", MapGuide.RETAKE_FROZEN, this::retake));
-            }
-            if (frozenRead) {
-                said.add(button(frozenOn == null ? "New screen…" : "New screen from here…", MapGuide.NEW_FROM_FROZEN,
-                        this::newScreen));
+                said.add(button("New screen from here…", MapGuide.NEW_FROM_FROZEN, this::newScreen));
             }
             said.add(button("● Back to live", null, this::start));
             said.add(button("✕", "Close the frame: the picked screen's shot again", this::unfreeze));
@@ -603,17 +607,26 @@ final class LiveBoard {
 
     /**
      * A new screen of the frozen frame: under the screen it shows (a panel opened over it) or else the screen last
-     * recognised, opened by the input last clicked there; its shot is this frame.
+     * recognised, opened by the input last clicked there; its shot is this frame, and cutting starts on it, its
+     * marker first.
      */
     private void newScreen() {
         String parent = frozenOn != null ? frozenOn : lastKnown;
         String via = lastClick != null && parent != null && parent.equals(lastClick.screen()) ? lastClick.field() : null;
         BufferedImage image = frozen;
         hands.newScreen(parent, via, false, name -> ScreenDesk.find(ScreenDesk.read(services), name)
-                .ifPresent(made -> Thread.ofVirtual().name("live-shot").start(() -> {
-                    ScreenDesk.keepShot(services, made, image);
-                    Platform.runLater(() -> select.accept(made));
-                })));
+                .ifPresent(made -> {
+                    if (frozen == image) {
+                        frozenOn = made;
+                        frozenRead = true;
+                        lit.accept(made);
+                        beginCut(made, CutForm.Kind.MARKER);
+                    }
+                    Thread.ofVirtual().name("live-shot").start(() -> {
+                        ScreenDesk.keepShot(services, made, image);
+                        Platform.runLater(() -> select.accept(made));
+                    });
+                }));
     }
 
     /** The frames the latest run saved when a wait timed out, each opened frozen. */
