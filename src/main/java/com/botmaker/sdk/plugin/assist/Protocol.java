@@ -144,7 +144,7 @@ final class Protocol {
                 - A click can be missed and a screen can be slow (lag, a dropped connection), so a step repeats
                   until the screen shows it worked, never clicks once and trusts it. Write a body out of the loop
                   methods that take a lambda: ImageFinder.whileFindAny, whileFindAll, ifFindAny (group, found ->
-                  …), whileFindCompare (good, bad, found -> …), untilFind(picture, action). Each pass looks at the
+                  …), whileFindCompare (good, bad, found -> …), untilFind(picture, action). Each pass looks at there
                   screen again, so a missed click or a slow screen is retried, not trusted. Build the logic from
                   what the lambda is handed (its parameter by var:<its name>): found.has(X) and found.get(X) say
                   which pictures this frame shows, ImageClicker.click(found.get(X)) or clickLast() act on them
