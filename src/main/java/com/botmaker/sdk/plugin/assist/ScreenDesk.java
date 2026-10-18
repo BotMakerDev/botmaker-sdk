@@ -66,9 +66,13 @@ public final class ScreenDesk {
     /** Tries {@code input} on {@code constant} as try_input does, {@code how} it says. Off the FX thread. */
     public static String tryInput(AgentContext context, String constant, Input input, Trying how) {
         String opens = how.opens();
+        if (input instanceof Strip strip && strip.scroll() != null && strip.scroll().drag() != null) {
+            return "try_input scrolls a strip by the wheel only: a dragged one is scrolled by a run.";
+        }
         String picture = switch (input) {
             case Button button -> button.picture() == null ? null : button.picture().id();
-            case Strip strip -> strip.members().isEmpty() ? null : strip.members().getFirst().id();
+            // Scrolled over a member that shows, wherever the strip carried it, as try_input scrolls one by its field.
+            case Strip strip -> strip.members().isEmpty() ? null : MapTools.shownMember(strip, context);
             case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
             case Hotkey ignored -> null;
         };

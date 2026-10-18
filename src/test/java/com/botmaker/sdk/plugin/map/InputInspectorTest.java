@@ -4,18 +4,25 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.plugin.map.InputInspector.Result;
+import com.botmaker.sdk.plugin.map.InputInspector.ScrollKind;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** What the picked input's editors write, as plain values. */
 class InputInspectorTest {
@@ -52,6 +59,34 @@ class InputInspectorTest {
         assertEquals(Pick.each(Order.EAST), InputInspector.wayPick(Pick.Mode.EACH, 3, Order.EAST));
         assertEquals(Pick.nth(3, Order.EAST), InputInspector.wayPick(Pick.Mode.NTH, 3, Order.EAST));
         assertEquals(Pick.first(Order.SOUTH), InputInspector.wayPick(Pick.Mode.FIRST, 3, Order.SOUTH));
+    }
+
+    @Test
+    void aStripsScrollIsTheWheelADragOrNone() {
+        assertEquals(Scroll.wheel(-5), InputInspector.scrollOf(ScrollKind.WHEEL, -5, Order.EAST, 300, 500));
+        assertEquals(Scroll.drag(Order.WEST, 300, Duration.ofMillis(500)),
+                InputInspector.scrollOf(ScrollKind.DRAG, -5, Order.WEST, 300, 500));
+        assertEquals(Order.NORTH, InputInspector.scrollOf(ScrollKind.DRAG, 0, Order.CENTER, 300, 500).drag(),
+                "a drag goes toward a side");
+        assertFalse(InputInspector.scrollOf(ScrollKind.NONE, -5, Order.EAST, 300, 500).moves(), "none: the strip off");
+        assertEquals(ScrollKind.WHEEL, ScrollKind.of(Scroll.wheel(3).step(120)));
+        assertEquals(ScrollKind.DRAG, ScrollKind.of(Scroll.drag(Order.NORTH, 200, Duration.ZERO)));
+        assertEquals(ScrollKind.NONE, ScrollKind.of(Scroll.wheel(0)));
+        assertEquals(ScrollKind.NONE, ScrollKind.of(null));
+    }
+
+    @Test
+    void aStripTakesOnlyAButtonInNoStripOrTree() {
+        Button tavern = MapFixtures.click("tavern");
+        Button arena = MapFixtures.click("arena");
+        Button guild = MapFixtures.click("guild");
+        Button rune = MapFixtures.click("rune");
+        MapScreen home = MapFixtures.screen("Home", tavern, arena, guild, rune, Hotkey.of(Key.Q),
+                Strip.of(Scroll.wheel(-5), List.of(tavern.picture(), arena.picture())),
+                Tree.of(List.of(Node.of(rune.picture()))));
+        assertEquals(List.of(guild.picture()), InputInspector.joinable(home));
+        assertEquals(List.of(), InputInspector.joinable(null));
+        assertEquals(List.of("b", "a", "c"), InputInspector.moved(List.of("a", "b", "c"), 0, 1), "members move too");
     }
 
     @Test

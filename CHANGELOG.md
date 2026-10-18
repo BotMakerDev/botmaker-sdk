@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens edits a strip by hand.** A button's Strip… puts it last in one of the screen's strips, or in a new one
+  turning the wheel; one in a strip says where and can come out. A strip picked on the board lists its buttons in
+  order, each moved or taken off, ＋ Member… one more of the screen's buttons, and sets how it scrolls: the wheel's
+  notches, a drag toward a side, or none, which takes the strip off once you say so. Its ▶ Scroll and measure scrolls
+  it once as try_input does, over a button that shows, and writes how far it moves and how long it glides.
 - **🗺 Screens edits a button or a hotkey by hand.** The input picked on the board shows its editors under its row:
   its result, information only, comes and goes, never (with why) and locked (with the picture proving it); a button's
   looks, each with what it means, reordered or taken off, one more from a picture, and whether it cycles through them;

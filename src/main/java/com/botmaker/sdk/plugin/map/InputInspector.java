@@ -10,7 +10,10 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
@@ -32,6 +35,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -41,12 +45,14 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * The input picked on 🗺 Screens' board, edited by its type under its row: what it does (its result, information only,
  * comes and goes, never, locked), a button's looks (each with its state, in order), whether the screen shows it more
- * than once and the copy each of its ways goes through, a hotkey's key, and ▶ Try with try_input's own settings. Each
- * change is one {@link ScreenEdits} write, as the tools make it, so ↶ undoes it.
+ * than once and the copy each of its ways goes through, the strip a button is in, a hotkey's key, a strip's members and
+ * scroll, and ▶ Try with try_input's own settings. Each change is one {@link ScreenEdits} write, as the tools make it,
+ * so ↶ undoes it.
  */
 final class InputInspector {
 
@@ -88,6 +94,28 @@ final class InputInspector {
         }
     }
 
+    /** How a strip is scrolled, as its editor picks it; none takes it off. */
+    enum ScrollKind {
+        WHEEL("The wheel"),
+        DRAG("A drag"),
+        NONE("None: not a strip");
+
+        private final String displayName;
+
+        ScrollKind(String displayName) {
+            this.displayName = displayName;
+        }
+
+        String displayName() {
+            return displayName;
+        }
+
+        /** How {@code scroll} goes; none for a scroll that moves nothing. */
+        static ScrollKind of(Scroll scroll) {
+            return scroll == null || !scroll.moves() ? NONE : scroll.drag() == null ? WHEEL : DRAG;
+        }
+    }
+
     /** The picks a way through a repeated button may take: {@link Pick.Mode#UNTIL} is a body's, never a way's. */
     static final List<Pick.Mode> WAY_PICKS = List.of(Pick.Mode.FIRST, Pick.Mode.NTH, Pick.Mode.EACH,
             Pick.Mode.UNTIL_NONE);
@@ -118,10 +146,18 @@ final class InputInspector {
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
                 all.add(copies(constant, field, button));
+                all.add(heading("Strip"));
+                all.add(inStrip(constant, button));
             }
             case Hotkey hotkey -> {
                 all.add(heading("Key"));
                 all.add(key(constant, field, hotkey));
+            }
+            case Strip strip -> {
+                all.add(heading("Members"));
+                all.add(members(constant, field, strip));
+                all.add(heading("Scroll"));
+                all.add(scroll(constant, field, strip));
             }
             default -> {
             }
@@ -406,6 +442,178 @@ final class InputInspector {
         return key;
     }
 
+    // --- the strip a button is in ---
+
+    private Node inStrip(String constant, Button button) {
+        MapScreen screen = graph.screens().get(constant);
+        Optional<String> held = screen == null ? Optional.empty() : screen.stripFieldOf(button);
+        if (held.isPresent()) {
+            Strip strip = screen.strips().get(held.get());
+            Label said = text("In " + held.get() + ", " + (indexOf(strip.members(), button.picture()) + 1) + " of "
+                    + strip.members().size());
+            HBox.setHgrow(said, Priority.ALWAYS);
+            return line(said, action("Out of the strip", "Looked for at its place again", () -> setMembers(constant,
+                    held.get(), strip, strip.members().stream().filter(m -> !m.id().equals(button.picture().id()))
+                            .toList())));
+        }
+        if (screen != null && screen.treeOf(button).isPresent()) return text("A node of a tree: its tree places it.");
+        if (button.picture() == null) return text("It has no picture to look for along a strip.");
+        return action("Strip…", MapGuide.IN_STRIP, () -> askStrip(constant, screen, button.picture()));
+    }
+
+    private void askStrip(String constant, MapScreen screen, ImageTemplate picture) {
+        List<String> fields = new ArrayList<>(screen == null ? List.of() : screen.strips().keySet());
+        String fresh = "A new strip";
+        fields.add(fresh);
+        ComboBox<String> which = new ComboBox<>(FXCollections.observableArrayList(fields));
+        which.setValue(fields.getFirst());
+        Spinner<Integer> notches = new Spinner<>(-20, 20, -5);
+        notches.setEditable(true);
+        notches.disableProperty().bind(which.valueProperty().isNotEqualTo(fresh));
+        Modals.form(services, "The strip " + picture.id() + " is in", new VBox(8, new Label("Put it last in"), which,
+                line(new Label("A new one turns the wheel"), notches, new Label("notches"))), () -> {
+            notches.commitValue();
+            Strip had = fresh.equals(which.getValue()) || screen == null ? null : screen.strips().get(which.getValue());
+            if (had != null) {
+                setMembers(constant, which.getValue(), had, Stream.concat(had.members().stream(), Stream.of(picture))
+                        .toList());
+            } else if (notches.getValue() == 0) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "a new strip turns by some notches of the wheel: give them.");
+            } else {
+                strip(constant, null, Strip.of(Scroll.wheel(notches.getValue()), List.of(picture)));
+            }
+        });
+    }
+
+    // --- a strip's members ---
+
+    private Node members(String constant, String field, Strip strip) {
+        VBox box = new VBox(6);
+        List<ImageTemplate> members = strip.members();
+        for (int i = 0; i < members.size(); i++) {
+            int at = i;
+            ImageTemplate member = members.get(i);
+            Label name = new Label(member.id());
+            name.getStyleClass().add("screen-row-label");
+            name.setMinWidth(0);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            javafx.scene.control.Button up = action("↑", "Before the button above it",
+                    () -> setMembers(constant, field, strip, moved(members, at, at - 1)));
+            up.setDisable(at == 0);
+            javafx.scene.control.Button down = action("↓", "After the button below it",
+                    () -> setMembers(constant, field, strip, moved(members, at, at + 1)));
+            down.setDisable(at == members.size() - 1);
+            javafx.scene.control.Button off = action("✕", "Out of the strip: looked for at its place again",
+                    () -> setMembers(constant, field, strip, without(members, at)));
+            box.getChildren().add(line(panel.thumb(member.id()), name, up, down, off));
+        }
+        List<ImageTemplate> free = joinable(graph.screens().get(constant));
+        javafx.scene.control.Button add = action("＋ Member…", "A button of the screen in no strip or tree, last; ✂ "
+                + "Cut on the board makes a new one as a strip's button", () -> askMember(constant, field, strip, free));
+        add.setDisable(free.isEmpty());
+        box.getChildren().add(add);
+        return box;
+    }
+
+    private void askMember(String constant, String field, Strip strip, List<ImageTemplate> free) {
+        ComboBox<String> picture = new ComboBox<>(FXCollections.observableArrayList(free.stream()
+                .map(ImageTemplate::id).toList()));
+        picture.setValue(free.getFirst().id());
+        Modals.form(services, "Another button of " + field, new VBox(8, new Label("The button, last in the strip"),
+                picture), () -> free.stream().filter(m -> m.id().equals(picture.getValue())).findFirst()
+                .ifPresent(m -> setMembers(constant, field, strip, Stream.concat(strip.members().stream(),
+                        Stream.of(m)).toList())));
+    }
+
+    /** {@code strip} given {@code members}; its last one gone takes it off, once the user says so. */
+    private void setMembers(String constant, String field, Strip strip, List<ImageTemplate> members) {
+        if (!members.isEmpty()) {
+            strip(constant, field, strip.members(members));
+            return;
+        }
+        hands.confirm("Take the strip off", "That is the last button of " + field + ": the strip is taken off, its "
+                + "button looked for at its place.", () -> strip(constant, field, strip.members(List.of())));
+    }
+
+    /** The buttons of {@code screen} a strip may take: each with a picture, in no strip or tree yet. */
+    static List<ImageTemplate> joinable(MapScreen screen) {
+        if (screen == null) return List.of();
+        return screen.inputs().values().stream()
+                .flatMap(i -> i instanceof Button b && b.picture() != null && screen.stripOf(b).isEmpty()
+                        && screen.treeOf(b).isEmpty() ? Stream.of(b.picture()) : Stream.empty())
+                .toList();
+    }
+
+    // --- a strip's scroll ---
+
+    private Node scroll(String constant, String field, Strip strip) {
+        Scroll now = strip.scroll() == null ? Scroll.wheel(0) : strip.scroll();
+        ComboBox<ScrollKind> kind = new ComboBox<>(FXCollections.observableArrayList(ScrollKind.values()));
+        kind.setConverter(named(ScrollKind::displayName));
+        kind.setValue(ScrollKind.of(now));
+        // Each spinner's range holds the value written: one out of it would be clamped, and written so on Set.
+        int turns = now.drag() == null && now.notches() != 0 ? now.notches() : -5;
+        Spinner<Integer> notches = new Spinner<>(Math.min(-20, turns), Math.max(20, turns), turns);
+        notches.setEditable(true);
+        notches.setPrefWidth(80);
+        ComboBox<Order> way = new ComboBox<>(FXCollections.observableArrayList(Arrays.stream(Order.values())
+                .filter(o -> o != Order.CENTER).toList()));
+        way.setConverter(named(InputInspector::orderName));
+        way.setValue(now.drag() == null ? Order.NORTH : now.drag());
+        int far = now.drag() == null ? 300 : Math.max(10, now.px());
+        Spinner<Integer> px = new Spinner<>(10, Math.max(4000, far), far, 10);
+        px.setEditable(true);
+        px.setPrefWidth(90);
+        int took = now.drag() == null ? 500 : (int) Math.min(Integer.MAX_VALUE, now.time().toMillis());
+        Spinner<Integer> ms = new Spinner<>(0, Math.max(5000, took), took, 100);
+        ms.setEditable(true);
+        ms.setPrefWidth(90);
+        HBox wheel = line(new Label("Notches"), notches, new Label("negative: down or toward you"));
+        HBox drag = line(new Label("Toward"), way, px, new Label("px over"), ms, new Label("ms"));
+        shownFor(wheel, kind, ScrollKind.WHEEL);
+        shownFor(drag, kind, ScrollKind.DRAG);
+        Label measured = text(now.step() == 0 ? "Not measured yet: ▶ Scroll and measure, below."
+                : "Measured: its buttons move " + now.step() + " px a scroll and hold still within "
+                + now.settle().toMillis() + " ms.");
+        javafx.scene.control.Button set = action("Set scroll", MapGuide.STRIP_SCROLL, () -> {
+            notches.commitValue();
+            px.commitValue();
+            ms.commitValue();
+            if (kind.getValue() == ScrollKind.WHEEL && notches.getValue() == 0) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "the wheel turns by some notches: give them.");
+                return;
+            }
+            Scroll made = scrollOf(kind.getValue(), notches.getValue(), way.getValue(), px.getValue(), ms.getValue());
+            if (made.moves()) {
+                strip(constant, field, strip.scroll(made));
+            } else {
+                hands.confirm("Take the strip off", field + " is no longer scrolled: the strip is taken off, its "
+                        + "buttons looked for at their places.", () -> strip(constant, field, strip.scroll(made)));
+            }
+        });
+        return new VBox(6, line(new Label("By"), kind), wheel, drag, measured, set);
+    }
+
+    /** The scroll a strip's editor sets: none is a wheel of no notches, which takes the strip off. */
+    static Scroll scrollOf(ScrollKind kind, int notches, Order way, int px, int ms) {
+        return switch (kind == null ? ScrollKind.NONE : kind) {
+            case WHEEL -> Scroll.wheel(notches);
+            case DRAG -> Scroll.drag(way == null || way == Order.CENTER ? Order.NORTH : way, px,
+                    Duration.ofMillis(ms));
+            case NONE -> Scroll.wheel(0);
+        };
+    }
+
+    private static void shownFor(Node node, ComboBox<ScrollKind> kind, ScrollKind shown) {
+        node.visibleProperty().bind(kind.valueProperty().isEqualTo(shown));
+        node.managedProperty().bind(node.visibleProperty());
+    }
+
+    private static int indexOf(List<ImageTemplate> members, ImageTemplate picture) {
+        for (int i = 0; i < members.size(); i++) if (members.get(i).id().equals(picture.id())) return i;
+        return -1;
+    }
+
     // --- ▶ Try ---
 
     private Node trying(String constant, Row row, Input input) {
@@ -428,7 +636,11 @@ final class InputInspector {
         stay.setSelected(true);
         stay.setTooltip(new Tooltip("Off: once the screen is finished, the game is walked to the next screen to "
                 + "explore, as Discovery goes"));
-        javafx.scene.control.Button go = action("▶ Try", MapGuide.TRY_HOW, () -> {
+        // A strip is scrolled, which opens nothing, and measured; try_input turns only the wheel.
+        boolean scrolled = input instanceof Strip;
+        boolean dragged = input instanceof Strip strip && strip.scroll() != null && strip.scroll().drag() != null;
+        javafx.scene.control.Button go = action(scrolled ? "▶ Scroll and measure" : "▶ Try",
+                scrolled ? MapGuide.MEASURE : MapGuide.TRY_HOW, () -> {
             // A number typed and not yet entered is the one tried.
             copy.commitValue();
             settle.commitValue();
@@ -439,27 +651,30 @@ final class InputInspector {
                     how));
         });
         go.getStyleClass().add("screen-panel-primary");
-        VBox box = new VBox(6, line(new Label("Opens"), opens), new FlowPane(12, 6, line(new Label("Wait up to"),
-                settle, new Label("ms")), stay));
+        go.setDisable(dragged);
+        VBox box = new VBox(6, new FlowPane(12, 6, line(new Label("Wait up to"), settle, new Label("ms")), stay));
+        if (!scrolled) box.getChildren().addFirst(line(new Label("Opens"), opens));
         if (byCopy) box.getChildren().addFirst(line(new Label("Copy #"), copy));
         box.getChildren().add(go);
+        if (dragged) box.getChildren().add(text("try_input scrolls a strip by the wheel only: a dragged one is "
+                + "scrolled by a run."));
         return box;
     }
 
-    // --- pure edits of a button's looks ---
+    // --- pure edits of a button's looks and a strip's members ---
 
-    /** {@code looks} with the one at {@code from} put at {@code to}; unchanged for either out of range. */
-    static List<Look> moved(List<Look> looks, int from, int to) {
-        if (from < 0 || from >= looks.size() || to < 0 || to >= looks.size()) return looks;
-        List<Look> now = new ArrayList<>(looks);
+    /** {@code items} with the one at {@code from} put at {@code to}; unchanged for either out of range. */
+    static <T> List<T> moved(List<T> items, int from, int to) {
+        if (from < 0 || from >= items.size() || to < 0 || to >= items.size()) return items;
+        List<T> now = new ArrayList<>(items);
         now.add(to, now.remove(from));
         return List.copyOf(now);
     }
 
-    /** {@code looks} without the one at {@code at}. */
-    static List<Look> without(List<Look> looks, int at) {
-        if (at < 0 || at >= looks.size()) return looks;
-        List<Look> now = new ArrayList<>(looks);
+    /** {@code items} without the one at {@code at}. */
+    static <T> List<T> without(List<T> items, int at) {
+        if (at < 0 || at >= items.size()) return items;
+        List<T> now = new ArrayList<>(items);
         now.remove(at);
         return List.copyOf(now);
     }
@@ -476,6 +691,10 @@ final class InputInspector {
 
     private void set(String constant, String field, Input now) {
         panel.wrote(ScreenEdits.setInput(services, constant, field, now));
+    }
+
+    private void strip(String constant, String field, Strip now) {
+        panel.wrote(ScreenEdits.setStrip(services, constant, field, now));
     }
 
     private static String modeName(Pick.Mode mode) {

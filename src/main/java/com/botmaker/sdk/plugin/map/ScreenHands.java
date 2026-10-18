@@ -362,7 +362,7 @@ final class ScreenHands {
         });
     }
 
-    private void confirm(String title, String question, Runnable yes) {
+    void confirm(String title, String question, Runnable yes) {
         Label said = new Label(question);
         said.setWrapText(true);
         Modals.form(services, title, new VBox(said), yes);

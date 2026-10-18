@@ -56,7 +56,8 @@ class HandParityTest {
             entry("RemoveWay", Hand.now("the panel's Ways in ⋯ ▸ Remove this way in")),
             entry("WayWhen", Hand.now("an arrow's menu ▸ Open only while")),
             entry("InputWhen", Hand.now("⋯ input ▸ Only there while")),
-            entry("Group", Hand.in(6, "the strip and tree inspectors")),
+            // A strip by a button's Strip… and a strip's Members and Scroll; a tree by the tree inspector.
+            entry("Group", Hand.in(7, "a button's Strip…, a strip's Members and Scroll, and the tree inspector")),
             entry("Link", Hand.in(7, "the tree inspector")),
             entry("LookWhen", Hand.now("the panel's Looks ⋯ ▸ Shows only while")),
             entry("AddMarker", Hand.now("✂ Cut marker, ＋ Marker from a picture… (shows it or never does)")),

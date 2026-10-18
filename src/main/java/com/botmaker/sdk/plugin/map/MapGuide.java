@@ -68,6 +68,13 @@ final class MapGuide {
     static final String WAY_COPY = "The copy of this repeated button the way goes through";
     static final String TRY_HOW = "Tries it as try_input does: which copy, the name of the screen it opens, how long it "
             + "is given, and whether the game stays here after";
+    static final String STRIP_MEMBERS = "Its buttons in the strip's order, each looked for anywhere along it and "
+            + "scrolled to over another that shows";
+    static final String STRIP_SCROLL = "How it is scrolled: the wheel turned some notches, or the pointer dragged; "
+            + "none takes the strip off, its buttons looked for at their places";
+    static final String MEASURE = "Scrolls it once as try_input does, and writes how far its buttons move and how "
+            + "long they glide";
+    static final String IN_STRIP = "Puts this button in a strip of the screen, or in a new one";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
@@ -104,6 +111,10 @@ final class MapGuide {
                     new Entry("Repeated", null, REPEATED + "; each way it leads by says its copy: " + WAY_COPY
                             + "."),
                     new Entry("Cycles", null, CYCLES + "."),
+                    new Entry("Strip…", null, IN_STRIP + "."),
+                    new Entry("Members", null, "A strip's: " + STRIP_MEMBERS + "."),
+                    new Entry("Scroll", null, "A strip's: " + STRIP_SCROLL + ". ▶ Scroll and measure: " + MEASURE
+                            + "."),
                     new Entry("Leads to…", null, LEADS_TO + ", as try_input records an input that led to a screen "
                             + "mapped already."),
                     new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."),

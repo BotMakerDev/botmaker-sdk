@@ -20,7 +20,8 @@ class MapGuideTest {
                 MapGuide.REMOVE_BACK, MapGuide.LIVE, MapGuide.FREEZE, MapGuide.MISSED, MapGuide.RETAKE_FROZEN,
                 MapGuide.NEW_FROM_FROZEN, MapGuide.RECORD_WAY, MapGuide.CUT_FROZEN, MapGuide.CUT_IGNORE,
                 MapGuide.CUT_SAVE, MapGuide.ADD_HOTKEY, MapGuide.REPEATED, MapGuide.CYCLES, MapGuide.WAY_COPY,
-                MapGuide.TRY_HOW)) {
+                MapGuide.TRY_HOW, MapGuide.STRIP_MEMBERS, MapGuide.STRIP_SCROLL, MapGuide.MEASURE,
+                MapGuide.IN_STRIP)) {
             assertTrue(said.contains(tip), tip);
         }
     }

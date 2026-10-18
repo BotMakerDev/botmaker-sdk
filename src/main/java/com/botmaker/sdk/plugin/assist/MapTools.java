@@ -284,7 +284,7 @@ final class MapTools {
      * The member of {@code strip} to scroll over: the first one a fresh look shows, wherever the strip carried it,
      * else its first. Home's column scrolled over its first member, out of view, moved nothing (2026-10-17).
      */
-    private static String shownMember(Strip strip, AgentContext context) {
+    static String shownMember(Strip strip, AgentContext context) {
         Optional<BufferedImage> frame = Frames.look(context);
         return strip.members().stream().map(ImageTemplate::id)
                 .filter(id -> frame.isPresent() && ActTools.shows(context, id, frame.get()))
