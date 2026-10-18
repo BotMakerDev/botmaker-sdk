@@ -62,6 +62,12 @@ final class MapGuide {
             + "back, a look, a strip's button, a zone, digits or a new image for a picture";
     static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
     static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
+    static final String ADD_HOTKEY = "A key this screen answers, noted untried";
+    static final String REPEATED = "The screen shows it more than once: a way and a run pick the copy they press";
+    static final String CYCLES = "Each press shows its next look, the usual one first again after the last";
+    static final String WAY_COPY = "The copy of this repeated button the way goes through";
+    static final String TRY_HOW = "Tries it as try_input does: which copy, the name of the screen it opens, how long it "
+            + "is given, and whether the game stays here after";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
@@ -92,7 +98,12 @@ final class MapGuide {
             new Section("The Screen tab", List.of(
                     new Entry("Graph | Screen", null, "The map, or the picked screen's shot as big as the tab."),
                     new Entry("a box", null, "Picks its input: the panel shows it first, with the screens it leads "
-                            + "to (→ picks one) and Leads to…; ✕ picks none."),
+                            + "to (→ picks one) and Leads to…; ✕ picks none. Under it, what it does (information "
+                            + "only, comes and goes, never, locked), a button's looks and copies, a hotkey's key, "
+                            + "and ▶ Try: " + TRY_HOW + "."),
+                    new Entry("Repeated", null, REPEATED + "; each way it leads by says its copy: " + WAY_COPY
+                            + "."),
+                    new Entry("Cycles", null, CYCLES + "."),
                     new Entry("Leads to…", null, LEADS_TO + ", as try_input records an input that led to a screen "
                             + "mapped already."),
                     new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."),
@@ -135,6 +146,7 @@ final class MapGuide {
                     new Entry("✂ Cut marker", null, CUT_MARKER + ". Markers lists them, and the pictures it never "
                             + "shows; ✕ takes one off."),
                     new Entry("＋ Marker from a picture…", null, ADD_MARKER + "."),
+                    new Entry("＋ Hotkey…", null, ADD_HOTKEY + "."),
                     new Entry("Ways in", null, "Each screen and input it is reached from; its ⋯ says when the way is "
                             + "open, or takes it off. The first is how it was found."),
                     new Entry("Looks", null, "The looks the screen has; each one's ⋯ names the method it shows only "

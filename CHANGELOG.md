@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens edits a button or a hotkey by hand.** The input picked on the board shows its editors under its row:
+  its result, information only, comes and goes, never (with why) and locked (with the picture proving it); a button's
+  looks, each with what it means, reordered or taken off, one more from a picture, and whether it cycles through them;
+  whether the screen shows it more than once, and the copy each way it opens goes through; a hotkey's key. Its ▶ Try
+  takes try_input's own settings: which copy, the name of the screen it opens, how long it is given, and whether the
+  game stays. ＋ Hotkey… adds a key the screen answers.
 - **🗺 Screens cuts on the frozen frame.** ✂ Cut on a frozen frame (or a screen's shot) draws pictures on the board
   itself, no window over the game: a box, an oval or a free shape, several at once, with ▨ a part a run skips. A form
   then asks what each is — the screen's marker, one more, a picture it never shows, a button (shown at times, while a

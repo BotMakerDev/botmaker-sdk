@@ -1,7 +1,10 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
@@ -26,6 +29,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
@@ -347,7 +351,9 @@ final class ScreenPanel {
         // No hand edit while a try or a walk writes the map: the two would race for Screens.java.
         Node screenMenu = hands.screenMenu(shown, this::retake);
         screenMenu.setDisable(busy);
-        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker, screenMenu);
+        Button hotkey = action("＋ Hotkey…", MapGuide.ADD_HOTKEY, () -> addHotkey(shown));
+        hotkey.setDisable(busy);
+        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker, hotkey, screenMenu);
 
         VBox inputs = new VBox(6);
         if (rows.isEmpty()) inputs.getChildren().add(text("No input cut yet."));
@@ -516,7 +522,55 @@ final class ScreenPanel {
             inputPicked.accept(constant, null);
         });
         acts.getChildren().addAll(leadsTo, unpick);
-        return List.of(heading("Picked input"), row(constant, row), acts);
+        List<Node> all = new ArrayList<>(List.of(heading("Picked input"), row(constant, row), acts));
+        all.addAll(new InputInspector(services, graph, hands, busy, inspected()).of(constant, row));
+        return all;
+    }
+
+    /** What the picked input's editors act through: the panel's writes, its runs and its thumbs. */
+    private InputInspector.Panel inspected() {
+        return new InputInspector.Panel() {
+            @Override
+            public void wrote(String said) {
+                ScreenPanel.this.wrote(said);
+            }
+
+            @Override
+            public void run(String doing, String constant, Supplier<String> work) {
+                ScreenPanel.this.run(doing, constant, work);
+            }
+
+            @Override
+            public Node thumb(String picture) {
+                return canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
+            }
+
+            @Override
+            public AgentContext tryContext() {
+                return new PanelContext(services, CaptureValue.current(services));
+            }
+        };
+    }
+
+    /** Asks for a key {@code constant} answers, and notes it as an untried hotkey of it. */
+    private void addHotkey(String constant) {
+        ComboBox<Key> key = InputInspector.keyPick(null);
+        Modals.form(services, "A hotkey of " + graph.shown(constant), new VBox(8, new Label("The key it answers"), key),
+                () -> {
+                    MapScreen screen = graph.screens().get(constant);
+                    Key picked = key.getValue();
+                    if (screen == null || picked == null) {
+                        say("Pick a key: type it (Q, Escape, F5) or pick it from the list.");
+                        return;
+                    }
+                    Optional<String> taken = InputInspector.keyTaken(screen, null, picked);
+                    if (taken.isPresent()) {
+                        say(ScreenEdits.NOT_WRITTEN + taken.get() + " is pressed by " + picked.label() + " already.");
+                        return;
+                    }
+                    wrote(ScreenEdits.setInput(services, constant, screen.fieldFor("key " + picked.label()),
+                            Hotkey.of(picked)));
+                });
     }
 
     /** {@code constant}'s ways in, each with its ⋯: when it is open, and taking it off. */

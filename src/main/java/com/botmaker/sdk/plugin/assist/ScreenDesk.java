@@ -48,6 +48,24 @@ public final class ScreenDesk {
      * waits for it. Acting on the user's own desktop is allowed, since they pressed ▶ Try.
      */
     public static String tryInput(AgentContext context, String constant, Input input, String opens) {
+        return tryInput(context, constant, input, new Trying(opens, null, null, true));
+    }
+
+    /**
+     * How ▶ Try tries an input, as try_input's own settings: {@code opens} the name the screen it opens shows (null:
+     * the picture's name), {@code match} the copy clicked from 1 in reading order (null: its best match; the button is
+     * then repeated), {@code settleMs} the longest it is given to answer (null: try_input's), and whether the game
+     * {@code stays} on the screen once it is finished, or is walked to the next screen to explore.
+     */
+    public record Trying(String opens, Integer match, Integer settleMs, boolean stays) {}
+
+    /** How long try_input gives an input to answer when it is not told, and the longest it may be given. */
+    public static final int SETTLE_MS = ActTools.SETTLE_MS;
+    public static final int LONGEST_SETTLE_MS = ActTools.LONGEST_SETTLE_MS;
+
+    /** Tries {@code input} on {@code constant} as try_input does, {@code how} it says. Off the FX thread. */
+    public static String tryInput(AgentContext context, String constant, Input input, Trying how) {
+        String opens = how.opens();
         String picture = switch (input) {
             case Button button -> button.picture() == null ? null : button.picture().id();
             case Strip strip -> strip.members().isEmpty() ? null : strip.members().getFirst().id();
@@ -56,8 +74,9 @@ public final class ScreenDesk {
         };
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
         String key = input instanceof Hotkey hotkey && hotkey.key() != null ? hotkey.key().label() : null;
-        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches, null, key, opens,
-                null, null, input.isInfo() ? true : null)), null, true, true);
+        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches,
+                key == null ? how.match() : null, key, opens, null, null, input.isInfo() ? true : null)),
+                how.settleMs(), how.stays(), true);
         return text(MapTools.tryInput(asked, context));
     }
 

@@ -285,7 +285,7 @@ final class ScreenHands {
     }
 
     /** A screen under {@code parent}, opened by its field {@code via}, or by one of its inputs picked when null. */
-    private void newScreen(String parent, String via) {
+    void newScreen(String parent, String via) {
         newScreen(parent, via, via != null, made -> {});
     }
 

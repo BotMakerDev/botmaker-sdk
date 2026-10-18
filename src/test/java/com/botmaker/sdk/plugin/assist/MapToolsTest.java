@@ -1,6 +1,11 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -111,6 +116,38 @@ class MapToolsTest {
                 "always again");
         assertEquals(screens.get("MAP").from(), ScreenEdits.withWayWhen(graph, screens.get("MAP"), "HOME", "map",
                 eventOn).from(), "no way from Home by the map: nothing changes");
+    }
+
+    /** Only the way in by that input goes through the copy picked; its condition stays. */
+    @Test
+    void aWayGoesThroughTheCopyPickedAndKeepsWhenItIsOpen() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen("Home", MapFixtures.click("m_key").repeated()));
+        screens.put("CAMPAIGN", MapFixtures.screen("Campaign", MapFixtures.click("map").repeated()));
+        BooleanSupplier eventOn = () -> true;
+        screens.put("MAP", MapScreen.of(Setup.named("Map").from(BotConstants.input("CAMPAIGN", "map"))
+                .alsoFrom(List.of(Way.of(BotConstants.input("HOME", "m_key")).when(eventOn)))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Pick second = Pick.nth(2, Order.WEST);
+
+        MapScreen other = ScreenEdits.withWayPick(graph, screens.get("MAP"), "HOME", "m_key", second);
+        assertEquals(second, other.alsoFrom().getFirst().pick());
+        assertSame(eventOn, other.alsoFrom().getFirst().when());
+        assertEquals(null, other.from().pick(), "the entrance stays on its first copy");
+        assertEquals(Pick.each(Order.NORTH), ScreenEdits.withWayPick(graph, other, "CAMPAIGN", "map",
+                Pick.each(Order.NORTH)).from().pick());
+    }
+
+    /** A button made to cycle, and a hotkey given another key, keep all else they were. */
+    @Test
+    void aButtonCyclesAndAHotkeyTakesAnotherKeyKeepingTheRest() {
+        Button buy = MapFixtures.click("buy").tried().repeated();
+        Button cycling = ScreenEdits.cycles(buy, true);
+        assertTrue(cycling.cycles());
+        assertEquals(buy, ScreenEdits.cycles(cycling, false));
+        Hotkey q = Hotkey.of(Key.Q).info().never("spends gems");
+        assertEquals(new Hotkey(Key.W, false, false, true, "spends gems", false, null, null),
+                ScreenEdits.withKey(q, Key.W));
     }
 
     /**

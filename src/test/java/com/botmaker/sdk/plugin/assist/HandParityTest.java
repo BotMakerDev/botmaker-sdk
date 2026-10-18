@@ -45,8 +45,8 @@ class HandParityTest {
             entry("Delete", Hand.now("⋯ Screen ▸ Delete…")),
             entry("Popup", Hand.now("⋯ Screen ▸ Popup")),
             entry("NewScreen", Hand.now("⋯ input ▸ Result ▸ Opens a new screen…, ⋯ Screen ▸ New screen from here…")),
-            entry("SetInput", Hand.in(5, "⋯ input: result, information only, comes and goes, never; locked and "
-                    + "repeated in the button inspector")),
+            entry("SetInput", Hand.now("the picked input's editors: result, information only, comes and goes, "
+                    + "never, locked, a button's looks, repeated and cycles, a hotkey's key; ⋯ input")),
             entry("ResetInput", Hand.now("⋯ input ▸ Result ▸ Untried")),
             entry("RemoveInput", Hand.now("⋯ input ▸ Remove from this screen")),
             entry("UseAsBack", Hand.now("⋯ input ▸ Use as the way back")),
@@ -64,7 +64,8 @@ class HandParityTest {
             // the map tools
             entry("not_a_screen", Hand.now("⋯ Screen ▸ Not a screen")),
             entry("place_pictures", Hand.now("⋯ Screen ▸ Add pictures the bot has…")),
-            entry("try_input", Hand.in(5, "▶ and ▶ Try next; which copy, what it opens, settle and stay on the board")),
+            entry("try_input", Hand.now("▶, ▶ Try next, and the picked input's ▶ Try: which copy, what it opens, "
+                    + "how long, and whether the game stays")),
             entry("go_to_screen", Hand.now("🧭 Go here")),
             entry("edit_map", Hand.now("its actions, each above")),
             // look, act, picture, notes and setup

@@ -348,6 +348,14 @@
     -fx-padding: 4 0 0 0;
 }
 
+/* A part of the picked input's editors (InputInspector): its looks, its copies, its key, ▶ Try. */
+.screen-panel-subheading {
+    -fx-font-size: 0.78em;
+    -fx-font-weight: bold;
+    -fx-text-fill: -bm-screen-plain;
+    -fx-padding: 2 0 0 0;
+}
+
 /* A sign the guide explains, where it is a word or a symbol rather than a pill (MapGuide). */
 .screen-guide-sign {
     -fx-font-weight: bold;

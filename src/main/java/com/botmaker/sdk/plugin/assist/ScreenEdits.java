@@ -3,10 +3,12 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
+import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
@@ -384,12 +387,53 @@ public final class ScreenEdits {
     /** {@code screen} with its way in through {@code from}'s field {@code viaField} taken only while {@code when}. */
     static MapScreen withWayWhen(ScreenGraph graph, MapScreen screen, String from, String viaField,
                                  BooleanSupplier when) {
+        return changingWay(graph, screen, from, viaField, way -> way.when(when));
+    }
+
+    /**
+     * Makes {@code to}'s way in through {@code from}'s field {@code viaField} go through the copy {@code pick} names of
+     * that repeated button; {@code pick} null, or its first copy from the north, for the topmost one.
+     */
+    public static String setWayPick(StudioServices services, String to, String from, String viaField, Pick pick) {
+        ScreenGraph graph = ScreenBook.read(services);
+        if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
+            return noWay(graph, to, from, viaField);
+        }
+        Pick kept = pick == null || pick.equals(Pick.first()) ? null : pick;
+        if (kept != null && !(graph.input(from, viaField).orElse(null) instanceof Button button && button.repeats())) {
+            return NOT_WRITTEN + viaField + " is no button " + graph.shown(from) + " shows more than once: make it "
+                    + "repeated first.";
+        }
+        return said(ScreenBook.update(services, to, s -> withWayPick(graph, s, from, viaField, kept)),
+                "That way goes through " + (kept == null ? Pick.first() : kept).label() + " now.");
+    }
+
+    /** {@code screen} with its way in through {@code from}'s field {@code viaField} through the copy {@code pick}. */
+    static MapScreen withWayPick(ScreenGraph graph, MapScreen screen, String from, String viaField, Pick pick) {
+        return changingWay(graph, screen, from, viaField, way -> way.pick(pick));
+    }
+
+    /** {@code screen} with its way in through {@code from}'s field {@code viaField} as {@code change} makes it. */
+    private static MapScreen changingWay(ScreenGraph graph, MapScreen screen, String from, String viaField,
+                                         UnaryOperator<Way> change) {
         return screen.setup(s -> {
-            Setup now = s.from() != null && wayFrom(graph, s.from(), from, viaField) ? s.fromWay(s.from().when(when))
+            Setup now = s.from() != null && wayFrom(graph, s.from(), from, viaField) ? s.fromWay(change.apply(s.from()))
                     : s;
             return now.alsoFrom(now.alsoFrom().stream()
-                    .map(way -> wayFrom(graph, way, from, viaField) ? way.when(when) : way).toList());
+                    .map(way -> wayFrom(graph, way, from, viaField) ? change.apply(way) : way).toList());
         });
+    }
+
+    /** {@code button} stepping through its looks on each press ({@link Button#cycling}), or not. */
+    public static Button cycles(Button button, boolean cycles) {
+        return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
+                button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles);
+    }
+
+    /** {@code hotkey} pressed by {@code key} instead, all else kept. */
+    public static Hotkey withKey(Hotkey hotkey, Key key) {
+        return new Hotkey(key, hotkey.isTried(), hotkey.isLeaving(), hotkey.isInfo(), hotkey.never(),
+                hotkey.comesAndGoes(), hotkey.lock(), hotkey.when());
     }
 
     /**
