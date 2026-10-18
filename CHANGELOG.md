@@ -61,7 +61,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   picks the screen on the graph, and a right-click gives the screen's or the input's ⋯ menu.
 - **🗺 Screens shows a screen big.** The centre is now *Graph | Screen*: a line picked in the outline shows its
   screen's shot as big as the tab, each input boxed; a box clicked picks its input, which the panel shows first
-  with the screens it leads to. The wheel zooms, *Fit* fits it again. *🔍 Show the screen big* opens the tab.
+  with the screens it leads to. The wheel zooms, *Fit* fits it again. A card's right-click *🔍 Show it on the Screen tab* opens the tab.
 - **A way into a screen mapped already, by hand.** An input's ⋯ ▸ Result ▸ *Leads to a screen on the map…* (and
   the picked input's *Leads to…*) records what try_input records for an input that led to one mapped already;
   edit_map's `add_way` does the same for the assistant.
@@ -422,6 +422,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **🗺 Screens' picture window shows a picture or a tree's drawing, never a screen's shot**: a shot is shown big on
+  the Screen tab's board, and a picture's "← <screen>" goes back there. The screens doc (`docs/architecture/screens.md`)
+  has a *By hand* section: the outline, the board, Live and ❄ Freeze, the cuts and each input's editor.
 - **JavaFX 27** (2026-10-18), from 25.0.4, the contract's version, for the slot editors. JavaFX 27 needs Java 25.
 - **`edit_map in_strip` is `edit_map group`.** A strip is `group` with kind `strip` (the default) and its notches.
 - **`Screens.java` lists its screens one line each.** A line shows the screen's marker, name, how far Discovery got

@@ -38,7 +38,7 @@ import java.util.function.Supplier;
 /**
  * One window beside 🗺 Screens showing an input's picture at its own size: a row's thumbnail is too small to tell a
  * picture by (the user's call, 2026-10-15). Each show replaces what it showed, in the same window, rather than opening
- * another. A screen's shot stays in the side panel (the user's call, 2026-10-15).
+ * another. It also draws a tree big; a screen's shot is shown big on the Screen tab's board.
  */
 final class PictureView {
 
@@ -49,11 +49,11 @@ final class PictureView {
     static final double MOST_ZOOM = 32;
     /** The widest a zoomed picture is drawn, in screen pixels. */
     private static final double MOST_SIDE = 8192;
-    /** How wide a screen's shot opens, and how far the wheel takes it each way, a step at a time. */
-    private static final double SCREEN_WIDTH = 880;
-    private static final double SCREEN_LEAST = 320;
-    private static final double SCREEN_MOST = 3840;
-    private static final double SCREEN_STEP = 1.2;
+    /** How wide a drawing opens, and how far the wheel takes it each way, a step at a time. */
+    private static final double DRAWING_WIDTH = 880;
+    private static final double DRAWING_LEAST = 320;
+    private static final double DRAWING_MOST = 3840;
+    private static final double DRAWING_STEP = 1.2;
     /** A wheel's notch, in scroll pixels: a touchpad's many small scrolls add up to a step, not a step each. */
     private static final double NOTCH = 40;
 
@@ -191,13 +191,13 @@ final class PictureView {
     }
 
     /**
-     * A screen's shot, big: {@code shotAt} draws it at a width with its inputs boxed, again at each zoom, so the boxes
-     * stay on their buttons. The wheel zooms it, Ctrl or not. {@code back} is the "← screen" button to the shot it
-     * was opened from, null for none. False when there is no shot to draw.
+     * A drawing, big (a tree's, {@link TreeView}): {@code drawAt} draws it at a width, again at each zoom, so it stays
+     * sharp. The wheel zooms it, Ctrl or not. False when there is nothing to draw. A screen's shot is shown big on the
+     * Screen tab's board instead.
      */
-    boolean showScreen(String name, Back back, Function<Double, Optional<Node>> shotAt) {
-        double[] width = {SCREEN_WIDTH};
-        Optional<Node> first = shotAt.apply(width[0]);
+    boolean showDrawing(String name, Function<Double, Optional<Node>> drawAt) {
+        double[] width = {DRAWING_WIDTH};
+        Optional<Node> first = drawAt.apply(width[0]);
         if (first.isEmpty()) return false;
         StackPane holder = new StackPane(first.get());
         holder.setPadding(new Insets(12));
@@ -207,21 +207,14 @@ final class PictureView {
         scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
             if (e.getDeltaY() == 0) return;
             e.consume();
-            double next = Math.clamp(width[0] * Math.pow(SCREEN_STEP, e.getDeltaY() / NOTCH), SCREEN_LEAST,
-                    SCREEN_MOST);
+            double next = Math.clamp(width[0] * Math.pow(DRAWING_STEP, e.getDeltaY() / NOTCH), DRAWING_LEAST,
+                    DRAWING_MOST);
             if (Math.abs(next - width[0]) < 1) return;
             width[0] = next;
-            shotAt.apply(next).ifPresent(shot -> holder.getChildren().setAll(shot));
+            drawAt.apply(next).ifPresent(drawn -> holder.getChildren().setAll(drawn));
         });
-        VBox side = new VBox(6, title(name), text("The wheel zooms, a drag moves it; click a box for what that "
-                + "input opens."));
-        if (back != null) {
-            Label status = new Label();
-            status.getStyleClass().add("screen-panel-status");
-            side.getChildren().addFirst(backButton(back, status));
-            side.getChildren().add(status);
-        }
-        show(name, scroller, side);
+        show(name, scroller, new VBox(6, title(name), text("The wheel zooms, a drag moves it; click a node to pick "
+                + "its button.")));
         return true;
     }
 

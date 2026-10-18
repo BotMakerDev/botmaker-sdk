@@ -677,7 +677,7 @@ final class ScreenPanel {
         ContextMenu menu = new ContextMenu(hands.screenItems(constant, this::retake).toArray(MenuItem[]::new));
         // No hand edit while a try or a walk writes the map.
         menu.getItems().forEach(item -> item.setDisable(busy));
-        MenuItem big = new MenuItem("🔍 Show the screen big");
+        MenuItem big = new MenuItem("🔍 Show it on the Screen tab");
         big.setOnAction(e -> showScreen(constant));
         menu.getItems().addAll(0, List.of(big, new SeparatorMenuItem()));
         return menu;
@@ -723,7 +723,7 @@ final class ScreenPanel {
         MapScreen screen = graph.screens().get(constant);
         Tree tree = screen == null ? null : screen.trees().get(field);
         if (tree == null) return false;
-        return viewer.showScreen(graph.shown(constant) + " · " + field, null, width -> Optional.of(TreeView.drawing(tree,
+        return viewer.showDrawing(graph.shown(constant) + " · " + field, width -> Optional.of(TreeView.drawing(tree,
                 canvas::pictureSize, width, (id, side) -> canvas.thumb(id, side, "screen-row-thumb"),
                 id -> ScreenCards.rows(graph, constant).stream()
                         .filter(r -> r.input() instanceof com.botmaker.sdk.api.screens.Button && id.equals(r.picture()))

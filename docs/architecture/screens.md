@@ -52,7 +52,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   lists the nodes indented by their lines and names the unplaced ones as a problem.
 - **🗺**: a tree's row says how it scrolls, its nodes and how many are not placed; its 🌳 draws it (`TreeView`) in the
   picture window, each node at the sum of offsets from the first, scaled to fit, its lines drawn, the unplaced ones in
-  a row below. A node clicked is picked as a boxed input of the shot is.
+  a row below. A node clicked is picked as a boxed input of the shot is. The tree's inspector draws it too, its nodes
+  dragged there to place them (see *By hand*).
 
 ## The graph and the walk (`internal/screens`)
 
@@ -156,11 +157,51 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `History.batch` step beside the user's code edits. ↶/↷ and Ctrl+Z/Ctrl+Y (`plugin/HistoryKeys`, shared with the
   Activity Flow) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
   keeps an undo of its own.
-- **`PictureView`** is one window beside the map: a screen's shot big (its inputs boxed, the wheel zooming), or an
-  input's picture at whole-pixel zoom, never blurred, with "← <screen>" back to the shot it was opened from. A box
-  clicked on the big shot that opens a screen shows that screen's shot in its place, its ← back to the one before.
+- **`PictureView`** is one window beside the map: an input's picture at whole-pixel zoom, never blurred, with
+  "← <screen>" back to its screen's board, or a tree's drawing big. A screen's shot is shown big on the board.
 - **`MapGuide`** is the toolbar's **?** legend, and holds the tooltips it repeats.
 - Around it: the `Navigate` screen picker and the `Pick`/`Order` editors (`plugin/editors/ScreenEditors`), the
   input picker (`InputPicker`: a screen, then its fields of the slot's type on its shot), the `Screens.java` tab
   (`ScreenConstantView`: one line per screen — marker, name, how far Discovery got, a button to the map — whose ▸
   builds its full card on first open, kept open for the session), Manage Pictures' groups by screen (`plugin/pictures/ScreenGroups`).
+
+## By hand (the user's calls of 2026-10-18)
+
+🗺 maps a game without the assistant. Every hand edit is the `ScreenEdits` or `PictureTools` call the tools make, so
+the window and the assistant write `Screens.java` one way. **`HandParityTest`** lists each `MapEdits.Edit` and each
+map tool against the hand path that covers it, and fails on one with none.
+
+- **The outline** (`ScreenOutline`, its model `Outline`, apart from JavaFX): the screens as a text tree, left of the
+  `Graph | Screen` tabs (full window only). Under a screen are its inputs, under an input the screen it opens first;
+  popups and screens not reached sit in groups below. The filter keeps the lines down to a hit; Owes and Untried
+  narrow it. A click shows the screen on the Screen tab; a right-click opens the card's or the input's ⋯ menu.
+- **The board** (`ScreenBoard`, the Screen tab): the picked screen's shot as big as the tab, each input's cut boxed,
+  its markers in their own colour; a box clicked picks its input. `ScreenPanel` beside it is the inspector: the
+  picked input first, else the screen's markers, looks (each one's `when`), ways in, way back and notes.
+  **Leads to…** records a way into a screen already mapped (`ScreenEdits.addWay`, `MapEdits.AddWay` for the tools).
+- **Live** (`LiveBoard`): the game drawn on the board from `ScreenDesk.look` (the tools' own frames, a private
+  session included), a click, drag, wheel or key on it sent through `ScreenDesk.hands`. The line under it names the
+  screen the game shows (`which_screen`'s matcher, at most once a second); a click inside an input's box that took
+  the game from one known screen to another with no way between them offers **Record** (`LiveWays`). **❄ Freeze**
+  keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by
+  the input last clicked. Missed frames (`missed_frames`) open frozen. ▶ Launch starts the game when it is not up.
+- **Cuts on the frozen frame** (`CutLayer`, `CutForm`, `assist/BoardCuts`): a box, an oval or a polygon drawn on the
+  board, ▨ the part a run skips, then each cut said what it is — a marker (set, add or absent), a button, the way
+  back, a look of a button or of the screen, a strip's button, a zone (`save_region`), digits (`save_digits`) or a
+  new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The pixels are the frame's,
+  never grabbed again. ✂'s ▾ keeps the cut over the game window (`CaptureTemplates`) as a fallback. An object cut
+  (the magic wand) is not on the board: crop_pictures has no shape for it.
+- **The input inspector** (`InputInspector`), by the input's class:
+  - **a button or a hotkey**: its result, information only, comes and goes, never, locked; a button's looks and
+    whether they cycle, repeated and each way's copy (`ScreenEdits.setWayPick`); a hotkey's key. ▶ Try runs
+    try_input's code (`ScreenDesk.Trying`): which copy, the name of the screen it opens, settle time, stay.
+  - **a strip**: its members in order (↑ ↓ ✕, ＋ Member… of a button in no strip or tree), its scroll (the wheel and
+    its notches, a drag, or none, which takes the strip off), and ▶ Scroll and measure, try_input's measure over a
+    member in view. A dragged strip is kept but not measured: try_input measures the wheel only.
+  - **a tree**: its nodes drawn by `TreeView`; a node dragged beside one it is linked to is placed there, its offset
+    in that node's size and rounded to 0.05 (`TreeView.snapped`; the node it is placed from already wins, so its
+    offset moves rather than a second one being written), a click picks its button. Each node's row: ↑ ↓ ✕,
+    Unlocked by… (`ScreenEdits.link`), Place… by number (`ScreenEdits.placeNode`, `unplaceNode`). Its scroll is a
+    drag, the wheel or none; ▶ Scroll and measure is `TreeMeasure` (`ScreenDesk.measureTree`), toward the tree's
+    end or its start.
+  - A button's Strip… or Tree… puts it in one of the screen's, or in a new one.

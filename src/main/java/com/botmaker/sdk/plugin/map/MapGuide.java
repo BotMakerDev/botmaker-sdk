@@ -110,7 +110,7 @@ final class MapGuide {
                     new Entry("Owes", null, FILTER_OWES + "."),
                     new Entry("Untried", null, FILTER_UNTRIED + "."),
                     new Entry("a click", null, "Picks the screen and shows it big in the Screen tab; an input's line "
-                            + "picks that input too."))),
+                            + "picks that input too; a right-click opens its ⋯ menu."))),
             new Section("The Screen tab", List.of(
                     new Entry("Graph | Screen", null, "The map, or the picked screen's shot as big as the tab."),
                     new Entry("a box", null, "Picks its input: the panel shows it first, with the screens it leads "
