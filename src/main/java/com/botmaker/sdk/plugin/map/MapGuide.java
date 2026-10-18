@@ -73,6 +73,10 @@ final class MapGuide {
     static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
     static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
     static final String ADD_HOTKEY = "A key this screen answers, noted untried";
+    static final String ADD_STRIP = "A new strip of the screen's buttons in no strip or tree, ticked in order, and how "
+            + "it scrolls";
+    static final String ADD_TREE = "A new tree of the screen's buttons in no strip or tree, ticked in order, and how "
+            + "it scrolls";
     static final String REPEATED = "The screen shows it more than once: a way and a run pick the copy they press";
     static final String CYCLES = "Each press shows its next look, the usual one first again after the last";
     static final String WAY_COPY = "The copy of this repeated button the way goes through";
@@ -191,6 +195,8 @@ final class MapGuide {
                             + "shows; ✕ takes one off."),
                     new Entry("＋ Marker from a picture…", null, ADD_MARKER + "."),
                     new Entry("＋ Hotkey…", null, ADD_HOTKEY + "."),
+                    new Entry("＋ Strip… ＋ Tree…", null, ADD_STRIP + "; a tree's nodes the same, linked and placed in "
+                            + "its editor after."),
                     new Entry("Ways in", null, "Each screen and input it is reached from; its ⋯ says when the way is "
                             + "open, or takes it off. The first is how it was found."),
                     new Entry("Looks", null, "The looks the screen has; each one's ⋯ names the method it shows only "

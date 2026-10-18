@@ -10,6 +10,7 @@ import com.botmaker.sdk.plugin.screen.CutShape;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -89,5 +90,15 @@ class BoardCutsTest {
         assertTrue(BoardCuts.notSaved("Not saved, shop_button: taken.", "Shop Button"), "by its sanitised name too");
         assertFalse(BoardCuts.notSaved(said, "collect_button"));
         assertFalse(BoardCuts.notSaved(said, null));
+    }
+
+    /** The cuts of one save marked a new strip make one strip, in order, and those marked a new tree one tree. */
+    @Test
+    void theCutsMarkedNewJoinOneNewStripOrTree() {
+        List<Cut> cuts = List.of(cut(new BoardCuts.Marker(false)), cut(new BoardCuts.Member(null, false, -3)),
+                cut(new BoardCuts.Member(null, true, 0)), cut(new BoardCuts.Member("hero_strip", false, 0)),
+                cut(new BoardCuts.Member(null, false, -3)), cut(new BoardCuts.Member(null, true, 0)));
+        assertEquals(Map.of(1, List.of(1, 4), 2, List.of(2, 5), 3, List.of(3), 4, List.of(), 5, List.of()),
+                BoardCuts.joined(cuts), "the marker is no member; hero_strip is the screen's own");
     }
 }

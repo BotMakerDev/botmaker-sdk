@@ -55,8 +55,8 @@ import java.util.stream.Stream;
  * comes and goes, never, locked), a button's looks (each with its state, in order), whether the screen shows it more
  * than once and the copy each of its ways goes through, the strip or tree a button is in, a hotkey's key, a strip's
  * members and scroll, a tree's nodes (in order, what unlocks each, where each sits, dragged in its drawing) and scroll,
- * and ▶ Try with try_input's own settings. Each change is one {@link ScreenEdits} write, as the tools make it,
- * so ↶ undoes it.
+ * and ▶ Try with try_input's own settings; and the screen panel's ＋ Strip… and ＋ Tree…. Each change is one
+ * {@link ScreenEdits} write, as the tools make it, so ↶ undoes it.
  */
 final class InputInspector {
 
@@ -572,6 +572,77 @@ final class InputInspector {
         });
     }
 
+    /**
+     * ＋ Strip… on the screen panel: a new strip of {@code constant} of the buttons ticked, in the screen's order, and
+     * how it scrolls.
+     */
+    void askNewStrip(String constant) {
+        List<ImageTemplate> free = joinable(graph.screens().get(constant));
+        if (noneFree(constant, free)) return;
+        List<CheckBox> ticks = ticks(free);
+        ScrollPick pick = ScrollPick.of(Scroll.wheel(-5), List.of(ScrollKind.WHEEL, ScrollKind.DRAG));
+        Modals.form(services, "A strip of " + graph.shown(constant), new VBox(8, new Label("Its buttons, in order"),
+                new VBox(4, ticks.toArray(Node[]::new)), new Label("Scrolled by"), pick.node()), () -> {
+            List<ImageTemplate> members = ticked(free, ticks);
+            Optional<Scroll> scroll = pick.scroll();
+            if (members.isEmpty()) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "tick the buttons the strip holds.");
+            } else if (scroll.isEmpty()) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "a new strip turns by some notches of the wheel: give them.");
+            } else {
+                strip(constant, null, Strip.of(scroll.get(), members));
+            }
+        });
+    }
+
+    /** ＋ Tree… on the screen panel: a new tree of {@code constant} of the buttons ticked, and how it scrolls. */
+    void askNewTree(String constant) {
+        List<ImageTemplate> free = joinable(graph.screens().get(constant));
+        if (noneFree(constant, free)) return;
+        List<CheckBox> ticks = ticks(free);
+        ComboBox<TreeScroll> kind = new ComboBox<>(FXCollections.observableArrayList(TreeScroll.values()));
+        kind.setConverter(named(TreeScroll::displayName));
+        kind.setValue(TreeScroll.DRAG);
+        Spinner<Integer> notches = new Spinner<>(-20, 20, -5);
+        notches.setEditable(true);
+        notches.setPrefWidth(80);
+        HBox wheel = line(new Label("Notches"), notches);
+        shownFor(wheel, kind, TreeScroll.WHEEL);
+        Modals.form(services, "A tree of " + graph.shown(constant), new VBox(8, new Label("Its nodes, in order"),
+                new VBox(4, ticks.toArray(Node[]::new)), line(new Label("Scrolled by"), kind), wheel), () -> {
+            notches.commitValue();
+            List<ImageTemplate> nodes = ticked(free, ticks);
+            if (nodes.isEmpty()) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "tick the buttons that are the tree's nodes.");
+            } else if (kind.getValue() == TreeScroll.WHEEL && notches.getValue() == 0) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "a tree the wheel scrolls turns by some notches: give them.");
+            } else {
+                tree(constant, null, scrolled(Tree.of(nodes.stream().map(com.botmaker.sdk.api.screens.Node::of)
+                        .toList()), kind.getValue(), notches.getValue()));
+            }
+        });
+    }
+
+    /** Whether {@code free}, the buttons of {@code constant} a new strip or tree may take, is empty: said so. */
+    private boolean noneFree(String constant, List<ImageTemplate> free) {
+        if (!free.isEmpty()) return false;
+        panel.wrote(ScreenEdits.NOT_WRITTEN + "every button of " + graph.shown(constant) + " with a picture is in a "
+                + "strip or a tree already: ✂ Cut inputs first.");
+        return true;
+    }
+
+    /** A tick for each of {@code free}, none ticked. */
+    private static List<CheckBox> ticks(List<ImageTemplate> free) {
+        return free.stream().map(p -> new CheckBox(p.id())).toList();
+    }
+
+    /** Those of {@code free} whose tick is on, in order. */
+    private static List<ImageTemplate> ticked(List<ImageTemplate> free, List<CheckBox> ticks) {
+        List<ImageTemplate> on = new ArrayList<>();
+        for (int i = 0; i < free.size(); i++) if (ticks.get(i).isSelected()) on.add(free.get(i));
+        return on;
+    }
+
     // --- a strip's members ---
 
     private Node members(String constant, String field, Strip strip) {
@@ -634,44 +705,63 @@ final class InputInspector {
 
     // --- a strip's scroll ---
 
+    /** A strip's scroll as its editors pick it: the way it goes, and the wheel's notches or the drag's way and length. */
+    private record ScrollPick(Node node, ComboBox<ScrollKind> kind, Spinner<Integer> notches, ComboBox<Order> way,
+                              Spinner<Integer> px, Spinner<Integer> ms) {
+
+        /** The controls set to {@code now}, offering {@code kinds}. */
+        static ScrollPick of(Scroll now, List<ScrollKind> kinds) {
+            ComboBox<ScrollKind> kind = new ComboBox<>(FXCollections.observableArrayList(kinds));
+            kind.setConverter(named(ScrollKind::displayName));
+            kind.setValue(ScrollKind.of(now));
+            // Each spinner's range holds the value written: one out of it would be clamped, and written so on Set.
+            int turns = now.drag() == null && now.notches() != 0 ? now.notches() : -5;
+            Spinner<Integer> notches = new Spinner<>(Math.min(-20, turns), Math.max(20, turns), turns);
+            notches.setEditable(true);
+            notches.setPrefWidth(80);
+            ComboBox<Order> way = new ComboBox<>(FXCollections.observableArrayList(Arrays.stream(Order.values())
+                    .filter(o -> o != Order.CENTER).toList()));
+            way.setConverter(named(InputInspector::orderName));
+            way.setValue(now.drag() == null ? Order.NORTH : now.drag());
+            int far = now.drag() == null ? 300 : Math.max(10, now.px());
+            Spinner<Integer> px = new Spinner<>(10, Math.max(4000, far), far, 10);
+            px.setEditable(true);
+            px.setPrefWidth(90);
+            int took = now.drag() == null ? 500 : (int) Math.min(Integer.MAX_VALUE, now.time().toMillis());
+            Spinner<Integer> ms = new Spinner<>(0, Math.max(5000, took), took, 100);
+            ms.setEditable(true);
+            ms.setPrefWidth(90);
+            HBox wheel = line(new Label("Notches"), notches, new Label("negative: down or toward you"));
+            HBox drag = line(new Label("Toward"), way, px, new Label("px over"), ms, new Label("ms"));
+            shownFor(wheel, kind, ScrollKind.WHEEL);
+            shownFor(drag, kind, ScrollKind.DRAG);
+            return new ScrollPick(new VBox(6, line(new Label("By"), kind), wheel, drag), kind, notches, way, px, ms);
+        }
+
+        /** The scroll picked; none for the wheel turned by no notch. */
+        Optional<Scroll> scroll() {
+            notches.commitValue();
+            px.commitValue();
+            ms.commitValue();
+            if (kind.getValue() == ScrollKind.WHEEL && notches.getValue() == 0) return Optional.empty();
+            return Optional.of(scrollOf(kind.getValue(), notches.getValue(), way.getValue(), px.getValue(),
+                    ms.getValue()));
+        }
+    }
+
     private Node scroll(String constant, String field, Strip strip) {
         Scroll now = strip.scroll() == null ? Scroll.wheel(0) : strip.scroll();
-        ComboBox<ScrollKind> kind = new ComboBox<>(FXCollections.observableArrayList(ScrollKind.values()));
-        kind.setConverter(named(ScrollKind::displayName));
-        kind.setValue(ScrollKind.of(now));
-        // Each spinner's range holds the value written: one out of it would be clamped, and written so on Set.
-        int turns = now.drag() == null && now.notches() != 0 ? now.notches() : -5;
-        Spinner<Integer> notches = new Spinner<>(Math.min(-20, turns), Math.max(20, turns), turns);
-        notches.setEditable(true);
-        notches.setPrefWidth(80);
-        ComboBox<Order> way = new ComboBox<>(FXCollections.observableArrayList(Arrays.stream(Order.values())
-                .filter(o -> o != Order.CENTER).toList()));
-        way.setConverter(named(InputInspector::orderName));
-        way.setValue(now.drag() == null ? Order.NORTH : now.drag());
-        int far = now.drag() == null ? 300 : Math.max(10, now.px());
-        Spinner<Integer> px = new Spinner<>(10, Math.max(4000, far), far, 10);
-        px.setEditable(true);
-        px.setPrefWidth(90);
-        int took = now.drag() == null ? 500 : (int) Math.min(Integer.MAX_VALUE, now.time().toMillis());
-        Spinner<Integer> ms = new Spinner<>(0, Math.max(5000, took), took, 100);
-        ms.setEditable(true);
-        ms.setPrefWidth(90);
-        HBox wheel = line(new Label("Notches"), notches, new Label("negative: down or toward you"));
-        HBox drag = line(new Label("Toward"), way, px, new Label("px over"), ms, new Label("ms"));
-        shownFor(wheel, kind, ScrollKind.WHEEL);
-        shownFor(drag, kind, ScrollKind.DRAG);
+        ScrollPick pick = ScrollPick.of(now, List.of(ScrollKind.values()));
         Label measured = text(now.step() == 0 ? "Not measured yet: ▶ Scroll and measure, below."
                 : "Measured: its buttons move " + now.step() + " px a scroll and hold still within "
                 + now.settle().toMillis() + " ms.");
         javafx.scene.control.Button set = action("Set scroll", MapGuide.STRIP_SCROLL, () -> {
-            notches.commitValue();
-            px.commitValue();
-            ms.commitValue();
-            if (kind.getValue() == ScrollKind.WHEEL && notches.getValue() == 0) {
+            Optional<Scroll> picked = pick.scroll();
+            if (picked.isEmpty()) {
                 panel.wrote(ScreenEdits.NOT_WRITTEN + "the wheel turns by some notches: give them.");
                 return;
             }
-            Scroll made = scrollOf(kind.getValue(), notches.getValue(), way.getValue(), px.getValue(), ms.getValue());
+            Scroll made = picked.get();
             if (made.moves()) {
                 strip(constant, field, strip.scroll(made));
             } else {
@@ -679,7 +769,7 @@ final class InputInspector {
                         + "buttons looked for at their places.", () -> strip(constant, field, strip.scroll(made)));
             }
         });
-        return new VBox(6, line(new Label("By"), kind), wheel, drag, measured, set);
+        return new VBox(6, pick.node(), measured, set);
     }
 
     /** The scroll a strip's editor sets: none is a wheel of no notches, which takes the strip off. */

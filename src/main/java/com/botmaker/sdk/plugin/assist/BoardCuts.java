@@ -22,7 +22,10 @@ import com.botmaker.sdk.plugin.screen.CutShape;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -68,7 +71,7 @@ public final class BoardCuts {
 
     /**
      * A button of the screen's strip or tree {@code group}, by its field (null: a new one, a strip turning by
-     * {@code notches} of the wheel).
+     * {@code notches} of the wheel; the cuts of one save marked so make one new strip, or tree, together).
      */
     public record Member(String group, boolean tree, int notches) implements As {
     }
@@ -135,9 +138,12 @@ public final class BoardCuts {
             }
             said.add(text);
         }
+        Map<Integer, List<Integer>> joined = joined(cuts);
         for (int i = 0; i < cuts.size(); i++) {
             Cut cut = cuts.get(i);
             Rect b = cut.box();
+            // A cut joining the new strip or tree an earlier one of the form made was written with it.
+            if (joined.containsKey(i) && joined.get(i).isEmpty()) continue;
             AgentReply reply = switch (cut.as()) {
                 case Place place -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
                         b.width(), b.height(), place.anchor()), context, shown);
@@ -146,14 +152,48 @@ public final class BoardCuts {
                 case Recut recut -> PictureTools.replacePicture(replace(cut, recut.picture()), context, shown, live);
                 default -> null;
             };
-            String one = cut.as() instanceof Member member ? member(context, screen, cut.name(), member)
+            // A member whose picture was not saved stays refused alone: the others join without it, as the first of
+            // them says (a new strip's notches).
+            List<Integer> writes = joined.getOrDefault(i, List.of(i)).stream().filter(at -> !refused.contains(at))
+                    .toList();
+            if (cut.as() instanceof Member && writes.isEmpty()) continue;
+            String one = cut.as() instanceof Member ? member(context, screen,
+                    writes.stream().map(at -> cuts.get(at).name()).toList(), (Member) cuts.get(writes.getFirst()).as())
                     : reply == null ? null : ScreenDesk.text(reply);
             if (reply != null ? reply.isRefused() : one != null && one.startsWith(ScreenEdits.NOT_WRITTEN)) {
-                if (!refused.contains(i)) refused.add(i);
+                for (int at : writes) if (!refused.contains(at)) refused.add(at);
             }
             if (one != null && !one.isBlank()) said.add(one);
         }
         return new Saved(String.join("\n", said), refused.stream().sorted().toList());
+    }
+
+    /**
+     * The cuts each member cut writes, by place in {@code cuts}: one joining a strip or tree the screen has, itself;
+     * the first marked a new strip, every cut so marked, in order, as one new strip, and the others none; the same for
+     * a new tree. A cut that is no member is not in it.
+     */
+    static Map<Integer, List<Integer>> joined(List<Cut> cuts) {
+        Map<Integer, List<Integer>> writes = new LinkedHashMap<>();
+        Map<Boolean, List<Integer>> fresh = new HashMap<>();
+        for (int i = 0; i < cuts.size(); i++) {
+            if (!(cuts.get(i).as() instanceof Member member)) continue;
+            if (member.group() != null) {
+                writes.put(i, List.of(i));
+                continue;
+            }
+            List<Integer> made = fresh.get(member.tree());
+            if (made == null) {
+                made = new ArrayList<>();
+                fresh.put(member.tree(), made);
+                writes.put(i, made);
+            } else {
+                writes.put(i, List.of());
+            }
+            made.add(i);
+        }
+        writes.replaceAll((i, at) -> List.copyOf(at));
+        return writes;
     }
 
     /** Whether crop_pictures said {@code name} was not saved while it saved the others: "Not saved, name: …". */
@@ -203,31 +243,36 @@ public final class BoardCuts {
     }
 
     /**
-     * The button just cut as {@code name}, put in {@code member}'s strip or tree of {@code screen}, after its
-     * members: the strip or tree keeps its field, how it scrolls and what was measured of it.
+     * The buttons just cut as {@code names}, put in {@code member}'s strip or tree of {@code screen}, after its
+     * members, in order: the strip or tree keeps its field, how it scrolls and what was measured of it.
      */
-    private static String member(AgentContext context, String screen, String name, Member member) {
+    private static String member(AgentContext context, String screen, List<String> names, Member member) {
         if (screen == null) {
-            return ScreenEdits.NOT_WRITTEN + name + ": a strip's or a tree's button is a screen's: pick the screen.";
+            return ScreenEdits.NOT_WRITTEN + String.join(", ", names)
+                    + ": a strip's or a tree's button is a screen's: pick the screen.";
         }
-        String id = TemplateLibrary.sanitizeName(name);
         return FxCall.call(() -> {
             Optional<MapScreen> on = ScreenBook.read(context.services()).screen(screen);
-            Optional<ImageTemplate> picture = on.stream().flatMap(s -> s.inputs().values().stream())
-                    .flatMap(i -> i instanceof Button button ? Stream.of(button.picture()) : Stream.empty())
-                    .filter(p -> p.id().equalsIgnoreCase(id)).findFirst();
-            if (picture.isEmpty()) return ScreenEdits.NOT_WRITTEN + id + " is no button of " + screen + ".";
-            MapScreen held = on.get();
+            List<ImageTemplate> pictures = new ArrayList<>();
+            for (String name : names) {
+                String id = TemplateLibrary.sanitizeName(name);
+                Optional<ImageTemplate> picture = on.stream().flatMap(s -> s.inputs().values().stream())
+                        .flatMap(i -> i instanceof Button button ? Stream.of(button.picture()) : Stream.empty())
+                        .filter(p -> p.id().equalsIgnoreCase(id)).findFirst();
+                if (picture.isEmpty()) return ScreenEdits.NOT_WRITTEN + id + " is no button of " + screen + ".";
+                pictures.add(picture.get());
+            }
+            MapScreen held = on.orElseThrow();
             if (member.tree()) {
                 Tree had = member.group() == null ? null : held.trees().get(member.group());
                 List<Node> nodes = new ArrayList<>(had == null ? List.of() : had.nodes());
-                nodes.add(Node.of(picture.get()));
+                pictures.forEach(p -> nodes.add(Node.of(p)));
                 return ScreenEdits.setTree(context.services(), screen, member.group(),
                         had == null ? Tree.of(nodes) : had.nodes(nodes));
             }
             Strip had = member.group() == null ? null : held.strips().get(member.group());
             List<ImageTemplate> members = new ArrayList<>(had == null ? List.of() : had.members());
-            members.add(picture.get());
+            members.addAll(pictures);
             if (had == null && member.notches() == 0) {
                 return ScreenEdits.NOT_WRITTEN + "a new strip turns by some notches of the wheel: give them.";
             }

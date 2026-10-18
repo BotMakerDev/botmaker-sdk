@@ -360,7 +360,11 @@ final class ScreenPanel {
         screenMenu.setDisable(busy);
         Button hotkey = action("＋ Hotkey…", MapGuide.ADD_HOTKEY, () -> addHotkey(shown));
         hotkey.setDisable(busy);
-        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker, hotkey, screenMenu);
+        Button strip = action("＋ Strip…", MapGuide.ADD_STRIP, () -> inspector().askNewStrip(shown));
+        strip.setDisable(busy);
+        Button tree = action("＋ Tree…", MapGuide.ADD_TREE, () -> inspector().askNewTree(shown));
+        tree.setDisable(busy);
+        FlowPane actions = new FlowPane(8, 8, tryNext, go, cutInputs, cutMarker, hotkey, strip, tree, screenMenu);
 
         VBox inputs = new VBox(6);
         if (rows.isEmpty()) inputs.getChildren().add(text("No input cut yet."));
@@ -530,8 +534,13 @@ final class ScreenPanel {
         });
         acts.getChildren().addAll(leadsTo, unpick);
         List<Node> all = new ArrayList<>(List.of(heading("Picked input"), row(constant, row), acts));
-        all.addAll(new InputInspector(services, graph, hands, busy, inspected()).of(constant, row));
+        all.addAll(inspector().of(constant, row));
         return all;
+    }
+
+    /** The input editors over the map shown. */
+    private InputInspector inspector() {
+        return new InputInspector(services, graph, hands, busy, inspected());
     }
 
     /** What the picked input's editors act through: the panel's writes, its runs and its thumbs. */

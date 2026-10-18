@@ -42,6 +42,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   line; Inputs that open a screen folds away each input tried that opened nothing (All inputs shows them again).
   Recent, at the top, lists the 10 screens whose shot was taken last, the newest first, and moves as a shot is
   retaken.
+- **🗺 Screens makes a strip or a tree as an input.** ＋ Strip… and ＋ Tree…, beside ＋ Hotkey…, tick the screen's
+  buttons in no strip or tree, in order, and say how it scrolls (the wheel by some notches, or a drag; a tree may
+  also fit on the screen). In the cut form, every cut marked a new strip makes one strip, in order, and every cut
+  marked a new tree one tree (before, each made its own); with several cuts, *Buttons → one new strip* and
+  *Buttons → one new tree* mark them all at once.
 
 ### Changed
 

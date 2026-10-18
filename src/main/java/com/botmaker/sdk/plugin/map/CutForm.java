@@ -141,7 +141,18 @@ final class CutForm {
         wrong.setVisible(false);
         body = new VBox(10, wrong, top, grid, hint("A name is lowercase with underscores: collect_button. The first marker "
                 + "replaces the screen's; a picture is watched still a second before it is saved when the game still "
-                + "shows the frame."));
+                + "shows the frame. The cuts marked a new strip make one strip, in order, turning by the first one's "
+                + "notches; those marked a new tree, one tree."));
+        if (cuts.size() > 1) {
+            // Written in full: api.screens.Button is this file's Button.
+            javafx.scene.control.Button strip = new javafx.scene.control.Button("Buttons → one new strip");
+            strip.setOnAction(e -> lines.forEach(l -> l.join(Kind.STRIP)));
+            javafx.scene.control.Button tree = new javafx.scene.control.Button("Buttons → one new tree");
+            tree.setOnAction(e -> lines.forEach(l -> l.join(Kind.TREE)));
+            HBox join = new HBox(8, strip, tree);
+            join.setAlignment(Pos.CENTER_LEFT);
+            body.getChildren().add(3, join);
+        }
     }
 
     /** Asks what {@code cuts}, drawn on {@code frame}, are. On the FX thread. */
@@ -277,6 +288,13 @@ final class CutForm {
 
         Kind kind() {
             return kind.getValue();
+        }
+
+        /** A button, or a member of a strip or tree, made a member of a new one: {@code as} a strip or a tree. */
+        void join(Kind as) {
+            if (kind() != Kind.BUTTON && kind() != Kind.STRIP && kind() != Kind.TREE) return;
+            kind.setValue(as);
+            group.setValue(NEW);
         }
 
         /** The kind's own controls, its choices read off the screen picked. */
