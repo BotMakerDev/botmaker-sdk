@@ -273,7 +273,7 @@ final class MapTools {
     }
 
     /** The node of {@code tree} a fresh look shows, else its first. */
-    private static String shownNode(Tree tree, AgentContext context) {
+    static String shownNode(Tree tree, AgentContext context) {
         Optional<BufferedImage> frame = Frames.look(context);
         return tree.members().stream().map(ImageTemplate::id)
                 .filter(id -> frame.isPresent() && ActTools.shows(context, id, frame.get()))

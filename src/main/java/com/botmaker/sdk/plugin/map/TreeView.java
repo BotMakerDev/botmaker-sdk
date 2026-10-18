@@ -11,13 +11,18 @@ import javafx.scene.shape.Line;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * A tree's nodes drawn where their offsets place them: the first node at the origin, each other one at the sum of the
@@ -28,6 +33,12 @@ final class TreeView {
 
     /** A node's size when its picture is not cut yet, in the game's pixels. */
     static final Size UNKNOWN = new Size(48, 48);
+
+    /** What an offset dragged by hand is rounded to: try_input's step for one it measures. */
+    static final double STEP = 0.05;
+
+    /** How far, in the drawing's pixels, a press moves before it is a drag. */
+    private static final double DRAG_SLOP = 5;
 
     /** The room left around the drawing, and between the nodes no offset places. */
     private static final double GAP = 16;
@@ -137,13 +148,69 @@ final class TreeView {
     }
 
     /**
+     * Where a node dragged in the drawing snaps: {@code across} of {@code other}'s widths and {@code down} of its
+     * heights from it, {@code other} the nearest node placed already that a line or an offset links it to.
+     */
+    record Drop(String other, double across, double down) {}
+
+    /** A node dragged in the drawing, and where it snapped; empty when no linked node is placed. True: written. */
+    interface Dropped {
+        boolean at(String id, Optional<Drop> drop);
+    }
+
+    /**
+     * Where {@code id}, dropped with its centre at ({@code x}, {@code y}) in {@code places}' pixels, sits from the
+     * nearest placed node of {@code tree} linked to it, rounded as a measured offset is; empty when none is. A node it
+     * is placed from already wins over a nearer one, so the offset it has is moved rather than a second one added.
+     */
+    static Optional<Drop> snapped(Tree tree, List<Place> places, String id, double x, double y) {
+        Set<String> linked = linked(tree, id);
+        Set<String> from = new HashSet<>();
+        tree.nodes().stream().filter(n -> n.picture() != null && n.picture().id().equals(id))
+                .flatMap(n -> n.beside().stream()).filter(b -> b.other() != null)
+                .forEach(b -> from.add(b.other().id()));
+        return places.stream().filter(p -> p.placed() && !p.id().equals(id) && linked.contains(p.id()))
+                .min(Comparator.<Place>comparingInt(p -> from.contains(p.id()) ? 0 : 1)
+                        .thenComparingDouble(p -> Math.hypot(p.x() - x, p.y() - y)))
+                .map(p -> new Drop(p.id(), rounded((x - p.x()) / p.width()), rounded((y - p.y()) / p.height())));
+    }
+
+    /** The ids of the nodes of {@code tree} a line or an offset joins to {@code id}, either way. */
+    private static Set<String> linked(Tree tree, String id) {
+        Set<String> linked = new HashSet<>();
+        for (com.botmaker.sdk.api.screens.Node node : tree.nodes()) {
+            if (node.picture() == null) continue;
+            boolean mine = node.picture().id().equals(id);
+            Stream.concat(node.after().stream(), node.beside().stream().map(Beside::other))
+                    .filter(p -> p != null).map(ImageTemplate::id).forEach(other -> {
+                        if (mine) linked.add(other);
+                        else if (other.equals(id)) linked.add(node.picture().id());
+                    });
+        }
+        return linked;
+    }
+
+    private static double rounded(double v) {
+        // As try_input rounds a measured offset: a node dragged by hand is a few pixels off too.
+        double r = Math.round(v / STEP) * STEP;
+        return Math.round(r * 100) / 100.0;
+    }
+
+    /** As {@link #drawing(Tree, Function, double, BiFunction, Consumer, Dropped)}, its nodes not dragged. */
+    static Node drawing(Tree tree, Function<String, Size> sizes, double width,
+                        BiFunction<String, Double, Node> thumb, Consumer<String> picked) {
+        return drawing(tree, sizes, width, thumb, picked, null);
+    }
+
+    /**
      * {@code tree} drawn {@code width} wide (at most {@link #MOST_SCALE} times the game's size per
      * {@link #BASE_WIDTH}): each node a {@code thumb} (picture
      * id and side, in the drawing's pixels) at its place, a line from each parent to its node; a click on a node hands
-     * its id to {@code picked}.
+     * its id to {@code picked}, and a node dragged is handed to {@code dropped} (null: nodes are not dragged) with
+     * where it snapped, going back to its place unless that wrote it.
      */
     static Node drawing(Tree tree, Function<String, Size> sizes, double width,
-                        BiFunction<String, Double, Node> thumb, Consumer<String> picked) {
+                        BiFunction<String, Double, Node> thumb, Consumer<String> picked, Dropped dropped) {
         List<Place> places = layout(tree, sizes);
         Pane pane = new Pane();
         pane.getStyleClass().add("screen-tree");
@@ -173,7 +240,38 @@ final class TreeView {
             Node box = thumb.apply(p.id(), side);
             box.relocate(sx.apply(p.x()) - side / 2, sy.apply(p.y()) - side / 2);
             Tooltip.install(box, new Tooltip(p.id() + (p.placed() ? "" : ": no offsets place it yet")));
-            box.setOnMouseClicked(e -> picked.accept(p.id()));
+            // A press that moved past the slop is a drag, not a click: a click's jitter writes nothing.
+            boolean[] moved = {false};
+            box.setOnMouseClicked(e -> {
+                if (!moved[0]) picked.accept(p.id());
+            });
+            if (dropped != null) {
+                double[] from = new double[2];
+                box.setOnMousePressed(e -> {
+                    from[0] = e.getSceneX();
+                    from[1] = e.getSceneY();
+                    moved[0] = false;
+                });
+                box.setOnMouseDragged(e -> {
+                    double dx = e.getSceneX() - from[0];
+                    double dy = e.getSceneY() - from[1];
+                    if (Math.hypot(dx, dy) >= DRAG_SLOP) moved[0] = true;
+                    if (!moved[0]) return;
+                    box.setTranslateX(dx);
+                    box.setTranslateY(dy);
+                });
+                box.setOnMouseReleased(e -> {
+                    double dx = box.getTranslateX();
+                    double dy = box.getTranslateY();
+                    if (!moved[0]) return;
+                    double x = p.x() + dx / scale;
+                    double y = p.y() + dy / scale;
+                    if (!dropped.at(p.id(), snapped(tree, places, p.id(), x, y))) {
+                        box.setTranslateX(0);
+                        box.setTranslateY(0);
+                    }
+                });
+            }
             pane.getChildren().add(box);
         }
         pane.setPrefSize(2 * GAP + (maxX - minX) * scale, 2 * GAP + (maxY - minY) * scale);

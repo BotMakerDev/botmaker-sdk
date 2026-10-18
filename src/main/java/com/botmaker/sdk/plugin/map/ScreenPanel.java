@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
@@ -543,6 +544,26 @@ final class ScreenPanel {
             @Override
             public Node thumb(String picture) {
                 return canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
+            }
+
+            @Override
+            public Node thumb(String picture, double side) {
+                return canvas.thumb(picture, side, "screen-row-thumb");
+            }
+
+            @Override
+            public Size pictureSize(String picture) {
+                return canvas.pictureSize(picture);
+            }
+
+            @Override
+            public double width() {
+                return shotWidth();
+            }
+
+            @Override
+            public void pick(String constant, Row row) {
+                picked(constant, row);
             }
 
             @Override

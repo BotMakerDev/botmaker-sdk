@@ -69,11 +69,13 @@ public final class ScreenDesk {
         if (input instanceof Strip strip && strip.scroll() != null && strip.scroll().drag() != null) {
             return "try_input scrolls a strip by the wheel only: a dragged one is scrolled by a run.";
         }
+        // A tree is measured toward its end, as try_input scrolls over a node of it with negative notches.
+        if (input instanceof Tree tree) return measureTree(context, constant, tree, false);
         String picture = switch (input) {
             case Button button -> button.picture() == null ? null : button.picture().id();
             // Scrolled over a member that shows, wherever the strip carried it, as try_input scrolls one by its field.
             case Strip strip -> strip.members().isEmpty() ? null : MapTools.shownMember(strip, context);
-            case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
+            case Tree ignored -> null;
             case Hotkey ignored -> null;
         };
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
@@ -81,6 +83,19 @@ public final class ScreenDesk {
         MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches,
                 key == null ? how.match() : null, key, opens, null, null, input.isInfo() ? true : null)),
                 how.settleMs(), how.stays(), true);
+        return text(MapTools.tryInput(asked, context));
+    }
+
+    /**
+     * Measures {@code constant}'s {@code tree} as try_input does over one of its nodes that shows: the offsets of its
+     * linked pairs in view, then its view moved once toward its start (left or above) or its end, and measured again.
+     * Off the FX thread.
+     */
+    public static String measureTree(AgentContext context, String constant, Tree tree, boolean towardStart) {
+        if (tree.members().isEmpty()) return ScreenEdits.NOT_WRITTEN + "the tree has no node to scroll over.";
+        // The sign says which way only: a wheel tree turns by its own notches.
+        MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(MapTools.shownNode(tree, context),
+                towardStart ? 1 : -1, null, null, null, null, null, null)), null, true, true);
         return text(MapTools.tryInput(asked, context));
     }
 

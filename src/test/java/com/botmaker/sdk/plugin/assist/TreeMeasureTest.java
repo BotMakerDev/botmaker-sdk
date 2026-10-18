@@ -31,6 +31,16 @@ class TreeMeasureTest {
             Node.of(C).after(List.of(A)))).dragged();
 
     @Test
+    void anOffsetTakenOffByHandGoesFromEitherNode() {
+        Tree placed = Tree.of(List.of(Node.of(A).beside(List.of(Beside.of(C, 0, 1))),
+                Node.of(B).beside(List.of(Beside.of(A, 1, 0), Beside.of(C, 2, 0))), Node.of(C)));
+
+        Tree apart = ScreenEdits.apart(ScreenEdits.apart(placed, "b", "a"), "c", "a");
+        assertEquals(List.of(), apart.nodes().get(0).beside(), "a's offset from c, written on a");
+        assertEquals(List.of(Beside.of(C, 2, 0)), apart.nodes().get(1).beside(), "b keeps its offset from c");
+    }
+
+    @Test
     void aLinkedPairInViewIsPlacedInItsParentsSize() {
         Map<String, Rect> seen = Map.of("a", new Rect(100, 200, 100, 80), "b", new Rect(220, 152, 100, 80));
 

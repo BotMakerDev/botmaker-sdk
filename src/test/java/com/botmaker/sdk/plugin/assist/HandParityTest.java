@@ -19,19 +19,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Every map action an assistant's tool can do has a hand path in 🗺 Screens (the user's call, 2026-10-18): each
  * edit_map action, each map tool, and the look, act, picture, notes and setup tools a person needs to build the map.
- * A new action fails here until it is given one; an action not yet covered names the phase of the screens-by-hand
- * plan that covers it, and once that plan ends none is left.
+ * A new action fails here until it is given one.
  */
 class HandParityTest {
 
-    /** Where a person does an action by hand; {@code phase} 0 when they can now, else the phase that adds it. */
-    private record Hand(String where, int phase) {
+    /** Where a person does an action by hand. */
+    private record Hand(String where) {
         static Hand now(String where) {
-            return new Hand(where, 0);
-        }
-
-        static Hand in(int phase, String where) {
-            return new Hand(where, phase);
+            return new Hand(where);
         }
     }
 
@@ -56,9 +51,9 @@ class HandParityTest {
             entry("RemoveWay", Hand.now("the panel's Ways in ⋯ ▸ Remove this way in")),
             entry("WayWhen", Hand.now("an arrow's menu ▸ Open only while")),
             entry("InputWhen", Hand.now("⋯ input ▸ Only there while")),
-            // A strip by a button's Strip… and a strip's Members and Scroll; a tree by the tree inspector.
-            entry("Group", Hand.in(7, "a button's Strip…, a strip's Members and Scroll, and the tree inspector")),
-            entry("Link", Hand.in(7, "the tree inspector")),
+            entry("Group", Hand.now("a button's Strip… or Tree…, a strip's Members and Scroll, a tree's Nodes and "
+                    + "Scroll")),
+            entry("Link", Hand.now("a tree node's Unlocked by…")),
             entry("LookWhen", Hand.now("the panel's Looks ⋯ ▸ Shows only while")),
             entry("AddMarker", Hand.now("✂ Cut marker, ＋ Marker from a picture… (shows it or never does)")),
             entry("RemoveMarker", Hand.now("the panel's markers ✕")),
@@ -96,7 +91,7 @@ class HandParityTest {
     void everyMapActionHasAHandPath() {
         List<String> missing = new ArrayList<>(actions());
         missing.removeAll(HANDS.keySet());
-        assertEquals(List.of(), missing, "give each a hand path in 🗺 Screens, or the phase that adds one");
+        assertEquals(List.of(), missing, "give each a hand path in 🗺 Screens");
     }
 
     @Test

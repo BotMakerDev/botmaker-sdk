@@ -75,6 +75,15 @@ final class MapGuide {
     static final String MEASURE = "Scrolls it once as try_input does, and writes how far its buttons move and how "
             + "long they glide";
     static final String IN_STRIP = "Puts this button in a strip of the screen, or in a new one";
+    static final String IN_TREE = "Puts this button in a tree of the screen, or in a new one, as one of its nodes";
+    static final String TREE_NODES = "Its nodes where their offsets place them: drag one beside a node it is linked "
+            + "to to place it there, click one to edit its button";
+    static final String UNLOCKED_BY = "The nodes whose line leads to it: they unlock it";
+    static final String PLACE_NODE = "Where it sits from a node it is linked to, in that node's widths and heights";
+    static final String TREE_SCROLL = "How it is scrolled: its view dragged, the wheel turned some notches, or none "
+            + "when it fits on the screen";
+    static final String MEASURE_TREE = "Measures where each linked pair in view sits, moves the view once and "
+            + "measures again, as try_input does over a node";
 
     /** One sign and what it means; {@code style} draws the sign as a pill of that class, null as plain text. */
     record Entry(String sign, String style, String meaning) {}
@@ -114,7 +123,10 @@ final class MapGuide {
                     new Entry("Strip…", null, IN_STRIP + "."),
                     new Entry("Members", null, "A strip's: " + STRIP_MEMBERS + "."),
                     new Entry("Scroll", null, "A strip's: " + STRIP_SCROLL + ". ▶ Scroll and measure: " + MEASURE
-                            + "."),
+                            + ". A tree's: " + TREE_SCROLL + ". ▶ Scroll and measure: " + MEASURE_TREE + "."),
+                    new Entry("Tree…", null, IN_TREE + "."),
+                    new Entry("Nodes", null, "A tree's: " + TREE_NODES + ". Unlocked by…: " + UNLOCKED_BY
+                            + ". Place…: " + PLACE_NODE + "."),
                     new Entry("Leads to…", null, LEADS_TO + ", as try_input records an input that led to a screen "
                             + "mapped already."),
                     new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."),

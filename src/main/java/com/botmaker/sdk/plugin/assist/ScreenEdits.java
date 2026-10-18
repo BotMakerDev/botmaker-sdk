@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -236,6 +237,37 @@ public final class ScreenEdits {
                 .collect(Collectors.joining(", ")) + ".";
         return said(ScreenBook.update(services, constant, s -> s.withInput(held.get().getKey(), tree.nodes(nodes))),
                 done);
+    }
+
+    /**
+     * Writes where {@code node} of {@code constant}'s tree {@code field} sits {@code beside} a node, as try_input writes
+     * one it measured: an offset it had from that node is replaced, and one that node had from it is taken off.
+     */
+    public static String placeNode(StudioServices services, String constant, String field, ImageTemplate node,
+                                   Beside beside) {
+        return said(ScreenBook.update(services, constant, s -> s.trees().containsKey(field) ? s.withInput(field,
+                        TreeMeasure.with(s.trees().get(field), List.of(new TreeMeasure.Offset(node, beside)))) : s),
+                node.id() + " sits " + beside.across() + " of " + beside.other().id() + "'s widths across and "
+                        + beside.down() + " of its heights down from it.");
+    }
+
+    /** Takes off the offset between {@code node} and {@code other} of {@code constant}'s tree {@code field}, either way. */
+    public static String unplaceNode(StudioServices services, String constant, String field, String node,
+                                     String other) {
+        return said(ScreenBook.update(services, constant, s -> s.trees().containsKey(field)
+                        ? s.withInput(field, apart(s.trees().get(field), node, other)) : s),
+                node + " is no longer placed from " + other + ".");
+    }
+
+    /** {@code tree} with no offset between the nodes {@code node} and {@code other}, written on either. */
+    static Tree apart(Tree tree, String node, String other) {
+        return tree.nodes(tree.nodes().stream().map(n -> {
+            if (n.picture() == null) return n;
+            String id = n.picture().id();
+            String gone = id.equals(node) ? other : id.equals(other) ? node : null;
+            return gone == null ? n : n.beside(n.beside().stream()
+                    .filter(b -> b.other() == null || !b.other().id().equals(gone)).toList());
+        }).toList());
     }
 
     /** The picture of {@code tree}'s node named {@code id}, any case. */

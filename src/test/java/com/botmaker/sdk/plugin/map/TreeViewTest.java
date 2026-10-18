@@ -67,6 +67,29 @@ class TreeViewTest {
     }
 
     @Test
+    void aNodeDroppedSnapsBesideTheNearestLinkedNodePlacedInThatNodesSize() {
+        // b is linked to a by a line, lost to nothing; c is placed but not linked to b.
+        Tree tree = Tree.of(List.of(Node.of(picture("a")),
+                Node.of(picture("b")).after(List.of(picture("a"))),
+                Node.of(picture("c")).beside(List.of(Beside.of(picture("a"), 3, 0))),
+                Node.of(picture("lost"))));
+        List<Place> places = TreeView.layout(tree, Map.of("a", new Size(40, 20), "b", new Size(10, 10),
+                "c", new Size(40, 20))::get);
+        TreeView.Drop drop = TreeView.snapped(tree, places, "b", 62.4, -31.4).orElseThrow();
+        assertEquals("a", drop.other());
+        assertEquals(1.55, drop.across(), "62.4 px is 1.56 of a's 40 px width, to the nearest 0.05");
+        assertEquals(-1.55, drop.down());
+        assertTrue(TreeView.snapped(tree, places, "lost", 0, 0).isEmpty(), "linked to nothing placed");
+        assertEquals("a", TreeView.snapped(tree, places, "c", 100, 0).orElseThrow().other(), "an offset links too");
+        // c is placed from a: dropped nearer d, a node it is also linked to, it moves its offset from a.
+        Tree both = tree.nodes(List.of(tree.nodes().get(0), tree.nodes().get(1),
+                Node.of(picture("c")).beside(List.of(Beside.of(picture("a"), 3, 0))),
+                Node.of(picture("d")).after(List.of(picture("c"))).beside(List.of(Beside.of(picture("a"), 0, 5)))));
+        List<Place> laid = TreeView.layout(both, id -> new Size(40, 20));
+        assertEquals("a", TreeView.snapped(both, laid, "c", 0, 95).orElseThrow().other());
+    }
+
+    @Test
     void anEmptyTreeLaysOutNothing() {
         assertEquals(List.of(), TreeView.layout(Tree.of(List.of()), id -> null));
     }

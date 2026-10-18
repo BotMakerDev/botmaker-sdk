@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens edits a tree by hand.** A button's Tree… makes it a node of one of the screen's trees, or of a new
+  one dragged, wheeled or fitting on the screen; one in a tree says which node it is and can come out. A tree picked
+  on the board draws its nodes where their offsets place them: a node dragged beside one it is linked to is placed
+  there, in that node's size, and a click picks its button. Each node is moved, taken off, given what unlocks it
+  (Unlocked by…) and where it sits from a node (Place…); ＋ Node… adds one more of the screen's buttons, and Scroll
+  sets how the tree scrolls. Its ▶ Scroll and measure measures the linked pairs in view, moves the view once toward
+  its end or its start, and measures again, as try_input does over a node. ▶ on a tree's row measures it the same
+  way instead of clicking its first node.
 - **🗺 Screens edits a strip by hand.** A button's Strip… puts it last in one of the screen's strips, or in a new one
   turning the wheel; one in a strip says where and can come out. A strip picked on the board lists its buttons in
   order, each moved or taken off, ＋ Member… one more of the screen's buttons, and sets how it scrolls: the wheel's

@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -13,6 +15,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -50,8 +53,9 @@ import java.util.stream.Stream;
 /**
  * The input picked on 🗺 Screens' board, edited by its type under its row: what it does (its result, information only,
  * comes and goes, never, locked), a button's looks (each with its state, in order), whether the screen shows it more
- * than once and the copy each of its ways goes through, the strip a button is in, a hotkey's key, a strip's members and
- * scroll, and ▶ Try with try_input's own settings. Each change is one {@link ScreenEdits} write, as the tools make it,
+ * than once and the copy each of its ways goes through, the strip or tree a button is in, a hotkey's key, a strip's
+ * members and scroll, a tree's nodes (in order, what unlocks each, where each sits, dragged in its drawing) and scroll,
+ * and ▶ Try with try_input's own settings. Each change is one {@link ScreenEdits} write, as the tools make it,
  * so ↶ undoes it.
  */
 final class InputInspector {
@@ -66,6 +70,18 @@ final class InputInspector {
 
         /** A picture's thumb. */
         Node thumb(String picture);
+
+        /** A picture's thumb {@code side} pixels big. */
+        Node thumb(String picture, double side);
+
+        /** A picture's size as cut, in the game's pixels; empty for one not cut. */
+        Size pictureSize(String picture);
+
+        /** How wide the panel draws what it shows. */
+        double width();
+
+        /** {@code row}, an input of {@code constant}, picked instead. */
+        void pick(String constant, Row row);
 
         /** What ▶ Try acts through: the project's capture, made on the FX thread. */
         AgentContext tryContext();
@@ -116,6 +132,28 @@ final class InputInspector {
         }
     }
 
+    /** How a tree is scrolled, as its editor picks it; none when it fits on the screen, still a tree. */
+    enum TreeScroll {
+        DRAG("A drag"),
+        WHEEL("The wheel"),
+        NONE("None: it fits on the screen");
+
+        private final String displayName;
+
+        TreeScroll(String displayName) {
+            this.displayName = displayName;
+        }
+
+        String displayName() {
+            return displayName;
+        }
+
+        /** How {@code tree} goes. */
+        static TreeScroll of(Tree tree) {
+            return tree.isDragged() ? DRAG : tree.notches() != 0 ? WHEEL : NONE;
+        }
+    }
+
     /** The picks a way through a repeated button may take: {@link Pick.Mode#UNTIL} is a body's, never a way's. */
     static final List<Pick.Mode> WAY_PICKS = List.of(Pick.Mode.FIRST, Pick.Mode.NTH, Pick.Mode.EACH,
             Pick.Mode.UNTIL_NONE);
@@ -146,8 +184,8 @@ final class InputInspector {
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
                 all.add(copies(constant, field, button));
-                all.add(heading("Strip"));
-                all.add(inStrip(constant, button));
+                all.add(heading("Strip or tree"));
+                all.add(inGroup(constant, button));
             }
             case Hotkey hotkey -> {
                 all.add(heading("Key"));
@@ -159,7 +197,11 @@ final class InputInspector {
                 all.add(heading("Scroll"));
                 all.add(scroll(constant, field, strip));
             }
-            default -> {
+            case Tree tree -> {
+                all.add(heading("Nodes"));
+                all.add(nodes(constant, field, tree));
+                all.add(heading("Scroll"));
+                all.add(treeScroll(constant, field, tree));
             }
         }
         all.add(heading("Try"));
@@ -442,9 +484,9 @@ final class InputInspector {
         return key;
     }
 
-    // --- the strip a button is in ---
+    // --- the strip or tree a button is in ---
 
-    private Node inStrip(String constant, Button button) {
+    private Node inGroup(String constant, Button button) {
         MapScreen screen = graph.screens().get(constant);
         Optional<String> held = screen == null ? Optional.empty() : screen.stripFieldOf(button);
         if (held.isPresent()) {
@@ -456,9 +498,54 @@ final class InputInspector {
                     held.get(), strip, strip.members().stream().filter(m -> !m.id().equals(button.picture().id()))
                             .toList())));
         }
-        if (screen != null && screen.treeOf(button).isPresent()) return text("A node of a tree: its tree places it.");
-        if (button.picture() == null) return text("It has no picture to look for along a strip.");
-        return action("Strip…", MapGuide.IN_STRIP, () -> askStrip(constant, screen, button.picture()));
+        Optional<Map.Entry<String, Tree>> tree = screen == null || button.picture() == null ? Optional.empty()
+                : screen.trees().entrySet().stream().filter(e -> e.getValue().has(button.picture())).findFirst();
+        if (tree.isPresent()) {
+            String field = tree.get().getKey();
+            Tree in = tree.get().getValue();
+            Label said = text("Node " + (indexOf(in.members(), button.picture()) + 1) + " of " + in.members().size()
+                    + " in " + field);
+            HBox.setHgrow(said, Priority.ALWAYS);
+            return line(said, action("Out of the tree", "Looked for at its place again; its lines and offsets go",
+                    () -> setNodes(constant, field, in, in.nodes().stream().filter(n -> n.picture() == null
+                            || !n.picture().id().equals(button.picture().id())).toList())));
+        }
+        if (button.picture() == null) return text("It has no picture to look for along a strip or in a tree.");
+        return new FlowPane(8, 6, action("Strip…", MapGuide.IN_STRIP, () -> askStrip(constant, screen,
+                button.picture())), action("Tree…", MapGuide.IN_TREE, () -> askTree(constant, screen,
+                button.picture())));
+    }
+
+    private void askTree(String constant, MapScreen screen, ImageTemplate picture) {
+        List<String> fields = new ArrayList<>(screen == null ? List.of() : screen.trees().keySet());
+        String fresh = "A new tree";
+        fields.add(fresh);
+        ComboBox<String> which = new ComboBox<>(FXCollections.observableArrayList(fields));
+        which.setValue(fields.getFirst());
+        ComboBox<TreeScroll> kind = new ComboBox<>(FXCollections.observableArrayList(TreeScroll.values()));
+        kind.setConverter(named(TreeScroll::displayName));
+        kind.setValue(TreeScroll.DRAG);
+        Spinner<Integer> notches = new Spinner<>(-20, 20, -5);
+        notches.setEditable(true);
+        notches.setPrefWidth(80);
+        HBox wheel = line(new Label("Notches"), notches);
+        shownFor(wheel, kind, TreeScroll.WHEEL);
+        VBox made = new VBox(8, line(new Label("A new one is scrolled by"), kind), wheel);
+        made.disableProperty().bind(which.valueProperty().isNotEqualTo(fresh));
+        Modals.form(services, "The tree " + picture.id() + " is in", new VBox(8, new Label("Make it a node of"),
+                which, made), () -> {
+            notches.commitValue();
+            Tree had = fresh.equals(which.getValue()) || screen == null ? null : screen.trees().get(which.getValue());
+            if (had != null) {
+                setNodes(constant, which.getValue(), had, Stream.concat(had.nodes().stream(),
+                        Stream.of(com.botmaker.sdk.api.screens.Node.of(picture))).toList());
+            } else if (kind.getValue() == TreeScroll.WHEEL && notches.getValue() == 0) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "a tree the wheel scrolls turns by some notches: give them.");
+            } else {
+                tree(constant, null, scrolled(Tree.of(List.of(com.botmaker.sdk.api.screens.Node.of(picture))),
+                        kind.getValue(), notches.getValue()));
+            }
+        });
     }
 
     private void askStrip(String constant, MapScreen screen, ImageTemplate picture) {
@@ -509,20 +596,21 @@ final class InputInspector {
         }
         List<ImageTemplate> free = joinable(graph.screens().get(constant));
         javafx.scene.control.Button add = action("＋ Member…", "A button of the screen in no strip or tree, last; ✂ "
-                + "Cut on the board makes a new one as a strip's button", () -> askMember(constant, field, strip, free));
+                + "Cut on the board makes a new one as a strip's button", () -> askButton("Another button of " + field,
+                "The button, last in the strip", free, m -> setMembers(constant, field, strip,
+                        Stream.concat(strip.members().stream(), Stream.of(m)).toList())));
         add.setDisable(free.isEmpty());
         box.getChildren().add(add);
         return box;
     }
 
-    private void askMember(String constant, String field, Strip strip, List<ImageTemplate> free) {
+    /** Asks which of {@code free}, said {@code what}, and hands it to {@code picked}. */
+    private void askButton(String title, String what, List<ImageTemplate> free, Consumer<ImageTemplate> picked) {
         ComboBox<String> picture = new ComboBox<>(FXCollections.observableArrayList(free.stream()
                 .map(ImageTemplate::id).toList()));
         picture.setValue(free.getFirst().id());
-        Modals.form(services, "Another button of " + field, new VBox(8, new Label("The button, last in the strip"),
-                picture), () -> free.stream().filter(m -> m.id().equals(picture.getValue())).findFirst()
-                .ifPresent(m -> setMembers(constant, field, strip, Stream.concat(strip.members().stream(),
-                        Stream.of(m)).toList())));
+        Modals.form(services, title, new VBox(8, new Label(what), picture), () -> free.stream()
+                .filter(m -> m.id().equals(picture.getValue())).findFirst().ifPresent(picked));
     }
 
     /** {@code strip} given {@code members}; its last one gone takes it off, once the user says so. */
@@ -604,14 +692,206 @@ final class InputInspector {
         };
     }
 
-    private static void shownFor(Node node, ComboBox<ScrollKind> kind, ScrollKind shown) {
+    private static <T> void shownFor(Node node, ComboBox<T> kind, T shown) {
         node.visibleProperty().bind(kind.valueProperty().isEqualTo(shown));
         node.managedProperty().bind(node.visibleProperty());
     }
 
     private static int indexOf(List<ImageTemplate> members, ImageTemplate picture) {
-        for (int i = 0; i < members.size(); i++) if (members.get(i).id().equals(picture.id())) return i;
+        for (int i = 0; i < members.size(); i++) {
+            if (members.get(i) != null && members.get(i).id().equals(picture.id())) return i;
+        }
         return -1;
+    }
+
+    // --- a tree's nodes ---
+
+    private Node nodes(String constant, String field, Tree tree) {
+        VBox box = new VBox(6);
+        Node drawing = TreeView.drawing(tree, panel::pictureSize, panel.width(), panel::thumb,
+                id -> pickNode(constant, field, id), (id, drop) -> dropped(constant, field, tree, id, drop));
+        Tooltip.install(drawing, new Tooltip(MapGuide.TREE_NODES));
+        box.getChildren().add(drawing);
+        List<com.botmaker.sdk.api.screens.Node> nodes = tree.nodes();
+        for (int i = 0; i < nodes.size(); i++) {
+            int at = i;
+            com.botmaker.sdk.api.screens.Node node = nodes.get(i);
+            if (node.picture() == null) continue;
+            Label name = new Label(node.picture().id());
+            name.getStyleClass().add("screen-row-label");
+            name.setMinWidth(0);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            javafx.scene.control.Button up = action("↑", "Before the node above it",
+                    () -> setNodes(constant, field, tree, moved(nodes, at, at - 1)));
+            up.setDisable(at == 0);
+            javafx.scene.control.Button down = action("↓", "After the node below it",
+                    () -> setNodes(constant, field, tree, moved(nodes, at, at + 1)));
+            down.setDisable(at == nodes.size() - 1);
+            javafx.scene.control.Button off = action("✕", "Out of the tree: looked for at its place again, its lines "
+                    + "and offsets gone", () -> setNodes(constant, field, tree, without(nodes, at)));
+            javafx.scene.control.Button links = action("Unlocked by…", MapGuide.UNLOCKED_BY,
+                    () -> askLinks(constant, tree, node));
+            javafx.scene.control.Button place = action("Place…", MapGuide.PLACE_NODE,
+                    () -> askPlace(constant, field, tree, node));
+            links.setDisable(tree.members().size() < 2);
+            place.setDisable(tree.members().size() < 2);
+            Label said = text(nodeSaid(node));
+            box.getChildren().addAll(line(panel.thumb(node.picture().id()), name, up, down, off),
+                    new FlowPane(8, 6, said, links, place));
+        }
+        List<String> unplaced = tree.unplaced();
+        if (!unplaced.isEmpty()) {
+            box.getChildren().add(text("No offsets place " + String.join(", ", unplaced) + " yet: drag each beside "
+                    + "a node it is linked to, or ▶ Scroll and measure with them in view."));
+        }
+        List<ImageTemplate> free = joinable(graph.screens().get(constant));
+        javafx.scene.control.Button add = action("＋ Node…", "A button of the screen in no strip or tree, last; ✂ Cut "
+                + "on the board makes a new one as a tree's node", () -> askButton("Another node of " + field,
+                "The button, last in the tree", free, m -> setNodes(constant, field, tree, Stream.concat(
+                        nodes.stream(), Stream.of(com.botmaker.sdk.api.screens.Node.of(m))).toList())));
+        add.setDisable(free.isEmpty());
+        box.getChildren().add(add);
+        return box;
+    }
+
+    /** What {@code node} says of itself: what unlocks it, and where it is placed from. */
+    static String nodeSaid(com.botmaker.sdk.api.screens.Node node) {
+        List<String> after = node.after().stream().filter(p -> p != null).map(ImageTemplate::id).toList();
+        List<String> beside = node.beside().stream().filter(b -> b.other() != null)
+                .map(b -> "(" + b.across() + ", " + b.down() + ") from " + b.other().id()).toList();
+        return (after.isEmpty() ? "No line leads to it" : "Unlocked by " + String.join(", ", after)) + "; "
+                + (beside.isEmpty() ? "no offset written on it" : "placed " + String.join(", ", beside)) + ".";
+    }
+
+    /** The node {@code id} clicked in the drawing: its button picked, where its looks are edited. */
+    private void pickNode(String constant, String field, String id) {
+        ScreenCards.rows(graph, constant).stream()
+                .filter(r -> r.input() instanceof Button && id.equals(r.picture())).findFirst()
+                .ifPresentOrElse(r -> panel.pick(constant, r), () -> panel.wrote(id + " is in " + field + " but is no "
+                        + "button of " + graph.shown(constant) + ": cut it on the board first."));
+    }
+
+    /** The node {@code id} dragged in the drawing, written where it snapped; false when it snapped nowhere. */
+    private boolean dropped(String constant, String field, Tree tree, String id, Optional<TreeView.Drop> drop) {
+        Optional<ImageTemplate> node = memberOf(tree, id);
+        Optional<ImageTemplate> other = drop.flatMap(d -> memberOf(tree, d.other()));
+        if (node.isEmpty() || other.isEmpty()) {
+            panel.wrote(ScreenEdits.NOT_WRITTEN + id + " is linked to no node placed yet: Unlocked by… links it, "
+                    + "then drag it beside that node.");
+            return false;
+        }
+        panel.wrote(ScreenEdits.placeNode(services, constant, field, node.get(),
+                Beside.of(other.get(), drop.get().across(), drop.get().down())));
+        return true;
+    }
+
+    private static Optional<ImageTemplate> memberOf(Tree tree, String id) {
+        return tree.members().stream().filter(p -> p != null && p.id().equals(id)).findFirst();
+    }
+
+    private void askLinks(String constant, Tree tree, com.botmaker.sdk.api.screens.Node node) {
+        String id = node.picture().id();
+        VBox ticks = new VBox(4);
+        List<CheckBox> boxes = new ArrayList<>();
+        for (ImageTemplate other : tree.members()) {
+            if (other == null || other.id().equals(id)) continue;
+            CheckBox tick = new CheckBox(other.id());
+            tick.setSelected(node.after().stream().anyMatch(p -> p != null && p.id().equals(other.id())));
+            boxes.add(tick);
+        }
+        ticks.getChildren().addAll(boxes);
+        Modals.form(services, "What unlocks " + id, new VBox(8, new Label("The nodes whose line leads to it"), ticks),
+                () -> panel.wrote(ScreenEdits.link(services, constant, graph.screens().get(constant), id,
+                        boxes.stream().filter(CheckBox::isSelected).map(CheckBox::getText).toList())));
+    }
+
+    private void askPlace(String constant, String field, Tree tree, com.botmaker.sdk.api.screens.Node node) {
+        String id = node.picture().id();
+        List<String> others = tree.members().stream().filter(p -> p != null && !p.id().equals(id))
+                .map(ImageTemplate::id).toList();
+        // The node it is placed from already first, then one that unlocks it, then any.
+        String first = node.beside().stream().filter(b -> b.other() != null).map(b -> b.other().id()).findFirst()
+                .or(() -> node.after().stream().filter(p -> p != null).map(ImageTemplate::id).findFirst())
+                .orElse(others.getFirst());
+        ComboBox<String> from = new ComboBox<>(FXCollections.observableArrayList(others));
+        from.setValue(first);
+        Optional<Beside> had = besideOf(node, first);
+        double wide = had.map(Beside::across).orElse(1.0);
+        double tall = had.map(Beside::down).orElse(0.0);
+        // Each range holds every offset written on the node: one out of it would be clamped, and written so.
+        double most = Math.max(20, node.beside().stream()
+                .mapToDouble(b -> Math.max(Math.abs(b.across()), Math.abs(b.down()))).max().orElse(0));
+        Spinner<Double> across = new Spinner<>(-most, most, wide, TreeView.STEP);
+        Spinner<Double> down = new Spinner<>(-most, most, tall, TreeView.STEP);
+        across.setEditable(true);
+        down.setEditable(true);
+        across.setPrefWidth(90);
+        down.setPrefWidth(90);
+        // A node it has no offset from starts one width right of it, as a fresh form does.
+        from.setOnAction(e -> {
+            Optional<Beside> now = besideOf(node, from.getValue());
+            across.getValueFactory().setValue(now.map(Beside::across).orElse(1.0));
+            down.getValueFactory().setValue(now.map(Beside::down).orElse(0.0));
+        });
+        CheckBox none = new CheckBox("No offset between them");
+        across.disableProperty().bind(none.selectedProperty());
+        down.disableProperty().bind(none.selectedProperty());
+        Modals.form(services, "Where " + id + " sits", new VBox(8, new Label("From"), from,
+                line(new Label("Its centre"), across, new Label("of its widths right")),
+                line(new Label("and"), down, new Label("of its heights below")),
+                text("Negative: left or above."), none), () -> {
+            across.commitValue();
+            down.commitValue();
+            Optional<ImageTemplate> other = memberOf(tree, from.getValue());
+            if (other.isEmpty()) return;
+            panel.wrote(none.isSelected() ? ScreenEdits.unplaceNode(services, constant, field, id, other.get().id())
+                    : ScreenEdits.placeNode(services, constant, field, node.picture(),
+                    Beside.of(other.get(), across.getValue(), down.getValue())));
+        });
+    }
+
+    private static Optional<Beside> besideOf(com.botmaker.sdk.api.screens.Node node, String other) {
+        return node.beside().stream().filter(b -> b.other() != null && b.other().id().equals(other)).findFirst();
+    }
+
+    /** {@code tree} given {@code nodes}; its last one gone takes it off, once the user says so. */
+    private void setNodes(String constant, String field, Tree tree, List<com.botmaker.sdk.api.screens.Node> nodes) {
+        if (!nodes.isEmpty()) {
+            tree(constant, field, tree.nodes(nodes));
+            return;
+        }
+        hands.confirm("Take the tree off", "That is the last node of " + field + ": the tree is taken off, its "
+                + "button looked for at its place.", () -> tree(constant, field, tree.nodes(List.of())));
+    }
+
+    // --- a tree's scroll ---
+
+    private Node treeScroll(String constant, String field, Tree tree) {
+        ComboBox<TreeScroll> kind = new ComboBox<>(FXCollections.observableArrayList(TreeScroll.values()));
+        kind.setConverter(named(TreeScroll::displayName));
+        kind.setValue(TreeScroll.of(tree));
+        int turns = tree.notches() != 0 ? tree.notches() : -5;
+        Spinner<Integer> notches = new Spinner<>(Math.min(-20, turns), Math.max(20, turns), turns);
+        notches.setEditable(true);
+        notches.setPrefWidth(80);
+        HBox wheel = line(new Label("Notches"), notches, new Label("how far: a walk turns it the way a node lies"));
+        shownFor(wheel, kind, TreeScroll.WHEEL);
+        javafx.scene.control.Button set = action("Set scroll", MapGuide.TREE_SCROLL, () -> {
+            notches.commitValue();
+            if (kind.getValue() == TreeScroll.WHEEL && notches.getValue() == 0) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + "the wheel turns by some notches: give them.");
+                return;
+            }
+            tree(constant, field, scrolled(tree, kind.getValue(), notches.getValue()));
+        });
+        return new VBox(6, line(new Label("By"), kind), wheel, set);
+    }
+
+    /** {@code tree} scrolled as its editor sets it: {@code notches} only by the wheel. */
+    static Tree scrolled(Tree tree, TreeScroll kind, int notches) {
+        TreeScroll by = kind == null ? TreeScroll.NONE : kind;
+        return new Tree(tree.nodes(), by == TreeScroll.DRAG, by == TreeScroll.WHEEL ? notches : 0, tree.isTried(),
+                tree.isLeaving(), tree.isInfo(), tree.never(), tree.comesAndGoes(), tree.lock(), tree.when());
     }
 
     // --- ▶ Try ---
@@ -636,22 +916,28 @@ final class InputInspector {
         stay.setSelected(true);
         stay.setTooltip(new Tooltip("Off: once the screen is finished, the game is walked to the next screen to "
                 + "explore, as Discovery goes"));
-        // A strip is scrolled, which opens nothing, and measured; try_input turns only the wheel.
-        boolean scrolled = input instanceof Strip;
+        // A strip or a tree is scrolled, which opens nothing, and measured; try_input turns a strip by the wheel only.
+        boolean scrolled = input instanceof Strip || input instanceof Tree;
         boolean dragged = input instanceof Strip strip && strip.scroll() != null && strip.scroll().drag() != null;
+        CheckBox back = new CheckBox("Toward its start (left or above)");
+        back.setTooltip(new Tooltip("Off: the view moves toward its end, what lies right of or below it"));
         javafx.scene.control.Button go = action(scrolled ? "▶ Scroll and measure" : "▶ Try",
-                scrolled ? MapGuide.MEASURE : MapGuide.TRY_HOW, () -> {
+                input instanceof Tree ? MapGuide.MEASURE_TREE : scrolled ? MapGuide.MEASURE : MapGuide.TRY_HOW, () -> {
             // A number typed and not yet entered is the one tried.
             copy.commitValue();
             settle.commitValue();
             Trying how = new Trying(opens.getText().isBlank() ? null : opens.getText().strip(),
                     byCopy && copy.getValue() > 0 ? copy.getValue() : null, settle.getValue(), stay.isSelected());
             AgentContext context = panel.tryContext();
-            panel.run("Trying " + row.label() + "…", constant, () -> ScreenDesk.tryInput(context, constant, input,
-                    how));
+            boolean towardStart = back.isSelected();
+            panel.run("Trying " + row.label() + "…", constant, () -> input instanceof Tree tree
+                    ? ScreenDesk.measureTree(context, constant, tree, towardStart)
+                    : ScreenDesk.tryInput(context, constant, input, how));
         });
         go.getStyleClass().add("screen-panel-primary");
         go.setDisable(dragged);
+        // A tree's measure waits on its nodes holding still, and stays.
+        if (input instanceof Tree) return new VBox(6, back, go);
         VBox box = new VBox(6, new FlowPane(12, 6, line(new Label("Wait up to"), settle, new Label("ms")), stay));
         if (!scrolled) box.getChildren().addFirst(line(new Label("Opens"), opens));
         if (byCopy) box.getChildren().addFirst(line(new Label("Copy #"), copy));
@@ -695,6 +981,10 @@ final class InputInspector {
 
     private void strip(String constant, String field, Strip now) {
         panel.wrote(ScreenEdits.setStrip(services, constant, field, now));
+    }
+
+    private void tree(String constant, String field, Tree now) {
+        panel.wrote(ScreenEdits.setTree(services, constant, field, now));
     }
 
     private static String modeName(Pick.Mode mode) {
