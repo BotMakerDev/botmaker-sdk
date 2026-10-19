@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.SlotContext;
 import com.botmaker.plugin.api.slot.ValueContext;
-import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.plugin.toolkit.Styles;
@@ -92,9 +91,9 @@ public final class ScreenEditors {
     }
 
     /** The bot's map as it is now; empty when there is none or it will not read. */
-    private static ScreenGraph graph(PluginValues values) {
+    private static ScreenGraph graph(StudioServices services) {
         // A map that will not read leaves the picker empty, never the block undrawn.
-        return ScreenMapRead.orEmpty(values);
+        return ScreenMapRead.orEmpty(services);
     }
 
     /** The picker. The map is read again each time the list opens: a screen mapped since then is offered. */
@@ -111,12 +110,12 @@ public final class ScreenEditors {
         // A constant the map does not list (it will not read, or the screen is gone) still shows by its name: the
         // Java names it, and a prompt would invite a pick over it.
         Optional<String> current = SCREENS.picked(ctx).map(Member::name);
-        show.accept(current.map(constant -> choices(graph(services.pluginValues()), true).stream()
+        show.accept(current.map(constant -> choices(graph(services), true).stream()
                 .filter(choice -> choice.constant().equals(constant)).findFirst()
                 .orElse(new Choice(constant, constant, null))));
         button.setOnAction(e -> {
             ContextMenu menu = new ContextMenu();
-            List<Choice> choices = choices(graph(services.pluginValues()), popups);
+            List<Choice> choices = choices(graph(services), popups);
             if (choices.isEmpty()) {
                 MenuItem none = new MenuItem(NO_MAP);
                 none.setDisable(true);

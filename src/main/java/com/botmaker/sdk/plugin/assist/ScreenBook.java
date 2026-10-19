@@ -36,7 +36,7 @@ final class ScreenBook {
 
     /** The map, in the order the bot declares its screens; a field the grammar cannot read is left out. */
     static ScreenGraph read(StudioServices services) {
-        return ScreenMapRead.of(services.pluginValues());
+        return ScreenMapRead.read(services);
     }
 
     /** The constant {@code typed} names: the constant itself, or the name the game shows, in any case. */

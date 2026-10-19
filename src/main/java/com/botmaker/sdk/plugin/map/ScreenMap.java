@@ -13,6 +13,7 @@ import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.shared.ipc.TelemetryFrame;
 import javafx.animation.KeyFrame;
@@ -397,6 +398,8 @@ public final class ScreenMap {
                 });
                 return;
             }
+            // Changed on disk, as by a hand outside Studio: the read kept is of the class as it was.
+            if (file.isEmpty() || !file.get().equals(was)) ScreenMapRead.forget();
             Read read;
             try {
                 read = read();

@@ -22,7 +22,7 @@ final class ScreenGroups {
     /** Each screen's group of {@code files}, keyed by {@link TemplateGalleryModel#screenKey}. On the FX thread. */
     static Map<String, List<Path>> of(StudioServices services, List<Path> files) {
         // A map that will not read costs its groups, never the pictures window.
-        return groups(ScreenMapRead.orEmpty(services.pluginValues()), files);
+        return groups(ScreenMapRead.orEmpty(services), files);
     }
 
     /**

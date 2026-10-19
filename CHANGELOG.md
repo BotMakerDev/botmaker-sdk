@@ -50,6 +50,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **🗺 Screens' live feed and the `Screens.java` tab no longer freeze Studio.** The map is read once and kept until
+  the bot's code changes (a history step, a write, `Screens.java` changed on disk): a map of fifty screens took
+  300–900 ms on the FX thread, and the feed read it every second, each card at each draw.
 - **edit_map's `popup` and `start` are one action, `set_kind`**, `as` `screen`, `popup`, `start` or `panel`.
   `screen` takes whichever mark the screen had off.
 - **🗺 Screens goes full screen, and its live game runs at about 30 frames a second.** ☰ Outline and ▤ Panel hide

@@ -125,9 +125,9 @@ public final class InputPicker {
         Class<? extends Input> kind = kind(ctx);
         javafx.scene.control.Button button = Styles.on(new javafx.scene.control.Button(), Styles.INSET_FIELD_FLAT);
         Optional<Member> current = SCREENS.picked(ctx).filter(Member::grouped);
-        button.setText(current.map(m -> label(graph(services.pluginValues()), m) + "  ▾").orElse(PROMPT));
+        button.setText(current.map(m -> label(graph(services), m) + "  ▾").orElse(PROMPT));
         button.setOnAction(e -> {
-            ScreenGraph graph = graph(services.pluginValues());
+            ScreenGraph graph = graph(services);
             // Read again: a pick made since the picker was drawn opens on its screen.
             Optional<String> on = SCREENS.picked(ctx).filter(Member::grouped).map(Member::group)
                     .filter(graph.screens()::containsKey);
@@ -296,8 +296,8 @@ public final class InputPicker {
                 Math.max(a.y() + a.height(), b.y() + b.height()) - y);
     }
 
-    private static ScreenGraph graph(PluginValues values) {
-        return ScreenMapRead.orEmpty(values);
+    private static ScreenGraph graph(StudioServices services) {
+        return ScreenMapRead.orEmpty(services);
     }
 
     /** The picture {@code id} as a small image; null when its file is missing. */

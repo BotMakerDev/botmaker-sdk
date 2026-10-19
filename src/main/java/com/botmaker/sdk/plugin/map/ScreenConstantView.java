@@ -177,9 +177,9 @@ public final class ScreenConstantView {
         return Optional.of(view);
     }
 
-    /** The map, one read for every card the tab draws in one go ({@link ScreenMapRead#orEmpty}). */
+    /** The map, one read for every card the tab draws until the code changes ({@link ScreenMapRead#orEmpty}). */
     private static ScreenGraph read(ValueContext ctx) {
-        return ScreenMapRead.orEmpty(ctx.services() == null ? null : ctx.services().pluginValues());
+        return ScreenMapRead.orEmpty(ctx.services());
     }
 
     /** The constant of {@code graph} whose setup is {@code held}; empty for none, and when the map could not be read. */

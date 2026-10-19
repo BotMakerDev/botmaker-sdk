@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
+import com.botmaker.plugin.api.History;
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
@@ -9,12 +11,10 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.shared.Diag;
-import javafx.application.Platform;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -149,45 +149,77 @@ public final class ScreenMapRead {
     }
 
     /**
-     * {@link #of}, or no screens when the class will not read: what a view that must draw anyway shows.
-     *
-     * <p>On the FX thread one read serves the whole event (2026-10-17): the {@code Screens.java} tab draws one card
-     * per screen, each asking, and each read opens every screen and input. Dropped once the event ends, and by
-     * every write here; off the FX thread nothing is kept.
+     * {@link #of} the project's map, kept until the bot's code changes (2026-10-19): a read of fifty screens holds the
+     * FX thread 300–900 ms, and the live feed asks once a second and every {@code Screens.java} card at each draw.
+     * Every change Studio makes is a history step ({@link History#onChanged}); a write here and a {@code Screens.java}
+     * changed on disk drop it too ({@link #forget}). A host whose history is {@link History#NONE} says nothing of
+     * changes, so nothing is kept there. A class that will not read throws, the same failure each time until it changes.
      */
-    public static ScreenGraph orEmpty(PluginValues values) {
-        boolean fx = onFxThread();
-        Kept kept = KEPT.get();
-        if (fx && kept != null && kept.values() == values) return kept.graph();
-        ScreenGraph graph;
+    public static ScreenGraph read(StudioServices services) {
+        PluginValues values = services.pluginValues();
+        History history = services.history();
+        if (history == History.NONE) return of(values);
+        Kept read = kept;
+        if (read == null || read.values() != values || read.history() != history) {
+            long seen = watch(history);
+            read = readKept(values, history);
+            keep(seen, read);
+        }
+        if (read.failure() != null) throw read.failure();
+        return read.graph();
+    }
+
+    private static Kept readKept(PluginValues values, History history) {
         try {
-            graph = of(values);
+            return new Kept(values, history, of(values), null);
         } catch (RuntimeException unreadable) {
-            graph = ScreenGraph.of(Map.of());
+            return new Kept(values, history, null, unreadable);
         }
-        if (fx && values != null) {
-            KEPT.set(new Kept(values, graph));
-            Platform.runLater(ScreenMapRead::forget);
-        }
-        return graph;
     }
 
-    /** The last read on the FX thread and what it read: {@link #orEmpty}'s, until its event ends. */
-    private record Kept(PluginValues values, ScreenGraph graph) {}
-
-    private static final AtomicReference<Kept> KEPT = new AtomicReference<>();
-
-    /** Drops the read kept: what writes the map calls it, so a view drawn after the write reads it again. */
-    public static void forget() {
-        KEPT.set(null);
-    }
-
-    /** Whether this is the FX thread; false where JavaFX is not there to ask, as in a headless host. */
-    private static boolean onFxThread() {
+    /** {@link #read}, or no screens when the class will not read: what a view that must draw anyway shows. */
+    public static ScreenGraph orEmpty(StudioServices services) {
+        if (services == null) return ScreenGraph.of(Map.of());
         try {
-            return Platform.isFxApplicationThread();
-        } catch (RuntimeException | LinkageError noFx) {
-            return false;
+            return read(services);
+        } catch (RuntimeException unreadable) {
+            return ScreenGraph.of(Map.of());
         }
+    }
+
+    /** The last read and what it read, or why it could not: {@link #read}'s, until the bot's code changes. */
+    private record Kept(PluginValues values, History history, ScreenGraph graph, RuntimeException failure) {}
+
+    private static volatile Kept kept;
+    /** Counts {@link #forget}s, so a read a change overtook is not kept. */
+    private static long changes;
+    private static History watched;
+    private static AutoCloseable watching;
+
+    /** Listens to {@code history} once (a project's own), and answers how many changes were seen so far. */
+    private static synchronized long watch(History history) {
+        if (watched != history) {
+            try {
+                if (watching != null) watching.close();
+            } catch (Exception closed) {
+                // The project it listened to is gone already.
+            }
+            watched = history;
+            watching = history.onChanged(ScreenMapRead::forget);
+        }
+        return changes;
+    }
+
+    private static synchronized void keep(long seen, Kept read) {
+        if (changes == seen) kept = read;
+    }
+
+    /**
+     * Drops the read kept: each history step does, a write here, and 🗺 Screens when {@code Screens.java} changed on
+     * disk, so the next view reads the class again.
+     */
+    public static synchronized void forget() {
+        changes++;
+        kept = null;
     }
 }
