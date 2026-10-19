@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A game is checked ready before it launches**: a run waits while Steam downloads the game (a trace line each
+  minute, 30 min at most) and stops with the reason when the game isn't installed or Steam is signed out, instead of
+  a launch that Steam turns into a dialog nobody answers. Studio's ▶ Launch and Launch and pick wait the same,
+  offer to open Steam to sign in, and offer Steam's install dialog; the Runner's game pick offers *install in
+  Steam…* for a listed game this computer lacks.
 - **🎮 Game lists more launchers**: Bottles programs (`bottles:`), Steam's non-Steam shortcuts, and on Windows
   the Start menu's apps and Store apps, Ubisoft Connect and Battle.net games (`url:`), and itch games. A bot lists
   and launches each like any other game (`LaunchTarget.Bottles`, `LaunchTarget.Link`).

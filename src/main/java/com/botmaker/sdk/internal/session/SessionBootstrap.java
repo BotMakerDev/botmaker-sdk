@@ -7,6 +7,7 @@ import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
+import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PrivateSession;
@@ -157,6 +158,18 @@ public final class SessionBootstrap {
     }
 
     /**
+     * Waits until {@code spec}'s game can start on this computer, before a run launches it: through a download its
+     * launcher is running (each minute a trace line), past an update the launcher fetches when asked to start it.
+     * A game VM's game is the guest's, and is never asked here.
+     *
+     * @throws IllegalStateException when the game isn't installed, its launcher is signed out, or the download
+     *                               outlasts {@link GameReadiness#UPDATE_WAIT}: the run stops with the reason
+     */
+    public static void requireReady(LaunchSpec spec) {
+        GameReadiness.awaitLaunchable(spec, GameReadiness.UPDATE_WAIT, Debug::log);
+    }
+
+    /**
      * Why {@code spec} can't start in {@code where} on this computer, or empty when it can: what the pickers grey a
      * game or a place by, with the reason to show. Asks what this computer's system and installed programs allow,
      * never what is open now (a launcher on the desktop is closed when the launch asks) nor which game VM is set up.
@@ -243,7 +256,8 @@ public final class SessionBootstrap {
      * isolation isn't requested, or the target has no command to give a display (an emulator app): the caller
      * runs its normal launch. Idempotent: once a session is registered, later calls no-op and return {@code true}.
      *
-     * @throws IllegalStateException when the game can't run in the private display — the backend isn't installed,
+     * @throws IllegalStateException when the game can't start ({@link #requireReady}), or can't run in the private
+     *                               display — the backend isn't installed,
      *                               its launcher is open on the desktop, the display didn't come up or the game
      *                               opened no window there: the run stops with the reason rather than putting the
      *                               game on the desktop. For a game VM, when it can't be opened or the game can't
@@ -282,6 +296,7 @@ public final class SessionBootstrap {
         // up (measured — a bot refused to isolate because of a Heroic that had been closed for hours), and the only
         // other sweep is inside a successful Sessions.startPrivate, which a refusal never reaches.
         Sessions.reapOrphans();
+        requireReady(spec);
         LaunchIsolation.Verdict verdict = LaunchIsolation.check(spec);
         if (!verdict.isolatable()) {
             // Asked before anything is spawned: a target that cannot be confined would otherwise cost the full

@@ -144,12 +144,19 @@ public final class QuickLaunch {
             launchInVm(button, spec, report, VmChoice.current(services));
             return;
         }
-        if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
-            launchInBackground(button, spec, report, services,
-                    SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()));
-            return;
-        }
-        onDesktop(spec, services, report, launched -> button.setDisable(false));
+        // A game VM's game is the guest's: this computer's launcher files say nothing of it.
+        ReadinessPrompt.clearThen(services, button.getScene() == null ? null : button.getScene().getWindow(), spec,
+                report, () -> {
+                    if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
+                        launchInBackground(button, spec, report, services,
+                                SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()));
+                        return;
+                    }
+                    onDesktop(spec, services, report, launched -> button.setDisable(false));
+                }, (ok, why) -> {
+                    button.setDisable(false);
+                    report.accept(ok, why);
+                });
     }
 
     /**
@@ -159,7 +166,11 @@ public final class QuickLaunch {
      */
     public static void launchOnDesktop(LaunchSpec spec, StudioServices services, Report report,
                                        Consumer<Boolean> ended) {
-        onDesktop(spec, services, report, ended);
+        ReadinessPrompt.clearThen(services, Modals.owner(services), spec, report,
+                () -> onDesktop(spec, services, report, ended), (ok, why) -> {
+                    ended.accept(false);
+                    report.accept(ok, why);
+                });
     }
 
     /** As {@link #launchOnDesktop}, then in the game VM the bot's settings name. */
@@ -277,22 +288,28 @@ public final class QuickLaunch {
             Platform.runLater(() -> done.accept(false, SessionBootstrap.missingBackend(backend)));
             return;
         }
-        HostLauncherPrompt.clearThen(services, Modals.owner(services), spec, () -> {
-            SessionBackends.DisplaySize size = ScreenSize.display(services);
-            BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
-            // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then.
-            // Counted here, as it is reported, since the session may be held by the time the FX thread reads it.
-            boolean[] first = {true};
-            launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
-                boolean progress = ok && first[0];
-                first[0] = false;
-                if (progress) return;
-                Platform.runLater(() -> {
-                    PrivateSession session = launcher.session();
-                    if (ok && session != null) SessionHandoff.offer(services, session);
-                    done.accept(ok && session != null, message);
-                });
+        // The assistant's launch reports only its outcome: a wait's progress lines go nowhere.
+        ReadinessPrompt.clearThen(services, Modals.owner(services), spec, (ok, line) -> { },
+                () -> HostLauncherPrompt.clearThen(services, Modals.owner(services), spec,
+                        () -> startPrivately(spec, services, backend, done), done), done);
+    }
+
+    private static void startPrivately(LaunchSpec spec, StudioServices services, SessionBackend backend,
+                                       BiConsumer<Boolean, String> done) {
+        SessionBackends.DisplaySize size = ScreenSize.display(services);
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
+        // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then.
+        // Counted here, as it is reported, since the session may be held by the time the FX thread reads it.
+        boolean[] first = {true};
+        launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
+            boolean progress = ok && first[0];
+            first[0] = false;
+            if (progress) return;
+            Platform.runLater(() -> {
+                PrivateSession session = launcher.session();
+                if (ok && session != null) SessionHandoff.offer(services, session);
+                done.accept(ok && session != null, message);
             });
-        }, done);
+        });
     }
 }

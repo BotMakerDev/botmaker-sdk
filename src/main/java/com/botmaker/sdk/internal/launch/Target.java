@@ -80,6 +80,7 @@ public final class Target {
         if (SessionBootstrap.launchIsolated(t.launchSpec())) {
             return;
         }
+        SessionBootstrap.requireReady(t.launchSpec());
         t.start();
     }
 
@@ -99,7 +100,14 @@ public final class Target {
         if (SessionBootstrap.launchIsolated(t.launchSpec())) {
             return;
         }
-        t.startIfNotRunning();
+        startUnlessRunning(t);
+    }
+
+    /** {@link LaunchTarget#startIfNotRunning()} once the game can start ({@link SessionBootstrap#requireReady}). */
+    private static void startUnlessRunning(LaunchTarget t) {
+        if (t.isRunning()) return;
+        SessionBootstrap.requireReady(t.launchSpec());
+        t.start();
     }
 
     /**
@@ -125,6 +133,7 @@ public final class Target {
             SessionBootstrap.relaunchInVm(t.launchSpec());
             return;
         }
+        SessionBootstrap.requireReady(t.launchSpec());
         t.restart();
     }
 
@@ -146,7 +155,7 @@ public final class Target {
             return Game.waitForDefaultSource(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
         }
 
-        t.startIfNotRunning();
+        startUnlessRunning(t);
         return Game.waitForLaunch(Source.current(), BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
     }
 

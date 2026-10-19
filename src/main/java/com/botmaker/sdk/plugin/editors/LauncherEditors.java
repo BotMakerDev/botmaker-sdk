@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
@@ -15,9 +16,11 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.launch.ReadinessPrompt;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
+import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 import javafx.scene.Node;
@@ -94,10 +97,14 @@ public final class LauncherEditors {
                 any = true;
                 boolean missing = GameCatalog.installed(spec).map(has -> !has).orElse(false);
                 boolean refused = !missing && SessionBootstrap.placeRefusal(parsed, place).isPresent();
-                MenuItem item = Pills.item(label(services, spec) + (missing ? " (not installed)"
-                        : refused ? " (can't run in " + placeName(place) + ")" : ""),
-                        () -> choose(ctx, pill, row, spec));
-                item.setDisable(missing || refused);
+                // A game Steam can install is offered to install instead: Steam shows its own dialog.
+                boolean installable = missing && GameReadiness.installLink(parsed).isPresent();
+                MenuItem item = Pills.item(label(services, spec) + (installable ? " (not installed: install in Steam…)"
+                        : missing ? " (not installed)" : refused ? " (can't run in " + placeName(place) + ")" : ""),
+                        installable ? () -> Async.load("game-install", () -> ReadinessPrompt.install(parsed),
+                                said -> pill.setTooltip(new Tooltip(said)), why -> { })
+                                : () -> choose(ctx, pill, row, spec));
+                item.setDisable(!installable && (missing || refused));
                 items.add(item);
             }
             if (!any) {
