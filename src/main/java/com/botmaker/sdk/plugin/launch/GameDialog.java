@@ -247,12 +247,23 @@ public final class GameDialog {
         stage.setOnHidden(e -> active = null);
         refreshCurrent();
         stage.show();
-        rescan();
+        Async.load("game-dialog-saved", GameCatalog::saved, saved -> {
+            if (lastScan == null) saved.ifPresent(this::fill);
+            rescan();
+        });
     }
 
-    /** Re-reads every library off the JavaFX thread and rebuilds the radio row and the grid. */
+    /**
+     * Re-reads every library off the JavaFX thread; the grid changes only when the libraries did. The saved list is
+     * on screen meanwhile, so a game added or removed since appears or goes, and nothing else moves.
+     */
     private void rescan() {
-        Async.load("game-dialog-scan", GameCatalog::scan, this::fill, why -> {
+        Async.load("game-dialog-scan", GameCatalog::scan, scanned -> {
+            if (!scanned.equals(lastScan)) fill(scanned);
+            // After the scan, not the saved fill: a scan that read the emulator cache before the refresh wrote it
+            // would put the old apps back, and a refresh over the saved list would be dropped by the scan's.
+            refreshEmulatorsOnce();
+        }, why -> {
             notice.setText("Couldn't read the libraries: " + why);
             Styles.pick(notice, Styles.ERROR_TEXT, Styles.DIALOG_HINT);
             notice.setVisible(true);
@@ -267,7 +278,10 @@ public final class GameDialog {
      */
     private void fill(List<GameCatalog.Section> scanned) {
         lastScan = scanned;
-        tiles.clear();
+        // A tile the libraries still list as it was stays, picture loaded and all; a gone or changed one is made anew.
+        Map<String, GameCatalog.Item> had = new HashMap<>();
+        tiles.forEach((spec, tile) -> had.put(spec, tile.item()));
+        tiles.keySet().removeAll(GameCatalog.outdated(had, scanned));
         Map<String, Path> art = new HashMap<>();
         for (GameCatalog.Section section : scanned) {
             for (GameCatalog.Item item : section.items()) {
@@ -324,7 +338,6 @@ public final class GameDialog {
         }
         showGroup(first);
         markCurrent();
-        refreshEmulatorsOnce();
     }
 
     /**
@@ -339,7 +352,8 @@ public final class GameDialog {
             if (!changed || stage == null || !stage.isShowing() || lastScan == null) return;
             // Only the emulator sections changed: the launchers' libraries aren't read again.
             List<GameCatalog.Section> scanned = lastScan;
-            Async.load("game-dialog-emulator-sections", () -> GameCatalog.withEmulatorsReread(scanned), this::fill);
+            Async.load("game-dialog-emulator-sections", () -> GameCatalog.withEmulatorsReread(scanned),
+                    reread -> fillOver(scanned, reread));
         });
     }
 
@@ -465,7 +479,16 @@ public final class GameDialog {
         choose(item);
         if (stage == null || !stage.isShowing() || lastScan == null) return;
         List<GameCatalog.Section> scanned = lastScan;
-        Async.load("game-dialog-installed", () -> GameCatalog.withEmulatorsReread(scanned), this::fill);
+        Async.load("game-dialog-installed", () -> GameCatalog.withEmulatorsReread(scanned),
+                reread -> fillOver(scanned, reread));
+    }
+
+    /**
+     * Fills {@code reread}, the emulator sections read again over {@code base}, unless a scan replaced {@code base}
+     * meanwhile: the saved list is on screen first, and its launchers must not come back over the scan's.
+     */
+    private void fillOver(List<GameCatalog.Section> base, List<GameCatalog.Section> reread) {
+        if (lastScan == base) fill(reread);
     }
 
     /** Makes {@code item} what this computer launches, remembers it, and says so. */

@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **The game dialog opens on the last list it found**: `GameCatalog.scan` saves what it lists to
+  `<cache>/games.json`, and the dialog shows it at once, then scans in the background. Only a game added, removed or
+  renamed changes the grid; every other tile stays as it was. The Runner's "not installed" reads the saved list
+  until a scan answers. A file of another version, or one that doesn't read, counts as none.
 - **"Close it and launch" closes the launcher in the way**: for a Lutris game on the Steam runner that is Steam.
 
 ### Changed

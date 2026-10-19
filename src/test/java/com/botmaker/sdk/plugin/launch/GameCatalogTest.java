@@ -18,7 +18,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -171,6 +173,47 @@ class GameCatalogTest {
         assertEquals(Optional.of(true), GameCatalog.installed("exe:" + exe, null), "a program is looked for on disk");
         assertEquals(Optional.of(false), GameCatalog.installed("exe:" + dir.resolve("gone.exe"), null));
         assertEquals(Optional.of(false), GameCatalog.installed("nonsense", listed));
+    }
+
+    @Test
+    void theSavedListReadsBackAsItWasShown(@TempDir Path dir) {
+        Path file = dir.resolve("cache/games.json");
+        List<GameCatalog.Section> shown = List.of(
+                new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Steam", false, List.of(
+                        new GameCatalog.Item("steam:570", "Dota 2", Path.of("/art/570.jpg")),
+                        new GameCatalog.Item("steam:440", "Team Fortress 2", null))),
+                new GameCatalog.Section(GameCatalog.Kind.EMULATOR, "Phone", false, false, List.of(), "Allow USB debugging"));
+        GameCatalog.save(file, shown, Set.of("steam:570", "steam:440", "heroic:Fn"));
+
+        GameCatalog.Snapshot back = GameCatalog.load(file).orElseThrow();
+        assertEquals(shown, back.shown());
+        assertEquals(Set.of("steam:570", "steam:440", "heroic:Fn"), back.listed());
+    }
+
+    @Test
+    void aSavedListThatDoesNotReadIsNone(@TempDir Path dir) throws Exception {
+        assertTrue(GameCatalog.load(dir.resolve("none.json")).isEmpty());
+        Path corrupt = Files.writeString(dir.resolve("corrupt.json"), "{\"version\":1,\"sections\":[{");
+        assertTrue(GameCatalog.load(corrupt).isEmpty());
+        Path older = Files.writeString(dir.resolve("older.json"), "{\"version\":0,\"sections\":[],\"listed\":[]}");
+        assertTrue(GameCatalog.load(older).isEmpty(), "another version's file is scanned again, not read");
+        Path unknownKind = Files.writeString(dir.resolve("kind.json"),
+                "{\"version\":1,\"sections\":[{\"kind\":\"GONE\",\"title\":\"x\",\"items\":[]}],\"listed\":[]}");
+        assertTrue(GameCatalog.load(unknownKind).isEmpty());
+    }
+
+    @Test
+    void aRescanRemakesOnlyTheTilesItDroppedOrChanged() {
+        GameCatalog.Item dota = new GameCatalog.Item("steam:570", "Dota 2", null);
+        GameCatalog.Item tf2 = new GameCatalog.Item("steam:440", "Team Fortress 2", null);
+        GameCatalog.Item hades = new GameCatalog.Item("exe:/g/hades", "Hades", null);
+        List<GameCatalog.Section> scanned = List.of(new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Steam", false,
+                List.of(dota, new GameCatalog.Item("steam:440", "TF2", null),
+                        new GameCatalog.Item("steam:730", "Counter-Strike 2", null))));
+
+        assertEquals(Set.of("steam:440", "exe:/g/hades"), GameCatalog.outdated(
+                Map.of(dota.spec(), dota, tf2.spec(), tf2, hades.spec(), hades), scanned),
+                "Dota 2 stays; TF2 renamed and Hades removed are remade; Counter-Strike 2 is simply new");
     }
 
     private static List<String> specs(GameCatalog.Section section) {

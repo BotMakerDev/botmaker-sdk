@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.launch;
 
+import com.botmaker.shared.config.CacheDirs;
 import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -18,15 +19,21 @@ import com.botmaker.shared.launch.DesktopEntries;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -49,6 +56,8 @@ public final class GameCatalog {
 
     /** The targets the last {@link #scan} listed, or {@code null} before one ran. */
     private static volatile Set<String> listed;
+    /** Held to set {@link #listed}, so the saved list never replaces a scan's. */
+    private static final Object LISTED = new Object();
     private static final AtomicBoolean SCANNING = new AtomicBoolean();
 
     private GameCatalog() {}
@@ -138,8 +147,106 @@ public final class GameCatalog {
         for (int i = 0; i < providers.size(); i++) {
             everything.add(new Section(Kind.LAUNCHER, "", false, items(providers.get(i), libraries.get(i))));
         }
-        listed = listedIn(everything);
+        Set<String> found = listedIn(everything);
+        synchronized (LISTED) {
+            listed = found;
+        }
+        save(savedFile(), shown, found);
         return shown;
+    }
+
+    /**
+     * What the last {@link #scan} listed, on this computer, kept on disk: what the dialog shows as it opens, before a
+     * scan answers — one runs {@code lutris}, and the dialog sat empty for seconds on each open (2026-10-19). Empty
+     * when none was saved, or the file is unreadable or of another version. Blocking (one small file); never throws.
+     */
+    public static Optional<List<Section>> saved() {
+        return load(savedFile()).map(snapshot -> {
+            // Never over a scan's answer that landed while the file was read.
+            synchronized (LISTED) {
+                if (listed == null) listed = snapshot.listed();
+            }
+            return snapshot.shown();
+        });
+    }
+
+    /** What {@link #save} keeps: the sections shown and every target listed, Heroic's copies of Epic games too. */
+    record Snapshot(List<Section> shown, Set<String> listed) {}
+
+    /** Bumped when the file's shape changes: an older file is then read as none. */
+    static final int SAVED_VERSION = 1;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** The file's shape: a picture as its path's text, a kind as its name. */
+    record SavedItem(String spec, String name, String artwork) {}
+
+    record SavedSection(String kind, String title, boolean folded, boolean stopped, List<SavedItem> items,
+                        String note) {}
+
+    record SavedScan(int version, List<SavedSection> sections, List<String> listed) {}
+
+    private static Path savedFile() {
+        return CacheDirs.cacheRoot().resolve("games.json");
+    }
+
+    /**
+     * Writes {@code shown} and {@code listed} to {@code file}, whole or not at all; one writer at a time, since the
+     * Runner's scan and the dialog's may finish together. Never throws.
+     */
+    static synchronized void save(Path file, List<Section> shown, Set<String> listed) {
+        List<SavedSection> sections = shown.stream().map(s -> new SavedSection(s.kind().name(), s.title(), s.folded(),
+                s.stopped(), s.items().stream().map(i -> new SavedItem(i.spec(), i.name(),
+                        i.artwork() == null ? null : i.artwork().toString())).toList(), s.note())).toList();
+        Path part = null;
+        try {
+            Files.createDirectories(file.getParent());
+            part = Files.createTempFile(file.getParent(), file.getFileName().toString(), ".part");
+            JSON.writeValue(part.toFile(), new SavedScan(SAVED_VERSION, sections, List.copyOf(listed)));
+            try {
+                Files.move(part, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException notHere) {
+                Files.move(part, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException | RuntimeException e) {
+            // A list not saved is scanned again on the next open.
+            if (part != null) part.toFile().delete();
+        }
+    }
+
+    /** What {@link #save} wrote to {@code file}; empty when there is none or it doesn't read. Never throws. */
+    static Optional<Snapshot> load(Path file) {
+        try {
+            if (!Files.isRegularFile(file)) return Optional.empty();
+            SavedScan scan = JSON.readValue(file.toFile(), SavedScan.class);
+            if (scan.version() != SAVED_VERSION || scan.sections() == null) return Optional.empty();
+            List<Section> shown = new ArrayList<>();
+            for (SavedSection s : scan.sections()) {
+                List<Item> items = s.items() == null ? List.of() : s.items().stream().map(i -> new Item(i.spec(),
+                        i.name(), i.artwork() == null ? null : Path.of(i.artwork()))).toList();
+                shown.add(new Section(Kind.valueOf(s.kind()), s.title(), s.folded(), s.stopped(), items, s.note()));
+            }
+            return Optional.of(new Snapshot(List.copyOf(shown),
+                    scan.listed() == null ? Set.of() : Set.copyOf(scan.listed())));
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The targets among {@code shown} whose tile a new scan drops or changes (gone, or another name or picture):
+     * the dialog keeps every other tile as it is, so a rescan that found nothing new moves nothing. Pure.
+     */
+    static Set<String> outdated(Map<String, Item> shown, List<Section> scanned) {
+        Map<String, Item> now = new HashMap<>();
+        for (Section section : scanned) {
+            for (Item item : section.items()) now.putIfAbsent(item.spec(), item);
+        }
+        Set<String> out = new HashSet<>();
+        shown.forEach((spec, item) -> {
+            if (!item.equals(now.get(spec))) out.add(spec);
+        });
+        return out;
     }
 
     /**
@@ -152,12 +259,13 @@ public final class GameCatalog {
 
     /**
      * Starts one {@link #scan} on a thread of its own when none ran or runs, so {@link #installed(String)} can answer
-     * for a launcher's game: every Runner row asks, and a scan runs {@code lutris}.
+     * for a launcher's game: every Runner row asks, and a scan runs {@code lutris}. The saved list answers first.
      */
     public static void scanOnce() {
         if (listed != null || !SCANNING.compareAndSet(false, true)) return;
         Thread.ofVirtual().name("game-scan").start(() -> {
             try {
+                saved();
                 scan();
             } finally {
                 SCANNING.set(false);
