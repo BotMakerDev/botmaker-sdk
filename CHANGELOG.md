@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Changed
+
+- **The vision results are declared by their methods.** `Vision.lastMatch()`, `Matches.none()`,
+  `Vision.lastColorMatch()` and `Text.lastMatch()` carry `@Fills`, and the host draws the pill; `SdkTypes`'
+  `MATCH_RESULT`, `MATCHES`, `COLOR_MATCH`, `TEXT_MATCH` and `ResultEditors` are gone. A bot sees no change.
+- **Declarations trimmed**: `OcrOptions.defaults()` and its nine withers are one call (`SdkTypes.OCR_CHAIN`); the
+  geometry editors ask the host for their declaration (`GeometryEditors::point`); `SdkRunOverlay.PART`. The
+  precision chains stay one per wither: a chain on a constant (`Precision.TIGHT.minArea(400)`) does not end at a
+  factory call, which a wither chain needs.
+
 ### Added
 
 - **The start screen, and screens that follow on their own.** `Setup.start()` marks the screen the game opens on,

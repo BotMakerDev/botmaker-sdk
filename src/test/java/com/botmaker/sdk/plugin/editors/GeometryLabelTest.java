@@ -47,7 +47,7 @@ class GeometryLabelTest {
         return TestContexts.typedSlot(type, source);
     }
 
-    // Each label is asked with the declaration the plugin hands its editor.
+    // Each label is asked with the declaration the host answers the editor's ValueContext.declared with.
     private static String pointLabel(ValueContext ctx) {
         return GeometryEditors.pointLabel(ctx, SdkTypes.POINT);
     }

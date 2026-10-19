@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
+import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
@@ -31,8 +32,11 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,8 +98,26 @@ class SdkPluginSurfaceTest {
             com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
-            com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class,
-            MatchResult.class, Matches.class, ColorMatch.class, TextMatch.class);
+            com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class);
+
+    /**
+     * The four vision results, each declared by the host off its {@code @Fills} method: what the pill says
+     * names the type, never the call, so no label says "last" (it also draws {@code ImageFinder.find(…)}).
+     */
+    @Test
+    void the_vision_results_are_filled_by_their_api_method() throws NoSuchMethodException {
+        Map<Method, String> filled = Map.of(
+                com.botmaker.sdk.api.vision.Vision.class.getMethod("lastMatch"), "Picture match",
+                Matches.class.getMethod("none"), "Pictures found",
+                com.botmaker.sdk.api.vision.Vision.class.getMethod("lastColorMatch"), "Colour match",
+                com.botmaker.sdk.api.text.Text.class.getMethod("lastMatch"), "Text found");
+        filled.forEach((method, label) -> {
+            assertEquals(label, method.getAnnotation(Fills.class).label(), method::toString);
+            assertFalse(label.toLowerCase(java.util.Locale.ROOT).contains("last"), label);
+        });
+        assertEquals(Set.of(MatchResult.class, Matches.class, ColorMatch.class, TextMatch.class),
+                filled.keySet().stream().map(Method::getReturnType).collect(java.util.stream.Collectors.toSet()));
+    }
 
     private final SdkPlugin plugin = new SdkPlugin();
 
@@ -311,8 +333,8 @@ class SdkPluginSurfaceTest {
     }
 
     /**
-     * Every SDK type draws itself (6f, 6d, 6e): the four vision results as a pill saying what the bot fills
-     * in, the rest as real pickers — so `plugin validate`'s pickers check has nothing to refuse here.
+     * Every SDK type draws itself (6f, 6d, 6e) as a real picker — so `plugin validate`'s pickers check has
+     * nothing to refuse here. The four vision results are the host's pills ({@code @Fills}).
      */
     @Test
     void every_sdk_type_draws_itself() {
@@ -321,8 +343,9 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(21, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
-                + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15");
+        assertEquals(17, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+                + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
+                + " vision results became @Fills 2026-10-19");
     }
 
     /**

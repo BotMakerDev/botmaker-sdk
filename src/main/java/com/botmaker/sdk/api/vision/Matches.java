@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
+import com.botmaker.plugin.api.value.Fills;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,7 +56,8 @@ public final class Matches {
         this.byTemplateId = byTemplateId;
     }
 
-    /** The empty result — nothing in the group was visible. */
+    /** The empty result — nothing in the group was visible. A fresh {@code Matches} the bot holds starts as it. */
+    @Fills(label = "Pictures found")
     public static Matches none() {
         return NONE;
     }

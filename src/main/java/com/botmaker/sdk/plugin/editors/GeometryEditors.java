@@ -54,23 +54,30 @@ public final class GeometryEditors {
             new String[]{"width", "height"}, "Choose size…", Pick.MEASURE,
             v -> v[0] + " × " + v[1]);
 
-    // Each takes the declaration it edits from its caller, the declaration itself: `types` names `editors`,
-    // and `editors` naming `types` back would make the two one package in two places (PluginLayersTest).
+    // Each asks the host for the declaration it edits (ValueContext.declared): `types` names `editors`, and
+    // `editors` naming `types` back would make the two one package in two places (PluginLayersTest).
 
     /** A {@code Rect}: drag a region on screen, or type {@code x, y, width, height}. */
-    public static Node rect(ValueContext ctx, ComponentType<Rect> type) {
-        return Editors.tuplePill(ctx, type, spec(RECT, ctx), SdkScreenPicks.forSlot(ctx));
+    public static Node rect(ValueContext ctx) {
+        return tuple(ctx, Rect.class, spec(RECT, ctx));
     }
 
     /** A {@code Point}: click one pixel under a magnifier, or type {@code x, y}. */
-    public static Node point(ValueContext ctx, ComponentType<Point> type) {
-        return Editors.tuplePill(ctx, type, spec(POINT, ctx), SdkScreenPicks.forSlot(ctx));
+    public static Node point(ValueContext ctx) {
+        return tuple(ctx, Point.class, spec(POINT, ctx));
     }
 
     /** A {@code Size}: measure by dragging over the thing, or type {@code width, height}. */
-    public static Node size(ValueContext ctx, ComponentType<Size> type) {
+    public static Node size(ValueContext ctx) {
         // SIZE, never spec(SIZE, …): a size is the same inside a window and on the desktop.
-        return Editors.tuplePill(ctx, type, SIZE, SdkScreenPicks.forSlot(ctx));
+        return tuple(ctx, Size.class, SIZE);
+    }
+
+    /** The tuple pill over the host's declaration of {@code type}; read-only on a host that has none to give. */
+    private static <T> Node tuple(ValueContext ctx, Class<T> type, TupleSpec spec) {
+        return ctx.declared(type)
+                .<Node>map(declared -> Editors.tuplePill(ctx, declared, spec, SdkScreenPicks.forSlot(ctx)))
+                .orElseGet(() -> Pills.bare(Slots.sourceOr(ctx, spec.placeholder())));
     }
 
     /**

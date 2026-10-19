@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
 import java.util.ArrayList;
@@ -58,6 +59,7 @@ public final class Vision {
      *
      * @return the last match result, never null
      */
+    @Fills(label = "Picture match")
     public static MatchResult lastMatch() {
         MatchResult result = lastMatch.get();
         return result != null ? result : MatchResult.notFound();
@@ -251,6 +253,7 @@ public final class Vision {
      *
      * @return the last colour match, never null
      */
+    @Fills(label = "Colour match")
     public static ColorMatch lastColorMatch() {
         ColorMatch result = lastColorMatch.get();
         return result != null ? result : ColorMatch.notFound();

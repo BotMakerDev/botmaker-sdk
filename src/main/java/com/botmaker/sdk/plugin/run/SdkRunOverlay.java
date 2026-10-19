@@ -30,8 +30,8 @@ import java.util.function.Consumer;
 public final class SdkRunOverlay {
 
     /** Declared through {@code PluginDeclaration.runOverlay}, which only a host with an overlay calls. */
-    public static final List<RunOverlayPart> ALL = List.of(
-            RunOverlayPart.id("sdk.run").bar(SdkRunOverlay::bar).layer(SdkRunOverlay::layer));
+    public static final RunOverlayPart PART = RunOverlayPart.id("sdk.run").bar(SdkRunOverlay::bar)
+            .layer(SdkRunOverlay::layer);
 
     private static final Color FOUND = Color.web("#3fb950");
     private static final Color CLICK = Color.web("#f0883e");

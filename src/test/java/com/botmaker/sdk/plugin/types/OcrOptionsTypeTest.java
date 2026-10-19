@@ -1,31 +1,21 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code OcrOptions} as a declared type: its constructor gives every part back, a fresh one has no part the
- * host cannot write, and the chain a person writes by hand is read and never written.
+ * host cannot write, and the chain a person writes by hand is one call with a link per wither.
  */
 class OcrOptionsTypeTest {
-
-    private static ComponentType<OcrOptions> chain(String name) {
-        return SdkTypes.OCR_CHAINS.stream()
-                .filter(c -> c.factory().getName().equals(name)).findFirst().orElseThrow();
-    }
 
     @Test
     void theConstructorGivesEveryPartBack() {
@@ -43,39 +33,25 @@ class OcrOptionsTypeTest {
         for (Object part : SdkTypes.OCR_OPTIONS.components(fresh)) assertNotNull(part);
     }
 
-    @Test
-    void theChainBuildsWhatEachMethodDoes() {
-        OcrOptions base = OcrOptions.defaults();
-        assertEquals(OcrOptions.defaults(), chain("defaults").build(List.of()));
-        assertEquals(base.withUpscale(3.0), chain("withUpscale").build(List.of(base, 3.0)));
-        assertEquals(base.withLevel(TextResult.Level.LINE),
-                chain("withLevel").build(List.of(base, TextResult.Level.LINE)));
-        assertEquals(base.withLanguages("eng+kor"), chain("withLanguages").build(List.of(base, "eng+kor")));
-        assertEquals(base.withCharWhitelist("0123456789"),
-                chain("withCharWhitelist").build(List.of(base, "0123456789")));
-    }
-
     /**
-     * Every wither is an instance factory on the value itself, so the host reads it and never writes it; the
-     * one static call, {@code defaults()}, is not the type's writer either — {@link SdkTypes#OCR_OPTIONS} is.
+     * {@code defaults()} and one link per wither: a value taken apart and built back is itself, however many links
+     * it needs, and {@code defaults()} alone needs none.
      */
     @Test
-    void eachWitherIsAnInstanceFactoryThatGivesItsPartsBack() {
-        OcrOptions value = OcrOptions.defaults().withUpscale(2.5);
-        for (ComponentType<OcrOptions> each : SdkTypes.OCR_CHAINS) {
-            Method method = (Method) each.factory();
-            if (method.getName().equals("defaults")) continue;
-            assertFalse(Modifier.isStatic(method.getModifiers()), method::toString);
-            assertEquals(OcrOptions.class, each.componentTypes().getFirst());
-            assertEquals(value, each.build(each.components(value)), method::toString);
-        }
-        assertEquals(10, SdkTypes.OCR_CHAINS.size());
+    void theChainGivesEveryPartBack() {
+        DeclaredCall<OcrOptions> chain = SdkTypes.OCR_CHAIN;
+        assertEquals("defaults", chain.factory().getName());
+        assertEquals(9, chain.withers().size());
+        assertEquals(OcrOptions.defaults(), chain.build(chain.components(OcrOptions.defaults())));
+        OcrOptions value = OcrOptions.defaults().withLanguages("eng+kor").withUpscale(3.0)
+                .withLevel(TextResult.Level.LINE).withCharWhitelist("0123456789").withInvert(true);
+        assertEquals(value, chain.build(chain.components(value)));
     }
 
     @Test
     void thePluginDeclaresTheTypeAndListsTheChain() {
         SdkPlugin plugin = new SdkPlugin();
         assertTrue(plugin.types().contains(SdkTypes.OCR_OPTIONS));
-        assertTrue(plugin.componentTypes().containsAll(SdkTypes.OCR_CHAINS));
+        assertTrue(plugin.componentTypes().contains(SdkTypes.OCR_CHAIN));
     }
 }

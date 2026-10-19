@@ -21,6 +21,8 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import com.botmaker.sdk.plugin.types.SettingsTypes;
 
+import java.util.List;
+
 /**
  * The BotMaker SDK, as a Studio plugin.
  *
@@ -76,7 +78,7 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .editors(() -> SdkEditors.ALL)
                 .values(SdkValues.class)
                 .toolbar(() -> SdkToolbarItems.ALL)
-                .runOverlay(() -> SdkRunOverlay.ALL)
+                .runOverlay(() -> List.of(SdkRunOverlay.PART))
                 .overlay(() -> SdkOverlay.PART)
                 .assistant(() -> SdkAssist.and(MapReport.TOOLS))
                 .assistantGuide(SdkAssist.GUIDE)

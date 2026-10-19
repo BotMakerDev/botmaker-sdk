@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.text;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;
@@ -86,6 +87,7 @@ public final class Text {
      *
      * @return the last text match, never null
      */
+    @Fills(label = "Text found")
     public static TextMatch lastMatch() {
         TextMatch result = lastMatch.get();
         return result != null ? result : TextMatch.notFound();

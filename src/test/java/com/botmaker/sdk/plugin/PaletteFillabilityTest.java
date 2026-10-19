@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.catalog.FacadeEntry;
 import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.basics.BasicsPlugin;
 import com.botmaker.sdk.api.screens.Button;
@@ -63,6 +64,7 @@ class PaletteFillabilityTest {
         Set<Class<?>> declared = new HashSet<>();
         for (PluginType<?> t : new BasicsPlugin().types()) declared.add(t.type());
         for (PluginType<?> t : new SdkPlugin().types()) declared.add(t.type());
+        declared.addAll(filled());
 
         List<String> unfillable = new ArrayList<>();
         Set<String> excused = new HashSet<>();
@@ -97,6 +99,21 @@ class PaletteFillabilityTest {
         if (declared.contains(type) || PICKED_BY_AN_EDITOR.contains(type)) return true;
         if (type.isEnum()) return true;                                       // the host's constant dropdown
         return type.isInterface() && type.isAnnotationPresent(FunctionalInterface.class); // a lambda body
+    }
+
+    /** The classes the host declares off the SDK's {@code @Fills} methods, found as the host finds them. */
+    private static Set<Class<?>> filled() {
+        String classes = SdkPlugin.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        Set<Class<?>> filled = new HashSet<>();
+        try (ScanResult scan = new ClassGraph().overrideClasspath(classes).enableMethodInfo().enableAnnotationInfo()
+                .scan()) {
+            for (Class<?> owner : scan.getClassesWithMethodAnnotation(Fills.class).loadClasses()) {
+                for (Method method : owner.getDeclaredMethods()) {
+                    if (method.isAnnotationPresent(Fills.class)) filled.add(method.getReturnType());
+                }
+            }
+        }
+        return filled;
     }
 
     private static PaletteCatalog catalog() {

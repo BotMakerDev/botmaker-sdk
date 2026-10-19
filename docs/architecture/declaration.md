@@ -16,8 +16,8 @@
   - Flow edits are `FlowEdits`, which 🔀 Activity Flow's save also uses.
 - **A type is declared once, in `plugin/types/SdkTypes`**, as a contract `PluginType.value(X.class)` whose
   steps ask for the fresh value, the editor (`() -> X::editor`) and the Java (`writtenAs(Owner::factory,
-  X::part, …)`, `writtenAsRecord()`, `writtenAsEach`, `writtenAsConstant()`, or `filledBy(Vision::lastMatch)`
-  for a result nobody edits). A part never picked on its own is `ComponentType.part(X.class).writtenAs(…)`, a
+  X::part, …)`, `writtenAsRecord()`, `writtenAsEach` or `writtenAsConstant()`). A result nobody edits is
+  declared by the host: its method carries `@Fills(label = …)` (`Vision.lastMatch()`). A part never picked on its own is `ComponentType.part(X.class).writtenAs(…)`, a
   field of a holder `SdkPlugin` names; a `Flow` is five parts (`FlowTypes`), a `CaptureSource` six calls
   (`CaptureTypes`). The host takes each `public static final` field (or list field) in field order, which is the
   menu's order and the order two shapes of one class are tried. Adding a type is one constant and nothing else.
