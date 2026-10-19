@@ -464,9 +464,9 @@ public final class GameDialog {
 
     /** Makes {@code item} what this computer launches, remembers it, and says so. */
     private void choose(GameCatalog.Item item) {
-        // Remembered first: setting the target refreshes the toolbar, whose label reads the name from here.
-        RecentTargets.remember(services, new RecentTargets.Recent(item.spec(), item.name(), item.artwork()));
+        RecentTargets.Recent recent = new RecentTargets.Recent(item.spec(), item.name(), item.artwork());
         if (picked != null) {
+            RecentTargets.remember(services, recent);
             stage.close();
             picked.accept(item.spec());
             return;
@@ -476,6 +476,9 @@ public final class GameDialog {
             report(false, refused.get());
             return;
         }
+        // After the write: remembering is a settings change, which relabels the toolbar from the bot's new first
+        // launcher — remembered before, it read the old one (2026-10-19).
+        RecentTargets.remember(services, recent);
         refreshCurrent();
         markCurrent();
         report(true, "This computer now launches " + item.name() + ".");

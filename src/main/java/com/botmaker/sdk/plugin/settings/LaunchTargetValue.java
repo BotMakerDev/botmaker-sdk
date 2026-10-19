@@ -68,15 +68,16 @@ public final class LaunchTargetValue {
         if (opened.ctx().isEmpty()) return Optional.of(opened.refused());
         ValueContext ctx = opened.ctx().get();
         String clearing = spec == null || spec.isBlank() ? current(services) : null;
-        services.runs().set(OLD_RUN_PROPERTY, null);
-        List<String> next = new ArrayList<>(all(services));
+        if (services.runs().get(OLD_RUN_PROPERTY).isPresent()) services.runs().set(OLD_RUN_PROPERTY, null);
+        List<String> was = all(services);
+        List<String> next = new ArrayList<>(was);
         if (spec == null || spec.isBlank()) {
             next.remove(clearing);
         } else {
             next.remove(spec.trim());
             next.addFirst(spec.trim());
         }
-        if (next.equals(all(services))) return Optional.empty();
+        if (next.equals(was)) return Optional.empty();
         return ctx.write(next.stream().map(Launcher::of).toList());
     }
 }

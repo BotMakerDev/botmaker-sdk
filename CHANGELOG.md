@@ -90,6 +90,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   first; once it is written, the frame is that screen's and cutting starts on it, its marker first, so the cut form
   offers it. New screen from here… on a known screen does the same.
 
+### Fixed
+
+- **🎮 Game shows the game just picked.** The dialog remembered the pick before writing it, so the toolbar
+  relabelled from the old first launcher; it remembers after the write now, and a refused pick is not remembered.
+
 ## [1.5.0] — 2026-10-18
 
 ### Added
