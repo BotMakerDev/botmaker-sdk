@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **🎮 Game lists more launchers**: Bottles programs (`bottles:`), Steam's non-Steam shortcuts, and on Windows
+  the Start menu's apps and Store apps, Ubisoft Connect and Battle.net games (`url:`), and itch games. A bot lists
+  and launches each like any other game (`LaunchTarget.Bottles`, `LaunchTarget.Link`).
+
 ### Fixed
 
 - **A game a place can't start is greyed, with why** (`SessionBootstrap.placeRefusal`): the Runner's game choice

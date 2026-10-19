@@ -22,7 +22,9 @@ import com.botmaker.shared.launch.Launcher;
  *   heroic:&lt;appName&gt;
  *   faugus:&lt;gameId&gt;
  *   lutris:&lt;id&gt;
- *   desktop:&lt;desktop-entry id&gt;
+ *   bottles:&lt;bottle&gt;/&lt;program&gt;
+ *   desktop:&lt;desktop-entry id, or a Start menu AppUserModelID&gt;
+ *   url:&lt;a launcher's link&gt;
  *   cli:&lt;command line&gt;
  *   exe:&lt;path&gt;
  *   emu-app:&lt;package&gt;@&lt;instanceName&gt;
@@ -145,7 +147,9 @@ public sealed interface LaunchTarget {
             case HEROIC -> new Heroic(parsed.token());
             case FAUGUS -> new Faugus(parsed.token());
             case LUTRIS -> new Lutris(parsed.token());
+            case BOTTLES -> new Bottles(parsed.token());
             case DESKTOP -> new App(parsed.token());
+            case URL -> new Link(parsed.token());
             case CLI -> new Cli(parsed.token());
             case EXE -> new Exe(parsed.token());
             case EMULATOR_APP -> emulatorApp(parsed);
@@ -208,11 +212,30 @@ public sealed interface LaunchTarget {
         }
     }
 
-    /** An application from the desktop's menu, launched by its desktop-entry id the way the menu starts it. */
+    /** A program in a Bottles bottle, {@code <bottle>/<program>}, started with {@code bottles-cli run}. */
+    record Bottles(String bottleAndProgram) implements LaunchTarget {
+        @Override
+        public LaunchSpec launchSpec() {
+            return new LaunchSpec(LaunchKind.BOTTLES, bottleAndProgram);
+        }
+    }
+
+    /**
+     * An application from the desktop's menu, launched by its desktop-entry id the way the menu starts it; on
+     * Windows by its Start menu id.
+     */
     record App(String desktopId) implements LaunchTarget {
         @Override
         public LaunchSpec launchSpec() {
             return new LaunchSpec(LaunchKind.DESKTOP, desktopId);
+        }
+    }
+
+    /** A launcher's link ({@code uplay://launch/<id>/0}, {@code battlenet://<product>}), opened by its handler. */
+    record Link(String url) implements LaunchTarget {
+        @Override
+        public LaunchSpec launchSpec() {
+            return new LaunchSpec(LaunchKind.URL, url);
         }
     }
 
