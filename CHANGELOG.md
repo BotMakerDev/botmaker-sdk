@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A launcher open on the desktop is closed on request, and a run never falls back to it.** ▶ Launch, Launch and
+  pick and the assistant's private launch ask "Steam is open on your desktop: close it and launch?" and close it.
+  A bot run whose settings say a private display stops with the reason when the launcher is open, the display
+  doesn't come up or the game opens no window there, instead of starting the game on the desktop.
 - **A plugged-in phone shows up.** 🎯 Capture Source, 🎮 Game and the emulator picker start the adb server as they
   open, then list again: with no server running, a phone on a cable was simply missing. Capture Source has a
   Phones section, each phone saying where it stands ("Allow USB debugging on the phone", offline, not connected)

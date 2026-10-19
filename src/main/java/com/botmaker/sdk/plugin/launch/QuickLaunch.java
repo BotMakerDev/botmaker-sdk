@@ -10,6 +10,7 @@ import com.botmaker.session.VmOptions;
 import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
+import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
@@ -22,6 +23,7 @@ import com.botmaker.shared.launch.Launcher;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
+import javafx.stage.Window;
 
 import java.nio.file.Path;
 import java.util.Optional;
@@ -238,23 +240,29 @@ public final class QuickLaunch {
                             ? message + " Press ▶ Launch again." : message));
             return;
         }
-        Path resourcesDir = services.resourcesDir();
-        // The session is made at the bot's screen size, not a fixed 1280x720: gamescope's -w/-h *is* the screen
-        // the game inside sees, so another size caps the game's own resolution options at it — and makes the
-        // capture a scaled copy of what the pictures were cut from.
-        SessionBackends.DisplaySize size = ScreenSize.display(services);
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(resourcesDir);
-        launcher.start(
-                backend, spec,
-                size.width(),
-                size.height(),
-                // The hop is the caller's: BackgroundLauncher lives in botmaker-session, which has no JavaFX,
-                // so the outcome arrives on whichever thread produced it and this one touches a button.
-                (ok, message) -> Platform.runLater(() -> {
-                    button.setDisable(false);
-                    report.accept(ok, message);
-                    if (ok && launcher.session() != null) SessionHandoff.offer(services, launcher.session());
-                }));
+        Window owner = button.getScene() == null ? null : button.getScene().getWindow();
+        HostLauncherPrompt.clearThen(services, owner, spec, () -> {
+            Path resourcesDir = services.resourcesDir();
+            // The session is made at the bot's screen size, not a fixed 1280x720: gamescope's -w/-h *is* the
+            // screen the game inside sees, so another size caps the game's own resolution options at it — and
+            // makes the capture a scaled copy of what the pictures were cut from.
+            SessionBackends.DisplaySize size = ScreenSize.display(services);
+            BackgroundLauncher launcher = BackgroundLauncher.forProject(resourcesDir);
+            launcher.start(
+                    backend, spec,
+                    size.width(),
+                    size.height(),
+                    // The hop is the caller's: BackgroundLauncher lives in botmaker-session, which has no JavaFX,
+                    // so the outcome arrives on whichever thread produced it and this one touches a button.
+                    (ok, message) -> Platform.runLater(() -> {
+                        button.setDisable(false);
+                        report.accept(ok, message);
+                        if (ok && launcher.session() != null) SessionHandoff.offer(services, launcher.session());
+                    }));
+        }, (ok, why) -> {
+            button.setDisable(false);
+            report.accept(ok, why);
+        });
     }
 
     /**
@@ -269,20 +277,22 @@ public final class QuickLaunch {
             Platform.runLater(() -> done.accept(false, SessionBootstrap.missingBackend(backend)));
             return;
         }
-        SessionBackends.DisplaySize size = ScreenSize.display(services);
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
-        // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then. Counted
-        // here, as it is reported, since the session may be held by the time the FX thread reads it.
-        boolean[] first = {true};
-        launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
-            boolean progress = ok && first[0];
-            first[0] = false;
-            if (progress) return;
-            Platform.runLater(() -> {
-                PrivateSession session = launcher.session();
-                if (ok && session != null) SessionHandoff.offer(services, session);
-                done.accept(ok && session != null, message);
+        HostLauncherPrompt.clearThen(services, Modals.owner(services), spec, () -> {
+            SessionBackends.DisplaySize size = ScreenSize.display(services);
+            BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
+            // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then.
+            // Counted here, as it is reported, since the session may be held by the time the FX thread reads it.
+            boolean[] first = {true};
+            launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
+                boolean progress = ok && first[0];
+                first[0] = false;
+                if (progress) return;
+                Platform.runLater(() -> {
+                    PrivateSession session = launcher.session();
+                    if (ok && session != null) SessionHandoff.offer(services, session);
+                    done.accept(ok && session != null, message);
+                });
             });
-        });
+        }, done);
     }
 }

@@ -204,12 +204,14 @@ public final class SessionBootstrap {
     /**
      * If this bot is isolated, bring up its nested display (once), register it, and launch {@code spec} into it —
      * returning {@code true} so the caller skips its normal {@code :0} launch. Returns {@code false} when
-     * isolation isn't requested (caller runs its normal launch) <em>or</em> when bring-up fails (graceful
-     * fallback to {@code :0}). Idempotent: once a session is registered, later calls no-op and return {@code true}.
+     * isolation isn't requested, or the target has no command to give a display (an emulator app): the caller
+     * runs its normal launch. Idempotent: once a session is registered, later calls no-op and return {@code true}.
      *
-     * @throws IllegalStateException when the backend the game needs is not installed: the run stops with the
-     *                               command that installs it rather than putting the game on the desktop. For a
-     *                               game VM, when it can't be opened or the game can't be started in it
+     * @throws IllegalStateException when the game can't run in the private display — the backend isn't installed,
+     *                               its launcher is open on the desktop, the display didn't come up or the game
+     *                               opened no window there: the run stops with the reason rather than putting the
+     *                               game on the desktop. For a game VM, when it can't be opened or the game can't
+     *                               be started in it
      */
     public static boolean launchIsolated(LaunchSpec spec) {
         if (!isolationRequested() || spec == null) {
@@ -248,40 +250,45 @@ public final class SessionBootstrap {
         if (!verdict.isolatable()) {
             // Asked before anything is spawned: a target that cannot be confined would otherwise cost the full
             // window budget and then land on :0 anyway, with a guess as the explanation.
-            Debug.log("isolated launch declined — running on :0. " + verdict.reason());
-            return false;
+            if (verdict.blocker() == LaunchIsolation.Blocker.NO_CHILD_COMMAND) {
+                // Nothing to hand a display to (an emulator app runs over ADB): :0 is where it runs anyway.
+                Debug.log("isolated launch declined — running on :0. " + verdict.reason());
+                return false;
+            }
+            // The bot's settings say a private display: a game put on the user's desktop instead is the one wrong
+            // answer, so the run stops with what to do — close Steam, install the backend (2026-10-19).
+            throw new IllegalStateException(verdict.reason());
         }
         SessionBackend chosen = backend(spec);
         if (!SessionBackends.isAvailable(chosen)) {
             throw new IllegalStateException(missingBackend(chosen));
         }
+        // A failure stops the run with its reason, never a quiet second launch on the user's desktop: the settings
+        // say a private display, and a game on :0 takes the user's mouse (2026-10-19).
         PrivateSession session = null;
+        String failure;
         try {
             session = Sessions.startPrivate(options(spec));
             BotSession.set(session);
             session.launch(spec);
-            if (session.attached() == null) {
-                // Display came up but the game never mapped a window on :N — tear down and fall back to :0. What
-                // actually happened is read off the process table rather than guessed at, in the same words
-                // Studio uses (shared owns the wording).
-                Debug.log("isolated launch: no window appeared on the nested display — falling back "
-                    + "to :0. " + LaunchIsolation.noWindowDiagnosis(spec));
-                BotSession.clear();
-                session.close();
-                return false;
+            if (session.attached() != null) {
+                Debug.log("isolated: running " + spec.spec() + " on nested " + chosen + " display at "
+                    + size().describe());
+                return true;
             }
-            Debug.log("isolated: running " + spec.spec() + " on nested " + chosen + " display at "
-                + size().describe());
-            return true;
+            // Display came up but the game never mapped a window on :N. What actually happened is read off the
+            // process table rather than guessed at, in the same words Studio uses (shared owns the wording).
+            failure = spec.describe() + " opened no window in the private display. "
+                + LaunchIsolation.noWindowDiagnosis(spec);
         } catch (Exception e) {
-            String why = e.getMessage() == null ? e.toString() : e.getMessage();
-            Debug.log("isolated bring-up failed: " + why + " — falling back to :0");
-            BotSession.clear();
-            if (session != null) {
-                try { session.close(); } catch (Exception ignored) { /* best-effort teardown */ }
-            }
-            return false;
+            failure = "The private display for " + spec.describe() + " didn't come up: "
+                + (e.getMessage() == null ? e.toString() : e.getMessage());
         }
+        BotSession.clear();
+        if (session != null) {
+            try { session.close(); } catch (Exception ignored) { /* best-effort teardown */ }
+        }
+        throw new IllegalStateException(failure);
     }
 
     /**
