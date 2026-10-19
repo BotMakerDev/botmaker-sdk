@@ -74,7 +74,7 @@ public final class FxCall {
     /** The first frame outside this class, so a slow call says who asked for it. */
     private static String caller() {
         return StackWalker.getInstance().walk(frames -> frames
-                .filter(frame -> frame.getDeclaringClass() != FxCall.class)
+                .filter(frame -> !frame.getClassName().equals(FxCall.class.getName()))
                 .findFirst().map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":"
                         + frame.getLineNumber())
                 .orElse("?"));

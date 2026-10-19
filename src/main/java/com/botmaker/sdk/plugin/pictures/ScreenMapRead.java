@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * The bot's map read out of its {@code Screens} class: the one read the assistant's tools, 🗺 Screens, the
@@ -53,8 +54,19 @@ public final class ScreenMapRead {
             }
         }
         Diag.log("map read: " + screens.size() + " screens, " + inputs + " inputs in "
-                + (System.nanoTime() - start) / 1_000_000 + " ms");
+                + (System.nanoTime() - start) / 1_000_000 + " ms on " + Thread.currentThread().getName() + ", for "
+                + askedBy());
         return ScreenGraph.of(screens);
+    }
+
+    /** The three frames that asked for a read, outside this class: which view or tool reads the map so often. */
+    private static String askedBy() {
+        return StackWalker.getInstance().walk(frames -> frames
+                .filter(frame -> !frame.getClassName().equals(ScreenMapRead.class.getName()))
+                .limit(3)
+                .map(frame -> frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1) + "."
+                        + frame.getMethodName() + ":" + frame.getLineNumber())
+                .collect(Collectors.joining(" < ")));
     }
 
     /** {@code constant}'s setup as the bot's class writes it; empty when there is none the grammar reads. */
