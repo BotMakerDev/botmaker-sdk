@@ -101,8 +101,9 @@ final class BackgroundModeBox {
         // that it might be needed.
         Runnable offerToCloseLauncher = () -> {
             LaunchSpec configured = launcher.configuredTarget();
-            LaunchKind kind = configured == null ? null : configured.kind();
-            boolean blocked = kind != null && HostLauncherProbe.isRunning(kind);
+            // The launcher in the way, which for a Lutris game on the Steam runner is Steam.
+            LaunchKind kind = HostLauncherProbe.openLauncher(configured).orElse(null);
+            boolean blocked = kind != null;
             closeLauncher.setText(blocked ? "Close " + kind.productName() : "");
             closeLauncher.setUserData(blocked ? kind : null);
             closeLauncher.setVisible(blocked);

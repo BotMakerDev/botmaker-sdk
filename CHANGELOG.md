@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Fixed
+
+- **"Close it and launch" closes the launcher in the way**: for a Lutris game on the Steam runner that is Steam.
+
 ### Changed
 
 - **A launcher open on the desktop is closed on request, and a run never falls back to it.** ▶ Launch, Launch and

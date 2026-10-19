@@ -34,16 +34,18 @@ final class HostLauncherPrompt {
      */
     static void clearThen(StudioServices services, Window owner, LaunchSpec spec, Runnable proceed,
                           BiConsumer<Boolean, String> refused) {
-        LaunchKind kind = spec.kind();
-        if (!HostLauncherProbe.routesThroughDaemon(kind)) {
+        if (!HostLauncherProbe.routesThroughDaemon(spec.kind())) {
             proceed.run();
             return;
         }
-        Async.load("host-launcher-probe", () -> HostLauncherProbe.running(kind), open -> {
+        // The launcher that is open, which for a Lutris game on the Steam runner can be Steam. Off the FX thread:
+        // knowing the runner can start `lutris` to list its games.
+        Async.load("host-launcher-probe", () -> HostLauncherProbe.openLauncher(spec), open -> {
             if (open.isEmpty()) {
                 proceed.run();
                 return;
             }
+            LaunchKind kind = open.get();
             if (!ask(services, owner, kind)) {
                 refused.accept(false, "Not launched: " + kind.productName() + " stays open on your desktop. Close "
                         + "it, or launch on this desktop, to play.");
