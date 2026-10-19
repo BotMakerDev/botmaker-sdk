@@ -19,9 +19,13 @@ import com.botmaker.session.display.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.capture.ScreenCapture;
+import com.botmaker.sdk.plugin.emulator.ConnectPhone;
+import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.PhoneState;
+import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.launch.GameWindows;
 import com.botmaker.shared.launch.WindowIdentity;
@@ -45,6 +49,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
@@ -207,6 +212,7 @@ public final class SourcePicker {
         FlowPane monitors = category();
         FlowPane desktop = category();
         FlowPane emulators = category();
+        FlowPane phones = category();
         FlowPane vm = category();
         String vmName = VmChoice.current(services);
 
@@ -221,6 +227,7 @@ public final class SourcePicker {
                 sectionLabel("Desktop"), desktop,
                 sectionLabel("Monitors"), monitors,
                 sectionLabel("Emulators"), emulators,
+                sectionLabel("Phones"), phones,
                 sectionLabel("Windows"), windows);
 
         ScrollPane scroll = new ScrollPane(content);
@@ -234,11 +241,11 @@ public final class SourcePicker {
         Label regionLabel = new Label("Region of source (optional):");
         Styles.on(regionLabel, Styles.DIALOG_HINT);
         Button draw = new Button("Draw…");
-        draw.setTooltip(new javafx.scene.control.Tooltip(
+        draw.setTooltip(new Tooltip(
                 "Grab the selected source and drag the part of it the bot should read"));
         draw.setOnAction(e -> drawRegion());
         Button clear = new Button("Whole");
-        clear.setTooltip(new javafx.scene.control.Tooltip("Read all of the selected source"));
+        clear.setTooltip(new Tooltip("Read all of the selected source"));
         clear.setOnAction(e -> setRegion(null));
         HBox regionRow = new HBox(6, regionLabel, rx, ry, rw, rh, draw, clear);
         regionRow.setAlignment(Pos.CENTER_LEFT);
@@ -249,14 +256,15 @@ public final class SourcePicker {
             windows.getChildren().clear();
             loadWindows(windows);
             emulators.getChildren().clear();
-            loadEmulators(emulators);
+            phones.getChildren().clear();
+            loadEmulators(emulators, phones);
             if (vmName != null) {
                 vm.getChildren().clear();
                 loadVm(vm, vmName);
             }
         });
         Button launchAndPick = new Button("▶ Launch and pick…");
-        launchAndPick.setTooltip(new javafx.scene.control.Tooltip(
+        launchAndPick.setTooltip(new Tooltip(
                 "Start the game this computer launches and pick the window it opens"));
         launchAndPick.setOnAction(e -> LaunchAndPick.show(services, stage).ifPresent(outcome -> {
             switch (outcome) {
@@ -297,7 +305,9 @@ public final class SourcePicker {
 
         loadWindows(windows);
         loadDesktopAndScreens(desktop, monitors);
-        loadEmulators(emulators);
+        // A phone on a cable is listed only by an adb server: started first, on the same thread, so the list has it.
+        thumbs().submit(AdbTools::wake);
+        loadEmulators(emulators, phones);
         if (vmName != null) loadVm(vm, vmName);
 
         stage.showAndWait();
@@ -450,9 +460,10 @@ public final class SourcePicker {
     /**
      * One tile per configured emulator instance across every product, with a live ADB {@code screencap} when
      * the instance is running. A stopped instance still gets a tile: it can be chosen before it is booted,
-     * which is exactly what somebody setting a project up is doing.
+     * which is exactly what somebody setting a project up is doing. Phones go to {@code phonesInto}, each saying
+     * where it stands ({@link PhoneState}), then the way to connect one.
      */
-    private void loadEmulators(FlowPane into) {
+    private void loadEmulators(FlowPane into, FlowPane phonesInto) {
         thumbs().submit(() -> {
             EmulatorInstanceScanner.Scan scan;
             try {
@@ -460,9 +471,14 @@ public final class SourcePicker {
             } catch (Throwable noScan) {
                 scan = new EmulatorInstanceScanner.Scan(List.of(), List.of());
             }
-            List<EmulatorInstance> instances = scan.instances();
+            List<EmulatorInstance> instances = scan.instances().stream()
+                    .filter(i -> i.platformId() != PlatformId.PHYSICAL).toList();
+            List<EmulatorInstance> phones = scan.instances().stream()
+                    .filter(i -> i.platformId() == PlatformId.PHYSICAL).toList();
+            loadPhones(phonesInto, phones, scan.statuses());
             if (instances.isEmpty()) {
-                List<PlatformStatus> statuses = scan.statuses();
+                List<PlatformStatus> statuses = scan.statuses().stream()
+                        .filter(s -> s.platformId() != PlatformId.PHYSICAL).toList();
                 Platform.runLater(() -> into.getChildren().add(emptyEmulatorsHint(statuses)));
                 return;
             }
@@ -501,6 +517,57 @@ public final class SourcePicker {
         } catch (Throwable noHost) {
             return shot;
         }
+    }
+
+    /**
+     * One tile per phone, its line saying where it stands: one waiting on "Allow USB debugging?" can be picked
+     * already, since it is saved by its serial and read once allowed. Then ＋ Connect a phone…, which lists again.
+     * Thumbnail thread.
+     */
+    private void loadPhones(FlowPane into, List<EmulatorInstance> phones, List<PlatformStatus> statuses) {
+        List<PhoneState> states = phones.stream().map(PhoneState::of).toList();
+        List<Image> images = new ArrayList<>();
+        for (int i = 0; i < phones.size(); i++) {
+            images.add(states.get(i).online() ? toFx(emulatorThumbnail(phones.get(i))) : null);
+        }
+        String why = phones.isEmpty() ? statuses.stream().filter(s -> s.platformId() == PlatformId.PHYSICAL)
+                .map(PlatformStatus::statusLine).findFirst().orElse(null) : null;
+        // One replace, not adds: a Connect's list and a Refresh's can overlap, and each must leave one copy.
+        Platform.runLater(() -> {
+            List<Node> nodes = new ArrayList<>();
+            for (int i = 0; i < phones.size(); i++) {
+                EmulatorInstance phone = phones.get(i);
+                PhoneState state = states.get(i);
+                VBox tile = tile(phone.name(), state.displayName());
+                if (!state.advice().isEmpty()) Tooltip.install(tile, new Tooltip(state.advice()));
+                CaptureSource target = new EmulatorSource(phone.reference());
+                clickable(tile, target);
+                offer(tile, target);
+                setThumb(tile, images.get(i), state.online() ? "No preview" : "Not readable yet");
+                nodes.add(tile);
+            }
+            if (phones.isEmpty()) {
+                nodes.add(hint("No phone found: plug one in with USB debugging on, or connect one over Wi-Fi."
+                        + (why == null ? "" : " " + why)));
+            }
+            Button connect = new Button("＋ Connect a phone…");
+            connect.setOnAction(e -> {
+                ConnectPhone.show(services, stage);
+                if (stage == null || !stage.isShowing()) return;
+                thumbs().submit(() -> {
+                    EmulatorInstanceScanner.Scan scan;
+                    try {
+                        scan = new EmulatorInstanceScanner().scan();
+                    } catch (Throwable noScan) {
+                        scan = new EmulatorInstanceScanner.Scan(List.of(), List.of());
+                    }
+                    loadPhones(into, scan.instances().stream()
+                            .filter(i -> i.platformId() == PlatformId.PHYSICAL).toList(), scan.statuses());
+                });
+            });
+            nodes.add(connect);
+            into.getChildren().setAll(nodes);
+        });
     }
 
     /**

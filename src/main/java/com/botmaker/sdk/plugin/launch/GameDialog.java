@@ -283,6 +283,11 @@ public final class GameDialog {
                 for (Tile tile : own) stopped(tile, section.stopped() ? section.title() : null);
             }
             Node extra = null;
+            if (section.note() != null) {
+                Label note = Styles.on(new Label(section.note()), Styles.DIALOG_HINT);
+                note.setWrapText(true);
+                extra = note;
+            }
             if (section.kind() == GameCatalog.Kind.ANDROID) {
                 emulator = emulatorTile();
                 extra = emulator;

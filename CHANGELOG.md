@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **A plugged-in phone shows up.** 🎯 Capture Source, 🎮 Game and the emulator picker start the adb server as they
+  open, then list again: with no server running, a phone on a cable was simply missing. Capture Source has a
+  Phones section, each phone saying where it stands ("Allow USB debugging on the phone", offline, not connected)
+  with ＋ Connect a phone…; 🎮 Game lists a phone whose apps haven't been read yet, with what it waits on.
 - **The bot's games and the runner's pick are two parameters.** `Sdk.launchTargets` is the games the bot's author
   supports, shown in the Parameters window only; the new `Sdk.launchTarget` (`LaunchChoice`, `SdkValue.Id.LAUNCH_TARGET`)
   is the one the person running the bot picks in the Runner, among the author's games this computer's system can

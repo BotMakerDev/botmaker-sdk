@@ -1,8 +1,10 @@
 package com.botmaker.sdk.plugin.launch;
 
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.PhoneState;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.game.InstalledGame;
 import com.botmaker.shared.game.FaugusLibraryScanner;
@@ -107,7 +109,7 @@ class GameCatalogTest {
         cache.putIcon(ld, "com.supercell.clashofclans", icon);
 
         List<GameCatalog.Section> sections = GameCatalog.emulatorSections(List.of(ld, memu, mumu, waydroid), cache,
-                instance -> instance == mumu);
+                instance -> instance == mumu, instance -> PhoneState.UNKNOWN);
 
         assertEquals(List.of("LDPlayer: LDPlayer", "MuMu Player: Android Device"),
                 sections.stream().map(GameCatalog.Section::title).toList(),
@@ -122,6 +124,21 @@ class GameCatalogTest {
         assertTrue(ldSection.items().get(0).artwork() != null && Files.isRegularFile(ldSection.items().get(0).artwork()));
         assertEquals(null, ldSection.items().get(1).artwork());
         assertEquals(false, sections.get(1).stopped());
+    }
+
+    /** A phone whose apps were never read is still a section, saying what it waits on; an emulator's isn't. */
+    @Test
+    void aPhoneWithNoAppsSeenYetIsASectionWithItsNote(@TempDir Path root) {
+        EmulatorAppCache cache = new EmulatorAppCache(root);
+        EmulatorInstance phone = new EmulatorInstance(PlatformId.PHYSICAL, "R58M1", new AdbEndpoint.Server("R58M1"));
+        EmulatorInstance ld = new EmulatorInstance(PlatformId.LDPLAYER, "LDPlayer", "127.0.0.1", 5555);
+
+        List<GameCatalog.Section> sections = GameCatalog.emulatorSections(List.of(phone, ld), cache,
+                instance -> false, instance -> PhoneState.UNAUTHORIZED);
+
+        assertEquals(1, sections.size(), "an emulator with no apps seen stays out");
+        assertEquals(List.of(), sections.getFirst().items());
+        assertEquals(PhoneState.UNAUTHORIZED.advice(), sections.getFirst().note());
     }
 
     @Test

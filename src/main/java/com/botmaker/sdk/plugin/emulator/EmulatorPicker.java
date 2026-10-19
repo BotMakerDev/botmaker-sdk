@@ -7,7 +7,9 @@ import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.EmulatorReadiness;
 import com.botmaker.shared.emulator.EmulatorState;
+import com.botmaker.shared.emulator.PhoneState;
 import com.botmaker.shared.emulator.PlatformId;
+import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
@@ -147,7 +149,11 @@ public final class EmulatorPicker {
      */
     private static void populate(VBox rows, Dialog<Selection> dialog) {
         rows.getChildren().setAll(new Label("Scanning for emulators…"));
-        Async.load("emulator-picker-scan", () -> new EmulatorInstanceScanner().scan(), scan -> {
+        Async.load("emulator-picker-scan", () -> {
+            // A phone on a cable is listed only by an adb server: started before the scan, so the scan has it.
+            AdbTools.wake();
+            return new EmulatorInstanceScanner().scan();
+        }, scan -> {
             rows.getChildren().clear();
             if (scan.instances().isEmpty()) {
                 // No instances — show what each product's discovery actually saw so the user can tell
@@ -160,8 +166,7 @@ public final class EmulatorPicker {
                 // A product that is installed and listed nothing would otherwise be indistinguishable from one
                 // this picker can't see at all — which is how a machine with six emulators looked like it had one.
                 for (PlatformStatus s : scan.statuses()) {
-                    // Phones have their own way in, the button below.
-                    if (s.platformId() == PlatformId.PHYSICAL) continue;
+                    // A phone's line too: "no adb" is why a plugged-in phone isn't listed.
                     if ((s.installed() && s.instanceCount() == 0) || !s.ok()) {
                         Label line = new Label(s.statusLine());
                         line.getStyleClass().add("emulator-picker-state");
@@ -292,6 +297,7 @@ public final class EmulatorPicker {
     private static void probeAndLoad(EmulatorInstance instance, RowUi ui, Dialog<Selection> dialog) {
         Async.run("emulator-probe-" + instance.name(), () -> {
             EmulatorLiveness liveness = EmulatorLiveness.check(instance);
+            PhoneState phone = instance.platformId() == PlatformId.PHYSICAL ? PhoneState.of(instance) : null;
             boolean running = liveness.running();
             List<EmulatorProbe.InstalledApp> live = running ? EmulatorProbe.installedAppsDetailed(instance) : null;
             BufferedImage shot = running ? EmulatorProbe.screencap(instance) : null;
@@ -312,7 +318,11 @@ public final class EmulatorPicker {
                 ui.thumb().setImage(preview);
                 if (running && live != null) cacheApps(instance, live);
                 List<EmulatorProbe.InstalledApp> show = running && live != null ? live : cachedApps(instance);
-                renderApps(ui.apps(), instance, show, emptyNote(liveness, live), running && live != null, dialog);
+                // A phone says what it waits on: "stopped" reads as something to start, and a phone isn't started.
+                String note = phone != null && !phone.online() && !phone.advice().isEmpty()
+                        ? phone.advice() : emptyNote(liveness, live);
+                if (phone != null && !phone.online()) ui.state().setText(phone.displayName());
+                renderApps(ui.apps(), instance, show, note, running && live != null, dialog);
                 showAction(instance, ui, dialog, liveness.state() != EmulatorState.STOPPED);
             });
         }, null);

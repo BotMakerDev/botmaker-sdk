@@ -1,9 +1,11 @@
 package com.botmaker.sdk.plugin.launch;
 
+import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.PhoneState;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.game.DesktopEntryScanner;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -83,9 +86,14 @@ public final class GameCatalog {
 
     /**
      * One section; a {@code folded} one has its own radio in the dialog but is left out of All. A {@code stopped}
-     * one is an emulator instance that isn't running: picking one of its apps starts it first.
+     * one is an emulator instance that isn't running: picking one of its apps starts it first. A {@code note} is
+     * shown in place of tiles: a phone whose apps can't be read yet, and why; {@code null} for every other.
      */
-    public record Section(Kind kind, String title, boolean folded, boolean stopped, List<Item> items) {
+    public record Section(Kind kind, String title, boolean folded, boolean stopped, List<Item> items, String note) {
+
+        public Section(Kind kind, String title, boolean folded, boolean stopped, List<Item> items) {
+            this(kind, title, folded, stopped, items, null);
+        }
 
         public Section(Kind kind, String title, boolean folded, List<Item> items) {
             this(kind, title, folded, false, items);
@@ -120,9 +128,11 @@ public final class GameCatalog {
         launchers.sort(Comparator.comparing(s -> s.title().toLowerCase()));
 
         List<Section> sections = new ArrayList<>(launchers);
-        sections.addAll(emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running));
+        sections.addAll(emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running,
+                PhoneState::of));
         sections.addAll(menuSections(menu()));
-        List<Section> shown = sections.stream().filter(s -> !s.items().isEmpty() || s.kind() == Kind.ANDROID).toList();
+        List<Section> shown = sections.stream()
+                .filter(s -> !s.items().isEmpty() || s.note() != null || s.kind() == Kind.ANDROID).toList();
         // Every library whole, Heroic's copies of Epic games too: a bot may list a game under either launcher.
         List<Section> everything = new ArrayList<>(shown);
         for (int i = 0; i < providers.size(); i++) {
@@ -185,10 +195,13 @@ public final class GameCatalog {
     /**
      * One section per emulator instance, holding the apps last seen on it ({@link EmulatorAppCache}): under the
      * names the apps show, with their icons, whether the instance runs or not. Waydroid's are left out, since
-     * the app menu already lists them ({@link Kind#ANDROID}). Pure but for the cache, for the tests.
+     * the app menu already lists them ({@link Kind#ANDROID}). A phone with no apps seen yet is a section too, its
+     * note saying what it waits on ({@code phone}): a phone plugged in for the first time listed nothing at all
+     * (2026-10-19). Pure but for the cache, for the tests.
      */
     static List<Section> emulatorSections(List<EmulatorInstance> instances, EmulatorAppCache cache,
-                                          Predicate<EmulatorInstance> running) {
+                                          Predicate<EmulatorInstance> running,
+                                          Function<EmulatorInstance, PhoneState> phone) {
         List<Section> sections = new ArrayList<>();
         for (EmulatorInstance instance : instances) {
             if (instance.platformId() == PlatformId.WAYDROID) continue;
@@ -197,9 +210,15 @@ public final class GameCatalog {
                 String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, app.packageName() + "@" + instance.reference()).spec();
                 items.add(new Item(spec, app.display(), cache.iconPath(instance, app.packageName())));
             }
-            if (items.isEmpty()) continue;
+            String note = null;
+            if (items.isEmpty()) {
+                if (instance.platformId() != PlatformId.PHYSICAL) continue;
+                PhoneState state = phone.apply(instance);
+                note = state.online() ? "Its apps are read as this dialog opens: reopen it if none appear."
+                        : state.advice();
+            }
             sections.add(new Section(Kind.EMULATOR, instance.caption(), false, !running.test(instance),
-                    List.copyOf(items)));
+                    List.copyOf(items), note));
         }
         return sections;
     }
@@ -214,8 +233,9 @@ public final class GameCatalog {
         if (!REFRESHING.tryLock()) return false;
         try {
             EmulatorAppCache cache = EmulatorAppCache.shared();
-            boolean changed = false;
-            for (EmulatorInstance instance : emulators()) {
+            // A phone on a cable is listed only by an adb server: one started now lists it, so discovery runs again.
+            boolean changed = AdbTools.wake();
+            for (EmulatorInstance instance : changed ? Platforms.discoverAll() : emulators()) {
                 if (instance.platformId() == PlatformId.WAYDROID || !EmulatorLiveness.running(instance)) continue;
                 changed |= EmulatorProbe.refresh(instance, cache);
             }
@@ -234,7 +254,7 @@ public final class GameCatalog {
      */
     public static List<Section> withEmulatorsReread(List<Section> scanned) {
         return replaceEmulators(scanned,
-                emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running));
+                emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running, PhoneState::of));
     }
 
     /** {@code scanned} with {@code emulators} in place of its emulator sections, after the launchers. Pure. */
