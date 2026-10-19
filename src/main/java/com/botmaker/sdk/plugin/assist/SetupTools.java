@@ -302,7 +302,9 @@ final class SetupTools {
         for (EmulatorInstance instance : scan.instances()) {
             EmulatorLiveness liveness = EmulatorLiveness.check(instance, scan.instances());
             String problem = liveness.problem(instance);
-            lines.add("\"" + instance.name() + "\" — " + instance.brand() + ", " + liveness.label()
+            // A phone by its serial, which stays put, with the model it shows once USB debugging is allowed.
+            String named = instance.reference().equals(instance.name()) ? "" : " (" + instance.name() + ")";
+            lines.add("\"" + instance.reference() + "\"" + named + " — " + instance.brand() + ", " + liveness.label()
                     + (problem == null ? "" : " (" + problem + ")"));
         }
         return AgentReply.text(String.join("\n", lines));
@@ -311,10 +313,14 @@ final class SetupTools {
     static AgentReply useEmulator(UseEmulator use, AgentContext context) {
         if (use.name() == null || use.name().isBlank()) return AgentReply.refused("Name an emulator.");
         String name = use.name().trim();
-        List<String> names = new EmulatorInstanceScanner().instanceNames();
-        Optional<String> known = names.stream().filter(n -> n.equalsIgnoreCase(name)).findFirst();
+        List<EmulatorInstance> instances = new EmulatorInstanceScanner().scan().instances();
+        // Saved by its reference (a phone's serial), found by that or by the name it shows.
+        Optional<String> known = instances.stream()
+                .filter(i -> i.reference().equalsIgnoreCase(name) || i.name().equalsIgnoreCase(name))
+                .map(EmulatorInstance::reference).findFirst();
         if (known.isEmpty()) {
-            return AgentReply.refused("No emulator called \"" + name + "\"; there are " + names + ".");
+            return AgentReply.refused("No emulator called \"" + name + "\"; there are "
+                    + instances.stream().map(EmulatorInstance::reference).toList() + ".");
         }
         String app = use.app() == null || use.app().isBlank() ? null : use.app().trim();
         String target = app == null ? null : "emu-app:" + app + "@" + known.get();
@@ -514,9 +520,10 @@ final class SetupTools {
             if (pkg == null || !PACKAGE.matcher(pkg).matches()) {
                 return "\"" + pkg + "\" is not an app's package, like com.example.game.";
             }
-            // The name may hold spaces ("Pixel 7"), so it is held to the names the scan found, not to a pattern.
-            if (instance == null || new EmulatorInstanceScanner().instanceNames().stream()
-                    .noneMatch(instance::equals)) {
+            // The name may hold spaces ("Pixel 7"), so it is held to what the scan found, not to a pattern: a
+            // reference (a phone's serial) or a name.
+            if (instance == null || new EmulatorInstanceScanner().scan().instances().stream()
+                    .noneMatch(i -> instance.equals(i.reference()) || instance.equals(i.name()))) {
                 return "\"" + instance + "\" is not an emulator set up here; list_emulators names them.";
             }
             return null;

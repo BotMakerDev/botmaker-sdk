@@ -225,7 +225,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      */
     private static EditorFrame emulatorFrame(CaptureSource source, String label) {
         EmulatorInstance instance =
-                EmulatorInstances.byName(CaptureLabels.emulatorName(source)).orElse(null);
+                EmulatorInstances.find(CaptureLabels.emulatorName(source)).orElse(null);
         BufferedImage image = instance == null ? null : EmulatorProbe.screencap(instance);
         if (!usable(image)) return null;
         return new EditorFrame(image, label,

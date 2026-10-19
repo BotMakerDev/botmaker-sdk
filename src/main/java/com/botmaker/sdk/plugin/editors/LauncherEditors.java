@@ -13,6 +13,7 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -35,7 +36,8 @@ import java.util.Optional;
  *
  * <p>A {@code Launcher} is picked from every game on this computer (🎮 Game, {@link GameDialog#pick}); a
  * {@code LaunchChoice} only from the author's list, those whose system is another hidden and those this computer
- * lacks greyed (2026-10-19). Either hands the pick back as a value and writes nothing itself.
+ * lacks greyed (2026-10-19). Either hands the pick back as a value; a runner's pick of an emulator or phone app also
+ * points capture at its device ({@link CaptureValue#follow}).
  */
 public final class LauncherEditors {
 
@@ -115,7 +117,9 @@ public final class LauncherEditors {
             return;
         }
         pill.setText(choiceLabel(ctx.services(), spec));
-        row.getChildren().set(1, launchButton(ctx.services(), launches(ctx.services(), spec)));
+        String launched = launches(ctx.services(), spec);
+        row.getChildren().set(1, launchButton(ctx.services(), launched));
+        if (ctx.services() != null) CaptureValue.follow(ctx.services(), launched);
     }
 
     /** What a run here launches with {@code chosen} picked: it, or the first of the bot's games this system starts. */

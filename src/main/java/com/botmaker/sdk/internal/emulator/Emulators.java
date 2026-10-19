@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorInstances;
 import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.EmulatorLauncher;
@@ -104,7 +105,7 @@ public final class Emulators {
 
     /**
      * The running emulator whose instance name equals {@code name} (as shown in the emulator's multi-instance
-     * manager).
+     * manager), or the phone whose serial it is.
      *
      * @throws IllegalArgumentException if {@code name} is null/blank
      * @throws IllegalStateException    if no running instance with that name is found
@@ -116,7 +117,7 @@ public final class Emulators {
         String needle = name.trim();
         Debug.log("named '" + needle + "'");
         for (EmulatorInstance instance : Platforms.discoverAll()) {
-            if (needle.equals(instance.name())) {
+            if (needle.equals(instance.reference()) || needle.equals(instance.name())) {
                 var emu = tryConnect(instance);
                 if (emu.isPresent()) {
                     return emu.get();
@@ -183,18 +184,9 @@ public final class Emulators {
         }
     }
 
-    /** The first discovered instance whose name matches {@code name} (trimmed), or empty. */
+    /** The discovered instance {@code name} names (a phone's serial, else an instance name), or empty. */
     private static Optional<EmulatorInstance> findInstance(String name) {
-        if (name == null || name.isBlank()) {
-            return Optional.empty();
-        }
-        String needle = name.trim();
-        for (EmulatorInstance instance : Platforms.discoverAll()) {
-            if (needle.equals(instance.name())) {
-                return Optional.of(instance);
-            }
-        }
-        return Optional.empty();
+        return EmulatorInstances.find(name);
     }
 
     /** The first discovered instance whose ADB endpoint matches {@code host:port}, or empty. */

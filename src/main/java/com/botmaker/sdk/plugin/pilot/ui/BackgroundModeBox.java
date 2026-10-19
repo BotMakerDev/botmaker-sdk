@@ -221,7 +221,7 @@ final class BackgroundModeBox {
                 + "cursor stays free.");
         PilotWidgets.tone(status, Styles.OK_TEXT); // green — this target is isolated by construction
         Async.load("emulator-liveness",
-                () -> EmulatorInstances.byName(instance).map(EmulatorProbe::isRunning).orElse(false), up -> {
+                () -> EmulatorInstances.find(instance).map(EmulatorProbe::isRunning).orElse(false), up -> {
                     if (up) return;
                     status.setText("● " + instance + " isn't running — start it with ▶ Launch now (or the emulator "
                             + "picker). The pilot streams it over ADB as soon as it's up; no background mode needed.");

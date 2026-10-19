@@ -26,6 +26,7 @@ import javafx.scene.control.Tooltip;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * The "▶ Launch now" button: brings the project's configured {@code launch.target} up <em>without</em>
@@ -146,6 +147,25 @@ public final class QuickLaunch {
                     SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()));
             return;
         }
+        onDesktop(spec, services, report, launched -> button.setDisable(false));
+    }
+
+    /**
+     * Starts {@code spec} on this desktop whatever the settings say — 🎯 Capture Source's ▶ Launch and pick, where
+     * the user chose the place. {@code report} hears progress and how it ended, {@code ended} whether it launched,
+     * just before; FX thread.
+     */
+    public static void launchOnDesktop(LaunchSpec spec, StudioServices services, Report report,
+                                       Consumer<Boolean> ended) {
+        onDesktop(spec, services, report, ended);
+    }
+
+    /** As {@link #launchOnDesktop}, then in the game VM the bot's settings name. */
+    public static void launchInVm(LaunchSpec spec, StudioServices services, Report report, Consumer<Boolean> ended) {
+        inVm(spec, report, VmChoice.current(services), ended);
+    }
+
+    private static void onDesktop(LaunchSpec spec, StudioServices services, Report report, Consumer<Boolean> ended) {
         report.accept(true, "Launching " + spec.describe() + "…");
         // On this desktop: a run must not join a private display an earlier launch offered.
         SessionHandoff.offer(services, null);
@@ -161,10 +181,10 @@ public final class QuickLaunch {
             });
             return note[0];
         }, last -> {
-            button.setDisable(false);
+            ended.accept(true);
             report.accept(true, (last != null ? last : "Launched " + spec.describe() + ".") + offDesktopNote(spec));
         }, why -> {
-            button.setDisable(false);
+            ended.accept(false);
             report.accept(false, "Couldn't launch: " + why);
         });
     }
@@ -174,9 +194,13 @@ public final class QuickLaunch {
      * desktop, and disconnect. The game goes on running there for the bot's run to drive.
      */
     private static void launchInVm(Button button, LaunchSpec spec, Report report, String vmName) {
+        inVm(spec, report, vmName, launched -> button.setDisable(false));
+    }
+
+    private static void inVm(LaunchSpec spec, Report report, String vmName, Consumer<Boolean> ended) {
         Optional<String> refused = SessionBootstrap.vmRefusal(spec);
         if (refused.isPresent()) {
-            button.setDisable(false);
+            ended.accept(false);
             report.accept(false, refused.get());
             return;
         }
@@ -190,10 +214,10 @@ public final class QuickLaunch {
             }
             return name;
         }, name -> {
-            button.setDisable(false);
+            ended.accept(true);
             report.accept(true, "Launched " + spec.describe() + " in the game VM " + name + ".");
         }, why -> {
-            button.setDisable(false);
+            ended.accept(false);
             report.accept(false, "Couldn't launch: " + why);
         });
     }

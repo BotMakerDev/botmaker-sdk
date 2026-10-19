@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.plugin.params.ParamSlot;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
@@ -75,13 +76,16 @@ public final class LaunchTargetValue {
      * The author's pick: makes {@code spec} the bot's preferred launcher — first in its list, held once — or, for
      * {@code null}, takes the one this computer launches out of the list. A runner's pick of another launcher is
      * dropped, so this computer launches what was just picked. A bot lacking the parameter has it written first.
-     * Either way the run property a computer kept before is cleared.
+     * Either way the run property a computer kept before is cleared. An emulator or phone app this computer now
+     * launches points capture at its device too ({@link CaptureValue#follow}).
      *
      * @return empty when written, else why nothing was
      */
     public static Optional<String> set(StudioServices services, String spec) {
         if (spec == null || spec.isBlank()) return remove(services, current(services));
-        return write(services, InstalledGame.canonical(spec), true);
+        Optional<String> refused = write(services, InstalledGame.canonical(spec), true);
+        if (refused.isEmpty()) CaptureValue.follow(services, current(services));
+        return refused;
     }
 
     /**

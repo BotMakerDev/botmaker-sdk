@@ -195,7 +195,7 @@ public final class PilotRoutes implements AutoCloseable {
      * with one push attempt in front of it, retried at most every 30 seconds.
      */
     private static EmulatorSurface openAdbSurface(String name) {
-        EmulatorInstance instance = EmulatorInstances.byName(name).orElse(null);
+        EmulatorInstance instance = EmulatorInstances.find(name).orElse(null);
         return instance == null ? null : new ScrcpyEmulatorSurface(instance);
     }
 }

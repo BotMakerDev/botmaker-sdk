@@ -82,6 +82,9 @@ import java.util.concurrent.Executors;
  * <p>A tile stands for the source itself, handed to the host as a value and written into the bot's own Java
  * through {@code CaptureTypes}.
  *
+ * <p>▶ Launch and pick… starts the game and recommends the window it opens ({@link LaunchAndPick}): the way to a
+ * game's window that is not open yet.
+ *
  * <p>Every grab runs off the FX thread and every one of them is best-effort: a tile with no thumbnail is
  * still a tile the user can pick, because a window that refuses its pixels is still the window they mean.
  */
@@ -252,6 +255,20 @@ public final class SourcePicker {
                 loadVm(vm, vmName);
             }
         });
+        Button launchAndPick = new Button("▶ Launch and pick…");
+        launchAndPick.setTooltip(new javafx.scene.control.Tooltip(
+                "Start the game this computer launches and pick the window it opens"));
+        launchAndPick.setOnAction(e -> LaunchAndPick.show(services, stage).ifPresent(outcome -> {
+            switch (outcome) {
+                case LaunchAndPick.Outcome.Picked picked -> {
+                    setRegion(null);
+                    selected = new Selection.Concrete(picked.window());
+                    close();
+                }
+                // The game VM's windows are the guest's, listed in its own section.
+                case LaunchAndPick.Outcome.InVm inVm -> refresh.fire();
+            }
+        }));
         Button cancel = new Button("Cancel");
         cancel.setOnAction(e -> {
             selected = null;
@@ -266,7 +283,7 @@ public final class SourcePicker {
 
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox bar = new HBox(8, refresh, spacer, cancel, ok);
+        HBox bar = new HBox(8, refresh, launchAndPick, spacer, cancel, ok);
         bar.setAlignment(Pos.CENTER_LEFT);
         VBox footer = offersRegion ? new VBox(6, regionRow, regionNote, bar) : new VBox(bar);
         footer.setPadding(new Insets(10, 14, 12, 14));
@@ -455,7 +472,7 @@ public final class SourcePicker {
                 Image image = running ? toFx(emulatorThumbnail(instance)) : null;
                 Platform.runLater(() -> {
                     VBox tile = tile(name, running ? "Emulator · running" : "Emulator · stopped");
-                    CaptureSource target = new EmulatorSource(name);
+                    CaptureSource target = new EmulatorSource(instance.reference());
                     clickable(tile, target);
                     offer(tile, target);
                     setThumb(tile, image, running ? "No preview" : "Stopped");

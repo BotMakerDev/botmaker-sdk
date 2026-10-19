@@ -29,6 +29,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **🎮 Game no longer grows the list.** A pick goes first in `launchTargets` and is held once, however it was
   spelled; the dialog shows the bot's games as pills, each with a ✕ to remove it. Every tile carries its launcher's
   badge, and the header, the pills and the Runner say what launches it (`Hades II · Steam game 1145350`).
+- **Capture follows an emulator or phone app.** Picking an `emu-app:` game, in 🎮 Game, an emulator block or the
+  Runner, also points `Sdk.captureSource` at its device. Any other game's window is picked once it is up.
+- **🎯 Capture Source ▸ ▶ Launch and pick…** starts the game this computer launches, on this desktop, in a private
+  display or in the game VM, lists the windows it opens and recommends the game's: new, not the launcher's own
+  (Steam, Heroic), the biggest. A pick saves the window by its class, and its title only when the class is generic.
+- **A phone is saved by its serial.** Pickers write `CaptureSource.emulator("R58M…")` and `emu-app:<pkg>@R58M…` for
+  a phone instead of its model name, which the adb server reports only once USB debugging is allowed. A bot that
+  saved the name still finds the phone; an emulator is still saved by its name.
 
 - **`SdkValues` fields are typed by shape**: `ManagedMethod<Run> RUN`, `ManagedParam<Flow> FLOW`,
   `ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES`, `ManagedClasses<Screen> SCREEN_MAP` and so on, for contract

@@ -26,6 +26,11 @@ public final class EmulatorRef {
         return instance.name();
     }
 
+    /** What a bot's Java names this instance by: a phone's serial, any other instance's name. */
+    public String reference() {
+        return instance.reference();
+    }
+
     /** Where this instance's ADB is — {@code host:port}, or a device serial (whether or not it's up). */
     public String endpoint() {
         return instance.endpoint();

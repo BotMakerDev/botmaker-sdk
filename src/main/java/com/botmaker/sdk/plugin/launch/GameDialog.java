@@ -391,7 +391,7 @@ public final class GameDialog {
                 return;
             }
             String spec = new LaunchSpec(LaunchKind.EMULATOR_APP,
-                    chosen.appPackage() + "@" + chosen.instance().name()).spec();
+                    chosen.appPackage() + "@" + chosen.instance().reference()).spec();
             // The app's own name and icon when the picker has seen them, as its card in the instance's section has.
             EmulatorAppCache cache = EmulatorAppCache.shared();
             String name = cache.packages(chosen.instance()).stream()

@@ -7,9 +7,12 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.WindowIdentity;
 
 import java.util.List;
@@ -104,6 +107,29 @@ public final class CaptureValue {
                 .filter(w -> w.getTitle().trim().equalsIgnoreCase(title.trim()))
                 .map(WindowIdentity::of).filter(Objects::nonNull)
                 .findFirst().map(NamedWindow::of);
+    }
+
+    /**
+     * Points capture at the device a launch target runs on, when it is an emulator or phone app
+     * ({@code emu-app:<package>@<instance>}): there the target says where its pixels are. Any other target leaves
+     * capture alone — its window is picked once it is up (🎯 Capture Source's ▶ Launch and pick), never guessed
+     * (2026-10-19). Call it on the JavaFX application thread.
+     *
+     * @return the device's reference when capture now follows it, else empty
+     */
+    public static Optional<String> follow(StudioServices services, String target) {
+        LaunchSpec spec = target == null ? null : LaunchSpec.parse(target);
+        if (spec == null || spec.kind() != LaunchKind.EMULATOR_APP || spec.emulatorInstance() == null) {
+            return Optional.empty();
+        }
+        String instance = spec.emulatorInstance();
+        // Already that device, maybe narrowed to a region of it: kept as written.
+        CaptureSource now = current(services);
+        if (now != null && now.base() instanceof EmulatorSource already && already.instanceName().equals(instance)) {
+            return Optional.of(instance);
+        }
+        point(services, new EmulatorSource(instance));
+        return Optional.of(instance);
     }
 
     /**

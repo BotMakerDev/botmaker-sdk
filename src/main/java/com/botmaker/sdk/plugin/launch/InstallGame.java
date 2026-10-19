@@ -178,7 +178,7 @@ final class InstallGame {
 
     /** The game's card: on {@code instance}, named and pictured as its APK says. */
     private static GameCatalog.Item item(EmulatorInstall.Result result, EmulatorInstance instance) {
-        String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, result.packageName() + "@" + instance.name()).spec();
+        String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, result.packageName() + "@" + instance.reference()).spec();
         return new GameCatalog.Item(spec, result.name(),
                 EmulatorAppCache.shared().iconPath(instance, result.packageName()));
     }

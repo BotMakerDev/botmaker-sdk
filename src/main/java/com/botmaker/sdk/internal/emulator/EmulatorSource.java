@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -113,14 +114,17 @@ public final class EmulatorSource implements CaptureSource {
         return null;
     }
 
-    /** The discovered instance whose name matches, or empty. */
+    /**
+     * The discovered instance this source names, or empty: by its reference first — a phone's serial, which a
+     * picker writes since 2026-10-19 — then by name, which a phone that was saved before still matches.
+     */
     private Optional<EmulatorRef> findRef() {
         if (instanceName.isEmpty()) {
             return Optional.empty();
         }
-        return Emulators.listAll().stream()
-                .filter(ref -> instanceName.equals(ref.name()))
-                .findFirst();
+        List<EmulatorRef> all = Emulators.listAll();
+        return all.stream().filter(ref -> instanceName.equals(ref.reference())).findFirst()
+                .or(() -> all.stream().filter(ref -> instanceName.equals(ref.name())).findFirst());
     }
 
     @Override

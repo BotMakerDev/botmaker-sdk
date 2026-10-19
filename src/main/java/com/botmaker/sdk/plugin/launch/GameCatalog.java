@@ -194,7 +194,7 @@ public final class GameCatalog {
             if (instance.platformId() == PlatformId.WAYDROID) continue;
             List<Item> items = new ArrayList<>();
             for (EmulatorProbe.InstalledApp app : cache.packages(instance)) {
-                String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, app.packageName() + "@" + instance.name()).spec();
+                String spec = new LaunchSpec(LaunchKind.EMULATOR_APP, app.packageName() + "@" + instance.reference()).spec();
                 items.add(new Item(spec, app.display(), cache.iconPath(instance, app.packageName())));
             }
             if (items.isEmpty()) continue;

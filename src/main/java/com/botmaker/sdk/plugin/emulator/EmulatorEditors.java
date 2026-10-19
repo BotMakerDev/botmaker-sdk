@@ -4,9 +4,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Slots;
-import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
-import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.shared.emulator.EmulatorInstances;
 
 import javafx.scene.Node;
@@ -43,10 +41,11 @@ public final class EmulatorEditors {
         Button pill = Pills.button(label(ctx), null);
         pill.setOnAction(e ->
                 EmulatorPicker.show(ctx.services(), Modals.owner(ctx.services())).ifPresent(chosen -> {
-                    String name = chosen.instance().name();
+                    // A phone by its serial, which stays when its model name appears: EmulatorInstance.reference.
+                    String name = chosen.instance().reference();
                     if (name == null || name.isBlank()) return;
                     ctx.set(name);
-                    pill.setText(EmulatorInstances.captionFor(name));
+                    pill.setText(chosen.instance().caption());
                     if (chosen.hasApp()) pointProjectAtApp(ctx, name, chosen.appPackage());
                 }));
         return pill;
@@ -74,8 +73,8 @@ public final class EmulatorEditors {
      * would lose the edit as well as the wiring.
      *
      * <p><b>Both halves are the bot's Java.</b> What the bot <em>launches</em> becomes the first of its
-     * {@code launchTargets} ({@link LaunchTargetValue}); where it <em>looks</em> is its
-     * {@code Sdk.captureSource} parameter.
+     * {@code launchTargets} ({@link LaunchTargetValue}), which points its {@code Sdk.captureSource} parameter at
+     * the device as every emulator-app pick does.
      */
     private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
         Optional<String> refused = LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);
@@ -83,7 +82,6 @@ public final class EmulatorEditors {
             ctx.services().status(refused.get());
             return;
         }
-        CaptureValue.point(ctx.services(), new EmulatorSource(instanceName));
         ctx.services().status("This computer now launches " + appPackage + " on " + instanceName
                 + ", and the bot captures from " + instanceName + ".");
     }
