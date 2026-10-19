@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.shared.Diag;
 import javafx.application.Platform;
 
 import java.util.concurrent.CompletableFuture;
@@ -35,13 +36,18 @@ public final class FxCall {
         CompletableFuture<T> answer = new CompletableFuture<>();
         // PENDING until the FX thread takes it; the waiter may cancel only work that has not started.
         AtomicInteger state = new AtomicInteger(PENDING);
+        String caller = caller();
+        long queued = System.nanoTime();
         try {
             Platform.runLater(() -> {
                 if (!state.compareAndSet(PENDING, RUNNING)) return;
+                long started = System.nanoTime();
                 try {
                     answer.complete(work.get());
                 } catch (RuntimeException | Error e) {
                     answer.completeExceptionally(e);
+                } finally {
+                    reportIfSlow(caller, queued, started);
                 }
             });
         } catch (IllegalStateException noToolkit) {
@@ -60,6 +66,25 @@ public final class FxCall {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted. " + cancel(state));
         }
+    }
+
+    /** A call that holds the FX thread longer than this is named in the debug output. */
+    private static final long SLOW_MS = 50;
+
+    /** The first frame outside this class, so a slow call says who asked for it. */
+    private static String caller() {
+        return StackWalker.getInstance().walk(frames -> frames
+                .filter(frame -> frame.getDeclaringClass() != FxCall.class)
+                .findFirst().map(frame -> frame.getClassName() + "." + frame.getMethodName() + ":"
+                        + frame.getLineNumber())
+                .orElse("?"));
+    }
+
+    private static void reportIfSlow(String caller, long queued, long started) {
+        long ran = (System.nanoTime() - started) / 1_000_000;
+        if (ran < SLOW_MS) return;
+        Diag.log("FX thread held " + ran + " ms by " + caller + " (waited " + (started - queued) / 1_000_000
+                + " ms to start)");
     }
 
     private static final int PENDING = 0;
