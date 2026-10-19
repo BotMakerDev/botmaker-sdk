@@ -89,11 +89,16 @@ public @interface SdkValue {
         /** The activities a run switches off — the parameter {@code skip}, a set of activity classes. */
         SKIP,
         /**
-         * The launchers the bot can start its game from, preferred first — the {@code List<Launcher>} parameter
-         * {@code launchTargets} ({@code Launcher.of("steam:1145350")}). A run takes the first one its
-         * computer's system can launch.
+         * The launchers the bot supports, preferred first — the {@code List<Launcher>} parameter {@code launchTargets}
+         * ({@code Launcher.of("steam:1145350")}), which its author lists. A run takes {@link #LAUNCH_TARGET}'s pick
+         * when it is one of them, else the first one its computer's system can launch.
          */
         LAUNCH_TARGETS,
+        /**
+         * Which of {@link #LAUNCH_TARGETS} this run starts — the {@link LaunchChoice} parameter {@code launchTarget},
+         * picked by the person running the bot; {@code LaunchChoice.of("")} for the first one this computer can launch.
+         */
+        LAUNCH_TARGET,
         /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
         VM
     }

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -67,6 +68,34 @@ class InstalledGameTest {
         assertNull(InstalledGame.firstRunnable(List.of("lutris:3"), Os.MAC));
         assertEquals("steam:570", InstalledGame.firstRunnable(List.of("nonsense", "steam:570"), Os.LINUX),
                 "a spec that does not parse is passed over");
+    }
+
+    @Test
+    void theRunnersPickWinsWhenTheBotListsItAndTheSystemStartsIt() {
+        List<String> launchers = List.of("faugus:abc", "steam:570", "lutris:3");
+        assertEquals("steam:570", InstalledGame.pick(launchers, " steam: 570", Os.LINUX));
+        assertEquals("faugus:abc", InstalledGame.pick(launchers, "", Os.LINUX), "no pick: the first available");
+        assertEquals("faugus:abc", InstalledGame.pick(launchers, "epic:x", Os.LINUX),
+                "a pick the author no longer lists is none");
+        assertEquals("steam:570", InstalledGame.pick(launchers, "lutris:3", Os.WINDOWS),
+                "a pick this system cannot start is none");
+    }
+
+    @Test
+    void theRunnersPickIsReadByItsMark() {
+        InstalledGame.install(Picked.class);
+        assertEquals("steam:570", InstalledGame.launchChoice());
+        InstalledGame.install(Sdk.class);
+        assertEquals("", InstalledGame.launchChoice(), "a bot with no pick has none");
+    }
+
+    /** A bot whose runner picked a launcher. */
+    public static final class Picked {
+        @SdkValue(SdkValue.Id.LAUNCH_TARGETS)
+        public static List<Launcher> launchers = List.of(Launcher.of("faugus:abc"), Launcher.of("steam:570"));
+
+        @SdkValue(SdkValue.Id.LAUNCH_TARGET)
+        public static LaunchChoice launcher = LaunchChoice.of(" steam:570 ");
     }
 
     @Test

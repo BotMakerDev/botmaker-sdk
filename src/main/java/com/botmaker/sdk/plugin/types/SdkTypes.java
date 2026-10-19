@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -260,6 +261,17 @@ public final class SdkTypes {
             .editor(() -> LauncherEditors::launcher)
             .preview(() -> LauncherEditors::preview)
             .writtenAs(Launcher::of, Launcher::spec);
+
+    /**
+     * Which of the bot's launchers a run starts, {@code LaunchChoice.of("steam:570")}: drawn as a pill offering only
+     * the author's games this computer can start ({@link LauncherEditors#choice}). A fresh one picks none, so a
+     * run starts the first available.
+     */
+    public static final DeclaredCallType<LaunchChoice> LAUNCH_CHOICE = PluginType.value(LaunchChoice.class)
+            .fresh(() -> LaunchChoice.of(""))
+            .editor(() -> LauncherEditors::choice)
+            .preview(() -> LauncherEditors::choicePreview)
+            .writtenAs(LaunchChoice::of, LaunchChoice::spec);
 
     /**
      * One activity of the flow: the bot's {@code Activities.Collect} enum, which an editor holds by name

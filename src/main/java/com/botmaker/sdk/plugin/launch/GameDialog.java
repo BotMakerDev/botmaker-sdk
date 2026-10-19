@@ -61,8 +61,10 @@ import java.util.function.Consumer;
  * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
  * (Steam, Epic, Heroic, Faugus, Lutris, …), one per emulator instance (its apps by name, dimmed while it is
  * stopped), Waydroid's Android apps, the menu's games, and every other app,
- * which All leaves out. A pick becomes the first of the bot's {@code launchTargets} in {@code Sdk.java}
- * ({@link LaunchTargetValue}) and is remembered in {@link RecentTargets}.
+ * which All leaves out. A pick becomes the first of the games the bot supports — its {@code launchTargets} in
+ * {@code Sdk.java} ({@link LaunchTargetValue}), held once — and is remembered in {@link RecentTargets}. Above the grid
+ * those games stand as pills, each with a ✕ that removes it; the person running the bot picks among them in the
+ * Runner ({@code LaunchChoice}).
  *
  * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of
  * its entries, and the launcher already knows how to start it. The one thing it adds to a launcher is
@@ -107,8 +109,9 @@ public final class GameDialog {
     private List<GameCatalog.Section> lastScan;
     private final Label current = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
     private final Label status = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
+    /** The games the bot supports, each with its ✕; hidden when picking for an editor. */
+    private final FlowPane supported = new FlowPane(6, 6);
     private final Button launch;
-    private final Button clear = new Button("Clear");
     private Stage stage;
 
     /** One tile, kept for the search and for marking the current target. */
@@ -165,33 +168,20 @@ public final class GameDialog {
         Label hint = Styles.on(new Label(picked != null
                 ? "Pick it from what this computer's launchers already have — the pick goes into the launcher you "
                         + "are editing."
-                : "Pick it from what this computer's launchers already have — the pick becomes the bot's first "
-                        + "launcher in Sdk.java, and each computer starts the first one its system can. ▶ Launch game "
-                        + "starts it without running the bot."), Styles.DIALOG_HINT);
+                : "Pick it from what this computer's launchers already have — the pick becomes the bot's preferred "
+                        + "game in Sdk.java. The person running the bot picks among the games it supports in the "
+                        + "Runner. ▶ Launch game starts it without running the bot."), Styles.DIALOG_HINT);
         hint.setWrapText(true);
 
-        clear.setOnAction(e -> {
-            Optional<String> refused = LaunchTargetValue.set(services, null);
-            if (refused.isPresent()) {
-                report(false, refused.get());
-                return;
-            }
-            picks.selectToggle(null);
-            refreshCurrent();
-            markCurrent();
-            String next = LaunchTargetValue.current(services);
-            report(true, "That launcher is no longer one of the bot's"
-                    + (next == null ? "; this computer launches nothing now." : "; this computer now launches "
-                    + GameButton.nameOf(services, next) + "."));
-            onChanged.run();
-        });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox currentRow = new HBox(8, current, spacer, clear, launch);
+        HBox currentRow = new HBox(8, current, spacer, launch);
         currentRow.setAlignment(Pos.CENTER_LEFT);
-        // Picking for an editor: the bot's current launcher is not what is being chosen, and Clear would write it.
-        currentRow.setVisible(picked == null);
-        currentRow.setManaged(picked == null);
+        // Picking for an editor: the bot's games are not what is being chosen, and a ✕ would write them.
+        for (Node own : List.of(currentRow, supported)) {
+            own.setVisible(picked == null);
+            own.setManaged(picked == null);
+        }
 
         TextField search = new TextField();
         search.setPromptText("Search…");
@@ -250,7 +240,8 @@ public final class GameDialog {
         HBox closeRow = new HBox(close);
         closeRow.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox root = new VBox(10, heading, hint, currentRow, search, filters, scroll, bottom, status, closeRow);
+        VBox root = new VBox(10, heading, hint, currentRow, supported, search, filters, scroll, bottom, status,
+                closeRow);
         root.setPadding(new Insets(16));
         stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 760, 640, 520, 420), root);
         stage.setOnHidden(e -> active = null);
@@ -376,7 +367,9 @@ public final class GameDialog {
     private ToggleButton tile(GameCatalog.Item item) {
         ToggleButton button = Styles.on(new ToggleButton(), Styles.TILE);
         button.setToggleGroup(picks);
-        button.setGraphic(cover(item.name(), item.artwork(), initials(item.name())));
+        LaunchSpec spec = LaunchSpec.parse(item.spec());
+        button.setGraphic(cover(item.name(), item.artwork(), initials(item.name()),
+                spec == null ? null : spec.kind().displayName()));
         fixSize(button);
         button.setTooltip(new javafx.scene.control.Tooltip(item.name() + "\n" + LaunchSpec.describe(item.spec())));
         button.setOnAction(e -> {
@@ -390,7 +383,7 @@ public final class GameDialog {
     /** The Android section's way to every other emulator and a phone: the emulator picker. */
     private Node emulatorTile() {
         Button other = Styles.on(new Button(), Styles.TILE);
-        other.setGraphic(cover("Other emulator or phone…", null, "+"));
+        other.setGraphic(cover("Other emulator or phone…", null, "+", null));
         fixSize(other);
         other.setOnAction(e -> EmulatorPicker.show(services, stage).ifPresent(chosen -> {
             if (!chosen.hasApp()) {
@@ -420,8 +413,11 @@ public final class GameDialog {
         tile.setMaxSize(TILE_WIDTH, TILE_HEIGHT);
     }
 
-    /** {@code name}'s cover, or {@code mark} in its place when there is no picture. */
-    private static Node cover(String name, Path artwork, String mark) {
+    /**
+     * {@code name}'s cover, or {@code mark} in its place when there is no picture, with {@code launcher} — what starts
+     * it, {@code null} for none — as a badge in its corner, so one game in two launchers reads as two.
+     */
+    private static Node cover(String name, Path artwork, String mark, String launcher) {
         StackPane frame = new StackPane();
         frame.setPrefSize(COVER_WIDTH, COVER_HEIGHT);
         frame.setMinSize(COVER_WIDTH, COVER_HEIGHT);
@@ -437,6 +433,11 @@ public final class GameDialog {
             frame.getChildren().add(view);
         } else {
             frame.getChildren().add(Styles.on(new Label(mark), Styles.CAPTION_STRONG));
+        }
+        if (launcher != null) {
+            Label badge = Styles.on(new Label(launcher), Styles.CHIP);
+            StackPane.setAlignment(badge, Pos.BOTTOM_LEFT);
+            frame.getChildren().add(badge);
         }
         Label caption = Styles.on(new Label(name), Styles.TILE_NAME);
         caption.setWrapText(true);
@@ -479,18 +480,71 @@ public final class GameDialog {
         // After the write: remembering is a settings change, which relabels the toolbar from the bot's new first
         // launcher — remembered before, it read the old one (2026-10-19).
         RecentTargets.remember(services, recent);
-        refreshCurrent();
-        markCurrent();
-        report(true, "This computer now launches " + item.name() + ".");
-        onChanged.run();
+        changed("The bot now supports " + item.name() + " and prefers it; this computer launches it.");
     }
 
-    /** The header line, and the two buttons that act on the current target. */
+    /** The header line, the launch button, and the row of the bot's games. */
     private void refreshCurrent() {
         String spec = LaunchTargetValue.current(services);
-        current.setText(spec == null ? "Nothing picked yet." : "Launches: " + GameButton.nameOf(services, spec));
-        clear.setDisable(spec == null);
+        current.setText(spec == null ? "Nothing picked yet." : "Launches here: " + GameButton.caption(services, spec));
         QuickLaunch.bind(launch, services, this::report);
+        if (picked == null) refreshSupported(spec);
+    }
+
+    /**
+     * One pill per game the bot supports, preferred first: pressing it makes it the preferred one, its ✕ removes it.
+     * {@code now} — what this computer launches — is marked ▶; one this system cannot start says so.
+     */
+    private void refreshSupported(String now) {
+        List<String> games = LaunchTargetValue.all(services);
+        List<Node> pills = new ArrayList<>();
+        pills.add(Styles.on(new Label(games.isEmpty() ? "This bot supports no game yet: pick one below."
+                : "This bot supports:"), Styles.SMALL_TEXT, Styles.MUTED_TEXT));
+        Os os = Os.current();
+        for (String spec : games) {
+            LaunchSpec parsed = LaunchSpec.parse(spec);
+            boolean here = parsed != null && parsed.runsOn(os);
+            Button prefer = Styles.on(new Button((spec.equals(now) ? "▶ " : "") + GameButton.caption(services, spec)
+                    + (here ? "" : " (not on " + os.displayName() + ")")), Styles.PILL);
+            prefer.setTooltip(new javafx.scene.control.Tooltip("Make it the bot's preferred game"));
+            prefer.setOnAction(e -> prefer(spec));
+            Button drop = Styles.on(new Button("✕"), Styles.PILL);
+            drop.setTooltip(new javafx.scene.control.Tooltip("Remove it from the games this bot supports"));
+            drop.setOnAction(e -> drop(spec));
+            pills.add(new HBox(2, prefer, drop));
+        }
+        supported.getChildren().setAll(pills);
+    }
+
+    /** Makes {@code spec}, already one of the bot's games, the preferred one. */
+    private void prefer(String spec) {
+        Optional<String> refused = LaunchTargetValue.set(services, spec);
+        if (refused.isPresent()) {
+            report(false, refused.get());
+            return;
+        }
+        changed("The bot now prefers " + GameButton.nameOf(services, spec) + ".");
+    }
+
+    /** Takes {@code spec} out of the bot's games. */
+    private void drop(String spec) {
+        Optional<String> refused = LaunchTargetValue.remove(services, spec);
+        if (refused.isPresent()) {
+            report(false, refused.get());
+            return;
+        }
+        String next = LaunchTargetValue.current(services);
+        changed(GameButton.nameOf(services, spec) + " is no longer one of the bot's games"
+                + (next == null ? "; this computer launches nothing now." : "; this computer launches "
+                + GameButton.nameOf(services, next) + "."));
+    }
+
+    /** After a write: the header, the bot's games and the picked tile follow, and the status says {@code what}. */
+    private void changed(String what) {
+        refreshCurrent();
+        markCurrent();
+        report(true, what);
+        onChanged.run();
     }
 
     /** Selects the current target's tile, so reopening shows what is picked. */

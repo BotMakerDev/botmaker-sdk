@@ -17,6 +17,8 @@ import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 
@@ -40,6 +43,10 @@ import java.util.function.Predicate;
  * twice; an Epic game Heroic also lists is listed once, under Epic.
  */
 public final class GameCatalog {
+
+    /** The targets the last {@link #scan} listed, or {@code null} before one ran. */
+    private static volatile Set<String> listed;
+    private static final AtomicBoolean SCANNING = new AtomicBoolean();
 
     private GameCatalog() {}
 
@@ -115,7 +122,64 @@ public final class GameCatalog {
         List<Section> sections = new ArrayList<>(launchers);
         sections.addAll(emulatorSections(emulators(), EmulatorAppCache.shared(), EmulatorLiveness::running));
         sections.addAll(menuSections(menu()));
-        return sections.stream().filter(s -> !s.items().isEmpty() || s.kind() == Kind.ANDROID).toList();
+        List<Section> shown = sections.stream().filter(s -> !s.items().isEmpty() || s.kind() == Kind.ANDROID).toList();
+        // Every library whole, Heroic's copies of Epic games too: a bot may list a game under either launcher.
+        List<Section> everything = new ArrayList<>(shown);
+        for (int i = 0; i < providers.size(); i++) {
+            everything.add(new Section(Kind.LAUNCHER, "", false, items(providers.get(i), libraries.get(i))));
+        }
+        listed = listedIn(everything);
+        return shown;
+    }
+
+    /**
+     * Whether this computer has {@code spec}'s game, as the last {@link #scan} found it; empty before one ran. A
+     * program's path is looked for on disk and a command line is taken as there, since no library lists either.
+     */
+    public static Optional<Boolean> installed(String spec) {
+        return installed(spec, listed);
+    }
+
+    /**
+     * Starts one {@link #scan} on a thread of its own when none ran or runs, so {@link #installed(String)} can answer
+     * for a launcher's game: every Runner row asks, and a scan runs {@code lutris}.
+     */
+    public static void scanOnce() {
+        if (listed != null || !SCANNING.compareAndSet(false, true)) return;
+        Thread.ofVirtual().name("game-scan").start(() -> {
+            try {
+                scan();
+            } finally {
+                SCANNING.set(false);
+            }
+        });
+    }
+
+    /** {@link #installed(String)} against {@code listed}, the targets a scan listed ({@code null}: none ran). Pure but for a path. */
+    static Optional<Boolean> installed(String spec, Set<String> listed) {
+        LaunchSpec parsed = LaunchSpec.parse(spec);
+        if (parsed == null) return Optional.of(false);
+        if (parsed.kind() == LaunchKind.CLI) return Optional.of(true);
+        if (parsed.kind() == LaunchKind.EXE) {
+            try {
+                return Optional.of(Files.isRegularFile(Path.of(parsed.token())));
+            } catch (InvalidPathException notAPath) {
+                return Optional.of(false);
+            }
+        }
+        return listed == null ? Optional.empty() : Optional.of(listed.contains(parsed.spec()));
+    }
+
+    /** Every target {@code sections} list, as {@link LaunchSpec#spec()} writes it. */
+    static Set<String> listedIn(List<Section> sections) {
+        Set<String> out = new HashSet<>();
+        for (Section section : sections) {
+            for (Item item : section.items()) {
+                LaunchSpec parsed = LaunchSpec.parse(item.spec());
+                if (parsed != null) out.add(parsed.spec());
+            }
+        }
+        return Set.copyOf(out);
     }
 
     /**

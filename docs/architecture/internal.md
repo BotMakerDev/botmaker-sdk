@@ -6,8 +6,8 @@ launch, the emulator transport, OpenCV matching) lives in **shared**, where Stud
 - `internal/observe` — the observation stack and `IpcObserver`, the adapter from observer callbacks onto
   shared's telemetry wire (`shared.ipc.TelemetryClient`).
 - `internal/config/InstalledGame` — the game half of the bot's `Sdk` parameters, read by their marks off the
-  classes `Bot.runFlow` is handed: `launchTargets` (a run starts the first its system can launch) and `vm`; a
-  `-D` given by hand wins. Set from Studio through `plugin/settings/LaunchTargetValue` and `VmChoice`.
+  classes `Bot.runFlow` is handed: `launchTargets` (the author's list), `launchTarget` (the runner's pick among
+  them; a run starts it, else the first its system can launch) and `vm`; a `-D` given by hand wins. Set from Studio through `plugin/settings/LaunchTargetValue` and `VmChoice`.
 - `internal/ocr/{OcrEngine,OcrNative,OcrPreprocessor}` — the Tesseract stack behind `api.vision.Text`.
   `OcrNative` extracts the bundled `tessdata` and delegates the OpenCV load to shared's
   `OpenCvNative.ensureLoaded()`. **The Tess4J / lept4j / bytedeco pins move together** — a mismatch throws an

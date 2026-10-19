@@ -142,6 +142,20 @@ class GameCatalogTest {
         assertEquals(List.of(steam, android), GameCatalog.replaceEmulators(List.of(steam, oldLd, android), List.of()));
     }
 
+    @Test
+    void aGameIsHereWhenTheLastScanListedItOrItsProgramIsOnDisk(@TempDir Path dir) throws Exception {
+        List<GameCatalog.Section> scanned = List.of(new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Steam", false,
+                List.of(new GameCatalog.Item("steam:570", "Dota 2", null))));
+        java.util.Set<String> listed = GameCatalog.listedIn(scanned);
+        assertEquals(Optional.of(true), GameCatalog.installed(" steam: 570", listed));
+        assertEquals(Optional.of(false), GameCatalog.installed("lutris:3", listed));
+        assertEquals(Optional.empty(), GameCatalog.installed("lutris:3", null), "no scan yet: unknown");
+        Path exe = Files.createFile(dir.resolve("game.exe"));
+        assertEquals(Optional.of(true), GameCatalog.installed("exe:" + exe, null), "a program is looked for on disk");
+        assertEquals(Optional.of(false), GameCatalog.installed("exe:" + dir.resolve("gone.exe"), null));
+        assertEquals(Optional.of(false), GameCatalog.installed("nonsense", listed));
+    }
+
     private static List<String> specs(GameCatalog.Section section) {
         return section.items().stream().map(GameCatalog.Item::spec).toList();
     }

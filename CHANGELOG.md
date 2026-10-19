@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The bot's games and the runner's pick are two parameters.** `Sdk.launchTargets` is the games the bot's author
+  supports, shown in the Parameters window only; the new `Sdk.launchTarget` (`LaunchChoice`, `SdkValue.Id.LAUNCH_TARGET`)
+  is the one the person running the bot picks in the Runner, among the author's games this computer's system can
+  start, a game this computer lacks greyed "(not installed)". A run starts the pick, else the first available. A bot
+  without `launchTarget` has it written when Studio binds the SDK.
+- **🎮 Game no longer grows the list.** A pick goes first in `launchTargets` and is held once, however it was
+  spelled; the dialog shows the bot's games as pills, each with a ✕ to remove it. Every tile carries its launcher's
+  badge, and the header, the pills and the Runner say what launches it (`Hades II · Steam game 1145350`).
+
 - **`SdkValues` fields are typed by shape**: `ManagedMethod<Run> RUN`, `ManagedParam<Flow> FLOW`,
   `ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES`, `ManagedClasses<Screen> SCREEN_MAP` and so on, for contract
   0.11.0's sealed `ManagedValue`. `ACTIVITIES` is declared with `ofEnumGroups`. A bot sees no change.

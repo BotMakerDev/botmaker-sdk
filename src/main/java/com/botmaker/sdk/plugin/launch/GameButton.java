@@ -49,6 +49,16 @@ public final class GameButton {
                 .orElse(null);
     }
 
+    /**
+     * What {@code spec} is and where it launches from — {@code Hades II · Steam game 1145350} — so two games of one
+     * name, or one game in two launchers, read apart; the description alone when the name is no more than it.
+     */
+    public static String caption(StudioServices services, String spec) {
+        String name = nameOf(services, spec);
+        String describe = LaunchSpec.describe(spec);
+        return name.equals(describe) || describe.contains(name) ? describe : name + " · " + describe;
+    }
+
     /** What {@code spec} is called: the name it was picked under, else the spec's short label. */
     public static String nameOf(StudioServices services, String spec) {
         return RecentTargets.find(services, spec).map(RecentTargets.Recent::name)

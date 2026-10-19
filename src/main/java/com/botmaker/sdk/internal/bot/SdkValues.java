@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.SdkValue;
@@ -207,16 +208,28 @@ public final class SdkValues {
             + " game in 🎮 Game, in the Runner or in Project ▸ Parameters.";
 
     /**
-     * The launchers the bot can start its game from, preferred first — {@code public static List<Launcher>
-     * launchTargets}, each a launch spec ({@code Launcher.of("steam:1145350")}). The bot's author lists
-     * them; a run takes the first its computer's system can launch ({@code LaunchKind.runsOn}), so nothing about
-     * a platform is written. Empty: the bot starts no game, and is run against one already open.
+     * The launchers the bot supports, preferred first — {@code public static List<Launcher> launchTargets}, each a
+     * launch spec ({@code Launcher.of("steam:1145350")}). The bot's author lists them, so the Runner does not show
+     * it; a run takes {@link #LAUNCH_TARGET}'s pick, else the first its computer's system can launch
+     * ({@code LaunchKind.runsOn}), so nothing about a platform is written. Empty: the bot starts no game, and is run
+     * against one already open.
      */
     public static final ManagedParam<List<Launcher>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
             .in(HOLDER)
             .startsAs(SdkValues::noLaunchTargets)
-            .shown(GAME_CATEGORY, "The launchers this bot can start its game from, preferred first",
-                    Param.Visibility.PUBLIC)
+            .shown(GAME_CATEGORY, "The games this bot supports, preferred first", Param.Visibility.EDITOR)
+            .because("The SDK reads this parameter when the bot starts its game. Add or remove a game in 🎮 Game or"
+                    + " in Project ▸ Parameters.");
+
+    /**
+     * Which of {@link #LAUNCH_TARGETS} a run starts — {@code public static LaunchChoice launchTarget}, picked in the
+     * Runner by the person running the bot (2026-10-19: apart from the author's list, which a pick used to reorder
+     * and grow). None: the first this computer can launch.
+     */
+    public static final ManagedParam<LaunchChoice> LAUNCH_TARGET = ManagedValue.param(SdkValue.Id.LAUNCH_TARGET)
+            .in(HOLDER)
+            .startsAs(SdkValues::firstAvailable)
+            .shown(GAME_CATEGORY, "Which of the bot's games this computer launches", Param.Visibility.PUBLIC)
             .because(GAME_PARAM);
 
     /**
@@ -267,6 +280,11 @@ public final class SdkValues {
     /** {@link #LAUNCH_TARGETS}'s: no launcher until the game is picked. */
     private static List<Launcher> noLaunchTargets() {
         return List.of();
+    }
+
+    /** {@link #LAUNCH_TARGET}'s: no pick, so the first launcher this computer can launch. */
+    private static LaunchChoice firstAvailable() {
+        return LaunchChoice.of("");
     }
 
     /** {@link #CAPTURE}'s: the whole desktop until the game's window is picked. */
