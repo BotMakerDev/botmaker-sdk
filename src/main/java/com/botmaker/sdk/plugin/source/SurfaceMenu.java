@@ -67,7 +67,7 @@ public final class SurfaceMenu {
                     .ifPresent(c -> remember(services, new Surface(c.target(), false,
                             CaptureLabels.shortLabel(c.target())), onChosen))));
         }
-        entries.add(fixed(services, "Whole desktop", desktop()));
+        entries.add(fixed(services, CaptureLabels.WHOLE_DESKTOP, desktop()));
         return List.copyOf(entries);
     }
 
@@ -109,7 +109,7 @@ public final class SurfaceMenu {
     }
 
     private static Surface desktop() {
-        return new Surface(CaptureSource.desktop(), false, "Whole desktop");
+        return new Surface(CaptureSource.desktop(), false, CaptureLabels.WHOLE_DESKTOP);
     }
 
     private static Path key(StudioServices services) {

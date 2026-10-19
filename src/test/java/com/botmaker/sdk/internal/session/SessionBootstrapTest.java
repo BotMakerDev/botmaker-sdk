@@ -9,6 +9,7 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.RunState;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
+import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.tools.UserDirs;
 import com.botmaker.shared.vm.Tart;
@@ -19,6 +20,9 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -307,6 +311,38 @@ class SessionBootstrapTest {
         assertTrue(SessionBootstrap.runningInVm(game), "the guest can't tell: the VM is open");
         BotSession.clear();
         assertFalse(SessionBootstrap.runningInVm(game), "no VM opened yet");
+    }
+
+    @Test
+    void aPlaceIsRefusedByTheSystemAndWhatIsInstalledNeverByWhatIsOpen() {
+        LaunchSpec lutris = LaunchSpec.parse("lutris:8");
+        LaunchSpec steam = LaunchSpec.parse("steam:570");
+        Function<LaunchSpec, LaunchIsolation.Verdict> isolates = verdict(LaunchIsolation.Blocker.NONE);
+        BotSettings.Where desktop = BotSettings.Where.MY_DESKTOP;
+        BotSettings.Where display = BotSettings.Where.PRIVATE_DISPLAY;
+        BotSettings.Where vm = BotSettings.Where.VM;
+
+        assertTrue(SessionBootstrap.placeRefusal(lutris, desktop, Os.LINUX, false, isolates).isEmpty());
+        assertTrue(SessionBootstrap.placeRefusal(lutris, display, Os.LINUX, false, isolates).isEmpty());
+        assertTrue(SessionBootstrap.placeRefusal(lutris, vm, Os.LINUX, false, isolates).isPresent(), "no VM on Linux");
+        assertTrue(SessionBootstrap.placeRefusal(lutris, vm, Os.WINDOWS, true, isolates).isPresent(),
+                "a Windows VM can't start Lutris");
+        assertTrue(SessionBootstrap.placeRefusal(steam, vm, Os.WINDOWS, true, isolates).isEmpty());
+        assertTrue(SessionBootstrap.placeRefusal(steam, display, Os.WINDOWS, true, isolates).isPresent());
+        assertTrue(SessionBootstrap.placeRefusal(LaunchSpec.parse("epic:Fortnite"), display, Os.LINUX, false, isolates)
+                .isPresent(), "Epic's own launcher isn't Linux's");
+
+        assertEquals(Optional.of("not here"), SessionBootstrap.placeRefusal(steam, display, Os.LINUX, false,
+                verdict(LaunchIsolation.Blocker.NOT_INSTALLED)));
+        assertTrue(SessionBootstrap.placeRefusal(steam, display, Os.LINUX, false,
+                verdict(LaunchIsolation.Blocker.HOST_LAUNCHER_OPEN)).isEmpty(), "the launch offers to close it");
+        assertTrue(SessionBootstrap.placeRefusal(steam, display, Os.LINUX, false,
+                verdict(LaunchIsolation.Blocker.NO_CHILD_COMMAND)).isEmpty(), "a run puts it on :0");
+    }
+
+    private static Function<LaunchSpec, LaunchIsolation.Verdict> verdict(LaunchIsolation.Blocker blocker) {
+        return spec -> new LaunchIsolation.Verdict(blocker, List.of(),
+                blocker == LaunchIsolation.Blocker.NONE ? null : "not here");
     }
 
     @Test

@@ -38,6 +38,11 @@ import java.util.Objects;
  */
 public final class CaptureLabels {
 
+    /** The source that follows the project's own: {@link CurrentSource}. */
+    public static final String PROJECT_DEFAULT = "Project default";
+    /** Every monitor together: {@link CaptureSource#desktop()}. */
+    public static final String WHOLE_DESKTOP = "Whole desktop";
+
     private CaptureLabels() {}
 
     /**
@@ -51,7 +56,7 @@ public final class CaptureLabels {
     public static String longLabel(CaptureSource source) {
         CaptureSource whole = whole(source);
         String label;
-        if (whole instanceof CurrentSource) label = "Project default";
+        if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
             label = "Window: " + (blank(window.label()) ? "(none picked)" : window.label())
@@ -59,7 +64,7 @@ public final class CaptureLabels {
                     : " (" + window.windowClass() + ")");
         } else if (whole instanceof EmulatorSource emulator) {
             label = EmulatorInstances.captionFor(emulator.instanceName());
-        } else label = "Whole desktop (all monitors)";
+        } else label = WHOLE_DESKTOP + " (all monitors)";
         Rect region = region(source);
         return region == null ? label : "%s — region %d×%d at (%d, %d)"
                 .formatted(label, region.width(), region.height(), region.x(), region.y());
@@ -75,13 +80,13 @@ public final class CaptureLabels {
     public static String shortLabel(CaptureSource source) {
         CaptureSource whole = whole(source);
         String label;
-        if (whole instanceof CurrentSource) label = "Project default";
+        if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
             label = blank(window.label()) ? "Window" : window.label();
         } else if (whole instanceof EmulatorSource emulator) {
             label = blank(emulator.instanceName()) ? "Emulator" : emulator.instanceName();
-        } else label = "Whole desktop";
+        } else label = WHOLE_DESKTOP;
         return region(source) == null ? label : label + " (region)";
     }
 

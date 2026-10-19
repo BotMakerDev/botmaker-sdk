@@ -6,6 +6,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
@@ -29,6 +30,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -97,9 +99,9 @@ final class LaunchAndPick {
             RadioButton button = new RadioButton(placeName(place));
             button.setUserData(place);
             button.setToggleGroup(where);
-            Optional<String> unavailable = unavailable(place);
+            Optional<String> unavailable = unavailable(spec, place);
             button.setDisable(unavailable.isPresent());
-            unavailable.ifPresent(why -> button.setTooltip(new javafx.scene.control.Tooltip(why)));
+            unavailable.ifPresent(why -> button.setTooltip(new Tooltip(why)));
             if (place == preferred && unavailable.isEmpty()) button.setSelected(true);
             places.getChildren().add(button);
         }
@@ -153,16 +155,20 @@ final class LaunchAndPick {
         return null;
     }
 
-    /** Why the game cannot be started in {@code place} on this computer, or empty when it can. */
-    private Optional<String> unavailable(BotSettings.Where place) {
-        return switch (place) {
-            case MY_DESKTOP -> Optional.empty();
-            case PRIVATE_DISPLAY -> Os.current() == Os.LINUX ? Optional.empty()
-                    : Optional.of("A private display is Linux's: on " + Os.current().displayName() + " a game VM keeps "
-                    + "the game off your desktop");
-            case VM -> VmChoice.current(services) != null ? Optional.empty()
-                    : Optional.of("No game VM is set up for this bot: set one up in its settings");
-        };
+    /**
+     * Why {@code spec} cannot be started in {@code place} on this computer, or empty when it can: the system, what is
+     * installed ({@link SessionBootstrap#placeRefusal}), and for the game VM whether one is set up.
+     */
+    private Optional<String> unavailable(LaunchSpec spec, BotSettings.Where place) {
+        if (spec == null) return Optional.empty();
+        Optional<String> refused = SessionBootstrap.placeRefusal(spec, place);
+        if (refused.isPresent() || place != BotSettings.Where.VM) return refused;
+        try {
+            SessionBootstrap.vmName(VmChoice.current(services));
+            return Optional.empty();
+        } catch (RuntimeException noVm) {
+            return Optional.of(noVm.getMessage());
+        }
     }
 
     private static String placeName(BotSettings.Where place) {

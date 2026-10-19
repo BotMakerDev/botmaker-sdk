@@ -15,8 +15,9 @@ import com.botmaker.sdk.api.input.Mouse;
 import java.awt.image.BufferedImage;
 
 /**
- * <em>Where</em> the vision layer looks — exactly one of three things: a {@link #window(String, String) window}, a single
- * {@link #monitor(int) monitor}, or the whole {@link #desktop() desktop}. Every matcher
+ * <em>Where</em> the vision layer looks — exactly one of four things: a {@link #window(String, String) window}, a single
+ * {@link #monitor(int) monitor}, the whole {@link #desktop() desktop}, or an {@link #emulator(String) emulator or
+ * phone}'s screen, read over ADB. Every matcher
  * ({@code ImageFinder}/{@code ImageClicker}/{@code ImageWaiter}) takes a {@code CaptureSource} instead of a
  * loose screen rectangle, so a template is matched — and clicked — in the source's own coordinate space
  * (even off-screen or on a second monitor) without duplicating any matching logic: the matcher runs on
@@ -24,7 +25,7 @@ import java.awt.image.BufferedImage;
  * {@link #origin()}.
  *
  * <p>A search <em>region</em> is not a separate concept — it is a {@link Rect} <em>of</em> a source: narrow
- * any of the three with {@link #region(Rect)} to get a sub-source that only captures (and therefore only
+ * any of the four with {@link #region(Rect)} to get a sub-source that only captures (and therefore only
  * matches within) that rectangle. Regions compose, so
  * {@code CaptureSource.window("game.exe", "").region(topBar)} is itself just another {@code CaptureSource}.
  *

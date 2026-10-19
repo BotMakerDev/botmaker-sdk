@@ -364,7 +364,8 @@ public final class SourcePicker {
      */
     private void drawRegion() {
         if (!(selected instanceof Selection.Concrete concrete)) {
-            regionNote.setText("Choose a source tile first: \"Project default\" is not a surface to draw on.");
+            regionNote.setText("Choose a source tile first: \"" + CaptureLabels.PROJECT_DEFAULT
+                    + "\" is not a surface to draw on.");
             return;
         }
         regionNote.setText("Grabbing " + CaptureLabels.shortLabel(concrete.target()) + "…");
@@ -403,7 +404,7 @@ public final class SourcePicker {
     // --- tiles -------------------------------------------------------------------------------------------
 
     private VBox projectDefaultTile() {
-        VBox tile = tile("Project default", "Tracks the project's default capture target");
+        VBox tile = tile(CaptureLabels.PROJECT_DEFAULT, "Tracks the project's default capture target");
         select(tile, new Selection.ProjectDefault());
         tile.setOnMouseClicked(e -> {
             select(tile, new Selection.ProjectDefault());
@@ -424,7 +425,7 @@ public final class SourcePicker {
      * writes a bot that reads screen 2 on a machine where the two disagree. The thumbnail is cut from the grab with the same bounds the bot's monitor capture uses.
      */
     private void loadDesktopAndScreens(FlowPane desktopInto, FlowPane monitorsInto) {
-        VBox desktopTile = tile("Whole desktop", "All monitors combined");
+        VBox desktopTile = tile(CaptureLabels.WHOLE_DESKTOP, "All monitors combined");
         CaptureSource desktop = CaptureSource.desktop();
         clickable(desktopTile, desktop);
         // Preselected only when the project-default tile did not claim it — so this is the "add a source"

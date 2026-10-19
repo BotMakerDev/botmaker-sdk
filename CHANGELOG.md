@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **A game a place can't start is greyed, with why** (`SessionBootstrap.placeRefusal`): the Runner's game choice
+  greys the games the bot's "Run the game in" can't start ("can't run in the game VM" for Lutris on Windows), and
+  Launch and pick greys each place by the game, with the reason as its tooltip. It reads the system, the installed
+  programs and the VM's launch rules, never a launcher open now; `docs/display-pipeline.md` §2 has the matrix.
+- **An emulator source looks its instance up once per two seconds**: `EmulatorSource` asks a scan at most 2 s old
+  (`Platforms.recent`) instead of running every product's tools on each capture while the emulator boots, and
+  asks afresh before it launches one.
+- "Project default" and "Whole desktop" are named once (`CaptureLabels`), and `CaptureSource`'s javadoc names its
+  fourth surface, an emulator or phone.
 - **The game dialog opens on the last list it found**: `GameCatalog.scan` saves what it lists to
   `<cache>/games.json`, and the dialog shows it at once, then scans in the background. Only a game added, removed or
   renamed changes the grid; every other tile stays as it was. The Runner's "not installed" reads the saved list

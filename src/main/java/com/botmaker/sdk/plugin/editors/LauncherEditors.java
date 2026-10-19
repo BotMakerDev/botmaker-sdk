@@ -6,14 +6,17 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -35,8 +38,8 @@ import java.util.Optional;
  * starts that game without running the bot so its window can be picked as the capture source (2026-10-13).
  *
  * <p>A {@code Launcher} is picked from every game on this computer (🎮 Game, {@link GameDialog#pick}); a
- * {@code LaunchChoice} only from the author's list, those whose system is another hidden and those this computer
- * lacks greyed (2026-10-19). Either hands the pick back as a value; a runner's pick of an emulator or phone app also
+ * {@code LaunchChoice} only from the author's list, those whose system is another hidden, and those this computer
+ * lacks or the bot's "Run the game in" can't start greyed (2026-10-19). Either hands the pick back as a value; a runner's pick of an emulator or phone app also
  * points capture at its device ({@link CaptureValue#follow}).
  */
 public final class LauncherEditors {
@@ -83,15 +86,18 @@ public final class LauncherEditors {
             List<MenuItem> items = new ArrayList<>();
             items.add(Pills.item(FIRST_AVAILABLE, () -> choose(ctx, pill, row, "")));
             Os os = Os.current();
+            BotSettings.Where place = place(services);
             boolean any = false;
             for (String spec : LaunchTargetValue.all(services)) {
                 LaunchSpec parsed = LaunchSpec.parse(spec);
                 if (parsed == null || !parsed.runsOn(os)) continue;
                 any = true;
                 boolean missing = GameCatalog.installed(spec).map(has -> !has).orElse(false);
-                MenuItem item = Pills.item(label(services, spec) + (missing ? " (not installed)" : ""),
+                boolean refused = !missing && SessionBootstrap.placeRefusal(parsed, place).isPresent();
+                MenuItem item = Pills.item(label(services, spec) + (missing ? " (not installed)"
+                        : refused ? " (can't run in " + placeName(place) + ")" : ""),
                         () -> choose(ctx, pill, row, spec));
-                item.setDisable(missing);
+                item.setDisable(missing || refused);
                 items.add(item);
             }
             if (!any) {
@@ -102,6 +108,22 @@ public final class LauncherEditors {
             return items;
         });
         return row;
+    }
+
+    /** Where Studio's launches put the game for the bot's settings: what a run here asks of each game. */
+    private static BotSettings.Where place(StudioServices services) {
+        BotSettings settings = BotSettingsWindow.current(services);
+        return SessionBootstrap.wantsVm(settings) ? BotSettings.Where.VM
+                : SessionBootstrap.wantsPrivateDisplay(settings) ? BotSettings.Where.PRIVATE_DISPLAY
+                : BotSettings.Where.MY_DESKTOP;
+    }
+
+    private static String placeName(BotSettings.Where place) {
+        return switch (place) {
+            case PRIVATE_DISPLAY -> "a private display";
+            case VM -> "the game VM";
+            case MY_DESKTOP -> "this desktop";
+        };
     }
 
     /** The runner's pick beside a declared choice. */

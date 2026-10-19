@@ -71,6 +71,14 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   cannot be shown; each screen keeps one shot and rows only say "look X". Wanted: one shot per look, saved when
   Discovery cuts the look; a look picker on the card and the panel; rows, boxes and list strips filtered to the
   picked look. A button's looks already step with ◀ ▶ (`LookToggle`).
+- **A run whose saved window is missing re-matches by the launch's pids** (launch-target plan 2026-10-19, not
+  built): Launch and pick saves the window by class (+ title when generic); a run that launched the game and finds no
+  such window could pick the new window whose pid descends from the launch, and log it. Only `exe:`/`cli:` (and
+  Faugus) give real descendants; Steam and Lutris games are children of the client, so a pid says little there.
+- **A Mac's Linux game VM is judged as macOS** (`SessionBootstrap.vmRefusal` asks `GuestLaunch.macCommand` by the
+  host's system): ask the VM's `guestOs` and `linuxCommand` for a Linux guest.
+- **The Runner's "First available here" skips a game its place can't start** (`InstalledGame.pick` reads only the
+  system; the choice greys by `SessionBootstrap.placeRefusal`).
 
 ## Deliberately not planned
 

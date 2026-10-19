@@ -25,6 +25,7 @@ import com.botmaker.session.display.SessionBackends;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
@@ -153,6 +154,41 @@ public final class SessionBootstrap {
         return GuestLaunch.command(spec).isPresent() ? Optional.empty()
             : Optional.of("A game VM can't start " + spec.describe()
                 + ": it runs a Windows game by path, command, Steam or Epic." + OR_THE_DESKTOP);
+    }
+
+    /**
+     * Why {@code spec} can't start in {@code where} on this computer, or empty when it can: what the pickers grey a
+     * game or a place by, with the reason to show. Asks what this computer's system and installed programs allow,
+     * never what is open now (a launcher on the desktop is closed when the launch asks) nor which game VM is set up.
+     */
+    public static Optional<String> placeRefusal(LaunchSpec spec, BotSettings.Where where) {
+        return placeRefusal(spec, where, Os.current(), hasGameVms(Os.current()), LaunchIsolation::setupCheck);
+    }
+
+    /** {@link #placeRefusal(LaunchSpec, BotSettings.Where)} on {@code os}, with its probes given. Pure, for the tests. */
+    static Optional<String> placeRefusal(LaunchSpec spec, BotSettings.Where where, Os os, boolean gameVms,
+                                         Function<LaunchSpec, LaunchIsolation.Verdict> isolation) {
+        boolean runsHere = spec.runsOn(os);
+        return switch (where) {
+            case MY_DESKTOP -> runsHere ? Optional.empty()
+                : Optional.of(spec.describe() + " does not run on " + os.displayName() + ".");
+            case PRIVATE_DISPLAY -> {
+                if (os != Os.LINUX) {
+                    yield Optional.of("A private display is Linux's: on " + os.displayName()
+                        + " a game VM keeps the game off your desktop.");
+                }
+                if (!runsHere) yield Optional.of(spec.describe() + " does not run on " + os.displayName() + ".");
+                // As a run takes them (launchIsolated): nothing to hand a display to runs on :0, as it would anyway.
+                LaunchIsolation.Verdict verdict = isolation.apply(spec);
+                yield switch (verdict.blocker()) {
+                    case NONE, NO_CHILD_COMMAND, HOST_LAUNCHER_OPEN -> Optional.empty();
+                    case PORTAL_WOULD_ESCAPE, NOT_INSTALLED -> Optional.of(verdict.reason());
+                };
+            }
+            case VM -> gameVms ? vmRefusal(spec, os)
+                : Optional.of("A game VM is for Windows and a Mac: on " + os.displayName()
+                    + " a private display keeps the game off your desktop.");
+        };
     }
 
     /**
