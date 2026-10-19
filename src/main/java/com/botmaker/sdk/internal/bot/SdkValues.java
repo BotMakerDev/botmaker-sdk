@@ -32,8 +32,9 @@ import java.util.Set;
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
- * <p>Eighteen declarations, one per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
- * plugin lists {@link #ALL} as its {@code managedValues()}, its windows open each one through a toolkit
+ * <p>One declaration per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
+ * plugin names this class ({@code .values(SdkValues.class)}), so each {@code public static final} field is one of
+ * its {@code managedValues()}, in field order; its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
@@ -239,10 +240,6 @@ public final class SdkValues {
                     Param.Visibility.EDITOR)
             .when(SdkValues::vmApplies)
             .because(GAME_PARAM);
-
-    /** All eighteen, in the order the plugin declares them. */
-    public static final List<ManagedValue<?>> ALL = List.of(FLOWS, RUN, FLOW_LAYOUT, CAPTURE, SETTINGS, PICTURES,
-            TAGS, ACTIVITIES, ZONES, DIGITS, SCREEN_MAP, SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, VM);
 
     private static boolean claimed;
 

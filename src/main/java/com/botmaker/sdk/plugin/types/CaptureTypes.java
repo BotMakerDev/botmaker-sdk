@@ -13,7 +13,6 @@ import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
 
-import java.util.List;
 
 /**
  * The calls a {@link CaptureSource} is written as. The type itself is {@link SdkTypes#CAPTURE_SOURCE}, declared
@@ -25,6 +24,9 @@ import java.util.List;
  * {@code .emulator("n")} and {@code CaptureSource.region(source, rect)}. The host reads a
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
  * matching its class — which is what {@code writtenAsParts()} on the type says.
+ *
+ * <p>{@code SdkPlugin} names this class; the host tries the fields in their order: the six it writes, then the
+ * chained region, which it only reads.
  */
 public final class CaptureTypes {
 
@@ -81,11 +83,4 @@ public final class CaptureTypes {
     public static final DeclaredCall<RegionSource> REGION_CHAIN = ComponentType.part(RegionSource.class)
             .writtenAsMember(Ref.member(CaptureSource.class, "region", Rect.class),
                     RegionSource::parent, RegionSource::sub);
-
-    /**
-     * Every shape, in the order the host tries them: the six it writes, then the chained region, which it
-     * only reads.
-     */
-    public static final List<ComponentType<?>> ALL =
-            List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
 }

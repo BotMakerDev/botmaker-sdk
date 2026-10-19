@@ -50,6 +50,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **The plugin's types and managed values are named by their classes**: `.types(SdkTypes.class, FlowTypes.class,
+  ScreenTypes.class, CaptureTypes.class, SettingsTypes.class)` and `.values(SdkValues.class)`. `SdkTypes.ALL`,
+  `SdkTypes.PARTS`, `SdkValues.ALL` and each part holder's `ALL` are gone; a new type, shape or value is its
+  field. The type menu keeps its order; `managedValues()` now lists `CAPTURE` where it is declared, after
+  `LAUNCH_TARGETS`. Needs the contract's next release.
 - **🗺 Screens' live feed and the `Screens.java` tab no longer freeze Studio.** The map is read once and kept until
   the bot's code changes (a history step, a write, `Screens.java` changed on disk): a map of fifty screens took
   300–900 ms on the FX thread, and the feed read it every second, each card at each draw.

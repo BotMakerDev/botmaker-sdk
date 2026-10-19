@@ -1,9 +1,9 @@
 # Declaration
 
 - **`SdkPlugin` is one declaration** on the contract's `DeclaredPlugin`:
-  `StudioPlugin.id(ID).named(NAME).types(…).parts(…).editors(…).values(…).toolbar(…).runOverlay(…)
-  .overlay(…).assistant(…).trial(Bot::trial).recorded(…)`. The surfaces are suppliers, so constructing it links
-  nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and `javafx-controls`, the toolkit,
+  `StudioPlugin.id(ID).named(NAME).types(SdkTypes.class, FlowTypes.class, …).editors(…).values(SdkValues.class)
+  .toolbar(…).runOverlay(…).overlay(…).assistant(…).trial(Bot::trial).recorded(…)`. Types and values are named
+  by their holder classes, the rest are suppliers, so constructing it links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and `javafx-controls`, the toolkit,
   Javalin and ZXing are `optional` here). It adds only `projectClosing()`, which releases the Remote Pilot.
 - **The overlay editor's part is `plugin/overlay/SdkOverlay`.**
   - Targets come from the `ActivityBody` type.
@@ -17,9 +17,10 @@
 - **A type is declared once, in `plugin/types/SdkTypes`**, as a contract `PluginType.value(X.class)` whose
   steps ask for the fresh value, the editor (`() -> X::editor`) and the Java (`writtenAs(Owner::factory,
   X::part, …)`, `writtenAsRecord()`, `writtenAsEach`, `writtenAsConstant()`, or `filledBy(Vision::lastMatch)`
-  for a result nobody edits). A part never picked on its own is `ComponentType.part(X.class).writtenAs(…)` in
-  `SdkTypes.PARTS`; a `Flow` is five parts (`FlowTypes`), a `CaptureSource` six calls (`CaptureTypes`).
-  Adding a type is one constant there and nothing else.
+  for a result nobody edits). A part never picked on its own is `ComponentType.part(X.class).writtenAs(…)`, a
+  field of a holder `SdkPlugin` names; a `Flow` is five parts (`FlowTypes`), a `CaptureSource` six calls
+  (`CaptureTypes`). The host takes each `public static final` field (or list field) in field order, which is the
+  menu's order and the order two shapes of one class are tried. Adding a type is one constant and nothing else.
 - **Factories are method references, with two string exceptions that stay**:
   - `CaptureTypes`' `REGION` and `REGION_CHAIN` name `CaptureSource.region` through `Ref.member`, because the static
     `region(src, r)` and the instance `src.region(r)` share a name and an arity and javac cannot reference

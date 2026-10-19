@@ -14,8 +14,12 @@ import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
+import com.botmaker.sdk.plugin.types.CaptureTypes;
+import com.botmaker.sdk.plugin.types.FlowTypes;
 import com.botmaker.sdk.plugin.types.PictureAt;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
+import com.botmaker.sdk.plugin.types.SettingsTypes;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -51,7 +55,8 @@ public final class SdkPlugin extends DeclaredPlugin {
      * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}), its part of the run overlay
      * ({@link SdkRunOverlay}) and the picture under a recorded click ({@link PictureAt}).
      *
-     * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier.
+     * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier
+     * and the types and values are named by class, initialised only when the host asks.
      * {@code javafx-controls} is {@code optional} here, so the classpath a headless host resolves this plugin
      * onto — the CLI's {@code validate} and {@code run}, the registry's CI — does not have it, and a constructor
      * that touched a JavaFX type fails there with:
@@ -67,10 +72,9 @@ public final class SdkPlugin extends DeclaredPlugin {
      */
     public SdkPlugin() {
         super(StudioPlugin.id(ID).named(NAME)
-                .types(() -> SdkTypes.ALL)
-                .parts(() -> SdkTypes.PARTS)
+                .types(SdkTypes.class, FlowTypes.class, ScreenTypes.class, CaptureTypes.class, SettingsTypes.class)
                 .editors(() -> SdkEditors.ALL)
-                .values(() -> SdkValues.ALL)
+                .values(SdkValues.class)
                 .toolbar(() -> SdkToolbarItems.ALL)
                 .runOverlay(() -> SdkRunOverlay.ALL)
                 .overlay(() -> SdkOverlay.PART)

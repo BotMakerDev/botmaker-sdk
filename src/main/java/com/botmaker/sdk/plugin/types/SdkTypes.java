@@ -45,13 +45,17 @@ import com.botmaker.sdk.plugin.editors.TemplateEditors;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
- * The types the SDK declares ({@link #ALL}) and the calls inside its values that are not types of their own
- * ({@link #PARTS}): a picture and a group of them, how exactly to match one, how to read text, three geometry shapes, three
- * enums, a key combination and a key sequence, the capture source, and the vision results a bot holds but
- * nobody edits.
+ * The types the SDK declares and the calls inside its values that are not types of their own: a picture and a
+ * group of them, how exactly to match one, how to read text, three geometry shapes, three enums, a key
+ * combination and a key sequence, the capture source, and the vision results a bot holds but nobody edits.
+ *
+ * <p>{@code SdkPlugin} names this class and the other holders ({@code .types(SdkTypes.class, …)}); the host
+ * takes every {@code public static final} declaration, and every one in a list field, in field order. So the
+ * types are declared in the order a menu offers them: the vision types, the geometry ones, the input types,
+ * the capture source and the picture group, then the ones a bot holds but nobody edits. A host offers
+ * plugin-basics' types before them. Two shapes of one class are tried in field order too.
  *
  * <p>Each type is one {@link PluginType#value} declaration, whose steps ask in order for what a fresh one is,
  * how a person edits it and how its Java is written. A factory is a method reference and each part an
@@ -140,6 +144,16 @@ public final class SdkTypes {
             .writtenAsRecord();
 
     /**
+     * A game font's digits as pictures: {@code new DigitSet("src/main/resources/digits/gold")}, and {@code .in(…)}
+     * only when they were cut from a frame of another size than the bot's (2026-10-11).
+     */
+    public static final DeclaredCallType<DigitSet> DIGIT_SET = PluginType.value(DigitSet.class)
+            .fresh(() -> new DigitSet("src/main/resources/digits/digits"))
+            .editor(() -> OcrEditors::digits)
+            .writtenAs(DigitSet::new, DigitSet::folder)
+            .with(DigitSet::in, DigitSet::frame);
+
+    /**
      * A point on the screen. Its editor is handed this declaration, which is where the arity, the parts and
      * the way back from a row of numbers to a value come from — so "a Point has two numbers" is stated once,
      * by the record. The same holds for {@link #RECT} and {@link #SIZE}.
@@ -170,16 +184,6 @@ public final class SdkTypes {
             .editor(() -> GeometryEditors::zone)
             .writtenAs(Zone::new, Zone::x, Zone::y, Zone::width, Zone::height)
             .with(Zone::anchored, Zone::anchor);
-
-    /**
-     * A game font's digits as pictures: {@code new DigitSet("src/main/resources/digits/gold")}, and {@code .in(…)}
-     * only when they were cut from a frame of another size than the bot's (2026-10-11).
-     */
-    public static final DeclaredCallType<DigitSet> DIGIT_SET = PluginType.value(DigitSet.class)
-            .fresh(() -> new DigitSet("src/main/resources/digits/digits"))
-            .editor(() -> OcrEditors::digits)
-            .writtenAs(DigitSet::new, DigitSet::folder)
-            .with(DigitSet::in, DigitSet::frame);
 
     /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
     public static final PluginType<Key> KEY = PluginType.value(Key.class)
@@ -225,17 +229,6 @@ public final class SdkTypes {
             .writtenAsEach(KeySequence::of, KeySequence::steps);
 
     /**
-     * Several pictures, written {@code ImageTemplateGroup.of(a, b)}. A fresh one holds the placeholder
-     * picture, for the reason a fresh {@code ImageTemplate} is it: an empty group is a value the bot cannot
-     * match anything with. Drawn by the same picture row as a run of picture arguments.
-     */
-    public static final DeclaredCallType<ImageTemplateGroup> IMAGE_TEMPLATE_GROUP =
-            PluginType.value(ImageTemplateGroup.class)
-                    .fresh(() -> ImageTemplateGroup.of(placeholder()))
-                    .editor(() -> TemplateEditors::group)
-                    .writtenAsEach(ImageTemplateGroup::of, ImageTemplateGroup::templates);
-
-    /**
      * Where a bot reads pixels from. An interface, so it is written as whichever of {@link CaptureTypes}' calls
      * builds it. A fresh one is the ambient source, which keeps following the project's source when that
      * changes later; a concrete source would freeze the declaration into what was true when it was made.
@@ -248,6 +241,17 @@ public final class SdkTypes {
             .editor(() -> CaptureSourceEditors::source)
             .preview(() -> CaptureSourceEditors::preview)
             .writtenAsParts();
+
+    /**
+     * Several pictures, written {@code ImageTemplateGroup.of(a, b)}. A fresh one holds the placeholder
+     * picture, for the reason a fresh {@code ImageTemplate} is it: an empty group is a value the bot cannot
+     * match anything with. Drawn by the same picture row as a run of picture arguments.
+     */
+    public static final DeclaredCallType<ImageTemplateGroup> IMAGE_TEMPLATE_GROUP =
+            PluginType.value(ImageTemplateGroup.class)
+                    .fresh(() -> ImageTemplateGroup.of(placeholder()))
+                    .editor(() -> TemplateEditors::group)
+                    .writtenAsEach(ImageTemplateGroup::of, ImageTemplateGroup::templates);
 
     /**
      * One launcher the bot starts its game from, {@code Launcher.of("heroic:43d4…")}: drawn as a pill naming the
@@ -315,20 +319,6 @@ public final class SdkTypes {
             .shownAs(() -> ctx -> ResultEditors.pill(ctx, TextMatch.class));
 
     /**
-     * Every type, in the order a menu should offer them: the vision types, the geometry ones, the input
-     * types, the capture source and the picture group, then the ones a bot holds but nobody edits. A host
-     * offers plugin-basics' types before them, which puts the literals a bot mostly counts and labels with at
-     * the top of the list.
-     */
-    public static final List<PluginType<?>> ALL = List.of(
-            IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET,
-            POINT, RECT, SIZE, ZONE,
-            KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE,
-            CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER,
-            ACTIVITY, OUTCOME,
-            MATCH_RESULT, MATCHES, COLOR_MATCH, TEXT_MATCH);
-
-    /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person
      * writes on a named precision ({@code Precision.TIGHT.minArea(400)}), read as the value they build.
      * Instance factories, so the host never writes them: an edited precision is written as
@@ -360,15 +350,4 @@ public final class SdkTypes {
             ComponentType.part(OcrOptions.class)
                     .writtenAs(OcrOptions::withCharWhitelist, o -> o, OcrOptions::charWhitelist),
             ComponentType.part(OcrOptions.class).writtenAs(OcrOptions::withLevel, o -> o, OcrOptions::level));
-
-    /**
-     * The calls inside this plugin's values that are not types of their own: a flow's and a layout's shapes,
-     * the calls a capture source and the bot settings are written as, the precision and OCR withers, a held
-     * combo and a key sequence's step. None is picked on its own; the host reads each back so an editor is handed a
-     * value rather than a string.
-     */
-    public static final List<ComponentType<?>> PARTS = Stream.of(
-                    FlowTypes.ALL, ScreenTypes.ALL, CaptureTypes.ALL, SettingsTypes.ALL, PRECISION_WITHERS, OCR_CHAINS,
-                    List.of(COMBO_HELD, STEP, PICTURE_TAG))
-            .<ComponentType<?>>flatMap(List::stream).toList();
 }

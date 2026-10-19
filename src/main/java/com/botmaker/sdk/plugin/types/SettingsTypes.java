@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.sdk.api.bot.BotSettings;
 
-import java.util.List;
 
 /**
  * The call a {@code @SdkValue(SETTINGS)} value is written as: {@code BotSettings.defaults()} followed by a named
@@ -45,7 +44,4 @@ public final class SettingsTypes {
             .with(BotSettings::inputBackend, settings -> settings.runIn().inputBackend())
             .with(BotSettings::maxRetryAttempts, BotSettings::maxRetryAttempts)
             .flag(BotSettings::debugOff, settings -> !settings.debug());
-
-    /** Every call a settings value is written as. */
-    public static final List<ComponentType<?>> ALL = List.of(SETTINGS);
 }

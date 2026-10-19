@@ -5,12 +5,11 @@ import com.botmaker.plugin.api.catalog.MemberEntry;
 import com.botmaker.plugin.api.catalog.PaletteCatalog;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.value.PluginType;
-import com.botmaker.plugin.basics.values.BasicsTypes;
+import com.botmaker.plugin.basics.BasicsPlugin;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
-import com.botmaker.sdk.plugin.types.SdkTypes;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.junit.jupiter.api.Test;
@@ -62,8 +61,8 @@ class PaletteFillabilityTest {
     @Test
     void every_offered_parameter_can_be_filled() {
         Set<Class<?>> declared = new HashSet<>();
-        for (PluginType<?> t : BasicsTypes.ALL) declared.add(t.type());
-        for (PluginType<?> t : SdkTypes.ALL) declared.add(t.type());
+        for (PluginType<?> t : new BasicsPlugin().types()) declared.add(t.type());
+        for (PluginType<?> t : new SdkPlugin().types()) declared.add(t.type());
 
         List<String> unfillable = new ArrayList<>();
         Set<String> excused = new HashSet<>();

@@ -233,12 +233,6 @@ public final class ScreenTypes {
             .<ImageTemplate, Pick>writtenAs(Pick::until, Pick::look)
             .when(pick -> pick.mode() == Pick.Mode.UNTIL);
 
-    /** The screen map's shapes, which {@code SdkTypes.PARTS} hands the host. */
-    public static final List<ComponentType<?>> ALL = List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE,
-            BUTTON_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_SHAPE, STRIP_SHAPE, BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE,
-            SCROLL_SHAPE, SCROLL_DRAG_SHAPE,
-            PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE, PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE);
-
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
     public static BooleanSupplier condition(String source) {
         return source == null || source.isBlank() ? null : new NamedCondition(source);

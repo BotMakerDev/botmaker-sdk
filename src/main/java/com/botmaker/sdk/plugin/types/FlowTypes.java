@@ -275,13 +275,6 @@ public final class FlowTypes {
     public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
             .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
 
-    /**
-     * The flow's four records — a flow, a card and a wire each spelled more than one way, the activity's spelling
-     * first — the run and the layout's three, which is what {@code SdkPlugin.componentTypes()} hands the host.
-     */
-    public static final List<ComponentType<?>> ALL = List.of(FLOW_SHAPE, FLOW_FROM_SUBFLOW_SHAPE, STEP_SHAPE,
-            SUBFLOW_STEP_SHAPE, EDGE_SHAPE, EDGE_INTO_SUBFLOW_SHAPE, EDGE_OUT_OF_SUBFLOW_SHAPE,
-            EDGE_BETWEEN_SUBFLOWS_SHAPE, LIMITS_SHAPE, RUN_SHAPE, LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
 
 
     // ---- what an editor builds a flow with -------------------------------------------------------------

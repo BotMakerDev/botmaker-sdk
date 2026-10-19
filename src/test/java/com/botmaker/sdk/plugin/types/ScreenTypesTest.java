@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.plugin.SdkPlugin;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
@@ -207,6 +208,7 @@ class ScreenTypesTest {
 
     @Test
     void theMapsShapesAreHandedToTheHost() {
-        assertTrue(SdkTypes.PARTS.containsAll(ScreenTypes.ALL));
+        assertTrue(new SdkPlugin().componentTypes().containsAll(List.of(ScreenTypes.SETUP_SHAPE,
+                ScreenTypes.WAY_SHAPE, ScreenTypes.BUTTON_SHAPE, ScreenTypes.TREE_SHAPE, ScreenTypes.PICK_UNTIL_SHAPE)));
     }
 }
