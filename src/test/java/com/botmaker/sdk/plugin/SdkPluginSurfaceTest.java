@@ -1,6 +1,9 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.slot.SlotEditor;
+import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.plugin.api.source.ManagedOpenSet;
+import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
@@ -40,6 +43,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -143,31 +147,33 @@ class SdkPluginSurfaceTest {
         var flows = byId.get(SdkValue.Id.FLOWS);
         assertEquals(SdkValue.class.getName(), flows.marker());
         assertEquals("Flows", flows.holder());
-        assertTrue(flows.isOpenSet());
+        assertInstanceOf(ManagedOpenSet.OfConstants.class, flows);
         assertEquals(com.botmaker.sdk.api.flow.Flow.class, flows.type());
         var run = byId.get(SdkValue.Id.RUN);
         assertEquals("Sdk", run.holder());
         assertEquals(com.botmaker.sdk.api.flow.Run.class, run.type());
-        assertEquals(com.botmaker.sdk.api.flow.Run.NONE, run.initial());
+        assertEquals(com.botmaker.sdk.api.flow.Run.NONE, assertInstanceOf(ManagedMethod.class, run).initial());
         var layout = byId.get(SdkValue.Id.FLOW_LAYOUT);
         assertEquals("Sdk", layout.holder());
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.type());
-        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE, layout.initial());
+        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE,
+                assertInstanceOf(ManagedMethod.class, layout).initial());
         var capture = byId.get(SdkValue.Id.CAPTURE);
         assertEquals("Sdk", capture.holder());
         assertEquals(CaptureSource.class, capture.type());
-        assertEquals(CaptureSource.desktop().getClass(), capture.initial().getClass());
+        assertEquals(CaptureSource.desktop().getClass(),
+                assertInstanceOf(ManagedParam.class, capture).initial().getClass());
         var settings = byId.get(SdkValue.Id.SETTINGS);
         assertEquals(com.botmaker.sdk.api.bot.BotSettings.class, settings.type());
         var pictures = byId.get(SdkValue.Id.PICTURES);
         assertEquals("Pictures", pictures.holder());
-        assertTrue(pictures.isOpenSet());
+        assertInstanceOf(ManagedOpenSet.OfConstants.class, pictures);
         assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
-        assertNull(pictures.initial());
         assertEquals("Activities", byId.get(SdkValue.Id.ACTIVITIES).holder());
         assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.ACTIVITIES).type());
-        assertTrue(byId.get(SdkValue.Id.ACTIVITIES).isGrouped(), "one enum of outcomes per activity");
-        assertEquals("Collect", byId.get(SdkValue.Id.ACTIVITIES)
+        ManagedOpenSet.EnumGroups<?> activities = assertInstanceOf(ManagedOpenSet.EnumGroups.class,
+                byId.get(SdkValue.Id.ACTIVITIES), "one enum of outcomes per activity");
+        assertEquals("Collect", activities
                 .byGroup(com.botmaker.sdk.api.flow.Activity.class, "Collect").orElseThrow().name());
         assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());

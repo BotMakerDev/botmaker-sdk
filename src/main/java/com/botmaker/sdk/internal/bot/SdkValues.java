@@ -2,6 +2,10 @@ package com.botmaker.sdk.internal.bot;
 
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.params.Param;
+import com.botmaker.plugin.api.source.ManagedClasses;
+import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.plugin.api.source.ManagedOpenSet;
+import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.sdk.api.bot.BotSettings;
@@ -57,7 +61,7 @@ public final class SdkValues {
      * The flows — {@code static final Flow MAIN = Flow.of(…)}, one per way of playing. 🔀 Activity Flow draws one,
      * keeping its activities, wires and layout in step.
      */
-    public static final ManagedValue<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
+    public static final ManagedOpenSet.OfConstants<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
             .of(Flow.class)
             .referredToAs(BotConstants::flow)
             .in("Flows")
@@ -65,18 +69,18 @@ public final class SdkValues {
                     + " activities, the wires and the layout in step.");
 
     /** The game's home and setup — {@code Run.of().home(…)}. */
-    public static final ManagedValue<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
+    public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
             .in(HOLDER)
             .holds(Run.class, Run.NONE)
             .because("This says how the bot gets the game home and sets it up. Change them in 🔀 Activity Flow.");
 
-    public static final ManagedValue<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
+    public static final ManagedMethod<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
             .in(HOLDER)
             .holds(FlowLayout.class, FlowLayout.NONE)
             .because("These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps"
                     + " them in step with the activities' names.");
 
-    public static final ManagedValue<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
+    public static final ManagedMethod<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
             .in(HOLDER)
             .holds(BotSettings.class, BotSettings.DEFAULTS)
             .because("These are the bot's settings — delays, confidence, input and its private display. Change"
@@ -87,7 +91,7 @@ public final class SdkValues {
      * Pictures renames the file, the constant and every use of it together; the canvas can only rename the one
      * it is looking at, which would leave the bot calling a name that is gone.
      */
-    public static final ManagedValue<ImageTemplate> PICTURES = ManagedValue.openSet(SdkValue.Id.PICTURES)
+    public static final ManagedOpenSet.OfConstants<ImageTemplate> PICTURES = ManagedValue.openSet(SdkValue.Id.PICTURES)
             .of(ImageTemplate.class)
             .in(TemplateNames.CLASS_NAME)
             .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
@@ -98,7 +102,7 @@ public final class SdkValues {
      * in {@code .tags(List.of(Tags.UI))} (2026-10-14). A tag inside a picture is a reference to the constant, read by
      * name ({@link BotConstants#tag}), so two tags of one name in two spellings stay one constant.
      */
-    public static final ManagedValue<PictureTag> TAGS = ManagedValue.openSet(SdkValue.Id.TAGS)
+    public static final ManagedOpenSet.OfConstants<PictureTag> TAGS = ManagedValue.openSet(SdkValue.Id.TAGS)
             .of(PictureTag.class)
             .referredToAs(BotConstants::tag)
             .in("Tags")
@@ -111,8 +115,8 @@ public final class SdkValues {
      * 🔀 Activity Flow adds, renames and removes an enum with its card and a constant with its exit, together with
      * every step, wire, body and {@code ActivitySwitch} call naming them.
      */
-    public static final ManagedValue<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
-            .ofEnums(Outcome.class, BotConstants::outcome)
+    public static final ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
+            .ofEnumGroups(Outcome.class, BotConstants::outcome)
             .groupedAs(Activity.class, BotConstants::activity)
             .in("Activities")
             .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
@@ -123,7 +127,7 @@ public final class SdkValues {
      * {@code source.region(Zone)} places on the game as it shows. The assistant's {@code save_region} adds one, or
      * moves one it names again.
      */
-    public static final ManagedValue<Zone> ZONES = ManagedValue.openSet(SdkValue.Id.ZONES)
+    public static final ManagedOpenSet.OfConstants<Zone> ZONES = ManagedValue.openSet(SdkValue.Id.ZONES)
             .of(Zone.class)
             .in("Zones")
             .because("Zones.java holds the bot's named areas. Ask Claude to save_region an area again, under its"
@@ -134,7 +138,7 @@ public final class SdkValues {
      * a folder of {@code 0.png} to {@code 9.png} that {@code Text.readDigits} reads a number with. The assistant's
      * {@code save_digits} cuts the digits of a number on screen into it and adds the constant.
      */
-    public static final ManagedValue<DigitSet> DIGITS = ManagedValue.openSet(SdkValue.Id.DIGITS)
+    public static final ManagedOpenSet.OfConstants<DigitSet> DIGITS = ManagedValue.openSet(SdkValue.Id.DIGITS)
             .of(DigitSet.class)
             .in("Digits")
             .because("Digits.java holds the game fonts' digit pictures. Ask Claude to save_digits on a number the"
@@ -147,7 +151,7 @@ public final class SdkValues {
      * BotConstants#screen}, {@link BotConstants#input}), so one equal to another, or not filled in yet, is still its
      * own.
      */
-    public static final ManagedValue<Screen> SCREEN_MAP = ManagedValue.openSet(SdkValue.Id.SCREEN_MAP)
+    public static final ManagedClasses<Screen> SCREEN_MAP = ManagedValue.openSet(SdkValue.Id.SCREEN_MAP)
             .ofClasses(Screen.class)
             .fields(Input.class, BotConstants::input)
             .setup(Screen::setup)
@@ -162,7 +166,7 @@ public final class SdkValues {
      * is {@code 0×0}, which is no size: pictures are matched as they are, and a private display is made at the
      * session default.
      */
-    public static final ManagedValue<Size> SCREEN = ManagedValue.method(SdkValue.Id.SCREEN)
+    public static final ManagedMethod<Size> SCREEN = ManagedValue.method(SdkValue.Id.SCREEN)
             .in(HOLDER)
             .holds(Size.class, new Size(0, 0))
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
@@ -175,14 +179,14 @@ public final class SdkValues {
             + " Runner or in Project ▸ Parameters.";
 
     /** Which flow a run walks — {@code public static Flow flow}, read by {@code Bot.runFlow} by its mark. */
-    public static final ManagedValue<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
+    public static final ManagedParam<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
             .in(HOLDER)
             .startsAs(SdkValues::noFlow)
             .shown(RUN_CATEGORY, "Which flow the bot runs", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** Whether a run sets the game up first — {@code public static boolean doSetup}. */
-    public static final ManagedValue<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
+    public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
             .in(HOLDER)
             .startsAs(SdkValues::setUpFirst)
             .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
@@ -190,7 +194,7 @@ public final class SdkValues {
             .because(RUN_PARAM);
 
     /** The activities a run switches off — {@code public static Set<Class<? extends Outcome>> skip}. */
-    public static final ManagedValue<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
+    public static final ManagedParam<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
             .in(HOLDER)
             .startsAs(SdkValues::skipNothing)
             .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
@@ -208,7 +212,7 @@ public final class SdkValues {
      * them; a run takes the first its computer's system can launch ({@code LaunchKind.runsOn}), so nothing about
      * a platform is written. Empty: the bot starts no game, and is run against one already open.
      */
-    public static final ManagedValue<List<Launcher>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
+    public static final ManagedParam<List<Launcher>> LAUNCH_TARGETS = ManagedValue.param(SdkValue.Id.LAUNCH_TARGETS)
             .in(HOLDER)
             .startsAs(SdkValues::noLaunchTargets)
             .shown(GAME_CATEGORY, "The launchers this bot can start its game from, preferred first",
@@ -220,7 +224,7 @@ public final class SdkValues {
      * person running the bot picked it (2026-10-13: a parameter, so the Runner shows it). {@code Bot.runFlow} reads
      * it by its mark ({@code InstalledGame}).
      */
-    public static final ManagedValue<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
+    public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
             .in(HOLDER)
             .startsAs(SdkValues::wholeDesktop)
             .shown(GAME_CATEGORY, "The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
@@ -233,7 +237,7 @@ public final class SdkValues {
      * the game in a VM, on a system that has game VMs. So the bot's {@code main} never names it; the session reads
      * it by its mark.
      */
-    public static final ManagedValue<String> VM = ManagedValue.param(SdkValue.Id.VM)
+    public static final ManagedParam<String> VM = ManagedValue.param(SdkValue.Id.VM)
             .in(HOLDER)
             .startsAs(SdkValues::theOneVm)
             .shown(GAME_CATEGORY, "The game VM the game runs in; blank for the one VM there is",

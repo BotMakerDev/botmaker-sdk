@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`SdkValues` fields are typed by shape**: `ManagedMethod<Run> RUN`, `ManagedParam<Flow> FLOW`,
+  `ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES`, `ManagedClasses<Screen> SCREEN_MAP` and so on, for contract
+  0.11.0's sealed `ManagedValue`. `ACTIVITIES` is declared with `ofEnumGroups`. A bot sees no change.
 - **The vision results are declared by their methods.** `Vision.lastMatch()`, `Matches.none()`,
   `Vision.lastColorMatch()` and `Text.lastMatch()` carry `@Fills`, and the host draws the pill; `SdkTypes`'
   `MATCH_RESULT`, `MATCHES`, `COLOR_MATCH`, `TEXT_MATCH` and `ResultEditors` are gone. A bot sees no change.

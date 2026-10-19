@@ -17,9 +17,9 @@ import java.util.List;
  * instead of {@code Activities.Collect.class} and {@code Activities.Collect.WON} (2026-10-10).
  *
  * <p>The host reads each enum nested in the bot's {@code Activities} class as {@link #activity} of its name
- * ({@code ManagedValue.groupedAs}) and each of its constants as {@link #outcome} of the two names
- * ({@code ManagedValue.ofEnums}), and writes a value equal to one back as that class literal or constant. An
- * outcome carries its enum's name, so {@code Battle.NEXT} and {@code Collect.NEXT} stay two outcomes. A bot's own
+ * ({@code ManagedOpenSet.GroupStep.groupedAs}) and each of its constants as {@link #outcome} of the two names
+ * ({@code ManagedOpenSet.Steps.ofEnumGroups}), and writes a value equal to one back as that class literal or
+ * constant. An outcome carries its enum's name, so {@code Battle.NEXT} and {@code Collect.NEXT} stay two outcomes. A bot's own
  * constants never meet one at run time, where a flow holds the enums'.
  */
 public final class BotConstants {

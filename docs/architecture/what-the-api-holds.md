@@ -41,7 +41,7 @@
   across flows: exits, broken exits, which flows run which.
 - **An activity is its outcome enum (2026-10-10; constants since 2026-10-02, never strings).** The bot's
   `@SdkValue(ACTIVITIES) final class Activities` in `plugins/sdk/` nests one `enum Collect implements Outcome
-  { NEXT, NOTHING_LEFT }` per activity (`SdkValues.ACTIVITIES`, an `ofEnums` grouped open set); its constants
+  { NEXT, NOTHING_LEFT }` per activity (`SdkValues.ACTIVITIES`, an `ofEnumGroups` open set); its constants
   are the activity's exits. A body is `public static Activities.Collect body()`, so javac refuses another
   activity's outcome. `NEXT` is an ordinary constant the editor seeds and the user may rename or remove;
   `DISABLED` is internal to the walker. A label is the name as words (`internal.flow.Labels`, `NOTHING_LEFT` →
