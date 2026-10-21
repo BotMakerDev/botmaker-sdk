@@ -1,12 +1,12 @@
 # Screens
 
 The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.java` holds one
-`GameScreen` constant per screen. A run walks it to reach a screen; the assistant's Discovery tools and the
+`Screen` subclass and its constant per screen. A run walks it to reach a screen; the assistant's Discovery tools and the
 🗺 Screens window write it. What changed and why is in `CHANGELOG.md` (the Screens audit, 2026-10-15).
 
 ## The model (`api/screens`)
 
-- **`GameScreen`**: a name, `markers` (pictures that all show while the game shows it) and `absent` (pictures none of
+- **`Screen`**: its inputs are its fields, the rest is its `Setup`: a name, `markers` (pictures that all show while the game shows it) and `absent` (pictures none of
   which shows: what tells it from a screen showing the same markers; `internal/screens/Markers` is the one rule every
   reader tells a screen by, 2026-10-16), a `from` way (the tree), `alsoFrom`
   ways, a `back` input (null: a close button, then Escape), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
@@ -18,8 +18,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   reached otherwise), `info()` (only tells: tried last), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
   picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
   copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16).
-- **`ScreenList`** (`GameScreen.lists`): some of a screen's inputs in one list that scrolls or column whose slots
-  shift, named by their pictures and its `notches` — never by a rectangle (the user's call, 2026-10-16, after Home's
+- **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
+  shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
   (`Reach.band`: their places, grown by the largest).
 - **`Way`**: a parent and the input that opens the screen. Its input is a bare copy; `ScreenGraph.via` reads the
@@ -100,7 +100,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done. A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
-  `ScreenList.SCROLLS` each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
+  its `Scroll.most` times each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a
   scroll after which every member that shows sits where it was (`Reach.still`, 4 px) met the end and turns back once.
   A walk plans with a list member that comes and goes, out of view, only when no other way is open.

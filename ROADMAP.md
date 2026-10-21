@@ -63,10 +63,26 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     machines", the tab `FAVORED_WAR_MACHINES_2`); Studio's rename refuses `Screens.java`.
   - A crop call that sets a marker and notes inputs on a new screen leaves the inputs unchecked ("no marker
     yet"): check them after the marker is written.
-- **Chores on the map** (the user's proposals, 2026-10-16, a later plan): `Navigate.press(screen, input)` does a
-  chore by the map (the list scroll, which copy, popups closed, where it leads), so a body stops chaining picture
-  clicks; and a first draft of a body generated from the map (`Navigate.to`, then one loop per chore, its disabled
-  look the stop), which the author orders and adds choices to.
+- **Activities coupled to the map** (Screens audit 2026-10-22, §6c of `~/.claude/plans/make-an-audit-of-functional-fern.md`;
+  a spec first, by brainstorming): an activity declares its screen (`Flow.activity(..).on(Screens.TAVERN)`), so 🗺
+  lights an activity's screens and the picture picker offers its chores; 🗺 and Live get *Record into <activity>*,
+  each press or Try appended to the body as a `Navigate.press(..)` line (a new host capability: insert a statement
+  in a method, `/contract-change`). The body stays Java; logic as a managed `Chores` value was weighed and set aside
+  for now (a second language, against "bodies are Java on map calls").
+- **Screens audit gaps (2026-10-22)**, each its own plan:
+  - Gestures on existing inputs: a `Button`'s click kind (double, right, hold, hover), `Hotkey` of a `Combo` or
+    sequence; `Mouse`/`Keyboard` already do them, `Reach.perform` does only a left click and one key.
+  - New inputs: a text `Field` (picture + text from a `@Param`, then Enter) and a `Drag` (picture → picture or zone).
+  - Text as a marker and as a button (OCR), for text-heavy or localized apps.
+  - Relative places: a `Pick` or `Way` by another input (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
+    `between`), in the other's size as the tree's `Beside`; rows matched by content; a screen with a subject (hero N).
+  - Readouts and results on a screen: zones and digits per screen, an input's outcomes (Victory | Defeat), so a body
+    stops waiting on pictures by hand.
+  - Edge costs: measured step and settle times feed `ScreenGraph.pathTo` and the walk's waits instead of `STEP_MS`.
+  - The by-hand flow (after the owed click-tests): "next untried" in the window, suggested cut names, the cut form
+    split by intent, Try that freezes the opened screen and starts its marker cut, an empty map instead of the
+    template's placeholder Home.
+  - Scale: a parse cached by file hash (a 45-screen read takes ~1 s).
 - **A screen's looks on 🗺 Screens** (the user's call, 2026-10-16, a later plan): a `ScreenVariant` (Halloween)
   cannot be shown; each screen keeps one shot and rows only say "look X". Wanted: one shot per look, saved when
   Discovery cuts the look; a look picker on the card and the panel; rows, boxes and list strips filtered to the
