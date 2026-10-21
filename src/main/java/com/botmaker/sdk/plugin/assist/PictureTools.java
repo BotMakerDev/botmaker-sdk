@@ -170,12 +170,11 @@ final class PictureTools {
         }
     }
 
-    private static final String SHAPE = "rect (the default), ellipse: the oval inside the box, a circle when it is "
-            + "square, or polygon: the shape through points; outside an ellipse or a polygon is skipped, so a round "
-            + "button or an odd-shaped icon matches over any background";
+    private static final String SHAPE = "rect (the default), ellipse (the oval inside the box) or polygon (through "
+            + "points); outside the shape is skipped, so a round icon matches over any background";
 
-    private static final String POINTS = "a polygon's corners, in order around it, three or more, in place of x, y, "
-            + "width and height";
+    private static final String POINTS = "a polygon's corners in order, three or more, in place of x, y, width and "
+            + "height";
 
     /** A part of a box that matching skips. */
     record Skip(@Describe("left edge, in the screenshot's pixels") int x,
@@ -197,41 +196,38 @@ final class PictureTools {
                @Describe(value = SHAPE, optional = true) CutShape shape,
                @Describe(value = POINTS, optional = true) List<Corner> points,
                @Describe(value = IGNORE, optional = true) Skip ignore,
-               @Describe(value = "what tells the screen apart; a screen shows where all its markers are found and none "
-                       + "of its absent pictures is. set: one marker when it is unique, several boxes when the screen "
-                       + "shares its title or frame (a tab, a dialog style), together replacing its markers; pays the "
-                       + "marker try_input left owed, or starts the map's first screen. add: one more marker, keeping "
-                       + "the ones it has. absent: a picture it never shows, where a screen like it does (a button only "
-                       + "the other has)", optional = true)
+               @Describe(value = "what tells the screen: all its markers found, none of its absent ones. set: the "
+                       + "marker, several boxes when the screen shares its title or frame (a tab), replacing its "
+                       + "markers; pays a marker owed or starts the first screen. add: one more. absent: a picture it "
+                       + "never shows where a screen like it does", optional = true)
                Mark marker,
-               @Describe(value = "true when it is the screen's close button, its way back", optional = true)
+               @Describe(value = "true for the screen's close button, its way back", optional = true)
                Boolean back,
-               @Describe(value = "true when the input shows only at times (a Claim when loot is ready, an event's "
-                       + "icon): it holds the screen back only while it shows", optional = true) Boolean sometimes,
-               @Describe(value = "true, with marker, when the screen is a popup the game opens on its own (a "
-                       + "reward, an offer): it starts it apart from the map's tree", optional = true)
+               @Describe(value = "true when the input shows only at times (a Claim when loot is ready)",
+                       optional = true) Boolean sometimes,
+               @Describe(value = "true, with marker, for a popup the game opens on its own (a reward, an offer)",
+                       optional = true)
                Boolean popup,
-               @Describe(value = "the input this is another look of, by its picture: the same button with a badge, "
-                       + "greyed out or picked. It stays one input; with state", optional = true)
+               @Describe(value = "the input this is another look of, by its picture (badged, greyed, picked): one "
+                       + "input still; with state", optional = true)
                String variantOf,
                @Describe(value = "with variantOf, what the look means (disabled, locked, done, busy: never pressed)",
                        optional = true)
                State state,
-               @Describe(value = "for an input that comes and goes, the bot's or a plugin's method saying when it is "
-                       + "there, as a method reference: Firestone::eventOn; with screenLook and marker, when that look "
-                       + "shows. It must exist; add_method makes one", optional = true)
+               @Describe(value = "for an input that comes and goes, a method reference saying when it is there "
+                       + "(Firestone::eventOn); with screenLook and marker, when that look shows. add_method makes "
+                       + "one", optional = true)
                String when,
-               @Describe(value = "the look of the screen this belongs to, in plain words (Halloween): the same screen, "
-                       + "reached and left the same way, dressed otherwise. With marker, what tells that look apart; "
-                       + "else an input only that look has", optional = true)
+               @Describe(value = "the look of the screen this belongs to (Halloween): the same screen dressed "
+                       + "otherwise, never a screen of its own. With marker, what tells that look; else an input only "
+                       + "it has", optional = true)
                String screenLook) {
     }
 
     record Crops(@Describe("the boxes to cut, in the last screenshot's pixels; one picture is a list of one")
                  List<Box> boxes,
-                 @Describe(value = "the screen they are on, as the bot's Screens names it: each noted there as an input, "
-                         + "untried until try_input tries it; 🖼 Manage Pictures groups them under that screen",
-                         optional = true)
+                 @Describe(value = "the screen they are on, as Screens names it: each noted there as an input, "
+                         + "untried until try_input tries it", optional = true)
                  String screen,
                  @Describe(value = "tags to file every one under, each declared (list_tags)", optional = true)
                  List<String> tags) {
@@ -312,10 +308,9 @@ final class PictureTools {
                     .describedAs("The pictures the bot can look for, each with the Pictures constant a block uses")
                     .takesNothing().handledBy(PictureTools::listPictures),
             AssistantTool.named("crop_pictures")
-                    .describedAs("Cuts boxes out of the last screenshot you took and saves each as a picture the "
-                            + "bot can find and click, declared as a Pictures constant: every input of a screen at "
-                            + "once, its marker among them; a name with no box notes a picture the bot has. A part "
-                            + "given to ignore is left out of matching, so copies that differ only there all match")
+                    .describedAs("Cuts boxes out of your last screenshot as Pictures constants the bot finds and "
+                            + "clicks: every input of a screen at once, its marker among them; a name with no box "
+                            + "notes a picture the bot has")
                     .takes(Crops.class).handledBy(PictureTools::cropPictures),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")

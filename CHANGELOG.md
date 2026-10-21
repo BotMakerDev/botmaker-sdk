@@ -34,6 +34,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
+  next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
+  shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.
 - **A game a place can't start is greyed, with why** (`SessionBootstrap.placeRefusal`): the Runner's game choice
   greys the games the bot's "Run the game in" can't start ("can't run in the game VM" for Lutris on Windows), and
   Launch and pick greys each place by the game, with the reason as its tooltip. It reads the system, the installed

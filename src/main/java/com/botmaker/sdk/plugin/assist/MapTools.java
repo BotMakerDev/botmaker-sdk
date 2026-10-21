@@ -167,14 +167,11 @@ final class MapTools {
                             + "tries them, without cutting them again. A marker starts the screen as a cut one does")
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
-                    .describedAs("Discovery's one way to act on a screen: clicks inputs cut on it (scrolls over "
-                            + "one, or taps a hotkey) and records in the bot's Screens what each did: opened a screen "
-                            + "(a new one, owing its marker, with its screenshot), led to one mapped already, changed "
-                            + "this one in place, or nothing. Every picture crop_pictures cut with a screen is untried "
-                            + "until this tries it. Breadth first: a screen opened gets its marker and inputs cut, "
-                            + "then its parent's inputs are tried on; refused while a screen owes its marker. Once "
-                            + "nothing on the screen is left to try, it walks to the next screen to explore, the "
-                            + "shallowest with inputs left (stay keeps it)")
+                    .describedAs("Discovery's one way to act on a screen: does inputs cut on it (click, scroll, "
+                            + "hotkey) and records in Screens what each did: opened a new screen (owing its marker), "
+                            + "led to a mapped one, changed this one, or nothing. Breadth first: refused while a "
+                            + "screen owes its marker; with nothing left to try here, walks to the shallowest screen "
+                            + "with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")
                     .describedAs("Walks the game to a screen of the bot's Screens as a run does: finds where it is "

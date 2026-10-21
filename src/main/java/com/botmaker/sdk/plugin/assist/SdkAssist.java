@@ -33,61 +33,41 @@ public final class SdkAssist {
      */
     public static final String GUIDE = """
             A bot is a set of activities and a flow that says which runs next. Automating a game goes through
-            stages: Setup once; then each screen through Discovery, Build and Trial, in that order; Tuning once
-            its trial passed; Upkeep when the game changes. Never write a body for a screen not yet surveyed:
-            it would miss the game's own controls.
-            - read_guide gives the steps of the stage the bot is at, worked out from its home method and its
-              Screens, and where each screen stands; read_guide with a stage gives another's.
-              Read it before starting, and again whenever a stage's check passes.
-            - The notes are the bot's Java (read_notes, write_notes): each screen's on its Screens constant, what
-              holds across the game on the run. When a stage's check passes for a screen, write_notes it with
-              reached (its new stage) and what the stage taught about the game, before going on.
+            stages: Setup once; each screen through Discovery, Build and Trial, in that order; Tuning once its
+            trial passed; Upkeep when the game changes. Never write a body for a screen not yet surveyed.
+            - read_guide gives the steps of the stage the bot is at, and where each screen stands; read_guide
+              with a stage gives another's. Read it before starting and whenever a stage's check passes.
+            - The notes are the bot's Java (read_notes, write_notes). When a stage's check passes for a screen,
+              write_notes it with reached (its new stage) and what the stage taught.
             - Stage 0, Setup: the game in view and a home method.
-            - Stage 1, Discovery: every screen the same way, from home: cut its marker and every input on it,
-              try each (every list scrolled to both ends), and finish a screen an input opens before the next
-              input. crop_pictures and try_input write the map, the bot's Screens class; go_to_screen walks it;
-              read_map reads it as the user's 🗺 Screens window shows it, and what it cannot do. A button that
-              changes its look is one input (a box's variantOf + state); the same screen dressed otherwise
-              (an event's theme) is one of its looks (screenLook), never a screen of its own; a list whose
-              entries change by day is one screen whose entries come and go. A tab whose content has a title
-              and inputs of its own is a screen of its own, the tab its way in. A picture sits at one place
-              on every screen that uses it: where a screen shows it elsewhere, the tools cut that screen a
-              copy of its own. When a method of the bot can say
-              when one is there, name it as a box's when (Firestone::eventOn). What try_input recorded
-              wrong (a panel taken for a way back, a result, a way in) is fixed with edit_map: trying the
-              input again does not undo it.
-            - Stage 2, Build: once the whole map is surveyed, one chore at a time, screen by screen, through
-              the game's own shortcuts, each body opening with Navigate.to its screen and each step proved by a
-              picture.
+            - Stage 1, Discovery: breadth first from home, every screen alike: cut its marker and every input,
+              try each, then the next screen read_guide names. crop_pictures and try_input write the bot's
+              Screens class, go_to_screen walks it, read_map reads it as 🗺 Screens shows it; edit_map fixes
+              what try_input recorded wrong (trying again does not undo it). A list whose entries change by day
+              is one screen whose entries come and go.
+            - Stage 2, Build: once the map is surveyed, one chore at a time, each body opening with Navigate.to
+              its screen and each step proved by a picture.
             - Stage 3, Trial: each activity from three states (work to do, nothing to do, interrupted), then
               the whole flow.
             - Stage 4, Tuning: faster, once it is right.
             - Stage 5, Upkeep: a marker or an entrance stops being found; edit_map moves the map with the game.
 
             The bot's shape
-            - One activity per chore (collect the loot, claim the quests, fight the boss). edit_flow's
-              add_activity adds its card and its enum in Activities, whose constants are the outcomes it can
-              report (NEXT to start with; connect on an outcome it has not got yet adds it). Its work is a
-              public static body() in a class of its own, returning that enum. A body does one unit of work,
-              returns, and never loops forever: the flow repeats it.
-            - The flow (read_flow; edit_flow's connect, set_start, add_flow) wires each outcome to the next
-              activity. Put the order of chores there, never in a body calling another body.
-            - Navigation is the map's: an activity's body opens with Navigate.to(Screens.X), X the screen
-              its chore is on, returns its NOT_NOW (or LOCKED) outcome when that answers false, and then
-              presses inputs with Navigate.press(Screens.X.field), never picture chains: a press walks to
-              its input's screen first. When a step gets stuck, the run walks back to the screen the body's Navigate.to reached
-              and runs the body once more; then the run's home, which with no home method walks to the map's
-              root screen.
-            - Popups the game opens on its own (an offer, a mail, a level-up) are no body's business: each is a
-              screen of the map (crop_pictures its marker with popup true, its way out with back true), and the
-              run closes the ones it shows before every look at the screen of every activity. An overlay the
-              map lacks is cleared by the map's close buttons, then Escape, and the run's trace says to map
-              it. A body that works through a popup-shaped screen itself switches the closing off around that
-              step with PopupGuard.enabled(false), and back on after.
-            - Pictures, points and regions are the bot's constants (Pictures.CLAIM_RESEARCH): one per idea and
-              place, named <idea>_<where>; the same idea on another screen is another picture. Tag each
-              picture with the activity that uses it, or a custom tag (edit_tags) for home and popups:
-              crop_pictures takes tags, list_tags shows them, edit_pictures changes them.
+            - One activity per chore. edit_flow's add_activity adds its card and its enum in Activities, whose
+              constants are its outcomes (NEXT first; connect on a new outcome adds it). Its work is a public
+              static body() in a class of its own, returning that enum: one unit of work, never a loop
+              forever, as the flow repeats it. The order of chores is the flow's (read_flow; edit_flow's
+              connect, set_start, add_flow), never a body calling another.
+            - A body opens with Navigate.to(Screens.X), returns NOT_NOW (or LOCKED) when that answers false,
+              then presses with Navigate.press(Screens.X.field), never picture chains. A stuck step walks back
+              to X and runs the body once more, then the run's home.
+            - Popups the game opens on its own are screens of the map (crop_pictures its marker with popup
+              true, its way out with back true), closed by the run before every look; never a body's business.
+              An overlay the map lacks is cleared by its close buttons, then Escape, and the trace says to map
+              it. A body working through a popup-shaped screen wraps that step in PopupGuard.enabled(false).
+            - Pictures are the bot's constants, one per idea and place, named <idea>_<where> (CLAIM_RESEARCH):
+              the same idea on another screen is another picture. Tag each with the activity using it or a
+              custom tag (edit_tags, list_tags, edit_pictures).
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             """;
 
