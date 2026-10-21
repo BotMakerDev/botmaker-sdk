@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.overlay;
 
+import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.ProbeContext;
 import com.botmaker.plugin.api.overlay.ProbeResult;
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;

@@ -1,11 +1,11 @@
 package com.botmaker.sdk.plugin.overlay;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.overlay.OverlayTool;
 import com.botmaker.plugin.api.overlay.OverlayToolContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.vision.ImageClicker;

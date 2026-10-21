@@ -2,7 +2,7 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
+import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 

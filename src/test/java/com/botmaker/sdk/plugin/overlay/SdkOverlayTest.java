@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.overlay;
 
+import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.OverlayPart;
 import com.botmaker.plugin.api.overlay.Watched;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -48,7 +49,7 @@ class SdkOverlayTest {
         OverlayPart.FrameSource frames = SdkOverlay.framesOf(fake(image)).orElseThrow();
         com.botmaker.plugin.api.overlay.OverlayFrame frame = frames.grab().orElseThrow();
         assertEquals(image, frame.image());
-        assertEquals(new com.botmaker.plugin.api.toolbar.ActionContext.Area(40, 60, 8, 6), frame.area());
+        assertEquals(new Area(40, 60, 8, 6), frame.area());
 
         assertEquals(Optional.empty(), SdkOverlay.framesOf(fake(null)).orElseThrow().grab(), "a failed capture");
         assertEquals(Optional.empty(), SdkOverlay.framesOf(null), "no source: Studio grabs the window");

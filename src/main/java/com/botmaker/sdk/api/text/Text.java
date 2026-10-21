@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.text;
+import com.botmaker.plugin.api.palette.Fills;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;

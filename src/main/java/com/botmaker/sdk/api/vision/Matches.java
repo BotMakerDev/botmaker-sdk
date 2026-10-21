@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
-import com.botmaker.plugin.api.value.Fills;
+import com.botmaker.plugin.api.palette.Fills;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.palette.Fills;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedOpenSet;
@@ -9,7 +10,6 @@ import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
-import com.botmaker.plugin.api.value.Fills;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.TestContexts;

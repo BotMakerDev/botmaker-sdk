@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.pictures;
 
-import com.botmaker.plugin.api.toolbar.ActionContext.Area;
+import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
