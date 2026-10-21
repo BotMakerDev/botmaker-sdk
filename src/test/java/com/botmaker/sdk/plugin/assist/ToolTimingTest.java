@@ -40,7 +40,7 @@ class ToolTimingTest {
                 "boxes", List.of("x 1 2 3 4")), null);
 
         assertEquals(new Sample("a", null, true, Side.RIGHT, List.of("x 1 2 3 4"), null), got.get());
-        assertEquals(tool.params(), timed.params());
+        assertEquals(tool.paramsType(), timed.paramsType(), "the same record, so the same schema");
         assertEquals(List.of("done"), reply.parts().stream().map(AgentReply.Part::text).toList());
     }
 
