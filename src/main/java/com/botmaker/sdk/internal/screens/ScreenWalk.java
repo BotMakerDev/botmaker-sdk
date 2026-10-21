@@ -408,7 +408,7 @@ public final class ScreenWalk {
                         blocking = seen.get().state();
                         break;
                     }
-                    reach.click(reach.pointOn(seen.get().place()));
+                    reach.press(button, seen.get().place());
                     look = seen.get().state();
                 } else if (!reach.perform(input, strip, p, frame.get())) {
                     // Every copy greyed out, locked, done or busy is a button showing that look; none at all, an
@@ -607,7 +607,7 @@ public final class ScreenWalk {
             Optional<Reach.Seen> seen = TreeWalk.reach(reach, button, tree.get(), buttons, frame).found();
             if (seen.isEmpty() || seen.get().state().blocks()) return false;
             if (edge.state() != null && edge.state() != seen.get().state()) return false;
-            reach.click(reach.pointOn(seen.get().place()));
+            reach.press(button, seen.get().place());
             return true;
         }
         return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
@@ -748,7 +748,7 @@ public final class ScreenWalk {
         List<Optional<Rect>> found = reach.findEach(closes.stream().map(Button::picture).toList(), frame);
         for (int i = 0; i < closes.size(); i++) {
             if (found.get(i).isEmpty()) continue;
-            reach.click(reach.pointOn(found.get(i).get()));
+            reach.press(closes.get(i), found.get(i).get());
             Optional<String> at = screenWithin(near);
             if (at.isPresent()) return Optional.of(new Uncovered(at.get(), closes.get(i).picture().id()));
             break;

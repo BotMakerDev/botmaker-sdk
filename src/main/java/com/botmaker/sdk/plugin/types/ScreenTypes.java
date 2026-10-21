@@ -4,9 +4,11 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
@@ -132,6 +134,8 @@ public final class ScreenTypes {
             .<List<Look>>with(Button::looks, Button::looks)
             .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
             .flag(Button::repeated, Button::repeats)
+            .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
+            .<Duration>with(Button::hold, Button::hold)
             .when(button -> BotConstants.inputName(button) == null && !button.cycles());
 
     /** {@code Button.cycling(List<ImageTemplate>)} and its links: a button showing its looks in turn. */
@@ -145,10 +149,20 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Button::locked, Button::lock)
             .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
             .flag(Button::repeated, Button::repeats)
+            .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
+            .<Duration>with(Button::hold, Button::hold)
             .when(button -> BotConstants.inputName(button) == null && button.cycles());
 
-    /** {@code Hotkey.of(Key)} and its links. */
-    public static final DeclaredCall<Hotkey> HOTKEY_SHAPE = ComponentType.part(Hotkey.class)
+    /**
+     * A button's gesture as written: none for a click, the default, nor for a hold of its own time, which
+     * {@code .hold(…)} says alone.
+     */
+    private static Gesture gestureWritten(Button button) {
+        return button.gesture() == Gesture.CLICK || button.hold() != null ? null : button.gesture();
+    }
+
+    /** {@code Hotkey.of(Key)} and its links: one key, tapped. */
+    public static final DeclaredCall<Hotkey> HOTKEY_KEY_SHAPE = ComponentType.part(Hotkey.class)
             .<Key, Hotkey>writtenAs(Hotkey::of, Hotkey::key)
             .flag(Hotkey::tried, Hotkey::isTried)
             .flag(Hotkey::leaves, Hotkey::isLeaving)
@@ -156,7 +170,20 @@ public final class ScreenTypes {
             .<String>with(Hotkey::never, Hotkey::never)
             .flag(Hotkey::sometimes, Hotkey::comesAndGoes)
             .<ImageTemplate>with(Hotkey::locked, Hotkey::lock)
-            .<BooleanSupplier>with(Hotkey::when, Parts.HOTKEY_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Hotkey::when, Parts.HOTKEY_WHEN.part(ScreenTypes::condition))
+            .when(hotkey -> hotkey.key() != null);
+
+    /** {@code Hotkey.of(Combo)} and the same links: keys pressed together, or held. */
+    public static final DeclaredCall<Hotkey> HOTKEY_COMBO_SHAPE = ComponentType.part(Hotkey.class)
+            .<Combo, Hotkey>writtenAs(Hotkey::of, Hotkey::combo)
+            .flag(Hotkey::tried, Hotkey::isTried)
+            .flag(Hotkey::leaves, Hotkey::isLeaving)
+            .flag(Hotkey::info, Hotkey::isInfo)
+            .<String>with(Hotkey::never, Hotkey::never)
+            .flag(Hotkey::sometimes, Hotkey::comesAndGoes)
+            .<ImageTemplate>with(Hotkey::locked, Hotkey::lock)
+            .<BooleanSupplier>with(Hotkey::when, Parts.HOTKEY_WHEN.part(ScreenTypes::condition))
+            .when(hotkey -> hotkey.key() == null);
 
     /** {@code Strip.of(Scroll, List<ImageTemplate>)} and its links: its members' defaults. */
     public static final DeclaredCall<Strip> STRIP_SHAPE = ComponentType.part(Strip.class)

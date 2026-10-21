@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
@@ -53,8 +54,11 @@ public final class BoardCuts {
     public record Absent() implements As {
     }
 
-    /** One of its buttons, shown only at times when {@code sometimes}, only while {@code when} holds when given. */
-    public record Press(boolean sometimes, String when) implements As {
+    /**
+     * One of its buttons, shown only at times when {@code sometimes}, only while {@code when} holds when given, pressed
+     * by {@code gesture} (null: a click).
+     */
+    public record Press(boolean sometimes, String when, Gesture gesture) implements As {
     }
 
     /** Its way back: its close button. */
@@ -164,6 +168,18 @@ public final class BoardCuts {
                 for (int at : writes) if (!refused.contains(at)) refused.add(at);
             }
             if (one != null && !one.isBlank()) said.add(one);
+        }
+        for (int i = 0; i < cuts.size(); i++) {
+            if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Press press)
+                    || press.gesture() == null || press.gesture() == Gesture.CLICK) continue;
+            String id = TemplateLibrary.sanitizeName(cuts.get(i).name());
+            Optional<String> field = FxCall.call(() -> ScreenBook.read(context.services()).screen(screen))
+                    .flatMap(on -> on.inputs().entrySet().stream()
+                            .filter(e -> e.getValue() instanceof Button b && b.picture() != null
+                                    && b.picture().id().equalsIgnoreCase(id))
+                            .map(Map.Entry::getKey).findFirst());
+            field.ifPresent(f -> said.add(FxCall.call(() -> ScreenEdits.setGesture(context.services(), screen, f,
+                    press.gesture(), null))));
         }
         return new Saved(String.join("\n", said), refused.stream().sorted().toList());
     }

@@ -5,8 +5,9 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
@@ -19,6 +20,7 @@ import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +84,7 @@ final class MapEdits {
     record SetKind(String screen, Kind as) implements Edit {
     }
 
-    @Describe("an input's result, info, never, lock, sometimes, repeated")
+    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
@@ -92,7 +94,9 @@ final class MapEdits {
                     @Describe(value = "why never clicked; blank clears", optional = true) String never,
                     @Describe(value = "the picture proving it locked; blank clears", optional = true) String locked,
                     @Describe(value = "true: shows only at times", optional = true) Boolean sometimes,
-                    @Describe(value = "true: a button shown more than once", optional = true) Boolean repeated)
+                    @Describe(value = "true: a button shown more than once", optional = true) Boolean repeated,
+                    @Describe(value = "how a button is pressed", optional = true) Gesture gesture,
+                    @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs)
             implements Edit, OfInput {
     }
 
@@ -384,13 +388,25 @@ final class MapEdits {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
-        if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null) {
-            return AgentReply.refused("Say what to set: did, info, never, locked, sometimes or repeated. Nothing "
-                    + "was written.");
+        if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null
+                && edit.gesture() == null && edit.holdMs() == null) {
+            return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture or "
+                    + "holdMs. Nothing was written.");
         }
         Input in = on.inputs().get(field);
         if (edit.repeated() != null && !(in instanceof Button)) {
             return AgentReply.refused(field + " is no button: only a button has copies. Nothing was written.");
+        }
+        boolean gestured = edit.gesture() != null || edit.holdMs() != null;
+        if (gestured && !(in instanceof Button || in instanceof Hotkey && edit.gesture() == null)) {
+            return AgentReply.refused(field + " is no button" + (edit.gesture() == null ? " or hotkey" : "")
+                    + ": only a button has a gesture, and a hotkey a hold. Nothing was written.");
+        }
+        if (edit.gesture() == Gesture.UNKNOWN || edit.holdMs() != null && edit.holdMs() < 0) {
+            return AgentReply.refused("No such gesture, or a hold under 0 ms. Nothing was written.");
+        }
+        if (edit.holdMs() != null && edit.gesture() != null && edit.gesture() != Gesture.HOLD) {
+            return AgentReply.refused("holdMs goes with gesture hold, or alone. Nothing was written.");
         }
         Input now = in;
         if (edit.did() != null) {
@@ -412,6 +428,11 @@ final class MapEdits {
         if (edit.info() != null) now = ScreenEdits.info(now, edit.info());
         if (edit.sometimes() != null) now = ScreenEdits.sometimes(now, edit.sometimes());
         if (edit.repeated() != null && now instanceof Button b) now = b.repeats(edit.repeated());
+        Duration hold = edit.holdMs() == null ? null : Duration.ofMillis(edit.holdMs());
+        if (gestured && now instanceof Button b) {
+            now = ScreenEdits.gestured(b, edit.gesture() == null ? Gesture.HOLD : edit.gesture(), hold);
+        }
+        if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }
 
@@ -478,7 +499,7 @@ final class MapEdits {
         }
         if (has(edit.key())) {
             return said(ScreenEdits.newScreen(context.services(), parent, edit.name(), null,
-                    Hotkey.of(Key.named(edit.key()).orElseThrow())));
+                    Hotkey.of(Combo.named(edit.key()).orElseThrow())));
         }
         String picture = edit.picture().strip();
         if (!ActTools.exists(context, picture)) return AgentReply.refused(Frames.noPicture(picture));
@@ -495,7 +516,7 @@ final class MapEdits {
             return "Name the input as try_input does: picture (with scroll for a strip) or key, one of them. "
                     + "Nothing was written.";
         }
-        if (byKey && Key.named(edit.key()).isEmpty()) return "\"" + edit.key() + "\" is no key. Nothing was written.";
+        if (byKey && Combo.named(edit.key()).isEmpty()) return "\"" + edit.key() + "\" is no key. Nothing was written.";
         if (edit.scroll() != null && (edit.scroll() == 0 || byKey)) {
             return "A scroll is over a picture, by at least one notch. Nothing was written.";
         }
@@ -508,7 +529,7 @@ final class MapEdits {
      */
     static boolean named(Input input, OfInput edit) {
         if (has(edit.key())) {
-            return input instanceof Hotkey hotkey && Key.named(edit.key()).filter(k -> k == hotkey.key()).isPresent();
+            return input instanceof Hotkey hotkey && Combo.named(edit.key()).filter(hotkey::presses).isPresent();
         }
         String picture = edit.picture().strip();
         return switch (input) {

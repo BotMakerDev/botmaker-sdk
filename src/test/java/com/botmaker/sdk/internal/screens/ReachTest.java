@@ -3,8 +3,10 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
+import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -83,14 +86,18 @@ class ReachTest {
             scrolled = Math.clamp(scrolled - (to.y() - from.y()) / 100, 0, end);
         }
 
+        /** A click as {@code click <y>}, another gesture by its id, a hold with its time. */
         @Override
-        public void click(Point at) {
-            done.add("click " + at.y());
+        public void press(Point at, Gesture gesture, Duration hold) {
+            done.add((gesture == Gesture.CLICK ? "click" : gesture.id()) + " " + at.y()
+                    + (gesture == Gesture.HOLD ? " " + hold.toMillis() : ""));
         }
 
+        /** Keys together as {@code key CTRL+S}, a hold with its time. */
         @Override
-        public void key(Key key) {
-            done.add("key " + key.name());
+        public void keys(Combo combo) {
+            done.add("key " + combo.keys().stream().map(Key::name).collect(Collectors.joining("+"))
+                    + (combo.hold().isZero() ? "" : " " + combo.hold().toMillis()));
         }
 
         @Override
@@ -396,6 +403,35 @@ class ReachTest {
         assertEquals("key ESCAPE", column.done.getLast());
     }
 
+    /** A button whose gesture is a double click is double-clicked at the centre of where it was found. */
+    @Test
+    void aDoubleButtonIsDoubleClickedAtItsCentre() {
+        Column column = new Column(Map.of("arena", 1), 4);
+        assertTrue(column.perform(Button.of(ARENA).gesture(Gesture.DOUBLE), column.look().orElseThrow()));
+        assertEquals(List.of("double 240"), column.done);
+    }
+
+    /** A held button is held its own time, or the default time when it has none. */
+    @Test
+    void aHoldButtonIsHeldItsDuration() {
+        Column column = new Column(Map.of("arena", 1), 4);
+        assertTrue(column.perform(Button.of(ARENA).hold(Duration.ofSeconds(2)), column.look().orElseThrow()));
+        assertTrue(column.perform(Button.of(ARENA).gesture(Gesture.HOLD), column.look().orElseThrow()));
+        assertEquals(List.of("hold 240 2000", "hold 240 " + Button.HOLD_TIME.toMillis()), column.done);
+        assertEquals(Button.of(ARENA), Button.of(ARENA).hold(Duration.ofSeconds(2)).gesture(Gesture.CLICK),
+                "a click keeps no hold time");
+    }
+
+    /** A hotkey of keys together presses them together, held as its combo says. */
+    @Test
+    void aComboHotkeyPressesItsKeysTogether() {
+        Column column = new Column(Map.of(), 4);
+        assertTrue(column.perform(Hotkey.of(Combo.of(Key.CTRL, Key.S)), column.look().orElseThrow()));
+        assertTrue(column.perform(Hotkey.of(Combo.of(Key.W).held(Duration.ofMillis(500))),
+                column.look().orElseThrow()));
+        assertEquals(List.of("key CTRL+S", "key W 500"), column.done);
+    }
+
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */
     private static final class Cards extends Column {
         final List<Rect> copies = List.of(new Rect(300, 400, 80, 40), new Rect(300, 100, 80, 40),
@@ -411,7 +447,7 @@ class ReachTest {
         }
 
         @Override
-        public void click(Point at) {
+        public void press(Point at, Gesture gesture, Duration hold) {
             done.add("click " + at.x() + "," + at.y());
         }
     }

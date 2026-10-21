@@ -42,7 +42,8 @@ class HandParityTest {
                     + "screen… ▸ None: the game opens on it")),
             entry("NewScreen", Hand.now("⋯ input ▸ Result ▸ Opens a new screen…, ⋯ Screen ▸ New screen from here…")),
             entry("SetInput", Hand.now("the picked input's editors: result, information only, comes and goes, "
-                    + "never, locked, a button's looks, repeated and cycles, a hotkey's key; ⋯ input")),
+                    + "never, locked, a button's Pressed by (its gesture and hold time), looks, repeated and cycles, a "
+                    + "hotkey's keys and hold; ⋯ input")),
             entry("ResetInput", Hand.now("⋯ input ▸ Result ▸ Untried")),
             entry("RemoveInput", Hand.now("⋯ input ▸ Remove from this screen")),
             entry("UseAsBack", Hand.now("⋯ input ▸ Use as the way back")),

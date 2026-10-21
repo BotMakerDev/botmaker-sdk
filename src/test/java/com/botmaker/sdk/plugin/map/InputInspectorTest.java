@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
@@ -120,8 +121,24 @@ class InputInspectorTest {
     void aKeyAnotherHotkeyOfTheScreenHasIsTaken() {
         MapScreen home = MapFixtures.screen("Home", Hotkey.of(Key.Q), MapFixtures.click("buy"));
         String q = MapFixtures.fieldOf(Hotkey.of(Key.Q));
-        assertEquals(Optional.of(q), InputInspector.keyTaken(home, null, Key.Q));
-        assertEquals(Optional.empty(), InputInspector.keyTaken(home, q, Key.Q), "its own key is its own");
-        assertEquals(Optional.empty(), InputInspector.keyTaken(home, null, Key.W));
+        assertEquals(Optional.of(q), InputInspector.keyTaken(home, null, Combo.of(Key.Q)));
+        assertEquals(Optional.of(q), InputInspector.keyTaken(home, null, Combo.of(Key.Q).held(Duration.ofMillis(300))),
+                "held or not, they are the same keys");
+        assertEquals(Optional.empty(), InputInspector.keyTaken(home, q, Combo.of(Key.Q)), "its own key is its own");
+        assertEquals(Optional.empty(), InputInspector.keyTaken(home, null, Combo.of(Key.W)));
+        assertEquals(Optional.empty(), InputInspector.keyTaken(home, null, Combo.of(Key.CTRL, Key.Q)));
+    }
+
+    /** The hotkey editor changes only what it was told: the keys' order and the keys it shows no tick for stay. */
+    @Test
+    void aHotkeysKeysKeepTheirOrderWhenEdited() {
+        List<Key> ctrl = List.of(Key.CTRL);
+        assertEquals(List.of(Key.S, Key.CTRL), InputInspector.retyped(List.of(Key.S, Key.CTRL), Key.S, ctrl));
+        assertEquals(List.of(Key.A, Key.B), InputInspector.retyped(List.of(Key.A, Key.B), Key.B, List.of()));
+        assertEquals(List.of(Key.CTRL, Key.Q), InputInspector.retyped(List.of(Key.Q), Key.Q, ctrl), "a tick goes first");
+        assertEquals(List.of(Key.S), InputInspector.retyped(List.of(Key.CTRL, Key.S), Key.S, List.of()));
+        assertEquals(List.of(Key.CTRL, Key.W), InputInspector.retyped(List.of(Key.CTRL, Key.S), Key.W, ctrl));
+        assertEquals(ctrl, InputInspector.retyped(ctrl, Key.CTRL, List.of()), "a modifier alone is its key");
+        assertEquals(List.of(Key.Q), InputInspector.retyped(List.of(), Key.Q, List.of()));
     }
 }

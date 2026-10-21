@@ -2,8 +2,9 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Beside;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -125,11 +126,11 @@ class TreeMeasureTest {
             }
 
             @Override
-            public void click(Point at) {
+            public void press(Point at, Gesture gesture, Duration hold) {
             }
 
             @Override
-            public void key(Key key) {
+            public void keys(Combo combo) {
             }
 
             @Override

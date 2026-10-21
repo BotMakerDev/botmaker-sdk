@@ -2,8 +2,10 @@ package com.botmaker.sdk.api.input;
 
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -44,10 +46,36 @@ public record Combo(List<Key> keys, Duration hold) {
         return new Combo(keys, hold);
     }
 
+    /**
+     * The keys {@code text} names, joined with {@code +} as {@link #caps()} writes them, each as {@link Key#named}
+     * reads it: {@code Ctrl+S}, {@code alt + tab}, {@code Q}. Empty when one names no key; never held.
+     */
+    public static Optional<Combo> named(String text) {
+        if (text == null || text.isBlank()) return Optional.empty();
+        String[] parts = text.split("\\+", -1);
+        List<Key> keys = new ArrayList<>();
+        for (int i = 0; i < parts.length; i++) {
+            // A key whose label holds the joiner (Num +) takes the parts after it until it names one.
+            String name = parts[i];
+            Optional<Key> key = Key.named(name.strip());
+            while (key.isEmpty() && i + 1 < parts.length) {
+                name = name + "+" + parts[++i];
+                key = Key.named(name.strip());
+            }
+            if (key.isEmpty()) return Optional.empty();
+            keys.add(key.get());
+        }
+        return keys.isEmpty() ? Optional.empty() : Optional.of(new Combo(keys));
+    }
+
+    /** The caps joined with {@code +}, with no hold: {@code Ctrl+S}. */
+    public String caps() {
+        return keys.stream().map(Key::label).collect(Collectors.joining("+"));
+    }
+
     /** The caps joined with {@code +}, then the hold when there is one: {@code Ctrl+S (hold 200 ms)}. */
     @Override
     public String toString() {
-        String caps = keys.stream().map(Key::label).collect(Collectors.joining("+"));
-        return hold.isZero() ? caps : caps + " (hold " + hold.toMillis() + " ms)";
+        return hold.isZero() ? caps() : caps() + " (hold " + hold.toMillis() + " ms)";
     }
 }

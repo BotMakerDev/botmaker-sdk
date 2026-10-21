@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,9 @@ import java.util.function.BooleanSupplier;
  * or a column whose slots shift is a member of one of its screen's {@link Strip strips}, which say how it is
  * scrolled to.
  *
+ * <p>A button is clicked unless its {@link #gesture} says otherwise: double-clicked, right-clicked, held a time
+ * ({@link #hold(Duration)}), or only pointed at (2026-10-22).
+ *
  * @param picture      the picture clicked, as the button usually looks
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
@@ -31,20 +35,28 @@ import java.util.function.BooleanSupplier;
  * @param when         when it is there, for one that comes and goes; null when not known
  * @param repeats      whether the screen shows it more than once: copies a body picks among
  * @param cycles       whether each press shows its next look, {@code picture} then {@code looks} in turn
+ * @param gesture      how it is pressed; {@link Gesture#CLICK} when null
+ * @param hold         how long a {@link Gesture#HOLD} is held; {@link #HOLD_TIME} when null, none for any other
  */
 public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, boolean isInfo, String never,
                      boolean comesAndGoes, ImageTemplate lock, List<Look> looks, BooleanSupplier when,
-                     boolean repeats, boolean cycles) implements Input {
+                     boolean repeats, boolean cycles, Gesture gesture, Duration hold) implements Input {
+
+    /** How long a button held for no time of its own is held: a long press on most phones and games. */
+    public static final Duration HOLD_TIME = Duration.ofMillis(800);
 
     public Button {
         looks = looks == null ? List.of() : List.copyOf(looks);
         // When it is there is said only of what comes and goes.
         comesAndGoes = comesAndGoes || when != null;
+        gesture = gesture == null ? Gesture.CLICK : gesture;
+        // Only a hold lasts a time.
+        if (gesture != Gesture.HOLD) hold = null;
     }
 
     /** {@code picture} clicked at its best match. */
     public static Button of(ImageTemplate picture) {
-        return new Button(picture, false, false, false, null, false, null, List.of(), null, false, false);
+        return new Button(picture, false, false, false, null, false, null, List.of(), null, false, false, null, null);
     }
 
     /**
@@ -54,7 +66,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     public static Button cycling(List<ImageTemplate> looks) {
         List<Look> rest = looks.stream().skip(1).map(look -> Look.of(look, State.NORMAL)).toList();
         return new Button(looks.isEmpty() ? null : looks.getFirst(), false, false, false, null, false, null, rest,
-                null, false, true);
+                null, false, true, null, null);
     }
 
     /** The looks a {@link #cycling} button shows in turn, its usual picture first. */
@@ -64,43 +76,50 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     @Override
     public Button tried() {
-        return new Button(picture, true, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, true, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button leaves() {
-        return new Button(picture, isTried, true, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, true, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button info() {
-        return new Button(picture, isTried, isLeaving, true, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, true, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button never(String why) {
-        return new Button(picture, isTried, isLeaving, isInfo, why, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, isInfo, why, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button sometimes() {
-        return new Button(picture, isTried, isLeaving, isInfo, never, true, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, isInfo, never, true, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button locked(ImageTemplate lock) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     @Override
     public Button when(BooleanSupplier condition) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, condition, repeats,
-                cycles);
+                cycles, gesture, hold);
     }
 
     /** This button, also looking as each of {@code looks} says. */
     public Button looks(List<Look> looks) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
     }
 
     /** This button, shown more than once on its screen: Claim on each mission card. */
@@ -110,7 +129,25 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** This button, shown more than once on its screen or not. */
     public Button repeats(boolean repeats) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles);
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
+    }
+
+    /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
+    public Button gesture(Gesture gesture) {
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold);
+    }
+
+    /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
+    public Button hold(Duration time) {
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                Gesture.HOLD, time);
+    }
+
+    /** How long it is held when its gesture is a hold: its own time, else {@link #HOLD_TIME}. */
+    public Duration holdTime() {
+        return hold == null ? HOLD_TIME : hold;
     }
 
     /** This button with {@code look} put in place of the one of the same picture, or added last. */

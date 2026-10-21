@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
@@ -607,7 +608,7 @@ final class ScreenPanel {
                         say("Pick a key: type it (Q, Escape, F5) or pick it from the list.");
                         return;
                     }
-                    Optional<String> taken = InputInspector.keyTaken(screen, null, picked);
+                    Optional<String> taken = InputInspector.keyTaken(screen, null, Combo.of(picked));
                     if (taken.isPresent()) {
                         say(ScreenEdits.NOT_WRITTEN + taken.get() + " is pressed by " + picked.label() + " already.");
                         return;

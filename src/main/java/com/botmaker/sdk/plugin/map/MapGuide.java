@@ -79,6 +79,9 @@ final class MapGuide {
             + "it scrolls";
     static final String REPEATED = "The screen shows it more than once: a way and a run pick the copy they press";
     static final String CYCLES = "Each press shows its next look, the usual one first again after the last";
+    static final String GESTURE = "How a run presses it: a click, a double or right click, a hold of the time beside "
+            + "it, or the pointer only moved onto it for what opens on hover";
+    static final String KEY_HOLD = "How long the keys stay down; 0 taps them";
     static final String WAY_COPY = "The copy of this repeated button the way goes through";
     static final String TRY_HOW = "Tries it as try_input does: which copy, the name of the screen it opens, how long it "
             + "is given, and whether the game stays here after";

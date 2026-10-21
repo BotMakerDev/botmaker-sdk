@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -23,6 +24,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -245,6 +247,8 @@ final class CutForm {
         private final CheckBox popup = new CheckBox("a popup the game opens itself");
         private final CheckBox sometimes = new CheckBox("shows only at times");
         private final ComboBox<String> when = new ComboBox<>();
+        private final ComboBox<Gesture> gesture = new ComboBox<>(FXCollections.observableArrayList(
+                Arrays.stream(Gesture.values()).filter(g -> g != Gesture.UNKNOWN).toList()));
         private final ComboBox<String> input = new ComboBox<>();
         private final ComboBox<State> state = new ComboBox<>(FXCollections.observableArrayList(
                 Arrays.stream(State.values()).filter(s -> s != State.NORMAL).toList()));
@@ -279,6 +283,10 @@ final class CutForm {
                     : services.pluginValues().methods(MethodShape.BOOLEAN);
             when.getItems().setAll(Stream.concat(Stream.of(ALWAYS), methods.stream()).toList());
             when.setValue(ALWAYS);
+            gesture.setButtonCell(cell(Gesture::displayName));
+            gesture.setCellFactory(list -> cell(Gesture::displayName));
+            gesture.setValue(Gesture.CLICK);
+            gesture.setTooltip(new Tooltip(MapGuide.GESTURE));
             Path resources = services.resourcesDir();
             picture.getItems().setAll(resources == null ? List.of() : TemplateLibrary.list(resources).stream()
                     .filter(f -> !TemplateLibrary.isUnmodifiedDefaultTemplate(f)).map(TemplateLibrary::baseName)
@@ -315,7 +323,7 @@ final class CutForm {
             name.setDisable(!kind().named());
             details.getChildren().setAll(switch (kind()) {
                 case MARKER, MORE_MARKER -> List.of(popup);
-                case BUTTON -> List.of(sometimes, new Label("there while"), when);
+                case BUTTON -> List.of(gesture, sometimes, new Label("there while"), when);
                 case LOOK -> List.of(new Label("of"), input, new Label("meaning"), state);
                 case SCREEN_LOOK -> List.of(look, lookMarker, new Label("shows while"), when);
                 case STRIP -> List.of(new Label("strip"), group, new Label("new: notches"), notches);
@@ -334,7 +342,7 @@ final class CutForm {
                 case MARKER -> new BoardCuts.Marker(popup.isSelected());
                 case MORE_MARKER -> new BoardCuts.MoreMarker(popup.isSelected());
                 case ABSENT -> new BoardCuts.Absent();
-                case BUTTON -> new BoardCuts.Press(sometimes.isSelected(), method);
+                case BUTTON -> new BoardCuts.Press(sometimes.isSelected(), method, gesture.getValue());
                 case BACK -> new BoardCuts.Back();
                 case LOOK -> new BoardCuts.LookOf(input.getValue(), state.getValue());
                 case SCREEN_LOOK -> new BoardCuts.ScreenLook(look.getText(), lookMarker.isSelected(), method);

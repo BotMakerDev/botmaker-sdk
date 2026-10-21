@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Buttons on the map can be double-clicked, right-clicked, held or hovered**: `Button.of(P).gesture(Gesture.DOUBLE)`,
+  `.hold(Duration.ofSeconds(2))`; a button that says nothing is still clicked. **Hotkeys take keys together or held**:
+  `Hotkey.of(Combo.of(Key.CTRL, Key.S))`; `Hotkey.of(Key.Q)` reads as before. 🗺 Screens' input panel sets a button's
+  *Pressed by* (and the hold's time) and a hotkey's Ctrl/Shift/Alt/Meta and hold; the cut form picks the gesture as
+  the button is cut; edit_map's set_input takes `gesture` and `holdMs`; try_input and ▶ Try press the button or keys
+  as a run does. An emulator takes a tap, a double tap and a long press.
 - **A screen's markers are boxed on 🗺 Screens**: on its shot (board and panel) and over the live game, in a colour
   no input uses, under the inputs and not clickable, so what tells the screen shows beside what acts on it.
 - **A game is checked ready before it launches**: a run waits while Steam downloads the game (a trace line each

@@ -5,7 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -262,7 +262,7 @@ final class MapTools {
                     null;
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
                     input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
-            case Hotkey hotkey -> hotkey.key() == null ? input : input.named(null, null, hotkey.key().label());
+            case Hotkey hotkey -> hotkey.combo() == null ? input : input.named(null, null, hotkey.combo().caps());
             // A tree scrolled over by its field is scrolled over a node that shows.
             case Tree tree -> tree.members().isEmpty() || input.scroll() == null ? input
                     : input.named(shownNode(tree, context), input.scroll(), null);
@@ -307,7 +307,7 @@ final class MapTools {
                     + "other. A button with no picture yet: screenshot, crop_pictures it with its screen, then "
                     + "try_input it. Nothing was done.");
         }
-        Optional<Key> key = byKey ? Key.named(input.key()) : Optional.empty();
+        Optional<Combo> key = byKey ? Combo.named(input.key()) : Optional.empty();
         if (byKey && key.isEmpty()) return Tried.refused("\"" + input.key() + "\" is no key.");
         String opens = input.opens() == null || input.opens().isBlank() ? null : input.opens().strip();
         String asked = input.screen() == null ? "" : input.screen().strip();
@@ -381,7 +381,7 @@ final class MapTools {
                     on.nodeButtons(measured), notches, input.desktop()), true);
         }
         // The field the input is, or a new one named from what it acts on.
-        String field = held.orElseGet(() -> on.fieldFor(byPicture ? what : "key " + key.get().label()));
+        String field = held.orElseGet(() -> on.fieldFor(byPicture ? what : "key " + key.get().caps()));
         Input made = made(services, held.map(on.inputs()::get), what, key.orElse(null), notches);
         if (info) made = made.info();
         // A copy tried by its place among the picture's copies: the button is repeated, and a way it opens goes
@@ -407,8 +407,10 @@ final class MapTools {
             ToolReach.of(context).ifPresent(reach -> reach.look()
                     .ifPresent(frame -> reach.inView(button, strip.get(), pick, frame)));
         }
+        // A hotkey of the map is pressed as it is written, held when it is.
+        Combo keys = base instanceof Hotkey hotkey ? hotkey.combo() : key.orElse(null);
         ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick,
-                strip.orElse(null), key.orElse(null), input.desktop(), settle, FrameChange.ANSWER_SHARE);
+                strip.orElse(null), keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = Markers.of(on);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
@@ -1329,11 +1331,11 @@ final class MapTools {
      * The field of {@code on} this try is: the key's, the picture's button (by any of its looks), or for a scroll the
      * strip over that picture by those notches, else the picture's untried button, which the scroll then stands for.
      */
-    private static Optional<String> held(MapScreen on, String picture, Key key, int notches, ScreenGraph graph,
+    private static Optional<String> held(MapScreen on, String picture, Combo key, int notches, ScreenGraph graph,
                                          String screen) {
         Map<String, Input> all = on.inputs();
         if (key != null) {
-            return all.entrySet().stream().filter(e -> e.getValue() instanceof Hotkey h && h.key() == key)
+            return all.entrySet().stream().filter(e -> e.getValue() instanceof Hotkey h && h.presses(key))
                     .map(Map.Entry::getKey).findFirst();
         }
         Optional<String> button = all.entrySet().stream()
@@ -1360,7 +1362,7 @@ final class MapTools {
      * The input to record: {@code held} as it is, a button it stood for made a strip over its picture (what was said
      * of the button kept: whether it only tells, its coming and going), or a new one.
      */
-    private static Input made(StudioServices services, Optional<Input> held, String picture, Key key, int notches) {
+    private static Input made(StudioServices services, Optional<Input> held, String picture, Combo key, int notches) {
         if (held.isPresent() && (notches == 0 || held.get() instanceof Strip)) return held.get();
         if (key != null) return Hotkey.of(key);
         ImageTemplate cut = FxCall.call(() -> ScreenBook.picture(services, picture));

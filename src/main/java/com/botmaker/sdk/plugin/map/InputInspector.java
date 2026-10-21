@@ -4,9 +4,11 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
@@ -180,6 +182,8 @@ final class InputInspector {
         all.add(does(constant, field, input));
         switch (input) {
             case Button button -> {
+                all.add(heading("Pressed by"));
+                all.add(gesture(constant, field, button));
                 all.add(heading("Looks"));
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
@@ -188,7 +192,7 @@ final class InputInspector {
                 all.add(inGroup(constant, button));
             }
             case Hotkey hotkey -> {
-                all.add(heading("Key"));
+                all.add(heading("Keys"));
                 all.add(key(constant, field, hotkey));
             }
             case Strip strip -> {
@@ -435,31 +439,108 @@ final class InputInspector {
         };
     }
 
-    // --- a hotkey's key ---
+    // --- how a button is pressed ---
 
-    private Node key(String constant, String field, Hotkey hotkey) {
-        ComboBox<Key> key = keyPick(hotkey.key());
-        // The key last written from here: the editable combo commits on focus loss and on Enter both.
-        Key[] written = {hotkey.key()};
-        key.setOnAction(e -> {
-            Key now = key.getValue();
-            if (now == null || now == written[0]) return;
-            Optional<String> taken = keyTaken(graph.screens().get(constant), field, now);
-            if (taken.isPresent()) {
-                panel.wrote(ScreenEdits.NOT_WRITTEN + taken.get() + " is pressed by " + now.label() + " already.");
-                return;
+    private Node gesture(String constant, String field, Button button) {
+        ComboBox<Gesture> gesture = new ComboBox<>(FXCollections.observableArrayList(Arrays.stream(Gesture.values())
+                .filter(g -> g != Gesture.UNKNOWN).toList()));
+        gesture.setConverter(named(Gesture::displayName));
+        gesture.setValue(button.gesture());
+        gesture.setTooltip(new Tooltip(MapGuide.GESTURE));
+        Spinner<Integer> ms = new Spinner<>(50, 60_000, (int) button.holdTime().toMillis(), 50);
+        ms.setEditable(true);
+        ms.setPrefWidth(90);
+        Label unit = new Label("ms");
+        boolean holds = button.gesture() == Gesture.HOLD;
+        ms.setVisible(holds);
+        ms.setManaged(holds);
+        unit.setVisible(holds);
+        unit.setManaged(holds);
+        gesture.setOnAction(e -> {
+            if (gesture.getValue() != null && gesture.getValue() != button.gesture()) {
+                panel.wrote(ScreenEdits.setGesture(services, constant, field, gesture.getValue(), null));
             }
-            written[0] = now;
-            set(constant, field, ScreenEdits.withKey(hotkey, now));
         });
-        return line(new Label("Pressed by"), key);
+        // The spinner commits on Enter, an arrow and focus loss alike: written once its time changed.
+        ms.valueProperty().addListener((o, was, is) -> {
+            if (is != null && is != button.holdTime().toMillis()) {
+                panel.wrote(ScreenEdits.setGesture(services, constant, field, Gesture.HOLD, Duration.ofMillis(is)));
+            }
+        });
+        return line(gesture, ms, unit);
     }
 
-    /** The field of {@code screen}, other than {@code field}, that is a hotkey of {@code key}; empty for none. */
-    static Optional<String> keyTaken(MapScreen screen, String field, Key key) {
+    // --- a hotkey's keys ---
+
+    private Node key(String constant, String field, Hotkey hotkey) {
+        List<Key> keys = hotkey.combo() == null ? List.of() : hotkey.combo().keys();
+        Key main = keys.reversed().stream().filter(k -> !MODIFIERS.contains(k)).findFirst()
+                .orElse(keys.isEmpty() ? null : keys.getLast());
+        ComboBox<Key> key = keyPick(main);
+        List<CheckBox> with = MODIFIERS.stream().map(m -> {
+            CheckBox tick = new CheckBox(m.label());
+            tick.setSelected(keys.contains(m) && m != main);
+            return tick;
+        }).toList();
+        Spinner<Integer> hold = new Spinner<>(0, 60_000,
+                hotkey.combo() == null ? 0 : (int) hotkey.combo().hold().toMillis(), 50);
+        hold.setEditable(true);
+        hold.setPrefWidth(90);
+        hold.setTooltip(new Tooltip(MapGuide.KEY_HOLD));
+        // The keys last written from here: the editable combo commits on focus loss and on Enter both.
+        Combo[] written = {hotkey.combo()};
+        Runnable write = () -> {
+            Key now = key.getValue();
+            if (now == null || hold.getValue() == null) return;
+            Combo combo = new Combo(retyped(keys, now, MODIFIERS.stream()
+                    .filter(m -> with.get(MODIFIERS.indexOf(m)).isSelected()).toList()),
+                    Duration.ofMillis(hold.getValue()));
+            if (combo.equals(written[0])) return;
+            Optional<String> taken = keyTaken(graph.screens().get(constant), field, combo);
+            if (taken.isPresent()) {
+                panel.wrote(ScreenEdits.NOT_WRITTEN + taken.get() + " is pressed by " + combo.caps() + " already.");
+                return;
+            }
+            written[0] = combo;
+            set(constant, field, hotkey.combo(combo));
+        };
+        key.setOnAction(e -> write.run());
+        with.forEach(tick -> tick.setOnAction(e -> write.run()));
+        hold.valueProperty().addListener((o, was, is) -> write.run());
+        List<Node> row = new ArrayList<>(with);
+        row.add(key);
+        return new VBox(6, line(row.toArray(Node[]::new)), line(new Label("held"), hold, new Label("ms")));
+    }
+
+    /** The keys a hotkey's ticks add to its key, in the order they go down. */
+    private static final List<Key> MODIFIERS = List.of(Key.CTRL, Key.SHIFT, Key.ALT, Key.META);
+
+    /**
+     * {@code keys} as the editor changed them, in their own order: its last key that is no modifier made {@code main}
+     * (added last when it has none), each modifier kept only while {@code ticked}, and a modifier newly ticked put
+     * first. A modifier that is {@code main} itself stays as its key.
+     */
+    static List<Key> retyped(List<Key> keys, Key main, List<Key> ticked) {
+        int last = -1;
+        for (int i = 0; i < keys.size(); i++) if (!MODIFIERS.contains(keys.get(i))) last = i;
+        List<Key> now = new ArrayList<>();
+        ticked.stream().filter(m -> m != main && !keys.contains(m)).forEach(now::add);
+        boolean placed = false;
+        for (int i = 0; i < keys.size(); i++) {
+            Key k = i == last ? main : keys.get(i);
+            if (i == last) placed = true;
+            else if (MODIFIERS.contains(k) && (k == main || !ticked.contains(k))) continue;
+            if (!now.contains(k)) now.add(k);
+        }
+        if (!placed && !now.contains(main)) now.add(main);
+        return now;
+    }
+
+    /** The field of {@code screen}, other than {@code field}, that is a hotkey of {@code keys}; empty for none. */
+    static Optional<String> keyTaken(MapScreen screen, String field, Combo keys) {
         if (screen == null) return Optional.empty();
         return screen.inputs().entrySet().stream()
-                .filter(e -> !e.getKey().equals(field) && e.getValue() instanceof Hotkey h && h.key() == key)
+                .filter(e -> !e.getKey().equals(field) && e.getValue() instanceof Hotkey h && h.presses(keys))
                 .map(Map.Entry::getKey).findFirst();
     }
 

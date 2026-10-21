@@ -2,9 +2,10 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -107,13 +108,13 @@ class TreeWalkTest {
         }
 
         @Override
-        public void click(Point at) {
+        public void press(Point at, Gesture gesture, Duration hold) {
             done.add("click");
         }
 
         @Override
-        public void key(Key key) {
-            done.add("key " + key.name());
+        public void keys(Combo combo) {
+            done.add("key " + combo.keys().getLast().name());
         }
 
         @Override

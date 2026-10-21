@@ -7,8 +7,10 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.text.OcrLanguage;
@@ -285,16 +287,17 @@ final class ActTools {
     }
 
     /**
-     * Clicks {@code picture}, scrolls {@code notches} over it when they are not 0, or taps {@code key} for try_input
+     * Clicks {@code picture} (by {@code copy}'s gesture when it is a button's), scrolls {@code notches} over it when
+     * they are not 0, or presses {@code keys} for try_input
      * on {@code screen}, waiting up to {@code settleMs} for a change as big as {@code share} of the screen, and
      * {@link FrameChange#QUIET_MS} when nothing moves at all. A {@code pick} clicks that copy of {@code copy}'s button
      * along {@code strip}. What moves on its own there is read again only past {@link #MOTION_REUSE_MS}.
      */
     static Entered enter(AgentContext context, String screen, String picture, int notches, Button copy, Pick pick,
-                         Strip strip, Key key, Boolean desktop, int settleMs, double share) {
-        if (key != null) {
-            return acted(context, screen, null, null, desktop, settleMs, false, "Pressed " + key.label(),
-                    "key " + key.label(), share, hands -> hands.key(key));
+                         Strip strip, Combo keys, Boolean desktop, int settleMs, double share) {
+        if (keys != null) {
+            return acted(context, screen, null, null, desktop, settleMs, false, "Pressed " + keys,
+                    "key " + keys.caps(), share, hands -> hands.keys(keys));
         }
         String verb = notches == 0 ? "clicked" : "scrolled";
         Spotted spotted = copy == null || pick == null ? spot(picture, verb, context)
@@ -305,6 +308,14 @@ final class ActTools {
             return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Scrolled " + notches
                     + " at " + spotted.name() + " (" + at.x() + "," + at.y() + ")", "scroll " + spotted.name() + " "
                     + notches, share, hands -> hands.scroll(at.x(), at.y(), notches));
+        }
+        // A button of the map is pressed by its gesture, as a run presses it.
+        Gesture gesture = copy == null ? Gesture.CLICK : copy.gesture();
+        if (gesture != Gesture.CLICK) {
+            long holdMs = copy.holdTime().toMillis();
+            return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, gesture.displayName() + " on "
+                    + spotted.name() + " at " + at.x() + "," + at.y(), gesture.id() + " " + spotted.name(), share,
+                    hands -> hands.press(at.x(), at.y(), gesture, holdMs));
         }
         return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name()
                 + " at " + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));

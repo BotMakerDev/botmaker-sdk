@@ -70,8 +70,7 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   in a method, `/contract-change`). The body stays Java; logic as a managed `Chores` value was weighed and set aside
   for now (a second language, against "bodies are Java on map calls").
 - **Screens audit gaps (2026-10-22)**, each its own plan:
-  - Gestures on existing inputs: a `Button`'s click kind (double, right, hold, hover), `Hotkey` of a `Combo` or
-    sequence; `Mouse`/`Keyboard` already do them, `Reach.perform` does only a left click and one key.
+  - A `Hotkey` of a `KeySequence` (combos one after another, a wait between); `Keyboard.sequence` already does it.
   - New inputs: a text `Field` (picture + text from a `@Param`, then Enter) and a `Drag` (picture → picture or zone).
   - Text as a marker and as a button (OCR), for text-heavy or localized apps.
   - Relative places: a `Pick` or `Way` by another input (`above`, `below`, `leftOf`, `rightOf`, `nearest`,

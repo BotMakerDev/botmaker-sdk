@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -146,8 +147,8 @@ class MapToolsTest {
         assertTrue(cycling.cycles());
         assertEquals(buy, ScreenEdits.cycles(cycling, false));
         Hotkey q = Hotkey.of(Key.Q).info().never("spends gems");
-        assertEquals(new Hotkey(Key.W, false, false, true, "spends gems", false, null, null),
-                ScreenEdits.withKey(q, Key.W));
+        assertEquals(new Hotkey(Combo.of(Key.W), false, false, true, "spends gems", false, null, null),
+                q.combo(Combo.of(Key.W)));
     }
 
     /**

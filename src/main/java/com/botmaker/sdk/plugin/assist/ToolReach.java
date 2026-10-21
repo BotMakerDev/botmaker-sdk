@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -156,13 +158,13 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
     }
 
     @Override
-    public void click(Point at) {
-        hands.click(at.x(), at.y());
+    public void press(Point at, Gesture gesture, Duration hold) {
+        hands.press(at.x(), at.y(), gesture, (hold == null ? Button.HOLD_TIME : hold).toMillis());
     }
 
     @Override
-    public void key(Key key) {
-        hands.key(key);
+    public void keys(Combo combo) {
+        hands.keys(combo);
     }
 
     @Override

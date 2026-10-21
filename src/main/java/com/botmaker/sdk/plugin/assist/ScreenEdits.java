@@ -3,9 +3,9 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
@@ -59,8 +59,8 @@ public final class ScreenEdits {
     public static Input untried(Input input) {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
-                    b.looks(), b.when(), b.repeats(), b.cycles());
-            case Hotkey h -> new Hotkey(h.key(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
+                    b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold());
+            case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
                     s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), false, false, t.isInfo(), null,
@@ -73,8 +73,8 @@ public final class ScreenEdits {
         if (sometimes) return input.sometimes();
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
-                    b.lock(), b.looks(), null, b.repeats(), b.cycles());
-            case Hotkey h -> new Hotkey(h.key(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
+                    b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold());
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
                     false, s.lock(), null);
@@ -88,8 +88,8 @@ public final class ScreenEdits {
         if (info) return input.info();
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
-                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles());
-            case Hotkey h -> new Hotkey(h.key(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
+                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold());
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
                     s.comesAndGoes(), s.lock(), s.when());
@@ -589,13 +589,30 @@ public final class ScreenEdits {
     /** {@code button} stepping through its looks on each press ({@link Button#cycling}), or not. */
     public static Button cycles(Button button, boolean cycles) {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
-                button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles);
+                button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
+                button.gesture(), button.hold());
     }
 
-    /** {@code hotkey} pressed by {@code key} instead, all else kept. */
-    public static Hotkey withKey(Hotkey hotkey, Key key) {
-        return new Hotkey(key, hotkey.isTried(), hotkey.isLeaving(), hotkey.isInfo(), hotkey.never(),
-                hotkey.comesAndGoes(), hotkey.lock(), hotkey.when());
+    /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
+    static Button gestured(Button button, Gesture gesture, Duration hold) {
+        return gesture == Gesture.HOLD && hold != null ? button.hold(hold) : button.gesture(gesture);
+    }
+
+    /**
+     * {@code constant}'s button {@code field} pressed by {@code gesture}, a hold held {@code hold} (null: the default
+     * time); a field that is no button is refused.
+     */
+    public static String setGesture(StudioServices services, String constant, String field, Gesture gesture,
+                                    Duration hold) {
+        if (gesture == Gesture.UNKNOWN) return NOT_WRITTEN + "no such gesture.";
+        ScreenGraph graph = ScreenBook.read(services);
+        if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
+            return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button has a gesture.";
+        }
+        Button now = gestured(button, gesture, hold);
+        return said(ScreenBook.update(services, constant, s -> s.withInput(field, now)),
+                field + " is pressed by " + (now.gesture() == Gesture.HOLD
+                        ? "a hold of " + now.holdTime().toMillis() + " ms" : now.gesture().displayName()) + " now.");
     }
 
     /**

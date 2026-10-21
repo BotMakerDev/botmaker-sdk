@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,5 +65,16 @@ class ComboTest {
     void a_null_or_negative_hold_is_refused() {
         assertThrows(NullPointerException.class, () -> Combo.of(Key.CTRL).held(null));
         assertThrows(IllegalArgumentException.class, () -> Combo.of(Key.CTRL).held(Duration.ofMillis(-1)));
+    }
+
+    @Test
+    void a_combo_is_read_back_from_its_caps() {
+        assertEquals(Optional.of(Combo.of(Key.CTRL, Key.S)), Combo.named("ctrl + s"));
+        assertEquals(Optional.of(Combo.of(Key.Q)), Combo.named("Q"));
+        Combo plus = Combo.of(Key.CTRL, Key.NUMPAD_ADD);
+        assertEquals(Optional.of(plus), Combo.named(plus.caps()), "a key whose label holds the joiner");
+        assertEquals(Optional.empty(), Combo.named("Ctrl+"));
+        assertEquals(Optional.empty(), Combo.named("Ctrl+nothing"));
+        assertEquals(Optional.empty(), Combo.named(" "));
     }
 }

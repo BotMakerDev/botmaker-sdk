@@ -2,9 +2,11 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -117,10 +119,55 @@ class ScreenTypesTest {
         Button never = Button.of(picture("gems")).never("spends gems").repeated();
 
         assertEquals(click, roundTrip(ScreenTypes.BUTTON_SHAPE, click));
-        assertEquals(key, roundTrip(ScreenTypes.HOTKEY_SHAPE, key));
+        assertEquals(key, roundTrip(ScreenTypes.HOTKEY_KEY_SHAPE, key));
         assertEquals(strip, roundTrip(ScreenTypes.STRIP_SHAPE, strip));
         assertEquals(never, roundTrip(ScreenTypes.BUTTON_SHAPE, never));
         assertTrue(never.repeats(), "a repeated button says so");
+    }
+
+    /**
+     * A map written before hotkeys took keys together, {@code Hotkey.of(Key.Q)}, still reads as one key, and keys
+     * together or held are written by {@code Hotkey.of(Combo)}.
+     */
+    @Test
+    void anOldHotkeyOfOneKeyStillReads() {
+        Hotkey q = Hotkey.of(Key.Q).tried();
+        assertTrue(ScreenTypes.HOTKEY_KEY_SHAPE.writes(q));
+        assertFalse(ScreenTypes.HOTKEY_COMBO_SHAPE.writes(q));
+        assertEquals(q, roundTrip(ScreenTypes.HOTKEY_KEY_SHAPE, q));
+        assertEquals(Hotkey.of(Combo.of(Key.Q)), Hotkey.of(Key.Q), "one key is a combo of it");
+
+        Hotkey save = Hotkey.of(Combo.of(Key.CTRL, Key.S)).info();
+        Hotkey held = Hotkey.of(Combo.of(Key.W).held(Duration.ofMillis(500)));
+        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.writes(save));
+        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.writes(held), "a held key is no tap");
+        assertEquals(save, roundTrip(ScreenTypes.HOTKEY_COMBO_SHAPE, save));
+        assertEquals(held, roundTrip(ScreenTypes.HOTKEY_COMBO_SHAPE, held));
+    }
+
+    /** A click, every button's gesture until said, writes no {@code .gesture(…)}; a hold writes its time alone. */
+    @Test
+    void aButtonWithNoGestureWritesNone() {
+        Button plain = Button.of(picture("claim"));
+        assertEquals(Gesture.CLICK, plain.gesture());
+        // The button's last two links: its gesture, then its hold.
+        List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(plain);
+        assertNull(parts.get(parts.size() - 2));
+        assertNull(parts.getLast());
+
+        Button twice = Button.of(picture("hero")).gesture(Gesture.DOUBLE).repeated();
+        Button held = Button.of(picture("charge")).hold(Duration.ofSeconds(2));
+        Button heldLong = Button.of(picture("charge")).gesture(Gesture.HOLD);
+        assertEquals(twice, roundTrip(ScreenTypes.BUTTON_SHAPE, twice));
+        assertEquals(held, roundTrip(ScreenTypes.BUTTON_SHAPE, held));
+        assertEquals(heldLong, roundTrip(ScreenTypes.BUTTON_SHAPE, heldLong));
+        List<Object> heldParts = ScreenTypes.BUTTON_SHAPE.components(held);
+        assertNull(heldParts.get(heldParts.size() - 2), "a hold of its own time says it alone");
+        assertEquals(Duration.ofSeconds(2), heldParts.getLast());
+        List<Object> twiceParts = ScreenTypes.BUTTON_SHAPE.components(twice);
+        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 2));
+        Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).gesture(Gesture.RIGHT);
+        assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
     }
 
     @Test

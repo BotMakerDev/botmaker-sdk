@@ -2,9 +2,10 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
@@ -186,13 +187,13 @@ class ScreenWalkTest {
         }
 
         @Override
-        public void click(Point at) {
+        public void press(Point at, Gesture gesture, Duration hold) {
             did("click " + places.get(at.x() / 20));
         }
 
         @Override
-        public void key(Key key) {
-            did("key " + key.name());
+        public void keys(Combo combo) {
+            did("key " + combo.keys().getLast().name());
         }
 
         @Override
@@ -662,8 +663,8 @@ class ScreenWalkTest {
                 looked.add(picture.id());
                 return game.find(picture, frame);
             }
-            @Override public void click(Point at) { game.click(at); }
-            @Override public void key(Key key) { game.key(key); }
+            @Override public void press(Point at, Gesture gesture, Duration hold) { game.press(at, gesture, hold); }
+            @Override public void keys(Combo combo) { game.keys(combo); }
             @Override public void scroll(Point at, int notches) { game.scroll(at, notches); }
             @Override public void drag(Point from, Point to, Duration time) { game.drag(from, to, time); }
             @Override public long nowMs() { return game.nowMs(); }
@@ -845,10 +846,10 @@ class ScreenWalkTest {
         }
 
         @Override
-        public void click(Point at) {}
+        public void press(Point at, Gesture gesture, Duration hold) {}
 
         @Override
-        public void key(Key key) {}
+        public void keys(Combo combo) {}
 
         @Override
         public void scroll(Point at, int notches) {}

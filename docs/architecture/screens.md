@@ -17,7 +17,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Input`**: a picture click, a key or a scroll, with `tried()` (opened nothing), `leaves()` (to a screen
   reached otherwise), `info()` (only tells: tried last), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
   picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
-  copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16).
+  copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16). A button is
+  pressed by its `Gesture` (`.gesture(Gesture.DOUBLE)`, right, middle, hover; `.hold(Duration)` a hold, else
+  `Button.HOLD_TIME`), a click when it says none; a `Hotkey` is a `Combo`, keys together or held
+  (`Hotkey.of(Key)` stays the one-key spelling, its own shape). An emulator takes a tap, a double tap and a long
+  press; the rest are a mouse's (2026-10-22).
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
@@ -98,7 +102,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   method, else a walk to `ScreenGraph.home()`: the `root()` (the start screen, else the first screen reached from
   none, popups aside), or past a start screen the one its loading ends on. Nothing leads back to a start screen.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
-  `ToolReach` for the assistant. `perform` is the one place an input is done. A list member not in view is scrolled
+  `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
+  Duration)` and `keys(Combo)`. A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
   its `Scroll.most` times each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a

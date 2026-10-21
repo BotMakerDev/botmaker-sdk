@@ -80,7 +80,7 @@ public final class ScreenDesk {
             case Hotkey ignored -> null;
         };
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
-        String key = input instanceof Hotkey hotkey && hotkey.key() != null ? hotkey.key().label() : null;
+        String key = input instanceof Hotkey hotkey && hotkey.combo() != null ? hotkey.combo().caps() : null;
         MapTools.Try asked = new MapTools.Try(constant, List.of(new MapTools.Step(picture, notches,
                 key == null ? how.match() : null, key, opens, null, null, input.isInfo() ? true : null)),
                 how.settleMs(), how.stays(), true);

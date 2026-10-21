@@ -3,8 +3,10 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
@@ -94,9 +96,26 @@ public interface Reach {
         return findEach(pictures, frame);
     }
 
-    void click(Point at);
+    /** Presses at {@code at} by {@code gesture}, a {@link Gesture#HOLD} held {@code hold}; anything unknown clicked. */
+    void press(Point at, Gesture gesture, Duration hold);
 
-    void key(Key key);
+    /** Presses {@code combo}'s keys together, held as it says, else a game's tap. */
+    void keys(Combo combo);
+
+    /** One left click at {@code at}. */
+    default void click(Point at) {
+        press(at, Gesture.CLICK, null);
+    }
+
+    /** {@code key} pressed. */
+    default void key(Key key) {
+        keys(Combo.of(key));
+    }
+
+    /** {@code button} pressed at {@code place}, where it was found, by its gesture. */
+    default void press(Button button, Rect place) {
+        press(pointOn(place), button.gesture(), button.holdTime());
+    }
 
     void scroll(Point at, int notches);
 
@@ -362,7 +381,7 @@ public interface Reach {
 
     /**
      * Does {@code input} on {@code frame}: a key pressed; a strip scrolled once over a member that shows (the middle
-     * of its band when none does); a button found, in any look but a disabled one, and clicked. A member of
+     * of its band when none does); a button found, in any look but a disabled one, and pressed by its gesture. A member of
      * {@code strip} not showing is scrolled to first: the strip's scroll is done over a member that shows, up to its
      * {@link Scroll#most} times each way, the game looked at again once the strip holds still. A scroll after which
      * no member moved a quarter of the strip's step met its end, and the scroll turns the other way once: the
@@ -378,7 +397,7 @@ public interface Reach {
     default boolean perform(Input input, Strip strip, Pick pick, BufferedImage frame) {
         return switch (input) {
             case Hotkey hotkey -> {
-                key(hotkey.key());
+                keys(hotkey.combo());
                 yield true;
             }
             // A tree is walked to one of its nodes, never pressed as a whole.
@@ -398,7 +417,7 @@ public interface Reach {
                 }
                 Optional<Seen> seen = inView(button, strip, pick, frame);
                 if (seen.isEmpty() || seen.get().state().blocks()) yield false;
-                click(pointOn(seen.get().place()));
+                press(button, seen.get().place());
                 yield true;
             }
         };
@@ -421,7 +440,7 @@ public interface Reach {
                 pause(CLICK_SETTLE_MS);
                 if (Thread.currentThread().isInterrupted()) return true;
             }
-            click(pointOn(copy.place()));
+            press(button, copy.place());
             any = true;
         }
         return any;

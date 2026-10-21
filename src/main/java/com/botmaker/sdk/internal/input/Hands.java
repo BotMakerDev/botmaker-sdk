@@ -2,8 +2,10 @@ package com.botmaker.sdk.internal.input;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.session.PointerPolicy;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.shared.capture.GenericWindow;
@@ -11,6 +13,7 @@ import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
 import java.awt.Rectangle;
+import java.util.List;
 
 /**
  * Input on a game outside a run, in the pixels of the frame read from it: the assistant's click, key and scroll.
@@ -24,7 +27,15 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
 
     void click(int x, int y);
 
-    void key(Key key);
+    /** At ({@code x}, {@code y}) by {@code gesture}, a hold held {@code holdMs}: what a map button's gesture does. */
+    void press(int x, int y, Gesture gesture, long holdMs);
+
+    /** {@code combo}'s keys down in order, held its hold (a key's tap when none), and up in reverse. */
+    void keys(Combo combo);
+
+    default void key(Key key) {
+        keys(Combo.of(key));
+    }
 
     void scroll(int x, int y, int amount);
 
@@ -41,14 +52,29 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
 
         @Override
-        public void key(Key key) {
+        public void press(int x, int y, Gesture gesture, long holdMs) {
+            if (gesture == Gesture.CLICK || gesture == Gesture.UNKNOWN) {
+                click(x, y);
+                return;
+            }
+            Point o = origin();
+            pressed(session.controller(), o.x() + x, o.y() + y, gesture, holdMs);
+        }
+
+        @Override
+        public void keys(Combo combo) {
             NativeController controller = session.controller();
             GenericWindow window = session.attached();
-            if (window == null) controller.keyDown(key.nativeCode());
-            else controller.keyDown(window, key.nativeCode());
-            hold();
-            if (window == null) controller.keyUp(key.nativeCode());
-            else controller.keyUp(window, key.nativeCode());
+            List<Key> keys = combo.keys();
+            for (Key key : keys) {
+                if (window == null) controller.keyDown(key.nativeCode());
+                else controller.keyDown(window, key.nativeCode());
+            }
+            hold(combo);
+            for (Key key : keys.reversed()) {
+                if (window == null) controller.keyUp(key.nativeCode());
+                else controller.keyUp(window, key.nativeCode());
+            }
         }
 
         @Override
@@ -72,8 +98,11 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
     }
 
-    /** The emulator's touch: a click, and a swipe for a drag. */
+    /** The emulator's touch: a click, a double tap, a long press, and a swipe for a drag. */
     record OnEmulator(CaptureSource emulator) implements Hands {
+
+        /** Between a double tap's two taps: well inside a phone's double-tap time. */
+        private static final long DOUBLE_TAP_MS = 80;
 
         @Override
         public void click(int x, int y) {
@@ -81,7 +110,25 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
 
         @Override
-        public void key(Key key) {
+        public void press(int x, int y, Gesture gesture, long holdMs) {
+            Point at = new Point(x, y);
+            // As a run presses it there: a touch screen has no right or middle button, and no hover but a press.
+            switch (gesture) {
+                case CLICK, UNKNOWN, RIGHT, MIDDLE -> emulator.click(at);
+                case DOUBLE -> {
+                    emulator.click(at);
+                    sleep(DOUBLE_TAP_MS);
+                    emulator.click(at);
+                }
+                // A swipe that stays put is a long press.
+                case HOLD -> emulator.drag(at, at, holdMs);
+                case HOVER -> {
+                }
+            }
+        }
+
+        @Override
+        public void keys(Combo combo) {
             throw new UnsupportedOperationException("The emulator takes clicks here; a key needs try_statement.");
         }
 
@@ -106,11 +153,24 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
 
         @Override
-        public void key(Key key) {
+        public void press(int x, int y, Gesture gesture, long holdMs) {
+            if (gesture == Gesture.CLICK || gesture == Gesture.UNKNOWN) {
+                click(x, y);
+                return;
+            }
             NativeController controller = NativeControllerFactory.get();
-            controller.keyDown(key.nativeCode());
-            hold();
-            controller.keyUp(key.nativeCode());
+            java.awt.Point back = controller.cursorPosition();
+            pressed(controller, origin.x() + x, origin.y() + y, gesture, holdMs);
+            // A hover leaves the pointer on what it opened.
+            if (back != null && gesture != Gesture.HOVER) controller.mouseMove(back.x, back.y);
+        }
+
+        @Override
+        public void keys(Combo combo) {
+            NativeController controller = NativeControllerFactory.get();
+            for (Key key : combo.keys()) controller.keyDown(key.nativeCode());
+            hold(combo);
+            for (Key key : combo.keys().reversed()) controller.keyUp(key.nativeCode());
         }
 
         @Override
@@ -128,6 +188,36 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             java.awt.Point back = controller.cursorPosition();
             glide(controller, origin.x() + fromX, origin.y() + fromY, origin.x() + toX, origin.y() + toY, ms);
             if (back != null) controller.mouseMove(back.x, back.y);
+        }
+    }
+
+    /**
+     * A gesture other than a click at the display's ({@code x}, {@code y}): the pointer moved there, then a double
+     * click's two presses, a right or middle press, the left button held {@code holdMs}, or nothing for a hover.
+     */
+    private static void pressed(NativeController controller, int x, int y, Gesture gesture, long holdMs) {
+        controller.mouseMove(x, y);
+        switch (gesture) {
+            case DOUBLE -> {
+                tap(controller, MouseButton.LEFT, controller.pressHoldMs());
+                tap(controller, MouseButton.LEFT, controller.pressHoldMs());
+            }
+            case RIGHT -> tap(controller, MouseButton.RIGHT, controller.pressHoldMs());
+            case MIDDLE -> tap(controller, MouseButton.MIDDLE, controller.pressHoldMs());
+            case HOLD -> tap(controller, MouseButton.LEFT, holdMs);
+            case CLICK, UNKNOWN -> tap(controller, MouseButton.LEFT, controller.pressHoldMs());
+            case HOVER -> {
+            }
+        }
+    }
+
+    /** {@code button} down, held {@code ms}, and up, up even when interrupted. */
+    private static void tap(NativeController controller, MouseButton button, long ms) {
+        controller.mouseButton(button.code(), true);
+        try {
+            sleep(ms);
+        } finally {
+            controller.mouseButton(button.code(), false);
         }
     }
 
@@ -153,10 +243,16 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
     }
 
-    /** A key's hold between press and release; an interrupt is kept for what follows. */
-    private static void hold() {
+    /** {@code combo}'s hold between its keys' press and release, a key's tap when it has none. */
+    private static void hold(Combo combo) {
+        sleep(combo.hold().isZero() ? KEY_HOLD_MS : combo.hold().toMillis());
+    }
+
+    /** A pause of {@code ms}; an interrupt is kept for what follows. */
+    private static void sleep(long ms) {
+        if (ms <= 0) return;
         try {
-            Thread.sleep(KEY_HOLD_MS);
+            Thread.sleep(ms);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

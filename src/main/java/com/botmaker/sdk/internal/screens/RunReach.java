@@ -5,13 +5,17 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Keyboard;
+import com.botmaker.sdk.api.input.Mouse;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -26,7 +30,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class RunReach implements Reach {
 
     /** How long a key is held, as the assistant's hands hold one: a game polling its keys misses a tap with none. */
-    private static final int KEY_HOLD_MS = 40;
+    private static final Duration KEY_HOLD = Duration.ofMillis(40);
+
+    /** Between a double tap's two taps on an emulator: well inside a phone's double-tap time. */
+    private static final long DOUBLE_TAP_MS = 80;
 
     @Override
     public Optional<BufferedImage> look() {
@@ -106,18 +113,49 @@ public final class RunReach implements Reach {
                 place.y() + place.height() / 4 + random.nextInt(place.height() / 2 + 1));
     }
 
+    /**
+     * A click and a hold through the source, so an emulator taps and long-presses; the other gestures as
+     * {@code Mouse} does them on the source's window.
+     */
     @Override
-    public void click(Point at) {
+    public void press(Point at, Gesture gesture, Duration hold) {
         CaptureSource source = Source.current();
-        source.click(onScreen(source, at));
+        if (source.base() instanceof EmulatorSource && gesture != Gesture.HOLD) {
+            pressed(source, at, gesture);
+            return;
+        }
+        switch (gesture) {
+            case DOUBLE -> Mouse.doubleClick(source, at.x(), at.y());
+            case RIGHT -> Mouse.rightClick(source, at.x(), at.y());
+            case MIDDLE -> Mouse.middleClick(source, at.x(), at.y());
+            // Pressed and let go where it was pressed, after the hold: a long press on an emulator too.
+            case HOLD -> source.drag(onScreen(source, at), onScreen(source, at),
+                    (hold == null ? Button.HOLD_TIME : hold).toMillis());
+            case HOVER -> Mouse.move(onScreen(source, at));
+            case CLICK, UNKNOWN -> source.click(onScreen(source, at));
+        }
+    }
+
+    /**
+     * {@code gesture} on an emulator, which has no mouse: a double tap for a double click, a tap for a right or middle
+     * click, and nothing for a hover, which a touch screen has no way to do without pressing.
+     */
+    private void pressed(CaptureSource emulator, Point at, Gesture gesture) {
+        switch (gesture) {
+            case DOUBLE -> {
+                emulator.click(onScreen(emulator, at));
+                pause(DOUBLE_TAP_MS);
+                emulator.click(onScreen(emulator, at));
+            }
+            case HOVER -> {
+            }
+            default -> emulator.click(onScreen(emulator, at));
+        }
     }
 
     @Override
-    public void key(Key key) {
-        CaptureSource source = Source.current();
-        Keyboard.press(source, key);
-        Wait.milliseconds(KEY_HOLD_MS);
-        Keyboard.release(source, key);
+    public void keys(Combo combo) {
+        Keyboard.combo(Source.current(), combo.hold().isZero() ? combo.held(KEY_HOLD) : combo);
     }
 
     @Override
