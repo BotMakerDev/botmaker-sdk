@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Flow;
@@ -110,7 +111,7 @@ public final class FlowConstants {
      * parameter.
      */
     public static List<String> homes(PluginValues values) {
-        return values == null ? List.of() : values.voidMethods();
+        return values == null ? List.of() : values.methods(MethodShape.VOID);
     }
 
     /**
@@ -121,7 +122,7 @@ public final class FlowConstants {
     public static PluginValues.MethodWrite createMethod(PluginValues values, String type, String className,
                                                         String method) {
         if (values == null) return new PluginValues.MethodWrite(null, PluginValues.NO_SOURCE_TREE);
-        return type == null ? values.createVoidMethod(className, method)
+        return type == null ? values.createMethod(MethodShape.VOID, className, method)
                 : SET.createMethod(values, type, className, method);
     }
 

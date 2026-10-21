@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -209,7 +210,8 @@ final class ScreenHands {
         always.setSelected(current.isEmpty());
         always.setOnAction(e -> set.accept(""));
         menu.getItems().add(always);
-        List<String> methods = services.pluginValues() == null ? List.of() : services.pluginValues().booleanMethods();
+        List<String> methods = services.pluginValues() == null ? List.of()
+                : services.pluginValues().methods(MethodShape.BOOLEAN);
         if (!methods.isEmpty()) menu.getItems().add(new SeparatorMenuItem());
         for (String method : methods) {
             RadioMenuItem one = new RadioMenuItem(method);
@@ -242,7 +244,7 @@ final class ScreenHands {
         Modals.form(services, "New method", new VBox(8, new Label("The class it goes in"), holder,
                 new Label("Its name: it answers true while the way is open"), name), () -> {
             String className = holder.getValue() == null ? "" : holder.getValue().strip();
-            PluginValues.MethodWrite wrote = services.pluginValues().createBooleanMethod(className,
+            PluginValues.MethodWrite wrote = services.pluginValues().createMethod(MethodShape.BOOLEAN, className,
                     name.getText().strip());
             if (!wrote.written()) {
                 done.accept("Not written: " + wrote.refusal());

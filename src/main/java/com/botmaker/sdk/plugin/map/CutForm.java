@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.screens.Button;
@@ -274,7 +275,8 @@ final class CutForm {
             anchor.setValue(Anchor.CENTER);
             shows.setPromptText("the number it shows: 12,500");
             notches.setPrefWidth(70);
-            List<String> methods = services.pluginValues() == null ? List.of() : services.pluginValues().booleanMethods();
+            List<String> methods = services.pluginValues() == null ? List.of()
+                    : services.pluginValues().methods(MethodShape.BOOLEAN);
             when.getItems().setAll(Stream.concat(Stream.of(ALWAYS), methods.stream()).toList());
             when.setValue(ALWAYS);
             Path resources = services.resourcesDir();

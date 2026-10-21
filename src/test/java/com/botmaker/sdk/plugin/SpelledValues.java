@@ -116,14 +116,17 @@ public abstract class SpelledValues implements PluginValues {
         return methods(set.id(), group);
     }
 
-    @Override public final List<String> voidMethods() { return methods((String) null, null); }
+    @Override public final List<String> methods(MethodShape shape) {
+        return shape == MethodShape.VOID ? methods((String) null, null) : List.of();
+    }
 
     @Override public final MethodWrite createMethod(ManagedValue<?> set, String group, String className,
                                                     String method) {
         return createMethod(set.id(), group, className, method);
     }
 
-    @Override public final MethodWrite createVoidMethod(String className, String method) {
-        return createMethod((String) null, null, className, method);
+    @Override public final MethodWrite createMethod(MethodShape shape, String className, String method) {
+        return shape == MethodShape.VOID ? createMethod((String) null, null, className, method)
+                : new MethodWrite(null, NO_SOURCE_TREE);
     }
 }
