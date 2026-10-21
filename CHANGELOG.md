@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A screen's markers are boxed on 🗺 Screens**: on its shot (board and panel) and over the live game, in a colour
+  no input uses, under the inputs and not clickable, so what tells the screen shows beside what acts on it.
 - **A game is checked ready before it launches**: a run waits while Steam downloads the game (a trace line each
   minute, 30 min at most) and stops with the reason when the game isn't installed or Steam is signed out, instead of
   a launch that Steam turns into a dialog nobody answers. Studio's ▶ Launch and Launch and pick wait the same,

@@ -603,11 +603,12 @@ final class ScreenCanvas {
      * row to {@code onPick} when clicked. A box away from its picture's place is dashed; a picture not on the shot is
      * listed under it. A member of one of {@code strips} is drawn in its strip instead, every member of the list in
      * it, over the place the list sits. {@code onShot} runs on a click elsewhere on the shot (null: none). The input
-     * whose field is {@code picked} is drawn picked (null: none).
+     * whose field is {@code picked} is drawn picked (null: none). Each of {@code markers} (picture ids) is boxed in
+     * the markers' colour, under the inputs and not clickable.
      */
-    Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<Strip> strips,
-                                  Map<String, FrameCut> cuts, Audit audit, String picked, Consumer<Row> onPick,
-                                  Runnable onShot) {
+    Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<String> markers,
+                                  List<Strip> strips, Map<String, FrameCut> cuts, Audit audit, String picked,
+                                  Consumer<Row> onPick, Runnable onShot) {
         int shotWidth = resources == null ? 0 : ScreenShots.size(ScreenShots.file(resources, constant)).width();
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
         return image(constant, width, false).map(image -> {
@@ -621,6 +622,18 @@ final class ScreenCanvas {
             FlowPane missing = new FlowPane(6, 4);
             // A shot whose size is unread has no place for a strip: its members are boxed one by one instead.
             List<Strip> drawn = shotWidth > 0 && shotHeight > 0 ? strips : List.of();
+            for (String marker : markers) {
+                Optional<Spot> spot = audit == null ? Optional.empty() : audit.of(marker);
+                Optional<Box> at = spot.isPresent() && spot.get().at() != null && shotWidth > 0 && shotHeight > 0
+                        ? Optional.of(boxOn(spot.get().at(), shotWidth, shotHeight, width, height))
+                        : cutBox(cuts.get(marker), shotWidth, shotHeight, width, height);
+                at.ifPresent(b -> {
+                    Rectangle box = new Rectangle(b.x(), b.y(), b.width(), b.height());
+                    box.getStyleClass().add("screen-shot-marker");
+                    box.setMouseTransparent(true);
+                    boxes.getChildren().add(box);
+                });
+            }
             for (Row row : rows) {
                 if (row.picture() == null || drawn.stream().anyMatch(s -> s.has(row))) continue;
                 Optional<Spot> spot = audit == null ? Optional.empty() : audit.of(row.picture());
@@ -639,14 +652,9 @@ final class ScreenCanvas {
                     // Found on the shot, in the shot's own pixels.
                     at = boxOn(spot.get().at(), shotWidth, shotHeight, width, height);
                 } else {
-                    FrameCut cut = cuts.get(row.picture());
-                    if (cut == null || cut.place() == null) continue;
-                    // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
-                    boolean framed = cut.frame() != null && cut.frame().width() > 0 && cut.frame().height() > 0;
-                    double frameWidth = framed ? cut.frame().width() : shotWidth;
-                    double frameHeight = framed ? cut.frame().height() : shotHeight;
-                    if (frameWidth <= 0 || frameHeight <= 0) continue;
-                    at = boxOn(cut.place(), frameWidth, frameHeight, width, height);
+                    Optional<Box> cut = cutBox(cuts.get(row.picture()), shotWidth, shotHeight, width, height);
+                    if (cut.isEmpty()) continue;
+                    at = cut.get();
                 }
                 Rectangle box = new Rectangle(at.x(), at.y(), at.width(), at.height());
                 box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
@@ -685,6 +693,18 @@ final class ScreenCanvas {
             shotAndMissing.setMaxWidth(width);
             return shotAndMissing;
         });
+    }
+
+    /** Where {@code cut} was cut, on a shot {@code width} by {@code height}; empty when it names no place. */
+    private static Optional<Box> cutBox(FrameCut cut, double shotWidth, double shotHeight, double width,
+                                        double height) {
+        if (cut == null || cut.place() == null) return Optional.empty();
+        // A picture that names no frame was cut on the game's frame, which the shot is, pixel for pixel.
+        boolean framed = cut.frame() != null && cut.frame().width() > 0 && cut.frame().height() > 0;
+        double frameWidth = framed ? cut.frame().width() : shotWidth;
+        double frameHeight = framed ? cut.frame().height() : shotHeight;
+        if (frameWidth <= 0 || frameHeight <= 0) return Optional.empty();
+        return Optional.of(boxOn(cut.place(), frameWidth, frameHeight, width, height));
     }
 
     /**

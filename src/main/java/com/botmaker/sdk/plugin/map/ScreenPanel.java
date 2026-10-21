@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
@@ -235,8 +236,15 @@ final class ScreenPanel {
         List<Row> rows = ScreenCards.rows(graph, constant);
         List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         Audit audit = audits.get(constant);
+        List<String> markers = markerIds(constant);
         board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
-                strips, cuts, audit, field, row -> picked(constant, row), null));
+                markers, strips, cuts, audit, field, row -> picked(constant, row), null));
+    }
+
+    /** The pictures that tell {@code constant}: its markers, by id. */
+    private List<String> markerIds(String constant) {
+        MapScreen screen = graph.screens().get(constant);
+        return screen == null ? List.of() : Markers.of(screen).shown().stream().map(ImageTemplate::id).toList();
     }
 
     /** {@code constant}'s ways in, each as the panel says it: the screen it leaves, by its name now. */
@@ -388,8 +396,8 @@ final class ScreenPanel {
         rows.stream().filter(r -> r.field().equals(picked)).findFirst()
                 .ifPresent(r -> all.getChildren().addAll(pickedInput(shown, r)));
         all.getChildren().addAll(heading("Markers"), markers, heading("Inputs"), inputs);
-        canvas.shotWithInputs(shown, shotWidth, rows, ScreenCards.strips(graph, shown, rows), cuts, audits.get(shown),
-                        picked, row -> picked(shown, row), () -> showScreen(shown))
+        canvas.shotWithInputs(shown, shotWidth, rows, markerIds(shown), ScreenCards.strips(graph, shown, rows), cuts,
+                        audits.get(shown), picked, row -> picked(shown, row), () -> showScreen(shown))
                 .ifPresent(shot -> all.getChildren().addFirst(shot));
         all.getChildren().addAll(heading("Ways in"), waysIn(shown, screen, card.popup()));
         if (!screen.variants().isEmpty()) {

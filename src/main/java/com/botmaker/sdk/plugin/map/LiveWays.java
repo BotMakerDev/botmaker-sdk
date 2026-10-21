@@ -39,18 +39,32 @@ final class LiveWays {
         Map<String, Rect> boxes = new LinkedHashMap<>();
         for (Row row : rows) {
             FrameCut cut = row.picture() == null ? null : cuts.get(row.picture());
-            if (cut == null || cut.place() == null) continue;
-            double from = cut.frame() == null ? width : cut.frame().width();
-            double fromHeight = cut.frame() == null ? height : cut.frame().height();
-            double scale = Math.min(width / from, height / fromHeight);
-            double left = (width - from * scale) / 2;
-            double top = (height - fromHeight * scale) / 2;
-            Rect place = cut.place();
-            boxes.putIfAbsent(row.field(), new Rect((int) Math.round(left + place.x() * scale),
-                    (int) Math.round(top + place.y() * scale), Math.max(1, (int) Math.round(place.width() * scale)),
-                    Math.max(1, (int) Math.round(place.height() * scale))));
+            if (cut != null && cut.place() != null) boxes.putIfAbsent(row.field(), scaled(cut, width, height));
         }
         return boxes;
+    }
+
+    /** Where each of {@code markers} (picture ids) was cut, on a frame {@code width} by {@code height}, by id. */
+    static Map<String, Rect> markerBoxes(List<String> markers, Map<String, FrameCut> cuts, int width, int height) {
+        Map<String, Rect> boxes = new LinkedHashMap<>();
+        for (String marker : markers) {
+            FrameCut cut = cuts.get(marker);
+            if (cut != null && cut.place() != null) boxes.putIfAbsent(marker, scaled(cut, width, height));
+        }
+        return boxes;
+    }
+
+    /** {@code cut}'s place on a frame {@code width} by {@code height}, letterboxed from the frame it was cut on. */
+    private static Rect scaled(FrameCut cut, int width, int height) {
+        double from = cut.frame() == null ? width : cut.frame().width();
+        double fromHeight = cut.frame() == null ? height : cut.frame().height();
+        double scale = Math.min(width / from, height / fromHeight);
+        double left = (width - from * scale) / 2;
+        double top = (height - fromHeight * scale) / 2;
+        Rect place = cut.place();
+        return new Rect((int) Math.round(left + place.x() * scale), (int) Math.round(top + place.y() * scale),
+                Math.max(1, (int) Math.round(place.width() * scale)),
+                Math.max(1, (int) Math.round(place.height() * scale)));
     }
 
     /** The field whose box holds {@code at}, the smallest when several do: a button drawn on a panel. */

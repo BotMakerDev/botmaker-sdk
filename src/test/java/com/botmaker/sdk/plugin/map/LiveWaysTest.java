@@ -26,6 +26,13 @@ class LiveWaysTest {
     }
 
     @Test
+    void aMarkerIsBoxedByItsPictureAndOneNeverCutIsLeftOut() {
+        Map<String, Rect> boxes = LiveWays.markerBoxes(List.of("home_title", "home_never_cut"),
+                Map.of("home_title", FrameCut.of(1920, 1080, new Rect(800, 20, 320, 60))), 960, 540);
+        assertEquals(Map.of("home_title", new Rect(400, 10, 160, 30)), boxes);
+    }
+
+    @Test
     void aFrameOfAnotherShapeIsFittedWholeAndCentred() {
         // A 1000×500 cut drawn on a 1000×1000 frame: half as tall, 250 down.
         Map<String, Rect> boxes = LiveWays.boxes(List.of(row("go", "go")),

@@ -4,7 +4,10 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.input.Hands;
+import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
@@ -390,12 +393,24 @@ final class LiveBoard {
         boxes.getChildren().clear();
         if (on == null || frameWidth == 0) return;
         double scale = view.getFitWidth() / frameWidth;
-        for (Rect box : boxesOf(on).values()) {
-            Rectangle drawn = new Rectangle(box.x() * scale, box.y() * scale, box.width() * scale,
-                    box.height() * scale);
-            drawn.getStyleClass().add("screen-live-box");
-            boxes.getChildren().add(drawn);
-        }
+        for (Rect box : markerBoxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-marker"));
+        for (Rect box : boxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-box"));
+    }
+
+    private static Rectangle drawn(Rect box, double scale, String style) {
+        Rectangle drawn = new Rectangle(box.x() * scale, box.y() * scale, box.width() * scale, box.height() * scale);
+        drawn.getStyleClass().add(style);
+        return drawn;
+    }
+
+    /** Where {@code constant}'s markers are on a live frame, by picture id. */
+    private Map<String, Rect> markerBoxesOf(String constant) {
+        ScreenGraph map = graph.get();
+        MapScreen screen = map.screens().get(constant);
+        if (screen == null || services.pluginValues() == null || frameWidth == 0) return Map.of();
+        List<String> markers = Markers.of(screen).shown().stream().map(ImageTemplate::id).toList();
+        return LiveWays.markerBoxes(markers, TemplateUses.cuts(services.pluginValues(), markers), frameWidth,
+                frameHeight);
     }
 
     /** Where {@code constant}'s inputs are on a live frame, by field. */

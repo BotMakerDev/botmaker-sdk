@@ -12,6 +12,7 @@
     -bm-screen-finished: -bm-severity-ok-text;
     -bm-screen-plain: -bm-muted;
     -bm-screen-here: -bm-accent;
+    -bm-screen-marker: -bm-cat-vision;
     /* A see-through grey lightens a dark shot and darkens a light one alike, in either theme. */
     -bm-screen-box-hover: rgba(128, 128, 128, 0.3);
 }
@@ -115,6 +116,19 @@
 .screen-shot-box-picked {
     -fx-stroke: -bm-screen-here;
     -fx-stroke-width: 3;
+}
+
+/* A marker of the screen, on its shot or the live game: what tells the screen, in a colour no input uses. */
+.screen-shot-marker,
+.screen-live-marker {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-screen-marker;
+    -fx-stroke-width: 2;
+}
+
+.screen-live-marker {
+    -fx-stroke-width: 1.5;
+    -fx-stroke-dash-array: 2 2;
 }
 
 /* The live board: the inputs of the screen the game shows, boxed thin over the game; the screen it shows in the outline. */
