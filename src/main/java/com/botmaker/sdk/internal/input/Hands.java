@@ -165,8 +165,14 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             if (back != null && gesture != Gesture.HOVER) controller.mouseMove(back.x, back.y);
         }
 
+        /** Never Alt or Meta with others: on the user's desktop they are the window manager's (Alt+F4, Meta+L). */
         @Override
         public void keys(Combo combo) {
+            if (combo.keys().size() > 1 && (combo.keys().contains(Key.ALT) || combo.keys().contains(Key.META))) {
+                throw new UnsupportedOperationException("On this desktop keys with Alt or Meta reach the window "
+                        + "manager, not only the game: run the game in a private display to press " + combo.caps()
+                        + ".");
+            }
             NativeController controller = NativeControllerFactory.get();
             for (Key key : combo.keys()) controller.keyDown(key.nativeCode());
             hold(combo);

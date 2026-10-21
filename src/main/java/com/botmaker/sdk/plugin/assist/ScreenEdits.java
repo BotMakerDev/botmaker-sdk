@@ -53,6 +53,9 @@ public final class ScreenEdits {
     /** How an answer begins when nothing was written. */
     public static final String NOT_WRITTEN = "Not written: ";
 
+    /** The longest a button or a hotkey is held, as 🗺's spinners offer: past it the game is held, not pressed. */
+    public static final Duration LONGEST_HOLD = Duration.ofMinutes(1);
+
     private ScreenEdits() {}
 
     /** {@code input} as it was cut, untried: tried, leaving, never and lock cleared, the rest kept. */
@@ -605,6 +608,9 @@ public final class ScreenEdits {
     public static String setGesture(StudioServices services, String constant, String field, Gesture gesture,
                                     Duration hold) {
         if (gesture == Gesture.UNKNOWN) return NOT_WRITTEN + "no such gesture.";
+        if (hold != null && (hold.isNegative() || hold.compareTo(LONGEST_HOLD) > 0)) {
+            return NOT_WRITTEN + "a hold lasts 0 to " + LONGEST_HOLD.toMillis() + " ms.";
+        }
         ScreenGraph graph = ScreenBook.read(services);
         if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
             return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button has a gesture.";

@@ -402,8 +402,10 @@ final class MapEdits {
             return AgentReply.refused(field + " is no button" + (edit.gesture() == null ? " or hotkey" : "")
                     + ": only a button has a gesture, and a hotkey a hold. Nothing was written.");
         }
-        if (edit.gesture() == Gesture.UNKNOWN || edit.holdMs() != null && edit.holdMs() < 0) {
-            return AgentReply.refused("No such gesture, or a hold under 0 ms. Nothing was written.");
+        if (edit.gesture() == Gesture.UNKNOWN || edit.holdMs() != null
+                && (edit.holdMs() < 0 || edit.holdMs() > ScreenEdits.LONGEST_HOLD.toMillis())) {
+            return AgentReply.refused("No such gesture, or a hold outside 0 to "
+                    + ScreenEdits.LONGEST_HOLD.toMillis() + " ms. Nothing was written.");
         }
         if (edit.holdMs() != null && edit.gesture() != null && edit.gesture() != Gesture.HOLD) {
             return AgentReply.refused("holdMs goes with gesture hold, or alone. Nothing was written.");
