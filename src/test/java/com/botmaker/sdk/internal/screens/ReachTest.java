@@ -9,10 +9,12 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -647,6 +649,141 @@ class ReachTest {
         assertEquals("each from the south-west", Pick.each(Order.SOUTH_WEST).label());
         assertEquals("until none", Pick.untilNone().label());
         assertEquals(Pick.first(), new Pick(null, 7, null), "a first pick holds no nth and reads north");
+    }
+
+    /**
+     * A screen of pictures and words at known places, at {@code scale} times the size they were cut at: three Claim
+     * copies down a column, a Daily title on the middle one's row, a header and a footer around it, an avatar frame.
+     */
+    private static final class Shown extends Column {
+        final int scale;
+        final Map<String, List<Rect>> pictures;
+
+        Shown(int scale, Map<String, List<Rect>> pictures) {
+            super(Map.of(), 0);
+            this.scale = scale;
+            this.pictures = pictures;
+        }
+
+        Shown(int scale) {
+            this(scale, Map.of(
+                    "claim", List.of(new Rect(500, 100, 60, 30), new Rect(500, 200, 60, 30), new Rect(500, 300, 60, 30)),
+                    "daily", List.of(new Rect(100, 205, 120, 20)),
+                    "header", List.of(new Rect(0, 150, 800, 20)),
+                    "footer", List.of(new Rect(0, 260, 800, 20)),
+                    "avatar_frame", List.of(new Rect(100, 100, 40, 20))));
+        }
+
+        private Rect scaled(Rect r) {
+            return new Rect(r.x() * scale, r.y() * scale, r.width() * scale, r.height() * scale);
+        }
+
+        @Override
+        public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
+            return findAll(picture, frame).stream().findFirst();
+        }
+
+        @Override
+        public List<Rect> findAll(ImageTemplate picture, BufferedImage frame) {
+            return pictures.getOrDefault(picture.id(), List.of()).stream().map(this::scaled).toList();
+        }
+
+        /** Words read where the picture of their id shows. */
+        @Override
+        public Optional<Rect> findText(Caption caption, BufferedImage frame) {
+            return find(new ImageTemplate("images/" + caption.words().text().toLowerCase() + ".png"), frame);
+        }
+
+        @Override
+        public void press(Point at, Gesture gesture, Duration hold) {
+            done.add("click " + at.x() + "," + at.y());
+        }
+
+        boolean press(Button button, Pick pick) {
+            return perform(button, null, pick, look().orElseThrow());
+        }
+    }
+
+    private static final ImageTemplate CLAIM = new ImageTemplate("images/claim.png");
+    private static final ImageTemplate DAILY = new ImageTemplate("images/daily.png");
+    private static final ImageTemplate AVATAR_FRAME = new ImageTemplate("images/avatar_frame.png");
+    private static final Caption DAILY_WORDS = Caption.of(Words.of("Daily"), new Zone(0, 0, 800, 600));
+
+    @Test
+    void aPicturelessButtonIsPressedBesideItsAnchor() {
+        Shown home = new Shown(1);
+        // Two of the frame's widths right of its centre, on its row: a spot the frame's size.
+        assertTrue(home.press(Button.beside(AVATAR_FRAME, 2, 0), null));
+        assertEquals(List.of("click 200,110"), home.done);
+        assertEquals(new Rect(180, 100, 40, 20),
+                home.seen(Button.beside(AVATAR_FRAME, 2, 0), home.look().orElseThrow()).orElseThrow().place());
+    }
+
+    @Test
+    void aPicturelessButtonWithItsAnchorGoneIsAbsent() {
+        Shown elsewhere = new Shown(1, Map.of());
+        assertFalse(elsewhere.press(Button.beside(AVATAR_FRAME, 2, 0), null));
+        assertTrue(elsewhere.done.isEmpty(), "no anchor, no blind click");
+    }
+
+    @Test
+    void rightOfPicksTheCopyInTheAnchorsRow() {
+        Shown quests = new Shown(1);
+        assertTrue(quests.press(Button.of(CLAIM).repeated().place(Place.rightOf(DAILY)), null));
+        assertTrue(quests.press(Button.of(CLAIM).repeated(), Pick.at(Place.rightOf(DAILY_WORDS))));
+        assertTrue(quests.press(Button.of(CLAIM).place(Place.rightOf(DAILY_WORDS)), null), "repeated or not");
+        assertEquals(List.of("click 530,215", "click 530,215", "click 530,215"), quests.done,
+                "the Claim on Daily's row, not the topmost");
+        assertTrue(quests.press(Button.of(CLAIM).repeated(), Pick.at(Place.above(
+                new ImageTemplate("images/header.png")))));
+        assertEquals("click 530,115", quests.done.getLast(), "above the header, in its column");
+    }
+
+    @Test
+    void aPlaceNoCopyMeetsPressesNothing() {
+        Shown quests = new Shown(1);
+        assertFalse(quests.press(Button.of(CLAIM).repeated(), Pick.at(Place.leftOf(DAILY))), "every Claim is right");
+        assertFalse(quests.press(Button.of(CLAIM).repeated().place(Place.rightOf(
+                new ImageTemplate("images/weekly.png"))), null), "an anchor not shown");
+        assertFalse(quests.press(Button.of(CLAIM).repeated(), Pick.at(Place.above(AVATAR_FRAME))),
+                "none in the frame's column");
+        assertTrue(quests.done.isEmpty());
+    }
+
+    @Test
+    void betweenPicksTheCopyInsideBothAnchors() {
+        Shown quests = new Shown(1);
+        Place inside = Place.between(new ImageTemplate("images/header.png"), new ImageTemplate("images/footer.png"));
+        assertTrue(quests.press(Button.of(CLAIM).repeated(), Pick.at(inside)));
+        assertEquals(List.of("click 530,215"), quests.done);
+        assertEquals("between header and footer", inside.label());
+    }
+
+    @Test
+    void aPlaceFollowsTheAnchorWhenTheFrameIsScaled() {
+        Shown twice = new Shown(2);
+        assertTrue(twice.press(Button.beside(AVATAR_FRAME, 2, 0), null));
+        assertTrue(twice.press(Button.of(CLAIM).repeated(), Pick.at(Place.rightOf(DAILY))));
+        assertEquals(List.of("click 400,220", "click 1060,430"), twice.done, "twice as far, as the anchor is");
+    }
+
+    @Test
+    void aGridsCellIsPressedByItsRowAndColumn() {
+        Shown bag = new Shown(1);
+        // The first cell two of the frame's heights below it, then 1.5 widths and 2 heights apart: 60 by 40 cells.
+        Button slots = Button.beside(AVATAR_FRAME, 0, 2).grid(Grid.of(2, 3, 1.5, 2));
+        assertTrue(bag.press(slots, Pick.cell(2, 3)));
+        assertEquals(List.of("click 240,190"), bag.done);
+        assertFalse(bag.press(slots, Pick.cell(3, 1)), "no third row");
+        assertTrue(bag.press(slots, null), "no pick: the first cell");
+        assertEquals("click 120,150", bag.done.getLast());
+        bag.done.clear();
+        assertTrue(bag.press(slots, Pick.each(Order.NORTH)));
+        assertEquals(6, bag.done.size(), "each cell");
+        assertFalse(new Shown(1, Map.of()).press(slots, Pick.cell(1, 1)), "no anchor, no cell");
+        assertFalse(ScreenWalk.sameCopy(Pick.cell(1, 1), Pick.cell(1, 2)), "a way through one cell is not another's");
+        assertTrue(ScreenWalk.sameCopy(Pick.cell(1, 2), Pick.cell(1, 2)));
+        assertFalse(ScreenWalk.sameCopy(null, Pick.at(Place.rightOf(DAILY))), "a place is not the first copy");
     }
 
     @Test

@@ -194,6 +194,9 @@ public final class ScreenEditors {
             return new Label("Shown once on its screen: no copy to pick.");
         }
         Pick[] now = {ctx.value(Pick.class).orElse(Pick.first())};
+        if (now[0].mode() == Pick.Mode.AT || now[0].mode() == Pick.Mode.CELL) {
+            return new Label("Pressed " + now[0].label() + ", as the Java says: a place or a cell is written there.");
+        }
         Spinner<Integer> nth = new Spinner<>(1, 50, Math.max(1, now[0].nth()));
         nth.setPrefWidth(70);
         Node[] pad = new Node[1];
@@ -208,13 +211,13 @@ public final class ScreenEditors {
         ToggleGroup modes = new ToggleGroup();
         HBox row = new HBox(2);
         for (Pick.Mode mode : Pick.Mode.values()) {
-            // Until a look is a cycling button's, offered above.
-            if (mode == Pick.Mode.UNTIL) continue;
+            // Until a look is a cycling button's, offered above; a place or a cell is written in the Java.
+            if (mode == Pick.Mode.UNTIL || mode == Pick.Mode.AT || mode == Pick.Mode.CELL) continue;
             ToggleButton button = new ToggleButton(switch (mode) {
                 case FIRST -> "First";
                 case NTH -> "Nth";
                 case EACH -> "Each";
-                case UNTIL_NONE, UNTIL -> "Until none";
+                case UNTIL_NONE, UNTIL, AT, CELL -> "Until none";
             });
             button.setToggleGroup(modes);
             button.setSelected(mode == now[0].mode());

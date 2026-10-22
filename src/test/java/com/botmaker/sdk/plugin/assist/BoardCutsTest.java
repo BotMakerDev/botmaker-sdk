@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.plugin.assist.BoardCuts.Cut;
 import com.botmaker.sdk.plugin.assist.MapTools.Mark;
@@ -24,6 +25,22 @@ class BoardCutsTest {
 
     private static Cut cut(BoardCuts.As as) {
         return new Cut("collect", BOX, CutShape.RECT, List.of(), null, as);
+    }
+
+    /** A spot cut is measured from its anchor in the anchor's sizes; a grid's cut is shared out in equal cells. */
+    @Test
+    void aSpotIsMeasuredFromItsAnchorAndAGridSharedOut() {
+        Rect anchor = new Rect(100, 100, 40, 20);
+        BoardCuts.Offsets one = BoardCuts.offsets(anchor, new Rect(180, 100, 40, 20), 1, 1);
+        assertEquals(2.0, one.across());
+        assertEquals(0.0, one.down());
+        assertNull(one.grid(), "one cell is a spot");
+        // Two rows of three 60 by 40 cells, the first centred 0 across, 2 down.
+        BoardCuts.Offsets bag = BoardCuts.offsets(anchor, new Rect(90, 130, 180, 80), 2, 3);
+        assertEquals(0.0, bag.across());
+        assertEquals(2.0, bag.down());
+        assertEquals(Grid.of(2, 3, 1.5, 2), bag.grid());
+        assertFalse(BoardCuts.picture(cut(new BoardCuts.Spot("avatar_frame", 1, 1))), "a spot saves no picture");
     }
 
     @Test

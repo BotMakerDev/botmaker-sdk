@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -70,6 +71,7 @@ final class CutForm {
         ZONE("An area (Zones)"),
         TEXT_MARKER("Words that tell it"),
         TEXT_BUTTON("A button known by its words"),
+        SPOT("A spot beside a picture, or its grid"),
         DIGITS("Digits of a number"),
         RECUT("A new image for a picture");
 
@@ -231,6 +233,12 @@ final class CutForm {
                                 + "words' zone another name.");
                     }
                 }
+                case SPOT -> {
+                    if (on() == null) return Optional.of(at + "a spot is a screen's: pick it.");
+                    if (line.beside.getValue() == null) {
+                        return Optional.of(at + "pick the picture it sits beside: one that always shows near it.");
+                    }
+                }
                 case DIGITS -> {
                     if (line.shows.getText().chars().noneMatch(Character::isDigit)) {
                         return Optional.of(at + "give the number it shows, as the game writes it.");
@@ -287,6 +295,10 @@ final class CutForm {
         private final TextField shows = new TextField();
         private final TextField reads = new TextField();
         private final ComboBox<String> picture = new ComboBox<>();
+        /** The picture a spot sits beside: the screen's markers and buttons' pictures. */
+        private final ComboBox<String> beside = new ComboBox<>();
+        private final Spinner<Integer> rows = new Spinner<>(1, 30, 1);
+        private final Spinner<Integer> columns = new Spinner<>(1, 30, 1);
         /** The cut as drawn, read by OCR the first time it is made words; null when it is off the frame. */
         private final BufferedImage image;
         private boolean read;
@@ -326,6 +338,10 @@ final class CutForm {
                     .filter(f -> !TemplateLibrary.isUnmodifiedDefaultTemplate(f)).map(TemplateLibrary::baseName)
                     .sorted().toList());
             picture.setPromptText("the picture");
+            beside.setPromptText("its anchor");
+            beside.setTooltip(new Tooltip(MapGuide.SPOT));
+            rows.setPrefWidth(64);
+            columns.setPrefWidth(64);
             details.setAlignment(Pos.CENTER_LEFT);
             fill();
         }
@@ -350,6 +366,11 @@ final class CutForm {
             if (!input.getItems().contains(input.getValue())) {
                 input.setValue(input.getItems().isEmpty() ? null : input.getItems().getFirst());
             }
+            beside.getItems().setAll(on == null ? List.of() : Stream.concat(on.markers().stream(),
+                            on.inputs().values().stream().flatMap(i -> i instanceof Button b && !b.isBeside()
+                                    ? Stream.of(b.picture()) : Stream.empty()))
+                    .filter(p -> p != null && p.place() != null).map(ImageTemplate::id).distinct().toList());
+            if (!beside.getItems().contains(beside.getValue())) beside.setValue(null);
             Map<String, ?> groups = on == null ? Map.of() : kind() == Kind.TREE ? on.trees() : on.strips();
             String had = group.getValue();
             group.getItems().setAll(Stream.concat(groups.keySet().stream(), Stream.of(NEW)).toList());
@@ -364,6 +385,7 @@ final class CutForm {
                 case TREE -> List.of(new Label("tree"), group);
                 case ZONE -> List.of(new Label("stays with"), anchor);
                 case TEXT_MARKER, TEXT_BUTTON -> List.of(new Label("reads"), reads);
+                case SPOT -> List.of(new Label("beside"), beside, new Label("cells"), rows, new Label("×"), columns);
                 case DIGITS -> List.of(shows);
                 case RECUT -> List.of(picture);
                 case ABSENT, BACK -> List.of();
@@ -408,6 +430,7 @@ final class CutForm {
                 case ZONE -> new BoardCuts.Place(anchor.getValue());
                 case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false);
                 case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true);
+                case SPOT -> new BoardCuts.Spot(beside.getValue(), rows.getValue(), columns.getValue());
                 case DIGITS -> new BoardCuts.Digits(shows.getText());
                 case RECUT -> new BoardCuts.Recut(picture.getValue());
             };

@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
@@ -91,6 +92,13 @@ public final class BoardCuts {
      * under that name.
      */
     public record Reads(String text, boolean button) implements As {
+    }
+
+    /**
+     * A button with no picture of its own, pressed beside the picture {@code anchor}: the cut is the spot, or a grid's
+     * {@code rows} by {@code columns} cells, each an equal share of it. Its field is named from the cut's name.
+     */
+    public record Spot(String anchor, int rows, int columns) implements As {
     }
 
     /** The digits of the number it shows, {@code shows} as the game writes it. */
@@ -189,6 +197,15 @@ public final class BoardCuts {
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
             said.add(one);
         }
+        // A spot is measured from its anchor where the anchor was cut, as edit_map's add_spot writes it.
+        for (int i = 0; i < cuts.size(); i++) {
+            if (!(cuts.get(i).as() instanceof Spot spot)) continue;
+            Cut cut = cuts.get(i);
+            String one = screen == null ? ScreenEdits.NOT_WRITTEN + cut.name() + ": a spot is a screen's: pick it."
+                    : FxCall.call(() -> spot(context, screen, cut, spot));
+            if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
+            said.add(one);
+        }
         for (int i = 0; i < cuts.size(); i++) {
             if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Press press)
                     || press.gesture() == null || press.gesture() == Gesture.CLICK) continue;
@@ -243,7 +260,48 @@ public final class BoardCuts {
     /** Whether {@code cut} is a picture of a screen, which crop_pictures saves. */
     static boolean picture(Cut cut) {
         return !(cut.as() instanceof Place || cut.as() instanceof Reads || cut.as() instanceof Digits
-                || cut.as() instanceof Recut);
+                || cut.as() instanceof Recut || cut.as() instanceof Spot);
+    }
+
+    /** {@code cut}, a spot of {@code screen}, written beside its anchor. On the FX thread. */
+    private static String spot(AgentContext context, String screen, Cut cut, Spot spot) {
+        if (spot.anchor() == null || !ScreenEdits.pictures(context.services()).contains(spot.anchor())) {
+            return ScreenEdits.NOT_WRITTEN + cut.name() + ": pick the picture it sits beside.";
+        }
+        Rect anchor = ScreenEdits.picture(context.services(), spot.anchor()).place();
+        if (anchor == null || anchor.width() <= 0 || anchor.height() <= 0) {
+            return ScreenEdits.NOT_WRITTEN + cut.name() + ": " + spot.anchor() + " has no place it was cut at; recut it.";
+        }
+        Offsets at = offsets(anchor, cut.box(), spot.rows(), spot.columns());
+        return ScreenEdits.addSpot(context.services(), screen, cut.name(), spot.anchor(), at.across(), at.down(),
+                at.grid());
+    }
+
+    /** Where a spot, or a grid's first cell, sits from its anchor, in the anchor's sizes, and the grid's steps. */
+    record Offsets(double across, double down, Grid grid) {
+    }
+
+    /**
+     * The offsets of {@code box}, drawn in the frame {@code anchor} was cut in: one spot, its centre from the anchor's;
+     * or {@code rows} by {@code columns} equal cells, the first's centre and the step between two. Three decimals, so
+     * the last cell of a wide grid drifts less than a pixel.
+     */
+    static Offsets offsets(Rect anchor, Rect box, int rows, int columns) {
+        int r = Math.max(1, rows);
+        int c = Math.max(1, columns);
+        double cellWidth = (double) box.width() / c;
+        double cellHeight = (double) box.height() / r;
+        double ax = anchor.x() + anchor.width() / 2.0;
+        double ay = anchor.y() + anchor.height() / 2.0;
+        double across = rounded((box.x() + cellWidth / 2 - ax) / anchor.width());
+        double down = rounded((box.y() + cellHeight / 2 - ay) / anchor.height());
+        Grid grid = r == 1 && c == 1 ? null : Grid.of(r, c, c == 1 ? 0 : rounded(cellWidth / anchor.width()),
+                r == 1 ? 0 : rounded(cellHeight / anchor.height()));
+        return new Offsets(across, down, grid);
+    }
+
+    private static double rounded(double value) {
+        return Math.round(value * 1000) / 1000.0;
     }
 
     /** {@code cut} as crop_pictures takes it: a member is a button of the screen first. */

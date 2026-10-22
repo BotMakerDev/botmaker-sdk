@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -198,6 +199,8 @@ final class InputInspector {
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
                 all.add(copies(constant, field, button));
+                all.add(heading("Where"));
+                all.add(where(constant, field, button));
                 all.add(heading("Strip or tree"));
                 all.add(inGroup(constant, button));
             }
@@ -449,7 +452,7 @@ final class InputInspector {
             case NTH -> Pick.nth(nth, order);
             case EACH -> Pick.each(order);
             case UNTIL_NONE -> Pick.untilNone();
-            case FIRST, UNTIL -> Pick.first(order);
+            case FIRST, UNTIL, AT, CELL -> Pick.first(order);
         };
     }
 
@@ -615,6 +618,71 @@ final class InputInspector {
         return ScreenEdits.zones(services).stream()
                 .filter(name -> ScreenEdits.zoneOf(services, name).filter(zone::equals).isPresent())
                 .findFirst().orElse(zone.toString());
+    }
+
+    // --- where a button is found ---
+
+    /**
+     * Where {@code button} is found: a spot's offset from its anchor (read only, cut again to move it), and the side of
+     * a picture it is only ever found at, or anywhere. A place from words is said, and changed by set_place.
+     */
+    private Node where(String constant, String field, Button button) {
+        List<Node> shown = new ArrayList<>();
+        if (button.isBeside()) {
+            Beside b = button.beside();
+            Label spot = new Label(button.label() + (b == null ? "" : ", " + b.across() + " of its widths across, "
+                    + b.down() + " of its heights down") + (button.grid() == null ? ""
+                    : "; " + button.grid().rows() + "×" + button.grid().columns() + " cells"));
+            spot.setWrapText(true);
+            spot.setTooltip(new Tooltip(MapGuide.SPOT));
+            shown.add(spot);
+        }
+        Place place = button.place();
+        if (place != null && place.words() != null) {
+            Label said = new Label("Found " + place.label() + ".");
+            said.setWrapText(true);
+            shown.add(said);
+            return shown.size() == 1 ? shown.getFirst() : new VBox(4, shown.toArray(Node[]::new));
+        }
+        ComboBox<Place.Side> side = new ComboBox<>(FXCollections.observableArrayList(Place.Side.values()));
+        side.setConverter(named(s -> s == Place.Side.UNKNOWN ? "Anywhere" : s.displayName()));
+        side.setValue(place == null ? Place.Side.UNKNOWN : place.side());
+        side.setTooltip(new Tooltip(MapGuide.PLACE));
+        ComboBox<String> anchor = new ComboBox<>(FXCollections.observableArrayList(ScreenEdits.pictures(services)));
+        anchor.setPromptText("a picture");
+        anchor.setValue(place == null || place.picture() == null ? null : place.picture().id());
+        ComboBox<String> other = new ComboBox<>(FXCollections.observableArrayList(ScreenEdits.pictures(services)));
+        other.setPromptText("and");
+        other.setValue(place == null || place.otherPicture() == null ? null : place.otherPicture().id());
+        Runnable fit = () -> {
+            boolean any = side.getValue() != Place.Side.UNKNOWN;
+            anchor.setVisible(any);
+            anchor.setManaged(any);
+            boolean two = side.getValue() == Place.Side.BETWEEN;
+            other.setVisible(two);
+            other.setManaged(two);
+        };
+        fit.run();
+        Runnable write = () -> {
+            fit.run();
+            Place.Side to = side.getValue();
+            boolean ready = to == Place.Side.UNKNOWN || anchor.getValue() != null
+                    && (to != Place.Side.BETWEEN || other.getValue() != null);
+            boolean same = to == (place == null ? Place.Side.UNKNOWN : place.side())
+                    && Objects.equals(anchor.getValue(), place == null || place.picture() == null ? null
+                    : place.picture().id())
+                    && Objects.equals(other.getValue(), place == null || place.otherPicture() == null ? null
+                    : place.otherPicture().id());
+            if (ready && !same) {
+                panel.wrote(ScreenEdits.setPlace(services, constant, field, to, anchor.getValue(), other.getValue(),
+                        null, null));
+            }
+        };
+        side.setOnAction(e -> write.run());
+        anchor.setOnAction(e -> write.run());
+        other.setOnAction(e -> write.run());
+        shown.add(line(side, anchor, other));
+        return shown.size() == 1 ? shown.getFirst() : new VBox(4, shown.toArray(Node[]::new));
     }
 
     // --- a text button's words ---
@@ -1325,6 +1393,8 @@ final class InputInspector {
             case EACH -> "Each, in turn";
             case UNTIL_NONE -> "The first, until none is left";
             case UNTIL -> "Until it shows a look";
+            case AT -> "The one at a place";
+            case CELL -> "A cell of its grid";
         };
     }
 

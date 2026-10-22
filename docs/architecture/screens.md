@@ -39,6 +39,17 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   when it is the whole words (`LineMatch.same`): case-blind, spaces and marks at its ends dropped, edits forgiven by
   length (none up to 4 letters, one up to 8, two past), so `Claim` never matches `Claimed` nor `OK` `O` (the user's
   call, 2026-10-22; `Text.findFuzzy`'s two edits anywhere in a line match almost any line for a short label).
+- **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
+  `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
+  only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are
+  the anchor's centre grown by its width or height, past its edge; the copy nearest the anchor wins
+  (`internal/screens/Placed`); no copy, or no anchor, presses nothing (ABSENT). `Button.beside(anchor, across, down)`
+  is a button with no picture of its own: its `picture` is the anchor, its `Beside` the spot's offset in the anchor's
+  size (a spot the anchor's size), pressed only when the anchor is found; there is no fixed spot without an anchor.
+  `.grid(Grid.of(rows, columns, across, down))` makes the spots a grid's cells, repeated, their steps in the anchor's
+  size, `Pick.cell(row, column)` one of them. `Reach.copies` maps each copy of the picture to its spots, then filters
+  by the place; `Reach.seen` takes the nearest for a place, the cell for a cell. 🗺's board still boxes a spot on its
+  anchor (`ScreenCanvas` was another session's at the time).
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in

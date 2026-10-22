@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -283,12 +284,16 @@ public interface Reach {
      * How {@code button} looks on {@code frame}: its looks looked for before its usual picture, since a badge or a
      * grey copy of a button also passes for the button itself; a member of {@code strip}, anywhere along it. A
      * repeated button is the copy {@code pick} names (null: the first), and every copy for {@link Pick.Mode#EACH}
-     * starts at the first. Empty for a button not there.
+     * starts at the first. A button {@link Button#place placed}, or a pick {@link Pick#at at} a place, is the copy
+     * nearest the place's anchor that meets it; a grid's {@link Pick#cell cell} is that cell. Empty for a button not
+     * there.
      */
     default Optional<Seen> seen(Button button, Strip strip, Pick pick, BufferedImage frame) {
-        if (button.repeats()) {
-            Pick p = pick == null ? Pick.first() : pick;
-            List<Seen> copies = copies(button, strip, p.order(), frame);
+        Pick p = pick == null ? Pick.first() : pick;
+        if (p.mode() == Pick.Mode.CELL) return cell(button, p, frame);
+        if (button.repeats() || button.place() != null || p.place() != null) {
+            List<Seen> all = copies(button, strip, p.order(), frame);
+            List<Seen> copies = p.place() == null ? all : placed(all, p.place(), frame);
             if (p.mode() == Pick.Mode.UNTIL_NONE) {
                 // The first copy still to press; every one greyed out, the first: a Claim under grey ones (Firestone's
                 // Quests, 2026-10-17).
@@ -314,8 +319,41 @@ public interface Reach {
             }
         }
         return best < 0 ? Optional.empty()
-                : Optional.of(new Seen(order.get(best).state(), placeOf(button, order.get(best),
-                found.get(best).get().place()), order.get(best).picture()));
+                : Optional.of(new Seen(order.get(best).state(), button.spots(placeOf(button, order.get(best),
+                found.get(best).get().place())).getFirst(), order.get(best).picture()));
+    }
+
+    /**
+     * {@code pick}'s cell of {@code button}'s grid, its anchor found at its best match; empty for a button of no grid,
+     * a cell past its rows or columns, or an anchor not there.
+     */
+    private Optional<Seen> cell(Button button, Pick pick, BufferedImage frame) {
+        if (button.grid() == null || button.picture() == null || pick.column() > button.grid().columns()
+                || pick.nth() > button.grid().rows()) {
+            return Optional.empty();
+        }
+        int at = (pick.nth() - 1) * button.grid().columns() + pick.column() - 1;
+        return find(button.picture(), frame).map(anchor -> new Seen(State.NORMAL, button.spots(anchor).get(at),
+                button.picture()));
+    }
+
+    /** {@code copies} that meet {@code place} on {@code frame}, nearest its anchor first; none when it is not there. */
+    private List<Seen> placed(List<Seen> copies, Place place, BufferedImage frame) {
+        Optional<Rect> anchor = anchorOf(place.picture(), place.words(), frame);
+        if (anchor.isEmpty()) return List.of();
+        Rect other = null;
+        if (place.side() == Place.Side.BETWEEN) {
+            Optional<Rect> second = anchorOf(place.otherPicture(), place.otherWords(), frame);
+            if (second.isEmpty()) return List.of();
+            other = second.get();
+        }
+        return Placed.meeting(copies, Seen::place, place.side(), anchor.get(), other);
+    }
+
+    /** Where an anchor shows on {@code frame}: its picture found, or its words read in their zone. */
+    private Optional<Rect> anchorOf(ImageTemplate picture, Caption words, BufferedImage frame) {
+        if (picture != null) return find(picture, frame);
+        return words == null ? Optional.empty() : findText(words, frame);
     }
 
     /**
@@ -358,9 +396,22 @@ public interface Reach {
     /**
      * Every copy of {@code button} on {@code frame}, along {@code order}, each in the look it shows: a copy is found by
      * any of its looks, its other looks before its usual picture, and a place another look already holds is that
-     * copy. Only those along {@code strip}, for a member of one.
+     * copy. Only those along {@code strip}, for a member of one. A button pressed {@link Button#beside} its picture is
+     * each spot, or cell, of each copy of the picture; a {@link Button#place placed} one only the copies that meet its
+     * place, nearest the anchor first.
      */
     default List<Seen> copies(Button button, Strip strip, Order order, BufferedImage frame) {
+        List<Seen> found = pictureCopies(button, strip, frame);
+        if (button.isBeside()) {
+            found = found.stream().flatMap(copy -> button.spots(copy.place()).stream()
+                    .map(spot -> new Seen(copy.state(), spot, copy.picture()))).toList();
+        }
+        if (button.place() != null) return placed(found, button.place(), frame);
+        return ordered(found, Seen::place, order, new Size(frame.getWidth(), frame.getHeight()));
+    }
+
+    /** Every copy of {@code button}'s picture on {@code frame}, in no order, as {@link #copies} finds them. */
+    private List<Seen> pictureCopies(Button button, Strip strip, BufferedImage frame) {
         Rect band = band(strip);
         List<Seen> all = new ArrayList<>();
         List<Double> scores = new ArrayList<>();
@@ -382,7 +433,7 @@ public interface Reach {
                 }
             }
         }
-        return ordered(all, Seen::place, order, new Size(frame.getWidth(), frame.getHeight()));
+        return all;
     }
 
     /** {@code button}'s looks in the order they are looked for: a badge or a grey copy also passes for the button. */

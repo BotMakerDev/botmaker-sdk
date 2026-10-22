@@ -80,8 +80,12 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     words a screen never shows; a text button in a strip; the picker's box for one (its zone); the anchor of a words'
     zone in the cut form (center today); a walk's poll reads a screen's words twice when it falls back to the whole
     frame (`Markers.onEach` keeps them per call).
-  - Relative places: a `Pick` or `Way` by another input (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
-    `between`), in the other's size as the tree's `Beside`; rows matched by content; a screen with a subject (hero N).
+  - Places, past their first cut (2026-10-22): 🗺's board boxes a `beside` spot or a grid on its anchor, not where it
+    is pressed (`ScreenCanvas`); the Pick editor shows `Pick.at` and `Pick.cell` read only; the input panel's *Where*
+    and set_input place by a picture only (a place from words is written in `Screens.java`); a way through a placed
+    copy (`Way.pick(Pick.at(…))`) is not offered in the window; a spot is moved by cutting it again; a spot and its
+    anchor's own button share a picture, so a tool naming the picture reaches the anchor's button (name the spot by
+    its field). Rows matched by content and a screen with a subject (hero N) stay open.
   - Readouts and results on a screen: zones and digits per screen, an input's outcomes (Victory | Defeat), so a body
     stops waiting on pictures by hand.
   - Edge costs: measured step and settle times feed `ScreenGraph.pathTo` and the walk's waits instead of `STEP_MS`.

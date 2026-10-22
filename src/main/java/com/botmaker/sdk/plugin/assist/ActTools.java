@@ -230,6 +230,17 @@ final class ActTools {
         if (base.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noPicture(picture)));
         Optional<BufferedImage> frame = reach.get().look();
         if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
+        // A place, a cell, or a button shown once at its spot or place is found as a run finds it.
+        boolean once = !copy.repeats() && (copy.isBeside() || copy.place() != null);
+        if (pick.mode() == Pick.Mode.AT || pick.mode() == Pick.Mode.CELL || once) {
+            Optional<Reach.Seen> seen = reach.get().seen(copy, strip, pick, frame.get());
+            String named = base.get() + (once ? "" : " " + pick.label());
+            if (seen.isEmpty()) {
+                return Spotted.no(AgentReply.text(named + " (" + copy.label() + ") is not on the screen at a run's score "
+                        + Frames.score(reach.get().confidence()) + "; nothing was " + acted + "."));
+            }
+            return new Spotted(frame.get(), reach.get().pointOn(seen.get().place()), named, null);
+        }
         int nth = Math.max(1, pick.nth());
         List<Rect> copies = reach.get().copies(copy, strip, pick.order(), frame.get()).stream()
                 .map(Reach.Seen::place).toList();
@@ -307,8 +318,10 @@ final class ActTools {
                     "key " + keys.caps(), share, hands -> hands.keys(keys));
         }
         String verb = notches == 0 ? "clicked" : "scrolled";
-        Spotted spotted = copy == null || pick == null ? spot(picture, verb, context)
-                : spotCopy(picture, copy, pick, strip, verb, context);
+        // A spot beside its picture, or a button only found at its place, is where a run finds it, not on the picture.
+        boolean placed = copy != null && (copy.isBeside() || copy.place() != null);
+        Spotted spotted = copy == null || pick == null && !placed ? spot(picture, verb, context)
+                : spotCopy(picture, copy, pick == null ? Pick.first() : pick, strip, verb, context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
         if (notches != 0) {

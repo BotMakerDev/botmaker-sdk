@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.types;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
@@ -11,12 +12,14 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Screen;
@@ -139,7 +142,7 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Button::locked, Button::lock)
             .<List<Look>>with(Button::looks, Button::looks)
             .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
-            .flag(Button::repeated, Button::repeats)
+            .flag(Button::repeated, ScreenTypes::repeatedWritten)
             .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
             .<Duration>with(Button::hold, Button::hold)
             .<Words>with(Button::types, Button::text)
@@ -149,7 +152,84 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
             .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
             .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
-            .when(button -> BotConstants.inputName(button) == null && !button.cycles());
+            .<Place>with(Button::place, Button::place)
+            .<Grid>with(Button::grid, Button::grid)
+            .when(button -> BotConstants.inputName(button) == null && !button.cycles() && button.beside() == null);
+
+    /**
+     * {@code Button.beside(ImageTemplate, double, double)} and the same links: a spot with no picture of its own, or a
+     * grid's cells, pressed at an offset from an anchor.
+     */
+    public static final DeclaredCall<Button> BUTTON_BESIDE_SHAPE = ComponentType.part(Button.class)
+            .<ImageTemplate, Double, Double, Button>writtenAs(Button::beside, Button::picture,
+                    button -> button.beside().across(), button -> button.beside().down())
+            .flag(Button::tried, Button::isTried)
+            .flag(Button::leaves, Button::isLeaving)
+            .flag(Button::info, Button::isInfo)
+            .<String>with(Button::never, Button::never)
+            .flag(Button::sometimes, Button::comesAndGoes)
+            .<ImageTemplate>with(Button::locked, Button::lock)
+            .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
+            .<List<Look>>with(Button::looks, Button::looks)
+            .flag(Button::repeated, ScreenTypes::repeatedWritten)
+            .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
+            .<Duration>with(Button::hold, Button::hold)
+            .<Words>with(Button::types, Button::text)
+            .flag(Button::typed, Button::typedByBody)
+            .flag(Button::submits, Button::isSubmitting)
+            .flag(Button::clears, Button::isClearing)
+            .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
+            .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
+            .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
+            .<Place>with(Button::place, Button::place)
+            .<Grid>with(Button::grid, Button::grid)
+            .when(button -> BotConstants.inputName(button) == null && !button.cycles() && button.beside() != null);
+
+    /** Whether a button is written repeated: a grid's cells are its copies, which {@code .grid(…)} says alone. */
+    private static boolean repeatedWritten(Button button) {
+        return button.repeats() && button.grid() == null;
+    }
+
+    /** {@code Grid.of(int, int, double, double)}: a grid button's rows and columns, its steps in the anchor's size. */
+    public static final DeclaredCall<Grid> GRID_SHAPE = ComponentType.part(Grid.class)
+            .<Integer, Integer, Double, Double, Grid>writtenAs(Grid::of, Grid::rows, Grid::columns, Grid::across,
+                    Grid::down);
+
+    public static final DeclaredCall<Place> PLACE_ABOVE_SHAPE = placeShape(Place::above, Place.Side.ABOVE);
+    public static final DeclaredCall<Place> PLACE_ABOVE_WORDS_SHAPE = wordsShape(Place::above, Place.Side.ABOVE);
+    public static final DeclaredCall<Place> PLACE_BELOW_SHAPE = placeShape(Place::below, Place.Side.BELOW);
+    public static final DeclaredCall<Place> PLACE_BELOW_WORDS_SHAPE = wordsShape(Place::below, Place.Side.BELOW);
+    public static final DeclaredCall<Place> PLACE_LEFT_OF_SHAPE = placeShape(Place::leftOf, Place.Side.LEFT_OF);
+    public static final DeclaredCall<Place> PLACE_LEFT_OF_WORDS_SHAPE = wordsShape(Place::leftOf,
+            Place.Side.LEFT_OF);
+    public static final DeclaredCall<Place> PLACE_RIGHT_OF_SHAPE = placeShape(Place::rightOf, Place.Side.RIGHT_OF);
+    public static final DeclaredCall<Place> PLACE_RIGHT_OF_WORDS_SHAPE = wordsShape(Place::rightOf,
+            Place.Side.RIGHT_OF);
+    public static final DeclaredCall<Place> PLACE_NEAREST_SHAPE = placeShape(Place::nearest, Place.Side.NEAREST);
+    public static final DeclaredCall<Place> PLACE_NEAREST_WORDS_SHAPE = wordsShape(Place::nearest,
+            Place.Side.NEAREST);
+
+    /** {@code Place.between(ImageTemplate, ImageTemplate)}. */
+    public static final DeclaredCall<Place> PLACE_BETWEEN_SHAPE = ComponentType.part(Place.class)
+            .<ImageTemplate, ImageTemplate, Place>writtenAs(Place::between, Place::picture, Place::otherPicture)
+            .when(place -> place.side() == Place.Side.BETWEEN && place.picture() != null);
+
+    /** {@code Place.between(Caption, Caption)}. */
+    public static final DeclaredCall<Place> PLACE_BETWEEN_WORDS_SHAPE = ComponentType.part(Place.class)
+            .<Caption, Caption, Place>writtenAs(Place::between, Place::words, Place::otherWords)
+            .when(place -> place.side() == Place.Side.BETWEEN && place.picture() == null);
+
+    /** {@code Place.<side>(ImageTemplate)}: a place from a picture. */
+    private static DeclaredCall<Place> placeShape(Ref.Of1<ImageTemplate, Place> factory, Place.Side side) {
+        return ComponentType.part(Place.class).<ImageTemplate, Place>writtenAs(factory, Place::picture)
+                .when(place -> place.side() == side && place.picture() != null);
+    }
+
+    /** {@code Place.<side>(Caption)}: a place from words. */
+    private static DeclaredCall<Place> wordsShape(Ref.Of1<Caption, Place> factory, Place.Side side) {
+        return ComponentType.part(Place.class).<Caption, Place>writtenAs(factory, Place::words)
+                .when(place -> place.side() == side && place.picture() == null);
+    }
 
     /** {@code Button.cycling(List<ImageTemplate>)} and its links: a button showing its looks in turn. */
     public static final DeclaredCall<Button> BUTTON_CYCLING_SHAPE = ComponentType.part(Button.class)
@@ -161,7 +241,7 @@ public final class ScreenTypes {
             .flag(Button::sometimes, Button::comesAndGoes)
             .<ImageTemplate>with(Button::locked, Button::lock)
             .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
-            .flag(Button::repeated, Button::repeats)
+            .flag(Button::repeated, ScreenTypes::repeatedWritten)
             .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
             .<Duration>with(Button::hold, Button::hold)
             .<Words>with(Button::types, Button::text)
@@ -171,6 +251,7 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
             .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
             .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
+            .<Place>with(Button::place, Button::place)
             .when(button -> BotConstants.inputName(button) == null && button.cycles());
 
     /**
@@ -316,6 +397,16 @@ public final class ScreenTypes {
     public static final DeclaredCall<Pick> PICK_UNTIL_SHAPE = ComponentType.part(Pick.class)
             .<ImageTemplate, Pick>writtenAs(Pick::until, Pick::look)
             .when(pick -> pick.mode() == Pick.Mode.UNTIL);
+
+    /** {@code Pick.at(Place)}. */
+    public static final DeclaredCall<Pick> PICK_AT_SHAPE = ComponentType.part(Pick.class)
+            .<Place, Pick>writtenAs(Pick::at, Pick::place)
+            .when(pick -> pick.mode() == Pick.Mode.AT);
+
+    /** {@code Pick.cell(int, int)}. */
+    public static final DeclaredCall<Pick> PICK_CELL_SHAPE = ComponentType.part(Pick.class)
+            .<Integer, Integer, Pick>writtenAs(Pick::cell, Pick::nth, Pick::column)
+            .when(pick -> pick.mode() == Pick.Mode.CELL);
 
     /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
     public static BooleanSupplier condition(String source) {

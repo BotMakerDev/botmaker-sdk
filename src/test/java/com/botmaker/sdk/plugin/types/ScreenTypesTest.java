@@ -9,14 +9,17 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.plugin.SdkPlugin;
+import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
@@ -154,10 +157,10 @@ class ScreenTypesTest {
     void aButtonWithNoGestureWritesNone() {
         Button plain = Button.of(picture("claim"));
         assertEquals(Gesture.CLICK, plain.gesture());
-        // Its gesture and hold links, before the text field's four and the drag's three.
+        // Its gesture and hold links, before the text field's four, the drag's three, its place and its grid.
         List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(plain);
-        assertNull(parts.get(parts.size() - 9));
-        assertNull(parts.get(parts.size() - 8));
+        assertNull(parts.get(parts.size() - 11));
+        assertNull(parts.get(parts.size() - 10));
 
         Button twice = Button.of(picture("hero")).gesture(Gesture.DOUBLE).repeated();
         Button held = Button.of(picture("charge")).hold(Duration.ofSeconds(2));
@@ -166,10 +169,10 @@ class ScreenTypesTest {
         assertEquals(held, roundTrip(ScreenTypes.BUTTON_SHAPE, held));
         assertEquals(heldLong, roundTrip(ScreenTypes.BUTTON_SHAPE, heldLong));
         List<Object> heldParts = ScreenTypes.BUTTON_SHAPE.components(held);
-        assertNull(heldParts.get(heldParts.size() - 9), "a hold of its own time says it alone");
-        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 8));
+        assertNull(heldParts.get(heldParts.size() - 11), "a hold of its own time says it alone");
+        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 10));
         List<Object> twiceParts = ScreenTypes.BUTTON_SHAPE.components(twice);
-        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 9));
+        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 11));
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).gesture(Gesture.RIGHT);
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
     }
@@ -185,7 +188,7 @@ class ScreenTypesTest {
         assertEquals(search, roundTrip(ScreenTypes.BUTTON_SHAPE, search));
         assertEquals(byBody, roundTrip(ScreenTypes.BUTTON_SHAPE, byBody));
         assertEquals(Words.of("Dragons"), ScreenTypes.BUTTON_SHAPE.components(search)
-                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 7));
+                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 9));
         assertTrue(byBody.typedByBody());
         assertFalse(search.typedByBody(), "a text of its own is walked through");
         Button old = Button.of(picture("claim")).tried();
@@ -206,8 +209,8 @@ class ScreenTypesTest {
         assertEquals(onto, roundTrip(ScreenTypes.BUTTON_SHAPE, onto));
         assertEquals(into, roundTrip(ScreenTypes.BUTTON_SHAPE, into));
         List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(into);
-        assertEquals(new Zone(600, 300, 40, 40), parts.get(parts.size() - 2));
-        assertNull(parts.getLast(), "the usual time is not written");
+        assertEquals(new Zone(600, 300, 40, 40), parts.get(parts.size() - 4));
+        assertNull(parts.get(parts.size() - 3), "the usual time is not written");
         assertNull(Button.of(picture("knob")).dragsInto(new Zone(0, 0, 1, 1)).dragTime(Button.DRAG_TIME).drag().time());
         Button typed = Button.of(picture("search")).types(Words.of("a")).dragsOnto(picture("slot"));
         assertNull(typed.typing(), "a drag types nothing");
@@ -266,6 +269,35 @@ class ScreenTypesTest {
         assertEquals(wheel, roundTrip(ScreenTypes.TREE_SHAPE, wheel));
         assertEquals(Beside.of(picture("damage"), -2, 0.5),
                 roundTrip(ScreenTypes.BESIDE_SHAPE, Beside.of(picture("damage"), -2, 0.5)));
+    }
+
+    /**
+     * A button placed from something else is written with its place, a spot beside an anchor by the offset, a grid by
+     * its cells and no {@code .repeated()}; a pick at a place or a cell by its own factory.
+     */
+    @Test
+    void placesSpotsAndGridsAreWrittenByTheirFactories() {
+        Caption daily = Caption.of(Words.of("Daily"), new Zone(100, 200, 300, 40));
+        Button claim = Button.of(picture("claim")).repeated().place(Place.rightOf(daily));
+        assertEquals(claim, roundTrip(ScreenTypes.BUTTON_SHAPE, claim));
+        Button avatar = Button.beside(picture("avatar_frame"), 1.5, -0.25).sometimes();
+        assertEquals(avatar, roundTrip(ScreenTypes.BUTTON_BESIDE_SHAPE, avatar));
+        Button slots = Button.beside(picture("bag"), 0, 2).grid(Grid.of(3, 5, 1.2, 1.1));
+        assertTrue(slots.repeats(), "a grid's cells are its copies");
+        assertEquals(slots, roundTrip(ScreenTypes.BUTTON_BESIDE_SHAPE, slots));
+        Button card = Button.beside(picture("deck"), 1, 0).looks(List.of(Look.of(picture("deck_grey"),
+                State.DISABLED))).dragsOnto(picture("slot"));
+        assertEquals(card, roundTrip(ScreenTypes.BUTTON_BESIDE_SHAPE, card), "no link lost to a spot");
+        assertNull(ScreenEdits.cycles(avatar, true).beside(), "a cycling button is pressed on its picture");
+        assertEquals(Place.between(picture("header"), picture("footer")),
+                roundTrip(ScreenTypes.PLACE_BETWEEN_SHAPE, Place.between(picture("header"), picture("footer"))));
+        assertEquals(Place.below(daily), roundTrip(ScreenTypes.PLACE_BELOW_WORDS_SHAPE, Place.below(daily)));
+        assertEquals(Pick.at(Place.nearest(picture("chest"))),
+                roundTrip(ScreenTypes.PICK_AT_SHAPE, Pick.at(Place.nearest(picture("chest")))));
+        assertEquals(Pick.cell(2, 4), roundTrip(ScreenTypes.PICK_CELL_SHAPE, Pick.cell(2, 4)));
+        assertEquals("row 2, column 4", Pick.cell(2, 4).label());
+        assertEquals("the one right of \"Daily\"", Pick.at(Place.rightOf(daily)).label());
+        assertEquals(Pick.first(), Pick.at(null), "a pick at no place is the first");
     }
 
     /** A wheel or a drag, each by its own factory, with what Discovery measured as links. */

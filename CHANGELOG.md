@@ -34,6 +34,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Claimed`). 🗺 Screens' cut form has *Words that tell it* and *A button known by its words*, the words read off the
   cut to start with; the panel lists a screen's words with ✕; edit_map has `add_text` and `remove_text`; try_input and
   ▶ Try press a text button where a fresh look reads it.
+- **Places, spots and grids on the map**: a button found only where it sits from a picture or words,
+  `Button.of(Pictures.CLAIM).repeated().place(Place.rightOf(Caption.of(Texts.DAILY, Zones.QUESTS)))`, or picked so
+  from a body, `Pick.at(Place.below(Pictures.EVENT_HEADER))` (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
+  `between`); none there presses nothing. A button with no picture of its own, `Button.beside(Pictures.AVATAR_FRAME,
+  2, 0)`, is pressed at an offset from its anchor in the anchor's size, only when the anchor is found; `.grid(Grid.of(3,
+  5, 1.2, 1.2))` makes it an inventory's cells, `Pick.cell(2, 3)` one of them. Both follow the anchor when the frame
+  is scaled. 🗺 Screens' cut form has *A spot beside a picture, or its grid*, and the input panel a *Where* section;
+  edit_map has `add_spot`, and set_input takes `side`, `anchor` and `other`.
 - **Drags on the map**: a button pressed, moved and let go, `Button.of(Pictures.CARD).dragsOnto(Pictures.SLOT)` or
   `.dragsInto(Zones.SLIDER_END)` (a swipe on a phone), `.dragTime(Duration)` (400 ms else). The drop is looked for on
   the frame the button is found on; a picture drop not there leaves it unpressed, ABSENT saying so. 🗺 Screens' input

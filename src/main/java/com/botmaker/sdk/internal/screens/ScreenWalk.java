@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -537,6 +538,12 @@ public final class ScreenWalk {
     static boolean sameCopy(Pick way, Pick pressed) {
         Pick a = way == null ? Pick.first() : way;
         if (a.mode() == Pick.Mode.EACH || pressed.mode() == Pick.Mode.EACH) return false;
+        // A copy at a place or a grid's cell is that place or that cell, never a copy along an order.
+        boolean placed = a.mode() == Pick.Mode.AT || a.mode() == Pick.Mode.CELL;
+        if (placed || pressed.mode() == Pick.Mode.AT || pressed.mode() == Pick.Mode.CELL) {
+            return a.mode() == pressed.mode() && a.nth() == pressed.nth() && a.column() == pressed.column()
+                    && Objects.equals(a.place(), pressed.place());
+        }
         return Math.max(1, a.nth()) == Math.max(1, pressed.nth()) && a.order() == pressed.order();
     }
 

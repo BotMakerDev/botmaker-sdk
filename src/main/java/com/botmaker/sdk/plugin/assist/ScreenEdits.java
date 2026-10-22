@@ -11,10 +11,12 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -38,6 +40,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -85,7 +88,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.comesAndGoes(), null,
                     t.when(), t.gesture(), t.hold());
@@ -102,7 +105,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
                     b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
@@ -120,7 +123,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
                     b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
@@ -624,7 +627,8 @@ public final class ScreenEdits {
     public static Button cycles(Button button, boolean cycles) {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
-                button.gesture(), button.hold(), button.typing(), button.drag());
+                button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
+                button.grid());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
@@ -755,6 +759,104 @@ public final class ScreenEdits {
         }
         return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.texts(now))),
                 graph.shown(constant) + " is told by \"" + words + "\" no more.");
+    }
+
+    /** The furthest a spot sits from its anchor, and a grid's step, in the anchor's sizes; the most rows or columns. */
+    static final double FURTHEST_SPOT = 40;
+    static final int MOST_CELLS = 30;
+
+    /**
+     * A new button of {@code constant}, field named from {@code field}, with no picture of its own: pressed {@code
+     * across} of the bot's picture {@code anchor}'s widths right of its centre and {@code down} of its heights below;
+     * a grid's cells when {@code grid} is given. Offsets past {@link #FURTHEST_SPOT}, more than {@link #MOST_CELLS}
+     * rows or columns, or a picture the bot lacks are refused.
+     */
+    public static String addSpot(StudioServices services, String constant, String field, String anchor, double across,
+                                 double down, Grid grid) {
+        if (field == null || field.isBlank()) return NOT_WRITTEN + "name the spot: its field.";
+        if (Math.abs(across) > FURTHEST_SPOT || Math.abs(down) > FURTHEST_SPOT || grid != null
+                && (Math.abs(grid.across()) > FURTHEST_SPOT || Math.abs(grid.down()) > FURTHEST_SPOT)) {
+            return NOT_WRITTEN + "a spot sits at most " + (int) FURTHEST_SPOT + " of its anchor's sizes away.";
+        }
+        if (grid != null && (grid.rows() > MOST_CELLS || grid.columns() > MOST_CELLS)) {
+            return NOT_WRITTEN + "a grid has at most " + MOST_CELLS + " rows and columns.";
+        }
+        if (grid != null && (grid.columns() > 1 && grid.across() == 0 || grid.rows() > 1 && grid.down() == 0)) {
+            return NOT_WRITTEN + "a grid's cells are some steps apart: give stepAcross for columns, stepDown for rows.";
+        }
+        if (anchor == null || !pictures(services).contains(anchor.strip())) {
+            return NOT_WRITTEN + "the bot has no picture " + anchor + ": cut the anchor first.";
+        }
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen on = graph.screens().get(constant);
+        if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
+        String named = on.fieldFor(field);
+        Button spot = Button.beside(picture(services, anchor.strip()), across, down).grid(grid);
+        return said(ScreenBook.update(services, constant, s -> s.withInput(named, spot)),
+                named + " is pressed " + (grid == null ? "" : "on " + grid.rows() + "×" + grid.columns() + " cells ")
+                        + "beside " + anchor.strip() + ", only when it shows.");
+    }
+
+    /**
+     * {@code constant}'s button {@code field} only ever found {@code side} of the bot's picture {@code anchor} (between
+     * it and {@code other}), or of {@code words} read in the zone {@code zone}; {@link Place.Side#UNKNOWN}: found
+     * anywhere again. The words are kept in the bot's {@code Texts} in the same step.
+     */
+    public static String setPlace(StudioServices services, String constant, String field, Place.Side side,
+                                  String anchor, String other, String words, String zone) {
+        ScreenGraph graph = ScreenBook.read(services);
+        if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
+            return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is placed.";
+        }
+        if (side == null || side == Place.Side.UNKNOWN) {
+            return said(ScreenBook.update(services, constant, s -> s.withInput(field, button.place(null))),
+                    field + " is found anywhere on " + graph.shown(constant) + " now.");
+        }
+        boolean byPicture = anchor != null && !anchor.isBlank();
+        boolean byWords = words != null && !words.isBlank();
+        if (byPicture == byWords) return NOT_WRITTEN + "a place is from one anchor: a picture or words.";
+        Place place;
+        if (byPicture) {
+            for (String id : side == Place.Side.BETWEEN ? Arrays.asList(anchor, other) : List.of(anchor)) {
+                if (id == null || !pictures(services).contains(id.strip())) {
+                    return NOT_WRITTEN + "the bot has no picture " + id + (side == Place.Side.BETWEEN
+                            ? ": between takes two pictures." : ".");
+                }
+            }
+            ImageTemplate from = picture(services, anchor.strip());
+            place = switch (side) {
+                case ABOVE -> Place.above(from);
+                case BELOW -> Place.below(from);
+                case LEFT_OF -> Place.leftOf(from);
+                case RIGHT_OF -> Place.rightOf(from);
+                case NEAREST -> Place.nearest(from);
+                case BETWEEN -> Place.between(from, picture(services, other.strip()));
+                case UNKNOWN -> null;
+            };
+        } else {
+            String said = words.strip();
+            if (side == Place.Side.BETWEEN) return NOT_WRITTEN + "between takes two pictures.";
+            if (said.length() > LONGEST_WORDS || said.contains("\n")) {
+                return NOT_WRITTEN + "give the words on one line, up to " + LONGEST_WORDS + " letters.";
+            }
+            Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
+            if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
+            Caption caption = Caption.of(Words.of(said), in.get());
+            place = switch (side) {
+                case ABOVE -> Place.above(caption);
+                case BELOW -> Place.below(caption);
+                case LEFT_OF -> Place.leftOf(caption);
+                case RIGHT_OF -> Place.rightOf(caption);
+                case NEAREST -> Place.nearest(caption);
+                case BETWEEN, UNKNOWN -> null;
+            };
+        }
+        Place at = place;
+        Button now = button.place(at);
+        String done = field + " is found " + at.label() + " now.";
+        if (at.words() == null) return said(ScreenBook.update(services, constant, s -> s.withInput(field, now)), done);
+        return said(ScreenBook.step(services, "Place " + field, () -> keptText(services, at.words().words())
+                .or(() -> ScreenBook.update(services, constant, s -> s.withInput(field, now)))), done);
     }
 
     /** Every zone of the bot's {@code Zones}, by name. */

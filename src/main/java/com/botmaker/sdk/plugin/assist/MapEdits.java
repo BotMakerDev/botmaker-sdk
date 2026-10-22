@@ -8,9 +8,11 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
+import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
@@ -105,7 +107,11 @@ final class MapEdits {
                     @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears,
                     @Describe(value = "dragged onto this picture; blank: no drag", optional = true) String dragOnto,
                     @Describe(value = "dragged into this Zones zone", optional = true) String dragInto,
-                    @Describe(value = "a drag's time", optional = true) Integer dragMs)
+                    @Describe(value = "a drag's time", optional = true) Integer dragMs,
+                    @Describe(value = "a button found only at this side of anchor; unknown: anywhere", optional = true)
+                    Place.Side side,
+                    @Describe(value = "a picture", optional = true) String anchor,
+                    @Describe(value = "between's second", optional = true) String other)
             implements Edit, OfInput {
     }
 
@@ -209,6 +215,16 @@ final class MapEdits {
     record RemoveText(String screen, String text) implements Edit {
     }
 
+    @Describe("a pictureless button: across widths, down heights from anchor picture's centre; rows×columns: a grid "
+            + "step apart")
+    record AddSpot(String screen, String field, String anchor, Double across, Double down,
+                   @Describe(value = "", optional = true) Integer rows,
+                   @Describe(value = "", optional = true) Integer columns,
+                   @Describe(value = "", optional = true) Double stepAcross,
+                   @Describe(value = "", optional = true) Double stepDown) implements Edit {
+    }
+
+
     @Describe("a new screen, opened by an input of screen (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
@@ -270,6 +286,8 @@ final class MapEdits {
             case RemoveMarker ignored -> marker(edit, context);
             case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
+            case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),
+                    spot.across() == null ? 0 : spot.across(), spot.down() == null ? 0 : spot.down(), grid(spot)));
             case SetInput set -> onInput(set, graph, screen, on, field -> setInput(context, screen, on, field, set));
             case ResetInput reset -> onInput(reset, graph, screen, on, field -> said(ScreenEdits.setInput(services,
                     screen, field, ScreenEdits.untried(on.inputs().get(field)))));
@@ -283,6 +301,15 @@ final class MapEdits {
             case Link link -> said(ScreenEdits.link(services, screen, on, link.picture(),
                     link.after() == null ? List.of() : link.after()));
         };
+    }
+
+    /** {@code spot}'s grid: none for one spot, a step of none along a side of one cell. */
+    private static Grid grid(AddSpot spot) {
+        int rows = spot.rows() == null ? 1 : spot.rows();
+        int columns = spot.columns() == null ? 1 : spot.columns();
+        if (rows <= 1 && columns <= 1) return null;
+        return Grid.of(rows, columns, spot.stepAcross() == null ? 0 : spot.stepAcross(),
+                spot.stepDown() == null ? 0 : spot.stepDown());
     }
 
     /**
@@ -411,10 +438,22 @@ final class MapEdits {
         }
         boolean typed = edit.types() != null || edit.submits() != null || edit.clears() != null;
         boolean drags = edit.dragOnto() != null || edit.dragInto() != null || edit.dragMs() != null;
-        if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null
-                && edit.gesture() == null && edit.holdMs() == null && !typed && !drags) {
+        boolean others = settles > 0 || edit.info() != null || edit.sometimes() != null || edit.repeated() != null
+                || edit.gesture() != null || edit.holdMs() != null || typed || drags;
+        if (edit.side() != null || edit.anchor() != null || edit.other() != null) {
+            if (others) return AgentReply.refused("Give side, anchor and other on their own. Nothing was written.");
+            // Only side unknown, alone, clears a place: an anchor with no side, or a side misspelt, writes nothing.
+            boolean clears = edit.side() == Place.Side.UNKNOWN && !has(edit.anchor()) && !has(edit.other());
+            if (!clears && (edit.side() == null || edit.side() == Place.Side.UNKNOWN)) {
+                return AgentReply.refused("Give side (above, below, left_of, right_of, nearest, between) with anchor, "
+                        + "or side unknown alone for anywhere. Nothing was written.");
+            }
+            return said(ScreenEdits.setPlace(context.services(), screen, field, edit.side(), edit.anchor(),
+                    edit.other(), null, null));
+        }
+        if (!others) {
             return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture, "
-                    + "holdMs, types, submits, clears, dragOnto, dragInto or dragMs. Nothing was written.");
+                    + "holdMs, types, submits, clears, dragOnto, dragInto, dragMs or side. Nothing was written.");
         }
         Input in = on.inputs().get(field);
         if (edit.repeated() != null && !(in instanceof Button)) {

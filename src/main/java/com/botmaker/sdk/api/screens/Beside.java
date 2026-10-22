@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 /**
@@ -17,5 +18,12 @@ public record Beside(ImageTemplate other, double across, double down) {
     /** A node's centre {@code across} of {@code other}'s widths right and {@code down} of its heights below. */
     public static Beside of(ImageTemplate other, double across, double down) {
         return new Beside(other, across, down);
+    }
+
+    /** Where this offset puts a place of {@code found}'s size, {@code other} shown at {@code found}. */
+    public Rect place(Rect found) {
+        int x = (int) Math.round(found.x() + across * found.width());
+        int y = (int) Math.round(found.y() + down * found.height());
+        return new Rect(x, y, found.width(), found.height());
     }
 }

@@ -43,7 +43,7 @@ class HandParityTest {
             entry("NewScreen", Hand.now("⋯ input ▸ Result ▸ Opens a new screen…, ⋯ Screen ▸ New screen from here…")),
             entry("SetInput", Hand.now("the picked input's editors: result, information only, comes and goes, "
                     + "never, locked, a button's Pressed by (its gesture and hold time, or its drag), Text field, "
-                    + "looks, repeated and cycles, a "
+                    + "looks, repeated and cycles, Where (a side of a picture), a "
                     + "hotkey's keys and hold; ⋯ input")),
             entry("ResetInput", Hand.now("⋯ input ▸ Result ▸ Untried")),
             entry("RemoveInput", Hand.now("⋯ input ▸ Remove from this screen")),
@@ -63,6 +63,7 @@ class HandParityTest {
             entry("RemoveMarker", Hand.now("the panel's markers ✕")),
             entry("AddText", Hand.now("a cut on the board as Words that tell it, or A button known by its words")),
             entry("RemoveText", Hand.now("the panel's markers: words ✕")),
+            entry("AddSpot", Hand.now("a cut on the board as A spot beside a picture, or its grid (beside, cells)")),
             // the map tools
             entry("not_a_screen", Hand.now("⋯ Screen ▸ Not a screen")),
             entry("place_pictures", Hand.now("⋯ Screen ▸ Add pictures the bot has…")),
