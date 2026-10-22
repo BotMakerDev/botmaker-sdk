@@ -71,8 +71,8 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   for now (a second language, against "bodies are Java on map calls").
 - **Screens audit gaps (2026-10-22)**, each its own plan:
   - A `Hotkey` of a `KeySequence` (combos one after another, a wait between); `Keyboard.sequence` already does it.
-  - A new input: a `Drag` (picture → picture or zone).
-  - A text field cut as one in the cut form (today a button cut, then *Text field* in the input panel); an emulator's
+  - A text field or a drag cut as one in the cut form (today a button cut, then *Text field* or *Drag* in the input
+    panel; a drag's drop cut on the same board); an emulator's
     field cleared before typing (adb has no select-all); a hotkey on an emulator sent as Android key events (it goes
     to the host's keyboard today).
   - Text as a marker and as a button (OCR), for text-heavy or localized apps.

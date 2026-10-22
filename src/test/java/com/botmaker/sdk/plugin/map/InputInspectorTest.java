@@ -143,6 +143,21 @@ class InputInspectorTest {
         assertEquals("types the body's text", ScreenCards.fieldTrait(MapFixtures.click("search").typed()));
     }
 
+    /** The drag editor writes no drag when unticked or with nothing picked, else its drop by kind and its time. */
+    @Test
+    void aDragIsLetGoOnAPictureOrInAZone() {
+        assertNull(InputInspector.dropOf(false, InputInspector.DropKind.PICTURE, "slot", 400), "unticked: pressed");
+        assertNull(InputInspector.dropOf(true, InputInspector.DropKind.ZONE, " ", 400), "nothing picked yet");
+        assertEquals(new InputInspector.Drop("slot", null, Duration.ofMillis(900)),
+                InputInspector.dropOf(true, InputInspector.DropKind.PICTURE, " slot ", 900));
+        assertEquals(new InputInspector.Drop(null, "SLIDER_END", Duration.ofMillis(400)),
+                InputInspector.dropOf(true, InputInspector.DropKind.ZONE, "SLIDER_END", 400));
+        assertEquals("dragged onto slot", ScreenCards.dragTrait(MapFixtures.click("card")
+                .dragsOnto(MapFixtures.picture("slot"))));
+        assertEquals("dragged onto slot, 900 ms", ScreenCards.dragTrait(MapFixtures.click("card")
+                .dragsOnto(MapFixtures.picture("slot")).dragTime(Duration.ofMillis(900))));
+    }
+
     /** The hotkey editor changes only what it was told: the keys' order and the keys it shows no tick for stay. */
     @Test
     void aHotkeysKeysKeepTheirOrderWhenEdited() {

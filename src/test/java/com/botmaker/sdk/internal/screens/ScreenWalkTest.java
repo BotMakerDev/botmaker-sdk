@@ -811,6 +811,33 @@ class ScreenWalkTest {
         assertEquals(List.of("click search", "type Dragons"), stays.done);
     }
 
+    /** A drag is pressed only once its drop shows too: absent, saying so, while the slot it goes onto is not there. */
+    @Test
+    void aDragWaitsForItsDrop() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), click("card").dragsOnto(picture("slot"))));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.shows.get("HOME").add("card");
+
+        ScreenWalk.Press press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "card", null);
+        assertEquals(Pressed.Result.ABSENT, press.result(), press.toString());
+        assertTrue(press.why().contains("drags onto slot"), press.why());
+        assertEquals(List.of(), game.done);
+
+        game.shows.get("HOME").add("slot");
+        press = new ScreenWalk(game.map, game, STEP_MS, null).press("HOME", "card", null);
+        assertEquals(Pressed.Result.DONE, press.result(), press.toString());
+        assertEquals(List.of("drag card"), game.done);
+
+        // Left where it was though the map says it leads away, a drag is not done again as a lost click is.
+        screens.put("DECK", screen(named("Deck", "deck_title", "HOME", "card")));
+        Game stays = new Game("HOME", ScreenGraph.of(screens));
+        stays.shows.get("HOME").addAll(List.of("card", "slot"));
+        press = new ScreenWalk(stays.map, stays, STEP_MS, null).press("HOME", "card", null);
+        assertEquals(Pressed.Result.LEFT, press.result(), press.toString());
+        assertEquals(List.of("drag card"), stays.done);
+    }
+
     @Test
     void aWayTheGameNoLongerShowsIsMissing() {
         Game game = new Game("HOME");

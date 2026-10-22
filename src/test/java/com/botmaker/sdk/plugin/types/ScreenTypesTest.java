@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
@@ -151,10 +152,10 @@ class ScreenTypesTest {
     void aButtonWithNoGestureWritesNone() {
         Button plain = Button.of(picture("claim"));
         assertEquals(Gesture.CLICK, plain.gesture());
-        // Its gesture and hold links, before the text field's four.
+        // Its gesture and hold links, before the text field's four and the drag's three.
         List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(plain);
-        assertNull(parts.get(parts.size() - 6));
-        assertNull(parts.get(parts.size() - 5));
+        assertNull(parts.get(parts.size() - 9));
+        assertNull(parts.get(parts.size() - 8));
 
         Button twice = Button.of(picture("hero")).gesture(Gesture.DOUBLE).repeated();
         Button held = Button.of(picture("charge")).hold(Duration.ofSeconds(2));
@@ -163,10 +164,10 @@ class ScreenTypesTest {
         assertEquals(held, roundTrip(ScreenTypes.BUTTON_SHAPE, held));
         assertEquals(heldLong, roundTrip(ScreenTypes.BUTTON_SHAPE, heldLong));
         List<Object> heldParts = ScreenTypes.BUTTON_SHAPE.components(held);
-        assertNull(heldParts.get(heldParts.size() - 6), "a hold of its own time says it alone");
-        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 5));
+        assertNull(heldParts.get(heldParts.size() - 9), "a hold of its own time says it alone");
+        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 8));
         List<Object> twiceParts = ScreenTypes.BUTTON_SHAPE.components(twice);
-        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 6));
+        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 9));
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).gesture(Gesture.RIGHT);
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
     }
@@ -182,7 +183,7 @@ class ScreenTypesTest {
         assertEquals(search, roundTrip(ScreenTypes.BUTTON_SHAPE, search));
         assertEquals(byBody, roundTrip(ScreenTypes.BUTTON_SHAPE, byBody));
         assertEquals(Words.of("Dragons"), ScreenTypes.BUTTON_SHAPE.components(search)
-                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 4));
+                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 7));
         assertTrue(byBody.typedByBody());
         assertFalse(search.typedByBody(), "a text of its own is walked through");
         Button old = Button.of(picture("claim")).tried();
@@ -190,6 +191,34 @@ class ScreenTypesTest {
         assertFalse(old.isField());
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).types(Words.of("a"));
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling), "no link is lost to a cycle");
+    }
+
+    /**
+     * A drag is written by its drop, a picture or a zone, and its time only when it has one of its own; it takes the
+     * place of a gesture and a text. A button of a map written before drags is dragged nowhere.
+     */
+    @Test
+    void aDragIsWrittenByItsDropAndItsTime() {
+        Button onto = Button.of(picture("card")).dragsOnto(picture("slot")).dragTime(Duration.ofMillis(900));
+        Button into = Button.of(picture("knob")).dragsInto(new Zone(600, 300, 40, 40));
+        assertEquals(onto, roundTrip(ScreenTypes.BUTTON_SHAPE, onto));
+        assertEquals(into, roundTrip(ScreenTypes.BUTTON_SHAPE, into));
+        List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(into);
+        assertEquals(new Zone(600, 300, 40, 40), parts.get(parts.size() - 2));
+        assertNull(parts.getLast(), "the usual time is not written");
+        assertNull(Button.of(picture("knob")).dragsInto(new Zone(0, 0, 1, 1)).dragTime(Button.DRAG_TIME).drag().time());
+        Button typed = Button.of(picture("search")).types(Words.of("a")).dragsOnto(picture("slot"));
+        assertNull(typed.typing(), "a drag types nothing");
+        assertFalse(Button.of(picture("card")).dragsOnto(picture("slot")).gesture(Gesture.DOUBLE).isDrag(),
+                "a gesture presses it again");
+        Button old = Button.of(picture("claim")).hold(Duration.ofSeconds(1));
+        assertEquals(old, roundTrip(ScreenTypes.BUTTON_SHAPE, old));
+        assertFalse(old.isDrag());
+        assertFalse(Button.of(picture("card")).dragsOnto(null).isDrag(), "a drag with nowhere to go is none");
+        assertTrue(Button.of(picture("card")).dragsOnto(picture("slot")).typing(null).isDrag(),
+                "typing nothing keeps the drag");
+        Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).dragsOnto(picture("slot"));
+        assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
     }
 
     @Test

@@ -287,7 +287,8 @@ final class ActTools {
     }
 
     /**
-     * Clicks {@code picture} (by {@code copy}'s gesture when it is a button's), scrolls {@code notches} over it when
+     * Clicks {@code picture} (by {@code copy}'s gesture when it is a button's, or drags it to its drop), scrolls
+     * {@code notches} over it when
      * they are not 0, or presses {@code keys} for try_input
      * on {@code screen}, waiting up to {@code settleMs} for a change as big as {@code share} of the screen, and
      * {@link FrameChange#QUIET_MS} when nothing moves at all. A {@code pick} clicks that copy of {@code copy}'s button
@@ -308,6 +309,19 @@ final class ActTools {
             return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Scrolled " + notches
                     + " at " + spotted.name() + " (" + at.x() + "," + at.y() + ")", "scroll " + spotted.name() + " "
                     + notches, share, hands -> hands.scroll(at.x(), at.y(), notches));
+        }
+        // A drag of the map is moved to its drop, found on the same frame, as a run drags it.
+        if (copy != null && copy.isDrag()) {
+            Optional<Point> drop = ToolReach.of(context).flatMap(reach -> reach.dropOn(copy, spotted.frame()));
+            if (drop.isEmpty()) {
+                return Entered.no(AgentReply.text(spotted.name() + " drags onto " + copy.drag().target()
+                        + ", which is not on the screen; nothing was dragged."));
+            }
+            Point to = drop.get();
+            long ms = copy.dragTime().toMillis();
+            return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Dragged " + spotted.name()
+                    + " from " + at.x() + "," + at.y() + " to " + to.x() + "," + to.y(), "drag " + spotted.name(),
+                    share, hands -> hands.drag(at.x(), at.y(), to.x(), to.y(), ms));
         }
         // A button of the map is pressed by its gesture, as a run presses it.
         Gesture gesture = copy == null ? Gesture.CLICK : copy.gesture();

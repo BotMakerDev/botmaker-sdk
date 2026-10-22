@@ -86,7 +86,7 @@ final class MapEdits {
     record SetKind(String screen, Kind as) implements Edit {
     }
 
-    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture, text field")
+    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture, text field, drag")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
@@ -101,7 +101,10 @@ final class MapEdits {
                     @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs,
                     @Describe(value = "a text field's text; blank: the body's", optional = true) String types,
                     @Describe(value = "a field: Enter after", optional = true) Boolean submits,
-                    @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears)
+                    @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears,
+                    @Describe(value = "dragged onto this picture; blank: no drag", optional = true) String dragOnto,
+                    @Describe(value = "dragged into this Zones zone", optional = true) String dragInto,
+                    @Describe(value = "a drag's time", optional = true) Integer dragMs)
             implements Edit, OfInput {
     }
 
@@ -394,10 +397,11 @@ final class MapEdits {
                     + "written.");
         }
         boolean typed = edit.types() != null || edit.submits() != null || edit.clears() != null;
+        boolean drags = edit.dragOnto() != null || edit.dragInto() != null || edit.dragMs() != null;
         if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null
-                && edit.gesture() == null && edit.holdMs() == null && !typed) {
+                && edit.gesture() == null && edit.holdMs() == null && !typed && !drags) {
             return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture, "
-                    + "holdMs, types, submits or clears. Nothing was written.");
+                    + "holdMs, types, submits, clears, dragOnto, dragInto or dragMs. Nothing was written.");
         }
         Input in = on.inputs().get(field);
         if (edit.repeated() != null && !(in instanceof Button)) {
@@ -428,6 +432,9 @@ final class MapEdits {
             return AgentReply.refused("A field types at most " + ScreenEdits.LONGEST_TEXT + " characters. Nothing was"
                     + " written.");
         }
+        Optional<AgentReply> dragRefused = drags ? dragRefused(context, field, in, edit, gestured || typed)
+                : Optional.empty();
+        if (dragRefused.isPresent()) return dragRefused.get();
         Input now = in;
         if (edit.did() != null) {
             now = switch (edit.did()) {
@@ -453,6 +460,7 @@ final class MapEdits {
             now = ScreenEdits.gestured(b, edit.gesture() == null ? Gesture.HOLD : edit.gesture(), hold);
         }
         if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
+        if (drags && now instanceof Button b) now = dragged(context, b, edit);
         if (typed && now instanceof Button b) {
             Words text = edit.types() == null ? b.text() : edit.types().isBlank() ? null : Words.of(edit.types());
             return said(ScreenEdits.setField(context.services(), screen, field, b.typing(new Typing(text,
@@ -460,6 +468,59 @@ final class MapEdits {
                     edit.clears() == null ? b.isClearing() : edit.clears()))));
         }
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
+    }
+
+    /**
+     * Why set_input's drag may not be written on {@code in}: no button, a gesture or a text with it (a drag is its own
+     * press), both drops, a drop the bot lacks, a time out of bounds, or a time alone on a button not dragged.
+     */
+    private static Optional<AgentReply> dragRefused(AgentContext context, String field, Input in, SetInput edit,
+                                                    boolean pressedElse) {
+        if (!(in instanceof Button b)) {
+            return Optional.of(AgentReply.refused(field + " is no button: only a button is dragged. Nothing was "
+                    + "written."));
+        }
+        if (pressedElse) {
+            return Optional.of(AgentReply.refused("A drag is its own press: give dragOnto, dragInto or dragMs without "
+                    + "gesture, holdMs or types. Nothing was written."));
+        }
+        if (has(edit.dragOnto()) && has(edit.dragInto())) {
+            return Optional.of(AgentReply.refused("Give dragOnto or dragInto, not both. Nothing was written."));
+        }
+        if (edit.dragMs() != null && (edit.dragMs() <= 0 || edit.dragMs() > ScreenEdits.LONGEST_HOLD.toMillis())) {
+            return Optional.of(AgentReply.refused("A drag takes 1 to " + ScreenEdits.LONGEST_HOLD.toMillis()
+                    + " ms. Nothing was written."));
+        }
+        boolean dropped = has(edit.dragOnto()) || has(edit.dragInto());
+        if (edit.dragMs() != null && !dropped && (edit.dragOnto() != null || edit.dragInto() != null)) {
+            return Optional.of(AgentReply.refused("A blank drop presses it again: give dragMs with a drop, or not at "
+                    + "all. Nothing was written."));
+        }
+        if (edit.dragOnto() == null && edit.dragInto() == null && !b.isDrag()) {
+            return Optional.of(AgentReply.refused(field + " is no drag yet: give dragOnto or dragInto with dragMs. "
+                    + "Nothing was written."));
+        }
+        if (has(edit.dragOnto()) && !ActTools.exists(context, edit.dragOnto().strip())) {
+            return Optional.of(AgentReply.refused(Frames.noPicture(edit.dragOnto().strip())));
+        }
+        if (has(edit.dragInto()) && ScreenEdits.zoneOf(context.services(), edit.dragInto().strip()).isEmpty()) {
+            return Optional.of(AgentReply.refused("The bot has no zone " + edit.dragInto().strip() + " in Zones "
+                    + "(save_region adds one). Nothing was written."));
+        }
+        return Optional.empty();
+    }
+
+    /** {@code button} dragged as set_input says, checked by {@link #dragRefused}: a blank drop presses it again. */
+    private static Button dragged(AgentContext context, Button button, SetInput edit) {
+        Button now = button;
+        if (has(edit.dragOnto())) {
+            now = now.dragsOnto(ScreenBook.picture(context.services(), edit.dragOnto().strip()));
+        } else if (has(edit.dragInto())) {
+            now = now.dragsInto(ScreenEdits.zoneOf(context.services(), edit.dragInto().strip()).orElseThrow());
+        } else if (edit.dragOnto() != null || edit.dragInto() != null) {
+            now = now.drag(null);
+        }
+        return edit.dragMs() == null ? now : now.dragTime(Duration.ofMillis(edit.dragMs()));
     }
 
     /**

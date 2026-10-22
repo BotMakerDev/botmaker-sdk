@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -70,6 +71,8 @@ public final class ScreenEdits {
 
     private static final ManagedSet<Words> TEXTS = ManagedSet.of(SdkValues.TEXTS);
 
+    private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
+
     /** The longest a button or a hotkey is held, as 🗺's spinners offer: past it the game is held, not pressed. */
     public static final Duration LONGEST_HOLD = Duration.ofMinutes(1);
 
@@ -80,7 +83,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing());
+                    b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
                     s.when());
@@ -95,7 +98,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
                     b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing());
+                    b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
@@ -111,7 +114,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
                     b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing());
+                    b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
@@ -613,7 +616,7 @@ public final class ScreenEdits {
     public static Button cycles(Button button, boolean cycles) {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
-                button.gesture(), button.hold(), button.typing());
+                button.gesture(), button.hold(), button.typing(), button.drag());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
@@ -656,6 +659,58 @@ public final class ScreenEdits {
             return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is typed into.";
         }
         return setField(services, constant, field, button.typing(typing));
+    }
+
+    /**
+     * {@code constant}'s button {@code field} dragged onto the bot's picture {@code onto}, or into its zone {@code
+     * into}, the move taking {@code time} (null: as long as it took, else {@link Button#DRAG_TIME}); neither: pressed
+     * by its gesture again. A field that is no button, both drops, one the bot lacks, or a time past {@link
+     * #LONGEST_HOLD} is refused.
+     */
+    public static String setDrag(StudioServices services, String constant, String field, String onto, String into,
+                                 Duration time) {
+        boolean picture = onto != null && !onto.isBlank();
+        boolean zone = into != null && !into.isBlank();
+        if (picture && zone) return NOT_WRITTEN + "a drag lets go on a picture or in a zone, not both.";
+        if (time != null && (time.isNegative() || time.isZero() || time.compareTo(LONGEST_HOLD) > 0)) {
+            return NOT_WRITTEN + "a drag takes 1 to " + LONGEST_HOLD.toMillis() + " ms.";
+        }
+        ScreenGraph graph = ScreenBook.read(services);
+        if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
+            return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is dragged.";
+        }
+        if (!picture && !zone) {
+            return said(ScreenBook.update(services, constant, s -> s.withInput(field, button.drag(null))),
+                    field + " is pressed by " + button.gesture().displayName() + " now.");
+        }
+        Button now;
+        if (picture) {
+            if (!pictures(services).contains(onto.strip())) return NOT_WRITTEN + "the bot has no picture " + onto + ".";
+            now = button.dragsOnto(picture(services, onto.strip()));
+        } else {
+            Optional<Zone> area = zoneOf(services, into.strip());
+            if (area.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + into + " in Zones.";
+            now = button.dragsInto(area.get());
+        }
+        Button timed = time == null ? now : now.dragTime(time);
+        return said(ScreenBook.update(services, constant, s -> s.withInput(field, timed)),
+                field + " is dragged onto " + (picture ? onto.strip() : "zone " + into.strip()) + " in "
+                        + timed.dragTime().toMillis() + " ms now.");
+    }
+
+    /** Every zone of the bot's {@code Zones}, by name. */
+    public static List<String> zones(StudioServices services) {
+        PluginValues values = services.pluginValues();
+        return values == null ? List.of() : ZONES.members(values).stream().map(Member::name).sorted().toList();
+    }
+
+    /** The bot's zone {@code name}, as its constant holds it; empty when {@code Zones} has none of that name. */
+    public static Optional<Zone> zoneOf(StudioServices services, String name) {
+        PluginValues values = services.pluginValues();
+        if (values == null || ZONES.members(values).stream().noneMatch(m -> m.name().equals(name))) {
+            return Optional.empty();
+        }
+        return ZONES.read(values, Member.of(name));
     }
 
     /**

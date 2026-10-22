@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -29,6 +30,10 @@ import java.util.function.BooleanSupplier;
  * ({@code .types(Texts.GUILD)}), which a walk types on its way through, or the text a body gives
  * ({@link #typed()}, {@code Navigate.type}), which no walk goes through (2026-10-22).
  *
+ * <p>A button that is dragged is pressed, moved onto a picture ({@link #dragsOnto}) or into a zone ({@link
+ * #dragsInto}), and let go, in place of its gesture: a card onto its slot, a slider to its end, a swipe on a phone. A
+ * drop not on the screen leaves it unpressed (2026-10-22).
+ *
  * @param picture      the picture clicked, as the button usually looks
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
@@ -43,19 +48,29 @@ import java.util.function.BooleanSupplier;
  * @param gesture      how it is pressed; {@link Gesture#CLICK} when null
  * @param hold         how long a {@link Gesture#HOLD} is held; {@link #HOLD_TIME} when null, none for any other
  * @param typing       what it types once clicked, for a text field; null when it is only clicked
+ * @param drag         where it is dragged once pressed; null when it is pressed by its gesture
  */
 public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, boolean isInfo, String never,
                      boolean comesAndGoes, ImageTemplate lock, List<Look> looks, BooleanSupplier when,
-                     boolean repeats, boolean cycles, Gesture gesture, Duration hold, Typing typing)
+                     boolean repeats, boolean cycles, Gesture gesture, Duration hold, Typing typing, Drag drag)
         implements Input {
 
     /** How long a button held for no time of its own is held: a long press on most phones and games. */
     public static final Duration HOLD_TIME = Duration.ofMillis(800);
 
+    /** How long a drag of no time of its own takes from the button to its drop: slow enough for a game to follow. */
+    public static final Duration DRAG_TIME = Duration.ofMillis(400);
+
     public Button {
         looks = looks == null ? List.of() : List.copyOf(looks);
         // When it is there is said only of what comes and goes.
         comesAndGoes = comesAndGoes || when != null;
+        // A drag with nowhere to go is none; a drag is its own press: no gesture, nothing typed.
+        if (drag != null && drag.onto() == null && drag.into() == null) drag = null;
+        if (drag != null) {
+            gesture = Gesture.CLICK;
+            typing = null;
+        }
         gesture = gesture == null ? Gesture.CLICK : gesture;
         // Only a hold lasts a time.
         if (gesture != Gesture.HOLD) hold = null;
@@ -64,7 +79,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     /** {@code picture} clicked at its best match. */
     public static Button of(ImageTemplate picture) {
         return new Button(picture, false, false, false, null, false, null, List.of(), null, false, false, null, null,
-                null);
+                null, null);
     }
 
     /**
@@ -74,7 +89,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     public static Button cycling(List<ImageTemplate> looks) {
         List<Look> rest = looks.stream().skip(1).map(look -> Look.of(look, State.NORMAL)).toList();
         return new Button(looks.isEmpty() ? null : looks.getFirst(), false, false, false, null, false, null, rest,
-                null, false, true, null, null, null);
+                null, false, true, null, null, null, null);
     }
 
     /** The looks a {@link #cycling} button shows in turn, its usual picture first. */
@@ -85,49 +100,49 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     @Override
     public Button tried() {
         return new Button(picture, true, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button leaves() {
         return new Button(picture, isTried, true, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button info() {
         return new Button(picture, isTried, isLeaving, true, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button never(String why) {
         return new Button(picture, isTried, isLeaving, isInfo, why, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button sometimes() {
         return new Button(picture, isTried, isLeaving, isInfo, never, true, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button locked(ImageTemplate lock) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     @Override
     public Button when(BooleanSupplier condition) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, condition, repeats,
-                cycles, gesture, hold, typing);
+                cycles, gesture, hold, typing, drag);
     }
 
     /** This button, also looking as each of {@code looks} says. */
     public Button looks(List<Look> looks) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
     /** This button, shown more than once on its screen: Claim on each mission card. */
@@ -138,19 +153,43 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     /** This button, shown more than once on its screen or not. */
     public Button repeats(boolean repeats) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, drag);
     }
 
-    /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
+    /**
+     * This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time; a drag is
+     * pressed by a gesture no more.
+     */
     public Button gesture(Gesture gesture) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, null);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public Button hold(Duration time) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                Gesture.HOLD, time, typing);
+                Gesture.HOLD, time, typing, null);
+    }
+
+    /** This button, dragged onto {@code target}, a picture the screen shows: a card onto its slot. */
+    public Button dragsOnto(ImageTemplate target) {
+        return drag(new Drag(target, null, drag == null ? null : drag.time()));
+    }
+
+    /** This button, dragged into {@code zone}, one of the bot's {@code Zones}: a slider to its end, a swipe. */
+    public Button dragsInto(Zone zone) {
+        return drag(new Drag(null, zone, drag == null ? null : drag.time()));
+    }
+
+    /** This drag, its move taking {@code time}: {@code .dragTime(Duration.ofSeconds(1))}. A button not dragged stays. */
+    public Button dragTime(Duration time) {
+        return drag == null ? this : drag(new Drag(drag.onto(), drag.into(), time));
+    }
+
+    /** This button, dragged as {@code drag} says once pressed, in place of its gesture and typing; null: pressed. */
+    public Button drag(Drag drag) {
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold, typing, drag);
     }
 
     /** This button, a text field: clicked, then {@code text} typed into it, one of the bot's {@code Texts}. */
@@ -173,10 +212,20 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return typing(new Typing(text(), isSubmitting(), true));
     }
 
-    /** This button, typing as {@code typing} says once clicked; null: only clicked. */
+    /** This button, typing as {@code typing} says once clicked, a drag clicked again; null: typing nothing. */
     public Button typing(Typing typing) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold, typing);
+                gesture, hold, typing, typing == null ? drag : null);
+    }
+
+    /** Whether it is dragged once pressed, onto a picture or into a zone. */
+    public boolean isDrag() {
+        return drag != null;
+    }
+
+    /** How long its drag's move takes: its own time, else {@link #DRAG_TIME}; null when it is not dragged. */
+    public Duration dragTime() {
+        return drag == null ? null : drag.time() == null ? DRAG_TIME : drag.time();
     }
 
     /** Whether it is a text field, typed into once clicked. */

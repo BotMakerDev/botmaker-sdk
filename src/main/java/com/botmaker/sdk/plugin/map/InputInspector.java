@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
@@ -189,6 +190,8 @@ final class InputInspector {
                 all.add(gesture(constant, field, button));
                 all.add(heading("Text field"));
                 all.add(typing(constant, field, button));
+                all.add(heading("Drag"));
+                all.add(drag(constant, field, button));
                 all.add(heading("Looks"));
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
@@ -515,6 +518,97 @@ final class InputInspector {
     static Typing typingOf(boolean field, String text, boolean submits, boolean clears) {
         if (!field) return null;
         return new Typing(text == null || text.isBlank() ? null : Words.of(text), submits, clears);
+    }
+
+    // --- a button's drag ---
+
+    /** What a drag is let go on, as the drag editor offers it. */
+    enum DropKind {
+        PICTURE("a picture"),
+        ZONE("a zone");
+
+        private final String displayName;
+
+        DropKind(String displayName) {
+            this.displayName = displayName;
+        }
+
+        String displayName() {
+            return displayName;
+        }
+    }
+
+    /** What the drag editor writes, by name: {@code onto} a picture or {@code into} a zone, the move taking {@code time}. */
+    record Drop(String onto, String into, Duration time) {}
+
+    private Node drag(String constant, String field, Button button) {
+        CheckBox dragged = new CheckBox("Dragged onto");
+        dragged.setSelected(button.isDrag());
+        dragged.setTooltip(new Tooltip(MapGuide.DRAG));
+        boolean zone = button.isDrag() && button.drag().into() != null;
+        ComboBox<DropKind> kind = new ComboBox<>(FXCollections.observableArrayList(DropKind.values()));
+        kind.setConverter(named(DropKind::displayName));
+        kind.setValue(zone ? DropKind.ZONE : DropKind.PICTURE);
+        ComboBox<String> target = new ComboBox<>();
+        target.setPromptText("which one");
+        HBox.setHgrow(target, Priority.ALWAYS);
+        Runnable offer = () -> target.setItems(FXCollections.observableArrayList(kind.getValue() == DropKind.ZONE
+                ? ScreenEdits.zones(services) : ScreenEdits.pictures(services)));
+        offer.run();
+        target.setValue(!button.isDrag() ? null : zone ? zoneName(button.drag().into())
+                : button.drag().onto().id());
+        long time = button.isDrag() ? button.dragTime().toMillis() : Button.DRAG_TIME.toMillis();
+        Spinner<Integer> ms = new Spinner<>(50, 60_000, (int) time, 50);
+        ms.setEditable(true);
+        ms.setPrefWidth(90);
+        Label unit = new Label("ms");
+        for (Node shown : List.of(kind, target, ms, unit)) {
+            shown.setVisible(button.isDrag());
+            shown.setManaged(button.isDrag());
+        }
+        // What was last written from here: a pick, then the spinner losing focus as the panel redraws, write once.
+        Drop[] written = {dropOf(button.isDrag(), kind.getValue(), target.getValue(), (int) time)};
+        Runnable write = () -> {
+            // Ticked with nothing picked yet, or another kind chosen: the pick is waited for, nothing written, so the
+            // panel is not drawn again from a map that has no drag yet.
+            if (dragged.isSelected() && (target.getValue() == null || target.getValue().isBlank())) {
+                for (Node shown : List.of(kind, target, ms, unit)) {
+                    shown.setVisible(true);
+                    shown.setManaged(true);
+                }
+                target.setPromptText("pick the picture or zone it is let go on");
+                return;
+            }
+            Drop now = dropOf(dragged.isSelected(), kind.getValue(), target.getValue(), ms.getValue());
+            if (!Objects.equals(now, written[0])) {
+                written[0] = now;
+                panel.wrote(now == null ? ScreenEdits.setDrag(services, constant, field, null, null, null)
+                        : ScreenEdits.setDrag(services, constant, field, now.onto(), now.into(), now.time()));
+            }
+        };
+        dragged.setOnAction(e -> write.run());
+        kind.setOnAction(e -> {
+            offer.run();
+            target.setValue(null);
+        });
+        target.setOnAction(e -> write.run());
+        ms.valueProperty().addListener((o, was, is) -> write.run());
+        return line(dragged, kind, target, ms, unit);
+    }
+
+    /** What the drag editor writes: none when it is not dragged, else its drop by name and its time. */
+    static Drop dropOf(boolean dragged, DropKind kind, String target, Integer ms) {
+        if (!dragged || target == null || target.isBlank()) return null;
+        String name = target.strip();
+        return new Drop(kind == DropKind.ZONE ? null : name, kind == DropKind.ZONE ? name : null,
+                ms == null ? null : Duration.ofMillis(ms));
+    }
+
+    /** The name of the bot's zone holding {@code zone}; its place when none does. */
+    private String zoneName(Zone zone) {
+        return ScreenEdits.zones(services).stream()
+                .filter(name -> ScreenEdits.zoneOf(services, name).filter(zone::equals).isPresent())
+                .findFirst().orElse(zone.toString());
     }
 
     // --- a hotkey's keys ---

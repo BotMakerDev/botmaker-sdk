@@ -426,14 +426,20 @@ public final class ScreenWalk {
                         blocking = seen.get().state();
                         break;
                     }
-                    reach.press((Button) acted, seen.get().place());
+                    if (!reach.press((Button) acted, seen.get().place(), frame.get())) {
+                        walked = noDrop(button, constant);
+                        break;
+                    }
                     look = seen.get().state();
                 } else if (!reach.perform(acted, strip, p, frame.get())) {
                     // Every copy greyed out, locked, done or busy is a button showing that look; none at all, an
-                    // absent one.
+                    // absent one; one that shows pressable, a drag whose drop is not there.
                     Optional<Reach.Seen> seen = input instanceof Button button
                             ? reach.seen(button, strip, p, frame.get()) : Optional.empty();
-                    if (seen.isPresent()) {
+                    if (seen.isPresent() && !seen.get().state().blocks() && input instanceof Button dragged
+                            && dragged.isDrag() && reach.dropOn(dragged, frame.get()).isEmpty()) {
+                        walked = noDrop(dragged, constant);
+                    } else if (seen.isPresent()) {
                         blocking = seen.get().state().blocks() ? seen.get().state() : State.DISABLED;
                         missed = Pressed.blockedBy(blocking);
                     }
@@ -453,9 +459,11 @@ public final class ScreenWalk {
                 // Still here though the map says it leads away: a click lost to lag is pressed once more, and a second
                 // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
                 if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
-                    // A field that keeps what it holds is never typed twice: its text would be there twice.
+                    // A field that keeps what it holds is never typed twice: its text would be there twice. Nor is a
+                    // drag done twice: what it moved is gone from where it was, and another may sit there now.
                     boolean retypes = acted instanceof Button typing && typing.text() != null && !typing.isClearing();
-                    if (retried || retypes) {
+                    boolean redrags = acted instanceof Button dragging && dragging.isDrag();
+                    if (retried || retypes || redrags) {
                         return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "
                                 + graph.shown(constant) + (retried ? " twice" : "")
                                 + ", though the map says it leads to "
@@ -481,6 +489,11 @@ public final class ScreenWalk {
         if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
         return new Press(missed, constant, 0, name + (blocking != null ? " looks " + blocking.id() + "."
                 : walked != null ? " " + walked : " is not on " + graph.shown(constant) + "."));
+    }
+
+    /** Why {@code dragged}, on {@code constant}, was not pressed: its drop is not on the screen. */
+    private String noDrop(Button dragged, String constant) {
+        return "drags onto " + dragged.drag().target() + ", which is not on " + graph.shown(constant) + ".";
     }
 
     /**
@@ -643,8 +656,7 @@ public final class ScreenWalk {
             Optional<Reach.Seen> seen = TreeWalk.reach(reach, button, tree.get(), buttons, frame).found();
             if (seen.isEmpty() || seen.get().state().blocks()) return false;
             if (edge.state() != null && edge.state() != seen.get().state()) return false;
-            reach.press(button, seen.get().place());
-            return true;
+            return reach.press(button, seen.get().place(), frame);
         }
         return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
     }
@@ -784,7 +796,7 @@ public final class ScreenWalk {
         List<Optional<Rect>> found = reach.findEach(closes.stream().map(Button::picture).toList(), frame);
         for (int i = 0; i < closes.size(); i++) {
             if (found.get(i).isEmpty()) continue;
-            reach.press(closes.get(i), found.get(i).get());
+            reach.press(closes.get(i), found.get(i).get(), frame);
             Optional<String> at = screenWithin(near);
             if (at.isPresent()) return Optional.of(new Uncovered(at.get(), closes.get(i).picture().id()));
             break;

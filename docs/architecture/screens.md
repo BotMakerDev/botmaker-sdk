@@ -26,7 +26,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   kept as pictures are), which a walk types on its way through; or `.typed()`, the text a body gives
   (`Navigate.type(field, text)`, a `@Param` when the runner picks it), which `ScreenWalk` never walks through and
   ends NOT_NOW naming. `.clears()` selects what it holds first (Ctrl+A; an emulator, with no select-all, keeps it),
-  `.submits()` presses Enter after (2026-10-22).
+  `.submits()` presses Enter after (2026-10-22). A drag is a button too (`Drag`, built as a trait like the field so
+  pictures, looks, copies and strips stay as they are): `.dragsOnto(Pictures.SLOT)`, let go on a picture found on the
+  same frame, or `.dragsInto(Zones.END)`, at a zone's centre placed on the frame as `source.region` places it
+  (a slider, a swipe); `.dragTime(Duration)`, else `Button.DRAG_TIME`. It takes the place of the gesture and the
+  text; a picture drop not on the frame is no press, ABSENT saying so (2026-10-22).
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
@@ -108,7 +112,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   none, popups aside), or past a start screen the one its loading ends on. Nothing leads back to a start screen.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
-  Duration)`, `keys(Combo)` and a field's `type(text, clears, submits)`. A list member not in view is scrolled
+  Duration)`, `keys(Combo)`, a field's `type(text, clears, submits)` and a drag's `drag(from, dropOn(…), time)`
+  (`press(Button, Rect, frame)`, false when the drop is missing). A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
   its `Scroll.most` times each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a
@@ -206,8 +211,9 @@ map tool against the hand path that covers it, and fails on one with none.
   **Leads to…** records a way into a screen already mapped (`ScreenEdits.addWay`, `MapEdits.AddWay` for the tools).
 - **Live** (`LiveBoard`): the game drawn on the board from `ScreenDesk.look` (the tools' own frames, a private
   session included) every 33 ms into one reused image (`LiveImage`, a `PixelBuffer`), a click, drag, wheel or key on
-  it sent through `ScreenDesk.hands`. The line says "N fps, M ms a read", and "the capture is the limit" when a read
-  takes longer than a frame; a lossy display route is left until that line says so. The line under it names the
+  it sent through `ScreenDesk.hands`. Where the game is read is found once a second on a thread of its own
+  (`PanelContext.found`: the window a class names, so a frame lists no windows). The line says "N fps, M ms a read,
+  D ms a draw", and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The line under it names the
   screen the game shows (`which_screen`'s matcher, at most once a second); a click inside an input's box that took
   the game from one known screen to another with no way between them offers **Record** (`LiveWays`). **❄ Freeze**
   keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by

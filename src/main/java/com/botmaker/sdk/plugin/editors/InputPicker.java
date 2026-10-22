@@ -216,7 +216,8 @@ public final class InputPicker {
     /** A row's text: the field, what it is, and what it is for. */
     private static String rowText(Choice choice, boolean pickable) {
         String what = switch (choice.input()) {
-            case Button b -> (b.isField() ? "text field" : "button") + (b.repeats() ? ", repeated" : "");
+            case Button b -> (b.isDrag() ? "drag" : b.isField() ? "text field" : "button")
+                    + (b.repeats() ? ", repeated" : "");
             case Hotkey h -> h.label();
             case Strip s -> pickable ? "strip of " + s.members().size() : "strip:";
             case Tree t -> pickable ? "tree of " + t.nodes().size() : "tree:";

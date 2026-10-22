@@ -39,8 +39,11 @@ class LiveImageTest {
 
     @Test
     void theRateSaysWhenTheCaptureHoldsItDown() {
-        assertEquals("· 30 fps, 12 ms a read", LiveBoard.rate(30, 30, 360, 1_000));
-        assertEquals("· 8 fps, 120 ms a read: the capture is the limit", LiveBoard.rate(8, 8, 960, 1_000));
-        assertEquals("· 0 fps, 0 ms a read", LiveBoard.rate(0, 0, 0, 1_000));
+        assertEquals("· 30 fps, 12 ms a read, 2 ms a draw", LiveBoard.rate(30, 30, 360, 60, 1_000));
+        assertEquals("· 8 fps, 120 ms a read, 3 ms a draw: the capture is the limit",
+                LiveBoard.rate(8, 8, 960, 24, 1_000));
+        assertEquals("· 10 fps, 20 ms a read, 50 ms a draw: drawing is the limit",
+                LiveBoard.rate(10, 10, 200, 500, 1_000));
+        assertEquals("· 0 fps, 0 ms a read, 0 ms a draw", LiveBoard.rate(0, 0, 0, 0, 1_000));
     }
 }

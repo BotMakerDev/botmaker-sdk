@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
@@ -456,6 +457,41 @@ class ReachTest {
         assertTrue(column.perform(Button.of(ARENA).types(Words.of("x")), column.look().orElseThrow()));
         assertTrue(column.perform(Button.of(ARENA).typed().submits(), column.look().orElseThrow()));
         assertEquals(List.of("click 240", "type \"x\"", "click 240"), column.done);
+    }
+
+    /** A column whose drags are told by where they go: {@code drag 50,240 to 50,340 in 400}. */
+    private static final class Dropping extends Column {
+        Dropping(Map<String, Integer> slots) {
+            super(slots, 0);
+        }
+
+        @Override
+        public void drag(Point from, Point to, Duration time) {
+            done.add("drag " + from.x() + "," + from.y() + " to " + to.x() + "," + to.y() + " in " + time.toMillis());
+        }
+    }
+
+    /**
+     * A drag is pressed on its button and let go on its picture, found on the same frame, or at its zone's centre, in
+     * its time; nothing is clicked.
+     */
+    @Test
+    void aDragGoesFromItsPictureToItsTarget() {
+        Dropping column = new Dropping(Map.of("arena", 1, "campaign", 2));
+        BufferedImage frame = column.look().orElseThrow();
+        assertTrue(column.perform(Button.of(ARENA).dragsOnto(CAMPAIGN), frame));
+        assertTrue(column.perform(Button.of(ARENA).dragsInto(new Zone(400, 300, 100, 50))
+                .dragTime(Duration.ofMillis(900)), frame));
+        assertEquals(List.of("drag 50,240 to 50,340 in 400", "drag 50,240 to 450,325 in 900"), column.done);
+    }
+
+    /** A drag whose picture is not on the frame is no press: nothing is dragged or clicked. */
+    @Test
+    void aDragWhoseTargetIsMissingDoesNothing() {
+        Dropping column = new Dropping(Map.of("arena", 1));
+        assertFalse(column.perform(Button.of(ARENA).dragsOnto(CAMPAIGN), column.look().orElseThrow()));
+        assertEquals(List.of(), column.done);
+        assertTrue(column.dropOn(Button.of(ARENA), column.look().orElseThrow()).isEmpty(), "a button drags nowhere");
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */

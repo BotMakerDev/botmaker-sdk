@@ -643,10 +643,16 @@ public final class ScreenGraph {
         return List.copyOf(ids);
     }
 
-    /** The ids of the pictures {@code input} acts on or is told by: a button's looks, a strip's members, a lock. */
+    /**
+     * The ids of the pictures {@code input} acts on or is told by: a button's looks and the picture it is dragged
+     * onto, a strip's members, a lock.
+     */
     public static List<String> pictureIds(Input input) {
         List<String> ids = new ArrayList<>();
         if (input instanceof Button button) for (Look look : button.allLooks()) ids.add(look.picture().id());
+        if (input instanceof Button button && button.isDrag() && button.drag().onto() != null) {
+            ids.add(button.drag().onto().id());
+        }
         if (input instanceof Strip strip) for (ImageTemplate member : strip.members()) ids.add(member.id());
         if (input instanceof Tree tree) for (ImageTemplate member : tree.members()) ids.add(member.id());
         if (input.lock() != null) ids.add(input.lock().id());
@@ -655,8 +661,8 @@ public final class ScreenGraph {
 
     /**
      * {@code screen} with the picture {@code id} taken out: one of its markers or absent pictures or a look's, a button
-     * clicking it (its field gone), a button's look, a strip's member, a lock, its way back. Its ways in are kept: a
-     * screen is not cut off by a picture going.
+     * clicking it (its field gone), a button's look or drop, a strip's member, a lock, its way back. Its ways in are
+     * kept: a screen is not cut off by a picture going.
      */
     public static MapScreen without(MapScreen screen, String id) {
         // The fields that go with the picture: a look naming one names it no more.
@@ -687,6 +693,8 @@ public final class ScreenGraph {
             Input kept = input;
             if (kept instanceof Button button) {
                 kept = button.looks(button.looks().stream().filter(v -> !is(v.picture(), id)).toList());
+                // A drag onto the picture going is pressed again.
+                if (button.isDrag() && is(button.drag().onto(), id)) kept = ((Button) kept).drag(null);
             }
             if (kept instanceof Strip strip) kept = strip.members(butPicture(strip.members(), id));
             if (kept instanceof Tree tree) kept = tree.without(id);

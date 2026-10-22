@@ -27,6 +27,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   guildName)`, usually from a `@Param`, and a walk that needs it ends NOT_NOW saying so. 🗺 Screens' input panel has a
   *Text field* section (its text, Clear first, Enter after), which adds the `Texts` constant; edit_map's set_input
   takes `types`, `submits` and `clears`; try_input types the field's text after the click.
+- **Drags on the map**: a button pressed, moved and let go, `Button.of(Pictures.CARD).dragsOnto(Pictures.SLOT)` or
+  `.dragsInto(Zones.SLIDER_END)` (a swipe on a phone), `.dragTime(Duration)` (400 ms else). The drop is looked for on
+  the frame the button is found on; a picture drop not there leaves it unpressed, ABSENT saying so. 🗺 Screens' input
+  panel has a *Drag* section (a picture or a zone, and the time); edit_map's set_input takes `dragOnto`, `dragInto`
+  and `dragMs`; try_input drags as a run does.
 
 - **Buttons on the map can be double-clicked, right-clicked, held or hovered**: `Button.of(P).gesture(Gesture.DOUBLE)`,
   `.hold(Duration.ofSeconds(2))`; a button that says nothing is still clicked. **Hotkeys take keys together or held**:
@@ -47,6 +52,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- **🗺 Screens' live board lists no windows per frame**: a game window named by its class was found among every
+  window twice a frame (about 9 ms each on a desktop of 12 windows). The window is now found once a second on a
+  thread of its own, and a frame reads it straight. The board's line also says what drawing a frame takes,
+  "N fps, M ms a read, D ms a draw", and which of the two is the limit.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

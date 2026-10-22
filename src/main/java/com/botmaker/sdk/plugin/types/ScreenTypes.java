@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
@@ -141,6 +142,9 @@ public final class ScreenTypes {
             .flag(Button::typed, Button::typedByBody)
             .flag(Button::submits, Button::isSubmitting)
             .flag(Button::clears, Button::isClearing)
+            .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
+            .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
+            .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
             .when(button -> BotConstants.inputName(button) == null && !button.cycles());
 
     /** {@code Button.cycling(List<ImageTemplate>)} and its links: a button showing its looks in turn. */
@@ -160,6 +164,9 @@ public final class ScreenTypes {
             .flag(Button::typed, Button::typedByBody)
             .flag(Button::submits, Button::isSubmitting)
             .flag(Button::clears, Button::isClearing)
+            .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
+            .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
+            .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
             .when(button -> BotConstants.inputName(button) == null && button.cycles());
 
     /**
@@ -168,6 +175,21 @@ public final class ScreenTypes {
      */
     private static Gesture gestureWritten(Button button) {
         return button.gesture() == Gesture.CLICK || button.hold() != null ? null : button.gesture();
+    }
+
+    /** The picture a button is dragged onto; null when it is not dragged, or dragged into a zone. */
+    private static ImageTemplate dropPicture(Button button) {
+        return button.drag() == null ? null : button.drag().onto();
+    }
+
+    /** The zone a button is dragged into; null when it is not dragged, or dragged onto a picture. */
+    private static Zone dropZone(Button button) {
+        return button.drag() == null ? null : button.drag().into();
+    }
+
+    /** A drag's time as written: none for the default. */
+    private static Duration dragTimeWritten(Button button) {
+        return button.drag() == null ? null : button.drag().time();
     }
 
     /** {@code Hotkey.of(Key)} and its links: one key, tapped. */

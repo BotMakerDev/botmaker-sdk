@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Drag;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -17,6 +18,8 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.vision.BotScreen;
+import com.botmaker.sdk.internal.vision.Places;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -122,15 +125,37 @@ public interface Reach {
     void type(String text, boolean clears, boolean submits);
 
     /**
-     * {@code button} pressed at {@code place}, where it was found, by its gesture; a text field's text typed after,
-     * once the field has taken the click. A field whose body gives its text types nothing here: {@code
-     * ScreenWalk.press} hands it the body's text as {@link Button#types}.
+     * {@code button} pressed at {@code place}, where it was found on {@code frame}, by its gesture; a text field's text
+     * typed after, once the field has taken the click; a drag moved from there to its drop on {@code frame}. A field
+     * whose body gives its text types nothing here: {@code ScreenWalk.press} hands it the body's text as {@link
+     * Button#types}. False when a drag's drop is not on {@code frame}, and nothing was done.
      */
-    default void press(Button button, Rect place) {
+    default boolean press(Button button, Rect place, BufferedImage frame) {
+        if (button.isDrag()) {
+            Optional<Point> drop = dropOn(button, frame);
+            if (drop.isEmpty()) return false;
+            drag(pointOn(place), drop.get(), button.dragTime());
+            return true;
+        }
         press(pointOn(place), button.gesture(), button.holdTime());
-        if (button.text() == null) return;
+        if (button.text() == null) return true;
         pause(FIELD_FOCUS_MS);
         type(button.text().text(), button.isClearing(), button.isSubmitting());
+        return true;
+    }
+
+    /**
+     * Where {@code button}'s drag lets go on {@code frame}: on its picture, found as any picture is, or at the centre
+     * of its zone, placed on the frame as {@code source.region} places one. Empty when it is no drag, or its picture is
+     * not there.
+     */
+    default Optional<Point> dropOn(Button button, BufferedImage frame) {
+        Drag drag = button.drag();
+        if (drag == null) return Optional.empty();
+        if (drag.onto() != null) return find(drag.onto(), frame).map(this::pointOn);
+        if (drag.into() == null) return Optional.empty();
+        Size live = new Size(frame.getWidth(), frame.getHeight());
+        return Optional.of(Places.inSource(drag.into(), BotScreen.size().orElse(null), live).center());
     }
 
     void scroll(Point at, int notches);
@@ -397,7 +422,8 @@ public interface Reach {
 
     /**
      * Does {@code input} on {@code frame}: a key pressed; a strip scrolled once over a member that shows (the middle
-     * of its band when none does); a button found, in any look but a disabled one, and pressed by its gesture. A member of
+     * of its band when none does); a button found, in any look but a disabled one, and pressed by its gesture, or
+     * dragged to its drop when that is on the frame too. A member of
      * {@code strip} not showing is scrolled to first: the strip's scroll is done over a member that shows, up to its
      * {@link Scroll#most} times each way, the game looked at again once the strip holds still. A scroll after which
      * no member moved a quarter of the strip's step met its end, and the scroll turns the other way once: the
@@ -433,8 +459,7 @@ public interface Reach {
                 }
                 Optional<Seen> seen = inView(button, strip, pick, frame);
                 if (seen.isEmpty() || seen.get().state().blocks()) yield false;
-                press(button, seen.get().place());
-                yield true;
+                yield press(button, seen.get().place(), frame);
             }
         };
     }
@@ -456,8 +481,9 @@ public interface Reach {
                 pause(CLICK_SETTLE_MS);
                 if (Thread.currentThread().isInterrupted()) return true;
             }
-            press(button, copy.place());
-            any = true;
+            // A drag after the first is let go where its drop is now: the last one may have filled the slot it found.
+            BufferedImage drops = any && button.isDrag() ? look().orElse(on) : on;
+            any |= press(button, copy.place(), drops);
         }
         return any;
     }
