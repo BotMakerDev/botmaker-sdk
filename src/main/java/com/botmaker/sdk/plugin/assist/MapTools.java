@@ -632,7 +632,9 @@ final class MapTools {
                                      State look, Pick pick, String child, BufferedImage frame, Duration took) {
         StudioServices services = context.services();
         String constant = ScreenBook.constantFor(graph, child);
-        MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)).takes(measured(took)));
+        String shot = ScreenShots.fresh(graph, constant, null);
+        MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)).takes(measured(took))
+                .shot(shot));
         // Tried again, what it did before goes: the way it opens is what it does now.
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
                         ScreenEdits.untried(base)))
@@ -640,7 +642,7 @@ final class MapTools {
         if (failed.isPresent()) return unwritten(failed.get());
         // A draft: the frame right after the click may be the way there (Firestone's Arena replay kept its VS
         // splash, 2026-10-16). The marker's cut replaces it with the frame the marker was cut from.
-        ScreenShots.save(services.resourcesDir(), constant, frame);
+        if (services.resourcesDir() != null) ScreenShots.write(services.resourcesDir().resolve(shot), frame);
         String from = graph.shown(screen);
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
                         + from + " by " + field + (pick == null ? "" : " " + pick.label()) + "; it owes its marker. 🖼 Manage Pictures groups the "
@@ -1069,7 +1071,7 @@ final class MapTools {
                 return refused;
             });
             if (failed.isPresent()) return unwritten(failed.get());
-            ScreenShots.remove(services.resourcesDir(), constant);
+            ScreenShots.remove(services.resourcesDir(), graph.screens().get(constant));
             return AgentReply.text(graph.shown(constant) + " is off the map; " + String.join(", ", entrances.stream()
                     .map(in -> in.field() + " is noted in " + graph.shown(in.screen())).toList())
                     + " as changing it in place.");
@@ -1248,7 +1250,7 @@ final class MapTools {
         here.ifPresent(c -> seen(graph, c));
         Optional<String> over = walk.popupOn(frame);
         // A screen mapped before shots were kept gets one the first time it is seen with nothing over it.
-        if (over.isEmpty()) here.ifPresent(c -> ScreenShots.saveIfMissing(context.services().resourcesDir(), c, frame));
+        if (over.isEmpty()) here.ifPresent(c -> ScreenShots.saveIfMissing(context.services(), graph, c, frame));
         return Optional.of(new Seen(graph, walk, here, over));
     }
 
@@ -1278,7 +1280,8 @@ final class MapTools {
         // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
         // snapshot hashed, compressed and kept, 2–3 s of every write and most of a 63 MB history (2026-10-16).
         if (frame.isPresent() && RETAKEN.add(resources.resolve(constant))) {
-            ScreenShots.save(resources, constant, ScreenFit.lookShown(reach, graph, constant, frame.get()), frame.get());
+            ScreenShots.save(context.services(), graph, constant, ScreenFit.lookShown(reach, graph, constant, frame.get()),
+                    frame.get());
         }
     }
 
@@ -1303,7 +1306,7 @@ final class MapTools {
             return "";
         }
         String look = ScreenFit.lookShown(reach.get(), graph, constant.get(), frame);
-        ScreenShots.save(resources, constant.get(), look, frame);
+        ScreenShots.save(context.services(), graph, constant.get(), look, frame);
         RETAKEN.add(resources.resolve(constant.get()));
         return " " + graph.shown(constant.get()) + (look == null ? "" : "'s look " + look) + "'s shot is this frame now.";
     }

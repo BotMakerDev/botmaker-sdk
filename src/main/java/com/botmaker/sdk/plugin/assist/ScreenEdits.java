@@ -336,13 +336,23 @@ public final class ScreenEdits {
         return screen.withInput(screen.fieldFor(back.label()), untried(back));
     }
 
-    /** Gives {@code constant} the name the game shows, {@code name}; its constant stays. */
+    /**
+     * Gives {@code constant} the name the game shows, {@code name}, and the constant and class that name makes, every
+     * use of them renamed by binding (2026-10-22: the constant stayed, {@code FAVORED_WAR_MACHINES_2} for a screen
+     * called Forge). Its shot stays where its Java names it. One step of Studio's history.
+     */
     public static String rename(StudioServices services, String constant, String name) {
         if (name == null || !MapTools.isName(name.strip())) return NOT_WRITTEN + "name it in plain words, on one line.";
         String typed = name.strip();
-        Optional<String> taken = ScreenBook.find(ScreenBook.read(services), typed).filter(c -> !c.equals(constant));
+        ScreenGraph graph = ScreenBook.read(services);
+        Optional<String> taken = ScreenBook.find(graph, typed).filter(c -> !c.equals(constant));
         if (taken.isPresent()) return NOT_WRITTEN + "Screens." + taken.get() + " is called " + typed + " already.";
-        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.name(typed))), "Renamed " + typed + ".");
+        String renamed = ScreenBook.constantFor(graph, typed, constant);
+        Optional<String> failed = ScreenBook.step(services, "Rename " + graph.shown(constant) + " to " + typed,
+                () -> ScreenBook.update(services, constant, s -> s.setup(x -> x.name(typed)))
+                        .or(() -> renamed.equals(constant) ? Optional.empty()
+                                : ScreenBook.renameConstant(services, constant, renamed)));
+        return said(failed, "Renamed " + typed + (renamed.equals(constant) ? "." : ", Screens." + renamed + "."));
     }
 
     /** Makes {@code constant} a popup, or a screen of the tree again ({@code popup} false). */
@@ -530,7 +540,7 @@ public final class ScreenEdits {
         }
         Optional<String> failed = ScreenBook.step(services, "Delete " + graph.shown(constant),
                 () -> ScreenBook.remove(services, constant));
-        if (failed.isEmpty()) ScreenShots.remove(services.resourcesDir(), constant);
+        if (failed.isEmpty()) ScreenShots.remove(services.resourcesDir(), graph.screens().get(constant));
         return said(failed, "Deleted " + graph.shown(constant) + ".");
     }
 
@@ -564,7 +574,7 @@ public final class ScreenEdits {
                     + "kept; go there first.";
         }
         String look = ScreenFit.lookShown(reach.get(), graph, constant, frame);
-        ScreenShots.save(context.services().resourcesDir(), constant, look, frame);
+        ScreenShots.save(context.services(), graph, constant, look, frame);
         return look == null ? "Shot taken." : "Shot of its look " + look + " taken.";
     }
 

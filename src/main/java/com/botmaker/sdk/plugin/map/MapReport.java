@@ -89,7 +89,7 @@ public final class MapReport {
         Path resources = services.resourcesDir();
         Predicate<String> file = id -> resources != null && Files.isRegularFile(TemplateLibrary.fileForName(resources,
                 id));
-        Predicate<String> shot = c -> resources != null && Files.isRegularFile(ScreenShots.file(resources, c));
+        Predicate<String> shot = c -> ScreenShots.has(resources, read.graph(), c);
         Map<String, FrameCut> cuts = FxCall.call(() -> services.pluginValues() == null ? Map.<String, FrameCut>of()
                 : TemplateUses.cuts(services.pluginValues()));
         double confidence = FxCall.call(() -> MapAudit.confidence(services));

@@ -208,7 +208,7 @@ public final class InputPicker {
         }
 
         VBox body = new VBox(6, head);
-        shot(resources, constant, services.pluginValues(), choices, kind,
+        shot(ScreenShots.file(resources, graph, constant).orElse(null), services.pluginValues(), choices, kind,
                 choice -> pick(ctx, constant, choice.field(), popup, button, graph)).ifPresent(body.getChildren()::add);
         ScrollPane rows = new ScrollPane(list);
         rows.setFitToWidth(true);
@@ -245,11 +245,9 @@ public final class InputPicker {
     }
 
     /** The screen's shot, each choice with a place boxed on it, a click on a box picking it; empty with no shot. */
-    private static Optional<Node> shot(Path resources, String constant, PluginValues values, List<Choice> choices,
+    private static Optional<Node> shot(Path file, PluginValues values, List<Choice> choices,
                                        Class<? extends Input> kind, Consumer<Choice> onPick) {
-        if (resources == null) return Optional.empty();
-        Path file = ScreenShots.file(resources, constant);
-        if (!Files.isRegularFile(file)) return Optional.empty();
+        if (file == null || !Files.isRegularFile(file)) return Optional.empty();
         Size size = ScreenShots.size(file);
         ImageView view = new ImageView(new Image(file.toUri().toString(), SHOT * 2, 0, true, true));
         view.setFitWidth(SHOT);

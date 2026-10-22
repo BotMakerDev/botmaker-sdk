@@ -39,6 +39,9 @@ class MapAuditTest {
     private static final int HEIGHT = 360;
     private static final int SIZE = 40;
 
+    /** Where Home's Java names its shot. */
+    private static final String SHOT = "screens/HOME.png";
+
     @TempDir
     Path resources;
 
@@ -63,7 +66,7 @@ class MapAuditTest {
             else if (!name.equals("gone") && !name.equals("event")) g.drawImage(picture, at.x(), at.y(), null);
         }
         g.dispose();
-        Path shotFile = ScreenShots.file(resources, "HOME");
+        Path shotFile = resources.resolve(SHOT);
         Files.createDirectories(shotFile.getParent());
         ImageIO.write(shot, "png", shotFile.toFile());
         return Map.of("home", FrameCut.of(WIDTH, HEIGHT, places.get("home")),
@@ -74,7 +77,7 @@ class MapAuditTest {
     }
 
     private static MapScreen screen() {
-        return MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(picture("here")),
+        return MapFixtures.screen(Setup.named("Home").markers(marks("home")).shot(SHOT), Button.of(picture("here")),
                 Button.of(picture("moved")), Button.of(picture("gone")), Button.of(picture("event")).sometimes());
     }
 
@@ -107,7 +110,7 @@ class MapAuditTest {
         ImageTemplate moved = picture("moved").at(new Rect(400, 200, SIZE, SIZE));
         ImageTemplate out = picture("gone").at(new Rect(560, 250, SIZE, SIZE));
         Rect column = new Rect(360, 160, 280, 170);
-        MapScreen listed = MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(moved),
+        MapScreen listed = MapFixtures.screen(Setup.named("Home").markers(marks("home")).shot(SHOT), Button.of(moved),
                 Button.of(out), Strip.of(Scroll.wheel(-3), List.of(moved, out)));
         Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", listed).orElseThrow();
         assertEquals(Where.AT_PLACE, audit.of("moved").orElseThrow().where(), "another slot of its list");
@@ -117,7 +120,7 @@ class MapAuditTest {
         assertEquals(column, gone.area());
         // Out of a list that does not hold it, it sits elsewhere again.
         ImageTemplate atHome = picture("moved").at(new Rect(20, 20, SIZE, SIZE));
-        MapScreen narrow = MapFixtures.screen(Setup.named("Home").markers(marks("home")), Button.of(atHome),
+        MapScreen narrow = MapFixtures.screen(Setup.named("Home").markers(marks("home")).shot(SHOT), Button.of(atHome),
                 Strip.of(Scroll.wheel(-3), List.of(atHome)));
         assertEquals(Where.ELSEWHERE,
                 MapAudit.of(resources, 0.9, cuts, "HOME", narrow).orElseThrow().of("moved").orElseThrow().where());
@@ -127,7 +130,7 @@ class MapAuditTest {
     void aShotWithoutItsMarkerSaysSo() throws IOException {
         Map<String, FrameCut> cuts = home();
         // A splash in place of the screen: nothing it names is on it.
-        ImageIO.write(noise(WIDTH, HEIGHT, 2), "png", ScreenShots.file(resources, "HOME").toFile());
+        ImageIO.write(noise(WIDTH, HEIGHT, 2), "png", resources.resolve(SHOT).toFile());
         Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow();
         assertFalse(audit.showsMarker());
     }

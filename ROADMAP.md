@@ -17,8 +17,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   `ScreenVariant.when` take only a method reference, since no plugin value carries Java text. An inline
   `() -> …` needs a contract capability first, a held part that is code which Studio edits as blocks, at the next
   contract release (`/contract-change`).
-- **Screens** (`docs/architecture/screens.md`): a long `GameScreen` chain is written as one line by the host;
-  it needs Java formatting, one call per line. Still open from the screen-map plan (`reactive-cooking-reef.md`):
+- **Screens on more than one surface** (the 2026-10-22 audit, gap 7): the map is one game window. A launcher
+  before the game, a second window, a browser tab or switching apps has no place on it. The design question is a
+  screen's `surface` (the game window, a launcher, another window by its identity) and how a walk moves between
+  surfaces; not built.
+- **Screens** (`docs/architecture/screens.md`), still open from the screen-map plan (`reactive-cooking-reef.md`):
   sub-states of a screen other than tabs (a toggle, a filter, a scroll position; phase 8) and chores kept as data
   (phase 9). Owed checks: the Discovery tools and
   `edit_map` live over MCP on Firestone, and the 🗺 Screens click-tests of the 2026-10-15 audit.

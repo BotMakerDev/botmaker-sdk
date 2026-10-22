@@ -189,7 +189,7 @@ public final class ScreenDesk {
 
     /** Saves {@code frame} as {@code constant}'s shot, over the one it had. Off the FX thread: it writes a file. */
     public static void keepShot(StudioServices services, String constant, BufferedImage frame) {
-        ScreenShots.save(services.resourcesDir(), constant, frame);
+        ScreenShots.save(services, FxCall.call(() -> ScreenBook.read(services)), constant, null, frame);
     }
 
     /** A reply's text, its pictures aside: what the window says of a tool it ran. */

@@ -129,7 +129,9 @@ public final class MapAudit {
     public static Optional<Audit> of(Path resources, double confidence, Map<String, FrameCut> cuts, String constant,
                                      MapScreen screen) {
         if (resources == null || screen == null) return Optional.empty();
-        Path shotFile = ScreenShots.file(resources, constant);
+        Optional<Path> named = ScreenShots.file(resources, screen);
+        if (named.isEmpty()) return Optional.empty();
+        Path shotFile = named.get();
         long shotTime = modified(shotFile);
         if (shotTime == 0) return Optional.empty();
         Map<String, Check> checks = checks(resources, screen);
@@ -193,7 +195,7 @@ public final class MapAudit {
         for (Map.Entry<String, MapScreen> other : graph.screens().entrySet()) {
             String c = other.getKey();
             if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
-            Optional<BufferedImage> shot = shot(resources, c);
+            Optional<BufferedImage> shot = shot(resources, other.getValue());
             if (shot.isEmpty()) continue;
             List<Fit> fits = fits(resources, confidence, Map.of(), names, shot.get());
             boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
@@ -201,15 +203,16 @@ public final class MapAudit {
             // Its words are read only where its pictures clash: the shot's title may still tell the two apart.
             if (all && none && set.texts().stream().allMatch(words -> Reach.findText(words, shot.get(), Reach::ocr)
                     .isPresent())) {
-                return Optional.of(new Clash(c, apart(resources, confidence, constant, other.getValue())));
+                return Optional.of(new Clash(c, apart(resources, confidence, graph.screens().get(constant),
+                        other.getValue())));
             }
         }
         return Optional.empty();
     }
 
-    /** {@code other}'s markers not on {@code constant}'s shot; empty while it has none. */
-    private static List<String> apart(Path resources, double confidence, String constant, MapScreen other) {
-        Optional<BufferedImage> own = shot(resources, constant);
+    /** {@code other}'s markers not on {@code screen}'s shot; empty while it has none. */
+    private static List<String> apart(Path resources, double confidence, MapScreen screen, MapScreen other) {
+        Optional<BufferedImage> own = shot(resources, screen);
         List<String> theirs = files(resources, other.markers());
         if (own.isEmpty() || theirs.isEmpty()) return List.of();
         return fits(resources, confidence, Map.of(), theirs, own.get()).stream()
@@ -222,11 +225,11 @@ public final class MapAudit {
                 .toList();
     }
 
-    private static Optional<BufferedImage> shot(Path resources, String constant) {
-        Path file = ScreenShots.file(resources, constant);
-        if (!Files.isRegularFile(file)) return Optional.empty();
+    private static Optional<BufferedImage> shot(Path resources, MapScreen screen) {
+        Optional<Path> file = ScreenShots.file(resources, screen).filter(Files::isRegularFile);
+        if (file.isEmpty()) return Optional.empty();
         try {
-            return Optional.ofNullable(ImageIO.read(file.toFile()));
+            return Optional.ofNullable(ImageIO.read(file.get().toFile()));
         } catch (IOException unreadable) {
             return Optional.empty();
         }

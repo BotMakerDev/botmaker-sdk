@@ -82,7 +82,8 @@ public final class ScreenTypes {
             .<String>with(Setup::notes, Setup::notes)
             .<Reached>with(Setup::reached, Setup::reached)
             .<List<String>>with(Setup::owes, Setup::owes)
-            .<Point>with(Setup::at, Setup::at);
+            .<Point>with(Setup::at, Setup::at)
+            .<String>with(Setup::shot, Setup::shot);
 
     /**
      * The conditions, each a method reference crossing as the text it is written as, {@code Firestone::eventOn}: a
@@ -126,7 +127,8 @@ public final class ScreenTypes {
             .<List<ImageTemplate>>with(ScreenVariant::markers, ScreenVariant::markers)
             .<List<ImageTemplate>>with(ScreenVariant::absent, ScreenVariant::absent)
             .<List<Input>>with(ScreenVariant::inputs, ScreenVariant::inputs)
-            .<BooleanSupplier>with(ScreenVariant::when, Parts.VARIANT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(ScreenVariant::when, Parts.VARIANT_WHEN.part(ScreenTypes::condition))
+            .<String>with(ScreenVariant::shot, ScreenVariant::shot);
 
     /** {@code Look.of(ImageTemplate, State)}: another look of a button. */
     public static final DeclaredCall<Look> LOOK_SHAPE = ComponentType.part(Look.class)

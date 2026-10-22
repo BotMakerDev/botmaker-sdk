@@ -1,10 +1,11 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * The bot's {@code Screens.java} as a poll sees it: where it is, its size and when it was last written. 🗺 Screens
@@ -30,16 +31,6 @@ record ScreensFile(Path file, long size, long modified) {
     }
 
     private static Path find(Path project) {
-        if (project == null) return null;
-        // The bot's main sources first: a test copy of the file is not the one the map is read from.
-        Path sources = Files.isDirectory(project.resolve("src/main/java")) ? project.resolve("src/main/java")
-                : project.resolve("src");
-        if (!Files.isDirectory(sources)) return null;
-        try (Stream<Path> files = Files.walk(sources)) {
-            return files.filter(path -> path.getFileName().toString().equals(NAME)).filter(Files::isRegularFile)
-                    .findFirst().orElse(null);
-        } catch (IOException | RuntimeException unreadable) {
-            return null;
-        }
+        return ScreenMapRead.screensFile(project);
     }
 }

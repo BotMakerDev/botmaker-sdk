@@ -1010,7 +1010,7 @@ class SdkAssistTest {
         AgentReply gated = tryOne("screen", "Home", "picture", "gold", "desktop", true, "settleMs", 0);
         assertTrue(gated.isRefused() && text(gated).startsWith("Engineer still owes its marker"), text(gated));
         // Home's shot is this very frame, coin and all: Engineer's marker would show on it, and be put back.
-        Files.delete(ScreenShots.file(resources, "HOME"));
+        Files.delete(ScreenShots.file(resources, screen("HOME")).orElseThrow());
         assertTrue(text(cropOne("name", "coin", "x", 300, "y", 200, "width", SIZE, "height", SIZE,
                 "screen", "engineer", "marker", "set")).contains("Noted in Engineer as its marker."));
         BufferedImage over = agent.frame;
@@ -1448,7 +1448,7 @@ class SdkAssistTest {
 
     /** {@code constant}'s saved shot. */
     private BufferedImage shot(String constant) throws IOException {
-        return ImageIO.read(ScreenShots.file(resources, constant).toFile());
+        return ImageIO.read(ScreenShots.file(resources, screen(constant)).orElseThrow().toFile());
     }
 
     /** {@code frame} with the box at {@code x, y} drawn over by other pixels: a panel opened over it. */
@@ -1511,12 +1511,15 @@ class SdkAssistTest {
         assertEquals(BotConstants.input("HOME", "ore"), screen("MINE").fromInput(), "reached through Home's ore");
         assertNull(input("HOME", "ore").never(), "the input that opens it is untried again");
         assertTrue(ScreenEdits.delete(host, "HOME").contains("Mine is reached from it"), "a parent stays");
-        assertEquals("Renamed Deep mine.", ScreenEdits.rename(host, "MINE", "Deep mine"));
-        assertEquals("Deep mine", screen("MINE").name());
-        ScreenEdits.setPopup(host, "MINE", true);
-        assertTrue(screen("MINE").isPopup());
-        assertEquals("Deleted Deep mine.", ScreenEdits.delete(host, "MINE"));
-        assertFalse(host.set("screen_map").containsKey("MINE"));
+        assertEquals("Renamed Deep mine, Screens.DEEP_MINE.", ScreenEdits.rename(host, "MINE", "Deep mine"));
+        assertEquals("Deep mine", screen("DEEP_MINE").name(), "the constant follows the name");
+        assertTrue(host.calls.contains("renameGroup screen_map MINE DEEP_MINE"), host.calls.toString());
+        assertEquals("Renamed deep mine.", ScreenEdits.rename(host, "DEEP_MINE", "deep mine"),
+                "a name that makes the same constant keeps it");
+        ScreenEdits.setPopup(host, "DEEP_MINE", true);
+        assertTrue(screen("DEEP_MINE").isPopup());
+        assertEquals("Deleted deep mine.", ScreenEdits.delete(host, "DEEP_MINE"));
+        assertFalse(host.set("screen_map").containsKey("DEEP_MINE"));
 
         ScreenEdits.useAsBack(host, "HOME", "ore");
         assertEquals(BotConstants.input("HOME", "ore"), screen("HOME").back());
@@ -1543,7 +1546,9 @@ class SdkAssistTest {
         assertEquals(List.of("Move 2 cards", "Move Shop", "Tidy the map"), host.steps,
                 "each drag and Tidy is one step of Studio's undo, however many screens it wrote");
         ScreenEdits.rename(host, "SHOP", "Store");
-        assertEquals("Edit Shop", host.steps.getLast(), "a lone edit is named for its screen");
+        assertEquals("Rename Shop to Store", host.steps.getLast(), "a rename is one step, its name and constant");
+        ScreenEdits.setPopup(host, "STORE", true);
+        assertEquals("Edit Store", host.steps.getLast(), "a lone edit is named for its screen");
     }
 
     /** edit_map does what 🗺 Screens' hand tools do, each input named as try_input names it (2026-10-15). */
@@ -1640,11 +1645,12 @@ class SdkAssistTest {
         assertEquals(Hotkey.of(Key.named("W").orElseThrow()), input("HOME", "keyW"));
         assertTrue(run("edit_map", "screen", "Home", "action", "new_screen", "name", "Cave", "picture", "nothing")
                 .isRefused());
-        run("edit_map", "screen", "Forge", "action", "rename", "name", "Big forge");
+        assertEquals("Renamed Big forge, Screens.BIG_FORGE.",
+                text(run("edit_map", "screen", "Forge", "action", "rename", "name", "Big forge")));
         run("edit_map", "screen", "Big forge", "action", "set_kind", "as", "popup");
-        assertTrue(screen("FORGE").isPopup());
-        assertEquals("Deleted Big forge.", text(run("edit_map", "screen", "FORGE", "action", "delete")));
-        assertFalse(host.set("screen_map").containsKey("FORGE"));
+        assertTrue(screen("BIG_FORGE").isPopup(), "the constant follows the name");
+        assertEquals("Deleted Big forge.", text(run("edit_map", "screen", "BIG_FORGE", "action", "delete")));
+        assertFalse(host.set("screen_map").containsKey("BIG_FORGE"));
         run("edit_map", "screen", "Home", "action", "remove_input", "picture", "tab");
         assertEquals(List.of("gem", "key_q", "keyW"), fields("HOME"));
     }
@@ -2147,7 +2153,8 @@ class SdkAssistTest {
         public Optional<String> renameGroup(String id, String group, String newName) {
             calls.add("renameGroup " + name(id) + " " + group + " " + newName);
             for (String member : List.copyOf(set(name(id)).keySet())) {
-                if (member.startsWith(group + ".")) {
+                // A set of classes: the class is the group itself, its fields are under it.
+                if (member.equals(group) || member.startsWith(group + ".")) {
                     set(name(id)).put(newName + member.substring(group.length()), set(name(id)).remove(member));
                 }
             }

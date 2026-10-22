@@ -106,7 +106,7 @@ public final class ScreenConstantView {
         MapScreen screen = graph.screens().get(constant);
         VBox box = new VBox(6);
         box.setPadding(new Insets(0, 0, 4, 20));
-        shot(services.resourcesDir(), constant).ifPresent(box.getChildren()::add);
+        shot(services.resourcesDir(), graph, constant).ifPresent(box.getChildren()::add);
         graph.backOf(constant).filter(back -> back.via() != null)
                 .ifPresent(back -> box.getChildren().add(new Label("Way back: " + back.label())));
         for (ScreenVariant look : screen.variants()) {
@@ -167,10 +167,10 @@ public final class ScreenConstantView {
         return Optional.of(view);
     }
 
-    private static Optional<Node> shot(Path resources, String constant) {
-        if (resources == null) return Optional.empty();
-        Path file = ScreenShots.file(resources, constant);
-        if (!Files.isRegularFile(file)) return Optional.empty();
+    private static Optional<Node> shot(Path resources, ScreenGraph graph, String constant) {
+        Optional<Path> named = ScreenShots.file(resources, graph, constant).filter(Files::isRegularFile);
+        if (named.isEmpty()) return Optional.empty();
+        Path file = named.get();
         ImageView view = new ImageView(new Image(file.toUri().toString(), SHOT * 2, 0, true, true, true));
         view.setFitWidth(SHOT);
         view.setPreserveRatio(true);

@@ -648,9 +648,17 @@ final class ScreenCanvas {
         else looks.put(constant, look);
     }
 
-    /** {@code constant}'s shot as drawn: that of the look picked, else its own ({@link ScreenShots#shown}). */
+    /**
+     * {@code constant}'s shot as drawn: that of the look picked, else its own, as its card's Java names them; null when
+     * it names none.
+     */
     private Path shotFile(String constant) {
-        return ScreenShots.shown(resources, constant, looks.get(constant));
+        String look = looks.get(constant);
+        String shot = cards.stream().filter(c -> c.constant().equals(constant)).findFirst()
+                .map(card -> card.shots().containsKey(look == null ? "" : look)
+                        && Files.isRegularFile(resources.resolve(card.shot(look))) ? card.shot(look) : card.shot(null))
+                .orElse(null);
+        return shot == null ? null : resources.resolve(shot);
     }
 
     /**
@@ -934,7 +942,7 @@ final class ScreenCanvas {
 
     private static long modified(Path file) {
         try {
-            return Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() : 0;
+            return file != null && Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() : 0;
         } catch (IOException gone) {
             return 0;
         }

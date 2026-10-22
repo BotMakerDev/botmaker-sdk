@@ -946,9 +946,10 @@ final class LiveBoard {
         if (resources == null || constant == null || !graph.get().screens().containsKey(constant)) {
             return Optional.empty();
         }
-        Path file = ScreenShots.file(resources, constant);
+        Path file = ScreenShots.file(resources, graph.get(), constant).orElse(null);
         try {
-            return Files.isRegularFile(file) ? Optional.ofNullable(ImageIO.read(file.toFile())) : Optional.empty();
+            return file != null && Files.isRegularFile(file) ? Optional.ofNullable(ImageIO.read(file.toFile()))
+                    : Optional.empty();
         } catch (IOException unreadable) {
             return Optional.empty();
         }

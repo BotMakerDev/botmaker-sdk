@@ -14,10 +14,18 @@ import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.shared.Diag;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The bot's map read out of its {@code Screens} class: the one read the assistant's tools, 🗺 Screens, the
@@ -30,6 +38,7 @@ import java.util.stream.Collectors;
 public final class ScreenMapRead {
 
     private static final String HOLDER = "Screens";
+    private static final String SCREENS_FILE = HOLDER + ".java";
 
     private ScreenMapRead() {}
 
@@ -170,18 +179,62 @@ public final class ScreenMapRead {
         Kept read = kept;
         if (read == null || read.values() != values || read.history() != history) {
             long seen = watch(history);
-            read = readKept(values, history);
+            // A step that left the map's files as they were, an edit to a body or an undo back to them, reads nothing
+            // (2026-10-22): the files are hashed in a few milliseconds, the map read in up to a second.
+            String stamp = stamp(services.projectDir());
+            Kept before = last;
+            read = stamp != null && before != null && before.values() == values && before.history() == history
+                    && stamp.equals(before.stamp()) ? before : readKept(values, history, stamp);
             keep(seen, read);
         }
         if (read.failure() != null) throw read.failure();
         return read.graph();
     }
 
-    private static Kept readKept(PluginValues values, History history) {
+    private static Kept readKept(PluginValues values, History history, String stamp) {
         try {
-            return new Kept(values, history, of(values), null);
+            return new Kept(values, history, of(values), null, stamp);
         } catch (RuntimeException unreadable) {
-            return new Kept(values, history, null, unreadable);
+            return new Kept(values, history, null, unreadable, stamp);
+        }
+    }
+
+    /**
+     * The bot's {@code Screens.java} under {@code project}'s sources, its main ones first (a test copy is not the one
+     * the map is read from); null when the project has none or it cannot be looked through.
+     */
+    public static Path screensFile(Path project) {
+        if (project == null) return null;
+        Path sources = Files.isDirectory(project.resolve("src/main/java")) ? project.resolve("src/main/java")
+                : project.resolve("src");
+        if (!Files.isDirectory(sources)) return null;
+        try (Stream<Path> files = Files.walk(sources)) {
+            return files.filter(path -> path.getFileName().toString().equals(SCREENS_FILE))
+                    .filter(Files::isRegularFile).findFirst().orElse(null);
+        } catch (IOException | RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * A hash of the bytes of every {@code .java} file beside the bot's {@code Screens.java}: the classes a map read
+     * reads ({@code Pictures}, {@code Texts}, {@code Zones} and the map itself), by name; null when there is no such
+     * file or one cannot be read, and a read is never reused then.
+     */
+    static String stamp(Path project) {
+        Path screens = screensFile(project);
+        if (screens == null) return null;
+        try (Stream<Path> siblings = Files.list(screens.getParent())) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (Path file : siblings.filter(f -> f.getFileName().toString().endsWith(".java")).sorted().toList()) {
+                digest.update(file.getFileName().toString().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(Files.readAllBytes(file));
+                digest.update((byte) 0);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException | RuntimeException unreadable) {
+            return null;
         }
     }
 
@@ -196,9 +249,12 @@ public final class ScreenMapRead {
     }
 
     /** The last read and what it read, or why it could not: {@link #read}'s, until the bot's code changes. */
-    private record Kept(PluginValues values, History history, ScreenGraph graph, RuntimeException failure) {}
+    private record Kept(PluginValues values, History history, ScreenGraph graph, RuntimeException failure,
+                        String stamp) {}
 
     private static volatile Kept kept;
+    /** The last read, {@link #forget} or not: reused while the files it was read from hash the same. */
+    private static volatile Kept last;
     /** Counts {@link #forget}s, so a read a change overtook is not kept. */
     private static long changes;
     private static History watched;
@@ -220,6 +276,7 @@ public final class ScreenMapRead {
 
     private static synchronized void keep(long seen, Kept read) {
         if (changes == seen) kept = read;
+        last = read;
     }
 
     /**

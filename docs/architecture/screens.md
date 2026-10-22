@@ -107,11 +107,23 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   time the screen it leaves loads in; ties keep the path a search by fewest edges finds first, so a map with no time
   walks as before.
 - **A look's shot** (2026-10-22): a frame showing one of a screen's looks (`ScreenWalk.lookOn`) is that look's shot,
-  `screens/<CONSTANT>@<look>.png` (`ScreenShots.file(resources, constant, look)`, the look's name lower case and
-  dashed), and leaves the screen's own; ❄ Freeze's retake, a cut marker and a walk's retake all save so. The panel's
+  and leaves the screen's own; ❄ Freeze's retake, a cut marker and a walk's retake all save so. The panel's
   *Look* picker shows the screen in one look: its shot (`ScreenShots.shown`, the screen's own while the look has
   none) on the panel, the board and its card, and only the rows every look shows plus that look's own
   (`ScreenCards.rows(graph, constant, look)`), so a strip draws only them too.
+- **The shot is named in Java** (the user's call, 2026-10-22): `Setup.shot("screens/HOME.png")` and
+  `ScreenVariant.shot(…)`, a path in the bot's resources that a run never reads. A shot found by the screen's
+  constant was lost by any rename that did not move the file too. The first save (`ScreenShots.save`) picks a path
+  no screen names (`ScreenShots.fresh`: `screens/<CONSTANT>.png`, `screens/<CONSTANT>@<look>.png`, then `_2`…),
+  writes the file and then the path into the setup, one history step; a later save writes over the file the Java
+  names. A screen whose Java names no shot has none, whatever files the folder holds: a map made before shows its
+  markers until a shot is taken again. A delete removes the files its Java names.
+- **A rename renames the constant** (2026-10-22): `edit_map rename` and the card's ⋯ *Rename* give the screen its
+  name and the constant and class that name makes (`ScreenBook.constantFor(graph, name, own)`), every use renamed
+  by binding (`PluginValues.renameGroup`), one history step; a name that makes the same constant keeps it. Studio's
+  own rename of a member of any plugin's open set, from the canvas or the assistant's `rename`, is planned the same
+  way past the file's lock (Studio's `ManagedRenames`), so `Screens.MARKET` renamed anywhere renames its class too.
+  The shot stays where its Java names it.
 
 ## Trees (`api/screens/Tree`, the user's calls of 2026-10-17)
 
@@ -227,7 +239,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   on the second in a row. The card a run is on is lit from telemetry.
 - **Reads on the FX thread** go through `ScreenMapRead.orEmpty` (`plugin/pictures`): one read per FX event, shared
   by every card and editor drawn in it, dropped after it; a write calls `forget()`. A picture opens on its own cut
-  (`TemplateUses.cut`), never on every picture constant's.
+  (`TemplateUses.cut`), never on every picture constant's. A read after a step is skipped while the files beside
+  `Screens.java` hash the same (`ScreenMapRead.stamp`, 2026-10-22): an edit to a body, or an undo back to the
+  text last read, reads nothing; the hash takes milliseconds, a read of fifty screens up to a second.
+- **The chain's layout** is the host's: a `setup()` chain that fits 120 columns stays on one line, a longer one is
+  one call per line (Studio's `SourceFormatter.formatValue`, 2026-10-22), laid out only where a write changed it.
 - **Search** (*Find a screen…*, `GraphCanvas.searchField`): each card's terms are `ScreenCards.terms` — its name,
   constant, `input <field>`, `picture <id>` and `notes …`; a term's label is shown, never searched. At most 12 hits
   are listed under the field, inside the map (a popup window would take the field's keys): names that begin with

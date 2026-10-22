@@ -18,6 +18,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -67,10 +68,19 @@ final class ScreenCards {
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
                 boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at,
-                List<String> activities) {
+                List<String> activities, Map<String, String> shots) {
 
         Card {
             activities = activities == null ? List.of() : List.copyOf(activities);
+            shots = shots == null ? Map.of() : Map.copyOf(shots);
+        }
+
+        /** A card whose Java names no shot. */
+        Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
+             boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at,
+             List<String> activities) {
+            this(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs, stage, at,
+                    activities, Map.of());
         }
 
         /** A card no activity works on. */
@@ -88,13 +98,22 @@ final class ScreenCards {
         /** This card moved to {@code at}, null for where the layout puts it. */
         Card withAt(Point at) {
             return new Card(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs,
-                    stage, at, activities);
+                    stage, at, activities, shots);
         }
 
         /** This card with {@code activities} working on it. */
         Card withActivities(List<String> activities) {
             return new Card(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs,
-                    stage, at, activities);
+                    stage, at, activities, shots);
+        }
+
+        /**
+         * The shot its Java names for {@code look}, a path in the bot's resources: that look's, else its own while the
+         * look has none (blank or null: its own); null when it names none.
+         */
+        String shot(String look) {
+            String own = shots.get("");
+            return look == null || look.isBlank() ? own : shots.getOrDefault(look, own);
         }
     }
 
@@ -232,7 +251,15 @@ final class ScreenCards {
         return new Card(constant, graph.shown(constant), screen.firstMarkerId(), state,
                 said, shape, screen.isPopup(), screen.isStart(), graph.panelOf(constant).map(graph::shown).orElse(null),
                 graph.presence(constant), tried, fields.size(),
-                stage == null ? "" : stage, screen.at());
+                stage == null ? "" : stage, screen.at(), List.of(), shots(screen));
+    }
+
+    /** The shots {@code screen}'s Java names, by look, its own under {@code ""}. */
+    private static Map<String, String> shots(MapScreen screen) {
+        Map<String, String> shots = new HashMap<>();
+        if (screen.setup().shot() != null) shots.put("", screen.setup().shot());
+        for (ScreenVariant look : screen.variants()) if (look.shot() != null) shots.put(look.name(), look.shot());
+        return shots;
     }
 
     /**

@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A screen's shot is named in its Java**: `Setup.shot("screens/HOME.png")`, and `ScreenVariant.shot(…)` for a
+  look. 🗺 writes it with the first shot it takes, so renaming a screen, in 🗺, in Studio or in your IDE, keeps its
+  shot. A map made before shows each screen's marker until its shot is taken again (❄ Freeze, or the next walk there).
+- **Renaming a screen renames its constant and class**: 🗺's *Rename* and edit_map's rename turn
+  `Screens.FAVORED_WAR_MACHINES_2` into `Screens.FORGE` along with its name, every use with it, as one ↶ step.
+  Studio's own rename works on a screen's constant too.
+- **🗺 reads the map less**: an edit that leaves `Screens.java` and the files beside it as they were, or an undo back
+  to them, no longer reads the whole map again. A long `setup()` chain is written one call per line.
 - **🗺 Activities on the map.** A flow card can say the screen its activity works on:
   `Flow.activity(Tavern.class, Tavern::body).on(Screens.TAVERN)`.
   - That screen's card on 🗺 shows a `⚙ Tavern` pill.

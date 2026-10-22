@@ -51,9 +51,14 @@ final class ScreenBook {
 
     /** A free constant for a screen the game calls {@code name}: {@code Guild hall} is {@code GUILD_HALL}. */
     static String constantFor(ScreenGraph graph, String name) {
+        return constantFor(graph, name, null);
+    }
+
+    /** As {@link #constantFor(ScreenGraph, String)}, {@code own} counted free: the constant of the screen renamed. */
+    static String constantFor(ScreenGraph graph, String name, String own) {
         String base = Optional.ofNullable(FlowNames.constantFor(name)).orElse("SCREEN");
         String constant = base;
-        for (int n = 2; graph.screens().containsKey(constant); n++) constant = base + "_" + n;
+        for (int n = 2; !constant.equals(own) && graph.screens().containsKey(constant); n++) constant = base + "_" + n;
         return constant;
     }
 
@@ -94,6 +99,16 @@ final class ScreenBook {
             ScreenMapRead.forget();
         }
         return answer.getFirst();
+    }
+
+    /**
+     * Renames {@code constant} to {@code renamed}, its class with it and every use of both, by binding. Empty when
+     * done, else why not.
+     */
+    static Optional<String> renameConstant(StudioServices services, String constant, String renamed) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return Optional.of("Studio has no source tree open.");
+        return values.renameGroup(SCREENS, constant, renamed);
     }
 
     /** Takes {@code constant} out of the map, its class with it. Empty when done, else why not. */

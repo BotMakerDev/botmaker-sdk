@@ -8,7 +8,10 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +41,37 @@ class ScreenMapReadTest {
         ScreenMapRead.forget();
         ScreenMapRead.read(services);
         assertEquals(3, values.reads, "a write drops it too");
+    }
+
+    @Test
+    void sameTextReadsOnce(@TempDir Path project) throws IOException {
+        Path folder = Files.createDirectories(project.resolve("src/main/java/com/bot/plugins/sdk"));
+        Path screens = folder.resolve("Screens.java");
+        Path pictures = folder.resolve("Pictures.java");
+        Files.writeString(screens, "class Screens {}");
+        Files.writeString(pictures, "class Pictures {}");
+        Values values = new Values();
+        Steps history = new Steps();
+        StudioServices services = services(values, history, project);
+
+        ScreenMapRead.forget();
+        ScreenMapRead.read(services);
+        history.step();
+        ScreenMapRead.read(services);
+        assertEquals(1, values.reads, "a step that left the map's files as they were reads nothing");
+
+        Files.writeString(pictures, "class Pictures { int recut; }");
+        history.step();
+        ScreenMapRead.read(services);
+        assertEquals(2, values.reads, "a file beside Screens.java is part of what the map reads");
+
+        Files.writeString(screens, "class Screens { int home; }");
+        history.step();
+        ScreenMapRead.read(services);
+        Files.writeString(screens, "class Screens { int home; }");
+        ScreenMapRead.forget();
+        ScreenMapRead.read(services);
+        assertEquals(3, values.reads, "rewritten to the same text, the map is not read again");
     }
 
     @Test
@@ -138,10 +172,14 @@ class ScreenMapReadTest {
     }
 
     private static StudioServices services(PluginValues values, History history) {
+        return services(values, history, null);
+    }
+
+    private static StudioServices services(PluginValues values, History history, Path project) {
         return new StudioServices() {
             @Override
             public Path projectDir() {
-                return null;
+                return project;
             }
 
             @Override
