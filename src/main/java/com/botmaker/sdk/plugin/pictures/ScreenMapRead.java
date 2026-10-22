@@ -6,6 +6,8 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -49,8 +51,10 @@ public final class ScreenMapRead {
                 MapScreen screen = member.grouped() ? screens.get(member.group()) : null;
                 if (screen == null) continue;
                 inputs++;
-                input(values, member).ifPresent(input ->
-                        screens.put(member.group(), screens.get(member.group()).withInput(member.name(), input)));
+                part(values, member).ifPresent(part -> screens.put(member.group(), switch (part) {
+                    case Input input -> screens.get(member.group()).withInput(member.name(), input);
+                    case Readout readout -> screens.get(member.group()).withReadout(member.name(), readout);
+                }));
             }
         }
         Diag.log("map read: " + screens.size() + " screens, " + inputs + " inputs in "
@@ -74,9 +78,11 @@ public final class ScreenMapRead {
         return values.open(SdkValues.SCREEN_MAP, Member.of(constant)).flatMap(ctx -> ctx.value(Setup.class));
     }
 
-    /** The input {@code member} holds; empty when there is none the grammar reads. */
-    public static Optional<Input> input(PluginValues values, Member member) {
-        return values.open(SdkValues.SCREEN_MAP, member).flatMap(ctx -> ctx.value(Input.class));
+    /** The input or the readout {@code member} holds; empty when there is none the grammar reads. */
+    public static Optional<ScreenPart> part(PluginValues values, Member member) {
+        return values.open(SdkValues.SCREEN_MAP, member)
+                .flatMap(ctx -> ctx.value(Input.class).<ScreenPart>map(input -> input)
+                        .or(() -> ctx.value(Readout.class)));
     }
 
     /**
@@ -102,8 +108,9 @@ public final class ScreenMapRead {
                     .orElse(Optional.of(HOLDER + "." + constant + "'s setup is written by hand, so it is left as it is."));
             if (refused.isPresent()) return refused;
         }
-        for (String field : was.inputs().keySet()) {
-            if (now.inputs().containsKey(field)) continue;
+        Map<String, ScreenPart> kept = now.parts();
+        for (String field : was.parts().keySet()) {
+            if (kept.containsKey(field)) continue;
             Optional<String> refused = values.remove(SdkValues.SCREEN_MAP, Member.of(constant, field));
             if (refused.isPresent()) return refused;
         }
@@ -112,9 +119,10 @@ public final class ScreenMapRead {
 
     /** Each field of {@code now} that {@code was} holds otherwise written, then each new one added. */
     private static Optional<String> writeFields(PluginValues values, String constant, MapScreen was, MapScreen now) {
-        Map<String, Input> added = new LinkedHashMap<>();
-        for (Map.Entry<String, Input> e : now.inputs().entrySet()) {
-            Input before = was.inputs().get(e.getKey());
+        Map<String, ScreenPart> added = new LinkedHashMap<>();
+        Map<String, ScreenPart> had = was.parts();
+        for (Map.Entry<String, ScreenPart> e : now.parts().entrySet()) {
+            ScreenPart before = had.get(e.getKey());
             if (before == null) {
                 added.put(e.getKey(), e.getValue());
                 continue;
@@ -129,10 +137,10 @@ public final class ScreenMapRead {
         return add(values, constant, added);
     }
 
-    /** Declares each of {@code inputs} in {@code constant}'s class, in order. Empty when written, else why not. */
-    public static Optional<String> add(PluginValues values, String constant, Map<String, Input> inputs) {
+    /** Declares each of {@code parts} in {@code constant}'s class, in order. Empty when written, else why not. */
+    public static Optional<String> add(PluginValues values, String constant, Map<String, ? extends ScreenPart> parts) {
         try {
-            for (Map.Entry<String, Input> e : inputs.entrySet()) {
+            for (Map.Entry<String, ? extends ScreenPart> e : parts.entrySet()) {
                 Optional<String> refused = addField(values, Member.of(constant, e.getKey()), e.getValue());
                 if (refused.isPresent()) return refused;
             }
@@ -142,10 +150,10 @@ public final class ScreenMapRead {
         }
     }
 
-    /** {@code member = input;}: the set is of screens, its fields of inputs, which the host checks. */
+    /** {@code member = part;}: the set is of screens, its fields of inputs and readouts, which the host checks. */
     @SuppressWarnings("unchecked")
-    private static Optional<String> addField(PluginValues values, Member member, Input input) {
-        return values.add((ManagedValue<Object>) (ManagedValue<?>) SdkValues.SCREEN_MAP, member, input);
+    private static Optional<String> addField(PluginValues values, Member member, ScreenPart part) {
+        return values.add((ManagedValue<Object>) (ManagedValue<?>) SdkValues.SCREEN_MAP, member, part);
     }
 
     /**

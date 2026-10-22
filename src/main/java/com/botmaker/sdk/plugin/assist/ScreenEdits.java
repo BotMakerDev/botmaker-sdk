@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -25,6 +26,7 @@ import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -77,6 +79,7 @@ public final class ScreenEdits {
     private static final ManagedSet<Words> TEXTS = ManagedSet.of(SdkValues.TEXTS);
 
     private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
+    private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
 
     /** The longest a button or a hotkey is held, as 🗺's spinners offer: past it the game is held, not pressed. */
     public static final Duration LONGEST_HOLD = Duration.ofMinutes(1);
@@ -744,6 +747,30 @@ public final class ScreenEdits {
                 () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
                         s -> s.withInput(named, TextButton.of(caption))))),
                 named + " clicks " + caption.said() + " where it is read in Zones." + zone.strip() + ".");
+    }
+
+    /**
+     * {@code constant} reading its zone {@code zone} as the readout {@code field}: words by OCR, or a number by the
+     * bot's digits {@code digits} when given; the one naming which one the screen shows when {@code subject}. What a
+     * zone or digits cut "read on this screen" writes.
+     */
+    public static String addReadout(StudioServices services, String constant, String field, String zone,
+                                    String digits, boolean subject) {
+        Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
+        if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
+        PluginValues values = services.pluginValues();
+        Optional<DigitSet> set = digits == null || values == null ? Optional.empty()
+                : DIGITS.read(values, Member.of(digits.strip()));
+        if (digits != null && set.isEmpty()) return NOT_WRITTEN + "the bot has no digits " + digits + " in Digits.";
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen on = graph.screens().get(constant);
+        if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
+        Readout made = set.map(s -> Readout.digits(in.get(), s)).orElseGet(() -> Readout.text(in.get()));
+        Readout readout = subject ? made.subject() : made;
+        String named = on.fieldFor(field);
+        return said(ScreenBook.update(services, constant, s -> s.withReadout(named, readout)),
+                named + " reads Zones." + zone.strip() + set.map(s -> " with Digits." + digits.strip()).orElse("")
+                        + " on " + graph.shown(constant) + (subject ? ", naming which one it shows." : "."));
     }
 
     /** {@code constant} told by its words {@code text} no more; the {@code Texts} constant stays for its other uses. */

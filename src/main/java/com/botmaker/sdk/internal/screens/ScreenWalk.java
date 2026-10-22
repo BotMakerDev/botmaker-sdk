@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -17,6 +18,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -716,6 +718,48 @@ public final class ScreenWalk {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isPresent() && whereOn(frame.get(), null).isPresent()) return frame;
+        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        return Optional.empty();
+    }
+
+    /**
+     * What {@code constant}'s readout {@code field} shows, read off one look; empty when that look does not show the
+     * screen, a screen with no marker included, or nothing is read there. Nothing is walked to or closed.
+     */
+    public Optional<String> read(String constant, String field) {
+        Optional<Readout> readout = graph.screen(constant).flatMap(screen -> screen.readout(field));
+        if (readout.isEmpty()) return Optional.empty();
+        Markers markers = Markers.of(graph.screens().get(constant));
+        if (!markers.any()) return Optional.empty();
+        return reach.look().filter(frame -> markers.on(reach, frame))
+                .flatMap(frame -> reach.readout(readout.get(), frame));
+    }
+
+    /**
+     * The screen that follows {@code from} on its own ({@link ScreenGraph#results}) once one shows, popups closed on
+     * the way: Victory or Defeat once a fight is done. Looked for up to {@code from}'s {@link ScreenGraph#loadMs};
+     * empty when none showed by then, a popup stayed, or {@code from} has no result with a marker.
+     */
+    public Optional<String> next(String from) {
+        Map<String, Markers> results = new LinkedHashMap<>();
+        for (String result : graph.results(from)) {
+            Markers markers = Markers.of(graph.screens().get(result));
+            if (markers.any()) results.put(result, markers);
+        }
+        if (results.isEmpty()) return Optional.empty();
+        long deadline = reach.nowMs() + graph.loadMs(from);
+        do {
+            reach.pause(POLL_MS);
+            Optional<BufferedImage> frame;
+            try {
+                frame = closePopups(reach.look());
+            } catch (Stayed stayed) {
+                return Optional.empty();
+            }
+            if (frame.isEmpty()) continue;
+            for (Map.Entry<String, Markers> result : results.entrySet()) {
+                if (result.getValue().on(reach, frame.get())) return Optional.of(result.getKey());
+            }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
         return Optional.empty();
     }

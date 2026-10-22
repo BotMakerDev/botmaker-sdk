@@ -66,7 +66,7 @@ final class ScreenBook {
         if (values == null) return Optional.of("Studio has no source tree open.");
         return step(services, "Add " + screen.name(), () -> values.create(SCREENS)
                 .or(() -> values.addClass(SCREENS, constant, screen.setup()))
-                .or(() -> ScreenMapRead.add(values, constant, screen.inputs())));
+                .or(() -> ScreenMapRead.add(values, constant, screen.parts())));
     }
 
     /**

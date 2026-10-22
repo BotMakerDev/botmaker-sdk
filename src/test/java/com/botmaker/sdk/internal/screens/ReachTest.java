@@ -15,10 +15,12 @@ import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -31,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -500,7 +503,7 @@ class ReachTest {
     }
 
     /** A screen of 800x600 whose zones each read {@code lines}, placed inside the part read; each read's size kept. */
-    private static final class Reading extends Column {
+    private static class Reading extends Column {
         final List<TextResult> lines;
         final List<String> read = new ArrayList<>();
 
@@ -541,6 +544,32 @@ class ReachTest {
         assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Claim"), new Zone(900, 700, 50, 50))), frame),
                 "a zone off the frame reads nothing");
         assertEquals(2, screen.done.size(), "words not read are not pressed");
+    }
+
+    /**
+     * A readout of words reads its zone alone, every line joined by a space; one of digits reads the number its digit
+     * pictures spell in that zone; a zone off the frame reads nothing.
+     */
+    @Test
+    void aReadoutReadsItsZoneOnlyAsWordsOrAsANumber() {
+        List<Rect> areas = new ArrayList<>();
+        Reading screen = new Reading(List.of(
+                new TextResult(" Gold ", new Rect(0, 0, 40, 20), 90f, TextResult.Level.LINE),
+                new TextResult("1,250", new Rect(50, 0, 40, 20), 90f, TextResult.Level.LINE))) {
+            @Override
+            public OptionalLong number(DigitSet digits, Rect area, BufferedImage frame) {
+                areas.add(area);
+                return OptionalLong.of(1250);
+            }
+        };
+        BufferedImage frame = screen.look().orElseThrow();
+        Zone gold = new Zone(100, 200, 200, 100);
+        assertEquals(Optional.of("Gold 1,250"), screen.readout(Readout.text(gold), frame));
+        assertEquals(List.of("200x100"), screen.read, "only the zone is read");
+        assertEquals(Optional.of("1250"), screen.readout(Readout.digits(gold, new DigitSet("digits/gold")), frame));
+        assertEquals(List.of(new Rect(100, 200, 200, 100)), areas);
+        assertEquals(Optional.empty(), screen.readout(Readout.text(new Zone(900, 700, 50, 50)), frame));
+        assertEquals(Optional.empty(), new Reading(List.of()).readout(Readout.text(gold), frame), "nothing read");
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */

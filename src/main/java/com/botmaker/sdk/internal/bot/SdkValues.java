@@ -20,8 +20,8 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
-import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -158,14 +158,15 @@ public final class SdkValues {
 
     /**
      * The game's screens — {@code static final class Campaign extends Screen} with its constant {@code CAMPAIGN}: its
-     * inputs are its fields ({@code public final Button claim = Button.of(…)}), the rest its {@link Screen#setup}. A
+     * inputs and readouts are its fields ({@code public final Button claim = Button.of(…)}), the rest its {@link
+     * Screen#setup}. A
      * screen and an input are named by their constant and field, read by name like a sub-flow ({@link
      * BotConstants#screen}, {@link BotConstants#input}), so one equal to another, or not filled in yet, is still its
      * own.
      */
     public static final ManagedClasses<Screen> SCREEN_MAP = ManagedValue.openSet(SdkValue.Id.SCREEN_MAP)
             .ofClasses(Screen.class)
-            .fields(Input.class, BotConstants::input)
+            .fields(ScreenPart.class, BotConstants::input)
             .setup(Screen::setup)
             .referredToAs(BotConstants::screen)
             .in("Screens")

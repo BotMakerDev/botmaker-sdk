@@ -1,11 +1,13 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.RunReach;
@@ -14,6 +16,7 @@ import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Goes from screen to screen by the bot's map, its {@code Screens} class: {@code Navigate.to(Screens.CAMPAIGN)}
@@ -162,6 +165,69 @@ public final class Navigate {
         // Remembered, not told: a screen's marker stays in view under a panel opened over it, so this may be its parent.
         if (on) ScreenMaps.seen(constant.get());
         return on;
+    }
+
+    /**
+     * What {@code readout} shows now, a readout of a screen of the map ({@code Screens.HOME.gold}): the words read in
+     * its zone, or the number its digits spell. Nothing is walked to: empty when the game does not show its screen, or
+     * nothing is read there.
+     */
+    @Hidden("no block can pick a readout yet: Studio reads Screens.HOME.gold as an input; written in Java")
+    public static Optional<String> read(Readout readout) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<BotConstants.InputName> name = map.nameOf(readout);
+        if (name.isEmpty()) {
+            Debug.log("That readout is not in the bot's screen map.");
+            return Optional.empty();
+        }
+        return new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null)
+                .read(name.get().screen(), name.get().field());
+    }
+
+    /**
+     * {@link #read} as a number: the digits it shows, every other mark passed over, so {@code 1,250} is 1250 and
+     * {@code 350/500} 350500; empty as for {@link #read}, or when it shows no digit.
+     */
+    @Hidden("as read: no block can pick a readout yet")
+    public static OptionalLong number(Readout readout) {
+        String digits = read(readout).map(text -> text.replaceAll("\\D", "")).orElse("");
+        if (digits.isEmpty()) return OptionalLong.empty();
+        try {
+            return OptionalLong.of(Long.parseLong(digits));
+        } catch (NumberFormatException tooLong) {
+            return OptionalLong.empty();
+        }
+    }
+
+    /**
+     * Which one {@code screen} shows, read off its {@link Readout#subject() subject} readout: the hero's name on a
+     * hero's page. Empty when it has none, the game does not show it, or nothing is read.
+     */
+    public static Optional<String> subject(Screen screen) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<String> constant = map.constantOf(screen);
+        Optional<String> field = constant.flatMap(map::screen).flatMap(MapScreen::subjectField);
+        if (field.isEmpty()) return Optional.empty();
+        return new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).read(constant.get(), field.get());
+    }
+
+    /**
+     * The screen that follows {@code from} on its own, once one shows: how a fight ends, its Victory and Defeat each a
+     * screen {@code .after(FIGHT)} (2026-10-22). Waits up to {@code from}'s {@link Setup#loads}; popups that show are
+     * closed. Empty when none showed by then, or the map has no screen after it: {@code switch} on what it returns.
+     */
+    public static Optional<Screen> next(Screen from) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<String> constant = map.constantOf(from);
+        if (constant.isEmpty()) {
+            Debug.log((from == null ? "No screen" : from.getClass().getSimpleName())
+                    + " is not in the bot's screen map.");
+            return Optional.empty();
+        }
+        Optional<String> next = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).next(constant.get());
+        if (next.isEmpty()) Debug.log("No screen after " + map.shown(constant.get()) + " showed.");
+        next.ifPresent(c -> tell(map, c));
+        return next.flatMap(map::instance);
     }
 
     /** The screen of the bot's map the game shows now, popups aside; empty when it shows none. */

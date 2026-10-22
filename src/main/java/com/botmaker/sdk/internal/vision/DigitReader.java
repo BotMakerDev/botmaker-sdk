@@ -70,6 +70,13 @@ public final class DigitReader {
 
     /** The number {@code set} reads in {@code source}, or empty when no digit is there or one is missing. */
     public static OptionalLong read(CaptureSource source, DigitSet set, double confidence) {
+        BufferedImage frame = source.base().capture();
+        if (frame == null) return OptionalLong.empty();
+        return read(frame, area(source, new Size(frame.getWidth(), frame.getHeight())), set, confidence);
+    }
+
+    /** The number {@code set} reads in {@code area} of {@code frame}, a whole capture; empty as for the source's. */
+    public static OptionalLong read(BufferedImage frame, Rect area, DigitSet set, double confidence) {
         List<Glyph> glyphs = load(digit -> TemplateSource.read(set.folder() + "/" + digit + ".png", new ArrayList<>())
                 .map(TemplateSource.Found::bytes));
         if (glyphs.isEmpty()) {
@@ -77,16 +84,14 @@ public final class DigitReader {
                     + " game shows.");
             return OptionalLong.empty();
         }
-        BufferedImage frame = source.base().capture();
-        if (frame == null) return OptionalLong.empty();
         Size live = new Size(frame.getWidth(), frame.getHeight());
         double scale = scale(set.frame() != null ? set.frame() : BotScreen.size().orElse(null), live);
         // A digit is cut with a pixel of background around the line; an area boxed tight on the ink is widened
         // by that much, so no digit is taller than the area it is looked for in.
         int pad = (int) Math.ceil(2 * scale) + 1;
-        Rect area = area(source, live).expand(pad).intersection(new Rect(0, 0, live.width(), live.height()));
-        if (area.empty()) return OptionalLong.empty();
-        BufferedImage part = frame.getSubimage(area.x(), area.y(), area.width(), area.height());
+        Rect padded = area.expand(pad).intersection(new Rect(0, 0, live.width(), live.height()));
+        if (padded.empty()) return OptionalLong.empty();
+        BufferedImage part = frame.getSubimage(padded.x(), padded.y(), padded.width(), padded.height());
         return read(part, scale, glyphs, confidence, set.name());
     }
 

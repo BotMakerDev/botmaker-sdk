@@ -34,6 +34,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Claimed`). 🗺 Screens' cut form has *Words that tell it* and *A button known by its words*, the words read off the
   cut to start with; the panel lists a screen's words with ✕; edit_map has `add_text` and `remove_text`; try_input and
   ▶ Try press a text button where a fresh look reads it.
+- **Readouts and results on the map**: a screen reads what it shows, a field beside its inputs, `public final
+  Readout gold = Readout.digits(Zones.GOLD, Digits.GOLD);` or `Readout.text(Zones.HERO_NAME)`, read from a body by
+  `Navigate.read(Screens.HOME.gold)` or `Navigate.number(…)` while the game shows that screen. A readout marked
+  `.subject()` names which one its screen shows, `Navigate.subject(Screens.HERO)`. How a fight ends is two screens
+  `.after(BATTLE)`, Victory and Defeat, and `Navigate.next(Screens.BATTLE)` waits for whichever shows, so a body no
+  longer waits on pictures by hand. 🗺 Screens' cut form has *read on this screen* (and *names which one it shows*)
+  on a zone or digits cut; read_map lists a screen's readouts and every screen that follows it on its own.
 - **Places, spots and grids on the map**: a button found only where it sits from a picture or words,
   `Button.of(Pictures.CLAIM).repeated().place(Place.rightOf(Caption.of(Texts.DAILY, Zones.QUESTS)))`, or picked so
   from a body, `Pick.at(Place.below(Pictures.EVENT_HEADER))` (`above`, `below`, `leftOf`, `rightOf`, `nearest`,

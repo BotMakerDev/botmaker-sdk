@@ -178,10 +178,10 @@ public final class MapReport {
         if (screen.isStart()) ins.add("the game opens on it");
         graph.panelOf(constant).filter(p -> !graph.parent(constant).equals(Optional.of(p))).ifPresent(p -> ins.add(
                 "a panel of " + graph.shown(p) + ", though its way in is not an input of it"));
-        List<String> next = graph.followers(constant);
+        List<String> next = graph.results(constant);
         if (!next.isEmpty()) {
-            ins.add(graph.shown(next.getFirst()) + " follows it on its own, given " + graph.loadMs(constant) / 1000
-                    + " s to show");
+            ins.add(String.join(" or ", next.stream().map(graph::shown).toList()) + " follows it on its own, given "
+                    + graph.loadMs(constant) / 1000 + " s to show");
         }
         if (screen.from() != null && (screen.from().via() != null || screen.from().isOnItsOwn())) {
             ins.add("in " + (screen.from().isOnItsOwn() ? "after " : "from ")
@@ -210,6 +210,8 @@ public final class MapReport {
             }
             out.append('\n');
         }
+        screen.readouts().forEach((field, readout) -> out.append(indent).append("  reads ").append(field).append(": ")
+                .append(readout.label()).append(" in ").append(readout.zone()).append('\n'));
         screen.trees().forEach((field, tree) -> nodes(out, indent + "  ", screen, field, tree));
         for (String what : screen.owes()) out.append(indent).append("  owes: ").append(what).append('\n');
         if (screen.notes() != null) {

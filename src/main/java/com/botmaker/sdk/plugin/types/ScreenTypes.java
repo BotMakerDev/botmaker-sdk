@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Scroll;
@@ -30,6 +31,7 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -304,6 +306,18 @@ public final class ScreenTypes {
     /** {@code Caption.of(Words, Zone)}: words a screen shows, one of the bot's {@code Texts}, read in a {@code Zones}. */
     public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class)
             .<Words, Zone, Caption>writtenAs(Caption::of, Caption::words, Caption::in);
+
+    /** {@code Readout.text(Zone)}, then {@code .subject()} when it names which one its screen shows. */
+    public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = ComponentType.part(Readout.class)
+            .<Zone, Readout>writtenAs(Readout::text, Readout::zone)
+            .flag(Readout::subject, Readout::isSubject)
+            .when(readout -> !readout.isNumber());
+
+    /** {@code Readout.digits(Zone, DigitSet)}: a number read with one of the bot's {@code Digits}, and the same link. */
+    public static final DeclaredCall<Readout> READOUT_DIGITS_SHAPE = ComponentType.part(Readout.class)
+            .<Zone, DigitSet, Readout>writtenAs(Readout::digits, Readout::zone, Readout::digits)
+            .flag(Readout::subject, Readout::isSubject)
+            .when(Readout::isNumber);
 
     /** {@code TextButton.of(Caption)} and its links: words clicked, pressed by a gesture as a button is. */
     public static final DeclaredCall<TextButton> TEXT_BUTTON_SHAPE = ComponentType.part(TextButton.class)

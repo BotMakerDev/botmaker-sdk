@@ -50,6 +50,25 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   size, `Pick.cell(row, column)` one of them. `Reach.copies` maps each copy of the picture to its spots, then filters
   by the place; `Reach.seen` takes the nearest for a place, the cell for a cell. 🗺's board still boxes a spot on its
   anchor (`ScreenCanvas` was another session's at the time).
+- **Readouts and results** (2026-10-22): a `Readout` is a field of its screen beside its inputs, never pressed,
+  `public final Readout gold = Readout.digits(Zones.GOLD, Digits.GOLD);` or `Readout.text(Zones.HERO_NAME)` by OCR.
+  Both kinds are a `ScreenPart`, the type the contract's `SCREEN_MAP` fields are of; `MapScreen` keeps them apart
+  (`inputs`, `readouts`). `Navigate.read(readout)` and `Navigate.number(readout)` read one off a single look, walking
+  nothing: empty when that look does not show its screen. A screen of one of several (hero N) names which by a readout
+  marked `.subject()`, read by `Navigate.subject(screen)`: the mark is on the readout, not a `Setup.subject(…)` link,
+  because the host reads `HERO.name` anywhere as the input reference `BotConstants.input` makes, never as a readout.
+  A result is a screen that follows another on its own: Victory and Defeat are each `.after(BATTLE)`, and
+  `Navigate.next(BATTLE)` waits up to Battle's `loads` for whichever shows (`ScreenGraph.results`, one step on;
+  `followers` goes on past them), popups closed meanwhile. A body that waited on pictures by hand,
+
+  ```java
+  if (!Navigate.press(Screens.HOME.battle).done()) return Activities.Battle.LOST;
+  return Navigate.next(Screens.BATTLE).filter(Screens.VICTORY::equals).isPresent()
+          ? Activities.Battle.WON : Activities.Battle.LOST;
+  ```
+
+  names the map's screens only. 🗺's cut form saves a zone or digits *read on this screen* as a readout of the cut's
+  name (a number's box becomes a zone of that name too); read_map lists them.
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in

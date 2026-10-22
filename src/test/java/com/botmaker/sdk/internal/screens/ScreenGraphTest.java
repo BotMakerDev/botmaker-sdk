@@ -1,11 +1,13 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
@@ -13,6 +15,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
@@ -457,6 +460,40 @@ class ScreenGraphTest {
         screens.put("BATTLE", screen(Setup.named("Battle").markers(marks("battle"))
                 .after(BotConstants.screen("ENTERING"))));
         return screens;
+    }
+
+    /**
+     * Home, which reads its gold, and its fight: Battle, loading up to 30 s, that ends on its own on Victory or
+     * Defeat; an Offer popup may show over any of them.
+     */
+    static Map<String, MapScreen> fight() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("fight"))
+                .withReadout("gold", Readout.digits(new Zone(10, 10, 80, 20), new DigitSet("digits/gold"))));
+        screens.put("BATTLE", screen(Setup.named("Battle").markers(marks("battle")).from(ref("HOME", "fight"))
+                .loads(Duration.ofSeconds(30))));
+        screens.put("VICTORY", screen(Setup.named("Victory").markers(marks("victory"))
+                .after(BotConstants.screen("BATTLE"))));
+        screens.put("DEFEAT", screen(Setup.named("Defeat").markers(marks("defeat"))
+                .after(BotConstants.screen("BATTLE"))));
+        screens.put("OFFER", screen(Setup.named("Offer").markers(marks("offer")).back(click("close_x")).popup()));
+        return screens;
+    }
+
+    @Test
+    void twoScreensAfterOneAreBothItsResults() {
+        ScreenGraph graph = ScreenGraph.of(fight());
+        assertEquals(List.of("VICTORY", "DEFEAT"), graph.results("BATTLE"));
+        assertEquals(List.of(), graph.results("HOME"), "Battle is pressed into, not followed on its own");
+        assertEquals(List.of(), graph.results("VICTORY"));
+        assertEquals(30_000, graph.loadMs("BATTLE"));
+        assertEquals(Optional.of(new BotConstants.InputName("HOME", "gold")),
+                graph.nameOf(graph.screens().get("HOME").readouts().get("gold")));
+        assertEquals(Optional.empty(), graph.nameOf(Readout.text(new Zone(0, 0, 1, 1))), "a readout of no screen");
+        assertEquals(Optional.empty(), graph.screens().get("HOME").subjectField());
+        MapScreen hero = graph.screens().get("HOME").withReadout("name", Readout.text(new Zone(0, 0, 9, 9)).subject());
+        assertEquals(Optional.of("name"), hero.subjectField());
+        assertEquals("gold2", hero.fieldFor("gold"), "a readout's name is taken");
     }
 
     @Test

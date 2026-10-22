@@ -21,7 +21,7 @@ import java.util.function.BooleanSupplier;
  * <p>A strip's traits are its members' defaults: a strip that {@link #comesAndGoes comes and goes} is one whose
  * members each may be absent (the user's call, 2026-10-16).
  */
-public sealed interface Input permits Button, TextButton, Hotkey, Strip, Tree {
+public sealed interface Input extends ScreenPart permits Button, TextButton, Hotkey, Strip, Tree {
 
     /** Whether Discovery tried it and it opened no screen: it changed this one, or nothing visible. */
     boolean isTried();

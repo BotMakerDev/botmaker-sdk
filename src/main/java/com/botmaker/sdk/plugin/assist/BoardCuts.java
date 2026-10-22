@@ -82,8 +82,11 @@ public final class BoardCuts {
     public record Member(String group, boolean tree, int notches) implements As {
     }
 
-    /** An area of the game, a Zones constant. */
-    public record Place(Anchor anchor) implements As {
+    /**
+     * An area of the game, a Zones constant; read on the screen as a readout of the cut's name when {@code readout},
+     * the one naming which one it shows when {@code subject}.
+     */
+    public record Place(Anchor anchor, boolean readout, boolean subject) implements As {
     }
 
     /**
@@ -101,8 +104,11 @@ public final class BoardCuts {
     public record Spot(String anchor, int rows, int columns) implements As {
     }
 
-    /** The digits of the number it shows, {@code shows} as the game writes it. */
-    public record Digits(String shows) implements As {
+    /**
+     * The digits of the number it shows, {@code shows} as the game writes it; with its box saved in Zones too and read
+     * on the screen by them as a readout of the cut's name when {@code readout}.
+     */
+    public record Digits(String shows, boolean readout) implements As {
     }
 
     /** A new image for the picture {@code picture}, keeping its name and every use. */
@@ -194,6 +200,34 @@ public final class BoardCuts {
             String zone = FlowNames.constantFor(cuts.get(i).name());
             String field = reads.button() ? cuts.get(i).name() : null;
             String one = FxCall.call(() -> ScreenEdits.addText(context.services(), screen, zone, reads.text(), field));
+            if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
+            said.add(one);
+        }
+        // A zone or a number read on the screen, once what it reads is saved: a number's box is a zone of its own.
+        for (int i = 0; i < cuts.size(); i++) {
+            Cut cut = cuts.get(i);
+            boolean number = cut.as() instanceof Digits digits && digits.readout();
+            boolean words = cut.as() instanceof Place place && place.readout();
+            boolean subject = words && ((Place) cut.as()).subject();
+            if (!number && !words || refused.contains(i)) continue;
+            if (screen == null) {
+                refused.add(i);
+                said.add(ScreenEdits.NOT_WRITTEN + cut.name() + ": a readout is a screen's: pick it.");
+                continue;
+            }
+            Rect b = cut.box();
+            if (number) {
+                AgentReply zone = PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
+                        b.width(), b.height(), Anchor.CENTER), context, shown);
+                said.add(ScreenDesk.text(zone));
+                if (zone.isRefused()) {
+                    refused.add(i);
+                    continue;
+                }
+            }
+            String constant = FlowNames.constantFor(cut.name());
+            String one = FxCall.call(() -> ScreenEdits.addReadout(context.services(), screen, cut.name(), constant,
+                    number ? constant : null, subject));
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
             said.add(one);
         }

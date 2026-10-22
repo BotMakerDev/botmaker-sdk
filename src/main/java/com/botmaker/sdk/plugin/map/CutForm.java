@@ -243,6 +243,18 @@ final class CutForm {
                     if (line.shows.getText().chars().noneMatch(Character::isDigit)) {
                         return Optional.of(at + "give the number it shows, as the game writes it.");
                     }
+                    if (!line.readout.isSelected()) break;
+                    if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
+                    // Its box is saved as a zone of its name too: over one of that name, it would move what that reads.
+                    if (ScreenEdits.zones(services).contains(FlowNames.constantFor(name))) {
+                        return Optional.of(at + "Zones has " + FlowNames.constantFor(name) + " already: give the "
+                                + "number another name.");
+                    }
+                }
+                case ZONE -> {
+                    if (line.readout.isSelected() && on() == null) {
+                        return Optional.of(at + "a readout is a screen's: pick it.");
+                    }
                 }
                 default -> {
                 }
@@ -299,6 +311,9 @@ final class CutForm {
         private final ComboBox<String> beside = new ComboBox<>();
         private final Spinner<Integer> rows = new Spinner<>(1, 30, 1);
         private final Spinner<Integer> columns = new Spinner<>(1, 30, 1);
+        /** A zone or a number read on the screen as a readout of the cut's name, and whether it names the subject. */
+        private final CheckBox readout = new CheckBox("read on this screen");
+        private final CheckBox subject = new CheckBox("names which one it shows");
         /** The cut as drawn, read by OCR the first time it is made words; null when it is off the frame. */
         private final BufferedImage image;
         private boolean read;
@@ -342,6 +357,8 @@ final class CutForm {
             beside.setTooltip(new Tooltip(MapGuide.SPOT));
             rows.setPrefWidth(64);
             columns.setPrefWidth(64);
+            readout.setTooltip(new Tooltip(MapGuide.READOUT));
+            subject.disableProperty().bind(readout.selectedProperty().not());
             details.setAlignment(Pos.CENTER_LEFT);
             fill();
         }
@@ -383,10 +400,10 @@ final class CutForm {
                 case SCREEN_LOOK -> List.of(look, lookMarker, new Label("shows while"), when);
                 case STRIP -> List.of(new Label("strip"), group, new Label("new: notches"), notches);
                 case TREE -> List.of(new Label("tree"), group);
-                case ZONE -> List.of(new Label("stays with"), anchor);
+                case ZONE -> List.of(new Label("stays with"), anchor, readout, subject);
                 case TEXT_MARKER, TEXT_BUTTON -> List.of(new Label("reads"), reads);
                 case SPOT -> List.of(new Label("beside"), beside, new Label("cells"), rows, new Label("×"), columns);
-                case DIGITS -> List.of(shows);
+                case DIGITS -> List.of(shows, readout);
                 case RECUT -> List.of(picture);
                 case ABSENT, BACK -> List.of();
             });
@@ -427,11 +444,12 @@ final class CutForm {
                 case SCREEN_LOOK -> new BoardCuts.ScreenLook(look.getText(), lookMarker.isSelected(), method);
                 case STRIP -> new BoardCuts.Member(field, false, notches.getValue());
                 case TREE -> new BoardCuts.Member(field, true, 0);
-                case ZONE -> new BoardCuts.Place(anchor.getValue());
+                case ZONE -> new BoardCuts.Place(anchor.getValue(), readout.isSelected(),
+                        readout.isSelected() && subject.isSelected());
                 case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false);
                 case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true);
                 case SPOT -> new BoardCuts.Spot(beside.getValue(), rows.getValue(), columns.getValue());
-                case DIGITS -> new BoardCuts.Digits(shows.getText());
+                case DIGITS -> new BoardCuts.Digits(shows.getText(), readout.isSelected());
                 case RECUT -> new BoardCuts.Recut(picture.getValue());
             };
             String named = kind().named() ? name.getText().strip() : picture.getValue();

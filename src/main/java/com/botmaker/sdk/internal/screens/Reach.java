@@ -1,8 +1,10 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
@@ -15,17 +17,20 @@ import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.ocr.LineMatch;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.vision.BotScreen;
+import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Places;
 
 import java.awt.image.BufferedImage;
@@ -36,7 +41,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.function.ToLongFunction;
 
 /**
@@ -139,19 +146,58 @@ public interface Reach {
     static Optional<Rect> findText(Caption caption, BufferedImage frame,
                                    Function<BufferedImage, List<TextResult>> read) {
         if (caption == null || caption.words() == null || caption.in() == null) return Optional.empty();
-        Rect zone = Places.inSource(caption.in(), BotScreen.size().orElse(null),
-                new Size(frame.getWidth(), frame.getHeight()));
-        int x = Math.max(0, zone.x());
-        int y = Math.max(0, zone.y());
-        int w = Math.min(frame.getWidth(), zone.x() + zone.width()) - x;
-        int h = Math.min(frame.getHeight(), zone.y() + zone.height()) - y;
-        if (w <= 0 || h <= 0) return Optional.empty();
-        for (TextResult line : read.apply(frame.getSubimage(x, y, w, h))) {
+        Optional<Rect> zone = onFrame(caption.in(), frame);
+        if (zone.isEmpty()) return Optional.empty();
+        Rect z = zone.get();
+        for (TextResult line : read.apply(frame.getSubimage(z.x(), z.y(), z.width(), z.height()))) {
             if (!LineMatch.same(line.text(), caption.words().text())) continue;
             Rect b = line.bounds();
-            return Optional.of(new Rect(b.x() + x, b.y() + y, b.width(), b.height()));
+            return Optional.of(new Rect(b.x() + z.x(), b.y() + z.y(), b.width(), b.height()));
         }
         return Optional.empty();
+    }
+
+    /** {@code zone} placed on {@code frame} as {@code source.region} places it, cut to the frame; empty off it. */
+    private static Optional<Rect> onFrame(Zone zone, BufferedImage frame) {
+        Rect placed = Places.inSource(zone, BotScreen.size().orElse(null),
+                new Size(frame.getWidth(), frame.getHeight()));
+        int x = Math.max(0, placed.x());
+        int y = Math.max(0, placed.y());
+        int w = Math.min(frame.getWidth(), placed.x() + placed.width()) - x;
+        int h = Math.min(frame.getHeight(), placed.y() + placed.height()) - y;
+        return w <= 0 || h <= 0 ? Optional.empty() : Optional.of(new Rect(x, y, w, h));
+    }
+
+    /**
+     * What {@code readout} shows on {@code frame}: the lines read in its zone, joined by a space, or the number its
+     * digits spell there. Empty when nothing is read.
+     */
+    default Optional<String> readout(Readout readout, BufferedImage frame) {
+        if (readout == null || readout.zone() == null) return Optional.empty();
+        Optional<Rect> zone = onFrame(readout.zone(), frame);
+        if (zone.isEmpty()) return Optional.empty();
+        Rect z = zone.get();
+        if (readout.isNumber()) {
+            OptionalLong number = number(readout.digits(), z, frame);
+            return number.isPresent() ? Optional.of(Long.toString(number.getAsLong())) : Optional.empty();
+        }
+        String text = read(frame.getSubimage(z.x(), z.y(), z.width(), z.height())).stream()
+                .map(line -> line.text().strip()).filter(line -> !line.isEmpty()).collect(Collectors.joining(" "));
+        return text.isEmpty() ? Optional.empty() : Optional.of(text);
+    }
+
+    /** The number {@code digits}' pictures read in {@code area} of {@code frame}, at a run's confidence; empty for none. */
+    default OptionalLong number(DigitSet digits, Rect area, BufferedImage frame) {
+        return digitsIn(digits, area, frame, BotSettings.current().confidence());
+    }
+
+    /** {@link #number} at {@code confidence}; a read that fails reads none. */
+    static OptionalLong digitsIn(DigitSet digits, Rect area, BufferedImage frame, double confidence) {
+        try {
+            return DigitReader.read(frame, area, digits, confidence);
+        } catch (RuntimeException | LinkageError unreadable) {
+            return OptionalLong.empty();
+        }
     }
 
     /** Presses at {@code at} by {@code gesture}, a {@link Gesture#HOLD} held {@code hold}; anything unknown clicked. */

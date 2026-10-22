@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
@@ -217,6 +218,31 @@ public final class ScreenGraph {
             }
         }
         return Optional.empty();
+    }
+
+    /** The screen and the field holding {@code readout}, this very value; empty when no screen of the map holds it. */
+    public Optional<InputName> nameOf(Readout readout) {
+        if (readout == null) return Optional.empty();
+        for (Map.Entry<String, MapScreen> e : screens.entrySet()) {
+            for (Map.Entry<String, Readout> field : e.getValue().readouts().entrySet()) {
+                if (field.getValue() == readout) return Optional.of(new InputName(e.getKey(), field.getKey()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The screens that follow {@code constant} on its own, one step on, in the order declared: how a fight ends,
+     * Victory or Defeat each {@code .after(FIGHT)}. {@link #followers} goes on past them.
+     */
+    public List<String> results(String constant) {
+        List<String> results = new ArrayList<>();
+        screens.forEach((c, screen) -> {
+            boolean follows = screen.ways().stream()
+                    .anyMatch(way -> way.isOnItsOwn() && onScreen(way).filter(constant::equals).isPresent());
+            if (follows && !c.equals(constant)) results.add(c);
+        });
+        return List.copyOf(results);
     }
 
     /**

@@ -96,6 +96,9 @@ final class MapGuide {
     static final String SPOT = "A spot with no picture of its own, an avatar or a custom upload: pressed beside a "
             + "picture that always shows near it, at the same distance in that picture's sizes, and only when it is "
             + "found. Cells: the cut is a grid of that many equal cells, an inventory's slots";
+    static final String READOUT = "Read on the screen picked, as a readout of the cut's name: a body reads it by "
+            + "Navigate.read or Navigate.number while the game shows that screen. Names which one it shows: the "
+            + "hero's name on a hero's page, read by Navigate.subject";
     static final String PLACE = "Found only where it sits from a picture: the Claim right of a row's title. The copy "
             + "nearest the picture that meets the side is pressed; none, and nothing is";
     static final String WAY_COPY ="The copy of this repeated button the way goes through";

@@ -5,7 +5,9 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
@@ -29,14 +31,21 @@ import java.util.function.UnaryOperator;
  * them. A run reads it off the bot's {@link Screen} class ({@link #of(Screen)}); Studio's tools off the class's
  * values as the host reads them, where an input another screen names is a reference ({@code BotConstants.input}).
  *
- * @param setup  everything but its inputs
- * @param inputs its inputs, field name to input
+ * @param setup    everything but its fields
+ * @param inputs   its inputs, field name to input
+ * @param readouts what it shows to be read, field name to readout
  */
-public record MapScreen(Setup setup, Map<String, Input> inputs) {
+public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts) {
 
     public MapScreen {
         setup = setup == null ? Setup.named("") : setup;
         inputs = inputs == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(inputs));
+        readouts = readouts == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(readouts));
+    }
+
+    /** A screen of {@code setup} and {@code inputs}, reading nothing. */
+    public MapScreen(Setup setup, Map<String, Input> inputs) {
+        this(setup, inputs, Map.of());
     }
 
     /** A screen of {@code setup} with no input yet. */
@@ -45,23 +54,28 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
     }
 
     /**
-     * {@code screen} as the bot's class holds it: its {@code public final} input fields, in the order declared, and its
-     * setup, read now that every constant is set.
+     * {@code screen} as the bot's class holds it: its {@code public final} input and readout fields, in the order
+     * declared, and its setup, read now that every constant is set.
      *
      * @throws IllegalStateException when its setup throws, so the bot's author sees why rather than a screen missing
      */
     public static MapScreen of(Screen screen) {
         Map<String, Input> inputs = new LinkedHashMap<>();
+        Map<String, Readout> readouts = new LinkedHashMap<>();
         for (Field field : screen.getClass().getDeclaredFields()) {
             int modifiers = field.getModifiers();
             if (Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers)
-                    || !Input.class.isAssignableFrom(field.getType())) {
+                    || !ScreenPart.class.isAssignableFrom(field.getType())) {
                 continue;
             }
             try {
-                if (field.get(screen) instanceof Input input) inputs.put(field.getName(), input);
+                switch (field.get(screen)) {
+                    case Input input -> inputs.put(field.getName(), input);
+                    case Readout readout -> readouts.put(field.getName(), readout);
+                    case null, default -> {}
+                }
             } catch (IllegalAccessException | LinkageError unreadable) {
-                // Not the bot's to read here: the screen lacks that input, and a walk through it says so.
+                // Not the bot's to read here: the screen lacks that field, and a walk through it says so.
             }
         }
         Setup setup;
@@ -70,7 +84,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         } catch (RuntimeException failed) {
             throw new IllegalStateException(screen.getClass().getSimpleName() + ".setup() failed: " + failed, failed);
         }
-        return new MapScreen(setup, inputs);
+        return new MapScreen(setup, inputs, readouts);
     }
 
     public String name() {
@@ -159,14 +173,38 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
 
     /** This screen, its setup as {@code change} makes it. */
     public MapScreen setup(UnaryOperator<Setup> change) {
-        return new MapScreen(change.apply(setup), inputs);
+        return new MapScreen(change.apply(setup), inputs, readouts);
     }
 
     /** This screen with {@code input} as its field {@code field}: in its place, or added last. */
     public MapScreen withInput(String field, Input input) {
         Map<String, Input> now = new LinkedHashMap<>(inputs);
         now.put(field, input);
-        return new MapScreen(setup, now);
+        return new MapScreen(setup, now, readouts);
+    }
+
+    /** This screen with {@code readout} as its field {@code field}: in its place, or added last. */
+    public MapScreen withReadout(String field, Readout readout) {
+        Map<String, Readout> now = new LinkedHashMap<>(readouts);
+        now.put(field, readout);
+        return new MapScreen(setup, inputs, now);
+    }
+
+    /** Every field of it: its inputs, then its readouts. */
+    public Map<String, ScreenPart> parts() {
+        Map<String, ScreenPart> parts = new LinkedHashMap<>(inputs);
+        parts.putAll(readouts);
+        return parts;
+    }
+
+    /** Its readout {@code field}; empty when it has none of that name. */
+    public Optional<Readout> readout(String field) {
+        return Optional.ofNullable(field == null ? null : readouts.get(field));
+    }
+
+    /** The field of the readout naming which one it shows ({@link Readout#subject()}); empty for a screen of one. */
+    public Optional<String> subjectField() {
+        return readouts.entrySet().stream().filter(e -> e.getValue().isSubject()).map(Map.Entry::getKey).findFirst();
     }
 
     /**
@@ -191,7 +229,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
                 else now.put(e.getKey(), kept);
             }
         }
-        return new MapScreen(setup, now);
+        return new MapScreen(setup, now, readouts);
     }
 
     /**
@@ -208,7 +246,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
         String base = name.isEmpty() ? "input" : Character.isDigit(name.charAt(0)) ? "n" + name : name.toString();
         if (SourceVersion.isKeyword(base)) base = base + "Input";
         String field = base;
-        for (int n = 2; inputs.containsKey(field); n++) field = base + n;
+        for (int n = 2; inputs.containsKey(field) || readouts.containsKey(field); n++) field = base + n;
         return field;
     }
 

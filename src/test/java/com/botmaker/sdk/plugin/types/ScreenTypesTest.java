@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Reached;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
@@ -27,6 +28,7 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -230,6 +232,25 @@ class ScreenTypesTest {
      * Words a screen shows are written as a caption of a {@code Texts} and a {@code Zones} constant, on its setup as a
      * marker or as a text button pressed by a gesture; a setup with none writes no {@code .texts}.
      */
+    /**
+     * A readout is written by its factory, words or digits by what it reads with, then {@code .subject()} when it names
+     * which one its screen shows; each shape writes only its own.
+     */
+    @Test
+    void aReadoutFieldIsWrittenByItsFactory() {
+        Zone gold = new Zone(10, 10, 80, 20);
+        Readout words = Readout.text(gold);
+        assertEquals(words, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, words));
+        Readout name = Readout.text(gold).subject();
+        assertEquals(name, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, name));
+        Readout number = Readout.digits(gold, new DigitSet("src/main/resources/digits/gold")).subject();
+        assertEquals(number, roundTrip(ScreenTypes.READOUT_DIGITS_SHAPE, number));
+        assertTrue(ScreenTypes.READOUT_TEXT_SHAPE.writes(words));
+        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.writes(number));
+        assertTrue(ScreenTypes.READOUT_DIGITS_SHAPE.writes(number));
+        assertEquals("digits gold, subject", number.label());
+    }
+
     @Test
     void wordsAreWrittenAsTheirTextAndTheirZone() {
         Caption settings = Caption.of(Words.of("Settings"), new Zone(100, 20, 300, 40));

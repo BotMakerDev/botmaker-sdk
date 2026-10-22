@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
@@ -85,7 +86,7 @@ class ScreenWalkTest {
     private static final String OVERLAY = "OVERLAY";
 
     /** The game: which screen shows, a popup over it, and what each input on each screen leads to. */
-    private static final class Game implements Reach {
+    private static class Game implements Reach {
         final ScreenGraph map;
         /** What the game shows on its own from a time on: Home once loading is done. */
         final TreeMap<Long, String> timeline = new TreeMap<>();
@@ -1124,6 +1125,46 @@ class ScreenWalkTest {
         ScreenWalk.Result result = go(game, "HOME", new ArrayList<>());
         assertFalse(result.arrived(), result.why());
         assertTrue(game.now < 1_000, "nothing waited for: " + game.now);
+    }
+
+    /** The game over {@link ScreenGraphTest#fight}: a fight that ends on Victory or Defeat, each after it. */
+    private static Game fight(String on) {
+        return new Game(on, ScreenGraph.of(ScreenGraphTest.fight()));
+    }
+
+    @Test
+    void nextReturnsTheScreenThatFollowsOnItsOwn() {
+        Game game = fight("BATTLE");
+        game.popup = "OFFER";
+        game.timeline.put(12_000L, "DEFEAT");
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        assertEquals(Optional.of("DEFEAT"), walk.next("BATTLE"));
+        assertTrue(game.now >= 12_000 && game.now < 30_000, "waited past a step's time: " + game.now);
+        assertEquals(List.of("click close_x"), game.done, "a popup over it is closed");
+        assertEquals(Optional.empty(), walk.next("DEFEAT"), "nothing follows a result");
+    }
+
+    @Test
+    void nextIsEmptyAfterItsLoads() {
+        Game game = fight("BATTLE");
+        assertEquals(Optional.empty(), new ScreenWalk(game.map, game, STEP_MS, null).next("BATTLE"));
+        assertTrue(game.now >= 30_000 && game.now < 31_000, "looked for as long as it loads: " + game.now);
+    }
+
+    @Test
+    void aReadoutIsReadOnlyWhileItsScreenShows() {
+        Game game = new Game("HOME", ScreenGraph.of(ScreenGraphTest.fight())) {
+            @Override
+            public Optional<String> readout(Readout readout, BufferedImage frame) {
+                return Optional.of("1,250");
+            }
+        };
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        assertEquals(Optional.of("1,250"), walk.read("HOME", "gold"));
+        assertEquals(Optional.empty(), walk.read("HOME", "silver"), "no such readout");
+        game.screen = "BATTLE";
+        assertEquals(Optional.empty(), walk.read("HOME", "gold"), "its screen is not shown");
+        assertEquals(List.of(), game.done, "nothing walked to");
     }
 
     @Test
