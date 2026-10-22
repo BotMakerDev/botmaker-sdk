@@ -86,6 +86,8 @@ import java.util.function.Function;
  */
 final class ScreenCanvas {
 
+    /** A card's own node: a click on it, in the full window, shows its screen big. */
+    static final String CARD_VIEW = "screen-card-view";
     static final String SHEET = Objects.requireNonNull(ScreenCanvas.class.getResource("screens.css")).toExternalForm();
 
     private static final double THUMB = 52;
@@ -158,11 +160,7 @@ final class ScreenCanvas {
         graph.setRules(Routes.Rules.DEFAULT.with(Loops.THROUGH));
         // ELK's first layout loads its classes, most of a second: done off the FX thread as the window opens.
         Thread.ofVirtual().name("elk-warm").start(ElkLayout::warm);
-        graph.setOnOpen(card -> {
-            // A screen with nothing below it has nothing to fold.
-            if (!folded.remove(card.constant()) && !below(card.constant()).isEmpty()) folded.add(card.constant());
-            redraw();
-        });
+        graph.setOnOpen(card -> fold(card.constant()));
         // A card picked while folded away (by Find, a run, an input opening it): the folds above it open.
         graph.selectedProperty().addListener((o, was, is) -> {
             // Only a new pick: a redraw handing back the same screen's new card leaves a fold the user just made.
@@ -400,6 +398,26 @@ final class ScreenCanvas {
         light();
     }
 
+    /**
+     * Folds away what {@code constant}'s entrances open, or unfolds it: a double-click on its card, or its right-click
+     * menu in the full window, where a click shows the screen big.
+     */
+    void fold(String constant) {
+        // A screen with nothing below it has nothing to fold.
+        if (!folded.remove(constant) && !below(constant).isEmpty()) folded.add(constant);
+        redraw();
+    }
+
+    /** Whether {@code constant} is folded: its menu offers Unfold. */
+    boolean isFolded(String constant) {
+        return folded.contains(constant);
+    }
+
+    /** Whether {@code constant} is folded or has something below it to fold: its menu offers Fold or Unfold. */
+    boolean canFold(String constant) {
+        return folded.contains(constant) || !below(constant).isEmpty();
+    }
+
     /** The screens the tree opens from {@code constant}: its entrances' ends. */
     private List<String> below(String constant) {
         return links.stream().filter(l -> l.entrance() && l.from().equals(constant)).map(Link::to).toList();
@@ -516,11 +534,12 @@ final class ScreenCanvas {
         if (folded.contains(card.constant())) badges.getChildren().add(badge("⊕", MapGuide.FOLDED));
 
         StackPane view = new StackPane(halo, face, badges);
-        view.getStyleClass().add("screen-card-view");
+        view.getStyleClass().add(CARD_VIEW);
         StackPane.setAlignment(badges, Pos.TOP_RIGHT);
         StackPane.setMargin(halo, new Insets(-5));
         Tooltip.install(view, new Tooltip(card.name() + " — Screens." + card.constant() + "\n" + card.tried() + " of "
-                + card.inputs() + " inputs tried. Double-click to fold what is below it."));
+                + card.inputs() + " inputs tried. Its right-click menu folds what is below it (in the overlay's "
+                + "pane, a double-click)."));
         // The canvas builds a card again whenever it lays out (a theme switch too), so the old one's pulse is
         // stopped and the new one lit at once.
         FadeTransition was = pulses.put(card.constant(), pulse);

@@ -30,6 +30,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenDesk.Trying;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.map.MapGuide.Part;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
@@ -76,6 +77,9 @@ final class InputInspector {
 
         /** {@code work} run off the FX thread while {@code doing} is said, on {@code constant}'s card. */
         void run(String doing, String constant, Supplier<String> work);
+
+        /** A try of {@code constant}'s input run as {@link #run}: a screen it opens gets its marker cut started. */
+        void tryIt(String doing, String constant, Supplier<String> work);
 
         /** A picture's thumb. */
         Node thumb(String picture);
@@ -189,44 +193,26 @@ final class InputInspector {
         all.add(does(constant, field, input));
         switch (input) {
             case Button button -> {
-                all.add(heading("Pressed by"));
-                all.add(gesture(constant, field, button));
-                all.add(heading("Text field"));
-                all.add(typing(constant, field, button));
-                all.add(heading("Drag"));
-                all.add(drag(constant, field, button));
-                all.add(heading("Looks"));
-                all.add(looks(constant, field, button));
-                all.add(heading("Copies"));
-                all.add(copies(constant, field, button));
-                all.add(heading("Where"));
-                all.add(where(constant, field, button));
-                all.add(heading("Strip or tree"));
-                all.add(inGroup(constant, button));
+                all.add(PanelParts.of(Part.PRESSED_BY, input, gesture(constant, field, button)));
+                all.add(PanelParts.of(Part.TEXT_FIELD, input, typing(constant, field, button)));
+                all.add(PanelParts.of(Part.DRAG, input, drag(constant, field, button)));
+                all.add(PanelParts.of(Part.BUTTON_LOOKS, input, looks(constant, field, button)));
+                all.add(PanelParts.of(Part.COPIES, input, copies(constant, field, button)));
+                all.add(PanelParts.of(Part.WHERE, input, where(constant, field, button)));
+                all.add(PanelParts.of(Part.GROUP, input, inGroup(constant, button)));
             }
-            case Hotkey hotkey -> {
-                all.add(heading("Keys"));
-                all.add(key(constant, field, hotkey));
-            }
-            case TextButton words -> {
-                all.add(heading("Words"));
-                all.add(words(words));
-            }
+            case Hotkey hotkey -> all.add(PanelParts.of(Part.KEYS, input, key(constant, field, hotkey)));
+            case TextButton words -> all.add(PanelParts.of(Part.WORDS, input, words(words)));
             case Strip strip -> {
-                all.add(heading("Members"));
-                all.add(members(constant, field, strip));
-                all.add(heading("Scroll"));
-                all.add(scroll(constant, field, strip));
+                all.add(PanelParts.of(Part.MEMBERS, input, members(constant, field, strip)));
+                all.add(PanelParts.of(Part.STRIP_SCROLL, input, scroll(constant, field, strip)));
             }
             case Tree tree -> {
-                all.add(heading("Nodes"));
-                all.add(nodes(constant, field, tree));
-                all.add(heading("Scroll"));
-                all.add(treeScroll(constant, field, tree));
+                all.add(PanelParts.of(Part.NODES, input, nodes(constant, field, tree)));
+                all.add(PanelParts.of(Part.TREE_SCROLL, input, treeScroll(constant, field, tree)));
             }
         }
-        all.add(heading("Try"));
-        all.add(trying(constant, row, input));
+        all.add(PanelParts.of(Part.TRY, input, trying(constant, row, input)));
         all.forEach(node -> node.setDisable(busy));
         return all;
     }
@@ -1329,7 +1315,7 @@ final class InputInspector {
                     byCopy && copy.getValue() > 0 ? copy.getValue() : null, settle.getValue(), stay.isSelected());
             AgentContext context = panel.tryContext();
             boolean towardStart = back.isSelected();
-            panel.run("Trying " + row.label() + "…", constant, () -> input instanceof Tree tree
+            panel.tryIt("Trying " + row.label() + "…", constant, () -> input instanceof Tree tree
                     ? ScreenDesk.measureTree(context, constant, tree, towardStart)
                     : ScreenDesk.tryInput(context, constant, input, how));
         });
@@ -1429,12 +1415,6 @@ final class InputInspector {
         HBox line = new HBox(8, nodes);
         line.setAlignment(Pos.CENTER_LEFT);
         return line;
-    }
-
-    private static Label heading(String text) {
-        Label heading = new Label(text);
-        heading.getStyleClass().add("screen-panel-subheading");
-        return heading;
     }
 
     private static Label text(String text) {

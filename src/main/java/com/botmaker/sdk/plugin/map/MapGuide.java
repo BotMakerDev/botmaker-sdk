@@ -2,6 +2,8 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Input;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -46,7 +48,82 @@ final class MapGuide {
 
     // --- a card's badges ---
     static final String LOCKED = "Every way in is locked on this account";
-    static final String FOLDED = "Folded: double-click to unfold";
+    static final String FOLDED = "Folded: Unfold in its right-click menu, or double-click it in the overlay's pane";
+
+    // --- the toolbar's ▶▶ ---
+    static final String NEXT_UNTRIED = "Pick the next input to try, on the screen Discovery explores next, and show "
+            + "it big: ▶ Try then tries it";
+
+    /**
+     * A part of the side panel or of the picked input's editors, each with a line always shown under its title saying
+     * what it is for. A part folds; those the input's kind needs open at first, the rest folded, and each then stays
+     * as it was last left on this computer ({@link PanelParts}).
+     */
+    enum Part {
+        MARKERS("Markers", "What tells this screen apart: pictures that all show on it, pictures it never shows, "
+                + "words it reads."),
+        INPUTS("Inputs", "Everything pressed on it: buttons, hotkeys, strips, trees. ▶ tries one, ⋯ edits it, a "
+                + "click on its box on the board picks it."),
+        WAYS_IN("Ways in", "Each input of another screen that opens this one; the first is how it was found."),
+        SCREEN_LOOKS("Looks", "Other looks of the whole screen, an event's skin: each shows only while its method "
+                + "says so."),
+        WAY_BACK("Way back", "What a walk presses to leave it: its own input, else a close button, then Escape."),
+        OWES("Owes", "What is left to cut or try here, as Discovery noted it."),
+        NOTES("Notes", "Your notes on it: what it spends and earns, its timers, its quirks."),
+        PRESSED_BY("Pressed by", "How the run presses it: a click, a double or right click, a hold, a hover."),
+        TEXT_FIELD("Text field", "A field the run types into: the words typed, the field cleared first, Enter "
+                + "after."),
+        DRAG("Drag", "Dragged rather than clicked: onto a picture or into a zone, over a time."),
+        BUTTON_LOOKS("Looks", "Other pictures of this button and what each means: Disabled is never pressed, "
+                + "Selected tells a tab."),
+        COPIES("Copies", "When its picture shows more than once: which copy is pressed, and in what order."),
+        WHERE("Where", "Where it is found: at its own place, or beside another picture, or a grid of spots there."),
+        GROUP("Strip or tree", "Whether it is one button of a strip that scrolls, or a node of a tree."),
+        KEYS("Keys", "The key or combination pressed, and how long it is held."),
+        WORDS("Words", "The words it is known by, read in its zone."),
+        MEMBERS("Members", "The strip's buttons, in their order along it."),
+        STRIP_SCROLL("Scroll", "How the strip turns to bring a member into view: wheel notches or a drag, measured "
+                + "once."),
+        NODES("Nodes", "The tree's nodes, how they link and where their offsets place them."),
+        TREE_SCROLL("Scroll", "How the tree's view moves to reach a node out of view."),
+        TRY("Try", "Presses it on the game now and records what it did.");
+
+        private final String title;
+        private final String caption;
+
+        Part(String title, String caption) {
+            this.title = title;
+            this.caption = caption;
+        }
+
+        String title() {
+            return title;
+        }
+
+        String caption() {
+            return caption;
+        }
+
+        /**
+         * Whether it opens at first for {@code input} (null: a part of the screen's panel): a screen's markers and
+         * inputs; a button's press and looks, its field or drag when it is one; every part of a hotkey, words, a strip
+         * or a tree, which shows only for its own kind; and Try.
+         */
+        boolean opensFor(Input input) {
+            return switch (this) {
+                case MARKERS, INPUTS, PRESSED_BY, BUTTON_LOOKS, KEYS, WORDS, MEMBERS, STRIP_SCROLL, NODES,
+                     TREE_SCROLL, TRY -> true;
+                case TEXT_FIELD -> input instanceof Button button && button.isField();
+                case DRAG -> input instanceof Button button && button.isDrag();
+                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, COPIES, WHERE, GROUP -> false;
+            };
+        }
+
+        /** Whether it opens by what the button is, never as it was last left: its field, its drag. */
+        boolean followsKind() {
+            return this == TEXT_FIELD || this == DRAG;
+        }
+    }
 
     // --- the side panel ---
     static final String TRY_NEXT = "Try the next untried input, as the assistant's try_input does";
@@ -79,8 +156,6 @@ final class MapGuide {
     static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
     static final String ADD_HOTKEY = "A key this screen answers, noted untried";
     static final String ADD_STRIP = "A new strip of the screen's buttons in no strip or tree, ticked in order, and how "
-            + "it scrolls";
-    static final String ADD_TREE = "A new tree of the screen's buttons in no strip or tree, ticked in order, and how "
             + "it scrolls";
     static final String REPEATED = "The screen shows it more than once: a way and a run pick the copy they press";
     static final String CYCLES = "Each press shows its next look, the usual one first again after the last";
@@ -140,6 +215,7 @@ final class MapGuide {
                     new Entry("↶ ↷", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y): a map edit "
                             + "and a code edit are undone in the order they were made."),
                     new Entry("Tidy", null, TIDY + "."),
+                    new Entry("▶▶ Next untried", null, NEXT_UNTRIED + "."),
                     new Entry("⤓ PNG", null, PNG + "."),
                     new Entry("☰ Outline ▤ Panel", null, "Show or hide the outline and the side panel; this "
                             + "computer remembers which."),
@@ -205,8 +281,10 @@ final class MapGuide {
                     new Entry("⊕", null, FOLDED + "."),
                     new Entry("thick outline", null, "The screen a run is on now; a thin one, the screens it came "
                             + "through. A pulsing card is being tried."),
-                    new Entry("drag", null, "Moves a card; it keeps that place in the bot's Screens. Double-click "
-                            + "folds what is below it."))),
+                    new Entry("click", null, "Picks the screen and shows it big in the Screen tab, its panel on the "
+                            + "right."),
+                    new Entry("drag", null, "Moves a card; it keeps that place in the bot's Screens. Its right-click "
+                            + "menu folds what is below it (in the overlay's pane, a double-click)."))),
             new Section("Arrows", List.of(
                     new Entry("solid", null, "How each screen was found: its parent's input that opens it."),
                     new Entry("dashed", null, "Another way into a screen, or a way back; Other ways hides them."),
@@ -220,9 +298,11 @@ final class MapGuide {
                     new Entry("✂ Cut marker", null, CUT_MARKER + ". Markers lists them, and the pictures it never "
                             + "shows; ✕ takes one off."),
                     new Entry("＋ Marker from a picture…", null, ADD_MARKER + "."),
-                    new Entry("＋ Hotkey…", null, ADD_HOTKEY + "."),
-                    new Entry("＋ Strip… ＋ Tree…", null, ADD_STRIP + "; a tree's nodes the same, linked and placed in "
-                            + "its editor after."),
+                    new Entry("parts", null, "Each part says under its title what it is for, and folds by its "
+                            + "title; the parts an input's kind needs open at first, and each stays as you left it."),
+                    new Entry("＋ Hotkey…", null, "In ⋯ Screen: " + ADD_HOTKEY + "."),
+                    new Entry("＋ Strip… ＋ Tree…", null, "In ⋯ Screen: " + ADD_STRIP + "; a tree's nodes the same, "
+                            + "linked and placed in its editor after."),
                     new Entry("Ways in", null, "Each screen and input it is reached from; its ⋯ says when the way is "
                             + "open, or takes it off. The first is how it was found. ＋ After a screen, on its "
                             + "own…: " + ON_ITS_OWN + "."),
@@ -235,8 +315,9 @@ final class MapGuide {
                             + "screen its way in is on, shown inside it; The next screen shows within…, how long a "
                             + "walk waits on it for the screen after it; retake the "
                             + "shot; add pictures the bot has; a new screen from here; not a screen, when its way in "
-                            + "only changes the screen above; delete. A card's right-click opens the same menu."),
-                    new Entry("the shot", null, "Click it to see it big in the Screen tab; click a box to pick its "
+                            + "only changes the screen above; delete; ＋ Hotkey, ＋ Strip, ＋ Tree. A card's "
+                            + "right-click opens the same menu, with Fold."),
+                    new Entry("the shot", null, "On the Screen tab, big: click a box to pick its "
                             + "input. A picture shows ← to go back to its screen. Each box is where its "
                             + "picture is on the shot; a dashed one is away from its picture's place (placed again "
                             + "while the game shows the screen, it gets a copy of its own there); one not on the shot "

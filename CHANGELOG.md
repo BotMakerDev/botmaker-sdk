@@ -21,6 +21,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Screens by hand, smoother**:
+  - A screen clicked on the graph shows big on the Screen tab at once. The side panel no longer repeats its shot;
+    folding what is below a screen moved to the card's right-click menu.
+  - **▶▶ Next untried** in the toolbar picks the next input to try, as Discovery goes, and shows it big.
+  - The side panel and the input editors are parts that fold, each with a line saying what it is for. Only those
+    the input's kind needs open at first; each stays as you left it. ＋ Hotkey, ＋ Strip and ＋ Tree moved into
+    ⋯ Screen.
+  - The cut form asks first what a cut is for: it tells the screen, it acts, or it reads or fixes. Each cut gets a
+    suggested name, from the words OCR reads on it, else `<screen>_<kind>_<n>`.
+  - A ▶ Try that opens a new screen shows that screen big and starts cutting its marker.
+  - An empty map says where to start: ● Live, then ❄ Freeze on the game's first screen.
+
 - **Text fields on the map**: a button that types once clicked, `Button.of(Pictures.SEARCH).types(Texts.GUILD)`,
   `.clears()` and `.submits()`. Its text is a constant of the bot's new `Texts` class (`Words.of("Dragons")`), so
   `Navigate.to` walks through it typing it; `.typed()` leaves the text to the body, `Navigate.type(Screens.GUILD.search,

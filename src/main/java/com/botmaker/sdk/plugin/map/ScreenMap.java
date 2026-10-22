@@ -23,6 +23,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
@@ -33,6 +34,8 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -155,6 +158,19 @@ public final class ScreenMap {
             screenTab.selectedProperty().addListener((o, was, is) -> {
                 if (!is) panel.boardHidden();
             });
+            // A card clicked shows its screen big at once (the user's call, 2026-10-22); a drag, a Ctrl or Shift pick
+            // and a double-click's second click do not. Folding is in the card's right-click menu. A filter: the
+            // card takes its click; the tab comes up once it picked itself.
+            canvas.graph().addEventFilter(MouseEvent.MOUSE_CLICKED, click -> {
+                if (click.getButton() != MouseButton.PRIMARY || click.getClickCount() != 1
+                        || !click.isStillSincePress() || click.isControlDown() || click.isShiftDown()
+                        || click.isMetaDown() || !onCard(click)) {
+                    return;
+                }
+                Platform.runLater(() -> {
+                    if (canvas.graph().selectedProperty().get() != null) tabs.getSelectionModel().select(screenTab);
+                });
+            });
             split = new SplitPane(outline.node(), tabs);
             split.setDividerPositions(OUTLINE_SHARE);
             SplitPane.setResizableWithParent(outline.node(), false);
@@ -167,7 +183,8 @@ public final class ScreenMap {
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
-            // A screen picked, on the map or through an input that opens it: the panel shows its shot, inputs boxed.
+            // A screen picked, on the map or through an input that opens it: the board shows its shot, inputs boxed,
+            // and the panel what it is and does.
             if (panel != null) panel.show(graph, selected);
             if (outline != null) outline.select(selected);
         });
@@ -585,7 +602,10 @@ public final class ScreenMap {
             Button whole = new Button("⛶");
             whole.setTooltip(new Tooltip(MapGuide.FULL_SCREEN));
             whole.setOnAction(e -> fullScreen());
-            bar.getChildren().addAll(tidy, png, outlineShown, panelShown, whole);
+            Button next = new Button("▶▶ Next untried");
+            next.setTooltip(new Tooltip(MapGuide.NEXT_UNTRIED));
+            next.setOnAction(e -> nextUntried());
+            bar.getChildren().addAll(next, tidy, png, outlineShown, panelShown, whole);
         } else {
             Button open = new Button("🗺 Open");
             open.setTooltip(new Tooltip(MapGuide.OPEN));
@@ -597,6 +617,36 @@ public final class ScreenMap {
         bar.setPadding(new Insets(8, 10, 8, 10));
         bar.getStyleClass().add("screen-map-bar");
         return bar;
+    }
+
+    /**
+     * ▶▶: the next input to try, as Discovery goes ({@link ScreenGraph#nextToExplore}, then its first untried input),
+     * picked and shown big, so ▶ Try in the panel tries it. A screen with nothing cut is shown for its cut.
+     */
+    private void nextUntried() {
+        Optional<String> next = graph.nextToExplore();
+        if (next.isEmpty()) {
+            tell(graph.screens().isEmpty() ? "No screen yet: ● Live, then ❄ Freeze on the game's first screen."
+                    : "Nothing is left to try: every screen reached has each of its inputs tried.");
+            return;
+        }
+        String constant = next.get();
+        String field = graph.untried(constant).stream().findFirst().orElse(null);
+        canvas.select(constant);
+        panel.pickInput(field);
+        inputPicked(constant, field);
+        tabs.getSelectionModel().select(screenTab);
+        tell(field == null ? graph.shown(constant) + " has nothing cut yet: ✂ Cut inputs on it."
+                : "Next to try: " + graph.shown(constant) + " · " + field + ". ▶ Try it in the panel.");
+    }
+
+    /** Whether {@code click} fell on a card of the graph, not on a button of it, a link or the empty canvas. */
+    private static boolean onCard(MouseEvent click) {
+        for (Node at = click.getPickResult().getIntersectedNode(); at != null; at = at.getParent()) {
+            if (at instanceof ButtonBase) return false;
+            if (at.getStyleClass().contains(ScreenCanvas.CARD_VIEW)) return true;
+        }
+        return false;
     }
 
     /** Tidy, after asking: no card keeps a corner of its own. */

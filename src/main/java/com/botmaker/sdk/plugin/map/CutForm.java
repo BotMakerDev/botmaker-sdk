@@ -41,9 +41,12 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -57,32 +60,70 @@ import java.util.stream.Stream;
  */
 final class CutForm {
 
-    /** What a cut is, as the form offers it. */
-    enum Kind {
-        MARKER("Its marker"),
-        MORE_MARKER("One more marker"),
-        ABSENT("A picture it never shows"),
-        BUTTON("A button"),
-        BACK("Its way back"),
-        LOOK("Another look of a button"),
-        SCREEN_LOOK("A look of the screen"),
-        STRIP("A button of a strip"),
-        TREE("A node of a tree"),
-        ZONE("An area (Zones)"),
-        TEXT_MARKER("Words that tell it"),
-        TEXT_BUTTON("A button known by its words"),
-        SPOT("A spot beside a picture, or its grid"),
-        DIGITS("Digits of a number"),
-        RECUT("A new image for a picture");
+    /**
+     * What a cut is for, the form's first choice: the kinds split by it (2026-10-22: one list of fifteen kinds was the
+     * by-hand flow's hardest step).
+     */
+    enum Intent {
+        TELLS("Tells the screen"),
+        ACTS("Acts"),
+        READS("Reads or fixes");
 
         private final String displayName;
 
-        Kind(String displayName) {
+        Intent(String displayName) {
             this.displayName = displayName;
         }
 
         String displayName() {
             return displayName;
+        }
+
+        /** Its kinds, in the form's order. */
+        List<Kind> kinds() {
+            return Arrays.stream(Kind.values()).filter(k -> k.intent == this).toList();
+        }
+    }
+
+    /** What a cut is, as the form offers it, grouped by what it is for. */
+    enum Kind {
+        MARKER("Its marker", Intent.TELLS, "marker"),
+        MORE_MARKER("One more marker", Intent.TELLS, "marker"),
+        ABSENT("A picture it never shows", Intent.TELLS, "absent"),
+        TEXT_MARKER("Words that tell it", Intent.TELLS, "words"),
+        BUTTON("A button", Intent.ACTS, "button"),
+        BACK("Its way back", Intent.ACTS, "back"),
+        STRIP("A button of a strip", Intent.ACTS, "member"),
+        TREE("A node of a tree", Intent.ACTS, "node"),
+        TEXT_BUTTON("A button known by its words", Intent.ACTS, "words_button"),
+        SPOT("A spot beside a picture, or its grid", Intent.ACTS, "spot"),
+        LOOK("Another look of a button", Intent.READS, "look"),
+        SCREEN_LOOK("A look of the screen", Intent.READS, "screen_look"),
+        ZONE("An area (Zones)", Intent.READS, "zone"),
+        DIGITS("Digits of a number", Intent.READS, "number"),
+        RECUT("A new image for a picture", Intent.READS, "recut");
+
+        private final String displayName;
+        private final Intent intent;
+        private final String slug;
+
+        Kind(String displayName, Intent intent, String slug) {
+            this.displayName = displayName;
+            this.intent = intent;
+            this.slug = slug;
+        }
+
+        String displayName() {
+            return displayName;
+        }
+
+        Intent intent() {
+            return intent;
+        }
+
+        /** The kind in a suggested name: {@code home_button_3}. */
+        String slug() {
+            return slug;
         }
 
         /** Whether its name is a new picture's or constant's: a recut keeps the picture's. */
@@ -117,6 +158,10 @@ final class CutForm {
     private final Consumer<String> say;
     /** Why OK did not save, at the top of the form opened again. */
     private final Label wrong = new Label();
+    /** The bot's pictures' names: a recut's choices, and names a suggestion takes none of. */
+    private final List<String> pictures;
+    /** The bot's zones' constants, read once: a words' zone or a readout is saved as one. */
+    private final List<String> zones;
 
     /**
      * @param shown  the screen the frame shows, or the one the cut was asked for; null: none
@@ -146,11 +191,16 @@ final class CutForm {
         });
         screen.setPromptText("none: pictures on no screen");
         screen.setValue(shown);
+        Path resources = services.resourcesDir();
+        pictures = resources == null ? List.of() : TemplateLibrary.list(resources).stream()
+                .filter(f -> !TemplateLibrary.isUnmodifiedDefaultTemplate(f)).map(TemplateLibrary::baseName)
+                .sorted().toList();
+        zones = ScreenEdits.zones(services);
         GridPane grid = new GridPane(8, 8);
         for (int i = 0; i < cuts.size(); i++) {
             Line line = new Line(i + 1, frame, cuts.get(i), i == 0 ? first : Kind.BUTTON);
             lines.add(line);
-            grid.addRow(i, line.thumb, line.name, line.kind, line.details);
+            grid.addRow(i, line.thumb, line.name, line.intent, line.kind, line.details);
         }
         screen.getEditor().textProperty().addListener((o, was, is) -> lines.forEach(Line::fill));
         HBox top = new HBox(8, new Label("On the screen"), screen, new Label("Tags"), tags);
@@ -160,8 +210,9 @@ final class CutForm {
         wrong.setStyle("-fx-text-fill: -bm-severity-error;");
         wrong.managedProperty().bind(wrong.visibleProperty());
         wrong.setVisible(false);
-        body = new VBox(10, wrong, top, grid, hint("A name is lowercase with underscores: collect_button. The first marker "
-                + "replaces the screen's; a picture is watched still a second before it is saved when the game still "
+        body = new VBox(10, wrong, top, grid, hint("Each cut is named from the words on it, else as screen, kind and "
+                + "number: change any name, lowercase with underscores (collect_button). Say first what a cut is for: "
+                + "it tells the screen, it acts, or it reads or fixes. The first marker replaces the screen's; a picture is watched still a second before it is saved when the game still "
                 + "shows the frame. The cuts marked a new strip make one strip, in order, turning by the first one's "
                 + "notches; those marked a new tree, one tree."));
         if (cuts.size() > 1) {
@@ -274,6 +325,14 @@ final class CutForm {
         return typed == null ? null : graph.screens().get(typed);
     }
 
+    /** The names a suggestion for {@code line} must not take: the bot's pictures and zones, and the other cuts'. */
+    private Set<String> taken(Line line) {
+        Set<String> taken = new HashSet<>(pictures);
+        zones.forEach(zone -> taken.add(zone.toLowerCase(Locale.ROOT)));
+        lines.stream().filter(l -> l != line).forEach(l -> taken.add(TemplateLibrary.sanitizeName(l.name.getText())));
+        return taken;
+    }
+
     private static Label hint(String text) {
         Label label = new Label(text);
         label.setWrapText(true);
@@ -289,7 +348,8 @@ final class CutForm {
         private final Drawn drawn;
         private final ImageView thumb = new ImageView();
         private final TextField name = new TextField();
-        private final ComboBox<Kind> kind = new ComboBox<>(FXCollections.observableArrayList(Kind.values()));
+        private final ComboBox<Intent> intent = new ComboBox<>(FXCollections.observableArrayList(Intent.values()));
+        private final ComboBox<Kind> kind = new ComboBox<>();
         private final HBox details = new HBox(6);
         private final CheckBox popup = new CheckBox("a popup the game opens itself");
         private final CheckBox sometimes = new CheckBox("shows only at times");
@@ -314,9 +374,12 @@ final class CutForm {
         /** A zone or a number read on the screen as a readout of the cut's name, and whether it names the subject. */
         private final CheckBox readout = new CheckBox("read on this screen");
         private final CheckBox subject = new CheckBox("names which one it shows");
-        /** The cut as drawn, read by OCR the first time it is made words; null when it is off the frame. */
+        /** The cut as drawn, read by OCR once; null when it is off the frame. */
         private final BufferedImage image;
-        private boolean read;
+        /** The words OCR read on it, its first line; null until read, or when nothing was. */
+        private String words;
+        /** The name last suggested: the name field still holding it takes the next suggestion. */
+        private String suggested = "";
 
         Line(int index, BufferedImage frame, Drawn drawn, Kind first) {
             this.index = index;
@@ -329,10 +392,22 @@ final class CutForm {
             thumb.setFitWidth(Math.min(72, drawn.box().width()));
             thumb.setFitHeight(48);
             name.setPromptText(index + ": its name");
+            intent.setButtonCell(cell(Intent::displayName));
+            intent.setCellFactory(list -> cell(Intent::displayName));
+            intent.setValue(first.intent());
+            kind.getItems().setAll(first.intent().kinds());
             kind.setButtonCell(kindCell());
             kind.setCellFactory(list -> kindCell());
             kind.setValue(first);
-            kind.valueProperty().addListener((o, was, is) -> fill());
+            // What it is for first, then which kind of that: another intent offers its own kinds, its first picked.
+            intent.valueProperty().addListener((o, was, is) -> {
+                if (is == null || is == was) return;
+                kind.getItems().setAll(is.kinds());
+                if (!is.kinds().contains(kind.getValue())) kind.setValue(is.kinds().getFirst());
+            });
+            kind.valueProperty().addListener((o, was, is) -> {
+                if (is != null) fill();
+            });
             state.setValue(State.DISABLED);
             look.setPromptText("the look's name: Halloween");
             anchor.setValue(Anchor.CENTER);
@@ -348,10 +423,7 @@ final class CutForm {
             gesture.setCellFactory(list -> cell(Gesture::displayName));
             gesture.setValue(Gesture.CLICK);
             gesture.setTooltip(new Tooltip(MapGuide.GESTURE));
-            Path resources = services.resourcesDir();
-            picture.getItems().setAll(resources == null ? List.of() : TemplateLibrary.list(resources).stream()
-                    .filter(f -> !TemplateLibrary.isUnmodifiedDefaultTemplate(f)).map(TemplateLibrary::baseName)
-                    .sorted().toList());
+            picture.getItems().setAll(pictures);
             picture.setPromptText("the picture");
             beside.setPromptText("its anchor");
             beside.setTooltip(new Tooltip(MapGuide.SPOT));
@@ -361,6 +433,7 @@ final class CutForm {
             subject.disableProperty().bind(readout.selectedProperty().not());
             details.setAlignment(Pos.CENTER_LEFT);
             fill();
+            readWords();
         }
 
         Kind kind() {
@@ -370,6 +443,7 @@ final class CutForm {
         /** A button, or a member of a strip or tree, made a member of a new one: {@code as} a strip or a tree. */
         void join(Kind as) {
             if (kind() != Kind.BUTTON && kind() != Kind.STRIP && kind() != Kind.TREE) return;
+            intent.setValue(as.intent());
             kind.setValue(as);
             group.setValue(NEW);
         }
@@ -407,16 +481,33 @@ final class CutForm {
                 case RECUT -> List.of(picture);
                 case ABSENT, BACK -> List.of();
             });
-            if (kind() == Kind.TEXT_MARKER || kind() == Kind.TEXT_BUTTON) readWords();
+            showWords();
+            suggest();
+        }
+
+        /** A name suggested ({@link CutNames}) while the field is empty or still holds the one suggested last. */
+        private void suggest() {
+            if (!kind().named()) return;
+            String now = name.getText();
+            if (!now.isBlank() && !now.equals(suggested)) return;
+            suggested = CutNames.suggest(words, screenTyped(), kind(), taken(this));
+            name.setText(suggested);
+        }
+
+        /** The words read put in {@code reads}, for words that tell the screen or press, unless typed there first. */
+        private void showWords() {
+            if (words != null && (kind() == Kind.TEXT_MARKER || kind() == Kind.TEXT_BUTTON)
+                    && reads.getText().isBlank()) {
+                reads.setText(words);
+            }
         }
 
         /**
-         * The words the cut shows, read once by OCR off the FX thread, as the run reads them: the first line, put in
-         * {@code reads} unless the user typed there first. Nothing is put when OCR cannot read it.
+         * The words the cut shows, read once by OCR off the FX thread, as the run reads them: the first line, its name
+         * suggested from, and put in {@code reads}. Nothing is put when OCR cannot read it.
          */
         private void readWords() {
-            if (read || image == null) return;
-            read = true;
+            if (image == null) return;
             WORDS.execute(() -> {
                 String said;
                 try {
@@ -425,8 +516,11 @@ final class CutForm {
                     return;
                 }
                 String first = said.lines().map(String::strip).filter(l -> !l.isEmpty()).findFirst().orElse("");
+                if (first.isEmpty()) return;
                 Platform.runLater(() -> {
-                    if (reads.getText().isBlank()) reads.setText(first);
+                    words = first;
+                    showWords();
+                    suggest();
                 });
             });
         }

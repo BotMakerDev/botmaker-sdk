@@ -1,11 +1,18 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Typing;
+import com.botmaker.sdk.api.text.Words;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.plugin.map.MapGuide.Part;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MapGuideTest {
@@ -35,6 +42,28 @@ class MapGuideTest {
                 "Result", "Information only", "Comes and goes", "Never…", "Locked by…", "Use as the way back", "solid", "dashed")) {
             assertTrue(signs.contains(sign), sign);
         }
+    }
+
+    @Test
+    void everyPartSaysWhatItIsFor() {
+        for (Part part : Part.values()) {
+            assertFalse(part.title().isBlank(), part.name());
+            assertTrue(part.caption().length() > 20, part.name());
+        }
+    }
+
+    @Test
+    void thePartsAnInputsKindNeedsOpenFirst() {
+        Button plain = MapFixtures.click("buy");
+        List<Part> open = Arrays.stream(Part.values()).filter(p -> p.opensFor(plain)).toList();
+        assertTrue(open.containsAll(List.of(Part.PRESSED_BY, Part.BUTTON_LOOKS, Part.TRY)), open.toString());
+        for (Part folded : List.of(Part.TEXT_FIELD, Part.DRAG, Part.COPIES, Part.WHERE, Part.GROUP)) {
+            assertFalse(folded.opensFor(plain), folded.name());
+        }
+        assertTrue(Part.TEXT_FIELD.opensFor(plain.typing(new Typing(Words.of("Dragons"), true, false))), "a field");
+        assertTrue(Part.MARKERS.opensFor(null) && Part.INPUTS.opensFor(null), "a screen's");
+        assertFalse(Part.NOTES.opensFor(null) || Part.WAY_BACK.opensFor(null), "a screen's rarer parts");
+        assertTrue(Part.TEXT_FIELD.followsKind() && Part.DRAG.followsKind() && !Part.COPIES.followsKind());
     }
 
     @Test

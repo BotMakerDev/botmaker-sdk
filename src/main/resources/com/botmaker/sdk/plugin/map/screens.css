@@ -390,12 +390,27 @@
     -fx-padding: 4 0 0 0;
 }
 
-/* A part of the picked input's editors (InputInspector): its looks, its copies, its key, ▶ Try. */
-.screen-panel-subheading {
-    -fx-font-size: 0.78em;
+/* A part of the side panel or of the picked input's editors (PanelParts): folded by its title, its caption under it. */
+.screen-part > .title {
+    -fx-background-color: transparent;
+    -fx-padding: 4 0 2 0;
+}
+
+.screen-part > .title > .text {
+    -fx-font-size: 0.82em;
     -fx-font-weight: bold;
+    -fx-fill: -bm-screen-plain;
+}
+
+.screen-part > .content {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 2 0 6 14;
+}
+
+.screen-part-caption {
+    -fx-font-size: 0.86em;
     -fx-text-fill: -bm-screen-plain;
-    -fx-padding: 2 0 0 0;
 }
 
 /* A sign the guide explains, where it is a word or a symbol rather than a pill (MapGuide). */

@@ -274,8 +274,16 @@ map tool against the hand path that covers it, and fails on one with none.
   says "panel of Home".
 - **The window** hides the outline (☰) or the panel (▤), remembered per computer, and ⛶/F11 makes it full screen.
 - **The board** (`ScreenBoard`, the Screen tab): the picked screen's shot as big as the tab, each input's cut boxed,
-  its markers in their own colour; a box clicked picks its input. `ScreenPanel` beside it is the inspector: the
-  picked input first, else the screen's markers, looks (each one's `when`), ways in, way back and notes.
+  its markers in their own colour; a box clicked picks its input. A card clicked on the graph brings this tab up at
+  once (`ScreenMap`, a still primary click on `ScreenCanvas.CARD_VIEW`), so folding is in the card's right-click menu
+  (`ScreenCanvas.fold`; the overlay's pane keeps the double-click). `ScreenPanel` beside it is the inspector, with
+  no shot of its own: the picked input first, else the screen's markers, looks (each one's `when`), ways in, way
+  back and notes. Each of those, and each part of the input inspector, is a `PanelParts` pane: folded by its
+  title, its caption (`MapGuide.Part`) always under it, open at first when the input's kind needs it
+  (`Part.opensFor`) and then as this computer last left it. ＋ Hotkey, ＋ Strip and ＋ Tree are in ⋯ Screen.
+  **▶▶ Next untried** picks `ScreenGraph.nextToExplore`'s first untried input and shows it big. A ▶ Try that adds a
+  screen owing its marker picks it, shows it big and starts its marker cut (`ScreenPanel.cutOpened`, once the map is
+  read again after the try).
   **Leads to…** records a way into a screen already mapped (`ScreenEdits.addWay`, `MapEdits.AddWay` for the tools).
 - **Live** (`LiveBoard`): the game read on a platform thread of its own, paced on the clock at up to 60 frames a
   second, straight into one of four reused images (`LiveImage`, each a `PixelBuffer`, swapped as a swap chain), and
@@ -296,7 +304,10 @@ map tool against the hand path that covers it, and fails on one with none.
 - **Cuts on the frozen frame** (`CutLayer`, `CutForm`, `assist/BoardCuts`): a box, an oval or a polygon drawn on the
   board, ▨ the part a run skips, then each cut said what it is — a marker (set, add or absent), a button, the way
   back, a look of a button or of the screen, a strip's button, a zone (`save_region`), digits (`save_digits`) or a
-  new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The pixels are the frame's,
+  new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The kinds are offered by
+  what a cut is for (`CutForm.Intent`: tells the screen, acts, reads or fixes), and each cut's name is suggested
+  (`CutNames`): the words OCR reads on it, else `<screen>_<kind>_<n>`, taken by no picture, zone or other cut, and
+  replaced while the field still holds it. The pixels are the frame's,
   never grabbed again. ✂'s ▾ keeps the cut over the game window (`CaptureTemplates`) as a fallback. An object cut
   (the magic wand) is not on the board: crop_pictures has no shape for it.
   - A free shape closes on a click on its first corner, ✓ Close shape, a double-click or Enter; a drawn cut is

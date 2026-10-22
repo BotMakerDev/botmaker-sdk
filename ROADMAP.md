@@ -102,9 +102,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     or reaches it, and never again (a slower later show does not raise it); a walk's own steps measure nothing; no
     hand editor sets it in 🗺 (it is written in `Screens.java`); a way back costs the screen it returns to, the same
     whichever input closes.
-  - The by-hand flow (after the owed click-tests): "next untried" in the window, suggested cut names, the cut form
-    split by intent, Try that freezes the opened screen and starts its marker cut, an empty map instead of the
-    template's placeholder Home.
+  - The by-hand flow, past its first cut (2026-10-22): the input editors' rarer actions stay in their parts (folded,
+    not in a ⋯); a suggested name is the cut form's only, crop_pictures still takes the assistant's; the gamebot
+    template's map keeps its placeholder Home until the template is retired (botmaker-cli's ROADMAP); a part's fold
+    is remembered per computer, not per project; a Try that opens a screen it is told the name of starts the marker
+    cut, one that lands on an unknown screen with no name still writes nothing.
   - Scale: a parse cached by file hash (a 45-screen read takes ~1 s).
 - **A run whose saved window is missing re-matches by the launch's pids** (launch-target plan 2026-10-19, not
   built): Launch and pick saves the window by class (+ title when generic); a run that launched the game and finds no
