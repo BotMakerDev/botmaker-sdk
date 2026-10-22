@@ -97,15 +97,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - A read that only moved cards pins them on the canvas as they are; before, every card was built again.
   - Scrolling no longer asks whether the tree should turn: only a resize does.
   - The canvas's own changes (grid, link paths, scaling while moving) are in the toolkit's changelog.
-- **🗺 Screens shows the work, not a tree**:
-  - The map is laid out in ranks from the first screen by every way between screens, not by the entrances alone.
-    A screen sits after every screen that opens it, and each rank is ordered to cross fewer ways.
-  - A way back runs back through the ranks it crosses, out of its screen's near side and into the far side of the
-    screen it returns to. Before, every way that was no entrance wrapped around the whole map.
-  - A way within one rank hooks beside it.
+- **🗺 Screens shows the work, not a tree, laid out by ELK** (`plugin.map.ElkLayout`):
+  - The map is laid out by ELK's layered algorithm, in ranks from the first screen, by every way between screens,
+    not by the entrances alone. The entrances weigh most, so they set the ranks, and each rank is ordered to cross
+    fewer ways.
+  - Every way is routed by ELK too, square and clear of the cards. A way back runs back against the entrances
+    instead of wrapping around the whole map, and two ways between the same screens each have their own path.
+  - A card moved by hand keeps its ways routed by the canvas, as before. So do the ways to and from popups.
+  - Popups, and screens no way reaches, are packed beside the rest.
   - The map still turns to fit the window, folds the screens a screen's entrances open, and keeps cards moved by
-    hand. Popups, and screens no way reaches, still sit in a grid below.
-  - ELK was weighed and not taken. It would have brought EMF and Guava, 8.4 MB, into every bot.
+    hand. Should ELK fail on a map, the toolkit's layered layout places it instead.
+  - A layout costs 55 to 75 ms both ways on a map of 45 screens and 160 ways, so the same cards and ways are not
+    laid out again on a redraw, and ELK is warmed off the FX thread as the window opens.
+  - **The SDK depends on ELK 0.12.0 at `compile`**, with EMF, Xbase's runtime library and Guava (pinned
+    33.7.2-jre). Every bot carries about 8.5 MB more: the user's call (2026-10-22).
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

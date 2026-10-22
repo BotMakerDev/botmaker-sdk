@@ -205,6 +205,29 @@
             <version>0.21.0</version>
         </dependency>
 
+        <!-- ELK's layered layout: 🗺 Screens lays the map out by it (plugin.map.ElkLayout). At `compile`, so every
+             bot carries it with EMF and Guava, about 8.4 MB: the user's call (2026-10-22), over the toolkit's own
+             layout. The toolkit itself stays without it. -->
+        <dependency>
+            <groupId>org.eclipse.elk</groupId>
+            <artifactId>org.eclipse.elk.alg.layered</artifactId>
+            <version>0.12.0</version>
+        </dependency>
+        <!-- Xbase's runtime library, which ELK's classes call and its poms leave out (its OSGi manifest asks for the
+             bundle instead): without it ELK's options fail to load. -->
+        <dependency>
+            <groupId>org.eclipse.xtext</groupId>
+            <artifactId>org.eclipse.xtext.xbase.lib</artifactId>
+            <version>2.44.0</version>
+        </dependency>
+        <!-- Guava pinned: ELK's graph asks for the range [15.0,), which Maven resolves to whatever is newest the day a
+             build runs, and offline to whichever ~/.m2 happens to hold. -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>33.7.2-jre</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

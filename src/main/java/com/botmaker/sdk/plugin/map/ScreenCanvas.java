@@ -133,12 +133,19 @@ final class ScreenCanvas {
     private Direction direction = Direction.RIGHT;
     /** Where the last layout put each card, before any was moved by hand. */
     private Placement laid = new Placement(Map.of(), Set.of(), 0);
+    /** What the last layout was of, and what it gave each way. */
+    private Laid lastLaid;
+    private Map<Direction, Placement> lastEach = Map.of();
     private Consumer<Map<String, Point>> onMoved = moved -> {};
     /** How much bigger the other way must show the map before the map turns. */
     private static final double TURN = 1.15;
 
     /** How big a whole layout is. */
     record Shape(double width, double height) {}
+
+    /** What a layout is of: the measured cards shown, every way, and what is set apart, first or folded away. */
+    private record Laid(List<GraphLayout.Card> shown, List<ElkLayout.Way> ways, Set<String> popups, String root,
+                        Set<String> hidden) {}
 
     /** A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none). */
     ScreenCanvas(Path resources) {
@@ -147,6 +154,8 @@ final class ScreenCanvas {
         graph.getStylesheets().add(SHEET);
         graph.getStyleClass().add("screen-map");
         graph.setRules(Routes.Rules.DEFAULT.with(Loops.THROUGH));
+        // ELK's first layout loads its classes, most of a second: done off the FX thread as the window opens.
+        Thread.ofVirtual().name("elk-warm").start(ElkLayout::warm);
         graph.setOnOpen(card -> {
             // A screen with nothing below it has nothing to fold.
             if (!folded.remove(card.constant()) && !below(card.constant()).isEmpty()) folded.add(card.constant());
@@ -204,29 +213,43 @@ final class ScreenCanvas {
     }
 
     /**
-     * Every way laid out in ranks from the first screen, rightward and downward, keeping whichever shows bigger in the
-     * window (the user's call, 2026-10-15: Home's twenty screens made a column a wide window showed small). Not the
-     * entrances' tree alone: that hid the work, and drew every other way around the whole map (2026-10-22). The
-     * entrances come first so they make the ranks, and the ways back run back through them. A folded screen hides
-     * what its entrances open; popups, and screens no way reaches, sit in a grid below.
+     * Every way laid out by ELK in ranks from the first screen, rightward and downward, keeping whichever shows bigger
+     * in the window (the user's call, 2026-10-15: Home's twenty screens made a column a wide window showed small). Not
+     * the entrances' tree alone: that hid the work, and drew every other way around the whole map (2026-10-22). A
+     * folded screen hides what its entrances open; popups, and screens no way reaches, are packed beside the rest.
+     * Should ELK fail on a map, the toolkit's layered layout places it instead, with the ways back run through its
+     * ranks.
      *
-     * @param solid the entrances, which {@link #ways} lists already
+     * @param solid the entrances, which {@link #links} holds already
      */
     private Placement arrange(List<GraphLayout.Card> cards, List<GraphLayout.Link> solid) {
         Set<String> hidden = foldedAway(links, folded, root);
         List<GraphLayout.Card> shown = cards.stream().filter(c -> !hidden.contains(c.id())).toList();
         Set<String> popups = new HashSet<>();
         for (Card card : this.cards) if (card.popup()) popups.add(card.constant());
-        List<GraphLayout.Link> ways = ways(links, popups);
+        List<ElkLayout.Way> ways = links.stream()
+                .map(l -> new ElkLayout.Way(l.from(), l.to(), l.entrance(), l.back())).toList();
         List<String> roots = root == null ? List.of() : List.of(root);
-        Map<Direction, Placement> each = new EnumMap<>(Direction.class);
+        // ELK takes tens of milliseconds a map: a redraw of the same cards and ways (a picture, a run's light) lays
+        // nothing out again.
+        Laid key = new Laid(shown, ways, popups, root, hidden);
+        Map<Direction, Placement> each = key.equals(lastLaid) ? lastEach : new EnumMap<>(Direction.class);
         Map<Direction, Shape> sized = new EnumMap<>(Direction.class);
         for (Direction way : Direction.values()) {
-            Placement ranked = LayeredLayout.arrange(shown, ways, roots, way, GAPS, LayeredLayout.SWEEPS, Loops.THROUGH);
-            Placement placed = new Placement(ranked.at(), hidden, ranked.crossings());
-            each.put(way, placed);
-            sized.put(way, shape(placed, cards));
+            if (!each.containsKey(way)) {
+                Placement ranked;
+                try {
+                    ranked = ElkLayout.arrange(shown, ways, popups, root, way, GAPS);
+                } catch (RuntimeException | LinkageError e) {
+                    ranked = LayeredLayout.arrange(shown, ways(links, popups), roots, way, GAPS, LayeredLayout.SWEEPS,
+                            Loops.THROUGH);
+                }
+                each.put(way, new Placement(ranked.at(), hidden, ranked.crossings(), ranked.paths()));
+            }
+            sized.put(way, shape(each.get(way), cards));
         }
+        lastLaid = key;
+        lastEach = each;
         boolean first = shapes.isEmpty();
         shapes = Map.copyOf(sized);
         Bounds view = graph.viewportProperty().get();
@@ -238,8 +261,8 @@ final class ScreenCanvas {
     }
 
     /**
-     * The ways that place the cards, in the order the layout takes them: entrances, the other ways on, then the ways
-     * back. None to or from a screen in {@code apart} (the popups, which open over any screen).
+     * The ways that place the cards when ELK fails, in the order the toolkit's layout takes them: entrances, the other
+     * ways on, then the ways back. None to or from a screen in {@code apart} (the popups, which open over any screen).
      */
     static List<GraphLayout.Link> ways(List<Link> links, Set<String> apart) {
         List<GraphLayout.Link> ways = new ArrayList<>();
