@@ -187,6 +187,11 @@ final class ScreenBoard {
         if (cover == null) draw(false);
     }
 
+    /** The shot shown with the input of field {@code picked} picked on it (null: none), not drawn again. */
+    void repick(String picked) {
+        if (cover == null) holder.getChildren().forEach(drawn -> ScreenCanvas.repick(drawn, picked));
+    }
+
     /** Draws the shot again; {@code resized} only when its width changed. */
     private void draw(boolean resized) {
         double width = width();

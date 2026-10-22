@@ -52,7 +52,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 
 /**
@@ -317,7 +319,10 @@ public final class ScreenMap {
         subscriptions.add(services.runs().onStateChanged(running -> Platform.runLater(() -> canvas.setHere(null))));
         if (panel != null) {
             showHistory();
-            subscriptions.add(services.history().onChanged(() -> Platform.runLater(this::showHistory)));
+            subscriptions.add(services.history().onChanged(() -> Platform.runLater(() -> {
+                showHistory();
+                panel.historyChanged();
+            })));
         }
     }
 
@@ -382,19 +387,24 @@ public final class ScreenMap {
         long asked = ++reads;
         ScreensFile was = lastFile;
         boolean due = ++pollsSinceRead >= READ_ANYWAY;
+        // Asked of what is drawn now, answered off the FX thread: stating every shot and picture held it each poll.
+        BooleanSupplier cardFiles = canvas.filesCheck();
+        Supplier<ScreenPanel.Written> panelFiles = panel == null ? () -> null : panel.filesCheck();
         Thread.ofVirtual().name("screen-map-read").start(() -> {
             Optional<ScreensFile> file = ScreensFile.of(project, was == null ? null : was.file());
             if (!due && file.isPresent() && file.get().equals(was)) {
                 // Screens.java as it was: only a picture or shot rewritten since is drawn again.
+                boolean filesChanged = cardFiles.getAsBoolean();
+                ScreenPanel.Written seen = panelFiles.get();
                 Platform.runLater(() -> {
                     reading = false;
                     if (stopped || !stillOpen() || asked != reads) return;
-                    if (canvas.filesChanged()) {
+                    if (filesChanged) {
                         canvas.redraw();
                         // A shot retaken moves its screen to the top of Recent.
                         if (outline != null) outline.show(graph, cards, links);
                     }
-                    if (panel != null) panel.show(graph, selected);
+                    if (panel != null) panel.filesSeen(seen);
                 });
                 return;
             }

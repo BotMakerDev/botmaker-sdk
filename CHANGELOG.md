@@ -67,6 +67,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Four images in turn: the read never waits for a frame being drawn, nor writes one the render thread may still be
     uploading, and a frame not drawn in time is replaced by the next, never queued.
   - The line says both rates: "R fps read, S shown, M ms a read, D ms a draw".
+- **🗺 Screens picks an input without drawing the panel again**:
+  - A box clicked on a shot, or an input's line in the outline, now restyles the boxes on the panel's shot and the
+    board, and swaps the picked input's part of the panel.
+  - Before, each pick read every picture's cut again, rebuilt the whole panel and both shots, and matched the
+    screen's pictures over its shot again. A part picked before is kept until the panel is drawn again.
+  - Rows, stages and cuts are read once per read of the map and history step; cuts again when a picture is rewritten.
+  - The screen's pictures are matched over its shot again only when the screen, a cut or a file changed.
+  - The 1.5 s poll states the shots and pictures off the FX thread, and draws only when one was rewritten.
+  - Each draw writes its time to the log, `map panel: HOME drawn in 12.3 ms (cuts …, board …, panel …)` or
+    `… picked buy in …`.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

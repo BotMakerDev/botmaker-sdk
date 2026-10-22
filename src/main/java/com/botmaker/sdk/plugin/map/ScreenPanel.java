@@ -28,7 +28,9 @@ import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
+import com.botmaker.shared.Diag;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -54,6 +56,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -109,6 +112,35 @@ final class ScreenPanel {
     private final BiConsumer<String, String> inputPicked;
     /** The field of the selected screen's input picked on the board or the outline; null for none. */
     private String picked;
+    /** The input drawn picked: a pick restyles the shots' boxes and swaps the picked input's part, nothing else. */
+    private String pickedDrawn;
+    /** The panel's shot as drawn, whose boxes a pick restyles; null while it has none. */
+    private Node shotDrawn;
+    /** Where the picked input's row and editors go in the panel drawn. */
+    private final VBox pickedPart = new VBox(12);
+    /** The picked input's part as built, by field, while the panel drawn stands: picking one again builds nothing. */
+    private final Map<String, List<Node>> pickedBuilt = new HashMap<>();
+    /** When the selected screen's shot and its pictures were written, as last stated: a retake or a recut draws. */
+    private Written written;
+    /** Counts the shows that stated {@link #written}, and the count a poll's check was asked at. */
+    private long stated;
+    private long checkedAt;
+    /** History steps seen: a step may move a cut in {@code Pictures.java} with no screen changed. */
+    private long steps;
+    /** What the reads below are of: another map, or a history step, drops them. */
+    private ScreenGraph readOf;
+    private long readAt;
+    private final Map<String, List<Row>> rowsRead = new HashMap<>();
+    private final Map<String, Cuts> cutsRead = new HashMap<>();
+    private Map<String, String> stagesRead;
+    /** What each screen's audit was made from: a draw that changed none of it matches nothing again. */
+    private final Map<String, Object> audited = new HashMap<>();
+
+    /** When {@code constant}'s shot ({@code shot}) and each picture it uses ({@code pictures}) were written; 0: none. */
+    record Written(String constant, long shot, List<Long> pictures) {}
+
+    /** Where a screen's pictures were cut, read when they were written at {@code times}. */
+    private record Cuts(List<Long> times, Map<String, FrameCut> cuts) {}
 
     /**
      * @param changed     run once an action wrote the map, so the window reads it at once rather than at its next poll
@@ -151,6 +183,8 @@ final class ScreenPanel {
         root.viewportBoundsProperty().addListener((o, was, is) -> {
             if (was == null || Math.abs(was.getWidth() - is.getWidth()) >= 8) draw();
         });
+        pickedPart.managedProperty().bind(pickedPart.visibleProperty());
+        pickedPart.visibleProperty().bind(Bindings.isNotEmpty(pickedPart.getChildren()));
         draw();
     }
 
@@ -188,6 +222,8 @@ final class ScreenPanel {
             picked = null;
         }
         this.selected = now;
+        written = now == null ? null : written(graph, now);
+        stated++;
         draw();
     }
 
@@ -198,48 +234,114 @@ final class ScreenPanel {
         draw();
     }
 
+    /** A step of the bot's history was made, undone or redone: what was read of its code is read again. */
+    void historyChanged() {
+        steps++;
+    }
+
+    /**
+     * The selected screen's files, stated on any thread: asked on the FX thread, as the map shown has them; its answer
+     * goes to {@link #filesSeen}. Null for no screen.
+     */
+    Supplier<Written> filesCheck() {
+        ScreenGraph of = graph;
+        String constant = selected;
+        checkedAt = stated;
+        return () -> constant == null ? null : written(of, constant);
+    }
+
+    /**
+     * What {@link #filesCheck} found, at the 1.5 s poll: drawn again when the selected screen's shot or a picture of
+     * it was rewritten, or a history step may have moved a cut.
+     */
+    void filesSeen(Written seen) {
+        boolean stepped = readAt != steps;
+        // Stated before a show stated them again: older than what is drawn.
+        boolean fresh = checkedAt == stated;
+        if (fresh && seen != null && seen.constant().equals(selected) && !seen.equals(written)) written = seen;
+        else if (!stepped) return;
+        draw();
+    }
+
+    /** {@code constant}'s files' times, on any thread: a handful of stats. */
+    private Written written(ScreenGraph of, String constant) {
+        return new Written(constant, canvas.shotTime(constant), of.pictures(constant).stream()
+                .map(canvas::pictureTime).toList());
+    }
+
     /** A box clicked on a shot: its input picked, here, on the board and in the outline. */
     private void picked(String constant, Row row) {
         pickInput(row.field());
         inputPicked.accept(constant, row.field());
     }
 
+    /**
+     * Draws what changed: the board and the panel when the screen, its files or its audit did, else only the input
+     * picked, its boxes restyled and its part swapped (2026-10-22: a click rebuilt the whole panel and both shots).
+     */
     private void draw() {
+        long start = System.nanoTime();
+        reads();
         MapScreen at = selected == null ? null : graph.screens().get(selected);
         String notes = at == null || at.notes() == null ? "" : at.notes();
         Map<String, FrameCut> cuts = selected == null ? Map.of() : cutsOf(selected);
+        long cut = System.nanoTime();
         double width = shotWidth();
-        // Everything the board shows: the screen, its rows, where its inputs were cut and are found on its shot, when
-        // the shot and its pictures were written, and the input picked.
-        List<Object> shown = selected == null ? List.of() : List.of(at, ScreenCards.rows(graph, selected), cuts,
-                canvas.shotTime(selected), pictureTimes(), Optional.ofNullable(audits.get(selected)),
-                Optional.ofNullable(picked));
+        // Everything the board shows but the input picked: the screen, its rows, where its inputs were cut and are
+        // found on its shot, and when the shot and its pictures were written.
+        List<Object> shown = selected == null ? List.of() : List.of(at, rows(selected), cuts,
+                Optional.ofNullable(written), Optional.ofNullable(audits.get(selected)));
         drawBoard(shown, cuts);
+        long boarded = System.nanoTime();
         // Everything the panel shows: that, its card, its way from the first screen, its ways in, how wide it is
         // drawn, and whether a try runs.
         Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
                 : List.of(shown, card(selected), ScreenCards.path(graph, selected), ways(selected), width, busy);
-        if (now.equals(drawn)) return;
+        if (now.equals(drawn)) {
+            if (Objects.equals(picked, pickedDrawn)) return;
+            repick();
+            Diag.log("map panel: " + selected + " picked " + picked + " in " + ms(System.nanoTime() - start));
+            return;
+        }
         drawn = now;
+        pickedBuilt.clear();
+        shotDrawn = null;
+        pickedDrawn = picked;
         content.getChildren().setAll(selected == null ? none() : screen(notes, cuts, width));
         content.getChildren().add(status);
         if (at != null) audit(selected, at, cuts);
+        Diag.log("map panel: " + selected + " drawn in " + ms(System.nanoTime() - start) + " (cuts "
+                + ms(cut - start) + ", board " + ms(boarded - cut) + ", panel " + ms(System.nanoTime() - boarded)
+                + ")");
     }
 
-    /** The board, drawn again only when {@code shown} changed. */
+    /** The input picked, drawn so on both shots and in its part of the panel, nothing else drawn again. */
+    private void repick() {
+        pickedDrawn = picked;
+        board.repick(picked);
+        if (shotDrawn != null) ScreenCanvas.repick(shotDrawn, picked);
+        pickedPart.getChildren().setAll(pickedNodes(selected));
+    }
+
+    private static String ms(long nanos) {
+        return String.format(Locale.ROOT, "%.1f ms", nanos / 1e6);
+    }
+
+    /** The board, drawn again only when {@code shown} changed; the input picked restyled on it. */
     private void drawBoard(Object shown, Map<String, FrameCut> cuts) {
         if (selected == null) {
             board.show(null, null, null, null);
             return;
         }
         String constant = selected;
-        String field = picked;
-        List<Row> rows = ScreenCards.rows(graph, constant);
+        List<Row> rows = rows(constant);
         List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         Audit audit = audits.get(constant);
         List<String> markers = markerIds(constant);
+        // The input picked when it is drawn: a pick since restyles the drawing, and a zoom draws it picked.
         board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
-                markers, strips, cuts, audit, field, row -> picked(constant, row), null));
+                markers, strips, cuts, audit, picked, row -> picked(constant, row), null));
+        board.repick(picked);
     }
 
     /** The pictures that tell {@code constant}: its markers, by id. */
@@ -270,15 +372,24 @@ final class ScreenPanel {
     private void audit(String constant, MapScreen screen, Map<String, FrameCut> cuts) {
         Path resources = services.resourcesDir();
         double confidence = MapAudit.confidence(services);
+        // Again only for another screen, cut, file or confidence: a pick, a try's busy or a wider panel changes no
+        // match.
+        Object from = List.of(screen, cuts, Optional.ofNullable(written), confidence);
+        if (from.equals(audited.put(constant, from))) return;
         Thread.ofVirtual().name("screen-audit").start(() -> {
             Optional<Audit> made;
+            boolean failed = false;
             try {
                 made = MapAudit.of(resources, confidence, cuts, constant, screen);
             } catch (RuntimeException unmatched) {
                 made = Optional.empty();
+                failed = true;
             }
             Optional<Audit> checked = made;
+            boolean again = failed;
             Platform.runLater(() -> {
+                // A shot read while it was written: the next draw checks it again.
+                if (again) audited.remove(constant, from);
                 if (checked.equals(Optional.ofNullable(audits.get(constant)))) return;
                 if (checked.isPresent()) audits.put(constant, checked.get());
                 else audits.remove(constant);
@@ -289,21 +400,40 @@ final class ScreenPanel {
 
     /** {@code constant}'s card, the stage its notes say it reached on it. */
     private Card card(String constant) {
-        return ScreenCards.card(graph, constant, ScreenDesk.stages(graph).getOrDefault(constant, ""));
+        reads();
+        if (stagesRead == null) stagesRead = ScreenDesk.stages(graph);
+        return ScreenCards.card(graph, constant, stagesRead.getOrDefault(constant, ""));
+    }
+
+    /** {@code constant}'s rows, read once a map. */
+    private List<Row> rows(String constant) {
+        reads();
+        return rowsRead.computeIfAbsent(constant, c -> ScreenCards.rows(graph, c));
+    }
+
+    /** The reads kept for the map shown: dropped for another map or after a history step. */
+    private void reads() {
+        if (readOf == graph && readAt == steps) return;
+        readOf = graph;
+        readAt = steps;
+        rowsRead.clear();
+        cutsRead.clear();
+        stagesRead = null;
     }
 
     /**
      * Where each picture {@code constant} uses was cut: what its shot's boxes are drawn from. Only its own pictures
-     * are opened, never all of the bot's: the panel draws on every read of the map.
+     * are opened, never all of the bot's, and again only for another map, a history step or a picture rewritten.
      */
     private Map<String, FrameCut> cutsOf(String constant) {
         if (services.pluginValues() == null || !graph.screens().containsKey(constant)) return Map.of();
-        return TemplateUses.cuts(services.pluginValues(), graph.pictures(constant));
-    }
-
-    /** When each picture the selected screen uses was written: a recut draws its thumbs again. */
-    private List<Long> pictureTimes() {
-        return graph.pictures(selected).stream().map(canvas::pictureTime).toList();
+        reads();
+        List<Long> times = written != null && written.constant().equals(constant) ? written.pictures() : List.of();
+        Cuts kept = cutsRead.get(constant);
+        if (kept != null && kept.times().equals(times)) return kept.cuts();
+        Map<String, FrameCut> cuts = TemplateUses.cuts(services.pluginValues(), graph.pictures(constant));
+        cutsRead.put(constant, new Cuts(times, cuts));
+        return cuts;
     }
 
     /** How wide the selected screen's shot is drawn: the panel's width less its padding. */
@@ -351,7 +481,7 @@ final class ScreenPanel {
 
         FlowPane pills = ScreenCanvas.pills(card);
 
-        List<Row> rows = ScreenCards.rows(graph, shown);
+        List<Row> rows = rows(shown);
         Optional<Row> next = rows.stream().filter(r -> r.state() == ScreenCards.RowState.UNTRIED).findFirst();
         Button tryNext = action("▶ Try next", next.map(r -> "Try " + r.label() + " as the assistant's try_input does")
                 .orElse("Nothing on it is left to try"), () -> next.ifPresent(r -> tryRow(shown, r)));
@@ -393,13 +523,15 @@ final class ScreenPanel {
         addMarker.setDisable(busy);
         markers.getChildren().add(addMarker);
 
-        VBox all = new VBox(12, head, pills, actions);
-        rows.stream().filter(r -> r.field().equals(picked)).findFirst()
-                .ifPresent(r -> all.getChildren().addAll(pickedInput(shown, r)));
+        pickedPart.getChildren().setAll(pickedNodes(shown));
+        VBox all = new VBox(12, head, pills, actions, pickedPart);
         all.getChildren().addAll(heading("Markers"), markers, heading("Inputs"), inputs);
         canvas.shotWithInputs(shown, shotWidth, rows, markerIds(shown), ScreenCards.strips(graph, shown, rows), cuts,
                         audits.get(shown), picked, row -> picked(shown, row), () -> showScreen(shown))
-                .ifPresent(shot -> all.getChildren().addFirst(shot));
+                .ifPresent(shot -> {
+                    shotDrawn = shot;
+                    all.getChildren().addFirst(shot);
+                });
         all.getChildren().addAll(heading("Ways in"), waysIn(shown, screen, card.popup()));
         if (!screen.variants().isEmpty()) {
             VBox looks = new VBox(6);
@@ -523,6 +655,14 @@ final class ScreenPanel {
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().add("screen-row");
         return line;
+    }
+
+    /** The picked input's part of the panel, built once while the panel drawn stands; none for no input picked. */
+    private List<Node> pickedNodes(String constant) {
+        if (picked == null || constant == null) return List.of();
+        return pickedBuilt.computeIfAbsent(picked, field -> rows(constant).stream()
+                .filter(r -> r.field().equals(field)).findFirst().map(r -> pickedInput(constant, r))
+                .orElse(List.of()));
     }
 
     /**

@@ -32,6 +32,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -67,6 +68,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -659,7 +661,7 @@ final class ScreenCanvas {
                 Rectangle box = new Rectangle(at.x(), at.y(), at.width(), at.height());
                 box.getStyleClass().addAll("screen-shot-box", "screen-shot-box-" + row.state().name()
                         .toLowerCase(Locale.ROOT));
-                if (row.field().equals(picked)) box.getStyleClass().add("screen-shot-box-picked");
+                pickable(box, row.field(), "screen-shot-box-picked", picked);
                 String tip = row.label() + ": " + row.result();
                 if (spot.isPresent() && spot.get().where() == Where.ELSEWHERE) {
                     box.getStyleClass().add("screen-shot-box-away");
@@ -695,6 +697,33 @@ final class ScreenCanvas {
         });
     }
 
+    /** What a box or a strip member drawn by {@link #shotWithInputs} is of: its input's field, and its style picked. */
+    private record Pickable(String field, String style) {}
+
+    /** {@code node}, drawn for the input {@code field}, styled {@code style} while it is {@code picked}. */
+    static void pickable(Node node, String field, String style, String picked) {
+        node.getProperties().put(Pickable.class, new Pickable(field, style));
+        if (field.equals(picked)) node.getStyleClass().add(style);
+    }
+
+    /**
+     * Every box and strip member in {@code drawn}, a shot {@link #shotWithInputs} drew, styled as one drawn with
+     * {@code picked} picked (null: none): a pick changes the shot shown, never draws it again (2026-10-22).
+     */
+    static void repick(Node drawn, String picked) {
+        if (drawn.getProperties().get(Pickable.class) instanceof Pickable p) {
+            boolean on = p.field().equals(picked);
+            if (on && !drawn.getStyleClass().contains(p.style())) drawn.getStyleClass().add(p.style());
+            else if (!on) drawn.getStyleClass().remove(p.style());
+        }
+        // A strip's members are its content, a child of its skin only once shown.
+        if (drawn instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) repick(scroll.getContent(), picked);
+        } else if (drawn instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) repick(child, picked);
+        }
+    }
+
     /** Where {@code cut} was cut, on a shot {@code width} by {@code height}; empty when it names no place. */
     private static Optional<Box> cutBox(FrameCut cut, double shotWidth, double shotHeight, double width,
                                         double height) {
@@ -718,7 +747,7 @@ final class ScreenCanvas {
         for (Row row : strip.members()) {
             Node picture = thumb(row.picture(), size, "screen-strip-member");
             picture.getStyleClass().add("screen-strip-member-" + row.state().name().toLowerCase(Locale.ROOT));
-            if (row.field().equals(picked)) picture.getStyleClass().add("screen-strip-member-picked");
+            pickable(picture, row.field(), "screen-strip-member-picked", picked);
             // Not on the screen at every time: drawn faint, as the game shows it only at times.
             if (row.input().comesAndGoes()) picture.setOpacity(0.45);
             Tooltip.install(picture, new Tooltip(row.label() + ": " + row.result()));
@@ -764,12 +793,19 @@ final class ScreenCanvas {
      * retake saved a shot meanwhile, or crop_pictures recut a marker.
      */
     boolean filesChanged() {
-        if (resources == null) return false;
-        if (cards.stream().anyMatch(c -> shotTime(c.constant()) != drawnTimes.getOrDefault(SHOT_KEY + c.constant(),
-                0L))) {
-            return true;
-        }
-        return drawnTimes.entrySet().stream().filter(e -> e.getKey().startsWith(PICTURE_KEY)).anyMatch(e ->
+        return filesCheck().getAsBoolean();
+    }
+
+    /**
+     * {@link #filesChanged}, asked of the cards as drawn now and answered on any thread: the 1.5 s poll states every
+     * card's shot and every picture drawn, some three hundred files for Firestone, off the FX thread.
+     */
+    BooleanSupplier filesCheck() {
+        if (resources == null) return () -> false;
+        List<String> constants = cards.stream().map(Card::constant).toList();
+        Map<String, Long> times = Map.copyOf(drawnTimes);
+        return () -> constants.stream().anyMatch(c -> shotTime(c) != times.getOrDefault(SHOT_KEY + c, 0L))
+                || times.entrySet().stream().filter(e -> e.getKey().startsWith(PICTURE_KEY)).anyMatch(e ->
                 modified(TemplateLibrary.fileForName(resources, e.getKey().substring(PICTURE_KEY.length())))
                         != e.getValue());
     }
