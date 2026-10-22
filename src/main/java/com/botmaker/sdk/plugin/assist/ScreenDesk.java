@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.Markers;
@@ -78,6 +79,10 @@ public final class ScreenDesk {
             case Strip strip -> strip.members().isEmpty() ? null : MapTools.shownMember(strip, context);
             case Tree ignored -> null;
             case Hotkey ignored -> null;
+            // Words have no picture: try_input presses them by their field.
+            case TextButton words -> FxCall.call(() -> ScreenBook.read(context.services())).screen(constant)
+                    .flatMap(on -> on.inputs().entrySet().stream().filter(e -> e.getValue().equals(words))
+                            .map(Map.Entry::getKey).findFirst()).orElse(null);
         };
         Integer notches = input instanceof Strip strip && strip.scroll() != null ? strip.scroll().notches() : null;
         String key = input instanceof Hotkey hotkey && hotkey.combo() != null ? hotkey.combo().caps() : null;

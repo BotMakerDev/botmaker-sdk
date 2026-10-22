@@ -75,7 +75,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     panel; a drag's drop cut on the same board); an emulator's
     field cleared before typing (adb has no select-all); a hotkey on an emulator sent as Android key events (it goes
     to the host's keyboard today).
-  - Text as a marker and as a button (OCR), for text-heavy or localized apps.
+  - Words, past their first cut (2026-10-22): a text button's gesture, traits and copies edited in the input panel
+    and by set_input (today written in `Screens.java`, or cut again); words on a screen look (`ScreenVariant`) and
+    words a screen never shows; a text button in a strip; the picker's box for one (its zone); the anchor of a words'
+    zone in the cut form (center today); a walk's poll reads a screen's words twice when it falls back to the whole
+    frame (`Markers.onEach` keeps them per call).
   - Relative places: a `Pick` or `Way` by another input (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
     `between`), in the other's size as the tree's `Beside`; rows matched by content; a screen with a subject (hero N).
   - Readouts and results on a screen: zones and digits per screen, an input's outcomes (Victory | Defeat), so a body

@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Drag;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -16,8 +17,13 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.ocr.LineMatch;
+import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.Places;
 
@@ -100,6 +106,51 @@ public interface Reach {
      */
     default List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
         return findEach(pictures, frame);
+    }
+
+    /**
+     * The lines of text {@code image} shows, each with its place in it, read by OCR as {@code Text} reads them. A read
+     * that fails reads none; natives that cannot load still throw, as they do for {@code Text}, so they never pass for
+     * a screen with no words.
+     */
+    default List<TextResult> read(BufferedImage image) {
+        return ocr(image);
+    }
+
+    /** {@link #read} by the SDK's OCR, for whoever reads with no reach: the audit of a shot. */
+    static List<TextResult> ocr(BufferedImage image) {
+        try {
+            return OcrEngine.recognize(image, Text.DEFAULT_OPTIONS);
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * Where {@code caption}'s words are on {@code frame}: the first line read inside its zone, placed on the frame as
+     * {@code source.region} places one, that is the words ({@link LineMatch#same}). Empty when no line there is.
+     */
+    default Optional<Rect> findText(Caption caption, BufferedImage frame) {
+        return findText(caption, frame, this::read);
+    }
+
+    /** {@link #findText(Caption, BufferedImage)}, the zone read by {@code read}. */
+    static Optional<Rect> findText(Caption caption, BufferedImage frame,
+                                   Function<BufferedImage, List<TextResult>> read) {
+        if (caption == null || caption.words() == null || caption.in() == null) return Optional.empty();
+        Rect zone = Places.inSource(caption.in(), BotScreen.size().orElse(null),
+                new Size(frame.getWidth(), frame.getHeight()));
+        int x = Math.max(0, zone.x());
+        int y = Math.max(0, zone.y());
+        int w = Math.min(frame.getWidth(), zone.x() + zone.width()) - x;
+        int h = Math.min(frame.getHeight(), zone.y() + zone.height()) - y;
+        if (w <= 0 || h <= 0) return Optional.empty();
+        for (TextResult line : read.apply(frame.getSubimage(x, y, w, h))) {
+            if (!LineMatch.same(line.text(), caption.words().text())) continue;
+            Rect b = line.bounds();
+            return Optional.of(new Rect(b.x() + x, b.y() + y, b.width(), b.height()));
+        }
+        return Optional.empty();
     }
 
     /** Presses at {@code at} by {@code gesture}, a {@link Gesture#HOLD} held {@code hold}; anything unknown clicked. */
@@ -441,6 +492,11 @@ public interface Reach {
             case Hotkey hotkey -> {
                 keys(hotkey.combo());
                 yield true;
+            }
+            case TextButton words -> {
+                Optional<Rect> place = findText(words.caption(), frame);
+                place.ifPresent(at -> press(pointOn(at), words.gesture(), words.holdTime()));
+                yield place.isPresent();
             }
             // A tree is walked to one of its nodes, never pressed as a whole.
             case Tree ignored -> false;

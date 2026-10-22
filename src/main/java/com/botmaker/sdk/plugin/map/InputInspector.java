@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -18,6 +19,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.text.Words;
@@ -202,6 +204,10 @@ final class InputInspector {
             case Hotkey hotkey -> {
                 all.add(heading("Keys"));
                 all.add(key(constant, field, hotkey));
+            }
+            case TextButton words -> {
+                all.add(heading("Words"));
+                all.add(words(words));
             }
             case Strip strip -> {
                 all.add(heading("Members"));
@@ -609,6 +615,19 @@ final class InputInspector {
         return ScreenEdits.zones(services).stream()
                 .filter(name -> ScreenEdits.zoneOf(services, name).filter(zone::equals).isPresent())
                 .findFirst().orElse(zone.toString());
+    }
+
+    // --- a text button's words ---
+
+    /** The words a text button is clicked on, and the zone they are read in, as {@code Screens.java} writes them. */
+    private Node words(TextButton words) {
+        Caption caption = words.caption();
+        String in = caption == null || caption.in() == null ? "nowhere" : "Zones." + zoneName(caption.in());
+        Label said = new Label((caption == null ? "?" : caption.said()) + ", read in " + in
+                + (words.gesture() == Gesture.CLICK ? "" : ", " + words.gesture().displayName().toLowerCase(Locale.ROOT)));
+        said.setWrapText(true);
+        said.setTooltip(new Tooltip(MapGuide.TEXT_BUTTON));
+        return said;
     }
 
     // --- a hotkey's keys ---

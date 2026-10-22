@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -23,6 +24,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
@@ -48,7 +50,7 @@ public final class ScreenTypes {
 
     /**
      * {@code Setup.named(String)} and its links, each written only when the screen has it: {@code .panelOf(…)},
-     * {@code .markers(List.of(…))}, {@code .absent(List.of(…))}, {@code .from(…)} (then {@code .fromPick(…)},
+     * {@code .markers(List.of(…))}, {@code .absent(List.of(…))}, {@code .texts(List.of(…))}, {@code .from(…)} (then {@code .fromPick(…)},
      * {@code .fromLooks(…)}, {@code .fromWhen(…)} when its way needs them) or {@code .after(…)} on its own,
      * {@code .alsoFrom(List.of(…))}, {@code .back(…)}, {@code .variants(List.of(…))}, {@code .popup()},
      * {@code .start()}, {@code .loads(…)}, … and {@code .at(new Point(…))} once its card was moved on 🗺 Screens' map.
@@ -58,6 +60,7 @@ public final class ScreenTypes {
             .<Screen>with(Setup::panelOf, Setup::panelOf)
             .<List<ImageTemplate>>with(Setup::markers, Setup::markers)
             .<List<ImageTemplate>>with(Setup::absent, Setup::absent)
+            .<List<Caption>>with(Setup::texts, Setup::texts)
             .<Input>with(Setup::from, Setup::fromInput)
             .<Screen>with(Setup::after, Setup::fromAfter)
             .<Pick>with(Setup::fromPick, setup -> setup.from() == null ? null : setup.from().pick())
@@ -84,6 +87,7 @@ public final class ScreenTypes {
                 setup -> setup.from() == null ? "" : sourceOf(setup.from().when()));
         static final Held<Button, String> BUTTON_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<Hotkey, String> HOTKEY_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
+        static final Held<TextButton, String> TEXT_BUTTON_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<Strip, String> STRIP_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<Tree, String> TREE_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
         static final Held<ScreenVariant, String> VARIANT_WHEN = Held.as(String.class, v -> sourceOf(v.when()));
@@ -215,6 +219,28 @@ public final class ScreenTypes {
             .<ImageTemplate>with(Hotkey::locked, Hotkey::lock)
             .<BooleanSupplier>with(Hotkey::when, Parts.HOTKEY_WHEN.part(ScreenTypes::condition))
             .when(hotkey -> hotkey.key() == null);
+
+    /** {@code Caption.of(Words, Zone)}: words a screen shows, one of the bot's {@code Texts}, read in a {@code Zones}. */
+    public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class)
+            .<Words, Zone, Caption>writtenAs(Caption::of, Caption::words, Caption::in);
+
+    /** {@code TextButton.of(Caption)} and its links: words clicked, pressed by a gesture as a button is. */
+    public static final DeclaredCall<TextButton> TEXT_BUTTON_SHAPE = ComponentType.part(TextButton.class)
+            .<Caption, TextButton>writtenAs(TextButton::of, TextButton::caption)
+            .flag(TextButton::tried, TextButton::isTried)
+            .flag(TextButton::leaves, TextButton::isLeaving)
+            .flag(TextButton::info, TextButton::isInfo)
+            .<String>with(TextButton::never, TextButton::never)
+            .flag(TextButton::sometimes, TextButton::comesAndGoes)
+            .<ImageTemplate>with(TextButton::locked, TextButton::lock)
+            .<BooleanSupplier>with(TextButton::when, Parts.TEXT_BUTTON_WHEN.part(ScreenTypes::condition))
+            .<Gesture>with(TextButton::gesture, ScreenTypes::gestureWritten)
+            .<Duration>with(TextButton::hold, TextButton::hold);
+
+    /** A text button's gesture as written: none for a click, nor for a hold of its own time, which says it. */
+    private static Gesture gestureWritten(TextButton button) {
+        return button.gesture() == Gesture.CLICK || button.hold() != null ? null : button.gesture();
+    }
 
     /** {@code Strip.of(Scroll, List<ImageTemplate>)} and its links: its members' defaults. */
     public static final DeclaredCall<Strip> STRIP_SHAPE = ComponentType.part(Strip.class)

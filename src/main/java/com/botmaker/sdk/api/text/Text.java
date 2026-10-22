@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.ocr.LineMatch;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.DigitReader;
@@ -418,7 +419,7 @@ public final class Text {
      * Whether {@code line} approximately contains {@code needle} within {@code maxDistance} edits
      * (case-insensitive). Exact substring is an early yes (distance 0); otherwise the needle is slid across the
      * line one window at a time (window = the needle's length ± {@code maxDistance}) and the best
-     * {@link #levenshtein} distance is compared to the budget — so a short needle can match inside a longer
+     * {@link LineMatch#distance} is compared to the budget — so a short needle can match inside a longer
      * noisy line without the line's extra length counting against it.
      */
     private static boolean fuzzyContains(String line, String needle, int maxDistance) {
@@ -434,31 +435,10 @@ public final class Text {
         for (int start = 0; start < hay.length(); start++) {
             int limit = Math.min(hay.length(), start + max);
             for (int end = start + min; end <= limit; end++) {
-                if (levenshtein(hay.substring(start, end), pat) <= maxDistance) return true;
+                if (LineMatch.distance(hay.substring(start, end), pat) <= maxDistance) return true;
             }
         }
         return false;
-    }
-
-    /** Classic iterative two-row Levenshtein edit distance between {@code a} and {@code b}. */
-    private static int levenshtein(String a, String b) {
-        int n = a.length();
-        int m = b.length();
-        if (n == 0) return m;
-        if (m == 0) return n;
-        int[] prev = new int[m + 1];
-        int[] curr = new int[m + 1];
-        for (int j = 0; j <= m; j++) prev[j] = j;
-        for (int i = 1; i <= n; i++) {
-            curr[0] = i;
-            char ca = a.charAt(i - 1);
-            for (int j = 1; j <= m; j++) {
-                int cost = (ca == b.charAt(j - 1)) ? 0 : 1;
-                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
-            }
-            int[] tmp = prev; prev = curr; curr = tmp;
-        }
-        return prev[m];
     }
 
     /** Sleeps the poll interval; returns true if interrupted (caller should abort the wait). */

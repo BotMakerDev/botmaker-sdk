@@ -31,6 +31,14 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   same frame, or `.dragsInto(Zones.END)`, at a zone's centre placed on the frame as `source.region` places it
   (a slider, a swipe); `.dragTime(Duration)`, else `Button.DRAG_TIME`. It takes the place of the gesture and the
   text; a picture drop not on the frame is no press, ABSENT saying so (2026-10-22).
+- **Words** (`Caption.of(Texts.SETTINGS, Zones.TITLE)`, a `Texts` and a `Zones` constant): what a screen shows, read
+  by OCR inside the zone only. `Setup.texts(List.of(…))` tells a screen by them too: `Markers.onEach` reads them last,
+  and only for a set its pictures leave in, each caption once per frame, so a screen of one frame and another title, or
+  of no picture of its own, is told apart at the cost of OCR only where pictures cannot decide. `TextButton.of(caption)`
+  is a fifth `Input`, clicked at the centre of the line that is its words, by a gesture as a button is. A line matches
+  when it is the whole words (`LineMatch.same`): case-blind, spaces and marks at its ends dropped, edits forgiven by
+  length (none up to 4 letters, one up to 8, two past), so `Claim` never matches `Claimed` nor `OK` `O` (the user's
+  call, 2026-10-22; `Text.findFuzzy`'s two edits anywhere in a line match almost any line for a short label).
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
@@ -113,7 +121,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
   Duration)`, `keys(Combo)`, a field's `type(text, clears, submits)` and a drag's `drag(from, dropOn(…), time)`
-  (`press(Button, Rect, frame)`, false when the drop is missing). A list member not in view is scrolled
+  (`press(Button, Rect, frame)`, false when the drop is missing); words are found by `findText(caption, frame)`,
+  the zone placed as `source.region` places it and cut out, then `read` (OCR, a test's fake). A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
   its `Scroll.most` times each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a

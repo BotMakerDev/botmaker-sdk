@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
@@ -20,6 +21,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
@@ -219,6 +221,27 @@ class ScreenTypesTest {
                 "typing nothing keeps the drag");
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).dragsOnto(picture("slot"));
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
+    }
+
+    /**
+     * Words a screen shows are written as a caption of a {@code Texts} and a {@code Zones} constant, on its setup as a
+     * marker or as a text button pressed by a gesture; a setup with none writes no {@code .texts}.
+     */
+    @Test
+    void wordsAreWrittenAsTheirTextAndTheirZone() {
+        Caption settings = Caption.of(Words.of("Settings"), new Zone(100, 20, 300, 40));
+        assertEquals(settings, roundTrip(ScreenTypes.CAPTION_SHAPE, settings));
+        Setup told = Setup.named("Settings").markers(marks("menu_frame")).texts(List.of(settings));
+        assertEquals(told, roundTrip(ScreenTypes.SETUP_SHAPE, told));
+        assertTrue(told.hasMarker());
+        assertTrue(Setup.named("Profile").texts(List.of(settings)).hasMarker(), "words alone tell a screen");
+        TextButton claim = TextButton.of(settings).hold(Duration.ofSeconds(2)).sometimes();
+        assertEquals(claim, roundTrip(ScreenTypes.TEXT_BUTTON_SHAPE, claim));
+        TextButton twice = TextButton.of(settings).gesture(Gesture.DOUBLE).tried();
+        assertEquals(twice, roundTrip(ScreenTypes.TEXT_BUTTON_SHAPE, twice));
+        List<Object> parts = ScreenTypes.TEXT_BUTTON_SHAPE.components(TextButton.of(settings));
+        assertNull(parts.get(parts.size() - 2), "a click is not written");
+        assertNull(TextButton.of(settings).gesture(Gesture.RIGHT).hold(), "only a hold lasts a time");
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -255,9 +256,14 @@ final class ActTools {
         return Frames.resources(context).flatMap(r -> Frames.picture(r, picture)).isPresent();
     }
 
-    /** Whether a run would tell {@code markers}' screen on {@code frame}: every marker found, no absent one. */
+    /**
+     * Whether a run would tell {@code markers}' screen on {@code frame}: every marker found, no absent one, and every
+     * one of its words read, by the run's own reading.
+     */
     static boolean shows(AgentContext context, Markers markers, BufferedImage frame) {
-        return markers.on(p -> shows(context, p.id(), frame));
+        Optional<ToolReach> reach = markers.texts().isEmpty() ? Optional.empty() : ToolReach.of(context);
+        return markers.on(p -> shows(context, p.id(), frame),
+                words -> reach.flatMap(r -> r.findText(words, frame)).isPresent());
     }
 
     /** Whether a run would find {@code picture} on {@code frame}. */
@@ -348,6 +354,28 @@ final class ActTools {
         }
         return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Clicked " + spotted.name()
                 + " at " + at.x() + "," + at.y(), "click " + spotted.name(), share, hands -> hands.click(at.x(), at.y()));
+    }
+
+    /**
+     * {@code words} pressed by their gesture where a fresh look reads them, as a run reads and presses them. Nothing
+     * pressed when they are not read in their zone.
+     */
+    static Entered enterText(AgentContext context, String screen, TextButton words, Boolean desktop, int settleMs,
+                             double share) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        Optional<BufferedImage> frame = reach.flatMap(Reach::look);
+        if (frame.isEmpty()) return Entered.no(AgentReply.refused(Frames.noScreen()));
+        Optional<Rect> place = reach.get().findText(words.caption(), frame.get());
+        if (place.isEmpty()) {
+            return Entered.no(AgentReply.text(words.label() + " is not read in its zone on the screen; nothing was "
+                    + "clicked."));
+        }
+        Point at = reach.get().pointOn(place.get());
+        Gesture gesture = words.gesture();
+        long holdMs = words.holdTime().toMillis();
+        return acted(context, screen, frame.get(), at, desktop, settleMs, false, gesture.displayName() + " on "
+                + words.label() + " at " + at.x() + "," + at.y(), gesture.id() + " " + words.label(), share,
+                hands -> hands.press(at.x(), at.y(), gesture, holdMs));
     }
 
     /**

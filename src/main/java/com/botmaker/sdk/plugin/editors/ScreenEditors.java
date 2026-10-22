@@ -84,7 +84,7 @@ public final class ScreenEditors {
         graph.screens().forEach((constant, screen) -> {
             if (popups || !screen.isPopup()) {
                 choices.add(new Choice(constant, graph.shown(constant),
-                        screen.hasMarker() ? screen.firstMarker().id() : null));
+                        screen.firstMarkerId()));
             }
         });
         return choices;

@@ -18,6 +18,7 @@ import com.botmaker.sdk.plugin.assist.MapTools.Mark;
 import com.botmaker.sdk.plugin.assist.PictureTools.Box;
 import com.botmaker.sdk.plugin.assist.PictureTools.Corner;
 import com.botmaker.sdk.plugin.assist.PictureTools.Skip;
+import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CutShape;
 
@@ -82,6 +83,14 @@ public final class BoardCuts {
 
     /** An area of the game, a Zones constant. */
     public record Place(Anchor anchor) implements As {
+    }
+
+    /**
+     * A zone around words the screen shows, {@code text} as the game writes them: what tells the screen, or a text
+     * button clicked on them when {@code button}, its field named from the cut's name. The zone is saved in Zones
+     * under that name.
+     */
+    public record Reads(String text, boolean button) implements As {
     }
 
     /** The digits of the number it shows, {@code shows} as the game writes it. */
@@ -151,6 +160,8 @@ public final class BoardCuts {
             AgentReply reply = switch (cut.as()) {
                 case Place place -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
                         b.width(), b.height(), place.anchor()), context, shown);
+                case Reads ignored -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
+                        b.width(), b.height(), Anchor.CENTER), context, shown);
                 case Digits digits -> PictureTools.saveDigits(new PictureTools.NamedDigits(cut.name(), b.x(), b.y(),
                         b.width(), b.height(), digits.shows()), context, shown);
                 case Recut recut -> PictureTools.replacePicture(replace(cut, recut.picture()), context, shown, live);
@@ -168,6 +179,15 @@ public final class BoardCuts {
                 for (int at : writes) if (!refused.contains(at)) refused.add(at);
             }
             if (one != null && !one.isBlank()) said.add(one);
+        }
+        // Words are written on the screen once their zone is saved, as edit_map's add_text writes them.
+        for (int i = 0; i < cuts.size(); i++) {
+            if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Reads reads)) continue;
+            String zone = FlowNames.constantFor(cuts.get(i).name());
+            String field = reads.button() ? cuts.get(i).name() : null;
+            String one = FxCall.call(() -> ScreenEdits.addText(context.services(), screen, zone, reads.text(), field));
+            if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
+            said.add(one);
         }
         for (int i = 0; i < cuts.size(); i++) {
             if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Press press)
@@ -222,7 +242,8 @@ public final class BoardCuts {
 
     /** Whether {@code cut} is a picture of a screen, which crop_pictures saves. */
     static boolean picture(Cut cut) {
-        return !(cut.as() instanceof Place || cut.as() instanceof Digits || cut.as() instanceof Recut);
+        return !(cut.as() instanceof Place || cut.as() instanceof Reads || cut.as() instanceof Digits
+                || cut.as() instanceof Recut);
     }
 
     /** {@code cut} as crop_pictures takes it: a member is a button of the screen first. */

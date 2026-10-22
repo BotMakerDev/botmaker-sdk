@@ -6,6 +6,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
@@ -513,6 +514,7 @@ final class ScreenPanel {
         if (!screen.hasMarker()) markers.getChildren().add(text("None yet: ✂ Cut marker."));
         screen.markers().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "shows", busy)));
         screen.absent().forEach(m -> markers.getChildren().add(markerRow(shown, m.id(), "never shows", busy)));
+        screen.texts().forEach(t -> markers.getChildren().add(textRow(shown, t, busy)));
         // Off the FX thread, as ✕: the new set is matched over every other screen's shot.
         Button addMarker = action("＋ Marker from a picture…", MapGuide.ADD_MARKER, () -> hands.askMarker(shown,
                 (picture, absent) -> {
@@ -652,6 +654,25 @@ final class ScreenPanel {
                         () -> ScreenEdits.removeMarker(services, constant, picture)));
         off.setDisable(busy);
         HBox line = new HBox(8, thumb, label, kind, off);
+        line.setAlignment(Pos.CENTER_LEFT);
+        line.getStyleClass().add("screen-row");
+        return line;
+    }
+
+    /** Words that tell the screen, read in their zone, with ✕ to take them off. */
+    private Node textRow(String constant, Caption words, boolean busy) {
+        Label label = new Label(words.said());
+        label.getStyleClass().add("screen-row-label");
+        label.setMinWidth(0);
+        HBox.setHgrow(label, Priority.ALWAYS);
+        Label kind = pill("reads", "screen-pill-plain");
+        kind.setTooltip(new Tooltip(MapGuide.TEXT_MARKER));
+        String text = words.words() == null ? "" : words.words().text();
+        Button off = action("✕", "Remove " + words.said() + " from what tells " + graph.shown(constant) + " apart",
+                () -> run("Taking " + words.said() + " off…", constant,
+                        () -> ScreenEdits.removeText(services, constant, text)));
+        off.setDisable(busy);
+        HBox line = new HBox(8, label, kind, off);
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().add("screen-row");
         return line;

@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
@@ -198,6 +199,16 @@ final class MapEdits {
     record RemoveMarker(String screen, String picture) implements Edit {
     }
 
+    @Describe("words read in a zone: a marker, or with field a text button clicked on them")
+    record AddText(String screen, @Describe("as the screen shows them") String text,
+                   @Describe("a Zones constant") String zone,
+                   @Describe(value = "", optional = true) String field) implements Edit {
+    }
+
+    @Describe("take a text marker off")
+    record RemoveText(String screen, String text) implements Edit {
+    }
+
     @Describe("a new screen, opened by an input of screen (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
@@ -257,6 +268,8 @@ final class MapEdits {
             case NewScreen opened -> newScreen(opened, graph, screen, context);
             case AddMarker ignored -> marker(edit, context);
             case RemoveMarker ignored -> marker(edit, context);
+            case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
+            case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
             case SetInput set -> onInput(set, graph, screen, on, field -> setInput(context, screen, on, field, set));
             case ResetInput reset -> onInput(reset, graph, screen, on, field -> said(ScreenEdits.setInput(services,
                     screen, field, ScreenEdits.untried(on.inputs().get(field)))));
@@ -628,6 +641,7 @@ final class MapEdits {
             // A tree is named by its field, never by a picture and a scroll.
             case Tree ignored -> false;
             case Hotkey ignored -> false;
+            case TextButton ignored -> false;
         };
     }
 

@@ -86,7 +86,12 @@ final class MapGuide {
             + "the text (Navigate.type), and no walk goes through it";
     static final String DRAG = "Pressed, moved onto a picture or into a zone of the bot's Zones, and let go: a card "
             + "onto its slot, a slider, a swipe. A picture not on the screen leaves it unpressed";
-    static final String WAY_COPY = "The copy of this repeated button the way goes through";
+    static final String TEXT_MARKER = "Words read inside a zone that tell the screen too, read only once its pictures "
+            + "say it may be this one: a line that is the words, whatever its case, a misread letter forgiven in longer "
+            + "words";
+    static final String TEXT_BUTTON ="Clicked where its words are read inside its zone: a line that is the words, "
+            + "whatever its case, a misread letter forgiven in longer words. Cut a zone around the words to make one";
+    static final String WAY_COPY ="The copy of this repeated button the way goes through";
     static final String TRY_HOW = "Tries it as try_input does: which copy, the name of the screen it opens, how long it "
             + "is given, and whether the game stays here after";
     static final String STRIP_MEMBERS = "Its buttons in the strip's order, each looked for anywhere along it and "

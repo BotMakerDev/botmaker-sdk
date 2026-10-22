@@ -5,9 +5,9 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import java.util.function.BooleanSupplier;
 
 /**
- * One way to act on a {@link Screen}, a field of it: a {@link Button} clicked, a {@link Hotkey} pressed, a
- * {@link Strip} of buttons that scrolls or shifts, or a {@link Tree} of linked buttons that scrolls in two
- * dimensions. The traits here are each kind's.
+ * One way to act on a {@link Screen}, a field of it: a {@link Button} clicked, a {@link TextButton} clicked on its
+ * words, a {@link Hotkey} pressed, a {@link Strip} of buttons that scrolls or shifts, or a {@link Tree} of linked
+ * buttons that scrolls in two dimensions. The traits here are each kind's.
  *
  * <p>Until it is {@link #tried}, {@link #leaves left by}, {@link #never} done or {@link #lock locked} it is untried:
  * Discovery tries every input of a screen before the screen counts as finished. An input that opened a screen is
@@ -21,7 +21,7 @@ import java.util.function.BooleanSupplier;
  * <p>A strip's traits are its members' defaults: a strip that {@link #comesAndGoes comes and goes} is one whose
  * members each may be absent (the user's call, 2026-10-16).
  */
-public sealed interface Input permits Button, Hotkey, Strip, Tree {
+public sealed interface Input permits Button, TextButton, Hotkey, Strip, Tree {
 
     /** Whether Discovery tried it and it opened no screen: it changed this one, or nothing visible. */
     boolean isTried();

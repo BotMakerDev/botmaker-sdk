@@ -177,7 +177,7 @@ public final class MapAudit {
 
     /**
      * The first screen of {@code graph} other than {@code constant} whose shot shows {@code set} (every marker found
-     * anywhere on it, no absent picture found): on that screen a run would take the game for {@code constant}. Rarity's
+     * anywhere on it, no absent picture found, every one of its words read): on that screen a run would take the game for {@code constant}. Rarity's
      * title scored 0.80 on Upgrade (2026-10-16). Skipped: a popup, whose shot shows the screen under it, and a screen
      * reached from {@code constant}, which a run finds over it first. Empty with no clash, or while a picture of
      * {@code set} has no file. Off the FX thread: it reads and matches every other shot.
@@ -198,7 +198,11 @@ public final class MapAudit {
             List<Fit> fits = fits(resources, confidence, Map.of(), names, shot.get());
             boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
             boolean none = fits.subList(shown.size(), fits.size()).stream().allMatch(f -> f.where() == Where.MISSING);
-            if (all && none) return Optional.of(new Clash(c, apart(resources, confidence, constant, other.getValue())));
+            // Its words are read only where its pictures clash: the shot's title may still tell the two apart.
+            if (all && none && set.texts().stream().allMatch(words -> Reach.findText(words, shot.get(), Reach::ocr)
+                    .isPresent())) {
+                return Optional.of(new Clash(c, apart(resources, confidence, constant, other.getValue())));
+            }
         }
         return Optional.empty();
     }

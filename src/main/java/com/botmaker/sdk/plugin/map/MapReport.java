@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -167,6 +168,8 @@ public final class MapReport {
                 .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
                 .append('\n');
         out.append(indent).append("  ").append(markers(screen.markers(), screen.absent()))
+                .append(screen.texts().isEmpty() ? "" : " · reads " + String.join(" + ",
+                        screen.texts().stream().map(Caption::said).toList()))
                 .append(" · back ").append(graph.backOf(constant).filter(b -> b.via() != null)
                         .map(ScreenGraph.Edge::label).orElse("the default (a close button, then Escape)"))
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');

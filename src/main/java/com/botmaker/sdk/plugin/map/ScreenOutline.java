@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.map.Outline.Entry;
@@ -242,6 +243,7 @@ final class ScreenOutline {
         return switch (input) {
             case Button button -> button.isDrag() ? "⇢" : button.isField() ? "✎" : "◻";
             case Hotkey ignored -> "⌨";
+            case TextButton ignored -> "🔤";
             case Strip ignored -> "☰";
             case Tree ignored -> "🌳";
         };

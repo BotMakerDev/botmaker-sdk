@@ -7,15 +7,20 @@ import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.text.Text;
+import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.BoardCuts.As;
+import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TagPicker;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.control.CheckBox;
@@ -38,6 +43,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -61,6 +68,8 @@ final class CutForm {
         STRIP("A button of a strip"),
         TREE("A node of a tree"),
         ZONE("An area (Zones)"),
+        TEXT_MARKER("Words that tell it"),
+        TEXT_BUTTON("A button known by its words"),
         DIGITS("Digits of a number"),
         RECUT("A new image for a picture");
 
@@ -83,6 +92,13 @@ final class CutForm {
     /** What the form hands back: the screen (null: none), the tags, and each cut as saved. */
     record Answer(String screen, List<String> tags, List<BoardCuts.Cut> cuts) {
     }
+
+    /**
+     * The one thread the form reads cuts' words on: OCR keeps an engine per thread (tessdata loaded, never freed), so
+     * a thread per read would leave one behind each time.
+     */
+    private static final ExecutorService WORDS = Executors.newSingleThreadExecutor(
+            Thread.ofPlatform().name("cut-words").daemon().factory());
 
     /** No method: always. */
     private static final String ALWAYS = "Always";
@@ -204,6 +220,17 @@ final class CutForm {
                         return Optional.of(at + "a new strip turns by some notches of the wheel.");
                     }
                 }
+                case TEXT_MARKER, TEXT_BUTTON -> {
+                    if (on() == null) return Optional.of(at + "words are a screen's: pick it.");
+                    if (line.reads.getText().isBlank()) {
+                        return Optional.of(at + "give the words it shows, as the game writes them.");
+                    }
+                    // Saving the words' zone over a zone of that name would move what other words read.
+                    if (ScreenEdits.zones(services).contains(FlowNames.constantFor(name))) {
+                        return Optional.of(at + "Zones has " + FlowNames.constantFor(name) + " already: give the "
+                                + "words' zone another name.");
+                    }
+                }
                 case DIGITS -> {
                     if (line.shows.getText().chars().noneMatch(Character::isDigit)) {
                         return Optional.of(at + "give the number it shows, as the game writes it.");
@@ -258,14 +285,19 @@ final class CutForm {
         private final Spinner<Integer> notches = new Spinner<>(-20, 20, -3);
         private final ComboBox<Anchor> anchor = new ComboBox<>(FXCollections.observableArrayList(Anchor.values()));
         private final TextField shows = new TextField();
+        private final TextField reads = new TextField();
         private final ComboBox<String> picture = new ComboBox<>();
+        /** The cut as drawn, read by OCR the first time it is made words; null when it is off the frame. */
+        private final BufferedImage image;
+        private boolean read;
 
         Line(int index, BufferedImage frame, Drawn drawn, Kind first) {
             this.index = index;
             this.drawn = drawn;
-            PictureCuts.cut(frame, drawn.box(), drawn.shape(), drawn.points())
-                    .map(p -> drawn.ignore() == null ? p : PictureCuts.masked(p, drawn.ignore()))
-                    .ifPresent(p -> thumb.setImage(ScreenCapture.toFxImage(PictureCuts.checkered(p.image()))));
+            Optional<PictureCuts.Piece> piece = PictureCuts.cut(frame, drawn.box(), drawn.shape(), drawn.points())
+                    .map(p -> drawn.ignore() == null ? p : PictureCuts.masked(p, drawn.ignore()));
+            image = piece.map(PictureCuts.Piece::image).orElse(null);
+            piece.ifPresent(p -> thumb.setImage(ScreenCapture.toFxImage(PictureCuts.checkered(p.image()))));
             thumb.setPreserveRatio(true);
             thumb.setFitWidth(Math.min(72, drawn.box().width()));
             thumb.setFitHeight(48);
@@ -278,6 +310,8 @@ final class CutForm {
             look.setPromptText("the look's name: Halloween");
             anchor.setValue(Anchor.CENTER);
             shows.setPromptText("the number it shows: 12,500");
+            reads.setPromptText("the words it shows: Settings");
+            reads.setTooltip(new Tooltip(MapGuide.TEXT_MARKER));
             notches.setPrefWidth(70);
             List<String> methods = services.pluginValues() == null ? List.of()
                     : services.pluginValues().methods(MethodShape.BOOLEAN);
@@ -329,9 +363,32 @@ final class CutForm {
                 case STRIP -> List.of(new Label("strip"), group, new Label("new: notches"), notches);
                 case TREE -> List.of(new Label("tree"), group);
                 case ZONE -> List.of(new Label("stays with"), anchor);
+                case TEXT_MARKER, TEXT_BUTTON -> List.of(new Label("reads"), reads);
                 case DIGITS -> List.of(shows);
                 case RECUT -> List.of(picture);
                 case ABSENT, BACK -> List.of();
+            });
+            if (kind() == Kind.TEXT_MARKER || kind() == Kind.TEXT_BUTTON) readWords();
+        }
+
+        /**
+         * The words the cut shows, read once by OCR off the FX thread, as the run reads them: the first line, put in
+         * {@code reads} unless the user typed there first. Nothing is put when OCR cannot read it.
+         */
+        private void readWords() {
+            if (read || image == null) return;
+            read = true;
+            WORDS.execute(() -> {
+                String said;
+                try {
+                    said = OcrEngine.text(image, Text.DEFAULT_OPTIONS);
+                } catch (RuntimeException | LinkageError e) {
+                    return;
+                }
+                String first = said.lines().map(String::strip).filter(l -> !l.isEmpty()).findFirst().orElse("");
+                Platform.runLater(() -> {
+                    if (reads.getText().isBlank()) reads.setText(first);
+                });
             });
         }
 
@@ -349,6 +406,8 @@ final class CutForm {
                 case STRIP -> new BoardCuts.Member(field, false, notches.getValue());
                 case TREE -> new BoardCuts.Member(field, true, 0);
                 case ZONE -> new BoardCuts.Place(anchor.getValue());
+                case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false);
+                case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true);
                 case DIGITS -> new BoardCuts.Digits(shows.getText());
                 case RECUT -> new BoardCuts.Recut(picture.getValue());
             };

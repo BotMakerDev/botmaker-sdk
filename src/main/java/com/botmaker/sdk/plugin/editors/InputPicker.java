@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -153,7 +154,7 @@ public final class InputPicker {
             // Nothing walks to a popup: its inputs are offered only where any input is taken (a way out).
             if (screen.isPopup() && kind != Input.class) return;
             MenuItem item = new MenuItem(graph.shown(constant),
-                    thumb(resources, screen.hasMarker() ? screen.firstMarker().id() : null));
+                    thumb(resources, screen.firstMarkerId()));
             item.setOnAction(a -> showScreen(ctx, kind, graph, constant, button));
             menu.getItems().add(item);
         });
@@ -219,6 +220,7 @@ public final class InputPicker {
             case Button b -> (b.isDrag() ? "drag" : b.isField() ? "text field" : "button")
                     + (b.repeats() ? ", repeated" : "");
             case Hotkey h -> h.label();
+            case TextButton t -> t.label();
             case Strip s -> pickable ? "strip of " + s.members().size() : "strip:";
             case Tree t -> pickable ? "tree of " + t.nodes().size() : "tree:";
         };
@@ -276,6 +278,7 @@ public final class InputPicker {
             case Strip s -> s.members();
             case Tree t -> t.members();
             case Hotkey h -> List.of();
+            case TextButton t -> List.of();
         };
         Rect band = null;
         int frameWidth = 0;

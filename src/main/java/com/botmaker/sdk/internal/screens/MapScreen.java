@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Screen;
@@ -139,6 +140,16 @@ public record MapScreen(Setup setup, Map<String, Input> inputs) {
 
     public ImageTemplate firstMarker() {
         return setup.firstMarker();
+    }
+
+    /** Its first marker picture's id, what stands for it on a card; null when no picture tells it. */
+    public String firstMarkerId() {
+        return firstMarker() == null ? null : firstMarker().id();
+    }
+
+    /** The words that tell it, each read in its zone. */
+    public List<Caption> texts() {
+        return setup.texts();
     }
 
     /** Its ways in: its {@code from}, then each {@code alsoFrom}. */

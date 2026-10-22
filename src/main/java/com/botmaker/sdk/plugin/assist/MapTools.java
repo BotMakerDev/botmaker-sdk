@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -263,6 +264,8 @@ final class MapTools {
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
                     input.scroll() != null || strip.scroll() == null ? input.scroll() : strip.scroll().notches(), null);
             case Hotkey hotkey -> hotkey.combo() == null ? input : input.named(null, null, hotkey.combo().caps());
+            // Words are pressed by their field, where a fresh look reads them.
+            case TextButton ignored -> input;
             // A tree scrolled over by its field is scrolled over a node that shows.
             case Tree tree -> tree.members().isEmpty() || input.scroll() == null ? input
                     : input.named(shownNode(tree, context), input.scroll(), null);
@@ -346,7 +349,11 @@ final class MapTools {
         String what = byPicture ? input.picture().strip() : null;
         Optional<String> held = held(on, what, key.orElse(null), notches, graph, screen);
         boolean untried = held.filter(f -> !graph.tried(screen, f)).isPresent();
-        if (byPicture && !ActTools.exists(context, what)) {
+        boolean byWords = held.map(on.inputs()::get).filter(TextButton.class::isInstance).isPresent();
+        if (byWords && (notches != 0 || match > 0)) {
+            return Tried.refused("Words are clicked where they are read: leave scroll and match out. Nothing was done.");
+        }
+        if (byPicture && !byWords && !ActTools.exists(context, what)) {
             if (!untried) return Tried.refused(Frames.noPicture(what));
             Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withoutInput(held.get())));
             // Nothing clicked: the game is where it was.
@@ -409,8 +416,10 @@ final class MapTools {
         }
         // A hotkey of the map is pressed as it is written, held when it is.
         Combo keys = base instanceof Hotkey hotkey ? hotkey.combo() : key.orElse(null);
-        ActTools.Entered first = ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick,
-                strip.orElse(null), keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
+        ActTools.Entered first = base instanceof TextButton words
+                ? ActTools.enterText(context, screen, words, input.desktop(), settle, FrameChange.ANSWER_SHARE)
+                : ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick, strip.orElse(null),
+                keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = Markers.of(on);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
@@ -785,9 +794,9 @@ final class MapTools {
     /** {@code set} as {@code mark} changes it by {@code cut}: replaced, added to, or given an absent picture. */
     private static Markers marked(Markers set, Mark mark, ImageTemplate cut) {
         return switch (mark) {
-            case SET -> new Markers(List.of(cut), set.absent());
-            case ADD -> new Markers(with(set.shown(), cut), set.absent());
-            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut));
+            case SET -> new Markers(List.of(cut), set.absent(), set.texts());
+            case ADD -> new Markers(with(set.shown(), cut), set.absent(), set.texts());
+            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut), set.texts());
         };
     }
 
@@ -1343,11 +1352,15 @@ final class MapTools {
                         && b.picture().id().equalsIgnoreCase(picture))
                 .map(Map.Entry::getKey).findFirst();
         if (notches == 0) {
-            // A button's other look is that button: clicking its badge copy tries the same input.
+            // A button's other look is that button: clicking its badge copy tries the same input. Words, which have no
+            // picture, by their field last: a picture's name wins, as byField lets it.
             return button.or(() -> all.entrySet().stream()
                     .filter(e -> e.getValue() instanceof Button b && b.looks().stream()
                             .anyMatch(v -> v.picture().id().equalsIgnoreCase(picture)))
-                    .map(Map.Entry::getKey).findFirst());
+                    .map(Map.Entry::getKey).findFirst())
+                    .or(() -> all.entrySet().stream()
+                            .filter(e -> e.getValue() instanceof TextButton && e.getKey().equalsIgnoreCase(picture))
+                            .map(Map.Entry::getKey).findFirst());
         }
         // Over any member it shows, either way and by any notches: a strip is scrolled over the member in view, to
         // both its ends. Its member's own button field is never made a strip.

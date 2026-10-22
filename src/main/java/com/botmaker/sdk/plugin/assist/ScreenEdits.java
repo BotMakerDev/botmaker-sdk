@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -18,6 +19,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
@@ -85,6 +87,8 @@ public final class ScreenEdits {
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
+            case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.comesAndGoes(), null,
+                    t.when(), t.gesture(), t.hold());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
                     s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), false, false, t.isInfo(), null,
@@ -101,6 +105,8 @@ public final class ScreenEdits {
                     b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
+            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
+                    t.lock(), null, t.gesture(), t.hold());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
                     false, s.lock(), null);
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), t.isInfo(),
@@ -117,6 +123,8 @@ public final class ScreenEdits {
                     b.typing(), b.drag());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
+            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
+                    t.comesAndGoes(), t.lock(), t.when(), t.gesture(), t.hold());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
                     s.comesAndGoes(), s.lock(), s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), false,
@@ -698,6 +706,57 @@ public final class ScreenEdits {
                         + timed.dragTime().toMillis() + " ms now.");
     }
 
+    /** The longest words a text marker or a text button reads: a title or a label, never a paragraph. */
+    static final int LONGEST_WORDS = 60;
+
+    /**
+     * {@code text}, read in the bot's zone {@code zone}, written on {@code constant}: words that tell it when
+     * {@code field} is blank, else a new text button clicked on them, its field named from {@code field}. The words
+     * are kept in the bot's {@code Texts} in the same step.
+     */
+    public static String addText(StudioServices services, String constant, String zone, String text, String field) {
+        String words = text == null ? "" : text.strip();
+        if (words.isEmpty() || words.length() > LONGEST_WORDS || words.contains("\n")) {
+            return NOT_WRITTEN + "give the words on one line, as the screen shows them, up to " + LONGEST_WORDS
+                    + " letters.";
+        }
+        Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
+        if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen on = graph.screens().get(constant);
+        if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
+        Caption caption = Caption.of(Words.of(words), in.get());
+        if (field == null || field.isBlank()) {
+            if (on.texts().contains(caption)) return "It is told by " + caption.said() + " already.";
+            List<Caption> now = new ArrayList<>(on.texts());
+            now.add(caption);
+            return said(ScreenBook.step(services, "Tell " + graph.shown(constant) + " by " + caption.said(),
+                    () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
+                            s -> s.setup(x -> x.texts(now))))),
+                    graph.shown(constant) + " is told by " + caption.said() + " in Zones." + zone.strip() + " too.");
+        }
+        String named = on.fieldFor(field);
+        return said(ScreenBook.step(services, "Text button " + named,
+                () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
+                        s -> s.withInput(named, TextButton.of(caption))))),
+                named + " clicks " + caption.said() + " where it is read in Zones." + zone.strip() + ".");
+    }
+
+    /** {@code constant} told by its words {@code text} no more; the {@code Texts} constant stays for its other uses. */
+    public static String removeText(StudioServices services, String constant, String text) {
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen on = graph.screens().get(constant);
+        if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
+        String words = text == null ? "" : text.strip();
+        List<Caption> now = on.texts().stream()
+                .filter(c -> c.words() == null || !c.words().text().equalsIgnoreCase(words)).toList();
+        if (now.size() == on.texts().size()) {
+            return NOT_WRITTEN + graph.shown(constant) + " is not told by \"" + words + "\".";
+        }
+        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.texts(now))),
+                graph.shown(constant) + " is told by \"" + words + "\" no more.");
+    }
+
     /** Every zone of the bot's {@code Zones}, by name. */
     public static List<String> zones(StudioServices services) {
         PluginValues values = services.pluginValues();
@@ -889,8 +948,8 @@ public final class ScreenEdits {
                     + ": remove it from there first.";
         }
         if (holds(absent ? was.absent() : was.shown(), id)) return "It is told by " + was.said() + " already.";
-        Markers now = absent ? new Markers(was.shown(), plus(was.absent(), picture))
-                : new Markers(plus(was.shown(), picture), was.absent());
+        Markers now = absent ? new Markers(was.shown(), plus(was.absent(), picture), was.texts())
+                : new Markers(plus(was.shown(), picture), was.absent(), was.texts());
         return toldBy(services, constant, now);
     }
 
@@ -906,7 +965,7 @@ public final class ScreenEdits {
         if (!holds(was.shown(), id) && !holds(was.absent(), id)) {
             return NOT_WRITTEN + "it is told by " + was.said() + ", not " + id + ".";
         }
-        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id));
+        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id), was.texts());
         if (!now.any()) return NOT_WRITTEN + id + " is its last marker: add another first.";
         return toldBy(services, constant, now);
     }

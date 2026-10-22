@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
@@ -15,6 +16,8 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.screens.TextButton;
+import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
@@ -492,6 +495,50 @@ class ReachTest {
         assertFalse(column.perform(Button.of(ARENA).dragsOnto(CAMPAIGN), column.look().orElseThrow()));
         assertEquals(List.of(), column.done);
         assertTrue(column.dropOn(Button.of(ARENA), column.look().orElseThrow()).isEmpty(), "a button drags nowhere");
+    }
+
+    /** A screen of 800x600 whose zones each read {@code lines}, placed inside the part read; each read's size kept. */
+    private static final class Reading extends Column {
+        final List<TextResult> lines;
+        final List<String> read = new ArrayList<>();
+
+        Reading(List<TextResult> lines) {
+            super(Map.of(), 0);
+            this.lines = lines;
+        }
+
+        @Override
+        public Optional<BufferedImage> look() {
+            return Optional.of(new BufferedImage(800, 600, BufferedImage.TYPE_INT_RGB));
+        }
+
+        @Override
+        public List<TextResult> read(BufferedImage image) {
+            read.add(image.getWidth() + "x" + image.getHeight());
+            return lines;
+        }
+    }
+
+    /**
+     * A text button is pressed by its gesture at the centre of the line that is its words, read only in its zone; a
+     * line one state on ({@code Claimed}) is not it, and words not read press nothing.
+     */
+    @Test
+    void aTextButtonIsClickedOnItsWords() {
+        Reading screen = new Reading(List.of(
+                new TextResult("Claimed", new Rect(10, 0, 60, 20), 90f, TextResult.Level.LINE),
+                new TextResult(" CLAIM! ", new Rect(10, 30, 60, 20), 90f, TextResult.Level.LINE)));
+        BufferedImage frame = screen.look().orElseThrow();
+        Zone quests = new Zone(100, 200, 200, 100);
+        TextButton claim = TextButton.of(Caption.of(Words.of("Claim"), quests));
+        assertTrue(screen.perform(claim, frame));
+        assertTrue(screen.perform(claim.hold(Duration.ofMillis(900)), frame));
+        assertEquals(List.of("click 240", "hold 240 900"), screen.done);
+        assertEquals(List.of("200x100", "200x100"), screen.read, "only the zone is read");
+        assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Collect"), quests)), frame));
+        assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Claim"), new Zone(900, 700, 50, 50))), frame),
+                "a zone off the frame reads nothing");
+        assertEquals(2, screen.done.size(), "words not read are not pressed");
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */

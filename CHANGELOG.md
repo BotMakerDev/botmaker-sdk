@@ -27,6 +27,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   guildName)`, usually from a `@Param`, and a walk that needs it ends NOT_NOW saying so. 🗺 Screens' input panel has a
   *Text field* section (its text, Clear first, Enter after), which adds the `Texts` constant; edit_map's set_input
   takes `types`, `submits` and `clears`; try_input types the field's text after the click.
+- **Words on the map**: a screen told by text it shows, `Setup.texts(List.of(Caption.of(Texts.SETTINGS,
+  Zones.TITLE)))`, read by OCR in the zone only once its pictures say it may be that screen; and a button known by its
+  words, `TextButton.of(Caption.of(Texts.CLAIM, Zones.QUESTS))`, clicked on the line that reads them. A line matches when
+  it is the whole words, case-blind, a misread letter forgiven in 5 to 8 letters and two past (`Claim` is never
+  `Claimed`). 🗺 Screens' cut form has *Words that tell it* and *A button known by its words*, the words read off the
+  cut to start with; the panel lists a screen's words with ✕; edit_map has `add_text` and `remove_text`; try_input and
+  ▶ Try press a text button where a fresh look reads it.
 - **Drags on the map**: a button pressed, moved and let go, `Button.of(Pictures.CARD).dragsOnto(Pictures.SLOT)` or
   `.dragsInto(Zones.SLIDER_END)` (a swipe on a phone), `.dragTime(Duration)` (400 ms else). The drop is looked for on
   the frame the button is found on; a picture drop not there leaves it unpressed, ABSENT saying so. 🗺 Screens' input

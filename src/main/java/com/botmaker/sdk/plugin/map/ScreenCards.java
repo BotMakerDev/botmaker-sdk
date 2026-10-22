@@ -3,10 +3,13 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
@@ -193,7 +196,7 @@ final class ScreenCards {
         }
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";
-        return new Card(constant, graph.shown(constant), screen.hasMarker() ? screen.firstMarker().id() : null, state,
+        return new Card(constant, graph.shown(constant), screen.firstMarkerId(), state,
                 said, shape, screen.isPopup(), screen.isStart(), graph.panelOf(constant).map(graph::shown).orElse(null),
                 graph.presence(constant), tried, fields.size(),
                 stage == null ? "" : stage, screen.at());
@@ -325,6 +328,7 @@ final class ScreenCards {
                     : "") + tree.nodes().size() + " nodes" + (tree.unplaced().isEmpty() ? ""
                     : ", " + tree.unplaced().size() + " not placed");
             case Hotkey ignored -> "";
+            case TextButton words -> textTrait(words);
         };
         return new Row(field, input, field, picture(input), state, result, kind, look,
                 ScreenTypes.sourceOf(input.when()), looks, traits);
@@ -336,7 +340,14 @@ final class ScreenCards {
                 + (field.isSubmitting() ? ", then Enter" : "");
     }
 
-    /** Where a drag lets go: {@code dragged onto slot_empty}, or {@code dragged onto zone {10, 20, 30x40}, 800 ms}. */
+    /** Where a text button's words are read: {@code reads "Claim" in quests}, and its gesture when it is no click. */
+    static String textTrait(TextButton words) {
+        Caption caption = words.caption();
+        return "reads " + (caption == null ? "?" : caption.said()) + (words.gesture() == Gesture.CLICK ? ""
+                : ", " + words.gesture().displayName().toLowerCase(Locale.ROOT));
+    }
+
+    /** Where a drag lets go:{@code dragged onto slot_empty}, or {@code dragged onto zone {10, 20, 30x40}, 800 ms}. */
     static String dragTrait(Button dragged) {
         return "dragged onto " + dragged.drag().target() + (dragged.drag().time() == null ? ""
                 : ", " + dragged.dragTime().toMillis() + " ms");
@@ -356,6 +367,7 @@ final class ScreenCards {
                     : strip.members().getFirst().id();
             case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
             case Hotkey ignored -> null;
+            case TextButton ignored -> null;
         };
     }
 
