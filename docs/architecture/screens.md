@@ -213,7 +213,8 @@ map tool against the hand path that covers it, and fails on one with none.
   session included) every 33 ms into one reused image (`LiveImage`, a `PixelBuffer`), a click, drag, wheel or key on
   it sent through `ScreenDesk.hands`. Where the game is read is found once a second on a thread of its own
   (`PanelContext.found`: the window a class names, so a frame lists no windows). The line says "N fps, M ms a read,
-  D ms a draw", and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The line under it names the
+  D ms a draw", and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The
+  line under it names the
   screen the game shows (`which_screen`'s matcher, at most once a second); a click inside an input's box that took
   the game from one known screen to another with no way between them offers **Record** (`LiveWays`). **❄ Freeze**
   keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by
