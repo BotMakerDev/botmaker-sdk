@@ -172,9 +172,8 @@ public final class ScreenWalk {
      * screen opened from it), or its markers hold all of {@code under}'s and more (a tab of a window).
      */
     private boolean standsAbove(String over, String under) {
-        Set<String> marks = new HashSet<>(Markers.of(graph.screens().get(under)).shown().stream()
-                .map(ImageTemplate::id).toList());
-        List<String> its = Markers.of(graph.screens().get(over)).shown().stream().map(ImageTemplate::id).toList();
+        Set<String> marks = new HashSet<>(graph.markers(under).shown().stream().map(ImageTemplate::id).toList());
+        List<String> its = graph.markers(over).shown().stream().map(ImageTemplate::id).toList();
         if (its.size() > marks.size() && its.containsAll(marks)) return true;
         if (graph.panelOf(over).filter(under::equals).isPresent()) return true;
         for (String from : graph.opensFrom(over)) {
@@ -284,7 +283,8 @@ public final class ScreenWalk {
                 reached.accept(at);
                 told = at;
             }
-            if (at.equals(target)) {
+            // A tab of the target is the target too: the game shows it, one of its tabs picked.
+            if (at.equals(target) || graph.tabOf(at, target)) {
                 return new Result(Outcome.ARRIVED, at, walked, "On " + graph.shown(at) + "."
                         + (uncovered == null ? "" : " " + uncovered));
             }
@@ -303,7 +303,8 @@ public final class ScreenWalk {
             if (arrives(next)) {
                 // Read again from the next look: a way back may land on another screen than the map's parent.
                 at = next.to();
-                if (!graph.screens().get(at).hasMarker()) {
+                // A tab whose button has no Selected look yet is as unmarked: nothing tells it either.
+                if (!graph.markers(at).any()) {
                     unmarked = at;
                     left = from;
                 }
@@ -311,7 +312,7 @@ public final class ScreenWalk {
             }
             // Nothing followed a loading screen or a transition in its time: the server or the connection, not the map.
             // A loading screen with no marker is where the game still is while no screen of the map shows.
-            boolean marked = graph.screens().get(from).hasMarker();
+            boolean marked = graph.markers(from).any();
             if (next.onItsOwn() && reach.look().map(f -> whereOn(f, from)).filter(on -> on.isEmpty() && !marked
                     || on.filter(from::equals).isPresent()).isPresent()) {
                 return new Result(Outcome.STUCK, from, walked, "Stuck loading on " + graph.shown(from) + ": "
@@ -555,7 +556,7 @@ public final class ScreenWalk {
      * closed; empty when it shows none.
      */
     private Optional<String> landing(String from, List<String> leads) {
-        Optional<String> unmarked = leads.stream().filter(to -> !Markers.of(graph.screens().get(to)).any()).findFirst();
+        Optional<String> unmarked = leads.stream().filter(to -> !graph.markers(to).any()).findFirst();
         if (unmarked.isPresent()) {
             reach.pause(POLL_MS);
             return unmarked;
@@ -579,7 +580,7 @@ public final class ScreenWalk {
 
     /** The first of {@code leads} whose markers {@code frame} shows. */
     private Optional<String> shownLead(List<String> leads, BufferedImage frame) {
-        return leads.stream().filter(to -> Markers.of(graph.screens().get(to)).on(reach, frame)).findFirst();
+        return leads.stream().filter(to -> graph.markers(to).on(reach, frame)).findFirst();
     }
 
     /**
@@ -660,7 +661,7 @@ public final class ScreenWalk {
         }
         Optional<Tree> tree = treeOf(edge);
         if (edge.via() instanceof Button button && tree.isPresent()) {
-            Map<String, Button> buttons = graph.screen(edge.from()).map(from -> from.nodeButtons(tree.get()))
+            Map<String, Button> buttons = graph.screen(graph.holder(edge)).map(from -> from.nodeButtons(tree.get()))
                     .orElse(Map.of());
             Optional<Reach.Seen> seen = TreeWalk.reach(reach, button, tree.get(), buttons, frame).found();
             if (seen.isEmpty() || seen.get().state().blocks()) return false;
@@ -670,14 +671,14 @@ public final class ScreenWalk {
         return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
     }
 
-    /** The strip of the screen {@code edge} leaves that its input is a member of; empty for one at its place. */
+    /** The strip of the screen holding {@code edge}'s input that its input is a member of; empty for one at its place. */
     private Optional<Strip> stripOf(ScreenGraph.Edge edge) {
-        return graph.screen(edge.from()).flatMap(from -> from.stripOf(edge.via()));
+        return graph.screen(graph.holder(edge)).flatMap(from -> from.stripOf(edge.via()));
     }
 
-    /** The tree of the screen {@code edge} leaves that its input is a node of; empty for one in none. */
+    /** The tree of the screen holding {@code edge}'s input that its input is a node of; empty for one in none. */
     private Optional<Tree> treeOf(ScreenGraph.Edge edge) {
-        return graph.screen(edge.from()).flatMap(from -> from.treeOf(edge.via()));
+        return graph.screen(graph.holder(edge)).flatMap(from -> from.treeOf(edge.via()));
     }
 
     /**
@@ -690,14 +691,14 @@ public final class ScreenWalk {
      */
     private boolean arrives(ScreenGraph.Edge edge) {
         MapScreen screen = graph.screens().get(edge.to());
-        Markers left = Markers.of(graph.screens().get(edge.from()));
-        Markers shows = edge.back() ? left : Markers.of(screen);
+        Markers left = graph.markers(edge.from());
+        Markers shows = edge.back() ? left : graph.markers(edge.to());
         if (!shows.any()) {
             reach.pause(POLL_MS);
             return true;    // a screen with no marker cannot be told: the walk takes it as reached, or left
         }
         List<Markers> after = edge.back() ? List.of() : graph.followers(edge.to()).stream()
-                .map(c -> Markers.of(graph.screens().get(c))).filter(Markers::any).toList();
+                .map(graph::markers).filter(Markers::any).toList();
         long deadline = reach.nowMs() + (edge.onItsOwn() ? graph.loadMs(edge.from()) : stepMs);
         do {
             reach.pause(POLL_MS);
@@ -729,7 +730,7 @@ public final class ScreenWalk {
     public Optional<String> read(String constant, String field) {
         Optional<Readout> readout = graph.screen(constant).flatMap(screen -> screen.readout(field));
         if (readout.isEmpty()) return Optional.empty();
-        Markers markers = Markers.of(graph.screens().get(constant));
+        Markers markers = graph.markers(constant);
         if (!markers.any()) return Optional.empty();
         return reach.look().filter(frame -> markers.on(reach, frame))
                 .flatMap(frame -> reach.readout(readout.get(), frame));
@@ -743,7 +744,7 @@ public final class ScreenWalk {
     public Optional<String> next(String from) {
         Map<String, Markers> results = new LinkedHashMap<>();
         for (String result : graph.results(from)) {
-            Markers markers = Markers.of(graph.screens().get(result));
+            Markers markers = graph.markers(result);
             if (markers.any()) results.put(result, markers);
         }
         if (results.isEmpty()) return Optional.empty();
@@ -801,7 +802,7 @@ public final class ScreenWalk {
 
     /** The look once {@code popup} is closed: its way out, then Escape when it stays. */
     private Optional<BufferedImage> close(String popup, BufferedImage frame) {
-        Markers shows = Markers.of(graph.screens().get(popup));
+        Markers shows = graph.markers(popup);
         ScreenGraph.Edge back = graph.backOf(popup).orElseThrow();
         boolean escaped = back.via() == null || !reach.perform(back.via(), frame);
         if (escaped) reach.key(Key.ESCAPE);
@@ -919,7 +920,7 @@ public final class ScreenWalk {
     /** The same, each marker looked for over the whole frame unless {@code near}. */
     private List<String> shown(List<String> constants, BufferedImage frame, boolean near) {
         List<Boolean> on = Markers.onEach(reach,
-                constants.stream().map(c -> Markers.of(graph.screens().get(c))).toList(), frame, near);
+                constants.stream().map(graph::markers).toList(), frame, near);
         List<String> shown = new ArrayList<>();
         for (int i = 0; i < constants.size(); i++) if (on.get(i)) shown.add(constants.get(i));
         return shown;

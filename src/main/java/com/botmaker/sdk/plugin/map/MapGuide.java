@@ -66,7 +66,10 @@ final class MapGuide {
     static final String LIVE = "Draw the game here, live: a click, a drag, the wheel or a key on it goes to the game";
     static final String FREEZE = "Keep the frame shown, lossless, to take a screen's shot or make a new screen of it";
     static final String MISSED = "A frame the latest run saved when a wait timed out, opened frozen";
-    static final String RETAKE_FROZEN = "This frame as the screen's shot, while its markers show on it";
+    static final String RETAKE_FROZEN = "This frame as the screen's shot, while its markers show on it; a frame showing "
+            + "one of its looks is that look's shot";
+    static final String LOOK_PICK = "Which look of this screen the shot and the inputs show: a look's own inputs only "
+            + "on it, its own shot once one was taken while the game showed it";
     static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked; "
             + "cutting then starts on it, its marker first";
     static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";

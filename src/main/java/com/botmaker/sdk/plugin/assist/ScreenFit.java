@@ -2,8 +2,8 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.internal.screens.MapScreen;
-import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.plugin.assist.MapAudit.Fit;
@@ -167,8 +167,14 @@ final class ScreenFit {
     static boolean shows(ToolReach reach, ScreenGraph graph, String constant, BufferedImage frame) {
         MapScreen screen = graph.screens().get(constant);
         if (screen == null || !screen.hasMarker()) return true;
-        return Markers.of(screen).on(reach, frame)
+        return graph.markers(constant).on(reach, frame)
                 || new ScreenWalk(graph, reach, ScreenWalk.STEP_MS, null).lookOn(constant, frame).isPresent();
+    }
+
+    /** The name of {@code constant}'s look {@code frame} shows, whose shot it is; null for the screen's plain look. */
+    static String lookShown(ToolReach reach, ScreenGraph graph, String constant, BufferedImage frame) {
+        return new ScreenWalk(graph, reach, ScreenWalk.STEP_MS, null).lookOn(constant, frame)
+                .map(ScreenVariant::name).orElse(null);
     }
 
     /**

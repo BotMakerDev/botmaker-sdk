@@ -120,6 +120,8 @@ final class ScreenCanvas {
     };
     /** When each card's shot and each picture drawn was written, as the cards last drew them: a newer one redraws. */
     private final Map<String, Long> drawnTimes = new HashMap<>();
+    /** The look each screen is shown in, by constant, as the side panel picked it; none: its plain look. */
+    private final Map<String, String> looks = new HashMap<>();
     private final Set<String> folded = new HashSet<>();
     private final Deque<String> trail = new ArrayDeque<>();
     private List<Card> cards = List.of();
@@ -616,9 +618,20 @@ final class ScreenCanvas {
         return resources == null ? 0 : modified(TemplateLibrary.fileForName(resources, id));
     }
 
-    /** When {@code constant}'s shot was written, 0 for none: a retake changes it. */
+    /** When {@code constant}'s shot was written, 0 for none: a retake changes it, and so does another look picked. */
     long shotTime(String constant) {
-        return resources == null ? 0 : modified(ScreenShots.file(resources, constant));
+        return resources == null ? 0 : modified(shotFile(constant));
+    }
+
+    /** Shows {@code constant} in its look {@code look} on its card and the panel's shot; blank for its plain look. */
+    void look(String constant, String look) {
+        if (look == null || look.isBlank()) looks.remove(constant);
+        else looks.put(constant, look);
+    }
+
+    /** {@code constant}'s shot as drawn: that of the look picked, else its own ({@link ScreenShots#shown}). */
+    private Path shotFile(String constant) {
+        return ScreenShots.shown(resources, constant, looks.get(constant));
     }
 
     /**
@@ -629,7 +642,7 @@ final class ScreenCanvas {
         if (resources == null) return Optional.empty();
         // A frame takes ~50 ms to read: read with the window shown, not before (1.7 s for Firestone's 36, 2026-10-16),
         // the card sized meanwhile by the file's header.
-        Size size = ScreenShots.size(ScreenShots.file(resources, constant));
+        Size size = ScreenShots.size(shotFile(constant));
         return image(constant, width, !loadNow).map(image -> shot(image, width, size.width() > 0 && size.height() > 0
                 ? Math.round(width * size.height() / size.width()) : heightAt(image, width)));
     }
@@ -654,7 +667,7 @@ final class ScreenCanvas {
      */
     private Optional<Image> image(String constant, double width, boolean background) {
         if (resources == null) return Optional.empty();
-        Path file = ScreenShots.file(resources, constant);
+        Path file = shotFile(constant);
         long time = modified(file);
         if (time == 0) return Optional.empty();
         // A card loads the game's frame at twice its width, crisp and small; the viewer loads it whole.
@@ -662,7 +675,7 @@ final class ScreenCanvas {
         // A whole frame is megabytes: read for the viewer each time, never kept.
         if (loaded == 0) return Optional.of(new Image(file.toUri().toString(), 0, 0, true, true));
         // Keyed by how it reads too: the panel's boxes need a shot read whole, not a card's still loading.
-        return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + constant + "@" + time + ":" + loaded
+        return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + file.getFileName() + "@" + time + ":" + loaded
                         + (background ? "~" : ""),
                 key -> new Image(file.toUri().toString(), loaded, 0, true, true, background)));
     }
@@ -701,7 +714,7 @@ final class ScreenCanvas {
     Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<String> markers,
                                   List<Strip> strips, Map<String, FrameCut> cuts, Audit audit, String picked,
                                   Consumer<Row> onPick, Runnable onShot) {
-        int shotWidth = resources == null ? 0 : ScreenShots.size(ScreenShots.file(resources, constant)).width();
+        int shotWidth = resources == null ? 0 : ScreenShots.size(shotFile(constant)).width();
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
         return image(constant, width, false).map(image -> {
             double height = heightAt(image, width);

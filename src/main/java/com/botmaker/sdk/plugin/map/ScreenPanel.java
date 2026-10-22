@@ -32,6 +32,7 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.shared.Diag;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -52,6 +53,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import javafx.util.StringConverter;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -131,7 +133,10 @@ final class ScreenPanel {
     /** What the reads below are of: another map, or a history step, drops them. */
     private ScreenGraph readOf;
     private long readAt;
+    /** Each screen's rows read, by constant and the look picked: {@code HOME@Halloween}. */
     private final Map<String, List<Row>> rowsRead = new HashMap<>();
+    /** The look picked for each screen, by constant; none: its plain look. Kept over redraws and other maps. */
+    private final Map<String, String> looksPicked = new HashMap<>();
     private final Map<String, Cuts> cutsRead = new HashMap<>();
     private Map<String, String> stagesRead;
     /** What each screen's audit was made from: a draw that changed none of it matches nothing again. */
@@ -291,7 +296,8 @@ final class ScreenPanel {
         // Everything the board shows but the input picked: the screen, its rows, where its inputs were cut and are
         // found on its shot, and when the shot and its pictures were written.
         List<Object> shown = selected == null ? List.of() : List.of(at, rows(selected), cuts,
-                Optional.ofNullable(written), Optional.ofNullable(audits.get(selected)));
+                Optional.ofNullable(written), Optional.ofNullable(audits.get(selected)),
+                looksPicked.getOrDefault(selected, ""));
         drawBoard(shown, cuts);
         long boarded = System.nanoTime();
         // Everything the panel shows: that, its card, its way from the first screen, its ways in, how wide it is
@@ -406,10 +412,42 @@ final class ScreenPanel {
         return ScreenCards.card(graph, constant, stagesRead.getOrDefault(constant, ""));
     }
 
-    /** {@code constant}'s rows, read once a map. */
+    /** {@code constant}'s rows on the look picked for it ({@link ScreenCards#rows(ScreenGraph, String, String)}). */
     private List<Row> rows(String constant) {
         reads();
-        return rowsRead.computeIfAbsent(constant, c -> ScreenCards.rows(graph, c));
+        String look = looksPicked.getOrDefault(constant, "");
+        return rowsRead.computeIfAbsent(constant + "@" + look, c -> ScreenCards.rows(graph, constant, look));
+    }
+
+    /**
+     * Which of {@code constant}'s looks its shots and rows show: its plain one, or a look by name, each with its own shot
+     * once ❄ Freeze or a cut took one while the game showed it.
+     */
+    private Node lookPick(String constant) {
+        ComboBox<String> pick = new ComboBox<>(FXCollections.observableArrayList(ScreenCards.looks(graph, constant)));
+        pick.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(String look) {
+                return look == null || look.isEmpty() ? "Usual look" : look;
+            }
+
+            @Override
+            public String fromString(String shown) {
+                return shown;
+            }
+        });
+        pick.setValue(looksPicked.getOrDefault(constant, ""));
+        pick.setTooltip(new Tooltip(MapGuide.LOOK_PICK));
+        pick.setOnAction(e -> {
+            String look = pick.getValue() == null ? "" : pick.getValue();
+            if (look.isEmpty()) looksPicked.remove(constant);
+            else looksPicked.put(constant, look);
+            canvas.look(constant, look);
+            draw();
+        });
+        HBox row = new HBox(8, new Label("Look"), pick);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
     }
 
     /** The reads kept for the map shown: dropped for another map or after a history step. */
@@ -527,6 +565,7 @@ final class ScreenPanel {
 
         pickedPart.getChildren().setAll(pickedNodes(shown));
         VBox all = new VBox(12, head, pills, actions, pickedPart);
+        if (!screen.variants().isEmpty()) all.getChildren().add(2, lookPick(shown));
         all.getChildren().addAll(heading("Markers"), markers, heading("Inputs"), inputs);
         canvas.shotWithInputs(shown, shotWidth, rows, markerIds(shown), ScreenCards.strips(graph, shown, rows), cuts,
                         audits.get(shown), picked, row -> picked(shown, row), () -> showScreen(shown))

@@ -76,6 +76,7 @@ public final class ScreenTypes {
             .<List<ScreenVariant>>with(Setup::variants, Setup::variants)
             .flag(Setup::popup, Setup::isPopup)
             .flag(Setup::start, Setup::isStart)
+            .flag(Setup::tab, Setup::isTab)
             .<Duration>with(Setup::loads, Setup::loads)
             .<String>with(Setup::notes, Setup::notes)
             .<Reached>with(Setup::reached, Setup::reached)

@@ -19,7 +19,8 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   contract release (`/contract-change`).
 - **Screens** (`docs/architecture/screens.md`): a long `GameScreen` chain is written as one line by the host;
   it needs Java formatting, one call per line. Still open from the screen-map plan (`reactive-cooking-reef.md`):
-  sub-states of a screen (phase 8) and chores kept as data (phase 9). Owed checks: the Discovery tools and
+  sub-states of a screen other than tabs (a toggle, a filter, a scroll position; phase 8) and chores kept as data
+  (phase 9). Owed checks: the Discovery tools and
   `edit_map` live over MCP on Firestone, and the 🗺 Screens click-tests of the 2026-10-15 audit.
 - **A screen's chores in the picture picker**: a click's picture after `Navigate.to(Screens.X)` in the same body
   could offer X's `Kind.CHORE` inputs first. The plugin reads no Java text, so the host would have to say which
@@ -92,15 +93,16 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     type (`BotConstants.input`); 🗺's board and cards draw no readout; no tool reads one live (read_text by its zone
     does); a readout is renamed or removed in `Screens.java`; `Navigate.to` cannot say which subject to walk to (hero
     N), only `Navigate.subject` reads which one shows.
+  - Tabs and looks, past their first cut (2026-10-22): the *Look* picker is on the side panel only (the card
+    follows it, with no picker of its own); the audit checks a screen's own shot, so on a look's shot the boxes sit
+    where the plain shot found them; a card shows no "tab of" pill; the cut form has no *tab* kind (a tab is marked
+    from the ⋯ menu once its way in is cut, and its button's Selected look cut as a look); a look with no marker is
+    never recognised, so its shot is never taken.
   - Edge costs: measured step and settle times feed `ScreenGraph.pathTo` and the walk's waits instead of `STEP_MS`.
   - The by-hand flow (after the owed click-tests): "next untried" in the window, suggested cut names, the cut form
     split by intent, Try that freezes the opened screen and starts its marker cut, an empty map instead of the
     template's placeholder Home.
   - Scale: a parse cached by file hash (a 45-screen read takes ~1 s).
-- **A screen's looks on 🗺 Screens** (the user's call, 2026-10-16, a later plan): a `ScreenVariant` (Halloween)
-  cannot be shown; each screen keeps one shot and rows only say "look X". Wanted: one shot per look, saved when
-  Discovery cuts the look; a look picker on the card and the panel; rows, boxes and list strips filtered to the
-  picked look. A button's looks already step with ◀ ▶ (`LookToggle`).
 - **A run whose saved window is missing re-matches by the launch's pids** (launch-target plan 2026-10-19, not
   built): Launch and pick saves the window by class (+ title when generic); a run that launched the game and finds no
   such window could pick the new window whose pid descends from the launch, and log it. Only `exe:`/`cli:` (and

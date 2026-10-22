@@ -79,13 +79,13 @@ final class MapEdits {
     record Delete(String screen) implements Edit {
     }
 
-    /** What kind of screen set_kind makes it: one of the tree, a popup, the start screen, or a panel. */
+    /** What kind of screen set_kind makes it: one of the tree, a popup, the start screen, a panel, or a tab. */
     enum Kind {
-        SCREEN, POPUP, START, PANEL
+        SCREEN, POPUP, START, PANEL, TAB
     }
 
     @Describe("screen; popup, the game opens it; start, it opens on it (new if none so called); panel, in the screen "
-            + "it opens from")
+            + "it opens from; tab, told by its button's selected look")
     record SetKind(String screen, Kind as) implements Edit {
     }
 
@@ -698,6 +698,7 @@ final class MapEdits {
             case POPUP -> ScreenEdits.setPopup(services, screen, true);
             case START -> ScreenEdits.setStart(services, screen, true);
             case PANEL -> ScreenEdits.setPanel(services, screen, true);
+            case TAB -> ScreenEdits.setTab(services, screen, true);
             case SCREEN -> ScreenEdits.ofTheTree(services, screen);
         };
     }

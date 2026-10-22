@@ -178,6 +178,9 @@ public final class MapReport {
         if (screen.isStart()) ins.add("the game opens on it");
         graph.panelOf(constant).filter(p -> !graph.parent(constant).equals(Optional.of(p))).ifPresent(p -> ins.add(
                 "a panel of " + graph.shown(p) + ", though its way in is not an input of it"));
+        graph.tabParent(constant).ifPresent(p -> ins.add("a tab of " + graph.shown(p) + ", told by its tab picked"
+                + (graph.markers(constant).shown().size() > screen.markers().size() ? ""
+                : ": its button has no Selected look yet, so nothing tells it")));
         List<String> next = graph.results(constant);
         if (!next.isEmpty()) {
             ins.add(String.join(" or ", next.stream().map(graph::shown).toList()) + " follows it on its own, given "

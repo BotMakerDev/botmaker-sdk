@@ -289,6 +289,22 @@ final class ScreenCards {
         return rows;
     }
 
+    /**
+     * {@link #rows} on {@code look} only, as the side panel shows the screen in that look: every row on all its looks,
+     * and those only {@code look} shows; blank or null for its plain look, which shows none of a look's own.
+     */
+    static List<Row> rows(ScreenGraph graph, String constant, String look) {
+        String on = look == null ? "" : look;
+        return rows(graph, constant).stream().filter(r -> r.look().isEmpty() || r.look().equals(on)).toList();
+    }
+
+    /** The looks a picker offers for {@code constant}, by name: its plain look ({@code ""}) first, then each of its own. */
+    static List<String> looks(ScreenGraph graph, String constant) {
+        List<String> looks = new ArrayList<>(List.of(""));
+        graph.screen(constant).ifPresent(s -> s.variants().forEach(v -> looks.add(v.name())));
+        return List.copyOf(looks);
+    }
+
     static Row row(ScreenGraph graph, String constant, String field) {
         Input input = graph.input(constant, field).orElseThrow();
         Optional<String> opens = graph.opens(constant, field);

@@ -4,8 +4,12 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -14,12 +18,20 @@ import org.junit.jupiter.api.Test;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
+import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What tells a screen: its pictures first, its words read only for a screen the pictures leave in. */
 class MarkersTest {
@@ -111,5 +123,33 @@ class MarkersTest {
         assertEquals(List.of(true, true), Markers.onEach(game,
                 List.of(new Markers(List.of(), List.of(), List.of(SETTINGS)), settings), frame));
         assertEquals(List.of("300x40"), game.reads, "words two screens name are read once");
+    }
+
+    /** A tab needs no marker: its button picked tells it, through the reference its way in names it by. */
+    @Test
+    void aTabIsToldByItsSelectedButton() {
+        Button gearTab = click("gear_tab").looks(List.of(Look.of(picture("gear_tab_on"), State.SELECTED)));
+        Button skillsTab = click("skills_tab").looks(List.of(Look.of(picture("skills_tab_on"), State.SELECTED),
+                Look.of(picture("skills_tab_new"), State.BADGE)));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")), gearTab, skillsTab,
+                click("info")));
+        screens.put("GEAR", screen(Setup.named("Gear").from(ref("HERO", "gear_tab")).tab()));
+        screens.put("SKILLS", screen(Setup.named("Skills").from(ref("HERO", "skills_tab")).tab()));
+        screens.put("INFO", screen(Setup.named("Info").from(ref("HERO", "info")).tab()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals("gear_tab_on", graph.markers("GEAR").ids());
+        assertEquals("skills_tab_on", graph.markers("SKILLS").ids(), "only its Selected look");
+        assertFalse(graph.markers("INFO").any(), "a button with no Selected look tells nothing");
+        assertEquals("gear_tab_on", Markers.of(MapScreen.of(Setup.named("Gear").from(gearTab).tab())).ids(),
+                "a run's own button, no reference");
+
+        Game game = new Game(Set.of("hero_title", "gear_tab_on", "skills_tab"), "");
+        BufferedImage frame = game.look().orElseThrow();
+        assertEquals(List.of(true, false), Markers.onEach(game,
+                List.of(graph.markers("GEAR"), graph.markers("SKILLS")), frame));
+        assertEquals(Optional.of("HERO"), graph.tabParent("GEAR"));
+        assertTrue(graph.tabOf("GEAR", "HERO"));
     }
 }

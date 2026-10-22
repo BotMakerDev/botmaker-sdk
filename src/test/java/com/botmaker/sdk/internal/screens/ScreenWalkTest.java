@@ -1167,6 +1167,48 @@ class ScreenWalkTest {
         assertEquals(List.of(), game.done, "nothing walked to");
     }
 
+    /**
+     * A tab is walked to by pressing its button where the game is, a sibling tab's included, never by a way back; the
+     * screen it is in is reached once one of its tabs shows.
+     */
+    @Test
+    void aTabIsWalkedByPressingIt() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home_title")), click("hero")));
+        screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")).from(ref("HOME", "hero")),
+                click("gear_tab").looks(List.of(Look.of(picture("gear_tab_on"), State.SELECTED))),
+                click("skills_tab").looks(List.of(Look.of(picture("skills_tab_on"), State.SELECTED)))));
+        screens.put("GEAR", screen(Setup.named("Gear").from(ref("HERO", "gear_tab")).tab()));
+        screens.put("SKILLS", screen(Setup.named("Skills").from(ref("HERO", "skills_tab")).tab()));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.shows.put("GEAR", new HashSet<>(Set.of("hero_title", "gear_tab_on", "skills_tab")));
+        game.shows.put("SKILLS", new HashSet<>(Set.of("hero_title", "gear_tab", "skills_tab_on")));
+        game.leads.put("HOME click hero", "GEAR");
+        game.leads.put("GEAR click skills_tab", "SKILLS");
+        game.leads.put("SKILLS click gear_tab", "GEAR");
+        game.leads.put("GEAR key ESCAPE", "HOME");
+        game.leads.put("SKILLS key ESCAPE", "HOME");
+
+        ScreenWalk.Result result = go(game, "SKILLS", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of("click hero", "click skills_tab"), game.done, "the hero opens on Gear, then its sibling");
+
+        game.done.clear();
+        result = go(game, "GEAR", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of("click gear_tab"), game.done, "pressed from the tab shown, no way back");
+
+        game.done.clear();
+        result = go(game, "HERO", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals("GEAR", result.at(), "a tab of it shows");
+        assertEquals(List.of(), game.done);
+
+        result = go(game, "HOME", new ArrayList<>());
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of("key ESCAPE"), game.done, "left as the screen it is in is");
+    }
+
     @Test
     void aGameJustOpenedIsWaitedForUntilItsStartScreenShows() {
         Game game = loading("NOTHING");    // drawing nothing of the map yet

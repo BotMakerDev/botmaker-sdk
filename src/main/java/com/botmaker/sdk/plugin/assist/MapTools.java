@@ -420,7 +420,7 @@ final class MapTools {
                 ? ActTools.enterText(context, screen, words, input.desktop(), settle, FrameChange.ANSWER_SHARE)
                 : ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick, strip.orElse(null),
                 keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
-        Markers onMarkers = Markers.of(on);
+        Markers onMarkers = graph.markers(screen);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
         ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
         boolean flashed = entered != slow;    // its markers hidden a moment, then back: this screen, redrawn
@@ -467,10 +467,10 @@ final class MapTools {
                     .filter(c -> !c.equals(screen));
             if (named.isPresent()) {
                 MapScreen to = graph.screens().get(named.get());
-                if (to.hasMarker() && !ActTools.shows(context, Markers.of(to), entered.after())) {
+                if (to.hasMarker() && !ActTools.shows(context, graph.markers(named.get()), entered.after())) {
                     // Taken at its word, a fight's start panel was recorded as the fight (2026-10-15).
                     return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: "
-                            + graph.shown(named.get()) + "'s marker " + Markers.of(to).ids() + " does not show, so this "
+                            + graph.shown(named.get()) + "'s marker " + graph.markers(named.get()).ids() + " does not show, so this "
                             + "is not " + graph.shown(named.get()) + ". Look at it (describe); give opens the name it "
                             + "shows, and try " + field + " again from " + name + ".")));
                 }
@@ -517,8 +517,8 @@ final class MapTools {
         }
         Optional<BufferedImage> frame = reach.get().look();
         if (frame.isEmpty()) return Optional.of(AgentReply.refused(Frames.noScreen()));
-        if (!ActTools.shows(context, Markers.of(on), frame.get())) {
-            return Optional.of(AgentReply.refused("The game is not on " + name + ": its marker " + Markers.of(on).ids()
+        if (!ActTools.shows(context, graph.markers(screen), frame.get())) {
+            return Optional.of(AgentReply.refused("The game is not on " + name + ": its marker " + graph.markers(screen).ids()
                     + (on.absent().isEmpty() ? "" : ", without " + String.join(", ", on.absent().stream()
                     .map(ImageTemplate::id).toList())) + ", is not on the screen. Go back to " + name + " first."));
         }
@@ -542,7 +542,7 @@ final class MapTools {
         if (reach.isEmpty()) return Optional.empty();
         ScreenWalk walk = new ScreenWalk(graph, reach.get(), STEP_MS, null);
         Optional<String> popup = walk.popupOn(entered.after()).filter(c -> !c.equals(screen)
-                && !ActTools.shows(context, Markers.of(graph.screens().get(c)), entered.before()));
+                && !ActTools.shows(context, graph.markers(c), entered.before()));
         if (popup.isPresent()) return popup;
         return walk.whereOn(entered.after(), screen).filter(c -> !c.equals(screen));
     }
@@ -804,7 +804,7 @@ final class MapTools {
     static Optional<Markers> markers(StudioServices services, String typed) {
         try {
             ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
-            return ScreenBook.find(graph, typed).map(c -> Markers.of(graph.screens().get(c)));
+            return ScreenBook.find(graph, typed).map(graph::markers);
         } catch (IllegalStateException busy) {
             return Optional.empty();
         }
@@ -824,7 +824,7 @@ final class MapTools {
         }
         Optional<String> constant = ScreenBook.find(graph, typed);
         if (constant.isEmpty()) return "";
-        Markers now = Markers.of(graph.screens().get(constant.get()));
+        Markers now = graph.markers(constant.get());
         if (now.same(before)) return "";
         Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services), graph,
                 constant.get(), now);
@@ -1261,7 +1261,9 @@ final class MapTools {
         Optional<BufferedImage> frame = reach.look().filter(f -> ScreenFit.shows(reach, graph, constant, f));
         // Once a session: each arrival wrote a 1–3 MB shot of an animated game, a new file the next Project History
         // snapshot hashed, compressed and kept, 2–3 s of every write and most of a 63 MB history (2026-10-16).
-        if (frame.isPresent() && RETAKEN.add(resources.resolve(constant))) ScreenShots.save(resources, constant, frame.get());
+        if (frame.isPresent() && RETAKEN.add(resources.resolve(constant))) {
+            ScreenShots.save(resources, constant, ScreenFit.lookShown(reach, graph, constant, frame.get()), frame.get());
+        }
     }
 
     /**
@@ -1284,9 +1286,10 @@ final class MapTools {
                 || !ScreenFit.shows(reach.get(), graph, constant.get(), frame)) {
             return "";
         }
-        ScreenShots.save(resources, constant.get(), frame);
+        String look = ScreenFit.lookShown(reach.get(), graph, constant.get(), frame);
+        ScreenShots.save(resources, constant.get(), look, frame);
         RETAKEN.add(resources.resolve(constant.get()));
-        return " " + graph.shown(constant.get()) + "'s shot is this frame now.";
+        return " " + graph.shown(constant.get()) + (look == null ? "" : "'s look " + look) + "'s shot is this frame now.";
     }
 
     /** The shots a walk has taken again since the plugin loaded, by file. */

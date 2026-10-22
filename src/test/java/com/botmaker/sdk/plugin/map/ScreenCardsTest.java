@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
+import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
@@ -338,6 +339,22 @@ class ScreenCardsTest {
         assertEquals(List.of(GraphLayout.Link.of("HOME", "SHOP"), GraphLayout.Link.of("SHOP", "BAG"),
                         GraphLayout.Link.of("HOME", "BAG"), GraphLayout.Link.of("SHOP", "HOME")),
                 ScreenCanvas.ways(links, Set.of("REWARD")));
+    }
+
+    /** A look's own inputs show only on it: the plain look lists what every look shows. */
+    @Test
+    void rowsFilterToThePickedLook() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("EVENT", screen(Setup.named("Event").markers(marks("event_title")).variants(List.of(
+                ScreenVariant.named("Halloween").markers(marks("event_pumpkins"))
+                        .inputs(List.of(ref("EVENT", "pumpkin"))))), click("claim"), click("pumpkin")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("", "Halloween"), ScreenCards.looks(graph, "EVENT"));
+        assertEquals(List.of("claim"), ScreenCards.rows(graph, "EVENT", "").stream().map(r -> r.field()).toList());
+        assertEquals(List.of("claim", "pumpkin"),
+                ScreenCards.rows(graph, "EVENT", "Halloween").stream().map(r -> r.field()).toList());
+        assertEquals(List.of("claim"), ScreenCards.rows(graph, "EVENT", null).stream().map(r -> r.field()).toList());
     }
 
     @Test

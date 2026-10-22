@@ -259,6 +259,39 @@ public final class ScreenGraph {
                 .filter(c -> !c.equals(constant));
     }
 
+    /** The screen {@code constant} is a tab of ({@link Setup#tab}): the one its way in is on; empty for none. */
+    public Optional<String> tabParent(String constant) {
+        return screen(constant).filter(MapScreen::isTab).map(MapScreen::from).flatMap(this::onScreen)
+                .filter(c -> !c.equals(constant));
+    }
+
+    /** Whether {@code constant} is a tab of {@code screen}, or a tab of one of its tabs. */
+    public boolean tabOf(String constant, String screen) {
+        Set<String> seen = new HashSet<>();
+        for (Optional<String> up = tabParent(constant); up.isPresent() && seen.add(up.get()); up = tabParent(up.get())) {
+            if (up.get().equals(screen)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * What tells {@code constant} ({@link Markers#of(MapScreen)}): a tab's button found through the reference its way
+     * in names it by, as Studio's tools read the map. Nothing tells a screen not in the map.
+     */
+    public Markers markers(String constant) {
+        MapScreen screen = screens.get(constant);
+        if (screen == null) return new Markers(List.of(), List.of());
+        if (!screen.isTab()) return Markers.of(screen);
+        Button tab = nameOf(screen.fromInput()).flatMap(n -> input(n.screen(), n.field()))
+                .filter(Button.class::isInstance).map(Button.class::cast).orElse(null);
+        return Markers.of(screen, tab);
+    }
+
+    /** The screen holding {@code edge}'s input: the one it leaves, else, for a tab's, the screen the tab is in. */
+    public String holder(Edge edge) {
+        return nameOf(edge.via()).map(InputName::screen).orElse(edge.from());
+    }
+
     /** Every screen a way into {@code constant} is on: its {@code from}'s, then each {@code alsoFrom}'s. */
     public Set<String> opensFrom(String constant) {
         Set<String> from = new LinkedHashSet<>();
@@ -568,8 +601,22 @@ public final class ScreenGraph {
                 nameOf(way.via()).ifPresent(via -> edges.add(new Edge(via.screen(), c, via.field(),
                         input(via.screen(), via.field()).orElseThrow(), false, way.pick(), way.state(), way.when())));
             }
-            if (!screen.isPopup()) backTo(c).ifPresent(p -> edges.add(back(c, p)));
+            // A tab is left as the screen it is in is: its way back is that screen's.
+            if (!screen.isPopup() && !screen.isTab()) backTo(c).ifPresent(p -> edges.add(back(c, p)));
         });
+        // A tab shows the screen it is in, so that screen's ways out leave from each of its tabs too: a sibling tab's
+        // button is pressed from where the game is.
+        List<Edge> own = List.copyOf(edges);
+        for (String c : screens.keySet()) {
+            Set<String> seen = new HashSet<>();
+            for (Optional<String> up = tabParent(c); up.isPresent() && seen.add(up.get()); up = tabParent(up.get())) {
+                String in = up.get();
+                for (Edge e : own) {
+                    if (!e.from().equals(in) || e.onItsOwn() || e.to().equals(c)) continue;
+                    edges.add(new Edge(c, e.to(), e.input(), e.via(), e.back(), e.pick(), e.state(), e.when()));
+                }
+            }
+        }
         return edges;
     }
 

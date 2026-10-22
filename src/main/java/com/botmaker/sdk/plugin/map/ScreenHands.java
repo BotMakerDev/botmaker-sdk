@@ -284,6 +284,12 @@ final class ScreenHands {
         panel.setSelected(screen != null && screen.isPanel());
         panel.setDisable(in.isEmpty() || screen == null || screen.isPopup() || screen.isStart());
         panel.setOnAction(e -> done.accept(ScreenEdits.setPanel(services, constant, panel.isSelected())));
+        // A tab of the screen its tab button is on, told by that button picked: no marker of its own.
+        CheckMenuItem tab = new CheckMenuItem("A tab of " + in.map(graph.get()::shown).orElse("the screen it opens "
+                + "from") + " (told by its tab button picked)");
+        tab.setSelected(screen != null && screen.isTab());
+        tab.setDisable(in.isEmpty() || screen == null || screen.isPopup() || screen.isStart());
+        tab.setOnAction(e -> done.accept(ScreenEdits.setTab(services, constant, tab.isSelected())));
         MenuItem loads = item("The next screen shows within…", () -> askText("The next screen shows within",
                 "Seconds the screen following " + shown + " on its own may take (0: 60)",
                 screen == null || screen.setup().loads() == null ? "0"
@@ -298,7 +304,7 @@ final class ScreenHands {
                 ScreenEdits.notAScreen(new PanelContext(services, CaptureValue.current(services)), constant)));
         MenuItem delete = item("Delete…", () -> confirm("Delete " + shown, "Delete " + shown + " from the map? Its "
                 + "pictures stay.", () -> done.accept(ScreenEdits.delete(services, constant))));
-        return List.of(rename, popup, start, panel, loads, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
+        return List.of(rename, popup, start, panel, tab, loads, shot, new SeparatorMenuItem(), place, child, new SeparatorMenuItem(),
                 notScreen, delete);
     }
 

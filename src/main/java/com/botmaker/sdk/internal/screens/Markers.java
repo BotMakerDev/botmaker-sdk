@@ -1,8 +1,11 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -36,8 +39,20 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         this(shown, absent, List.of());
     }
 
+    /**
+     * What tells {@code screen}: its own markers, and for a tab its way in's button picked, when that way in is the
+     * button itself. One the host reads names it by reference, so {@link ScreenGraph#markers} finds it instead.
+     */
     public static Markers of(MapScreen screen) {
-        return new Markers(screen.markers(), screen.absent(), screen.texts());
+        return of(screen, screen.isTab() && screen.fromInput() instanceof Button tab ? tab : null);
+    }
+
+    /** What tells {@code screen}, a tab told by {@code tab} picked; null for none. */
+    static Markers of(MapScreen screen, Button tab) {
+        if (tab == null) return new Markers(screen.markers(), screen.absent(), screen.texts());
+        List<ImageTemplate> shown = new ArrayList<>(screen.markers());
+        tab.looks().stream().filter(look -> look.state() == State.SELECTED).map(Look::picture).forEach(shown::add);
+        return new Markers(shown, screen.absent(), screen.texts());
     }
 
     public static Markers of(ScreenVariant look) {

@@ -92,6 +92,20 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `Screens.HOME_UPGRADE`), its way in an input of that screen. It walks as any child screen and is found over Home
   while Home's markers show. Not a class nested in Home's: Studio's open set of classes reads only classes nested
   directly in `Screens` (the user's pick, 2026-10-18).
+- **A tab** (2026-10-22) is a screen shown inside the one its tab button is on, told by that button in its
+  `State.SELECTED` look: `Setup.named("Gear").from(HERO.gearTab).tab()`, the button carrying `Look.of(GEAR_TAB_ON,
+  State.SELECTED)`. It needs no marker of its own (`ScreenGraph.markers` adds the look, through the reference Studio
+  reads the way in as). The screen it is in, and its other tabs, are left from it as from that screen: its edges are
+  copied onto each tab (`ScreenGraph.edges`), so a walk presses a sibling tab directly, and its way back is that
+  screen's. A walk to the screen it is in arrives once any of its tabs shows (`ScreenGraph.tabOf`). An input of the
+  screen is found on that screen's class when pressed from a tab (`ScreenGraph.holder`: its strip, its tree). The
+  ⋯ menu's *A tab of …* and edit_map's `set_kind tab` mark it (`ScreenEdits.setTab`).
+- **A look's shot** (2026-10-22): a frame showing one of a screen's looks (`ScreenWalk.lookOn`) is that look's shot,
+  `screens/<CONSTANT>@<look>.png` (`ScreenShots.file(resources, constant, look)`, the look's name lower case and
+  dashed), and leaves the screen's own; ❄ Freeze's retake, a cut marker and a walk's retake all save so. The panel's
+  *Look* picker shows the screen in one look: its shot (`ScreenShots.shown`, the screen's own while the look has
+  none) on the panel, the board and its card, and only the rows every look shows plus that look's own
+  (`ScreenCards.rows(graph, constant, look)`), so a strip draws only them too.
 
 ## Trees (`api/screens/Tree`, the user's calls of 2026-10-17)
 

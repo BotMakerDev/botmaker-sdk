@@ -7,9 +7,11 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.Locale;
 
 /**
  * A picture of each whole screen of the map, for 🗺 Screens' cards and side panel: the marker alone says which screen
@@ -19,6 +21,8 @@ import java.util.Iterator;
  * nothing matches it, and a missing one only leaves the card showing its marker. try_input saves a draft when it opens a
  * screen, and the cut of the screen's marker replaces it with the frame it was cut from; which_screen saves one when it
  * sees a screen that has none. Any other shot is taken only on a frame the screen's marker shows on (2026-10-16).
+ * A frame showing one of the screen's looks ({@code ScreenVariant}) is that look's shot, {@code <CONSTANT>@<look>.png},
+ * and leaves the screen's own as it was (2026-10-22).
  */
 public final class ScreenShots {
 
@@ -53,11 +57,37 @@ public final class ScreenShots {
         return resources.resolve(FOLDER).resolve(constant + ".png");
     }
 
+    /**
+     * Where {@code constant}'s shot in its look {@code look} is, {@code screens/EVENT@halloween.png}, whether or not it
+     * exists yet; the screen's own shot for null or blank, the plain look.
+     */
+    public static Path file(Path resources, String constant, String look) {
+        String id = lookId(look);
+        return id.isEmpty() ? file(resources, constant) : resources.resolve(FOLDER).resolve(constant + "@" + id + ".png");
+    }
+
+    /** The shot shown for {@code constant} in {@code look}: that look's, else the screen's own while the look has none. */
+    public static Path shown(Path resources, String constant, String look) {
+        Path own = file(resources, constant, look);
+        return Files.isRegularFile(own) ? own : file(resources, constant);
+    }
+
+    /** {@code look} as its shot's file names it: lower case, a dash for each run of other marks; empty for none. */
+    static String lookId(String look) {
+        if (look == null) return "";
+        return look.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+    }
+
     /** Saves {@code frame} as {@code constant}'s shot, over the one it had; a shot that cannot be written is left. */
     static void save(Path resources, String constant, BufferedImage frame) {
+        save(resources, constant, null, frame);
+    }
+
+    /** As {@link #save}, as the shot of {@code constant}'s look {@code look}: the screen's own for null. */
+    static void save(Path resources, String constant, String look, BufferedImage frame) {
         if (resources == null || constant == null || frame == null) return;
         try {
-            Path file = file(resources, constant);
+            Path file = file(resources, constant, look);
             Files.createDirectories(file.getParent());
             ImageIO.write(frame, "png", file.toFile());
         } catch (IOException | RuntimeException unwritten) {
@@ -72,11 +102,16 @@ public final class ScreenShots {
         }
     }
 
-    /** Removes {@code constant}'s shot: its screen left the map. */
+    /** Removes {@code constant}'s shot and each of its looks': its screen left the map. */
     static void remove(Path resources, String constant) {
         if (resources == null || constant == null) return;
         try {
             Files.deleteIfExists(file(resources, constant));
+            Path folder = resources.resolve(FOLDER);
+            if (!Files.isDirectory(folder)) return;
+            try (DirectoryStream<Path> looks = Files.newDirectoryStream(folder, constant + "@*.png")) {
+                for (Path look : looks) Files.deleteIfExists(look);
+            }
         } catch (IOException ignored) {
             // A stray shot names no constant: nothing reads it.
         }

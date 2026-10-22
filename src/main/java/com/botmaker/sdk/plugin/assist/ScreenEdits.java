@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -355,11 +356,39 @@ public final class ScreenEdits {
     public static String ofTheTree(StudioServices services, String constant) {
         MapScreen screen = ScreenBook.read(services).screens().get(constant);
         if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
-        if (!screen.isPopup() && !screen.isStart() && !screen.isPanel()) {
+        if (!screen.isPopup() && !screen.isStart() && !screen.isPanel() && !screen.isTab()) {
             return "A screen of the tree already: nothing to change.";
         }
-        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.notPopup().notStart().panelOf(null))),
-                "A screen of the tree now.");
+        return said(ScreenBook.update(services, constant,
+                s -> s.setup(x -> x.notPopup().notStart().panelOf(null).notTab())), "A screen of the tree now.");
+    }
+
+    /**
+     * Makes {@code constant} a tab of the screen its way in is on ({@code tab} true), told by the button its way in
+     * presses in that button's Selected look, or a screen told by its own markers again. Refused for a popup, a start
+     * screen, and a screen no button of another opens.
+     */
+    public static String setTab(StudioServices services, String constant, boolean tab) {
+        ScreenGraph graph = ScreenBook.read(services);
+        MapScreen screen = graph.screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        if (!tab) return said(ScreenBook.update(services, constant, s -> s.setup(Setup::notTab)),
+                "Told by its own markers now.");
+        if (screen.isPopup() || screen.isStart()) {
+            return NOT_WRITTEN + graph.shown(constant) + " is " + (screen.isPopup() ? "a popup" : "the start screen")
+                    + ": a tab is opened by its tab button, on the screen it is in.";
+        }
+        Optional<String> in = graph.parent(constant).filter(c -> !graph.followsOnItsOwn(constant));
+        Optional<Input> button = graph.nameOf(screen.fromInput()).flatMap(n -> graph.input(n.screen(), n.field()))
+                .filter(Button.class::isInstance);
+        if (in.isEmpty() || button.isEmpty()) {
+            return NOT_WRITTEN + "a tab is opened by its tab button, and no button of another screen opens "
+                    + graph.shown(constant) + ": give it a way in first.";
+        }
+        boolean picked = ((Button) button.get()).looks().stream().anyMatch(l -> l.state() == State.SELECTED);
+        return said(ScreenBook.update(services, constant, s -> s.setup(Setup::tab)), "A tab of "
+                + graph.shown(in.get()) + " now" + (picked ? "." : "; its button has no Selected look yet, so nothing "
+                + "tells it: add one to " + graph.nameOf(screen.fromInput()).orElseThrow().field() + "."));
     }
 
     /**
@@ -534,8 +563,9 @@ public final class ScreenEdits {
             return "The game does not show " + graph.shown(constant) + " now: its markers are not found. The shot was "
                     + "kept; go there first.";
         }
-        ScreenShots.save(context.services().resourcesDir(), constant, frame);
-        return "Shot taken.";
+        String look = ScreenFit.lookShown(reach.get(), graph, constant, frame);
+        ScreenShots.save(context.services().resourcesDir(), constant, look, frame);
+        return look == null ? "Shot taken." : "Shot of its look " + look + " taken.";
     }
 
     /** place_pictures: pictures the bot has, put on {@code screen} as inputs, its marker or its way back. */

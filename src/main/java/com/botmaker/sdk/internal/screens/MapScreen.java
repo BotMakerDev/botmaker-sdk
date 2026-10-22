@@ -132,6 +132,11 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         return setup.isPanel();
     }
 
+    /** Whether it is a tab of the screen its way in is on ({@link Setup#tab}). */
+    public boolean isTab() {
+        return setup.isTab();
+    }
+
     public String notes() {
         return setup.notes();
     }

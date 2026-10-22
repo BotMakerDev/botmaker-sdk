@@ -41,6 +41,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `.after(BATTLE)`, Victory and Defeat, and `Navigate.next(Screens.BATTLE)` waits for whichever shows, so a body no
   longer waits on pictures by hand. 🗺 Screens' cut form has *read on this screen* (and *names which one it shows*)
   on a zone or digits cut; read_map lists a screen's readouts and every screen that follows it on its own.
+- **Tabs and looks' shots on the map**: a tab is a screen told by its tab button picked, `Setup.named("Gear")
+  .from(HERO.gearTab).tab()` with a `State.SELECTED` look on the button, so it needs no marker of its own; a walk
+  presses a sibling tab directly and takes any tab as the screen it is in. Mark one from 🗺 Screens' ⋯ (*A tab of …*)
+  or edit_map's `set_kind tab`. A frame showing a screen's look (Halloween) is that look's own shot, and the panel's
+  *Look* picker shows the screen in it: its shot on the panel, the board and the card, and only the inputs that look
+  shows.
 - **Places, spots and grids on the map**: a button found only where it sits from a picture or words,
   `Button.of(Pictures.CLAIM).repeated().place(Place.rightOf(Caption.of(Texts.DAILY, Zones.QUESTS)))`, or picked so
   from a body, `Pick.at(Place.below(Pictures.EVENT_HEADER))` (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
