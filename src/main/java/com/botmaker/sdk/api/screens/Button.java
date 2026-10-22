@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.time.Duration;
@@ -24,6 +25,10 @@ import java.util.function.BooleanSupplier;
  * <p>A button is clicked unless its {@link #gesture} says otherwise: double-clicked, right-clicked, held a time
  * ({@link #hold(Duration)}), or only pointed at (2026-10-22).
  *
+ * <p>A text field is a button that {@link #types} once clicked: one of the bot's {@code Texts}
+ * ({@code .types(Texts.GUILD)}), which a walk types on its way through, or the text a body gives
+ * ({@link #typed()}, {@code Navigate.type}), which no walk goes through (2026-10-22).
+ *
  * @param picture      the picture clicked, as the button usually looks
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
@@ -37,10 +42,12 @@ import java.util.function.BooleanSupplier;
  * @param cycles       whether each press shows its next look, {@code picture} then {@code looks} in turn
  * @param gesture      how it is pressed; {@link Gesture#CLICK} when null
  * @param hold         how long a {@link Gesture#HOLD} is held; {@link #HOLD_TIME} when null, none for any other
+ * @param typing       what it types once clicked, for a text field; null when it is only clicked
  */
 public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, boolean isInfo, String never,
                      boolean comesAndGoes, ImageTemplate lock, List<Look> looks, BooleanSupplier when,
-                     boolean repeats, boolean cycles, Gesture gesture, Duration hold) implements Input {
+                     boolean repeats, boolean cycles, Gesture gesture, Duration hold, Typing typing)
+        implements Input {
 
     /** How long a button held for no time of its own is held: a long press on most phones and games. */
     public static final Duration HOLD_TIME = Duration.ofMillis(800);
@@ -56,7 +63,8 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** {@code picture} clicked at its best match. */
     public static Button of(ImageTemplate picture) {
-        return new Button(picture, false, false, false, null, false, null, List.of(), null, false, false, null, null);
+        return new Button(picture, false, false, false, null, false, null, List.of(), null, false, false, null, null,
+                null);
     }
 
     /**
@@ -66,7 +74,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     public static Button cycling(List<ImageTemplate> looks) {
         List<Look> rest = looks.stream().skip(1).map(look -> Look.of(look, State.NORMAL)).toList();
         return new Button(looks.isEmpty() ? null : looks.getFirst(), false, false, false, null, false, null, rest,
-                null, false, true, null, null);
+                null, false, true, null, null, null);
     }
 
     /** The looks a {@link #cycling} button shows in turn, its usual picture first. */
@@ -77,49 +85,49 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     @Override
     public Button tried() {
         return new Button(picture, true, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button leaves() {
         return new Button(picture, isTried, true, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button info() {
         return new Button(picture, isTried, isLeaving, true, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button never(String why) {
         return new Button(picture, isTried, isLeaving, isInfo, why, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button sometimes() {
         return new Button(picture, isTried, isLeaving, isInfo, never, true, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button locked(ImageTemplate lock) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     @Override
     public Button when(BooleanSupplier condition) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, condition, repeats,
-                cycles, gesture, hold);
+                cycles, gesture, hold, typing);
     }
 
     /** This button, also looking as each of {@code looks} says. */
     public Button looks(List<Look> looks) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     /** This button, shown more than once on its screen: Claim on each mission card. */
@@ -130,19 +138,70 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     /** This button, shown more than once on its screen or not. */
     public Button repeats(boolean repeats) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
     public Button gesture(Gesture gesture) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                gesture, hold);
+                gesture, hold, typing);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public Button hold(Duration time) {
         return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
-                Gesture.HOLD, time);
+                Gesture.HOLD, time, typing);
+    }
+
+    /** This button, a text field: clicked, then {@code text} typed into it, one of the bot's {@code Texts}. */
+    public Button types(Words text) {
+        return typing(new Typing(text, isSubmitting(), isClearing()));
+    }
+
+    /** This button, a text field whose text the body gives: {@code Navigate.type(Screens.GUILD.search, name)}. */
+    public Button typed() {
+        return typing(new Typing(null, isSubmitting(), isClearing()));
+    }
+
+    /** This button, a text field Enter is pressed in once its text is typed. */
+    public Button submits() {
+        return typing(new Typing(text(), true, isClearing()));
+    }
+
+    /** This button, a text field emptied before its text is typed. */
+    public Button clears() {
+        return typing(new Typing(text(), isSubmitting(), true));
+    }
+
+    /** This button, typing as {@code typing} says once clicked; null: only clicked. */
+    public Button typing(Typing typing) {
+        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+                gesture, hold, typing);
+    }
+
+    /** Whether it is a text field, typed into once clicked. */
+    public boolean isField() {
+        return typing != null;
+    }
+
+    /** What it types, one of the bot's {@code Texts}; null when it is no field, or its body gives the text. */
+    public Words text() {
+        return typing == null ? null : typing.text();
+    }
+
+    /** Whether it is a text field whose text only a body gives: no walk goes through it. */
+    public boolean typedByBody() {
+        return typing != null && typing.text() == null;
+    }
+
+    /** Whether Enter is pressed once its text is typed. */
+    public boolean isSubmitting() {
+        return typing != null && typing.submits();
+    }
+
+    /** Whether the field is emptied before its text is typed. */
+    public boolean isClearing() {
+        return typing != null && typing.clears();
     }
 
     /** How long it is held when its gesture is a hold: its own time, else {@link #HOLD_TIME}. */

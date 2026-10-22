@@ -84,7 +84,7 @@ class ScreenEditorsTest {
                 seen++;
             }
         }
-        assertEquals(5, seen, "press(Button), press(Button, Pick), press(Hotkey), state(Button)");
+        assertEquals(6, seen, "press(Button), press(Button, Pick), press(Hotkey), state(Button), type(Button, …)");
     }
 
     /**

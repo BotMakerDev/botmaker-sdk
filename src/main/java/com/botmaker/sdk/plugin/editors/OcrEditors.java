@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.OcrOptions.BinarizeMode;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.text.TextResult;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.plugin.screen.EditorFrame;
 import javafx.scene.Node;
@@ -86,6 +87,22 @@ public final class OcrEditors {
                 + "a game font's digits as pictures. Ask Claude to save_digits on a number the game shows to add"
                 + " the ones it lacks."));
         return pill;
+    }
+
+    /** A text of the bot's, edited in place: Enter or leaving the box writes it. */
+    public static Node words(ValueContext ctx) {
+        TextField box = new TextField(ctx.value(Words.class).map(Words::text).orElse(""));
+        box.setPromptText("the text it types");
+        box.setTooltip(new Tooltip("A text of the bot's: a text field of 🗺 Screens types it."));
+        Runnable write = () -> {
+            Words now = Words.of(box.getText());
+            if (!ctx.value(Words.class).map(now::equals).orElse(false)) ctx.write(now);
+        };
+        box.setOnAction(e -> write.run());
+        box.focusedProperty().addListener((o, was, is) -> {
+            if (!is) write.run();
+        });
+        return box;
     }
 
     /** The editor: a pill saying the whole setting, opening the dialog. */

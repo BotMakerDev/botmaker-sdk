@@ -134,6 +134,10 @@ class TreeMeasureTest {
             }
 
             @Override
+            public void type(String text, boolean clears, boolean submits) {
+            }
+
+            @Override
             public void scroll(Point at, int notches) {
             }
 

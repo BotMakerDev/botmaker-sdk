@@ -13,6 +13,8 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Typing;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -27,6 +29,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What the picked input's editors write, as plain values. */
@@ -127,6 +130,17 @@ class InputInspectorTest {
         assertEquals(Optional.empty(), InputInspector.keyTaken(home, q, Combo.of(Key.Q)), "its own key is its own");
         assertEquals(Optional.empty(), InputInspector.keyTaken(home, null, Combo.of(Key.W)));
         assertEquals(Optional.empty(), InputInspector.keyTaken(home, null, Combo.of(Key.CTRL, Key.Q)));
+    }
+
+    /** The text field editor writes no typing when unticked, and the body's text when its box is blank. */
+    @Test
+    void aFieldsTextIsItsOwnOrTheBodys() {
+        assertNull(InputInspector.typingOf(false, "Dragons", true, true), "unticked: only clicked");
+        assertEquals(new Typing(Words.of("Dragons"), true, false), InputInspector.typingOf(true, "Dragons", true, false));
+        assertEquals(new Typing(null, false, true), InputInspector.typingOf(true, "  ", false, true));
+        assertEquals("types \"Dragons\", then Enter",
+                ScreenCards.fieldTrait(MapFixtures.click("search").types(Words.of("Dragons")).submits()));
+        assertEquals("types the body's text", ScreenCards.fieldTrait(MapFixtures.click("search").typed()));
     }
 
     /** The hotkey editor changes only what it was told: the keys' order and the keys it shows no tick for stay. */

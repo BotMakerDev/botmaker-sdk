@@ -2,6 +2,9 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
+import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
@@ -15,8 +18,11 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -29,11 +35,14 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -53,6 +62,14 @@ public final class ScreenEdits {
     /** How an answer begins when nothing was written. */
     public static final String NOT_WRITTEN = "Not written: ";
 
+    /** The longest text a field types: a search, a name, a line of chat. */
+    public static final int LONGEST_TEXT = 500;
+
+    /** The longest name a text's constant is given from the text. */
+    private static final int TEXT_NAME_LENGTH = 32;
+
+    private static final ManagedSet<Words> TEXTS = ManagedSet.of(SdkValues.TEXTS);
+
     /** The longest a button or a hotkey is held, as 🗺's spinners offer: past it the game is held, not pressed. */
     public static final Duration LONGEST_HOLD = Duration.ofMinutes(1);
 
@@ -62,7 +79,8 @@ public final class ScreenEdits {
     public static Input untried(Input input) {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
-                    b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold());
+                    b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
+                    b.typing());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
                     s.when());
@@ -76,7 +94,8 @@ public final class ScreenEdits {
         if (sometimes) return input.sometimes();
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
-                    b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold());
+                    b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
+                    b.typing());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
@@ -91,7 +110,8 @@ public final class ScreenEdits {
         if (info) return input.info();
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
-                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold());
+                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
+                    b.typing());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
@@ -593,7 +613,7 @@ public final class ScreenEdits {
     public static Button cycles(Button button, boolean cycles) {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
-                button.gesture(), button.hold());
+                button.gesture(), button.hold(), button.typing());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
@@ -619,6 +639,63 @@ public final class ScreenEdits {
         return said(ScreenBook.update(services, constant, s -> s.withInput(field, now)),
                 field + " is pressed by " + (now.gesture() == Gesture.HOLD
                         ? "a hold of " + now.holdTime().toMillis() + " ms" : now.gesture().displayName()) + " now.");
+    }
+
+    /**
+     * {@code constant}'s button {@code field} as a text field typing {@code typing}'s text, or only clicked when
+     * {@code typing} is null. Its text is one of the bot's {@code Texts}: the constant holding it, else a new one
+     * named after it, added in the same step; null text is the body's ({@code Navigate.type}). A field that is no
+     * button, or a text longer than {@link #LONGEST_TEXT}, is refused.
+     */
+    public static String setTyping(StudioServices services, String constant, String field, Typing typing) {
+        if (typing != null && typing.text() != null && typing.text().text().length() > LONGEST_TEXT) {
+            return NOT_WRITTEN + "a field types at most " + LONGEST_TEXT + " characters.";
+        }
+        ScreenGraph graph = ScreenBook.read(services);
+        if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
+            return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is typed into.";
+        }
+        return setField(services, constant, field, button.typing(typing));
+    }
+
+    /**
+     * {@code constant}'s field {@code field} written as {@code now}, its text kept in the bot's {@code Texts} in the
+     * same step: what {@link #setTyping} and the assistant's set_input write.
+     */
+    static String setField(StudioServices services, String constant, String field, Button now) {
+        Typing typing = now.typing();
+        Optional<String> failed = ScreenBook.step(services, "Type in " + field,
+                () -> (now.text() == null ? Optional.<String>empty() : keptText(services, now.text()))
+                        .or(() -> ScreenBook.update(services, constant, s -> s.withInput(field, now))));
+        return said(failed, typing == null ? field + " is only clicked now."
+                : field + " types " + (typing.text() == null ? "the text its body gives (Navigate.type)"
+                : "\"" + typing.text().text() + "\"") + (typing.clears() ? ", cleared first" : "")
+                + (typing.submits() ? ", then Enter" : "") + ".");
+    }
+
+    /** {@code words} as a constant of the bot's {@code Texts}: the one holding it already, else a new one. */
+    private static Optional<String> keptText(StudioServices services, Words words) {
+        PluginValues values = services.pluginValues();
+        List<Member> members = TEXTS.members(values);
+        if (members.stream().anyMatch(m -> TEXTS.read(values, m).filter(words::equals).isPresent())) {
+            return Optional.empty();
+        }
+        Optional<String> missing = values.create(TEXTS.value());
+        if (missing.isPresent()) return missing;
+        Set<String> taken = new HashSet<>();
+        members.forEach(m -> taken.add(m.name()));
+        return TEXTS.add(values, Member.of(textName(words.text(), taken)), words);
+    }
+
+    /** A constant's name for {@code text}, none of {@code taken}: {@code "Dragons guild"} is {@code DRAGONS_GUILD}. */
+    static String textName(String text, Set<String> taken) {
+        String base = text.strip().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_").replaceAll("^_+|_+$", "");
+        if (base.length() > TEXT_NAME_LENGTH) base = base.substring(0, TEXT_NAME_LENGTH).replaceAll("_+$", "");
+        if (base.isEmpty()) base = "TEXT";
+        else if (Character.isDigit(base.charAt(0))) base = "TEXT_" + base;
+        String name = base;
+        for (int i = 2; taken.contains(name); i++) name = base + "_" + i;
+        return name;
     }
 
     /**

@@ -14,7 +14,9 @@ import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -84,7 +86,7 @@ final class MapEdits {
     record SetKind(String screen, Kind as) implements Edit {
     }
 
-    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture")
+    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture, text field")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
@@ -96,7 +98,10 @@ final class MapEdits {
                     @Describe(value = "true: shows only at times", optional = true) Boolean sometimes,
                     @Describe(value = "true: a button shown more than once", optional = true) Boolean repeated,
                     @Describe(value = "how a button is pressed", optional = true) Gesture gesture,
-                    @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs)
+                    @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs,
+                    @Describe(value = "a text field's text; blank: the body's", optional = true) String types,
+                    @Describe(value = "a field: Enter after", optional = true) Boolean submits,
+                    @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears)
             implements Edit, OfInput {
     }
 
@@ -388,10 +393,11 @@ final class MapEdits {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
+        boolean typed = edit.types() != null || edit.submits() != null || edit.clears() != null;
         if (settles == 0 && edit.info() == null && edit.sometimes() == null && edit.repeated() == null
-                && edit.gesture() == null && edit.holdMs() == null) {
-            return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture or "
-                    + "holdMs. Nothing was written.");
+                && edit.gesture() == null && edit.holdMs() == null && !typed) {
+            return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture, "
+                    + "holdMs, types, submits or clears. Nothing was written.");
         }
         Input in = on.inputs().get(field);
         if (edit.repeated() != null && !(in instanceof Button)) {
@@ -409,6 +415,18 @@ final class MapEdits {
         }
         if (edit.holdMs() != null && edit.gesture() != null && edit.gesture() != Gesture.HOLD) {
             return AgentReply.refused("holdMs goes with gesture hold, or alone. Nothing was written.");
+        }
+        if (typed && !(in instanceof Button)) {
+            return AgentReply.refused(field + " is no button: only a button is a text field. Nothing was written.");
+        }
+        // Enter and Ctrl+A belong to a field: a plain button made one by them would close every way through it.
+        if (edit.types() == null && typed && !(in instanceof Button b && b.isField())) {
+            return AgentReply.refused(field + " is no text field yet: give types (blank: the body's text) with "
+                    + "submits or clears. Nothing was written.");
+        }
+        if (edit.types() != null && edit.types().length() > ScreenEdits.LONGEST_TEXT) {
+            return AgentReply.refused("A field types at most " + ScreenEdits.LONGEST_TEXT + " characters. Nothing was"
+                    + " written.");
         }
         Input now = in;
         if (edit.did() != null) {
@@ -435,6 +453,12 @@ final class MapEdits {
             now = ScreenEdits.gestured(b, edit.gesture() == null ? Gesture.HOLD : edit.gesture(), hold);
         }
         if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
+        if (typed && now instanceof Button b) {
+            Words text = edit.types() == null ? b.text() : edit.types().isBlank() ? null : Words.of(edit.types());
+            return said(ScreenEdits.setField(context.services(), screen, field, b.typing(new Typing(text,
+                    edit.submits() == null ? b.isSubmitting() : edit.submits(),
+                    edit.clears() == null ? b.isClearing() : edit.clears()))));
+        }
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }
 

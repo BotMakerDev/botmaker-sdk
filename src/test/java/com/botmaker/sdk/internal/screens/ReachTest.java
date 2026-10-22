@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 
@@ -98,6 +99,14 @@ class ReachTest {
         public void keys(Combo combo) {
             done.add("key " + combo.keys().stream().map(Key::name).collect(Collectors.joining("+"))
                     + (combo.hold().isZero() ? "" : " " + combo.hold().toMillis()));
+        }
+
+        /** Typing as {@code type "text"}, after {@code clear} and before {@code enter} when they are asked. */
+        @Override
+        public void type(String text, boolean clears, boolean submits) {
+            if (clears) done.add("clear");
+            done.add("type \"" + text + "\"");
+            if (submits) done.add("enter");
         }
 
         @Override
@@ -430,6 +439,23 @@ class ReachTest {
         assertTrue(column.perform(Hotkey.of(Combo.of(Key.W).held(Duration.ofMillis(500))),
                 column.look().orElseThrow()));
         assertEquals(List.of("key CTRL+S", "key W 500"), column.done);
+    }
+
+    /**
+     * A text field is clicked, given time to take the click, cleared, typed and submitted; one whose body gives its
+     * text is only clicked here, where nothing hands it one.
+     */
+    @Test
+    void aFieldIsClickedClearedTypedAndSubmitted() {
+        Column column = new Column(Map.of("arena", 1), 4);
+        assertTrue(column.perform(Button.of(ARENA).types(Words.of("Dragons")).clears().submits(),
+                column.look().orElseThrow()));
+        assertEquals(List.of("click 240", "clear", "type \"Dragons\"", "enter"), column.done);
+        assertEquals(Reach.FIELD_FOCUS_MS, column.now, "the field took the click before the typing");
+        column.done.clear();
+        assertTrue(column.perform(Button.of(ARENA).types(Words.of("x")), column.look().orElseThrow()));
+        assertTrue(column.perform(Button.of(ARENA).typed().submits(), column.look().orElseThrow()));
+        assertEquals(List.of("click 240", "type \"x\"", "click 240"), column.done);
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */

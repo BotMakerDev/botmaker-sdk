@@ -168,6 +168,11 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
     }
 
     @Override
+    public void type(String text, boolean clears, boolean submits) {
+        hands.type(text, clears, submits);
+    }
+
+    @Override
     public void scroll(Point at, int notches) {
         hands.scroll(at.x(), at.y(), notches);
     }

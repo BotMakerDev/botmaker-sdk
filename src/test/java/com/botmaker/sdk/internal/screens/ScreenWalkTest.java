@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
@@ -194,6 +195,11 @@ class ScreenWalkTest {
         @Override
         public void keys(Combo combo) {
             did("key " + combo.keys().getLast().name());
+        }
+
+        @Override
+        public void type(String text, boolean clears, boolean submits) {
+            did("type " + text);
         }
 
         @Override
@@ -665,6 +671,9 @@ class ScreenWalkTest {
             }
             @Override public void press(Point at, Gesture gesture, Duration hold) { game.press(at, gesture, hold); }
             @Override public void keys(Combo combo) { game.keys(combo); }
+            @Override public void type(String text, boolean clears, boolean submits) {
+                game.type(text, clears, submits);
+            }
             @Override public void scroll(Point at, int notches) { game.scroll(at, notches); }
             @Override public void drag(Point from, Point to, Duration time) { game.drag(from, to, time); }
             @Override public long nowMs() { return game.nowMs(); }
@@ -750,6 +759,56 @@ class ScreenWalkTest {
 
         assertEquals(ScreenWalk.Outcome.LOCKED, walked.outcome());
         assertEquals(List.of(), game.done);
+    }
+
+    /**
+     * A screen whose only way in is a field whose text the body gives is never walked to: the walk ends NOT_NOW,
+     * naming the field, and types nothing. The body's text gets there, and the field pressed without one is not.
+     */
+    @Test
+    void aScreenOnlyBehindAFieldEndsNotNow() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), click("search").typed().submits()));
+        screens.put("RESULTS", screen(named("Results", "results_title", "HOME", "search")));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.leads.put("HOME type Dragons", "RESULTS");
+
+        ScreenWalk.Result walked = go(game, "RESULTS", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.NOT_NOW, walked.outcome(), walked.why());
+        assertTrue(walked.why().contains("opens only by typing in Home's search"), walked.why());
+        assertEquals(List.of(), game.done);
+
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        assertEquals(Pressed.Result.NOT_NOW, walk.press("HOME", "search", null).result(), "no text, no press");
+        assertEquals(Pressed.Result.NOT_NOW, walk.press("HOME", "campaign", null, Words.of("x")).result(),
+                "a button that is no field types nothing");
+        assertEquals(List.of(), game.done);
+        ScreenWalk.Press typed = walk.press("HOME", "search", null, Words.of("Dragons"));
+        assertEquals(Pressed.Result.DONE, typed.result(), typed.toString());
+        assertEquals("RESULTS", typed.at());
+        assertEquals(List.of("click search", "type Dragons"), game.done);
+    }
+
+    /** A field with a text of its own is walked through like a button, typing its text on the way. */
+    @Test
+    void aFieldWithItsOwnTextIsWalkedThrough() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"), click("search").types(Words.of("Dragons")).submits()));
+        screens.put("RESULTS", screen(named("Results", "results_title", "HOME", "search")));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.leads.put("HOME type Dragons", "RESULTS");
+
+        ScreenWalk.Result walked = go(game, "RESULTS", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("click search", "type Dragons"), game.done);
+
+        // Left where it was, a field that keeps what it holds is not typed again as a lost click is pressed again.
+        Game stays = new Game("HOME", ScreenGraph.of(screens));
+        ScreenWalk.Press press = new ScreenWalk(stays.map, stays, STEP_MS, null).press("HOME", "search", null);
+        assertEquals(Pressed.Result.LEFT, press.result(), press.toString());
+        assertEquals(List.of("click search", "type Dragons"), stays.done);
     }
 
     @Test
@@ -850,6 +909,9 @@ class ScreenWalkTest {
 
         @Override
         public void keys(Combo combo) {}
+
+        @Override
+        public void type(String text, boolean clears, boolean submits) {}
 
         @Override
         public void scroll(Point at, int notches) {}

@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
@@ -150,10 +151,10 @@ class ScreenTypesTest {
     void aButtonWithNoGestureWritesNone() {
         Button plain = Button.of(picture("claim"));
         assertEquals(Gesture.CLICK, plain.gesture());
-        // The button's last two links: its gesture, then its hold.
+        // Its gesture and hold links, before the text field's four.
         List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(plain);
-        assertNull(parts.get(parts.size() - 2));
-        assertNull(parts.getLast());
+        assertNull(parts.get(parts.size() - 6));
+        assertNull(parts.get(parts.size() - 5));
 
         Button twice = Button.of(picture("hero")).gesture(Gesture.DOUBLE).repeated();
         Button held = Button.of(picture("charge")).hold(Duration.ofSeconds(2));
@@ -162,12 +163,33 @@ class ScreenTypesTest {
         assertEquals(held, roundTrip(ScreenTypes.BUTTON_SHAPE, held));
         assertEquals(heldLong, roundTrip(ScreenTypes.BUTTON_SHAPE, heldLong));
         List<Object> heldParts = ScreenTypes.BUTTON_SHAPE.components(held);
-        assertNull(heldParts.get(heldParts.size() - 2), "a hold of its own time says it alone");
-        assertEquals(Duration.ofSeconds(2), heldParts.getLast());
+        assertNull(heldParts.get(heldParts.size() - 6), "a hold of its own time says it alone");
+        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 5));
         List<Object> twiceParts = ScreenTypes.BUTTON_SHAPE.components(twice);
-        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 2));
+        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 6));
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).gesture(Gesture.RIGHT);
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
+    }
+
+    /**
+     * A text field is a button and its typing links: a text of the bot's, or {@code .typed()} for the body's,
+     * cleared and submitted when it says. A button of a map written before fields types nothing.
+     */
+    @Test
+    void aTextFieldIsWrittenByItsTextAndItsTraits() {
+        Button search = Button.of(picture("search")).types(Words.of("Dragons")).clears().submits();
+        Button byBody = Button.of(picture("search")).typed().submits();
+        assertEquals(search, roundTrip(ScreenTypes.BUTTON_SHAPE, search));
+        assertEquals(byBody, roundTrip(ScreenTypes.BUTTON_SHAPE, byBody));
+        assertEquals(Words.of("Dragons"), ScreenTypes.BUTTON_SHAPE.components(search)
+                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 4));
+        assertTrue(byBody.typedByBody());
+        assertFalse(search.typedByBody(), "a text of its own is walked through");
+        Button old = Button.of(picture("claim")).tried();
+        assertEquals(old, roundTrip(ScreenTypes.BUTTON_SHAPE, old));
+        assertFalse(old.isField());
+        Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).types(Words.of("a"));
+        assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling), "no link is lost to a cycle");
     }
 
     @Test

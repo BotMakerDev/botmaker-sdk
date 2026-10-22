@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.text.DigitSet;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -44,7 +45,7 @@ import java.util.Set;
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
  * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
- * {@code ZONES}, {@code DIGITS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
+ * {@code ZONES}, {@code DIGITS}, {@code TEXTS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
  * run's {@code @Param} fields in {@code Sdk.java}, which {@code Bot.runFlow} reads by their marks and nothing
  * claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
  * which {@code Bot.runFlow} reads by their marks.
@@ -144,6 +145,16 @@ public final class SdkValues {
             .in("Digits")
             .because("Digits.java holds the game fonts' digit pictures. Ask Claude to save_digits on a number the"
                     + " game shows to add or fix one.");
+
+    /**
+     * The bot's texts — {@code static final Words GUILD = Words.of("Dragons")}, which a text field of the map types
+     * ({@code Button.types(Texts.GUILD)}). A field's text set in 🗺 Screens, or by the assistant's set_input, adds
+     * one (2026-10-22).
+     */
+    public static final ManagedOpenSet.OfConstants<Words> TEXTS = ManagedValue.openSet(SdkValue.Id.TEXTS)
+            .of(Words.class)
+            .in("Texts")
+            .because("Texts.java holds the texts the bot types. Set a text field's text in 🗺 Screens to add one.");
 
     /**
      * The game's screens — {@code static final class Campaign extends Screen} with its constant {@code CAMPAIGN}: its

@@ -18,6 +18,8 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Typing;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -46,6 +48,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -184,6 +187,8 @@ final class InputInspector {
             case Button button -> {
                 all.add(heading("Pressed by"));
                 all.add(gesture(constant, field, button));
+                all.add(heading("Text field"));
+                all.add(typing(constant, field, button));
                 all.add(heading("Looks"));
                 all.add(looks(constant, field, button));
                 all.add(heading("Copies"));
@@ -468,6 +473,48 @@ final class InputInspector {
             }
         });
         return line(gesture, ms, unit);
+    }
+
+    // --- a text field's typing ---
+
+    private Node typing(String constant, String field, Button button) {
+        CheckBox isField = new CheckBox("Types text");
+        isField.setSelected(button.isField());
+        isField.setTooltip(new Tooltip(MapGuide.FIELD));
+        TextField text = new TextField(button.text() == null ? "" : button.text().text());
+        text.setPromptText("blank: the body gives it (Navigate.type)");
+        HBox.setHgrow(text, Priority.ALWAYS);
+        CheckBox clears = new CheckBox("Clear first");
+        clears.setSelected(button.isClearing());
+        CheckBox submits = new CheckBox("Enter after");
+        submits.setSelected(button.isSubmitting());
+        for (Node shown : List.of(text, clears, submits)) {
+            shown.setVisible(button.isField());
+            shown.setManaged(button.isField());
+        }
+        // What was last written from here: Enter, then the box losing focus as the panel redraws, write once.
+        Typing[] written = {button.typing()};
+        Runnable write = () -> {
+            Typing now = typingOf(isField.isSelected(), text.getText(), submits.isSelected(), clears.isSelected());
+            if (!Objects.equals(now, written[0])) {
+                written[0] = now;
+                panel.wrote(ScreenEdits.setTyping(services, constant, field, now));
+            }
+        };
+        isField.setOnAction(e -> write.run());
+        clears.setOnAction(e -> write.run());
+        submits.setOnAction(e -> write.run());
+        text.setOnAction(e -> write.run());
+        text.focusedProperty().addListener((o, was, is) -> {
+            if (!is) write.run();
+        });
+        return line(isField, text, clears, submits);
+    }
+
+    /** What the text field editor writes: none when it is no field, the body's text when its text is blank. */
+    static Typing typingOf(boolean field, String text, boolean submits, boolean clears) {
+        if (!field) return null;
+        return new Typing(text == null || text.isBlank() ? null : Words.of(text), submits, clears);
     }
 
     // --- a hotkey's keys ---

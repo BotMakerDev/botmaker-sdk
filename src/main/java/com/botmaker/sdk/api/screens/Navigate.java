@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.observe.Bots;
@@ -96,6 +97,20 @@ public final class Navigate {
     }
 
     /**
+     * Types {@code text} in {@code field}, a text field of the map ({@code Screens.GUILD.search}), in place of its
+     * own text: walks to its screen, clicks it, clears it when it {@link Button#clears clears}, types, presses Enter
+     * when it {@link Button#submits submits}, and waits for where the map says it leads, as {@link #press(Button,
+     * Pick)} does. Its text is usually a {@code @Param} the person running the bot picks. {@link
+     * Pressed.Result#NOT_NOW} for a button that is no text field.
+     *
+     * @throws BotStuckException as {@link #to} does, when the walk to its screen gets stuck
+     */
+    public static Pressed type(Button field, String text) {
+        if (field == null) return pressed(null, null);
+        return pressed(field, null, Words.of(text == null ? "" : text));
+    }
+
+    /**
      * How {@code button} looks on the game now, by its looks ({@link State#DISABLED} for a greyed-out Buy); empty when
      * it is not in view. Nothing is walked or scrolled to: it is a look at the screen as it stands.
      */
@@ -109,6 +124,17 @@ public final class Navigate {
     }
 
     private static Pressed pressed(Input input, Pick pick) {
+        return pressed(input, pick, null);
+    }
+
+    private static Pressed pressed(Input input, Pick pick, Words typed) {
+        // Refused before any walk: a field with no text to type, or text for a button that is no field.
+        boolean field = input instanceof Button button && button.isField();
+        if (typed == null ? field && ((Button) input).typedByBody() : !field) {
+            Debug.log(input.label() + (field ? " types the text its body gives: Navigate.type it."
+                    : " is no text field: nothing is typed in it."));
+            return new Pressed(Pressed.Result.NOT_NOW, null, 0);
+        }
         ScreenGraph map = ScreenMaps.installed();
         Optional<BotConstants.InputName> name = map.nameOf(input);
         if (name.isEmpty()) {
@@ -118,7 +144,7 @@ public final class Navigate {
         String constant = name.get().screen();
         if (!to(map.instance(constant).orElse(null))) return new Pressed(Pressed.Result.NOT_NOW, null, 0);
         ScreenWalk.Press press = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null)
-                .press(constant, name.get().field(), pick);
+                .press(constant, name.get().field(), pick, typed);
         if (press.at() != null) tell(map, press.at());
         if (press.result() != Pressed.Result.DONE) Debug.log(press.why());
         return new Pressed(press.result(), press.at() == null ? null : map.instance(press.at()).orElse(null),

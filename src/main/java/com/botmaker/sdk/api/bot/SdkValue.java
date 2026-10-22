@@ -72,6 +72,8 @@ public @interface SdkValue {
         ZONES,
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
         DIGITS,
+        /** The texts the bot types, one a text field of its map names — a class of {@code Words} constants. */
+        TEXTS,
         /**
          * The game's screens and the inputs between them, as Discovery found them — {@code Screens}, a class of
          * {@code Screen} classes each with its constant, that a run walks to reach a screen.

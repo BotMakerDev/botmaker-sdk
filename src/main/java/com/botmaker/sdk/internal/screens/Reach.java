@@ -51,6 +51,9 @@ public interface Reach {
     /** How long the game is let settle between two copies of a button {@link Pick#each} presses. */
     long CLICK_SETTLE_MS = 600;
 
+    /** How long a text field is given to take its click before its text is typed. */
+    long FIELD_FOCUS_MS = 200;
+
     /** How far a member may shift between two looks and still count as not moved: a match is found to a pixel or two. */
     int STILL_PX = 4;
 
@@ -112,9 +115,22 @@ public interface Reach {
         keys(Combo.of(key));
     }
 
-    /** {@code button} pressed at {@code place}, where it was found, by its gesture. */
+    /**
+     * Types {@code text} into the field just clicked: what it holds selected first when {@code clears}, so the text
+     * takes its place, and Enter pressed after when {@code submits}.
+     */
+    void type(String text, boolean clears, boolean submits);
+
+    /**
+     * {@code button} pressed at {@code place}, where it was found, by its gesture; a text field's text typed after,
+     * once the field has taken the click. A field whose body gives its text types nothing here: {@code
+     * ScreenWalk.press} hands it the body's text as {@link Button#types}.
+     */
     default void press(Button button, Rect place) {
         press(pointOn(place), button.gesture(), button.holdTime());
+        if (button.text() == null) return;
+        pause(FIELD_FOCUS_MS);
+        type(button.text().text(), button.isClearing(), button.isSubmitting());
     }
 
     void scroll(Point at, int notches);

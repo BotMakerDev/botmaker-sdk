@@ -98,6 +98,7 @@ class SdkPluginSurfaceTest {
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, com.botmaker.sdk.api.text.DigitSet.class,
+            com.botmaker.sdk.api.text.Words.class,
             Point.class, Rect.class, Size.class,
             com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
@@ -179,6 +180,8 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());
         assertEquals("Digits", byId.get(SdkValue.Id.DIGITS).holder());
         assertEquals(com.botmaker.sdk.api.text.DigitSet.class, byId.get(SdkValue.Id.DIGITS).type());
+        assertEquals("Texts", byId.get(SdkValue.Id.TEXTS).holder());
+        assertEquals(com.botmaker.sdk.api.text.Words.class, byId.get(SdkValue.Id.TEXTS).type());
         // One declaration per constant, and nothing else.
         assertEquals(SdkValue.Id.values().length, byId.size());
         assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
@@ -349,9 +352,9 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(18, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
-                + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19");
+                + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22");
     }
 
     /**

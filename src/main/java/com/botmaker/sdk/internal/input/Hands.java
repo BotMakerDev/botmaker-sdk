@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.session.PointerPolicy;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.shared.capture.GenericWindow;
@@ -35,6 +36,16 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
 
     default void key(Key key) {
         keys(Combo.of(key));
+    }
+
+    /** {@code text} typed into the focused field as it reads, no key of it held. */
+    void text(String text);
+
+    /** {@code text} typed into the field just clicked, after Ctrl+A when it {@code clears}, then Enter when it submits. */
+    default void type(String text, boolean clears, boolean submits) {
+        if (clears) keys(Combo.of(Key.CTRL, Key.A));
+        text(text);
+        if (submits) key(Key.ENTER);
     }
 
     void scroll(int x, int y, int amount);
@@ -75,6 +86,13 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
                 if (window == null) controller.keyUp(key.nativeCode());
                 else controller.keyUp(window, key.nativeCode());
             }
+        }
+
+        @Override
+        public void text(String text) {
+            GenericWindow window = session.attached();
+            if (window == null) session.controller().typeText(text);
+            else session.controller().typeText(window, text);
         }
 
         @Override
@@ -133,6 +151,21 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
         }
 
         @Override
+        public void text(String text) {
+            if (!(emulator.base() instanceof EmulatorSource device)) {
+                throw new UnsupportedOperationException("This emulator takes no text here; a field needs a run.");
+            }
+            device.text(text);
+        }
+
+        /** Its own text input and Enter key: an emulator has no select-all, so a field there keeps what it held. */
+        @Override
+        public void type(String text, boolean clears, boolean submits) {
+            text(text);
+            if (submits && emulator.base() instanceof EmulatorSource device) device.key(EmulatorSource.KEYCODE_ENTER);
+        }
+
+        @Override
         public void scroll(int x, int y, int amount) {
             throw new UnsupportedOperationException("The emulator takes clicks here; a scroll needs try_statement.");
         }
@@ -177,6 +210,11 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             for (Key key : combo.keys()) controller.keyDown(key.nativeCode());
             hold(combo);
             for (Key key : combo.keys().reversed()) controller.keyUp(key.nativeCode());
+        }
+
+        @Override
+        public void text(String text) {
+            NativeControllerFactory.get().typeText(text);
         }
 
         @Override

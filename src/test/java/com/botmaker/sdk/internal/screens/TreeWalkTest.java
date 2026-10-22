@@ -118,6 +118,11 @@ class TreeWalkTest {
         }
 
         @Override
+        public void type(String text, boolean clears, boolean submits) {
+            done.add("type " + text);
+        }
+
+        @Override
         public long nowMs() {
             return now;
         }

@@ -240,7 +240,7 @@ final class ScreenOutline {
     /** What an input is, by a sign before its field. */
     static String sign(Input input) {
         return switch (input) {
-            case Button ignored -> "◻";
+            case Button button -> button.isField() ? "✎" : "◻";
             case Hotkey ignored -> "⌨";
             case Strip ignored -> "☰";
             case Tree ignored -> "🌳";

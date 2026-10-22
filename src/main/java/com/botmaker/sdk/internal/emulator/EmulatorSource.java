@@ -27,6 +27,9 @@ public final class EmulatorSource implements CaptureSource {
     /** How old a scan of the emulators may be to answer whether this one is up. */
     private static final Duration RECENT = Duration.ofSeconds(2);
 
+    /** Android's {@code KEYCODE_ENTER}. */
+    public static final int KEYCODE_ENTER = 66;
+
     private final String instanceName;
 
     private volatile Emulator connected;
@@ -85,6 +88,18 @@ public final class EmulatorSource implements CaptureSource {
     public void scroll(Point at, int notches) {
         Emulator emu = resolve();
         if (emu != null) emu.scroll(at, notches);
+    }
+
+    /** Types {@code text} into the emulator's focused field. */
+    public void text(String text) {
+        Emulator emu = resolve();
+        if (emu != null) emu.text(text);
+    }
+
+    /** Sends the Android key event {@code keyCode}: {@link #KEYCODE_ENTER} once a field's text is typed. */
+    public void key(int keyCode) {
+        Emulator emu = resolve();
+        if (emu != null) emu.key(keyCode);
     }
 
     /**

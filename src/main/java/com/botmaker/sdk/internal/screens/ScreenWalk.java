@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
@@ -346,11 +347,28 @@ public final class ScreenWalk {
      * or whose method says it is not there now.
      */
     public Press press(String constant, String field, Pick pick) {
+        return press(constant, field, pick, null);
+    }
+
+    /**
+     * {@link #press(String, String, Pick)}, a text field typing {@code typed} in place of its own text: the body's
+     * ({@code Navigate.type}). A field whose text only a body gives is not pressed without it, nor is anything but a
+     * field given one.
+     */
+    public Press press(String constant, String field, Pick pick, Words typed) {
         MapScreen screen = graph.screens().get(constant);
         Optional<Input> found = screen == null ? Optional.empty() : screen.effective(field);
         String name = graph.shown(constant) + "'s " + field;
         if (found.isEmpty()) return new Press(Pressed.Result.ABSENT, constant, 0, name + " is not in the map.");
         Input input = found.get();
+        if (typed != null && !(input instanceof Button b && b.isField())) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is no text field: nothing is typed in it.");
+        }
+        if (typed == null && input instanceof Button b && b.typedByBody()) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " types the text its body gives: "
+                    + "Navigate.type it.");
+        }
+        Input acted = typed == null ? input : ((Button) input).types(typed);
         if (input.lock() != null) return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is locked.");
         if (input.never() != null) {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is never pressed: " + input.never());
@@ -408,9 +426,9 @@ public final class ScreenWalk {
                         blocking = seen.get().state();
                         break;
                     }
-                    reach.press(button, seen.get().place());
+                    reach.press((Button) acted, seen.get().place());
                     look = seen.get().state();
-                } else if (!reach.perform(input, strip, p, frame.get())) {
+                } else if (!reach.perform(acted, strip, p, frame.get())) {
                     // Every copy greyed out, locked, done or busy is a button showing that look; none at all, an
                     // absent one.
                     Optional<Reach.Seen> seen = input instanceof Button button
@@ -435,9 +453,12 @@ public final class ScreenWalk {
                 // Still here though the map says it leads away: a click lost to lag is pressed once more, and a second
                 // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
                 if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
-                    if (retried) {
+                    // A field that keeps what it holds is never typed twice: its text would be there twice.
+                    boolean retypes = acted instanceof Button typing && typing.text() != null && !typing.isClearing();
+                    if (retried || retypes) {
                         return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "
-                                + graph.shown(constant) + " twice, though the map says it leads to "
+                                + graph.shown(constant) + (retried ? " twice" : "")
+                                + ", though the map says it leads to "
                                 + String.join(", ", leads.stream().map(graph::shown).toList()) + ".");
                     }
                     retried = true;
@@ -549,7 +570,7 @@ public final class ScreenWalk {
     private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame, boolean search) {
         Input via = edge.via();
         if (via == null) return Conditions.holds(edge.when());    // a way on its own may be open only while
-        if (via.lock() != null) return false;
+        if (via.lock() != null || typedByBody(edge)) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
         // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
@@ -569,12 +590,27 @@ public final class ScreenWalk {
         return edge.state() == null || edge.state() == seen.get().state();
     }
 
+    /** Whether {@code edge} goes through a text field whose text only a body gives: no walk types it. */
+    private static boolean typedByBody(ScreenGraph.Edge edge) {
+        return edge.via() instanceof Button button && button.typedByBody();
+    }
+
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */
     private Result blocked(String at, String target, Set<ScreenGraph.Edge> missed, Set<ScreenGraph.Edge> strayed,
                            List<String> walked) {
         Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge);
         String to = graph.shown(target);
-        if (graph.pathTo(at, target, known.and(edge -> edge.via() == null || edge.via().lock() == null)).isPresent()) {
+        Predicate<ScreenGraph.Edge> unlocked = edge -> edge.via() == null || edge.via().lock() == null;
+        Optional<List<ScreenGraph.Edge>> typing = graph.pathTo(at, target, known.and(unlocked))
+                .filter(path -> path.stream().anyMatch(ScreenWalk::typedByBody))
+                .filter(path -> graph.pathTo(at, target, known.and(unlocked)
+                        .and(edge -> !typedByBody(edge))).isEmpty());
+        if (typing.isPresent()) {
+            ScreenGraph.Edge field = typing.get().stream().filter(ScreenWalk::typedByBody).findFirst().orElseThrow();
+            return new Result(Outcome.NOT_NOW, at, walked, to + " opens only by typing in " + graph.shown(field.from())
+                    + "'s " + field.input() + ", whose text the body gives: Navigate.type it first.");
+        }
+        if (graph.pathTo(at, target, known.and(unlocked)).isPresent()) {
             return new Result(Outcome.NOT_NOW, at, walked, "The way to " + to + " is not on the screen now: it comes "
                     + "and goes.");
         }

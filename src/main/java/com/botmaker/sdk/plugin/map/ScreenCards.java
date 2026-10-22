@@ -318,7 +318,8 @@ final class ScreenCards {
                         .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList()
                 : List.of();
         String traits = switch (input) {
-            case Button button -> button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
+            case Button button -> button.isField() ? fieldTrait(button)
+                    : button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
             case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
             case Tree tree -> (tree.isDragged() ? "dragged, " : tree.notches() != 0 ? "wheel " + tree.notches() + ", "
                     : "") + tree.nodes().size() + " nodes" + (tree.unplaced().isEmpty() ? ""
@@ -327,6 +328,12 @@ final class ScreenCards {
         };
         return new Row(field, input, field, picture(input), state, result, kind, look,
                 ScreenTypes.sourceOf(input.when()), looks, traits);
+    }
+
+    /** What a text field types: {@code types "Dragons", then Enter}, or {@code types the body's text}. */
+    static String fieldTrait(Button field) {
+        return "types " + (field.text() == null ? "the body's text" : "\"" + field.text().text() + "\"")
+                + (field.isSubmitting() ? ", then Enter" : "");
     }
 
     /** How a strip scrolls, as try_input measured it: {@code wheel -5, step 120px, settles in 400 ms}. */

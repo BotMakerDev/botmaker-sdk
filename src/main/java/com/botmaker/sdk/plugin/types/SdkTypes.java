@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.text.DigitSet;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -151,6 +152,12 @@ public final class SdkTypes {
             .editor(() -> OcrEditors::digits)
             .writtenAs(DigitSet::new, DigitSet::folder)
             .with(DigitSet::in, DigitSet::frame);
+
+    /** A text of the bot's, {@code Words.of("Dragons")}: what a text field of the map types (2026-10-22). */
+    public static final DeclaredCallType<Words> WORDS = PluginType.value(Words.class)
+            .fresh(() -> Words.of(""))
+            .editor(() -> OcrEditors::words)
+            .writtenAs(Words::of, Words::text);
 
     /**
      * A point on the screen. Its editor asks the host for this declaration ({@code ValueContext.declared}),

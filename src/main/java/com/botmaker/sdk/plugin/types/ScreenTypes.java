@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 
@@ -136,6 +137,10 @@ public final class ScreenTypes {
             .flag(Button::repeated, Button::repeats)
             .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
             .<Duration>with(Button::hold, Button::hold)
+            .<Words>with(Button::types, Button::text)
+            .flag(Button::typed, Button::typedByBody)
+            .flag(Button::submits, Button::isSubmitting)
+            .flag(Button::clears, Button::isClearing)
             .when(button -> BotConstants.inputName(button) == null && !button.cycles());
 
     /** {@code Button.cycling(List<ImageTemplate>)} and its links: a button showing its looks in turn. */
@@ -151,6 +156,10 @@ public final class ScreenTypes {
             .flag(Button::repeated, Button::repeats)
             .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
             .<Duration>with(Button::hold, Button::hold)
+            .<Words>with(Button::types, Button::text)
+            .flag(Button::typed, Button::typedByBody)
+            .flag(Button::submits, Button::isSubmitting)
+            .flag(Button::clears, Button::isClearing)
             .when(button -> BotConstants.inputName(button) == null && button.cycles());
 
     /**

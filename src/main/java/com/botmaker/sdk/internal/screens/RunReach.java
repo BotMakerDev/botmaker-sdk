@@ -5,7 +5,9 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.Keyboard;
 import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.screens.Button;
@@ -156,6 +158,24 @@ public final class RunReach implements Reach {
     @Override
     public void keys(Combo combo) {
         Keyboard.combo(Source.current(), combo.hold().isZero() ? combo.held(KEY_HOLD) : combo);
+    }
+
+    /**
+     * Typed on the source's window, cleared by Ctrl+A; on an emulator through its own text input, which has no
+     * select-all, so a field there keeps what it held.
+     */
+    @Override
+    public void type(String text, boolean clears, boolean submits) {
+        CaptureSource source = Source.current();
+        if (source.base() instanceof EmulatorSource emulator) {
+            if (clears) Debug.log("An emulator's field is not cleared before typing: it has no select-all.");
+            emulator.text(text);
+            if (submits) emulator.key(EmulatorSource.KEYCODE_ENTER);
+            return;
+        }
+        if (clears) Keyboard.combo(source, Combo.of(Key.CTRL, Key.A).held(KEY_HOLD));
+        Keyboard.type(source, text);
+        if (submits) Keyboard.combo(source, Combo.of(Key.ENTER).held(KEY_HOLD));
     }
 
     @Override

@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Text fields on the map**: a button that types once clicked, `Button.of(Pictures.SEARCH).types(Texts.GUILD)`,
+  `.clears()` and `.submits()`. Its text is a constant of the bot's new `Texts` class (`Words.of("Dragons")`), so
+  `Navigate.to` walks through it typing it; `.typed()` leaves the text to the body, `Navigate.type(Screens.GUILD.search,
+  guildName)`, usually from a `@Param`, and a walk that needs it ends NOT_NOW saying so. 🗺 Screens' input panel has a
+  *Text field* section (its text, Clear first, Enter after), which adds the `Texts` constant; edit_map's set_input
+  takes `types`, `submits` and `clears`; try_input types the field's text after the click.
+
 - **Buttons on the map can be double-clicked, right-clicked, held or hovered**: `Button.of(P).gesture(Gesture.DOUBLE)`,
   `.hold(Duration.ofSeconds(2))`; a button that says nothing is still clicked. **Hotkeys take keys together or held**:
   `Hotkey.of(Combo.of(Key.CTRL, Key.S))`; `Hotkey.of(Key.Q)` reads as before. 🗺 Screens' input panel sets a button's

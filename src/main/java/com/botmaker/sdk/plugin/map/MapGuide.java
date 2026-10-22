@@ -82,6 +82,8 @@ final class MapGuide {
     static final String GESTURE = "How a run presses it: a click, a double or right click, a hold of the time beside "
             + "it, or the pointer only moved onto it for what opens on hover";
     static final String KEY_HOLD = "How long the keys stay down; 0 taps them";
+    static final String FIELD = "A text box: clicked, then its text typed, one of the bot's Texts. Blank, a body gives "
+            + "the text (Navigate.type), and no walk goes through it";
     static final String WAY_COPY = "The copy of this repeated button the way goes through";
     static final String TRY_HOW = "Tries it as try_input does: which copy, the name of the screen it opens, how long it "
             + "is given, and whether the game stays here after";
