@@ -5,10 +5,11 @@ import com.botmaker.plugin.toolkit.graph.GraphCanvas.Arrow;
 import com.botmaker.plugin.toolkit.graph.GraphLayout;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Gaps;
+import com.botmaker.plugin.toolkit.graph.GraphLayout.Loops;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Placement;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.LayeredLayout;
-import com.botmaker.plugin.toolkit.graph.TreeLayout;
+import com.botmaker.plugin.toolkit.graph.Routes;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -62,6 +63,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -73,10 +75,11 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The map drawn: one card per screen on the toolkit's {@link GraphCanvas}, laid out as a tree from the first screen,
- * left to right. Each entrance is a solid arrow carrying its input's picture; another way in and a way back are
- * dashed, and can be hidden. A double-click folds a screen's subtree away and back. Popups and screens the tree does
- * not reach sit in a grid below it.
+ * The map drawn: one card per screen on the toolkit's {@link GraphCanvas}, laid out in ranks from the first screen by
+ * every way between them, left to right or downward. Each entrance is a solid arrow carrying its input's picture;
+ * another way in and a way back are dashed, and can be hidden; a way back runs back through the ranks it crosses. A
+ * double-click folds away the screens a screen's entrances open, and back. Popups and screens no way reaches sit in a
+ * grid below.
  *
  * <p>What a run reaches is lit ({@link #setHere}) with a short trail of the screens before it; the screen being tried
  * pulses ({@link #setTrying}).
@@ -125,13 +128,13 @@ final class ScreenCanvas {
     private String trying;
     /** Pictures read before a card is drawn, not after: a drawing made off screen is taken at once. */
     private boolean loadNow;
-    /** The tree's size laid out each way, at the last layout: a resize asks again which fits the window. */
+    /** The map's size laid out each way, at the last layout: a resize asks again which fits the window. */
     private Map<Direction, Shape> shapes = Map.of();
     private Direction direction = Direction.RIGHT;
     /** Where the last layout put each card, before any was moved by hand. */
     private Placement laid = new Placement(Map.of(), Set.of(), 0);
     private Consumer<Map<String, Point>> onMoved = moved -> {};
-    /** How much bigger the other way must show the map before the tree turns. */
+    /** How much bigger the other way must show the map before the map turns. */
     private static final double TURN = 1.15;
 
     /** How big a whole layout is. */
@@ -143,6 +146,7 @@ final class ScreenCanvas {
         graph = new GraphCanvas<>(Card::constant, this::view, this::arrow, this::arrange);
         graph.getStylesheets().add(SHEET);
         graph.getStyleClass().add("screen-map");
+        graph.setRules(Routes.Rules.DEFAULT.with(Loops.THROUGH));
         graph.setOnOpen(card -> {
             // A screen with nothing below it has nothing to fold.
             if (!folded.remove(card.constant()) && !below(card.constant()).isEmpty()) folded.add(card.constant());
@@ -159,7 +163,7 @@ final class ScreenCanvas {
                 });
             }
         });
-        // A window made wide or tall: the tree is laid out the other way when that way now fits it better. Not while
+        // A window made wide or tall: the map is laid out the other way when that way now fits it better. Not while
         // cards are moved by hand: they stay where they were put.
         // A resize only: the bounds move on every scroll too, and each scroll asked again (2026-10-22, a pan's lag).
         graph.viewportProperty().addListener((o, was, is) -> {
@@ -200,21 +204,26 @@ final class ScreenCanvas {
     }
 
     /**
-     * The tree laid out rightward and downward, keeping whichever shows bigger in the window (the user's call,
-     * 2026-10-15: Home's twenty screens made a column a wide window showed small); a map with no tree, layered.
+     * Every way laid out in ranks from the first screen, rightward and downward, keeping whichever shows bigger in the
+     * window (the user's call, 2026-10-15: Home's twenty screens made a column a wide window showed small). Not the
+     * entrances' tree alone: that hid the work, and drew every other way around the whole map (2026-10-22). The
+     * entrances come first so they make the ranks, and the ways back run back through them. A folded screen hides
+     * what its entrances open; popups, and screens no way reaches, sit in a grid below.
+     *
+     * @param solid the entrances, which {@link #ways} lists already
      */
-    private Placement arrange(List<GraphLayout.Card> cards, List<GraphLayout.Link> links) {
-        if (root == null) {
-            shapes = Map.of();
-            direction = Direction.RIGHT;
-            graph.setDirection(direction);
-            laid = LayeredLayout.arrange(cards, links, List.of());
-            return laid;
-        }
+    private Placement arrange(List<GraphLayout.Card> cards, List<GraphLayout.Link> solid) {
+        Set<String> hidden = foldedAway(links, folded, root);
+        List<GraphLayout.Card> shown = cards.stream().filter(c -> !hidden.contains(c.id())).toList();
+        Set<String> popups = new HashSet<>();
+        for (Card card : this.cards) if (card.popup()) popups.add(card.constant());
+        List<GraphLayout.Link> ways = ways(links, popups);
+        List<String> roots = root == null ? List.of() : List.of(root);
         Map<Direction, Placement> each = new EnumMap<>(Direction.class);
         Map<Direction, Shape> sized = new EnumMap<>(Direction.class);
         for (Direction way : Direction.values()) {
-            Placement placed = TreeLayout.arrange(cards, links, root, way, GAPS, Set.copyOf(folded));
+            Placement ranked = LayeredLayout.arrange(shown, ways, roots, way, GAPS, LayeredLayout.SWEEPS, Loops.THROUGH);
+            Placement placed = new Placement(ranked.at(), hidden, ranked.crossings());
             each.put(way, placed);
             sized.put(way, shape(placed, cards));
         }
@@ -226,6 +235,46 @@ final class ScreenCanvas {
         graph.setDirection(direction);
         laid = each.get(direction);
         return laid;
+    }
+
+    /**
+     * The ways that place the cards, in the order the layout takes them: entrances, the other ways on, then the ways
+     * back. None to or from a screen in {@code apart} (the popups, which open over any screen).
+     */
+    static List<GraphLayout.Link> ways(List<Link> links, Set<String> apart) {
+        List<GraphLayout.Link> ways = new ArrayList<>();
+        for (int pass = 0; pass < 3; pass++) {
+            for (Link link : links) {
+                int order = link.entrance() ? 0 : link.back() ? 2 : 1;
+                if (order == pass && !apart.contains(link.from()) && !apart.contains(link.to())) {
+                    ways.add(GraphLayout.Link.of(link.from(), link.to()));
+                }
+            }
+        }
+        return ways;
+    }
+
+    /**
+     * The screens folds hide: each one an entrance opens from a folded screen, and on down; never {@code root}, and
+     * never a folded screen by its own fold, which entrances in a ring away from the root would do, leaving no card
+     * to unfold it by.
+     */
+    static Set<String> foldedAway(List<Link> links, Set<String> folded, String root) {
+        Set<String> hidden = new LinkedHashSet<>();
+        for (String fold : folded) {
+            Set<String> seen = new HashSet<>(Set.of(fold));
+            Deque<String> open = new ArrayDeque<>(List.of(fold));
+            while (!open.isEmpty()) {
+                String at = open.poll();
+                for (Link link : links) {
+                    if (link.entrance() && link.from().equals(at) && !link.to().equals(root) && seen.add(link.to())) {
+                        hidden.add(link.to());
+                        open.add(link.to());
+                    }
+                }
+            }
+        }
+        return hidden;
     }
 
     /** How big {@code placed} is: the box round its shown cards. */
@@ -291,7 +340,7 @@ final class ScreenCanvas {
         graph.setMenus(card -> cardMenus.apply(card.constant()), linkMenus);
     }
 
-    /** Shows {@code cards} joined by {@code links}, the tree grown from {@code root} (null: no tree). */
+    /** Shows {@code cards} joined by {@code links}, ranked from {@code root} (null: from the screens nothing enters). */
     void show(List<Card> cards, List<Link> links, String root) {
         boolean onlyMoved = !this.cards.isEmpty() && onlyMoved(this.cards, cards) && links.equals(this.links)
                 && Objects.equals(root, this.root);

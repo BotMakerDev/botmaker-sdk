@@ -89,6 +89,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - A read that only moved cards pins them on the canvas as they are; before, every card was built again.
   - Scrolling no longer asks whether the tree should turn: only a resize does.
   - The canvas's own changes (grid, link paths, scaling while moving) are in the toolkit's changelog.
+- **🗺 Screens shows the work, not a tree**:
+  - The map is laid out in ranks from the first screen by every way between screens, not by the entrances alone.
+    A screen sits after every screen that opens it, and each rank is ordered to cross fewer ways.
+  - A way back runs back through the ranks it crosses, out of its screen's near side and into the far side of the
+    screen it returns to. Before, every way that was no entrance wrapped around the whole map.
+  - A way within one rank hooks beside it.
+  - The map still turns to fit the window, folds the screens a screen's entrances open, and keeps cards moved by
+    hand. Popups, and screens no way reaches, still sit in a grid below.
+  - ELK was weighed and not taken. It would have brought EMF and Guava, 8.4 MB, into every bot.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

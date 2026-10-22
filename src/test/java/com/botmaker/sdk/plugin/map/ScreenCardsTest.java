@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.plugin.toolkit.graph.GraphLayout;
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
@@ -322,5 +324,30 @@ class ScreenCardsTest {
         assertFalse(ScreenCanvas.onlyMoved(laid, List.of(home, new Card("SHOP", "Shop", "shop", State.OWES, "", "",
                 false, false, null, ScreenGraph.Presence.ALWAYS, 0, 0, "", null))), "a card that changed is drawn again");
         assertFalse(ScreenCanvas.onlyMoved(laid, List.of(home)), "a card gone");
+    }
+
+    private static Link way(String from, String to, boolean entrance, boolean back) {
+        return new Link(from, to, null, null, entrance, back, "", "");
+    }
+
+    @Test
+    void theMapIsRankedByEveryWayEntrancesFirstPopupsApart() {
+        List<Link> links = List.of(way("SHOP", "HOME", false, true), way("HOME", "BAG", false, false),
+                way("HOME", "SHOP", true, false), way("SHOP", "BAG", true, false), way("SHOP", "REWARD", true, false));
+
+        assertEquals(List.of(GraphLayout.Link.of("HOME", "SHOP"), GraphLayout.Link.of("SHOP", "BAG"),
+                        GraphLayout.Link.of("HOME", "BAG"), GraphLayout.Link.of("SHOP", "HOME")),
+                ScreenCanvas.ways(links, Set.of("REWARD")));
+    }
+
+    @Test
+    void aFoldHidesWhatItsEntrancesOpenAndOnDownNeverTheRoot() {
+        List<Link> links = List.of(way("HOME", "SHOP", true, false), way("SHOP", "BAG", true, false),
+                way("BAG", "HOME", true, false), way("HOME", "BAG", false, false), way("HOME", "MAIL", true, false));
+
+        assertEquals(Set.of("BAG"), ScreenCanvas.foldedAway(links, Set.of("SHOP"), "HOME"));
+        assertEquals(Set.of("SHOP", "BAG", "MAIL"), ScreenCanvas.foldedAway(links, Set.of("HOME"), "HOME"));
+        List<Link> ring = List.of(way("SHOP", "BAG", true, false), way("BAG", "SHOP", true, false));
+        assertEquals(Set.of("BAG"), ScreenCanvas.foldedAway(ring, Set.of("SHOP"), "HOME"), "a fold never hides itself");
     }
 }
