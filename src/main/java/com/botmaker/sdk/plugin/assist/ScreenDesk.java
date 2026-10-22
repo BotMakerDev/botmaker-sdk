@@ -142,11 +142,13 @@ public final class ScreenDesk {
     }
 
     /**
-     * {@link #look} for many frames: where it reads is found once, each call of the answer reads one frame there. A
-     * live feed asks again now and then, so a private display brought up since is read. Off the FX thread.
+     * {@link #look} for many frames when it reads elsewhere than the context's capture source, the private display or
+     * the emulator: where it reads is found once, each call of the answer reads one frame there. Empty for the screen
+     * the context watches, which a live feed grabs itself. A live feed asks again now and then, so a private display
+     * brought up since is read. Off the FX thread.
      */
-    public static Supplier<Optional<BufferedImage>> feed(AgentContext context) {
-        return Frames.feed(context);
+    public static Optional<Supplier<Optional<BufferedImage>>> away(AgentContext context) {
+        return Frames.away(context);
     }
 
     /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */

@@ -7,10 +7,16 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.Window;
+import com.botmaker.sdk.internal.capture.WindowHandles;
+import com.botmaker.sdk.plugin.assist.ScreenDesk;
+import com.botmaker.shared.capture.FrameGrab;
+import com.botmaker.shared.capture.FrameSink;
 
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * What the assistant's tools are handed when 🗺 Screens runs them: the project's capture source, the screen the bot
@@ -43,6 +49,39 @@ final class PanelContext implements AgentContext {
     PanelContext found() {
         return source instanceof NamedWindow named && named.base() instanceof Window open
                 ? new PanelContext(services, open, last) : this;
+    }
+
+    /**
+     * Where a live feed reads the game: the private display or the emulator as the look tools read them, else the
+     * window the source names, grabbed and kept open, else the source's frames. Off the FX thread.
+     */
+    LiveFeed live() {
+        Optional<Supplier<Optional<BufferedImage>>> away = ScreenDesk.away(this);
+        if (away.isPresent()) return LiveFeed.of(away.get());
+        if (source instanceof Window open && WindowHandles.id(open) != null) {
+            // A window moved is a place of its own: its grab opened again says where its frames sit now.
+            Point origin = open.origin();
+            return new LiveFeed(List.of(WindowHandles.id(open), origin), () -> placed(WindowHandles.grab(open), origin));
+        }
+        return LiveFeed.of(this::frame);
+    }
+
+    /** {@code grab}, where each frame sits on the desktop kept as {@link #frame} keeps it, for a click on it. */
+    private FrameGrab placed(FrameGrab grab, Point origin) {
+        return new FrameGrab() {
+            @Override
+            public boolean grab(FrameSink sink) {
+                return grab.grab((width, height) -> {
+                    last.set(new Area(origin.x(), origin.y(), width, height));
+                    return sink.pixels(width, height);
+                });
+            }
+
+            @Override
+            public void close() {
+                grab.close();
+            }
+        };
     }
 
     @Override

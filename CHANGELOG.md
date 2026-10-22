@@ -56,6 +56,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   window twice a frame (about 9 ms each on a desktop of 12 windows). The window is now found once a second on a
   thread of its own, and a frame reads it straight. The board's line also says what drawing a frame takes,
   "N fps, M ms a read, D ms a draw", and which of the two is the limit.
+- **🗺 Screens' live board reads a window through shared memory**:
+  - The window's grab (shared's `grabWindow`) stays open while the same window is found.
+  - It writes each frame straight into the back one of the board's two images, and the two swap on a show.
+  - A frame is no longer turned into a `BufferedImage` and copied twice; ❄ Freeze copies the frame shown.
+  - A game window's read drops from about 20 ms to 2–5 ms.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

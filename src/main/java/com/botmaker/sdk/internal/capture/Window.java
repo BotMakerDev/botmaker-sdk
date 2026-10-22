@@ -53,7 +53,7 @@ public class Window implements CaptureSource {
      * pixels can be read (a game VM's guest windows, a private display's), otherwise this computer's. A session
      * whose pixels aren't on X11 (Waydroid's) has no window to find, as {@code Source.current()} knows.
      */
-    private static NativeController controller() {
+    static NativeController controller() {
         DesktopSession session = BotSession.get();
         return session != null && session.x11Capturable() ? session.controller() : NativeControllerFactory.get();
     }

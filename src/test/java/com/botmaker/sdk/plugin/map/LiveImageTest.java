@@ -1,40 +1,60 @@
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.shared.capture.FrameGrab;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveImageTest {
 
-    private static int[] argb(BufferedImage frame) {
-        int[] into = new int[frame.getWidth() * frame.getHeight()];
-        LiveImage.argb(frame, into);
-        return into;
+    @Test
+    void aFrameIsWrittenIntoTheSlotNotShownAndTheSlotsSwapOnAShow() {
+        LiveImage frames = new LiveImage();
+        int[] first = frames.pixels(2, 1);
+        first[1] = 0xFF00FF80;
+        assertEquals(0x00FF80, frames.taken().getRGB(1, 0) & 0xFFFFFF);
+        LiveImage.Slot shown = frames.flip();
+        assertEquals(2, shown.width());
+        int[] second = frames.pixels(2, 1);
+        assertNotSame(first, second);
+        // The next show swaps back: the first slot's array is written again, never the one on screen.
+        frames.flip();
+        assertSame(first, frames.pixels(2, 1));
     }
 
     @Test
-    void anIntFrameIsCopiedWholeAndOpaque() {
+    void aFrameOfAnotherSizeGetsAnArrayOfItsSize() {
+        LiveImage frames = new LiveImage();
+        assertEquals(6, frames.pixels(3, 2).length);
+        assertEquals(4, frames.pixels(2, 2).length);
+        assertEquals(2, frames.taken().getWidth());
+    }
+
+    @Test
+    void aGrabWritesThroughTheBoardsSlots() {
+        LiveImage frames = new LiveImage();
         BufferedImage frame = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
-        frame.setRGB(0, 0, 0x123456);
         frame.setRGB(1, 1, 0xABCDEF);
-        assertArrayEquals(new int[]{0xFF123456, 0xFF000000, 0xFF000000, 0xFFABCDEF}, argb(frame));
+        assertTrue(FrameGrab.of(() -> frame).grab(frames));
+        assertEquals(0xABCDEF, frames.taken().getRGB(1, 1) & 0xFFFFFF);
     }
 
     @Test
-    void anyOtherFrameIsReadThroughItsColours() {
-        BufferedImage frame = new BufferedImage(2, 1, BufferedImage.TYPE_3BYTE_BGR);
-        frame.setRGB(1, 0, 0x00FF80);
-        assertArrayEquals(new int[]{0xFF000000, 0xFF00FF80}, argb(frame));
-    }
-
-    @Test
-    void aPartOfALargerFrameIsReadAsItsOwn() {
-        BufferedImage whole = new BufferedImage(3, 3, BufferedImage.TYPE_INT_RGB);
-        whole.setRGB(1, 1, 0x010203);
-        assertArrayEquals(new int[]{0xFF010203, 0xFF000000}, argb(whole.getSubimage(1, 1, 2, 1)));
+    void aWindowFoundAgainIsTheSamePlaceAndAFeedOfFramesNever() {
+        LiveFeed window = new LiveFeed(List.of(7L, "0,0"), () -> FrameGrab.of(() -> null));
+        assertTrue(window.samePlace(new LiveFeed(List.of(7L, "0,0"), () -> FrameGrab.of(() -> null))));
+        assertFalse(window.samePlace(new LiveFeed(List.of(7L, "5,0"), () -> FrameGrab.of(() -> null))));
+        LiveFeed frames = LiveFeed.of(Optional::empty);
+        assertFalse(frames.samePlace(LiveFeed.of(Optional::empty)));
+        assertFalse(frames.samePlace(null));
     }
 
     @Test

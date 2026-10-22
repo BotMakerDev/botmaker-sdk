@@ -91,9 +91,17 @@ final class Frames {
      * a launch may bring a private display up. Blocking.
      */
     static Supplier<Optional<BufferedImage>> feed(AgentContext context) {
+        return away(context).orElse(context::frame);
+    }
+
+    /**
+     * {@link #feed} when it reads elsewhere than the context's capture source: the private display, the emulator;
+     * empty for the screen the context watches. Blocking.
+     */
+    static Optional<Supplier<Optional<BufferedImage>>> away(AgentContext context) {
         PrivateSession session = session(context);
         if (session != null) {
-            return () -> {
+            return Optional.of(() -> {
                 try {
                     // The game's window, as a run's SessionSource grabs it: gamescope never paints its root, so the
                     // whole screen is black there; the screen only until a window is attached.
@@ -102,13 +110,13 @@ final class Frames {
                 } catch (RuntimeException closing) {
                     return Optional.empty();
                 }
-            };
+            });
         }
         CaptureSource emulator = emulator(context);
         if (emulator != null) {
-            return () -> emulator.isPresent() ? Optional.ofNullable(emulator.capture()) : Optional.empty();
+            return Optional.of(() -> emulator.isPresent() ? Optional.ofNullable(emulator.capture()) : Optional.empty());
         }
-        return context::frame;
+        return Optional.empty();
     }
 
     /**

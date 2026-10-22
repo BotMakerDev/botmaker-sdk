@@ -19,6 +19,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.shared.capture.FrameGrab;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -109,16 +110,16 @@ final class LiveBoard {
     private final Work work;
     /** Counts each start and stop: a frame loop of an earlier start ends, and what it read is dropped. */
     private final AtomicLong generation = new AtomicLong();
-    private final AtomicBoolean drawing = new AtomicBoolean();
     private final AtomicBoolean reading = new AtomicBoolean();
-    /** The last live frame, lossless: what ❄ Freeze keeps. */
-    private volatile BufferedImage latest;
-    /** The game as the board draws it, one image drawn again in place. */
-    private final LiveImage frames = new LiveImage();
     /** How many frames a second the board draws, and what a read of the game takes. */
     private final Label rate = new Label();
 
     // On the FX thread from here.
+    /**
+     * The game as the board draws it, two images drawn in turn; the one shown is what ❄ Freeze keeps. One per start:
+     * a loop of an earlier start may still be writing its own.
+     */
+    private LiveImage frames = new LiveImage();
     /** The inputs given to the game, one at a time and in order, off the FX thread; made when first needed. */
     private ExecutorService acting;
     private PanelContext context;
@@ -244,7 +245,9 @@ final class LiveBoard {
         showLine();
         long mine = generation.incrementAndGet();
         PanelContext reads = context;
-        Thread.ofVirtual().name("live-board").start(() -> loop(mine, reads));
+        LiveImage slots = new LiveImage();
+        frames = slots;
+        Thread.ofVirtual().name("live-board").start(() -> loop(mine, reads, slots));
     }
 
     private void stop() {
@@ -257,8 +260,8 @@ final class LiveBoard {
         showLine();
     }
 
-    /** Reads the game until another start or a stop, drawing each frame the FX thread is ready for. */
-    private void loop(long mine, PanelContext reads) {
+    /** Reads the game into {@code slots} until another start or a stop, drawing each frame the FX thread is ready for. */
+    private void loop(long mine, PanelContext reads, LiveImage slots) {
         boolean desktop = ScreenDesk.hands(reads) instanceof Hands.OnDesktop;
         Platform.runLater(() -> {
             if (generation.get() != mine) return;
@@ -266,84 +269,97 @@ final class LiveBoard {
             showLine();
         });
         // Where the game is read, found again each second on a thread of its own: finding it reads the bot on the FX
-        // thread and lists every window, which a frame must never wait on (2026-10-22).
-        AtomicReference<Supplier<Optional<BufferedImage>>> feed = new AtomicReference<>();
+        // thread and lists every window, which a frame must never wait on (2026-10-22). This loop opens what is found,
+        // and keeps it open while the same place is found: a window's grab holds its pixmap and shared memory.
+        AtomicReference<LiveFeed> feed = new AtomicReference<>();
         Thread.ofVirtual().name("live-feed").start(() -> find(mine, reads, feed));
-        AtomicLong drawNanos = new AtomicLong();
-        long lastHere = 0;
-        long lastRate = System.currentTimeMillis();
-        long lookMs = 0;
-        int looks = 0;
-        int drawn = 0;
-        while (generation.get() == mine) {
-            long began = System.currentTimeMillis();
-            Supplier<Optional<BufferedImage>> from = feed.get();
-            Optional<BufferedImage> got;
-            if (from == null) {
-                got = Optional.empty();
-            } else {
-                try {
-                    got = from.get();
-                } catch (RuntimeException unreadable) {
-                    got = Optional.empty();
-                }
-                lookMs += System.currentTimeMillis() - began;
-                looks++;
-            }
-            if (began - lastRate >= RATE_MS) {
-                String now = rate(drawn, looks, lookMs, drawNanos.getAndSet(0) / 1_000_000, began - lastRate);
-                Platform.runLater(() -> {
-                    if (generation.get() == mine) rate.setText(now);
-                });
-                lastRate = began;
-                lookMs = 0;
-                looks = 0;
-                drawn = 0;
-            }
-            // Stopped or started again while the game was read: this loop's frame is not the board's any more.
-            if (generation.get() != mine) return;
-            if (got.isPresent()) {
-                BufferedImage image = got.get();
-                latest = image;
-                if (drawing.compareAndSet(false, true)) {
+        LiveFeed at = null;
+        FrameGrab grab = null;
+        AtomicBoolean drawing = new AtomicBoolean();
+        try {
+            AtomicLong drawNanos = new AtomicLong();
+            long lastHere = 0;
+            long lastRate = System.currentTimeMillis();
+            long lookMs = 0;
+            int looks = 0;
+            int drawn = 0;
+            while (generation.get() == mine) {
+                long began = System.currentTimeMillis();
+                LiveFeed found = feed.get();
+                if (found != null && !found.samePlace(at)) {
+                    if (grab != null) grab.close();
+                    at = found;
                     try {
-                        long taking = System.nanoTime();
-                        frames.take(image);
-                        drawNanos.addAndGet(System.nanoTime() - taking);
-                        drawn++;
-                        Platform.runLater(() -> {
-                            long showing = System.nanoTime();
-                            try {
-                                if (generation.get() == mine) shown(frames.show(), image.getWidth(), image.getHeight());
-                            } finally {
-                                drawNanos.addAndGet(System.nanoTime() - showing);
-                                drawing.set(false);
+                        grab = found.opens().get();
+                    } catch (RuntimeException unopened) {
+                        // Opened again next frame.
+                        grab = null;
+                        at = null;
+                    }
+                }
+                // A frame still on its way to the board holds the slot a grab writes into: this one is not read.
+                boolean busy = drawing.get();
+                boolean got = false;
+                if (grab != null && !busy) {
+                    try {
+                        got = grab.grab(slots);
+                    } catch (RuntimeException unreadable) {
+                        got = false;
+                    }
+                    lookMs += System.currentTimeMillis() - began;
+                    looks++;
+                }
+                if (began - lastRate >= RATE_MS) {
+                    String now = rate(drawn, looks, lookMs, drawNanos.getAndSet(0) / 1_000_000, began - lastRate);
+                    Platform.runLater(() -> {
+                        if (generation.get() == mine) rate.setText(now);
+                    });
+                    lastRate = began;
+                    lookMs = 0;
+                    looks = 0;
+                    drawn = 0;
+                }
+                // Stopped or started again while the game was read: this loop's frame is not the board's any more.
+                if (generation.get() != mine) return;
+                if (got) {
+                    if (began - lastHere >= HERE_MS && reading.compareAndSet(false, true)) {
+                        lastHere = began;
+                        long takenMs = began;
+                        BufferedImage image = slots.taken();
+                        Thread.ofVirtual().name("live-here").start(() -> readHere(mine, reads, image, takenMs));
+                    }
+                    drawing.set(true);
+                    drawn++;
+                    Platform.runLater(() -> {
+                        long showing = System.nanoTime();
+                        try {
+                            if (generation.get() == mine) {
+                                Image image = slots.show();
+                                shown(image, (int) image.getWidth(), (int) image.getHeight());
                             }
-                        });
-                    } catch (RuntimeException undrawn) {
-                        drawing.set(false);
-                    }
+                        } finally {
+                            drawNanos.addAndGet(System.nanoTime() - showing);
+                            drawing.set(false);
+                        }
+                    });
+                } else if (grab != null && !busy) {
+                    Platform.runLater(() -> {
+                        if (generation.get() == mine && blind == null) {
+                            blind = "No frame: the game is not up, or the bot looks at no window. ▶ Launch starts it.";
+                            showLine();
+                        }
+                    });
                 }
-                if (began - lastHere >= HERE_MS && reading.compareAndSet(false, true)) {
-                    lastHere = began;
-                    long takenMs = began;
-                    Thread.ofVirtual().name("live-here").start(() -> readHere(mine, reads, image, takenMs));
+                long rest = FRAME_MS - (System.currentTimeMillis() - began);
+                if (rest <= 0) continue;
+                try {
+                    Thread.sleep(rest);
+                } catch (InterruptedException e) {
+                    return;
                 }
-            } else if (from != null) {
-                Platform.runLater(() -> {
-                    if (generation.get() == mine && blind == null) {
-                        blind = "No frame: the game is not up, or the bot looks at no window. ▶ Launch starts it.";
-                        showLine();
-                    }
-                });
             }
-            long rest = FRAME_MS - (System.currentTimeMillis() - began);
-            if (rest <= 0) continue;
-            try {
-                Thread.sleep(rest);
-            } catch (InterruptedException e) {
-                return;
-            }
+        } finally {
+            if (grab != null) grab.close();
         }
     }
 
@@ -351,10 +367,10 @@ final class LiveBoard {
      * Finds where the game is read, then again each second, into {@code feed}, until another start or a stop: a
      * window the game opened since, a private display a launch brought up.
      */
-    private void find(long mine, PanelContext reads, AtomicReference<Supplier<Optional<BufferedImage>>> feed) {
+    private void find(long mine, PanelContext reads, AtomicReference<LiveFeed> feed) {
         while (generation.get() == mine) {
             try {
-                feed.set(ScreenDesk.feed(reads.found()));
+                feed.set(reads.found().live());
             } catch (RuntimeException unfound) {
                 // The next second finds it again.
             }
@@ -631,7 +647,7 @@ final class LiveBoard {
     // --- frozen ---
 
     private void freeze() {
-        BufferedImage image = latest;
+        BufferedImage image = frames.shown();
         if (image == null) {
             done.accept("Nothing to freeze yet: no frame came from the game.");
             return;
@@ -768,7 +784,7 @@ final class LiveBoard {
      */
     void cut(String screen, boolean marker) {
         CutForm.Kind first = marker ? CutForm.Kind.MARKER : CutForm.Kind.BUTTON;
-        if (frozen == null && liveButton.isSelected() && latest != null) freeze();
+        if (frozen == null && liveButton.isSelected() && frames.showing()) freeze();
         if (frozen == null) {
             Optional<BufferedImage> shot = shot(screen);
             if (shot.isEmpty()) {
