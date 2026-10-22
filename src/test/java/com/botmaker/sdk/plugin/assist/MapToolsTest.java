@@ -61,7 +61,7 @@ class MapToolsTest {
         BufferedImage pressed = filled(Color.GRAY, 20);     // a button's press: a corner, under SCREEN_SHARE
         BufferedImage garage = filled(Color.BLUE, 0);
         ActTools.Entered first = new ActTools.Entered(AgentReply.text("Clicked garage; changed a corner."), before,
-                pressed, Motion.NONE, "click garage", "Clicked garage");
+                pressed, Motion.NONE, "click garage", "Clicked garage", 200);
         assertTrue(first.share() < MapTools.SCREEN_SHARE);
 
         long[] waited = {0};
@@ -73,6 +73,7 @@ class MapToolsTest {
         assertTrue(later.share() >= MapTools.SCREEN_SHARE);
         assertEquals("answered", later.reply().parts().getFirst().text());
         assertEquals("click garage", later.how());
+        assertEquals(200 + waited[0], later.tookMs(), "the first change's time, then the wait for the screen");
 
         waited[0] = 0;
         ActTools.Entered same = ActTools.later(first, () -> Optional.of(pressed), MapTools.SLOW_SCREEN_MS,

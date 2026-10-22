@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
@@ -648,26 +650,62 @@ public final class ScreenGraph {
         return screen(constant).map(s -> back(constant, null));
     }
 
-    /** The fewest edges {@code usable} allows from {@code from} to {@code to}; empty when none leads there. */
+    /** What a screen not measured is taken to need to show once its way in is done, to plan a path by. */
+    static final long TAKES_MS = 1_000;
+    /** What each step costs on top of its screen's time: the press itself, and the look that sees it arrived. */
+    static final long STEP_COST_MS = 300;
+
+    /** How long {@code constant} takes to show once its way in is done ({@link Setup#takes}); empty while not measured. */
+    public Optional<Duration> takes(String constant) {
+        return screen(constant).map(s -> s.setup().takes());
+    }
+
+    /**
+     * What taking {@code edge} costs, in ms: the time the screen it reaches {@link #takes takes} (else
+     * {@link #TAKES_MS}) and {@link #STEP_COST_MS}; a way on its own, the time the screen it leaves {@link #loadMs loads
+     * in}.
+     */
+    long cost(Edge edge) {
+        if (edge.onItsOwn()) return loadMs(edge.from());
+        return takes(edge.to()).map(Duration::toMillis).orElse(TAKES_MS) + STEP_COST_MS;
+    }
+
+    /**
+     * The quickest edges {@code usable} allows from {@code from} to {@code to}, by each edge's {@link #cost}; empty
+     * when none leads there. Of paths that cost the same, the one a search by fewest edges finds first, edges in their
+     * map order (2026-10-22).
+     */
     public Optional<List<Edge>> pathTo(String from, String to, Predicate<Edge> usable) {
         if (!screens.containsKey(from) || !screens.containsKey(to)) return Optional.empty();
         if (from.equals(to)) return Optional.of(List.of());
         List<Edge> edges = edges().stream().filter(usable).toList();
         Map<String, Edge> reachedBy = new HashMap<>();
-        Deque<String> queue = new ArrayDeque<>(List.of(from));
-        Set<String> seen = new HashSet<>(Set.of(from));
+        Map<String, Long> costs = new HashMap<>(Map.of(from, 0L));
+        Map<String, Long> found = new HashMap<>(Map.of(from, 0L));
+        // By cost, then by when it was first found: with every cost alike, the queue a search by fewest edges keeps.
+        PriorityQueue<String> queue = new PriorityQueue<>(Comparator.<String>comparingLong(costs::get)
+                .thenComparingLong(found::get));
+        queue.add(from);
+        Set<String> done = new HashSet<>();
         while (!queue.isEmpty()) {
             String at = queue.poll();
-            for (Edge edge : edges) {
-                if (!edge.from().equals(at) || !seen.add(edge.to())) continue;
-                reachedBy.put(edge.to(), edge);
-                if (edge.to().equals(to)) {
-                    List<Edge> path = new ArrayList<>();
-                    for (String step = to; !step.equals(from); step = reachedBy.get(step).from()) {
-                        path.addFirst(reachedBy.get(step));
-                    }
-                    return Optional.of(path);
+            if (!done.add(at)) continue;
+            if (at.equals(to)) {
+                List<Edge> path = new ArrayList<>();
+                for (String step = to; !step.equals(from); step = reachedBy.get(step).from()) {
+                    path.addFirst(reachedBy.get(step));
                 }
+                return Optional.of(path);
+            }
+            for (Edge edge : edges) {
+                if (!edge.from().equals(at) || done.contains(edge.to())) continue;
+                long cost = costs.get(at) + cost(edge);
+                Long now = costs.get(edge.to());
+                if (now != null && now <= cost) continue;
+                queue.remove(edge.to());
+                costs.put(edge.to(), cost);
+                found.putIfAbsent(edge.to(), (long) found.size());
+                reachedBy.put(edge.to(), edge);
                 queue.add(edge.to());
             }
         }

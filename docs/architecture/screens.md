@@ -100,6 +100,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   screen's. A walk to the screen it is in arrives once any of its tabs shows (`ScreenGraph.tabOf`). An input of the
   screen is found on that screen's class when pressed from a tab (`ScreenGraph.holder`: its strip, its tree). The
   ⋯ menu's *A tab of …* and edit_map's `set_kind tab` mark it (`ScreenEdits.setTab`).
+- **Edge costs** (2026-10-22): `Setup.takes(Duration)` is how long a screen takes to show once its way in is done,
+  written by try_input and ▶ Try from the time the screen took to settle (`ActTools.Entered.took`, rounded to
+  100 ms) on a screen opened or reached with no time yet. `ScreenGraph.pathTo` is a Dijkstra: an edge costs the
+  time its screen takes (`TAKES_MS`, 1 s, when not measured) plus `STEP_COST_MS` (300 ms), a way on its own the
+  time the screen it leaves loads in; ties keep the path a search by fewest edges finds first, so a map with no time
+  walks as before.
 - **A look's shot** (2026-10-22): a frame showing one of a screen's looks (`ScreenWalk.lookOn`) is that look's shot,
   `screens/<CONSTANT>@<look>.png` (`ScreenShots.file(resources, constant, look)`, the look's name lower case and
   dashed), and leaves the screen's own; ❄ Freeze's retake, a cut marker and a walk's retake all save so. The panel's
@@ -146,7 +152,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   place and `MARKER_MARGIN` both scaled from the cut frame; when no screen shows near, the screens one step away
   over the whole frame, a window of another shape having moved the UI pinned to its edges — never every screen,
   which took 11 s a poll) and
-  walks one edge at a time: do the input, wait up to `STEP_MS` (10 s) for the next marker, close a popup that
+  walks one edge at a time: do the input, wait for the next marker up to twice the time the screen
+  `Setup.takes` (at least `LEAST_STEP_MS`, 2 s; `STEP_MS`, 10 s, for a screen not measured), close a popup that
   shows, plan again from where a stray step landed. A way back is done once the left screen's marker is gone,
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:
   Upkeep), STUCK, STOPPED.

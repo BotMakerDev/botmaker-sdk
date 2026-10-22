@@ -31,6 +31,7 @@ import com.botmaker.session.PrivateSession;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -289,12 +290,18 @@ final class ActTools {
     /**
      * What an action did: the answer as click or key says it, and when it happened and the screen was read after
      * it, the frames either side and what moved on its own; {@code how} says it in the Map's words
-     * ({@code click engineer_home}, {@code key Q}) and {@code done} in the answer's ({@code Clicked … at x,y}).
+     * ({@code click engineer_home}, {@code key Q}) and {@code done} in the answer's ({@code Clicked … at x,y});
+     * {@code tookMs}, how long from the action the screen took to settle on {@code after}.
      */
     record Entered(AgentReply reply, BufferedImage before, BufferedImage after, Motion motion, String how,
-                   String done) {
+                   String done, long tookMs) {
         static Entered no(AgentReply reply) {
-            return new Entered(reply, null, null, Motion.NONE, null, null);
+            return new Entered(reply, null, null, Motion.NONE, null, null, 0);
+        }
+
+        /** What it took, rounded to 100 ms, as a screen's {@code takes} is written. */
+        Duration took() {
+            return Duration.ofMillis(Math.round(tookMs / 100.0) * 100);
         }
 
         /** The share of the screen the action changed; 0 when it was not done or not read after. */
@@ -455,6 +462,7 @@ final class ActTools {
             return Entered.no(AgentReply.refused("The input failed: " + failed.getMessage()));
         }
         // From here the action happened: an answer that is not a refusal, so it is not tried again.
+        long acted = Clock.REAL.nowMs();
         Optional<BufferedImage> after;
         try {
             after = ToolTiming.timed(ToolTiming.Phase.SETTLE,
@@ -468,7 +476,7 @@ final class ActTools {
         // A screen the input changed may move otherwise now (a tab, a toggle): its motion is read again next time.
         if (screen != null && FrameChange.box(last, after.get(), motion).isPresent()) ambient = null;
         return new Entered(answer(context, done, last, after.get(), motion, Boolean.TRUE.equals(show)), last,
-                after.get(), motion, how, done);
+                after.get(), motion, how, done, Clock.REAL.nowMs() - acted);
     }
 
     /**
@@ -490,19 +498,20 @@ final class ActTools {
 
     static Entered later(Entered entered, Supplier<Optional<BufferedImage>> look, int capMs, double share, Clock clock,
                          Function<BufferedImage, AgentReply> answer) throws InterruptedException {
+        long start = clock.nowMs();
         Optional<BufferedImage> after = FrameChange.answered(entered.before(), entered.motion(), look, capMs, share,
                 clock);
         if (after.isEmpty() || FrameChange.share(entered.before(), after.get(), entered.motion()) < share) {
             return entered;
         }
         return new Entered(answer.apply(after.get()), entered.before(), after.get(), entered.motion(), entered.how(),
-                entered.done());
+                entered.done(), entered.tookMs() + clock.nowMs() - start);
     }
 
     /** {@code entered} read again on {@code after}, a later look: its answer said anew from that frame. */
     static Entered again(AgentContext context, Entered entered, BufferedImage after) {
         return new Entered(answer(context, entered.done(), entered.before(), after, entered.motion(), false),
-                entered.before(), after, entered.motion(), entered.how(), entered.done());
+                entered.before(), after, entered.motion(), entered.how(), entered.done(), entered.tookMs());
     }
 
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */

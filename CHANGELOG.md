@@ -41,6 +41,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `.after(BATTLE)`, Victory and Defeat, and `Navigate.next(Screens.BATTLE)` waits for whichever shows, so a body no
   longer waits on pictures by hand. 🗺 Screens' cut form has *read on this screen* (and *names which one it shows*)
   on a zone or digits cut; read_map lists a screen's readouts and every screen that follows it on its own.
+- **Walks timed by the screens' own times**: ▶ Try and try_input write how long the screen an input opens took to
+  show, `.takes(Duration.ofMillis(800))`. A walk takes the quickest path by those times rather than the one of
+  fewest steps, and gives each step twice its screen's time (at least 2 s) instead of a fixed 10 s; read_map says
+  each measured time. A map with no time measured walks as before.
 - **Tabs and looks' shots on the map**: a tab is a screen told by its tab button picked, `Setup.named("Gear")
   .from(HERO.gearTab).tab()` with a `State.SELECTED` look on the button, so it needs no marker of its own; a walk
   presses a sibling tab directly and takes any tab as the screen it is in. Mark one from 🗺 Screens' ⋯ (*A tab of …*)

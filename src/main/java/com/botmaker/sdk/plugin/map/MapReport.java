@@ -192,6 +192,7 @@ public final class MapReport {
         }
         screen.alsoFrom().forEach(way -> ins.add("also " + (way.isOnItsOwn() ? "after " : "from ")
                 + graph.onScreen(way).map(graph::shown).orElse("?") + " " + way(graph, way)));
+        graph.takes(constant).ifPresent(t -> ins.add("shows within " + t.toMillis() / 1000.0 + " s of its way in"));
         if (!ins.isEmpty()) out.append(indent).append("  ").append(String.join("; ", ins)).append('\n');
         for (ScreenVariant look : screen.variants()) {
             String when = ScreenTypes.sourceOf(look.when());

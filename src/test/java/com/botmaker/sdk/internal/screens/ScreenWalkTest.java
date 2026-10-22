@@ -550,6 +550,24 @@ class ScreenWalkTest {
         assertTrue(game.now >= STEP_MS, "the first step waited its time for Campaign");
     }
 
+    /** A screen measured to take 3 s is given 6 s a step, not a step's fixed time; a quick one at least 2 s. */
+    @Test
+    void aMeasuredStepWaitsTwiceItsTime() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(s -> s.takes(Duration.ofSeconds(3))));
+        screens.put("MAIL", screens.get("MAIL").setup(s -> s.takes(Duration.ofMillis(200))));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.leads.put("HOME click campaign", "MAIL");
+
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        ScreenWalk.Result walked = walk.go("CAMPAIGN", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertTrue(game.now >= 6_000 && game.now < 6_000 + STEP_MS, "Campaign waited for twice 3 s: " + game.now);
+        ScreenGraph.Edge intoMail = game.map.pathTo("HOME", "MAIL", edge -> true).orElseThrow().getFirst();
+        assertEquals(ScreenWalk.LEAST_STEP_MS, walk.waitMs(intoMail), "0.4 s is below the least a step is given");
+    }
+
     @Test
     void aPopupIsClosedBeforeTheWalk() {
         Game game = new Game("HOME");

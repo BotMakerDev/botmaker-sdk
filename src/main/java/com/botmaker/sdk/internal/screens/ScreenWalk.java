@@ -58,10 +58,13 @@ public final class ScreenWalk {
     }
 
     /**
-     * How long one step is given for the next screen's marker to show, by a run and by the assistant's walks alike:
-     * fixed, not the bot's timeouts, since a screen slow to draw is the game's pace, not the bot's.
+     * How long one step is given for the next screen's marker to show, by a run and by the assistant's walks alike,
+     * when that screen says nothing of how long it {@link ScreenGraph#takes takes}: fixed, not the bot's timeouts,
+     * since a screen slow to draw is the game's pace, not the bot's.
      */
     public static final long STEP_MS = 10_000;
+    /** The least a step into a measured screen is given, however quick it showed when measured. */
+    static final long LEAST_STEP_MS = 2_000;
     /** How often the screen is read while waiting for a marker. */
     static final long POLL_MS = 250;
     /** How many popups in a row are closed before a step; more is a loop. */
@@ -551,7 +554,8 @@ public final class ScreenWalk {
     }
 
     /**
-     * Where the game is once a press settled: the first of {@code leads} whose markers show within a step's time (one
+     * Where the game is once a press settled: the first of {@code leads} whose markers show within a step into the
+     * slowest of them (one
      * with no markers is taken as reached), else the screen a look after {@link Reach#CLICK_SETTLE_MS} shows, popups
      * closed; empty when it shows none.
      */
@@ -562,7 +566,7 @@ public final class ScreenWalk {
             return unmarked;
         }
         if (!leads.isEmpty()) {
-            long deadline = reach.nowMs() + stepMs;
+            long deadline = reach.nowMs() + leads.stream().mapToLong(this::stepInto).max().orElse(stepMs);
             do {
                 reach.pause(POLL_MS);
                 // Looked for before popups are closed, since a lead may be one (a confirm), then once they are.
@@ -686,7 +690,7 @@ public final class ScreenWalk {
      * once its screen's markers show. A way back arrives once the screen left is gone and another of the map shows:
      * a panel's parent stays in view under it, and a screen opened from another than its parent in the tree (an
      * {@code alsoFrom}) closes back to that one, which the walk reads from the next look (2026-10-15). A way on its
-     * own is given the time the screen it leaves {@link ScreenGraph#loadMs loads in}, not a step's. A way into a
+     * own is given the time the screen it leaves {@link ScreenGraph#loadMs loads in}, any other {@link #waitMs}. A way into a
      * transition arrives too once a screen after it shows: the game may have shown the transition too briefly to see.
      */
     private boolean arrives(ScreenGraph.Edge edge) {
@@ -699,7 +703,7 @@ public final class ScreenWalk {
         }
         List<Markers> after = edge.back() ? List.of() : graph.followers(edge.to()).stream()
                 .map(graph::markers).filter(Markers::any).toList();
-        long deadline = reach.nowMs() + (edge.onItsOwn() ? graph.loadMs(edge.from()) : stepMs);
+        long deadline = reach.nowMs() + waitMs(edge);
         do {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
@@ -710,6 +714,20 @@ public final class ScreenWalk {
             }
         } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
         return false;
+    }
+
+    /**
+     * How long {@code edge} is given to arrive: twice the time its screen {@link ScreenGraph#takes takes}, at least
+     * {@link #LEAST_STEP_MS}; a step's time for a screen not measured, and for a way on its own the time the screen
+     * it leaves loads in.
+     */
+    long waitMs(ScreenGraph.Edge edge) {
+        return edge.onItsOwn() ? graph.loadMs(edge.from()) : stepInto(edge.to());
+    }
+
+    /** How long a step into {@code constant} is given: twice what it takes, at least {@link #LEAST_STEP_MS}. */
+    private long stepInto(String constant) {
+        return graph.takes(constant).map(t -> Math.max(2 * t.toMillis(), LEAST_STEP_MS)).orElse(stepMs);
     }
 
     /** The first look within {@code ms} that shows a screen of the map, popups closed; empty when none did. */

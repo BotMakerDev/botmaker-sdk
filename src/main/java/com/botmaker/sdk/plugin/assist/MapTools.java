@@ -30,6 +30,7 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -480,7 +481,7 @@ final class MapTools {
             Optional<String> known = anew ? Optional.empty() : named.or(() -> landed(context, graph, screen, entered));
             if (known.isPresent()) {
                 AgentReply said = entered.reply().and(reached(services, graph, screen, field, base, look, pick,
-                        known.get()));
+                        known.get(), entered.took()));
                 // A popup shows over the screen; anything else left it, maybe finished.
                 return Tried.left(graph.screens().get(known.get()).isPopup() ? said : up(context, said, screen, input));
             }
@@ -490,7 +491,7 @@ final class MapTools {
                         + "go back to " + name + " and try it again with opens, the name it shows.")));
             }
             return Tried.left(entered.reply().and(opened(context, graph, screen, field, base, look, pick, child,
-                    entered.after())));
+                    entered.after(), entered.took())));
         }
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
         AgentReply said = noted(services, screen, field, base.tried(),
@@ -612,15 +613,23 @@ final class MapTools {
         return look == null ? way : way.whenLooks(look);
     }
 
+    /** {@code took} as a screen's {@code takes}: null for no time measured. */
+    private static Duration measured(Duration took) {
+        return took.isZero() ? null : took;
+    }
+
     /** The picture name a way back with no input of its own clicks first, before Escape: Firestone's close_x. */
     static final String CLOSE = "close_x";
 
-    /** {@code base}, which opened a screen the map has not: added below the others, owing its marker. */
+    /**
+     * {@code base}, which opened a screen the map has not: added below the others, owing its marker, and showing
+     * within {@code took}, the time it took to settle.
+     */
     private static AgentReply opened(AgentContext context, ScreenGraph graph, String screen, String field, Input base,
-                                     State look, Pick pick, String child, BufferedImage frame) {
+                                     State look, Pick pick, String child, BufferedImage frame, Duration took) {
         StudioServices services = context.services();
         String constant = ScreenBook.constantFor(graph, child);
-        MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)));
+        MapScreen made = MapScreen.of(Setup.named(child).fromWay(way(screen, field, look, pick)).takes(measured(took)));
         // Tried again, what it did before goes: the way it opens is what it does now.
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
                         ScreenEdits.untried(base)))
@@ -645,10 +654,11 @@ final class MapTools {
     /**
      * {@code base}, the field {@code field} of {@code screen}, led to {@code known}, mapped already: a popup over it,
      * its way back, or another way into {@code known}; a screen above {@code screen} in the tree is no screen it opens,
-     * so the input says it leaves.
+     * so the input says it leaves. A way into {@code known} gives it {@code took}, the time it took to settle, while it
+     * says no time of its own.
      */
     private static AgentReply reached(StudioServices services, ScreenGraph graph, String screen, String field,
-                                      Input base, State look, Pick pick, String known) {
+                                      Input base, State look, Pick pick, String known, Duration took) {
         String to = graph.shown(known);
         MapScreen target = graph.screens().get(known);
         if (target.isPopup()) {
@@ -680,10 +690,13 @@ final class MapTools {
                 && (lead.state() == null || lead.state() == look) && Objects.equals(lead.pick(), pick));
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
                         ScreenEdits.untried(base)))
-                .or(() -> already ? Optional.empty() : ScreenBook.update(services, known, s -> s.setup(x -> {
+                .or(() -> already && target.setup().takes() != null ? Optional.empty()
+                        : ScreenBook.update(services, known, s -> s.setup(x -> {
+                    Setup timed = x.takes() == null ? x.takes(measured(took)) : x;
+                    if (already) return timed;
                     List<Way> ways = new ArrayList<>(x.alsoFrom());
                     ways.add(way(screen, field, look, pick));
-                    return x.alsoFrom(ways);
+                    return timed.alsoFrom(ways);
                 }))));
         if (failed.isPresent()) return unwritten(failed.get());
         return noted(services, screen, field, null, "opens " + to + ", mapped already: a way into it", false);

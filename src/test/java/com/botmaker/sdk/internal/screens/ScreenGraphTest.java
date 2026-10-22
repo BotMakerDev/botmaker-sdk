@@ -215,6 +215,39 @@ class ScreenGraphTest {
         assertEquals(Optional.of(List.of()), tree.pathTo("MAP", "MAP", edge -> true));
     }
 
+    /** Root to Target through Slow, taking {@code slow}, or through Fast1 and Fast2, each taking {@code fast}. */
+    private static Map<String, MapScreen> slowOrFast(Duration slow, Duration fast) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("ROOT", screen("Root", click("to_slow"), click("to_fast")));
+        screens.put("SLOW", screen(Setup.named("Slow").from(ref("ROOT", "to_slow")).takes(slow), click("slow_on")));
+        screens.put("FAST1", screen(Setup.named("Fast1").from(ref("ROOT", "to_fast")).takes(fast),
+                click("fast_on")));
+        screens.put("FAST2", screen(Setup.named("Fast2").from(ref("FAST1", "fast_on")).takes(fast),
+                click("fast_end")));
+        screens.put("TARGET", screen(Setup.named("Target").from(ref("SLOW", "slow_on"))
+                .alsoFrom(List.of(Way.of(ref("FAST2", "fast_end"))))));
+        return screens;
+    }
+
+    /** A walk takes the quicker path by each screen's measured time, not the one of fewest steps (2026-10-22). */
+    @Test
+    void aSlowEdgeLosesToTwoFastOnes() {
+        ScreenGraph graph = ScreenGraph.of(slowOrFast(Duration.ofSeconds(5), Duration.ofMillis(200)));
+        List<ScreenGraph.Edge> path = graph.pathTo("ROOT", "TARGET", edge -> true).orElseThrow();
+        assertEquals(List.of("FAST1", "FAST2", "TARGET"), path.stream().map(ScreenGraph.Edge::to).toList(),
+                "0.5 + 0.5 + 1.3 s beats 5.3 + 1.3 s");
+    }
+
+    /** A map with no time measured walks the path of fewest steps, the first of them in map order. */
+    @Test
+    void noCostsGiveTheBfsPath() {
+        ScreenGraph graph = ScreenGraph.of(slowOrFast(null, null));
+        assertEquals(List.of("SLOW", "TARGET"), graph.pathTo("ROOT", "TARGET", edge -> true).orElseThrow().stream()
+                .map(ScreenGraph.Edge::to).toList());
+        assertEquals(List.of("CAMPAIGN", "HOME", "ENGINEER"), ScreenGraph.of(firestone())
+                .pathTo("MAP", "ENGINEER", edge -> true).orElseThrow().stream().map(ScreenGraph.Edge::to).toList());
+    }
+
     @Test
     void aLoopOfWaysInEndsEveryWalk() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();

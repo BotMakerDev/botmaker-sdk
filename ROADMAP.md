@@ -98,7 +98,10 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     where the plain shot found them; a card shows no "tab of" pill; the cut form has no *tab* kind (a tab is marked
     from the ⋯ menu once its way in is cut, and its button's Selected look cut as a look); a look with no marker is
     never recognised, so its shot is never taken.
-  - Edge costs: measured step and settle times feed `ScreenGraph.pathTo` and the walk's waits instead of `STEP_MS`.
+  - Screen times, past their first cut (2026-10-22): a screen's `takes` is written once, by the first try that opens
+    or reaches it, and never again (a slower later show does not raise it); a walk's own steps measure nothing; no
+    hand editor sets it in 🗺 (it is written in `Screens.java`); a way back costs the screen it returns to, the same
+    whichever input closes.
   - The by-hand flow (after the owed click-tests): "next untried" in the window, suggested cut names, the cut form
     split by intent, Try that freezes the opened screen and starts its marker cut, an empty map instead of the
     template's placeholder Home.

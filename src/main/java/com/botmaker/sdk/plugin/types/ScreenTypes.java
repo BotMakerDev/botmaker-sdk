@@ -78,6 +78,7 @@ public final class ScreenTypes {
             .flag(Setup::start, Setup::isStart)
             .flag(Setup::tab, Setup::isTab)
             .<Duration>with(Setup::loads, Setup::loads)
+            .<Duration>with(Setup::takes, Setup::takes)
             .<String>with(Setup::notes, Setup::notes)
             .<Reached>with(Setup::reached, Setup::reached)
             .<List<String>>with(Setup::owes, Setup::owes)
