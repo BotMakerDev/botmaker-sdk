@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.session.PrivateSession;
 
 import java.awt.image.BufferedImage;
 import java.util.LinkedHashMap;
@@ -154,6 +155,11 @@ public final class ScreenDesk {
      */
     public static Optional<Supplier<Optional<BufferedImage>>> away(AgentContext context) {
         return Frames.away(context);
+    }
+
+    /** The private display the look tools read, or null when they read this desktop or an emulator. Blocking. */
+    public static PrivateSession session(AgentContext context) {
+        return Frames.session(context);
     }
 
     /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */

@@ -9,8 +9,10 @@ import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.Window;
 import com.botmaker.sdk.internal.capture.WindowHandles;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
+import com.botmaker.session.PrivateSession;
 import com.botmaker.shared.capture.FrameGrab;
 import com.botmaker.shared.capture.FrameSink;
+import com.botmaker.shared.capture.GenericWindow;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -52,10 +54,19 @@ final class PanelContext implements AgentContext {
     }
 
     /**
-     * Where a live feed reads the game: the private display or the emulator as the look tools read them, else the
-     * window the source names, grabbed and kept open, else the source's frames. Off the FX thread.
+     * Where a live feed reads the game: the window attached on the private display, grabbed and kept open, else the
+     * private display or the emulator as the look tools read them, else the window the source names, grabbed and
+     * kept open, else the source's frames. Off the FX thread.
      */
     LiveFeed live() {
+        PrivateSession session = ScreenDesk.session(this);
+        GenericWindow game = session == null ? null : session.attached();
+        if (game != null) {
+            // The display's agent grabs the game's window into a file both processes map, so no frame crosses its
+            // pipe (2026-10-22); a window attached again is a place of its own.
+            return new LiveFeed(List.of(session.displayName(), session.attachedWindowId()),
+                    () -> session.controller().grabWindow(game));
+        }
         Optional<Supplier<Optional<BufferedImage>>> away = ScreenDesk.away(this);
         if (away.isPresent()) return LiveFeed.of(away.get());
         if (source instanceof Window open && WindowHandles.id(open) != null) {
