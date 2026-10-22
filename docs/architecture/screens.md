@@ -203,8 +203,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   ↑ ↓ Enter or a click picks one: the map zooms to it at readable size (`zoomTo`, eased over 250 ms) and selects it;
   Esc clears the field and fits the map. Every hit is also lit on the map.
 - **`ScreenCards`** decides, apart from JavaFX, each card (state, progress, `pills`), each link (`label()` names
-  the default way back), each input's row and each list's `Strip`. **`ScreenCanvas`** draws them, folds the tree,
-  caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
+  the default way back), each input's row and each list's `Strip`. **`ScreenCanvas`** draws them, laid out by ELK's
+  layered algorithm (`ElkLayout`, the user's call of 2026-10-22; a dependency of the SDK, not the toolkit, so other
+  plugins stay lean): ranks follow the entrances from the start screen, a way back goes in as a reversed edge,
+  popups sit apart, and ELK's orthogonal routes are the links' paths. A card placed by hand keeps its `at` and only
+  its own links are routed again (the toolkit's `Placement.pinned`); ELK failing to load falls back to the toolkit's
+  `LayeredLayout`. It caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
   the background, sized by the file's header (`ScreenShots.size`); the panel's shot loads at once, since its boxes
   need its shape. A list's members are drawn as one scrolling strip over where the list sits, not boxed one by one.
 - **`ScreenPanel`** is the picked screen: its shot with boxes, ▶ Try, 🧭 Go here, ✂ Cut, notes, and the hand
@@ -217,6 +221,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `at(new Point(x, y))` in `Screens.java` (`ScreenEdits.move`), so the map looks the same on the next open and on
   another computer; the first move pins every card shown, so the others stay put. **Tidy** (`ScreenEdits.tidy`)
   drops every `at`.
+- **Links in focus** (the toolkit's `GraphCanvas.setFocusLinks`, 2026-10-22): at rest the entrances are drawn full
+  and every other way at 15% without its label; the card under the pointer, else the selected ones, lights its ways
+  in and out and fades the rest. Only opacity and order change, nothing is routed again. **⇄ All links** draws every
+  way full, remembered per computer.
 - **Undo** is Studio's own, through the contract's `StudioServices.history()`: each hand edit, move and Tidy is one
   `History.batch` step beside the user's code edits. ↶/↷ and Ctrl+Z/Ctrl+Y (`plugin/HistoryKeys`, shared with the
   Activity Flow) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
@@ -252,8 +260,9 @@ map tool against the hand path that covers it, and fails on one with none.
   second, straight into one of four reused images (`LiveImage`, each a `PixelBuffer`, swapped as a swap chain), and
   drawn on the FX pulse only when a new frame came (`LiveBoard.Pulse`, an `AnimationTimer`); a click, drag, wheel or
   key on it is sent through `ScreenDesk.hands`. A window is read through its grab (`PanelContext.live`, shared's
-  `grabWindow`), kept open while the same window is found; a private session or an emulator through
-  `ScreenDesk.look`. Where the game is read is found once a second on a thread of its own (`PanelContext.found`: the
+  `grabWindow`), kept open while the same window is found; a private session's attached window the same way,
+  its display agent writing the frames into a file both processes map (`docs/display-pipeline.md` §4); an emulator,
+  or a private display with no window attached, through `ScreenDesk.look`. Where the game is read is found once a second on a thread of its own (`PanelContext.found`: the
   window a class names, so a frame lists no windows). The line says "R fps read, S shown, M ms a read, D ms a draw",
   and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The line under it
   names the

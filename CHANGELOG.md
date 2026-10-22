@@ -83,6 +83,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - It writes each frame straight into the back one of the board's two images, and the two swap on a show.
   - A frame is no longer turned into a `BufferedImage` and copied twice; ❄ Freeze copies the frame shown.
   - A game window's read drops from about 20 ms to 2–5 ms.
+  - A game on a private display is read through its display agent's grab too, the frames in a file both processes
+    map; before, each frame came down the agent's pipe.
 - **🗺 Screens' live board reads and draws apart, up to 60 fps**:
   - The game is read on a thread of its own, paced on the clock at up to 60 frames a second.
   - The board draws on JavaFX's own pulse, only when a new frame came; no `runLater` per frame.
