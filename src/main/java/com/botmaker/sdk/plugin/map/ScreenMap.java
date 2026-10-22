@@ -79,6 +79,7 @@ public final class ScreenMap {
     private static final Preferences PREFS = Preferences.userNodeForPackage(ScreenMap.class);
     private static final String OUTLINE_KEY = "map.outline";
     private static final String PANEL_KEY = "map.panel";
+    private static final String ALL_LINKS_KEY = "map.allLinks";
 
     /** The window open on each project, by its folder. On the FX thread. */
     private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
@@ -158,11 +159,11 @@ public final class ScreenMap {
             split.setDividerPositions(OUTLINE_SHARE);
             SplitPane.setResizableWithParent(outline.node(), false);
             root.setCenter(split);
-            remembered(outlineShown, OUTLINE_KEY, this::showOutline);
+            remembered(outlineShown, OUTLINE_KEY, true, this::showOutline);
         } else {
             root.setCenter(canvas.graph());
         }
-        if (panel != null) remembered(panelShown, PANEL_KEY, is -> root.setRight(is ? panel.node() : null));
+        if (panel != null) remembered(panelShown, PANEL_KEY, true, is -> root.setRight(is ? panel.node() : null));
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
@@ -187,8 +188,8 @@ public final class ScreenMap {
     }
 
     /** {@code toggle} shown as this computer last left it, and each change applied and kept. */
-    private static void remembered(ToggleButton toggle, String key, Consumer<Boolean> apply) {
-        toggle.setSelected(PREFS.getBoolean(key, true));
+    private static void remembered(ToggleButton toggle, String key, boolean fallback, Consumer<Boolean> apply) {
+        toggle.setSelected(PREFS.getBoolean(key, fallback));
         apply.accept(toggle.isSelected());
         toggle.selectedProperty().addListener((o, was, is) -> {
             PREFS.putBoolean(key, is);
@@ -549,6 +550,10 @@ public final class ScreenMap {
         others.setSelected(true);
         others.setTooltip(new Tooltip(MapGuide.OTHER_WAYS));
         others.selectedProperty().addListener((o, was, is) -> canvas.graph().setShowDashed(is));
+        // Faint until a screen is focused, unless every link is asked for: a whole map of arrows hid the work.
+        ToggleButton all = new ToggleButton("⇄ All links");
+        all.setTooltip(new Tooltip(MapGuide.ALL_LINKS));
+        remembered(all, ALL_LINKS_KEY, false, is -> canvas.graph().setFocusLinks(!is));
         Button fit = new Button("Fit");
         fit.setTooltip(new Tooltip(MapGuide.FIT));
         fit.setOnAction(e -> canvas.graph().fit());
@@ -564,7 +569,7 @@ public final class ScreenMap {
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         said.getStyleClass().add("screen-panel-path");
-        HBox bar = new HBox(8, search, others, out, fit, in);
+        HBox bar = new HBox(8, search, others, all, out, fit, in);
         if (full) {
             undo.setOnAction(e -> step(true));
             redo.setOnAction(e -> step(false));

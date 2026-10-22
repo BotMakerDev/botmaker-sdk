@@ -111,6 +111,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
     laid out again on a redraw, and ELK is warmed off the FX thread as the window opens.
   - **The SDK depends on ELK 0.12.0 at `compile`**, with EMF, Xbase's runtime library and Guava (pinned
     33.7.2-jre). Every bot carries about 8.5 MB more: the user's call (2026-10-22).
+- **🗺 Screens' links in focus** (`ScreenMap`, the toolkit's `GraphCanvas.setFocusLinks`):
+  - At rest the entrances are drawn full, with their chips; the other ways are faint, without theirs.
+  - The screen under the pointer, or else the screen picked (a click, the outline, a search hit), lights every way
+    in and out of it, chips included, over the rest, which go faint, entrances too.
+  - **⇄ All links** in the toolbar draws every way in full, as before; this computer remembers it, off at first.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

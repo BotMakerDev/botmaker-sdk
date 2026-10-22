@@ -23,6 +23,8 @@ final class MapGuide {
 
     // --- the toolbar ---
     static final String OTHER_WAYS = "Show the dashed arrows: other ways into a screen, and ways back";
+    static final String ALL_LINKS = "Draw every arrow in full. Off, only the entrances are, and the arrows in and out "
+            + "of the screen under the pointer or picked; the rest are faint";
     static final String FIT = "Zoom to show the whole map";
     static final String ZOOM_OUT = "Zoom out (the wheel zooms about the pointer; a right drag pans)";
     static final String ZOOM_IN = "Zoom in";
@@ -127,6 +129,7 @@ final class MapGuide {
                     new Entry("Find a screen…", null, "Lists the screens whose name, constant, inputs, pictures or "
                             + "notes have the words; ↑ ↓ and Enter or a click zooms to one, Esc fits the map again."),
                     new Entry("Other ways", null, OTHER_WAYS + "."),
+                    new Entry("⇄ All links", null, ALL_LINKS + "; this computer remembers which."),
                     new Entry("− Fit +", null, FIT + "; the wheel zooms about the pointer, a right drag pans."),
                     new Entry("↶ ↷", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y): a map edit "
                             + "and a code edit are undone in the order they were made."),
