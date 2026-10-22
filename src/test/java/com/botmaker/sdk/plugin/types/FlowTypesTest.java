@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
@@ -193,7 +194,8 @@ class FlowTypesTest {
                 FlowTypes.FLOW_SHAPE.componentTypes());
         assertEquals(4, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
         assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
-                boolean.class, boolean.class, Class.class, Flow.class), FlowTypes.STEP_SHAPE.componentTypes());
+                boolean.class, boolean.class, Class.class, Flow.class, Screen.class),
+                FlowTypes.STEP_SHAPE.componentTypes());
         assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
     }
 

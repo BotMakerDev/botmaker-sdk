@@ -16,6 +16,7 @@ import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
@@ -233,13 +234,14 @@ public final class FlowWalker {
      * Runs {@code body}; when a step of it gets stuck after its {@code Navigate.to} arrived, walks back to that screen
      * by the map and runs the body once more (2026-10-16). A stray step, a popup the map lacks or a slow screen then
      * costs one walk, not the run's home recovery. A body that never reached a screen, a walk back that does not
-     * arrive, and a second stuck step go on to that recovery.
+     * arrive, and a second stuck step go on to that recovery. A step that says its screen ({@code .on(Screens.X)},
+     * 2026-10-22) walks back there instead, reached or not.
      */
     private static Outcome runOrWalkBack(Flow.Step step, ActivityBody<?> body) {
         try {
             return body.run();
         } catch (BotStuckException stuck) {
-            String back = ScreenMaps.reached();
+            String back = backTo(step);
             if (back == null) throw stuck;
             String shown = ScreenMaps.installed().shown(back);
             Debug.error("[Activity] " + step.label() + " got stuck (" + stuck.getMessage() + "): walking back to "
@@ -251,6 +253,15 @@ public final class FlowWalker {
             }
             return body.run();
         }
+    }
+
+    /** The screen a stuck {@code step} walks back to: the one it says it works on, else the last one it reached. */
+    static String backTo(Flow.Step step) {
+        if (step.screen() != null) {
+            Optional<String> said = ScreenMaps.installed().constantOf(step.screen());
+            if (said.isPresent()) return said.get();
+        }
+        return ScreenMaps.reached();
     }
 
     /** How the run walks back to a screen it reached: {@code Navigate.to} it; a test stands in for the game. */

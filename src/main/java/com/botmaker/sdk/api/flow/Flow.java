@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.Labels;
@@ -233,14 +234,21 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
      *                    without opening the project ({@link #switchable()})
      * @param whenOff     where the run goes when this card is switched off or has no body yet;
      *                    {@link Activity#NONE} ends the run there
+     * @param screen      the screen of the map this activity works on ({@link #on}), or null for none said
      */
     public record Step(Node node, ActivityBody<?> body, String description, boolean enabled,
-                       boolean goHome, boolean runnerSwitch, Node whenOff) {
+                       boolean goHome, boolean runnerSwitch, Node whenOff, Screen screen) {
 
         public Step {
             node = node == null ? Activity.NONE : node;
             description = description == null ? "" : description;
             whenOff = whenOff == null ? Activity.NONE : whenOff;
+        }
+
+        /** A step that names no screen. */
+        public Step(Node node, ActivityBody<?> body, String description, boolean enabled,
+                    boolean goHome, boolean runnerSwitch, Node whenOff) {
+            this(node, body, description, enabled, goHome, runnerSwitch, whenOff, null);
         }
 
         /** The activity this card is, or {@link Activity#NONE} for a sub-flow card. */
@@ -250,17 +258,25 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
 
         /** This step with {@code description}, the one line the canvas shows. */
         public Step described(String description) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff, screen);
         }
 
         /** This step switched off: the run takes its off-wire rather than its work. */
         public Step off() {
-            return new Step(node, body, description, false, goHome, runnerSwitch, whenOff);
+            return new Step(node, body, description, false, goHome, runnerSwitch, whenOff, screen);
         }
 
         /** This step with the bot's {@link Run#home} run before it. */
         public Step goesHome() {
-            return new Step(node, body, description, enabled, true, runnerSwitch, whenOff);
+            return new Step(node, body, description, enabled, true, runnerSwitch, whenOff, screen);
+        }
+
+        /**
+         * This step working on {@code screen} of the map — {@code .on(Screens.TAVERN)}: 🗺 lights it for this
+         * activity and records into its body there, and a stuck run walks back to it before retrying.
+         */
+        public Step on(Screen screen) {
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff, screen);
         }
 
         /**
@@ -277,17 +293,17 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
 
         /** This step offered to the person running the bot, who may switch it off or back on for their machine. */
         public Step switchable() {
-            return new Step(node, body, description, enabled, goHome, true, whenOff);
+            return new Step(node, body, description, enabled, goHome, true, whenOff, screen);
         }
 
         /** This step going on to {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Class<? extends Outcome> to) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, Activity.of(to));
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, Activity.of(to), screen);
         }
 
         /** This step going on to the sub-flow card {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Flow to) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, new Sub(to));
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, new Sub(to), screen);
         }
 
         /** The card's label, which is what the canvas and the trace show. */

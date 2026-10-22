@@ -200,7 +200,8 @@ public final class FlowTypes {
                 .flag(Flow.Step::checksPopups, step -> false)
                 .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
                 .<Class<? extends Outcome>, Activity>with(Flow.Step::whenOff, Parts.OFF, FlowTypes::whenOff)
-                .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()));
+                .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()))
+                .with(Flow.Step::on, Flow.Step::screen);
     }
 
     /** Where {@code step} goes switched off, when that is an activity: {@link Activity#NONE} for a sub-flow. */
@@ -217,7 +218,7 @@ public final class FlowTypes {
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
     public static Flow.Step whenOff(Flow.Step step, Flow.Node to) {
         return new Flow.Step(step.node(), step.body(), step.description(), step.enabled(), step.goHome(),
-                step.runnerSwitch(), to);
+                step.runnerSwitch(), to, step.screen());
     }
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */

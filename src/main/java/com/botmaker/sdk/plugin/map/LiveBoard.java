@@ -3,7 +3,9 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -14,6 +16,8 @@ import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
+import com.botmaker.sdk.plugin.flow.ActivityScreens;
+import com.botmaker.sdk.plugin.flow.ActivityScreens.Target;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
@@ -27,6 +31,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -106,6 +111,7 @@ final class LiveBoard {
     private final ToggleButton liveButton = new ToggleButton("● Live");
     private final Button freeze = new Button("❄ Freeze");
     private final MenuButton missed = new MenuButton("Missed frames");
+    private final MenuButton record = new MenuButton(RECORD_OFF);
     private final ImageView view = new ImageView();
     private final Pane boxes = new Pane();
     private final StackPane game = new StackPane(view, boxes);
@@ -159,6 +165,10 @@ final class LiveBoard {
     private Point pressedAt;
     private long pressedMs;
     private double wheel;
+    /** The activity Live's presses, typing and walks are written into; null while not recording. */
+    private Target recording;
+
+    private static final String RECORD_OFF = "⏺ Record into…";
 
     /**
      * Runs {@code work}, said as {@code doing}, off the FX thread, the map read again once it wrote it; false when it
@@ -199,8 +209,11 @@ final class LiveBoard {
         missed.setTooltip(new Tooltip(MapGuide.MISSED));
         missed.setOnShowing(e -> missed.getItems().setAll(missedItems()));
         missed.getItems().add(new MenuItem());
+        record.setTooltip(new Tooltip(MapGuide.RECORD_INTO));
+        record.setOnShowing(e -> record.getItems().setAll(recordItems()));
+        record.getItems().add(new MenuItem());
         Button launch = QuickLaunch.button(services, (ok, message) -> done.accept(message));
-        board.controls(liveButton, freeze, launch, missed);
+        board.controls(liveButton, freeze, launch, missed, record);
         view.setPreserveRatio(true);
         frozenView.setPreserveRatio(true);
         boxes.setMouseTransparent(true);
@@ -525,20 +538,106 @@ final class LiveBoard {
         Point to = toFrame(e.getX(), e.getY());
         pressedAt = null;
         e.consume();
+        String screen = on != null ? on : lastKnown;
+        String field = screen == null ? null : LiveWays.fieldAt(boxesOf(screen), from).orElse(null);
         if (Math.abs(to.x() - from.x()) < DRAG_PX && Math.abs(to.y() - from.y()) < DRAG_PX) {
             // A click on an input not yet followed by a read of the game is kept: the screen this one fell on is not
             // known, and that click's way in is still to be proved.
             boolean pending = lastClick != null && lastClick.field() != null && readAtMs < lastClick.atMs();
-            if (!pending) {
-                String screen = on != null ? on : lastKnown;
-                String field = screen == null ? null : LiveWays.fieldAt(boxesOf(screen), from).orElse(null);
-                lastClick = new LiveWays.Click(screen, field, System.currentTimeMillis());
-            }
+            if (!pending) lastClick = new LiveWays.Click(screen, field, System.currentTimeMillis());
+            recordButton(screen, field, false);
             act(h -> h.click(from.x(), from.y()));
         } else {
+            recordButton(screen, field, true);
             long ms = Math.max(LEAST_DRAG_MS, System.currentTimeMillis() - pressedMs);
             act(h -> h.drag(from.x(), from.y(), to.x(), to.y(), ms));
         }
+    }
+
+    // --- recording into an activity's body ---
+
+    /** The activity Live records into now, null while not recording: 🧭 Go here records its walk there too. */
+    Target recording() {
+        return recording;
+    }
+
+    /** The menu: every activity of the bot's flows, its screen named, then Stop while recording. */
+    private List<MenuItem> recordItems() {
+        List<MenuItem> items = new ArrayList<>();
+        ScreenGraph map = graph.get();
+        List<Target> targets = ActivityScreens.targets(services.pluginValues(), map);
+        for (Target target : targets) {
+            String on = target.screen() == null ? "" : " — on " + map.shown(target.screen());
+            MenuItem item = new MenuItem(target.label() + on);
+            item.setOnAction(e -> {
+                recording = target;
+                record.setText("⏺ " + target.label());
+                record.getStyleClass().add("screen-recording");
+                done.accept("Recording into " + target.label() + " (" + target.body() + "): each press, typed field "
+                        + "and walk is written at its end.");
+            });
+            items.add(item);
+        }
+        if (targets.isEmpty()) {
+            MenuItem none = new MenuItem("No activity of the flows has a body to record into");
+            none.setDisable(true);
+            items.add(none);
+        }
+        if (recording != null) {
+            MenuItem stop = new MenuItem("■ Stop recording");
+            stop.setOnAction(e -> {
+                done.accept("Stopped recording into " + recording.label() + ".");
+                recording = null;
+                record.setText(RECORD_OFF);
+                record.getStyleClass().remove("screen-recording");
+            });
+            items.add(stop);
+        }
+        return items;
+    }
+
+    /**
+     * Writes the press on {@code screen}'s {@code field} into the activity recorded into: {@code Navigate.press}, or
+     * {@code Navigate.type} with the text asked for a field the body types into; a drag only from a button that drags.
+     */
+    private void recordButton(String screen, String field, boolean dragged) {
+        if (recording == null || screen == null || field == null) return;
+        MapScreen shown = graph.get().screens().get(screen);
+        if (shown == null || !(shown.inputs().get(field) instanceof com.botmaker.sdk.api.screens.Button button)) return;
+        if (dragged != (button.drag() != null)) return;
+        Target into = recording;
+        if (button.typing() != null && button.typing().text() == null) {
+            TextInputDialog ask = new TextInputDialog();
+            ask.setTitle("Record into " + into.label());
+            ask.setHeaderText("What does " + into.label() + " type into " + field + "?");
+            Optional<String> text = ask.showAndWait();
+            if (text.isEmpty()) return;
+            done.accept(BodyRecorder.said(BodyRecorder.type(services.pluginValues(), into, screen, field, text.get()),
+                    into, "type " + field));
+            return;
+        }
+        done.accept(BodyRecorder.said(BodyRecorder.press(services.pluginValues(), into, screen, field, false), into,
+                "press " + field));
+    }
+
+    /** Writes a key that is one of {@code screen}'s hotkeys into the activity recorded into. */
+    private void recordKey(String screen, Key key) {
+        if (recording == null || screen == null) return;
+        MapScreen shown = graph.get().screens().get(screen);
+        if (shown == null) return;
+        Target into = recording;
+        shown.inputs().entrySet().stream()
+                .filter(e -> e.getValue() instanceof Hotkey hotkey && hotkey.presses(Combo.of(key)))
+                .findFirst()
+                .ifPresent(e -> done.accept(BodyRecorder.said(BodyRecorder.press(services.pluginValues(), into,
+                        screen, e.getKey(), true), into, "press " + e.getKey())));
+    }
+
+    /** Writes a walk the panel made to {@code screen} into the activity recorded into, when it arrived. */
+    void recordWalk(String screen) {
+        if (recording == null || screen == null) return;
+        done.accept(BodyRecorder.said(BodyRecorder.walk(services.pluginValues(), recording, screen), recording,
+                "walk to " + graph.get().shown(screen)));
     }
 
     private void wheeled(ScrollEvent e) {
@@ -561,6 +660,7 @@ final class LiveBoard {
         Optional<Key> key = Key.named(e.getCode().name()).or(() -> Key.named(e.getCode().getName()));
         if (key.isEmpty()) return;
         e.consume();
+        recordKey(on, key.get());
         act(h -> h.key(key.get()));
     }
 

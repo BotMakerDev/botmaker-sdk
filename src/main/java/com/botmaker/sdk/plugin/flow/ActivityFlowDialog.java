@@ -779,7 +779,7 @@ public final class ActivityFlowDialog {
         Point2D at = canvas.nextFreeSpot();
         List<String> outcomes = FlowConstants.outcomesOf(services.pluginValues(), step.label());
         ActivityDraft draft = ActivityDraft.of(new Flow.Step(step.activity(), step.body(), step.description(), true,
-                step.goHome(), step.runnerSwitch(), Activity.NONE),
+                step.goHome(), step.runnerSwitch(), Activity.NONE, step.screen()),
                 outcomes.isEmpty() ? List.of(Arrow.NEXT) : outcomes, at.getX(), at.getY());
         canvas.add(draft);
         error("");

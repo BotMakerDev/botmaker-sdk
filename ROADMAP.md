@@ -22,9 +22,6 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   sub-states of a screen other than tabs (a toggle, a filter, a scroll position; phase 8) and chores kept as data
   (phase 9). Owed checks: the Discovery tools and
   `edit_map` live over MCP on Firestone, and the 🗺 Screens click-tests of the 2026-10-15 audit.
-- **A screen's chores in the picture picker**: a click's picture after `Navigate.to(Screens.X)` in the same body
-  could offer X's `Kind.CHORE` inputs first. The plugin reads no Java text, so the host would have to say which
-  screen the body walked to: a contract capability first (`/contract-change`).
 - **A timed-out find inside an activity** clears an unmapped overlay (`PopupGuard.uncover`) but does not walk back
   to the activity's screen: only a thrown `BotStuckException` does.
 - **Launch targets**: `Target.set(String spec)` has no editor (a `@LaunchTargetSpec` could reuse the
@@ -64,12 +61,10 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     machines", the tab `FAVORED_WAR_MACHINES_2`); Studio's rename refuses `Screens.java`.
   - A crop call that sets a marker and notes inputs on a new screen leaves the inputs unchecked ("no marker
     yet"): check them after the marker is written.
-- **Activities coupled to the map** (Screens audit 2026-10-22, §6c of `~/.claude/plans/make-an-audit-of-functional-fern.md`;
-  a spec first, by brainstorming): an activity declares its screen (`Flow.activity(..).on(Screens.TAVERN)`), so 🗺
-  lights an activity's screens and the picture picker offers its chores; 🗺 and Live get *Record into <activity>*,
-  each press or Try appended to the body as a `Navigate.press(..)` line (a new host capability: insert a statement
-  in a method, `/contract-change`). The body stays Java; logic as a managed `Chores` value was weighed and set aside
-  for now (a second language, against "bodies are Java on map calls").
+- **Record into <activity>, past its first cut** (2026-10-22): a press is written when Live gives it, not once the
+  game shows its result; a strip's or tree's member, a repeated button's `Pick` and the inspector's ▶ Try are not
+  recorded; the flow editor has no box for a card's `.on(Screens.X)` (written in `Flows.java` by hand). Logic as a
+  managed `Chores` value stays set aside (a second language, against "bodies are Java on map calls").
 - **Screens audit gaps (2026-10-22)**, each its own plan:
   - A `Hotkey` of a `KeySequence` (combos one after another, a wait between); `Keyboard.sequence` already does it.
   - A text field or a drag cut as one in the cut form (today a button cut, then *Text field* or *Drag* in the input

@@ -406,6 +406,21 @@ class FlowWalkerTest {
     }
 
     @Test
+    void aStepThatSaysItsScreenWalksBackThereRatherThanToTheOneItReached() {
+        HomeScreen home = new HomeScreen();
+        ScreenMaps.use(ScreenGraph.ofScreens(Map.of("HOME", home)));
+        List<String> walked = new ArrayList<>();
+        FlowWalker.walkBackBy(constant -> walked.add(constant));
+        try {
+            walk(flow(A.class, List.of(stuckOnTavern(1).on(home), on(B.class)), Flow.edge(A.LEFT, B.class)));
+        } finally {
+            FlowWalker.walkBackBy(null);
+        }
+
+        assertEquals(List.of("HOME"), walked);
+    }
+
+    @Test
     void aSecondStuckStepGoesOnToTheRunsRecovery() {
         FlowWalker.walkBackBy(constant -> true);
         try {

@@ -150,6 +150,9 @@ final class MapGuide {
     static final String NEW_FROM_FROZEN = "A new screen with this frame as its shot, opened by the input last clicked; "
             + "cutting then starts on it, its marker first";
     static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";
+    static final String RECORD_INTO = "Write what you do in Live into an activity's body, as the map's own calls: a "
+            + "press is Navigate.press, a field the body types into Navigate.type, 🧭 Go here Navigate.to. Each goes "
+            + "at the body's end, before its return; undo takes it back";
     static final String CUT_FROZEN = "Draw pictures on this frame, then say what each is: a marker, a button, its way "
             + "back, a look, a strip's button, a zone, digits or a new image for a picture";
     static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
@@ -258,6 +261,9 @@ final class MapGuide {
                             + "the bar names the screen it shows, by its markers, which the graph and the outline "
                             + "light; its inputs are boxed."),
                     new Entry("Record: A · input → B", null, RECORD_WAY + "."),
+                    new Entry("⏺ Record into…", null, RECORD_INTO + ". An activity whose flow card says "
+                            + ".on(Screens.X) shows as ⚙ on that screen's card. Record: A · input → B writes the map; "
+                            + "this writes the body."),
                     new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
                             + "screen: " + NEW_FROM_FROZEN + ". A frame of no screen of the map offers New screen "
                             + "first: name it, then cut."),

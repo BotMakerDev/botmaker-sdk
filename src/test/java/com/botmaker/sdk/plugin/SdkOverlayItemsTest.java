@@ -1,9 +1,7 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.record.RecordedValue;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -14,9 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * The plugin's overlay row and its part in recording, asserted on the data rather than on a window.
+ * The plugin's overlay row, asserted on the data rather than on a window.
  *
- * <p>Worth a test because {@code toolbarItems()} and {@code recordedValues()} are called by the host while a
+ * <p>Worth a test because {@code toolbarItems()} is called by the host while a
  * project is opening, on a classpath that may have no JavaFX at all ({@code botmaker plugin validate}, the
  * registry's CI). A list that links a JavaFX type while being built is the 2026-09-05 bug in a new place.
  */
@@ -41,13 +39,5 @@ class SdkOverlayItemsTest {
                 .toList();
 
         assertEquals(List.of("point-here", "picture-here"), ids);
-    }
-
-    /** The one value a recording needs from this plugin: the picture under a click. */
-    @Test
-    void a_recording_asks_this_plugin_only_for_the_picture_under_a_click() {
-        List<RecordedValue<?>> values = new SdkPlugin().recordedValues();
-
-        assertEquals(List.of(ImageTemplate.class), values.stream().map(RecordedValue::type).toList());
     }
 }

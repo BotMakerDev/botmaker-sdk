@@ -2,8 +2,6 @@ package com.botmaker.sdk.api.input;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.record.Gesture;
-import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.internal.observe.Bots;
@@ -81,7 +79,6 @@ public class Mouse {
      * — a fixed point inside a window (or a monitor / region), independent of where that surface currently
      * sits on the desktop. Equivalent to clicking {@code source.origin() + (x, y)} in absolute coordinates.
      */
-    @Records(Gesture.CLICK)
     public static void click(CaptureSource source, int x, int y) {
         if (source == null) return;
         Point o = source.origin();
@@ -164,21 +161,18 @@ public class Mouse {
      * {@link #down(MouseButton)}/{@link #up(MouseButton)} calls.
      */
     /** Double-clicks at {@code (x, y)} relative to {@code source}'s top-left corner. */
-    @Records(Gesture.DOUBLE_CLICK)
     public static void doubleClick(CaptureSource source, int x, int y) {
         Point at = relative(source, x, y);
         if (at != null) doubleClick(at);
     }
 
     /** Right-clicks at {@code (x, y)} relative to {@code source}'s top-left corner. */
-    @Records(Gesture.RIGHT_CLICK)
     public static void rightClick(CaptureSource source, int x, int y) {
         Point at = relative(source, x, y);
         if (at != null) rightClick(at);
     }
 
     /** Middle-clicks at {@code (x, y)} relative to {@code source}'s top-left corner. */
-    @Records(Gesture.MIDDLE_CLICK)
     public static void middleClick(CaptureSource source, int x, int y) {
         Point at = relative(source, x, y);
         if (at != null) middleClick(at);
@@ -188,7 +182,6 @@ public class Mouse {
      * Drags from {@code start} to {@code end}, both relative to {@code source}'s top-left corner, over
      * {@code durationMs} milliseconds.
      */
-    @Records(Gesture.DRAG)
     public static void drag(CaptureSource source, Point start, Point end, long durationMs) {
         Point from = start == null ? null : relative(source, start.x(), start.y());
         Point to = end == null ? null : relative(source, end.x(), end.y());
@@ -276,13 +269,11 @@ public class Mouse {
     }
 
     /** Scroll up / away from you by {@code notches} (always a positive amount). */
-    @Records(Gesture.SCROLL_UP)
     public static void scrollUp(int notches) {
         controller().scroll(Math.abs(notches));
     }
 
     /** Scroll down / toward you by {@code notches} (always a positive amount). */
-    @Records(Gesture.SCROLL_DOWN)
     public static void scrollDown(int notches) {
         controller().scroll(-Math.abs(notches));
     }

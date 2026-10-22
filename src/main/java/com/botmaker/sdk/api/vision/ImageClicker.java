@@ -1,8 +1,6 @@
 package com.botmaker.sdk.api.vision;
 
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.record.Gesture;
-import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -45,7 +43,6 @@ public class ImageClicker {
      * @param template the image template to search for and click
      * @return true if the template was found and clicked, false otherwise
      */
-    @Records(value = Gesture.CLICK, rank = 10)
     public static boolean click(ImageTemplate template) {
         return click(template, Source.current());
     }

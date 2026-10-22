@@ -169,6 +169,17 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   there (`Navigate.to`) and runs the body once more, before the run's home. `InstalledRun.home()` is the run's home
   method, else a walk to `ScreenGraph.home()`: the `root()` (the start screen, else the first screen reached from
   none, popups aside), or past a start screen the one its loading ends on. Nothing leads back to a start screen.
+- **An activity names its screen** (2026-10-22): `Flow.activity(Tavern.class, Tavern::body).on(Screens.TAVERN)`
+  (`Flow.Step.screen`, written by `FlowTypes` as a wither). A stuck body walks back there rather than to the screen
+  it last reached (`FlowWalker.backTo`). `plugin/flow/ActivityScreens` reads which activity works where off the
+  flows: 🗺 shows a `⚙ Tavern` pill on that card, and the input picker in `Tavern::body` (the slot's
+  `enclosingMethodSource`) offers TAVERN first.
+- **Record into <activity>** (2026-10-22): Live's ⏺ menu picks an activity of the flows; then a click or drag on a
+  known input appends `Navigate.press(Screens.X.field);` (a hotkey's key too, a field the body types into
+  `Navigate.type(field, "<asked>")`), and 🧭 Go here, once arrived, `Navigate.to(Screens.X);`. `BodyRecorder`
+  names each call as a typed `Ref` and each argument as a `PluginValues.Argument.member` of `SCREEN_MAP`; the host
+  writes the line before the body's closing `return` (`PluginValues.appendCall`, contract 0.11.0). *Record: A ·
+  input → B* stays the map's: it writes a way in, not the body.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
   Duration)`, `keys(Combo)`, a field's `type(text, clears, submits)` and a drag's `drag(from, dropOn(…), time)`

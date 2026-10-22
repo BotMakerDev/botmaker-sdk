@@ -338,6 +338,8 @@
 .screen-pill-untried { -fx-border-color: -bm-screen-untried; -fx-text-fill: -bm-screen-untried; }
 .screen-pill-finished { -fx-border-color: -bm-screen-finished; -fx-text-fill: -bm-screen-finished; }
 .screen-pill-stage { -fx-border-color: -bm-screen-here; -fx-text-fill: -bm-screen-here; }
+.screen-pill-activity { -fx-border-color: -bm-screen-marker; -fx-text-fill: -bm-screen-marker; }
+.screen-recording { -fx-text-fill: -bm-screen-owes; }
 
 /* --- an entrance's input, on its arrow --- */
 

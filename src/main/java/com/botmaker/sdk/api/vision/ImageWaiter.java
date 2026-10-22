@@ -1,7 +1,5 @@
 package com.botmaker.sdk.api.vision;
 import com.botmaker.plugin.api.palette.Palette;
-import com.botmaker.plugin.api.record.Gesture;
-import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.console.Debug;
 
 import com.botmaker.sdk.api.bot.BotSettings;
@@ -43,7 +41,6 @@ public class ImageWaiter {
      * @param timeout  how long to wait
      * @return true if the template was found within timeout, false if the timeout elapsed
      */
-    @Records(Gesture.AWAIT)
     public static boolean waitFor(ImageTemplate template, Duration timeout) {
         return waitFor(template, Source.current(), timeout);
     }

@@ -2,8 +2,6 @@ package com.botmaker.sdk.api.input;
 
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.palette.PaletteDefault;
-import com.botmaker.plugin.api.record.Gesture;
-import com.botmaker.plugin.api.record.Records;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -44,8 +42,7 @@ import java.util.function.Consumer;
  * form — with no third variant carrying a value a property already holds, so there is nothing here to trim.
  * {@code hold} (2026-10-11) presses a key for a {@link Duration} and always releases it.
  * {@code sequence} (2026-09-27) presses a {@link KeySequence}: combos with a wait after each.
- * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu, and is what
- * a recording falls back to on a host that cannot fill a {@code Combo}.
+ * {@code combo} leads with its {@link Combo} shape (2026-09-26); the varargs one is in its submenu.
  */
 @Palette(category = "interaction", categoryLabel = "Interaction", icon = "⌨")
 public class Keyboard {
@@ -83,7 +80,6 @@ public class Keyboard {
     }
 
     /** Press then release a key. */
-    @Records(Gesture.KEY)
     public static void tap(Key key) {
         press(key);
         release(key);
@@ -101,7 +97,6 @@ public class Keyboard {
      * Press a chord: hold every key in order, then release them in reverse order — e.g.
      * {@code Keyboard.combo(Key.CTRL, Key.C)} for copy.
      */
-    @Records(Gesture.COMBO)
     public static void combo(Key... keys) {
         for (Key key : keys) {
             press(key);
@@ -115,8 +110,7 @@ public class Keyboard {
      * Press {@code combo}: hold every key in order, wait its {@link Combo#hold() hold}, then release them in
      * reverse — e.g. {@code Keyboard.combo(Combo.of(Key.CTRL, Key.C))} for copy.
      */
-    @PaletteDefault   // ties with combo(Key...) on width; the value is what the editor and the recorder write
-    @Records(value = Gesture.COMBO, rank = 1)
+    @PaletteDefault   // ties with combo(Key...) on width; the value is what the editor writes
     public static void combo(Combo combo) {
         combo(Source.current(), combo);
     }
@@ -133,7 +127,6 @@ public class Keyboard {
      * Type a string on the ambient {@link Source}, handling shifting for uppercase / shifted characters. Best
      * effort for non-ASCII input (falls back to the platform's keysym/VK mapping).
      */
-    @Records(Gesture.TYPE)
     public static void type(String text) {
         type(Source.current(), text);
     }

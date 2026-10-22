@@ -274,9 +274,7 @@ class SdkPluginSurfaceTest {
      * ({@code screen-map}) follows it at 20 (2026-10-14).
      *
      * <p>The last two are {@link ToolbarGroup#OVERLAY}: they are drawn on the overlay editor's own row rather
-     * than on the main bar, and their subject is the window the HUD is drawn over. Recording is not among
-     * them: it is the host's, and this plugin takes part through {@code @Records} and {@code recordedValues()}.
-     */
+     * than on the main bar, and their subject is the window the HUD is drawn over.     */
     @Test
     void the_toolbar_contributes_eleven_items_in_their_groups_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();

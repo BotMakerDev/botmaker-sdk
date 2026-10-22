@@ -21,6 +21,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
+import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -33,6 +34,7 @@ import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
@@ -149,6 +151,9 @@ public final class InputPicker {
                                    javafx.scene.control.Button button) {
         ContextMenu menu = new ContextMenu();
         Path resources = ctx.services().resourcesDir();
+        // In an activity's body, the screen its flow card says it works on comes first (.on(Screens.X)).
+        Optional<String> first = activityScreen(ctx, graph);
+        List<MenuItem> rest = new ArrayList<>();
         graph.screens().forEach((constant, screen) -> {
             if (choices(screen, kind).stream().noneMatch(c -> pickable(c, kind))) return;
             // Nothing walks to a popup: its inputs are offered only where any input is taken (a way out).
@@ -156,8 +161,11 @@ public final class InputPicker {
             MenuItem item = new MenuItem(graph.shown(constant),
                     thumb(resources, screen.firstMarkerId()));
             item.setOnAction(a -> showScreen(ctx, kind, graph, constant, button));
-            menu.getItems().add(item);
+            if (first.filter(constant::equals).isPresent()) menu.getItems().add(item);
+            else rest.add(item);
         });
+        if (!menu.getItems().isEmpty() && !rest.isEmpty()) menu.getItems().add(new SeparatorMenuItem());
+        menu.getItems().addAll(rest);
         if (menu.getItems().isEmpty()) {
             MenuItem none = new MenuItem(ScreenEditors.NO_MAP);
             none.setDisable(true);
@@ -298,6 +306,18 @@ public final class InputPicker {
         int y = Math.min(a.y(), b.y());
         return new Rect(x, y, Math.max(a.x() + a.width(), b.x() + b.width()) - x,
                 Math.max(a.y() + a.height(), b.y() + b.height()) - y);
+    }
+
+    /** The screen the activity whose body holds this slot works on, as its flow card says; empty elsewhere. */
+    private static Optional<String> activityScreen(ValueContext ctx, ScreenGraph graph) {
+        Optional<String> body = ctx.slot().flatMap(SlotContext::enclosingMethodSource);
+        if (body.isEmpty()) return Optional.empty();
+        try {
+            return ActivityScreens.screenOf(ActivityScreens.targets(ctx.services().pluginValues(), graph), body.get());
+        } catch (RuntimeException unreadable) {
+            // Flows that do not read leave the screens in the map's order.
+            return Optional.empty();
+        }
     }
 
     private static ScreenGraph graph(StudioServices services) {

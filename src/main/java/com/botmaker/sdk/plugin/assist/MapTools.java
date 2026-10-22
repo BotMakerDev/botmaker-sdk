@@ -56,6 +56,9 @@ import java.util.regex.Pattern;
 final class MapTools {
 
     /** The share of the still screen an input must change to have opened a screen: Firestone's side panels. */
+    /** How go_to_screen's answer starts when the walk did not arrive. */
+    static final String NOT_THERE = "Not there";
+
     static final double SCREEN_SHARE = 0.15;
     /** How much longer a small change is read on while the screen's marker still shows: Garage drew a second late. */
     static final int SLOW_SCREEN_MS = 2_500;
@@ -1205,7 +1208,7 @@ final class MapTools {
         if (walked.arrived()) retakeShot(context, reach.get(), graph, walked.at());
         String path =walked.walked().isEmpty() ? "" : " Walked: " + String.join(" › ",
                 walked.walked().stream().map(graph::shown).toList()) + ".";
-        return AgentReply.text((walked.arrived() ? "" : "Not there (" + walked.outcome().name().toLowerCase(Locale.ROOT)
+        return AgentReply.text((walked.arrived() ? "" : NOT_THERE + " (" + walked.outcome().name().toLowerCase(Locale.ROOT)
                 .replace('_', ' ') + "): ") + walked.why() + path);
     }
 

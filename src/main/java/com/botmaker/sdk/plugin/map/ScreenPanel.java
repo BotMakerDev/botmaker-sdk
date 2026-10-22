@@ -1042,7 +1042,12 @@ final class ScreenPanel {
 
     private void goHere(String constant) {
         PanelContext context = new PanelContext(services, CaptureValue.current(services));
-        run("Going to " + graph.shown(constant) + "…", constant, () -> ScreenDesk.goTo(context, constant));
+        run("Going to " + graph.shown(constant) + "…", constant, () -> {
+            ScreenDesk.Walked walked = ScreenDesk.walk(context, constant);
+            // Recorded only once there: a walk that did not arrive is not a step of the activity.
+            if (walked.arrived()) Platform.runLater(() -> live.recordWalk(constant));
+            return walked.said();
+        });
     }
 
     /** Runs {@code work} off the FX thread, the card pulsing, and says what it answered. */

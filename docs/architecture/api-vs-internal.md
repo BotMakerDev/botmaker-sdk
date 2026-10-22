@@ -18,11 +18,9 @@
   (`SourceOrder`, alphabetical on any failure). **Constructors are not catalogued**: a palette entry inserts
   a *call*.
 
-- **Recording is the host's; the SDK annotates.** `@Records(Gesture, rank)` on a public static `api` method
-  (`Mouse.click`, `Keyboard.type/tap/combo`, `Wait.time`, `ImageClicker.click` at rank 10, `ImageWaiter.waitFor`
-  for `AWAIT`, …) says which call writes a gesture. The host fills parameters by type; the one type it cannot
-  fill is `plugin/types/PictureAt`, a `RecordedValue` (the project picture under the click). This module
-  writes no Java for a recording.
+- **Recording is the screen map's.** 🗺's *Record into* appends typed map calls (`Navigate.press`, `type`,
+  `to`) to an activity's body through the contract's `PluginValues.appendCall`; the host writes them. The macro
+  recorder's `@Records` marks and `PictureAt` went on 2026-10-22: they wrote raw clicks at a spot.
 
 - **No `api` signature may name a type a bot cannot write**: not `internal` (`PluginLayersTest`, by
   reflection), and not `botmaker-shared` or OpenCV, which are freely breakable. `ImageTemplate.getMat()`

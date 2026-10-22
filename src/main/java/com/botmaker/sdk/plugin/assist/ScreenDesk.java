@@ -116,7 +116,17 @@ public final class ScreenDesk {
 
     /** Walks the game to {@code constant} as go_to_screen does, and says where it ended. Off the FX thread. */
     public static String goTo(AgentContext context, String constant) {
-        return text(MapTools.goToScreen(new MapTools.Goal(constant, true), context));
+        return walk(context, constant).said();
+    }
+
+    /** What a walk said, and whether it arrived. */
+    public record Walked(String said, boolean arrived) {}
+
+    /** {@link #goTo}, saying whether the game got there. Off the FX thread. */
+    public static Walked walk(AgentContext context, String constant) {
+        AgentReply reply = MapTools.goToScreen(new MapTools.Goal(constant, true), context);
+        String said = text(reply);
+        return new Walked(said, !reply.isRefused() && !said.startsWith(MapTools.NOT_THERE));
     }
 
     /**

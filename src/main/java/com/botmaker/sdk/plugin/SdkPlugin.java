@@ -16,7 +16,6 @@ import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
 import com.botmaker.sdk.plugin.types.FlowTypes;
-import com.botmaker.sdk.plugin.types.PictureAt;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import com.botmaker.sdk.plugin.types.SettingsTypes;
@@ -54,8 +53,8 @@ public final class SdkPlugin extends DeclaredPlugin {
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
      * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @SdkValue} values its windows keep
-     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}), its part of the run overlay
-     * ({@link SdkRunOverlay}) and the picture under a recorded click ({@link PictureAt}).
+     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}) and its part of the run overlay
+     * ({@link SdkRunOverlay}).
      *
      * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier
      * and the types and values are named by class, initialised only when the host asks.
@@ -82,8 +81,7 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .overlay(() -> SdkOverlay.PART)
                 .assistant(() -> SdkAssist.and(MapReport.TOOLS))
                 .assistantGuide(SdkAssist.GUIDE)
-                .trial(Bot::trial)
-                .recorded(() -> PictureAt.ALL));
+                .trial(Bot::trial));
     }
 
     /**

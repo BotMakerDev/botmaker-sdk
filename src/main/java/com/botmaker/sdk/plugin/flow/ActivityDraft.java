@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.flow;
 
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -64,6 +65,9 @@ public final class ActivityDraft {
      */
     private String body;
 
+    /** The screen its card says it works on ({@code .on(Screens.TAVERN)}), carried through as the body is; or null. */
+    private Screen screen;
+
     private List<String> brokenExits = List.of();
 
     public ActivityDraft(String name, String description, boolean enabled, List<String> outcomes,
@@ -91,6 +95,7 @@ public final class ActivityDraft {
         ActivityDraft draft = new ActivityDraft(step.label(), step.description(), step.enabled(), exits,
                 step.goHome(), x, y, FlowTypes.sourceOf(step.body()));
         draft.runnerSwitch.set(step.runnerSwitch());
+        draft.screen = step.screen();
         return draft;
     }
 
@@ -105,7 +110,7 @@ public final class ActivityDraft {
      */
     public Flow.Step toStep(Flow.Node whenOff) {
         return new Flow.Step(FlowNames.node(name.get()), isSubflow() ? null : FlowTypes.body(body), description.get(),
-                enabled.get(), goHome.get(), runnerSwitch.get(), whenOff);
+                enabled.get(), goHome.get(), runnerSwitch.get(), whenOff, isSubflow() ? null : screen);
     }
 
     /** The flow this card runs, {@code DAILY}, when it is a sub-flow card ({@code ▸ DAILY}); else null. */

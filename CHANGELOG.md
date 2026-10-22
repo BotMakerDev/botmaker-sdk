@@ -21,6 +21,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **🗺 Activities on the map.** A flow card can say the screen its activity works on:
+  `Flow.activity(Tavern.class, Tavern::body).on(Screens.TAVERN)`.
+  - That screen's card on 🗺 shows a `⚙ Tavern` pill.
+  - A step that gets stuck walks back to that screen before it runs once more.
+  - In `Tavern::body`, the input picker lists TAVERN first.
+- **⏺ Record into <activity>**, on 🗺's Live board. Pick an activity, then drive the game. Each action is written
+  at the end of that activity's body, before its `return`:
+  - a click or drag on a known input becomes `Navigate.press(Screens.X.field);`;
+  - a key that is one of the screen's hotkeys is recorded the same way;
+  - a field the body types into asks for the text, then becomes `Navigate.type(Screens.X.field, "…");`;
+  - 🧭 Go here, once it arrives, becomes `Navigate.to(Screens.X);`.
+
+  Studio writes each line, and ↶ takes it back. *Record: A · input → B* still writes the map's ways.
+
 - **🗺 Screens by hand, smoother**:
   - A screen clicked on the graph shows big on the Screen tab at once. The side panel no longer repeats its shot;
     folding what is below a screen moved to the card's right-click menu.
@@ -93,6 +107,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **🎮 Game lists more launchers**: Bottles programs (`bottles:`), Steam's non-Steam shortcuts, and on Windows
   the Start menu's apps and Store apps, Ubisoft Connect and Battle.net games (`url:`), and itch games. A bot lists
   and launches each like any other game (`LaunchTarget.Bottles`, `LaunchTarget.Link`).
+
+### Removed
+
+- **The macro recorder's leftovers**: the `@Records` marks on `Mouse`, `Keyboard`, `Wait`, `ImageClicker` and
+  `ImageWaiter`, and `PictureAt`, the picture under a recorded click. Studio's ⏺ Record was already gone, and it
+  wrote raw clicks at a spot.
 
 ### Fixed
 
