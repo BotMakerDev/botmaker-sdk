@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.toolkit.graph.GraphLayout.Direction;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
@@ -308,5 +309,18 @@ class ScreenCardsTest {
                 Direction.DOWN, new ScreenCanvas.Shape(950, 950));
         assertEquals(Direction.DOWN, ScreenCanvas.better(near, 900, 900));
         assertFalse(ScreenCanvas.turns(near, Direction.RIGHT, 900, 900), "a little bigger: the tree stays as it is");
+    }
+
+    @Test
+    void aDragReadBackOnlyMovesTheCards() {
+        Card home = new Card("HOME", "Home", "home", State.FINISHED, "", "", false, true, null,
+                ScreenGraph.Presence.ALWAYS, 0, 0, "", null);
+        Card shop = new Card("SHOP", "Shop", "shop", State.FINISHED, "", "", false, false, null,
+                ScreenGraph.Presence.ALWAYS, 0, 0, "", null);
+        List<Card> laid = List.of(home, shop);
+        assertTrue(ScreenCanvas.onlyMoved(laid, List.of(home, shop.withAt(new Point(300, 40)))), "a card dropped");
+        assertFalse(ScreenCanvas.onlyMoved(laid, List.of(home, new Card("SHOP", "Shop", "shop", State.OWES, "", "",
+                false, false, null, ScreenGraph.Presence.ALWAYS, 0, 0, "", null))), "a card that changed is drawn again");
+        assertFalse(ScreenCanvas.onlyMoved(laid, List.of(home)), "a card gone");
     }
 }

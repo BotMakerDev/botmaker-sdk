@@ -84,6 +84,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - The 1.5 s poll states the shots and pictures off the FX thread, and draws only when one was rewritten.
   - Each draw writes its time to the log, `map panel: HOME drawn in 12.3 ms (cuts …, board …, panel …)` or
     `… picked buy in …`.
+- **🗺 Screens pans, zooms and drops a card without stalling**:
+  - A card dropped is read back from `Screens.java` off the FX thread; the read held it 300 to 900 ms.
+  - A read that only moved cards pins them on the canvas as they are; before, every card was built again.
+  - Scrolling no longer asks whether the tree should turn: only a resize does.
+  - The canvas's own changes (grid, link paths, scaling while moving) are in the toolkit's changelog.
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

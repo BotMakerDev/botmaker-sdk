@@ -71,6 +71,12 @@ final class ScreenCards {
         boolean conditional() {
             return presence != ScreenGraph.Presence.ALWAYS;
         }
+
+        /** This card moved to {@code at}, null for where the layout puts it. */
+        Card withAt(Point at) {
+            return new Card(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs,
+                    stage, at);
+        }
     }
 
     /**

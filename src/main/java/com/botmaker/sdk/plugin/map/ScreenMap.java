@@ -174,15 +174,15 @@ public final class ScreenMap {
             canvas.setMenus(panel::menuFor, panel::linkMenu);
             canvas.graph().setOnEdgeClicked(panel::showLink);
         }
-        // A card moved by hand keeps its corner in Screens.java, read back at once so the next drag or redraw starts
-        // from it; refused, the map is drawn again as the Java has it.
+        // A card moved by hand keeps its corner in Screens.java, read back off the FX thread: the canvas has it where
+        // it was dropped meanwhile. Refused, the map is drawn again as the Java has it.
         canvas.setOnMoved(corners -> {
             String result = ScreenEdits.move(services, corners);
-            refresh();
             if (result.startsWith(ScreenEdits.NOT_WRITTEN)) canvas.redraw();
+            else readLater(true);
             tell(result);
         });
-        poll = new Timeline(new KeyFrame(POLL, e -> readLater()));
+        poll = new Timeline(new KeyFrame(POLL, e -> readLater(false)));
         poll.setCycleCount(Timeline.INDEFINITE);
     }
 
@@ -312,7 +312,7 @@ public final class ScreenMap {
             canvas.graph().fit();
             if (constant != null) canvas.select(constant);
         };
-        readLater();
+        readLater(false);
         poll.play();
         subscriptions.add(services.runs().onTelemetry(this::telemetry));
         // A run starting or ending leaves no screen known to be on the game.
@@ -374,62 +374,83 @@ public final class ScreenMap {
      */
     void refresh() {
         reads++;
+        // The reads still out are older than this one, and dropped: the next poll may read.
+        reading = false;
         if (stillOpen()) apply(read());
     }
 
     /**
      * Reads the map on a thread of its own, as the poll does, then draws what changed on the FX thread. One read at a
-     * time; one overtaken by {@link #refresh} is dropped, being older than what it drew.
+     * time; one overtaken by {@link #refresh} or an edit's read is dropped, being older than what it drew.
+     *
+     * @param edited after the user's own edit, whose result the canvas shows already (a card dropped): read whatever
+     *               the file says, overtaking a poll's read, and leave the FX thread free meanwhile (2026-10-22: a
+     *               drop's read held it 300 to 900 ms)
      */
-    private void readLater() {
-        if (reading || !stillOpen()) return;
+    private void readLater(boolean edited) {
+        if (reading && !edited || !stillOpen()) return;
         reading = true;
         long asked = ++reads;
         ScreensFile was = lastFile;
-        boolean due = ++pollsSinceRead >= READ_ANYWAY;
+        boolean due = edited || ++pollsSinceRead >= READ_ANYWAY;
         // Asked of what is drawn now, answered off the FX thread: stating every shot and picture held it each poll.
         BooleanSupplier cardFiles = canvas.filesCheck();
         Supplier<ScreenPanel.Written> panelFiles = panel == null ? () -> null : panel.filesCheck();
         Thread.ofVirtual().name("screen-map-read").start(() -> {
-            Optional<ScreensFile> file = ScreensFile.of(project, was == null ? null : was.file());
-            if (!due && file.isPresent() && file.get().equals(was)) {
-                // Screens.java as it was: only a picture or shot rewritten since is drawn again.
-                boolean filesChanged = cardFiles.getAsBoolean();
-                ScreenPanel.Written seen = panelFiles.get();
-                Platform.runLater(() -> {
-                    reading = false;
-                    if (stopped || !stillOpen() || asked != reads) return;
-                    if (filesChanged) {
-                        canvas.redraw();
-                        // A shot retaken moves its screen to the top of Recent.
-                        if (outline != null) outline.show(graph, cards, links);
-                    }
-                    if (panel != null) panel.filesSeen(seen);
-                });
-                return;
-            }
-            // Changed on disk, as by a hand outside Studio: the read kept is of the class as it was.
-            if (file.isEmpty() || !file.get().equals(was)) ScreenMapRead.forget();
-            Read read;
             try {
-                read = read();
-            } catch (Throwable broken) {
-                // A half-built plugin jar fails with an Error, not an exception: said, and the next poll reads again.
-                read = new Read(null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
+                readOff(asked, was, due, cardFiles, panelFiles);
+            } catch (RuntimeException lost) {
+                // Lost before it could answer (a file that could not be stated): the next poll reads again.
+                Platform.runLater(() -> {
+                    if (asked == reads) reading = false;
+                });
             }
-            Read done = read;
+        });
+    }
+
+    /** {@link #readLater}'s read, off the FX thread: {@code asked} is its number, drawn only while still the latest. */
+    private void readOff(long asked, ScreensFile was, boolean due, BooleanSupplier cardFiles,
+                         Supplier<ScreenPanel.Written> panelFiles) {
+        Optional<ScreensFile> file = ScreensFile.of(project, was == null ? null : was.file());
+        if (!due && file.isPresent() && file.get().equals(was)) {
+            // Screens.java as it was: only a picture or shot rewritten since is drawn again.
+            boolean filesChanged = cardFiles.getAsBoolean();
+            ScreenPanel.Written seen = panelFiles.get();
             Platform.runLater(() -> {
+                if (asked != reads) return;
                 reading = false;
                 if (stopped || !stillOpen()) return;
-                if (asked != reads) return;
-                apply(done);
-                // Kept only for a read that drew: a failed one, or an empty one the last drawing stayed over, is
-                // read again at the next poll.
-                if (done.failed() == null && !emptyOnce) {
-                    lastFile = file.orElse(null);
-                    pollsSinceRead = 0;
+                if (filesChanged) {
+                    canvas.redraw();
+                    // A shot retaken moves its screen to the top of Recent.
+                    if (outline != null) outline.show(graph, cards, links);
                 }
+                if (panel != null) panel.filesSeen(seen);
             });
+            return;
+        }
+        // Changed on disk, as by a hand outside Studio: the read kept is of the class as it was.
+        if (file.isEmpty() || !file.get().equals(was)) ScreenMapRead.forget();
+        Read read;
+        try {
+            read = read();
+        } catch (Throwable broken) {
+            // A half-built plugin jar fails with an Error, not an exception: said, and the next poll reads again.
+            read = new Read(null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
+        }
+        Read done = read;
+        Platform.runLater(() -> {
+            // Only the latest read frees the next: an older one ending early would let a poll start beside it.
+            if (asked != reads) return;
+            reading = false;
+            if (stopped || !stillOpen()) return;
+            apply(done);
+            // Kept only for a read that drew: a failed one, or an empty one the last drawing stayed over, is read
+            // again at the next poll.
+            if (done.failed() == null && !emptyOnce) {
+                lastFile = file.orElse(null);
+                pollsSinceRead = 0;
+            }
         });
     }
 

@@ -161,7 +161,9 @@ final class ScreenCanvas {
         });
         // A window made wide or tall: the tree is laid out the other way when that way now fits it better. Not while
         // cards are moved by hand: they stay where they were put.
+        // A resize only: the bounds move on every scroll too, and each scroll asked again (2026-10-22, a pan's lag).
         graph.viewportProperty().addListener((o, was, is) -> {
+            if (was != null && was.getWidth() == is.getWidth() && was.getHeight() == is.getHeight()) return;
             if (!shapes.isEmpty() && pins().isEmpty() && turns(shapes, direction, is.getWidth(), is.getHeight())) {
                 redraw();
             }
@@ -291,11 +293,27 @@ final class ScreenCanvas {
 
     /** Shows {@code cards} joined by {@code links}, the tree grown from {@code root} (null: no tree). */
     void show(List<Card> cards, List<Link> links, String root) {
+        boolean onlyMoved = !this.cards.isEmpty() && onlyMoved(this.cards, cards) && links.equals(this.links)
+                && Objects.equals(root, this.root);
         this.cards = List.copyOf(cards);
         this.links = List.copyOf(links);
         this.root = root;
         folded.retainAll(cards.stream().map(Card::constant).toList());
-        redraw();
+        // A drag read back: the canvas has the cards where they were dropped, so each card is not built again
+        // (2026-10-22: every card's pictures drawn afresh after each drop). No pin left, as after Tidy, the layout
+        // picks its way again.
+        Map<String, Pt> pins = pins();
+        if (onlyMoved && !pins.isEmpty()) graph.setPinned(pins);
+        else redraw();
+    }
+
+    /** Whether {@code now} is {@code was} but for where cards were moved to. */
+    static boolean onlyMoved(List<Card> was, List<Card> now) {
+        if (was.size() != now.size()) return false;
+        for (int i = 0; i < was.size(); i++) {
+            if (!was.get(i).withAt(null).equals(now.get(i).withAt(null))) return false;
+        }
+        return true;
     }
 
     void redraw() {
