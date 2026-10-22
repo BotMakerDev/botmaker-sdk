@@ -209,12 +209,15 @@ map tool against the hand path that covers it, and fails on one with none.
   its markers in their own colour; a box clicked picks its input. `ScreenPanel` beside it is the inspector: the
   picked input first, else the screen's markers, looks (each one's `when`), ways in, way back and notes.
   **Leads to…** records a way into a screen already mapped (`ScreenEdits.addWay`, `MapEdits.AddWay` for the tools).
-- **Live** (`LiveBoard`): the game drawn on the board from `ScreenDesk.look` (the tools' own frames, a private
-  session included) every 33 ms into one reused image (`LiveImage`, a `PixelBuffer`), a click, drag, wheel or key on
-  it sent through `ScreenDesk.hands`. Where the game is read is found once a second on a thread of its own
-  (`PanelContext.found`: the window a class names, so a frame lists no windows). The line says "N fps, M ms a read,
-  D ms a draw", and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The
-  line under it names the
+- **Live** (`LiveBoard`): the game read on a platform thread of its own, paced on the clock at up to 60 frames a
+  second, straight into one of four reused images (`LiveImage`, each a `PixelBuffer`, swapped as a swap chain), and
+  drawn on the FX pulse only when a new frame came (`LiveBoard.Pulse`, an `AnimationTimer`); a click, drag, wheel or
+  key on it is sent through `ScreenDesk.hands`. A window is read through its grab (`PanelContext.live`, shared's
+  `grabWindow`), kept open while the same window is found; a private session or an emulator through
+  `ScreenDesk.look`. Where the game is read is found once a second on a thread of its own (`PanelContext.found`: the
+  window a class names, so a frame lists no windows). The line says "R fps read, S shown, M ms a read, D ms a draw",
+  and "the capture is the limit" or "drawing is the limit" when one takes longer than a frame. The line under it
+  names the
   screen the game shows (`which_screen`'s matcher, at most once a second); a click inside an input's box that took
   the game from one known screen to another with no way between them offers **Record** (`LiveWays`). **❄ Freeze**
   keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by

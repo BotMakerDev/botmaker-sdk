@@ -61,6 +61,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - It writes each frame straight into the back one of the board's two images, and the two swap on a show.
   - A frame is no longer turned into a `BufferedImage` and copied twice; ❄ Freeze copies the frame shown.
   - A game window's read drops from about 20 ms to 2–5 ms.
+- **🗺 Screens' live board reads and draws apart, up to 60 fps**:
+  - The game is read on a thread of its own, paced on the clock at up to 60 frames a second.
+  - The board draws on JavaFX's own pulse, only when a new frame came; no `runLater` per frame.
+  - Four images in turn: the read never waits for a frame being drawn, nor writes one the render thread may still be
+    uploading, and a frame not drawn in time is replaced by the next, never queued.
+  - The line says both rates: "R fps read, S shown, M ms a read, D ms a draw".
 - **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
   next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
   shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.

@@ -4,30 +4,57 @@ import com.botmaker.shared.capture.FrameGrab;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveImageTest {
 
     @Test
-    void aFrameIsWrittenIntoTheSlotNotShownAndTheSlotsSwapOnAShow() {
+    void theNewestFramePublishedIsTheOneTakenAndOneNotTakenIsDropped() {
         LiveImage frames = new LiveImage();
-        int[] first = frames.pixels(2, 1);
-        first[1] = 0xFF00FF80;
-        assertEquals(0x00FF80, frames.taken().getRGB(1, 0) & 0xFFFFFF);
-        LiveImage.Slot shown = frames.flip();
-        assertEquals(2, shown.width());
-        int[] second = frames.pixels(2, 1);
-        assertNotSame(first, second);
-        // The next show swaps back: the first slot's array is written again, never the one on screen.
-        frames.flip();
-        assertSame(first, frames.pixels(2, 1));
+        assertFalse(frames.take());
+        assertNull(frames.shown());
+        frames.pixels(1, 1)[0] = 0xFF000001;
+        frames.publish();
+        frames.pixels(1, 1)[0] = 0xFF000002;
+        frames.publish();
+        assertTrue(frames.take());
+        assertEquals(2, frames.shown().getRGB(0, 0) & 0xFFFFFF);
+        // Nothing new since: the frame shown stays.
+        assertFalse(frames.take());
+        assertEquals(2, frames.shown().getRGB(0, 0) & 0xFFFFFF);
+    }
+
+    @Test
+    void theCaptureNeverWritesTheSlotShownNorTheOneShownBefore() {
+        LiveImage frames = new LiveImage();
+        Set<int[]> seen = new HashSet<>();
+        int[] shownArray = null;
+        int[] shownBefore = null;
+        for (int i = 0; i < 12; i++) {
+            int[] written = frames.pixels(1, 1);
+            assertNotSame(shownArray, written);
+            assertNotSame(shownBefore, written);
+            seen.add(written);
+            written[0] = i;
+            frames.publish();
+            if (i % 2 == 0) {
+                assertTrue(frames.take());
+                shownBefore = shownArray;
+                shownArray = written;
+            }
+        }
+        assertEquals(4, seen.size());
     }
 
     @Test
@@ -48,6 +75,34 @@ class LiveImageTest {
     }
 
     @Test
+    void framesCrossThreadsWhole() throws InterruptedException {
+        LiveImage frames = new LiveImage();
+        AtomicBoolean done = new AtomicBoolean();
+        Thread capture = Thread.ofPlatform().start(() -> {
+            for (int i = 1; i <= 20_000; i++) {
+                int[] into = frames.pixels(64, 1);
+                Arrays.fill(into, i);
+                frames.publish();
+            }
+            done.set(true);
+        });
+        int last = 0;
+        while (true) {
+            boolean finished = done.get();
+            if (!frames.take()) {
+                if (finished) break;
+                continue;
+            }
+            BufferedImage shown = frames.shown();
+            int first = shown.getRGB(0, 0) & 0xFFFFFF;
+            for (int x = 1; x < 64; x++) assertEquals(first, shown.getRGB(x, 0) & 0xFFFFFF, "a torn frame");
+            assertTrue(first > last, "an older frame after a newer one");
+            last = first;
+        }
+        capture.join();
+    }
+
+    @Test
     void aWindowFoundAgainIsTheSamePlaceAndAFeedOfFramesNever() {
         LiveFeed window = new LiveFeed(List.of(7L, "0,0"), () -> FrameGrab.of(() -> null));
         assertTrue(window.samePlace(new LiveFeed(List.of(7L, "0,0"), () -> FrameGrab.of(() -> null))));
@@ -58,12 +113,13 @@ class LiveImageTest {
     }
 
     @Test
-    void theRateSaysWhenTheCaptureHoldsItDown() {
-        assertEquals("· 30 fps, 12 ms a read, 2 ms a draw", LiveBoard.rate(30, 30, 360, 60, 1_000));
-        assertEquals("· 8 fps, 120 ms a read, 3 ms a draw: the capture is the limit",
-                LiveBoard.rate(8, 8, 960, 24, 1_000));
-        assertEquals("· 10 fps, 20 ms a read, 50 ms a draw: drawing is the limit",
-                LiveBoard.rate(10, 10, 200, 500, 1_000));
-        assertEquals("· 0 fps, 0 ms a read, 0 ms a draw", LiveBoard.rate(0, 0, 0, 0, 1_000));
+    void theRateSaysWhatHoldsItDown() {
+        assertEquals("· 60 fps read, 59 shown, 3 ms a read, 1 ms a draw",
+                LiveBoard.rate(60, 59, 60, 180, 59, 1_000));
+        assertEquals("· 8 fps read, 8 shown, 120 ms a read, 3 ms a draw: the capture is the limit",
+                LiveBoard.rate(8, 8, 8, 960, 24, 1_000));
+        assertEquals("· 60 fps read, 10 shown, 2 ms a read, 50 ms a draw: drawing is the limit",
+                LiveBoard.rate(60, 10, 60, 120, 500, 1_000));
+        assertEquals("· 0 fps read, 0 shown, 0 ms a read, 0 ms a draw", LiveBoard.rate(0, 0, 0, 0, 0, 1_000));
     }
 }
