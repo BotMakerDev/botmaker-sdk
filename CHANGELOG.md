@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **CI's plugin gate is named for the catalog** ("Plugin gate (the checks the catalog runs)"): the plugin registry
+  became `botmaker-catalog`. Nothing changes for a bot.
+
 - **A sample bot is compiled by the SDK's own tests** (`SampleBotCompileTest`, sources in
   `src/test/resources/samplebot`): three activities, a flow, the run's values, and one use of each kind of map
   input, readout and screen setup. An `api.*` change that breaks a bot now fails `mvn test` here, in place of

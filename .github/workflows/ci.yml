@@ -104,8 +104,9 @@ jobs:
         run: mvn -B -DskipTests verify
 
       # THE PLUGIN GATE. This module is Studio's plugin #1, and the premise of the whole plugin platform is
-      # that it gets no back door — a privileged default plugin, but a plugin. So the seven checks the
-      # plugin registry runs on every third-party submission run here, on every push, against this build.
+      # that it gets no back door — a privileged default plugin, but a plugin. So the checks the catalog
+      # (botmaker-catalog, the plugin registry until 2026-10-23) runs on every plugin entry run here, on
+      # every push, against this build.
       #
       # Nobody had ever run them on this module until 2026-09-02, and `pom-scopes` failed the moment
       # somebody did: botmaker-studio-api was declared `optional` at `compile` where the platform's rule is
@@ -157,7 +158,7 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-archetype
           path: .deps/botmaker-plugin-archetype
 
-      - name: Plugin gate (the checks the plugin registry runs)
+      - name: Plugin gate (the checks the catalog runs)
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
