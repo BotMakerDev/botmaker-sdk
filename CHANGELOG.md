@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A sample bot is compiled by the SDK's own tests** (`SampleBotCompileTest`, sources in
+  `src/test/resources/samplebot`): three activities, a flow, the run's values, and one use of each kind of map
+  input, readout and screen setup. An `api.*` change that breaks a bot now fails `mvn test` here, in place of
+  building the gamebot template. The javadoc examples say `MyBot::goHome` instead of `Gamebot::goHome`.
 - **A screen's shot is named in its Java**: `Setup.shot("screens/HOME.png")`, and `ScreenVariant.shot(…)` for a
   look. 🗺 writes it with the first shot it takes, so renaming a screen, in 🗺, in Studio or in your IDE, keeps its
   shot. A map made before shows each screen's marker until its shot is taken again (❄ Freeze, or the next walk there).

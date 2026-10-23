@@ -129,10 +129,10 @@ public final class ActivityFlowDialog {
      */
     private Set<String> savedActivities = Set.of();
 
-    /** The run's home, {@code Gamebot::goHome}: the canvas does not draw it, and a save writes it when it changed. */
+    /** The run's home, {@code MyBot::goHome}: the canvas does not draw it, and a save writes it when it changed. */
     private Runnable home;
 
-    /** The run's setup, {@code Gamebot::setup}: written like {@link #home}. */
+    /** The run's setup, {@code MyBot::setup}: written like {@link #home}. */
     private Runnable setup;
 
     /**
@@ -1150,7 +1150,7 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The bot's way home — {@code Sdk.run()}'s {@code .home(Gamebot::goHome)}, run at start-up, after anything
+     * The bot's way home — {@code Sdk.run()}'s {@code .home(MyBot::goHome)}, run at start-up, after anything
      * unexpected and before each activity whose ⌂ is ticked, whichever flow runs — picked among the bot's
      * {@code public static void} methods, and how a bot starts the flow at all ({@link #methodChoice}).
      *
@@ -1179,7 +1179,7 @@ public final class ActivityFlowDialog {
     }
 
     /**
-     * The bot's setup — {@code Sdk.run()}'s {@code .setup(Gamebot::setup)}, run after the bot has started the game,
+     * The bot's setup — {@code Sdk.run()}'s {@code .setup(MyBot::setup)}, run after the bot has started the game,
      * before home, when the bot's {@code doSetup} parameter is ticked — picked as the home is. What it checks is the
      * bot's own code: the game's settings, and the ones a user chose in the bot's parameters.
      */

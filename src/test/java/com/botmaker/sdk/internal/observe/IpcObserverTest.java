@@ -73,10 +73,10 @@ class IpcObserverTest {
         }
     }
 
-    /** The worked template lives under com.botmaker too; only our libraries are skipped when finding its line. */
+    /** A bot may live under com.botmaker too; only our libraries are skipped when finding its line. */
     @Test
     void aBotUnderComBotmakerIsTheBotsOwnCodeButOurLibrariesAreNot() {
-        assertFalse(IpcObserver.isLibrary("com.botmaker.gamebot.Collect"));
+        assertFalse(IpcObserver.isLibrary("com.botmaker.farm.Collect"));
         assertFalse(IpcObserver.isLibrary("com.example.Farm"));
         assertTrue(IpcObserver.isLibrary("com.botmaker.sdk.api.input.Mouse"));
         assertTrue(IpcObserver.isLibrary("com.botmaker.shared.Diag"));

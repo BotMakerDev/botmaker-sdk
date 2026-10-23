@@ -69,7 +69,7 @@ public class Bot {
      * flow its {@code flow} parameter names — the whole of a bot's {@code main}.
      *
      * <pre>{@code
-     * public final class Gamebot extends Bot {
+     * public final class MyBot extends Bot {
      *
      *     public static void main(String[] args) {
      *         runFlow(Sdk.class);

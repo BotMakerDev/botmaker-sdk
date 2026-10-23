@@ -235,9 +235,9 @@ class FlowArrangeTest {
         assertEquals(1, FlowArrange.fitZoom(new Box(0, 0, 300, 200), 1200, 800), "a small flow stays at 1:1");
     }
 
-    /** The gamebot's flow: Collect loops on itself, Battle and Rest loop back to it. */
+    /** A collect-battle-rest flow: Collect loops on itself, Battle and Rest loop back to it. */
     @Test
-    void theGamebotFlowRunsLeftToRightWithEveryWireKept() {
+    void aCollectBattleRestFlowRunsLeftToRightWithEveryWireKept() {
         Flow flow = new Flow().card("Collect", 2).card("Battle", 2).card("Rest", 1)
                 .wire("Collect", 0, "Collect").wire("Collect", 1, "Battle")
                 .wire("Battle", 0, "Collect").wire("Battle", 1, "Rest").wire("Rest", 0, "Collect");

@@ -12,8 +12,8 @@ gets both halves: its bot runs on the first, and Studio loads the second from th
 
 ## Using it
 
-Start from the [gamebot template](https://github.com/BotMakerDev/botmaker-gamebot) (**Create New Project ▸
-Gamebot** in Studio), or add it to a project's pom:
+Tick it in Studio's **New Project** (a blank project, or a published bot that already uses it), or add it to a
+project's pom:
 
 ```xml
 <repositories>
@@ -31,8 +31,8 @@ Gamebot** in Studio), or add it to a project's pom:
 ```
 
 The plugin half also needs `javafx-controls`, `javafx-graphics`, `javalin` and zxing `core` at `provided`
-scope; the gamebot template's `pom.xml` lists them with the versions to use. A bot links none of them at run
-time. Do not declare `botmaker-plugin-toolkit` or `botmaker-plugin-basics` beside the SDK: it brings both,
+scope; Studio writes them into a new project's `pom.xml` with the versions to use. A bot links none of them at
+run time. Do not declare `botmaker-plugin-toolkit` or `botmaker-plugin-basics` beside the SDK: it brings both,
 and a direct entry wins by Maven's nearest-wins rule at a version the SDK was not built against.
 
 ## The runtime: what a bot calls
@@ -119,4 +119,5 @@ mvn -Ptemplates -Dbotmaker.sdk.version=$(mvn -q -f botmaker-sdk/pom.xml help:eva
 ## Releasing
 
 From the umbrella only, with `--sdk <version>` plus the downstream it forces (studio); `/release-check` names
-it. Add `--gamebot` to move the template's pin to the new SDK.
+it. `SampleBotCompileTest` compiles a bot (`src/test/resources/samplebot`) against the SDK, so an `api.*`
+change that breaks bots fails the SDK's own tests.

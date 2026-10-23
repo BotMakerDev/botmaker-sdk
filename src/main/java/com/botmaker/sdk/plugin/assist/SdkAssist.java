@@ -28,7 +28,7 @@ public final class SdkAssist {
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its activities, and a
-     * flow says which runs next. What the gamebot template's {@code Gamebot} javadoc tells a person, said as rules.
+     * flow says which runs next, said as rules.
      * It names the {@link Protocol}'s stages only: read_guide gives the steps of the one the bot is at.
      */
     public static final String GUIDE = """

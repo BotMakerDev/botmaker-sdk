@@ -15,8 +15,8 @@ package com.botmaker.sdk.api.flow;
  * @SdkValue(SdkValue.Id.RUN)
  * public static Run run() {
  *     return Run.of()
- *             .home(Gamebot::goHome)
- *             .setup(Gamebot::setup);
+ *             .home(MyBot::goHome)
+ *             .setup(MyBot::setup);
  * }
  * }</pre>
  *
@@ -45,7 +45,7 @@ public record Run(Runnable home, Runnable setup, String notes) {
         return NONE;
     }
 
-    /** This run, getting the game back to a known screen with {@code home} — {@code Gamebot::goHome}. */
+    /** This run, getting the game back to a known screen with {@code home} — {@code MyBot::goHome}. */
     public Run home(Runnable home) {
         return new Run(home, setup, notes);
     }
@@ -59,7 +59,7 @@ public record Run(Runnable home, Runnable setup, String notes) {
     }
 
     /**
-     * This run, making the game ready with {@code setup} — {@code Gamebot::setup} — once the bot has started the
+     * This run, making the game ready with {@code setup} — {@code MyBot::setup} — once the bot has started the
      * game, before {@link #home}, when the bot's {@code doSetup} parameter is ticked. The bot writes it: open the
      * game's settings, set what the bot needs, and call {@code Bot.stop("…")} when the user has to change something
      * by hand.

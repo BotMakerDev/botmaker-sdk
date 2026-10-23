@@ -7,8 +7,7 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **macOS: OCR has never run on a Mac** (natives staged 2026-10-11 without one). Owed on Apple Silicon:
   `OcrEngine.recognize` and `getWords` load the `darwin-aarch64/` natives and read text; whether dyld maps
   Leptonica once or twice (`vmmap <pid> | grep lepton`), and that OCR works either way.
-- **Release owed**: `--sdk 2.0.0 --gamebot … --studio` (the umbrella `CLAUDE.md` › Templates). The gamebot
-  template stays on its old pin until that run.
+- **Release owed**: `--sdk 2.0.0 … --studio` (`/release-check` names what it forces).
 - **Activity Flow**: a flow written from *+ New outcome…* while the Activity Flow window is open is
   overwritten by that window's next save (it holds its own drafts). Dragging from a wired port refuses
   ("remove that wire first") instead of moving the arrow — a gesture change, waiting for a decision. A
@@ -101,8 +100,7 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     hand editor sets it in 🗺 (it is written in `Screens.java`); a way back costs the screen it returns to, the same
     whichever input closes.
   - The by-hand flow, past its first cut (2026-10-22): the input editors' rarer actions stay in their parts (folded,
-    not in a ⋯); a suggested name is the cut form's only, crop_pictures still takes the assistant's; the gamebot
-    template's map keeps its placeholder Home until the template is retired (botmaker-cli's ROADMAP); a part's fold
+    not in a ⋯); a suggested name is the cut form's only, crop_pictures still takes the assistant's; a part's fold
     is remembered per computer, not per project; a Try that opens a screen it is told the name of starts the marker
     cut, one that lands on an unknown screen with no name still writes nothing.
   - Scale: a parse cached by file hash (a 45-screen read takes ~1 s).

@@ -41,7 +41,7 @@ class FlowTypesTest {
     private static final Activity REST = BotConstants.activity("Rest");
     private static final Outcome NOTHING_LEFT = BotConstants.outcome("Collect", "NOTHING_LEFT");
 
-    private static Flow gamebot() {
+    private static Flow collectBattleRest() {
         Flow.Step collect = FlowTypes.step(COLLECT, FlowTypes.body("Collect::body"))
                 .described("Click collect, then battle.").checksPopups();
         Flow.Step rest = FlowTypes.step(REST, FlowTypes.body("Rest::body"))
@@ -55,7 +55,7 @@ class FlowTypesTest {
     }
 
     private static Run run() {
-        return Run.of().home(FlowTypes.method("Gamebot::goHome")).setup(FlowTypes.method("Gamebot::setup"));
+        return Run.of().home(FlowTypes.method("MyBot::goHome")).setup(FlowTypes.method("MyBot::setup"));
     }
 
     /** {@code build(components(v))} for one shape, which is the law every {@code ComponentType} owes. */
@@ -65,8 +65,8 @@ class FlowTypesTest {
 
     @Test
     void aFlowComesApartAndGoesBackTogetherWhole() {
-        assertEquals(gamebot(), roundTrip(FlowTypes.FLOW_SHAPE, gamebot()));
-        assertTrue(roundTrip(FlowTypes.FLOW_SHAPE, gamebot()).steps().getLast().runnerSwitch(),
+        assertEquals(collectBattleRest(), roundTrip(FlowTypes.FLOW_SHAPE, collectBattleRest()));
+        assertTrue(roundTrip(FlowTypes.FLOW_SHAPE, collectBattleRest()).steps().getLast().runnerSwitch(),
                 "the runner's switch rides on its card");
     }
 
@@ -77,11 +77,11 @@ class FlowTypesTest {
     @Test
     void theRunHoldsItsHomeAndItsSetup() {
         assertEquals(run(), roundTrip(FlowTypes.RUN_SHAPE, run()));
-        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.RUN_SHAPE, run()).home()));
+        assertEquals("MyBot::goHome", FlowTypes.sourceOf(roundTrip(FlowTypes.RUN_SHAPE, run()).home()));
         Run none = run().setup(null);
-        assertEquals("Gamebot::goHome", FlowTypes.sourceOf(none.home()), "dropping the setup keeps the home");
+        assertEquals("MyBot::goHome", FlowTypes.sourceOf(none.home()), "dropping the setup keeps the home");
         assertNull(run().home(null).home());
-        assertEquals("Gamebot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
+        assertEquals("MyBot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
         assertEquals(3, FlowTypes.RUN_SHAPE.withers().size());
         assertEquals(List.of(Runnable.class, Runnable.class, String.class),
                 FlowTypes.RUN_SHAPE.componentTypes());
@@ -97,13 +97,13 @@ class FlowTypesTest {
         assertEquals(1, FlowTypes.FLOW_SHAPE.constants().size(), "written as Flow.NONE: no start to name");
         Flow emptied = new Flow(List.of(), List.of(), null, Flow.limits(5, 5));
         assertEquals(Flow.NONE, FlowTypes.written(emptied), "a flow with no activity left has nothing to start at");
-        assertEquals(gamebot(), FlowTypes.written(gamebot()));
+        assertEquals(collectBattleRest(), FlowTypes.written(collectBattleRest()));
     }
 
     /** Every nested shape owes the law too — a flow's parts are values, not text. */
     @Test
     void eachShapeInsideAFlowRoundTripsOnItsOwn() {
-        Flow flow = gamebot();
+        Flow flow = collectBattleRest();
         assertEquals(flow.steps().getFirst(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getFirst()));
         assertEquals(flow.steps().getLast(), roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getLast()));
         assertEquals(COLLECT, roundTrip(FlowTypes.STEP_SHAPE, flow.steps().getLast()).whenOff());
@@ -149,11 +149,11 @@ class FlowTypesTest {
             assertEquals(edge, only(edge, FlowTypes.EDGE_SHAPE, FlowTypes.EDGE_INTO_SUBFLOW_SHAPE,
                     FlowTypes.EDGE_OUT_OF_SUBFLOW_SHAPE, FlowTypes.EDGE_BETWEEN_SUBFLOWS_SHAPE), edge.toString());
         }
-        for (Flow.Edge edge : gamebot().edges()) {
+        for (Flow.Edge edge : collectBattleRest().edges()) {
             assertEquals(edge, only(edge, FlowTypes.EDGE_SHAPE, FlowTypes.EDGE_INTO_SUBFLOW_SHAPE,
                     FlowTypes.EDGE_OUT_OF_SUBFLOW_SHAPE, FlowTypes.EDGE_BETWEEN_SUBFLOWS_SHAPE), edge.toString());
         }
-        assertEquals(gamebot(), only(gamebot(), FlowTypes.FLOW_SHAPE, FlowTypes.FLOW_FROM_SUBFLOW_SHAPE));
+        assertEquals(collectBattleRest(), only(collectBattleRest(), FlowTypes.FLOW_SHAPE, FlowTypes.FLOW_FROM_SUBFLOW_SHAPE));
     }
 
     /** {@code value} through the one of {@code shapes} that writes it, failing when not exactly one does. */
@@ -173,7 +173,7 @@ class FlowTypesTest {
         assertEquals("DAILY", BotConstants.flowName(DAILY));
         assertEquals("DAILY", new Flow.Sub(DAILY).name());
         assertNull(BotConstants.flowName(Flow.NONE), "an empty flow is no reference");
-        assertNull(BotConstants.flowName(gamebot()));
+        assertNull(BotConstants.flowName(collectBattleRest()));
     }
 
     /** An activity is no part's {@code Class} the editor could hold: each shape refuses one that is not a name. */
@@ -192,7 +192,7 @@ class FlowTypesTest {
     void aFlowIsFourComponents() {
         assertEquals(List.of(List.class, List.class, Class.class, Flow.Limits.class),
                 FlowTypes.FLOW_SHAPE.componentTypes());
-        assertEquals(4, FlowTypes.FLOW_SHAPE.components(gamebot()).size());
+        assertEquals(4, FlowTypes.FLOW_SHAPE.components(collectBattleRest()).size());
         assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
                 boolean.class, boolean.class, Class.class, Flow.class, Screen.class),
                 FlowTypes.STEP_SHAPE.componentTypes());
@@ -238,7 +238,7 @@ class FlowTypesTest {
         assertEquals("Collect::body", FlowTypes.sourceOf(named));
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, named::run);
         org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class,
-                FlowTypes.method("Gamebot::goHome")::run);
+                FlowTypes.method("MyBot::goHome")::run);
     }
 
     @Test

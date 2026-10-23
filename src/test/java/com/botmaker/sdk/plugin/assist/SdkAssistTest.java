@@ -608,7 +608,7 @@ class SdkAssistTest {
         String read = text(run("read_flow"));
         assertTrue(read.contains("Home: none.") && read.contains("Setup: none."), read);
         // The fake bot has no public static void method: a name it lacks would not compile.
-        AgentReply missing = run("edit_flow", "action", "set_flow_method", "which", "setup", "method", "Gamebot::setup");
+        AgentReply missing = run("edit_flow", "action", "set_flow_method", "which", "setup", "method", "MyBot::setup");
         assertTrue(missing.isRefused());
         assertTrue(text(missing).contains("It has: none."), text(missing));
         assertEquals("The bot has no setup now.", text(run("edit_flow", "action", "set_flow_method", "which", "setup")));

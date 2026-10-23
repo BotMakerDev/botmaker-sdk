@@ -22,7 +22,7 @@ import java.lang.annotation.Target;
  *
  *     @SdkValue(SdkValue.Id.RUN)
  *     public static Run run() {
- *         return Run.of().home(Gamebot::goHome);
+ *         return Run.of().home(MyBot::goHome);
  *     }
  * }
  *

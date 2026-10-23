@@ -147,7 +147,7 @@ public final class IpcObserver implements BotObserver {
 
     /**
      * The first frame of the bot's own code, or empty. Our libraries are skipped by their packages rather than
-     * by {@code com.botmaker.}: the worked template is {@code com.botmaker.gamebot}, and skipping the whole
+     * by {@code com.botmaker.}: a bot may live under it ({@code com.botmaker.farm}), and skipping the whole
      * prefix would find no line in it at all. {@code com.botmaker.studio.} is the trace agent Studio
      * runs a bot with, whose frames sit between a traced call and the bot line that made it.
      */

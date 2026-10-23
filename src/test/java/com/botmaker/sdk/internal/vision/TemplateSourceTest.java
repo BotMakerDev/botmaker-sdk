@@ -39,7 +39,7 @@ class TemplateSourceTest {
     @Test
     void theSamePathFromAnotherWorkingDirectoryIsFoundOnTheClasspath(@TempDir Path root) throws Exception {
         // The IntelliJ case: working directory one level up, target/classes on the classpath.
-        Path classes = root.resolve("gamebot/target/classes");
+        Path classes = root.resolve("farm/target/classes");
         Files.createDirectories(classes.resolve("images"));
         Files.write(classes.resolve("images/collect.png"), PIXELS);
 

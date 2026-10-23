@@ -24,7 +24,7 @@
   (`.described(…)`, `.off()`, `.switchable()` — the runner may skip it through `Sdk.skip` — `.goesHome()`,
   `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is),
   `Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum),
-  `Run` (`Run.of().home(Gamebot::goHome).setup(Gamebot::setup)` in `Sdk.run()`, once for the bot; an activity's
+  `Run` (`Run.of().home(MyBot::goHome).setup(MyBot::setup)` in `Sdk.run()`, once for the bot; an activity's
   work, the way home and setup are **method references**, so a rename is a compile error naming the holder),
   `Activity` (an activity by its enum's simple name, the key runtime and editor agree on), `ActivityBody<O>` (a
   body returns its own activity's enum), `FlowLayout` (the editor's card positions, keyed by flow then by

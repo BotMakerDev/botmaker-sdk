@@ -77,7 +77,7 @@ class FlowConstantsTest {
         @Override
         public Optional<String> removeGroup(String id, String group) {
             asked.add("removeGroup " + group);
-            if (used.contains(group)) return Optional.of("used in Gamebot.java");
+            if (used.contains(group)) return Optional.of("used in MyBot.java");
             enums.remove(group);
             return Optional.empty();
         }
@@ -111,7 +111,7 @@ class FlowConstantsTest {
         /** Each enum's methods: {@code Collect::body} returns {@code Collect}, whether a flow links it or not. */
         @Override
         public List<String> methods(String id, String group) {
-            return group == null ? List.of("Gamebot::goHome") : List.of(group + "::body");
+            return group == null ? List.of("MyBot::goHome") : List.of(group + "::body");
         }
 
         @Override
@@ -127,7 +127,7 @@ class FlowConstantsTest {
     void the_methods_a_card_can_run_and_the_way_home() {
         Project project = new Project(Set.of(), "Collect NEXT");
         assertEquals(List.of("Collect::body"), FlowConstants.bodies(project, "Collect"));
-        assertEquals(List.of("Gamebot::goHome"), FlowConstants.homes(project));
+        assertEquals(List.of("MyBot::goHome"), FlowConstants.homes(project));
         assertEquals("Collect::gather", FlowConstants.createMethod(project, "Collect", "Collect", "gather").reference());
         assertEquals("Home::goHome", FlowConstants.createMethod(project, null, "Home", "goHome").reference());
         assertFalse(FlowConstants.createMethod(project, "Battle", "Battle", "body").written());
@@ -142,7 +142,7 @@ class FlowConstantsTest {
     void a_method_belongs_to_the_enum_it_returns() {
         Project project = new Project(Set.of(), "Collect NEXT", "Battle NEXT");
         assertEquals(Optional.of("Battle"), FlowConstants.returnedBy(project, "Battle::body"));
-        assertEquals(Optional.empty(), FlowConstants.returnedBy(project, "Gamebot::goHome"));
+        assertEquals(Optional.empty(), FlowConstants.returnedBy(project, "MyBot::goHome"));
         assertEquals(Optional.empty(), FlowConstants.returnedBy(project, null));
     }
 

@@ -145,7 +145,7 @@ final class FlowTools {
             + "first. Popups have no method: they are popup screens of the map")
     record SetFlowMethod(@Describe(value = "home gets the game back to a known screen; setup makes it ready after "
                                  + "the bot starts it, when doSetup is ticked") Hook which,
-                         @Describe(value = "a public static void method of the bot with no parameter, Gamebot::setup; "
+                         @Describe(value = "a public static void method of the bot with no parameter, MyBot::setup; "
                                  + "leave out for none", optional = true) String method) implements Change {
     }
 

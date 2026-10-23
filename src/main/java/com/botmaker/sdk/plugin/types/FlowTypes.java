@@ -46,7 +46,7 @@ import java.util.Map;
  *
  * <h2>A body is a name, and it crosses as the source it is written as</h2>
  *
- * <p>An activity's body is written {@code Collect::body}, and the run's {@code .home(…)} {@code Gamebot::goHome}.
+ * <p>An activity's body is written {@code Collect::body}, and the run's {@code .home(…)} {@code MyBot::goHome}.
  * Neither is made into a live object — the editor never runs a bot's code — so each crosses as the
  * {@code String} the file writes, and is written back exactly so. The flow editor checks what a person types
  * ({@code FlowNames.isMethodReference}); this class checks nothing.
@@ -154,7 +154,7 @@ public final class FlowTypes {
 
     /**
      * {@code Run.of()} and its {@code .home(…)} and {@code .setup(…)} links, each written only when the run has
-     * one. Each method crosses as the text it is written as, {@code Gamebot::goHome}.
+     * one. Each method crosses as the text it is written as, {@code MyBot::goHome}.
      */
     public static final DeclaredCall<Run> RUN_SHAPE = ComponentType.part(Run.class)
             .writtenAs(Run::of)
@@ -297,7 +297,7 @@ public final class FlowTypes {
     }
 
     /**
-     * The run's home or setup that only knows what it is written as — {@code Gamebot::goHome} — or {@code null}.
+     * The run's home or setup that only knows what it is written as — {@code MyBot::goHome} — or {@code null}.
      */
     public static Runnable method(String source) {
         return source == null || source.isBlank() ? null : new NamedMethod(source);
@@ -334,7 +334,7 @@ public final class FlowTypes {
         }
     }
 
-    /** The run's home or setup as a name, {@code Gamebot::goHome}: {@link Named}'s counterpart, and as honest. */
+    /** The run's home or setup as a name, {@code MyBot::goHome}: {@link Named}'s counterpart, and as honest. */
     record NamedMethod(String source) implements Runnable {
 
         @Override
