@@ -106,11 +106,11 @@ mvn test                          # here
 mvn -pl botmaker-sdk -am install  # from the umbrella root: the SDK and every module it needs, at main's -SNAPSHOT
 ```
 
-A change to `api.*` is done only when both templates build against it, from the umbrella root:
+A change to `api.*` is done only when the sample bot (`src/test/resources/samplebot`) still compiles against
+it:
 
 ```bash
-mvn -Ptemplates -Dbotmaker.sdk.version=$(mvn -q -f botmaker-sdk/pom.xml help:evaluate \
-    -Dexpression=project.version -DforceStdout) install
+mvn test -Dtest=SampleBotCompileTest
 ```
 
 `api.*` may break between releases: Studio's plugin upgrade repairs a bot's calls. The package rules
