@@ -148,10 +148,20 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-host
           path: .deps/botmaker-plugin-host
 
+      # The cli bundles the archetype's `template` zip (`plugin new`), resolved at its main -SNAPSHOT, which
+      # nothing publishes: red on main until 2026-10-23 with "Could not find artifact
+      # …botmaker-plugin-archetype:zip:template:…-SNAPSHOT". The toolkit it needs is installed above.
+      - name: Check out botmaker-plugin-archetype (botmaker-cli's bundled example)
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-archetype
+          path: .deps/botmaker-plugin-archetype
+
       - name: Plugin gate (the checks the plugin registry runs)
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
+          mvn_retry mvn -B -q -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
           java -jar .deps/botmaker-cli/target/botmaker-cli-*-all.jar plugin validate . --no-build
 
