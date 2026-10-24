@@ -17,6 +17,292 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+No source changes since v1.6.0; re-released for updated upstream pins.
+
+### Added
+
+- **CI's plugin gate is named for the catalog** ("Plugin gate (the checks the catalog runs)"): the plugin registry
+  became `botmaker-catalog`. Nothing changes for a bot.
+
+- **A sample bot is compiled by the SDK's own tests** (`SampleBotCompileTest`, sources in
+  `src/test/resources/samplebot`): three activities, a flow, the run's values, and one use of each kind of map
+  input, readout and screen setup. An `api.*` change that breaks a bot now fails `mvn test` here, in place of
+  building the gamebot template. The javadoc examples say `MyBot::goHome` instead of `Gamebot::goHome`.
+- **A screen's shot is named in its Java**: `Setup.shot("screens/HOME.png")`, and `ScreenVariant.shot(…)` for a
+  look. 🗺 writes it with the first shot it takes, so renaming a screen, in 🗺, in Studio or in your IDE, keeps its
+  shot. A map made before shows each screen's marker until its shot is taken again (❄ Freeze, or the next walk there).
+- **Renaming a screen renames its constant and class**: 🗺's *Rename* and edit_map's rename turn
+  `Screens.FAVORED_WAR_MACHINES_2` into `Screens.FORGE` along with its name, every use with it, as one ↶ step.
+  Studio's own rename works on a screen's constant too.
+- **🗺 reads the map less**: an edit that leaves `Screens.java` and the files beside it as they were, or an undo back
+  to them, no longer reads the whole map again. A long `setup()` chain is written one call per line.
+- **🗺 Activities on the map.** A flow card can say the screen its activity works on:
+  `Flow.activity(Tavern.class, Tavern::body).on(Screens.TAVERN)`.
+  - That screen's card on 🗺 shows a `⚙ Tavern` pill.
+  - A step that gets stuck walks back to that screen before it runs once more.
+  - In `Tavern::body`, the input picker lists TAVERN first.
+- **⏺ Record into <activity>**, on 🗺's Live board. Pick an activity, then drive the game. Each action is written
+  at the end of that activity's body, before its `return`:
+  - a click or drag on a known input becomes `Navigate.press(Screens.X.field);`;
+  - a key that is one of the screen's hotkeys is recorded the same way;
+  - a field the body types into asks for the text, then becomes `Navigate.type(Screens.X.field, "…");`;
+  - 🧭 Go here, once it arrives, becomes `Navigate.to(Screens.X);`.
+
+  Studio writes each line, and ↶ takes it back. *Record: A · input → B* still writes the map's ways.
+
+- **🗺 Screens by hand, smoother**:
+  - A screen clicked on the graph shows big on the Screen tab at once. The side panel no longer repeats its shot;
+    folding what is below a screen moved to the card's right-click menu.
+  - **▶▶ Next untried** in the toolbar picks the next input to try, as Discovery goes, and shows it big.
+  - The side panel and the input editors are parts that fold, each with a line saying what it is for. Only those
+    the input's kind needs open at first; each stays as you left it. ＋ Hotkey, ＋ Strip and ＋ Tree moved into
+    ⋯ Screen.
+  - The cut form asks first what a cut is for: it tells the screen, it acts, or it reads or fixes. Each cut gets a
+    suggested name, from the words OCR reads on it, else `<screen>_<kind>_<n>`.
+  - A ▶ Try that opens a new screen shows that screen big and starts cutting its marker.
+  - An empty map says where to start: ● Live, then ❄ Freeze on the game's first screen.
+
+- **Text fields on the map**: a button that types once clicked, `Button.of(Pictures.SEARCH).types(Texts.GUILD)`,
+  `.clears()` and `.submits()`. Its text is a constant of the bot's new `Texts` class (`Words.of("Dragons")`), so
+  `Navigate.to` walks through it typing it; `.typed()` leaves the text to the body, `Navigate.type(Screens.GUILD.search,
+  guildName)`, usually from a `@Param`, and a walk that needs it ends NOT_NOW saying so. 🗺 Screens' input panel has a
+  *Text field* section (its text, Clear first, Enter after), which adds the `Texts` constant; edit_map's set_input
+  takes `types`, `submits` and `clears`; try_input types the field's text after the click.
+- **Words on the map**: a screen told by text it shows, `Setup.texts(List.of(Caption.of(Texts.SETTINGS,
+  Zones.TITLE)))`, read by OCR in the zone only once its pictures say it may be that screen; and a button known by its
+  words, `TextButton.of(Caption.of(Texts.CLAIM, Zones.QUESTS))`, clicked on the line that reads them. A line matches when
+  it is the whole words, case-blind, a misread letter forgiven in 5 to 8 letters and two past (`Claim` is never
+  `Claimed`). 🗺 Screens' cut form has *Words that tell it* and *A button known by its words*, the words read off the
+  cut to start with; the panel lists a screen's words with ✕; edit_map has `add_text` and `remove_text`; try_input and
+  ▶ Try press a text button where a fresh look reads it.
+- **Readouts and results on the map**: a screen reads what it shows, a field beside its inputs, `public final
+  Readout gold = Readout.digits(Zones.GOLD, Digits.GOLD);` or `Readout.text(Zones.HERO_NAME)`, read from a body by
+  `Navigate.read(Screens.HOME.gold)` or `Navigate.number(…)` while the game shows that screen. A readout marked
+  `.subject()` names which one its screen shows, `Navigate.subject(Screens.HERO)`. How a fight ends is two screens
+  `.after(BATTLE)`, Victory and Defeat, and `Navigate.next(Screens.BATTLE)` waits for whichever shows, so a body no
+  longer waits on pictures by hand. 🗺 Screens' cut form has *read on this screen* (and *names which one it shows*)
+  on a zone or digits cut; read_map lists a screen's readouts and every screen that follows it on its own.
+- **Walks timed by the screens' own times**: ▶ Try and try_input write how long the screen an input opens took to
+  show, `.takes(Duration.ofMillis(800))`. A walk takes the quickest path by those times rather than the one of
+  fewest steps, and gives each step twice its screen's time (at least 2 s) instead of a fixed 10 s; read_map says
+  each measured time. A map with no time measured walks as before.
+- **Tabs and looks' shots on the map**: a tab is a screen told by its tab button picked, `Setup.named("Gear")
+  .from(HERO.gearTab).tab()` with a `State.SELECTED` look on the button, so it needs no marker of its own; a walk
+  presses a sibling tab directly and takes any tab as the screen it is in. Mark one from 🗺 Screens' ⋯ (*A tab of …*)
+  or edit_map's `set_kind tab`. A frame showing a screen's look (Halloween) is that look's own shot, and the panel's
+  *Look* picker shows the screen in it: its shot on the panel, the board and the card, and only the inputs that look
+  shows.
+- **Places, spots and grids on the map**: a button found only where it sits from a picture or words,
+  `Button.of(Pictures.CLAIM).repeated().place(Place.rightOf(Caption.of(Texts.DAILY, Zones.QUESTS)))`, or picked so
+  from a body, `Pick.at(Place.below(Pictures.EVENT_HEADER))` (`above`, `below`, `leftOf`, `rightOf`, `nearest`,
+  `between`); none there presses nothing. A button with no picture of its own, `Button.beside(Pictures.AVATAR_FRAME,
+  2, 0)`, is pressed at an offset from its anchor in the anchor's size, only when the anchor is found; `.grid(Grid.of(3,
+  5, 1.2, 1.2))` makes it an inventory's cells, `Pick.cell(2, 3)` one of them. Both follow the anchor when the frame
+  is scaled. 🗺 Screens' cut form has *A spot beside a picture, or its grid*, and the input panel a *Where* section;
+  edit_map has `add_spot`, and set_input takes `side`, `anchor` and `other`.
+- **Drags on the map**: a button pressed, moved and let go, `Button.of(Pictures.CARD).dragsOnto(Pictures.SLOT)` or
+  `.dragsInto(Zones.SLIDER_END)` (a swipe on a phone), `.dragTime(Duration)` (400 ms else). The drop is looked for on
+  the frame the button is found on; a picture drop not there leaves it unpressed, ABSENT saying so. 🗺 Screens' input
+  panel has a *Drag* section (a picture or a zone, and the time); edit_map's set_input takes `dragOnto`, `dragInto`
+  and `dragMs`; try_input drags as a run does.
+
+- **Buttons on the map can be double-clicked, right-clicked, held or hovered**: `Button.of(P).gesture(Gesture.DOUBLE)`,
+  `.hold(Duration.ofSeconds(2))`; a button that says nothing is still clicked. **Hotkeys take keys together or held**:
+  `Hotkey.of(Combo.of(Key.CTRL, Key.S))`; `Hotkey.of(Key.Q)` reads as before. 🗺 Screens' input panel sets a button's
+  *Pressed by* (and the hold's time) and a hotkey's Ctrl/Shift/Alt/Meta and hold; the cut form picks the gesture as
+  the button is cut; edit_map's set_input takes `gesture` and `holdMs`; try_input and ▶ Try press the button or keys
+  as a run does. An emulator takes a tap, a double tap and a long press.
+- **A screen's markers are boxed on 🗺 Screens**: on its shot (board and panel) and over the live game, in a colour
+  no input uses, under the inputs and not clickable, so what tells the screen shows beside what acts on it.
+- **A game is checked ready before it launches**: a run waits while Steam downloads the game (a trace line each
+  minute, 30 min at most) and stops with the reason when the game isn't installed or Steam is signed out, instead of
+  a launch that Steam turns into a dialog nobody answers. Studio's ▶ Launch and Launch and pick wait the same,
+  offer to open Steam to sign in, and offer Steam's install dialog; the Runner's game pick offers *install in
+  Steam…* for a listed game this computer lacks.
+- **🎮 Game lists more launchers**: Bottles programs (`bottles:`), Steam's non-Steam shortcuts, and on Windows
+  the Start menu's apps and Store apps, Ubisoft Connect and Battle.net games (`url:`), and itch games. A bot lists
+  and launches each like any other game (`LaunchTarget.Bottles`, `LaunchTarget.Link`).
+
+### Removed
+
+- **The macro recorder's leftovers**: the `@Records` marks on `Mouse`, `Keyboard`, `Wait`, `ImageClicker` and
+  `ImageWaiter`, and `PictureAt`, the picture under a recorded click. Studio's ⏺ Record was already gone, and it
+  wrote raw clicks at a spot.
+
+### Fixed
+
+- **🗺 Screens' live board lists no windows per frame**: a game window named by its class was found among every
+  window twice a frame (about 9 ms each on a desktop of 12 windows). The window is now found once a second on a
+  thread of its own, and a frame reads it straight. The board's line also says what drawing a frame takes,
+  "N fps, M ms a read, D ms a draw", and which of the two is the limit.
+- **🗺 Screens' live board reads a window through shared memory**:
+  - The window's grab (shared's `grabWindow`) stays open while the same window is found.
+  - It writes each frame straight into the back one of the board's two images, and the two swap on a show.
+  - A frame is no longer turned into a `BufferedImage` and copied twice; ❄ Freeze copies the frame shown.
+  - A game window's read drops from about 20 ms to 2–5 ms.
+  - A game on a private display is read through its display agent's grab too, the frames in a file both processes
+    map; before, each frame came down the agent's pipe.
+- **🗺 Screens' live board reads and draws apart, up to 60 fps**:
+  - The game is read on a thread of its own, paced on the clock at up to 60 frames a second.
+  - The board draws on JavaFX's own pulse, only when a new frame came; no `runLater` per frame.
+  - Four images in turn: the read never waits for a frame being drawn, nor writes one the render thread may still be
+    uploading, and a frame not drawn in time is replaced by the next, never queued.
+  - The line says both rates: "R fps read, S shown, M ms a read, D ms a draw".
+- **🗺 Screens picks an input without drawing the panel again**:
+  - A box clicked on a shot, or an input's line in the outline, now restyles the boxes on the panel's shot and the
+    board, and swaps the picked input's part of the panel.
+  - Before, each pick read every picture's cut again, rebuilt the whole panel and both shots, and matched the
+    screen's pictures over its shot again. A part picked before is kept until the panel is drawn again.
+  - Rows, stages and cuts are read once per read of the map and history step; cuts again when a picture is rewritten.
+  - The screen's pictures are matched over its shot again only when the screen, a cut or a file changed.
+  - The 1.5 s poll states the shots and pictures off the FX thread, and draws only when one was rewritten.
+  - Each draw writes its time to the log, `map panel: HOME drawn in 12.3 ms (cuts …, board …, panel …)` or
+    `… picked buy in …`.
+- **🗺 Screens pans, zooms and drops a card without stalling**:
+  - A card dropped is read back from `Screens.java` off the FX thread; the read held it 300 to 900 ms.
+  - A read that only moved cards pins them on the canvas as they are; before, every card was built again.
+  - Scrolling no longer asks whether the tree should turn: only a resize does.
+  - The canvas's own changes (grid, link paths, scaling while moving) are in the toolkit's changelog.
+- **🗺 Screens shows the work, not a tree, laid out by ELK** (`plugin.map.ElkLayout`):
+  - The map is laid out by ELK's layered algorithm, in ranks from the first screen, by every way between screens,
+    not by the entrances alone. The entrances weigh most, so they set the ranks, and each rank is ordered to cross
+    fewer ways.
+  - Every way is routed by ELK too, square and clear of the cards. A way back runs back against the entrances
+    instead of wrapping around the whole map, and two ways between the same screens each have their own path.
+  - A card moved by hand keeps its ways routed by the canvas, as before. So do the ways to and from popups.
+  - Popups, and screens no way reaches, are packed beside the rest.
+  - The map still turns to fit the window, folds the screens a screen's entrances open, and keeps cards moved by
+    hand. Should ELK fail on a map, the toolkit's layered layout places it instead.
+  - A layout costs 55 to 75 ms both ways on a map of 45 screens and 160 ways, so the same cards and ways are not
+    laid out again on a redraw, and ELK is warmed off the FX thread as the window opens.
+  - **The SDK depends on ELK 0.12.0 at `compile`**, with EMF, Xbase's runtime library and Guava (pinned
+    33.7.2-jre). Every bot carries about 8.5 MB more: the user's call (2026-10-22).
+- **🗺 Screens' links in focus** (`ScreenMap`, the toolkit's `GraphCanvas.setFocusLinks`):
+  - At rest the entrances are drawn full, with their chips; the other ways are faint, without theirs.
+  - The screen under the pointer, or else the screen picked (a click, the outline, a search hit), lights every way
+    in and out of it, chips included, over the rest, which go faint, entrances too.
+  - **⇄ All links** in the toolbar draws every way in full, as before; this computer remembers it, off at first.
+- **The assistant's guide says Discovery is breadth first**: it still said to finish each opened screen before the
+  next input (the order before 2026-10-16). The guide, crop_pictures' fields and try_input's description are
+  shorter, 43 484 → 40 752 characters, leaving room under `SdkToolBudgetTest`'s 43 500.
+- **A game a place can't start is greyed, with why** (`SessionBootstrap.placeRefusal`): the Runner's game choice
+  greys the games the bot's "Run the game in" can't start ("can't run in the game VM" for Lutris on Windows), and
+  Launch and pick greys each place by the game, with the reason as its tooltip. It reads the system, the installed
+  programs and the VM's launch rules, never a launcher open now; `docs/display-pipeline.md` §2 has the matrix.
+- **An emulator source looks its instance up once per two seconds**: `EmulatorSource` asks a scan at most 2 s old
+  (`Platforms.recent`) instead of running every product's tools on each capture while the emulator boots, and
+  asks afresh before it launches one.
+- "Project default" and "Whole desktop" are named once (`CaptureLabels`), and `CaptureSource`'s javadoc names its
+  fourth surface, an emulator or phone.
+- **The game dialog opens on the last list it found**: `GameCatalog.scan` saves what it lists to
+  `<cache>/games.json`, and the dialog shows it at once, then scans in the background. Only a game added, removed or
+  renamed changes the grid; every other tile stays as it was. The Runner's "not installed" reads the saved list
+  until a scan answers. A file of another version, or one that doesn't read, counts as none.
+- **"Close it and launch" closes the launcher in the way**: for a Lutris game on the Steam runner that is Steam.
+
+### Changed
+
+- **A launcher open on the desktop is closed on request, and a run never falls back to it.** ▶ Launch, Launch and
+  pick and the assistant's private launch ask "Steam is open on your desktop: close it and launch?" and close it.
+  A bot run whose settings say a private display stops with the reason when the launcher is open, the display
+  doesn't come up or the game opens no window there, instead of starting the game on the desktop.
+- **A plugged-in phone shows up.** 🎯 Capture Source, 🎮 Game and the emulator picker start the adb server as they
+  open, then list again: with no server running, a phone on a cable was simply missing. Capture Source has a
+  Phones section, each phone saying where it stands ("Allow USB debugging on the phone", offline, not connected)
+  with ＋ Connect a phone…; 🎮 Game lists a phone whose apps haven't been read yet, with what it waits on.
+- **The bot's games and the runner's pick are two parameters.** `Sdk.launchTargets` is the games the bot's author
+  supports, shown in the Parameters window only; the new `Sdk.launchTarget` (`LaunchChoice`, `SdkValue.Id.LAUNCH_TARGET`)
+  is the one the person running the bot picks in the Runner, among the author's games this computer's system can
+  start, a game this computer lacks greyed "(not installed)". A run starts the pick, else the first available. A bot
+  without `launchTarget` has it written when Studio binds the SDK.
+- **🎮 Game no longer grows the list.** A pick goes first in `launchTargets` and is held once, however it was
+  spelled; the dialog shows the bot's games as pills, each with a ✕ to remove it. Every tile carries its launcher's
+  badge, and the header, the pills and the Runner say what launches it (`Hades II · Steam game 1145350`).
+- **Capture follows an emulator or phone app.** Picking an `emu-app:` game, in 🎮 Game, an emulator block or the
+  Runner, also points `Sdk.captureSource` at its device. Any other game's window is picked once it is up.
+- **🎯 Capture Source ▸ ▶ Launch and pick…** starts the game this computer launches, on this desktop, in a private
+  display or in the game VM, lists the windows it opens and recommends the game's: new, not the launcher's own
+  (Steam, Heroic), the biggest. A pick saves the window by its class, and its title only when the class is generic.
+- **A phone is saved by its serial.** Pickers write `CaptureSource.emulator("R58M…")` and `emu-app:<pkg>@R58M…` for
+  a phone instead of its model name, which the adb server reports only once USB debugging is allowed. A bot that
+  saved the name still finds the phone; an emulator is still saved by its name.
+
+- **`SdkValues` fields are typed by shape**: `ManagedMethod<Run> RUN`, `ManagedParam<Flow> FLOW`,
+  `ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES`, `ManagedClasses<Screen> SCREEN_MAP` and so on, for contract
+  0.11.0's sealed `ManagedValue`. `ACTIVITIES` is declared with `ofEnumGroups`. A bot sees no change.
+- **The vision results are declared by their methods.** `Vision.lastMatch()`, `Matches.none()`,
+  `Vision.lastColorMatch()` and `Text.lastMatch()` carry `@Fills`, and the host draws the pill; `SdkTypes`'
+  `MATCH_RESULT`, `MATCHES`, `COLOR_MATCH`, `TEXT_MATCH` and `ResultEditors` are gone. A bot sees no change.
+- **Declarations trimmed**: `OcrOptions.defaults()` and its nine withers are one call (`SdkTypes.OCR_CHAIN`); the
+  geometry editors ask the host for their declaration (`GeometryEditors::point`); `SdkRunOverlay.PART`. The
+  precision chains stay one per wither: a chain on a constant (`Precision.TIGHT.minArea(400)`) does not end at a
+  factory call, which a wither chain needs.
+
+### Added
+
+- **The start screen, and screens that follow on their own.** `Setup.start()` marks the screen the game opens on,
+  its loading screen: it has no way in, and the map's root is it. `.after(LOADING)` (`Way.onItsOwn`) is a way in
+  with no input: Home shows by itself once loading is done, and so does the screen after a transition (Battle
+  `.after(ENTERING_BATTLE)`, Entering battle opened by Map's Fight). A walk presses nothing on such a way: it waits
+  for the next screen, up to the screen it follows' `.loads(Duration)` (60 s by default), and a screen still
+  shown then ends it stuck: "Stuck loading on Loading: Home did not show in 60 s", server or connection trouble. A
+  transition the game shows too briefly to see is passed, and a game just opened, showing nothing of the map yet,
+  is waited for as long as its start screen loads.
+  - **🗺 Screens**: New screen… offers "None: the game opens on it"; ⋯ Screen has Start screen and The next screen
+    shows within…; Ways in has ＋ After a screen, on its own…. The card says "start screen", the outline puts a
+    screen that follows another on its own next to it, and read_map says who follows whom and in how long.
+  - **edit_map**: `set_kind` `start` (a new start screen when none is called so), and `add_way` with no input, given
+    `seconds`. `remove_way` from that screen with no input takes it off.
+- **Panels.** `Setup.named("Upgrade").panelOf(HOME).from(HOME.upgrade)` says, in the code, that Upgrade is shown
+  inside Home: a screen of its own, walked as any screen Home opens, and found over Home while Home's markers still
+  show, however it is opened. Its class stays beside Home's in `Screens` (`HomeUpgrade`, `Screens.HOME_UPGRADE`).
+  ⋯ Screen ▸ A panel of Home marks it; its card, the outline and read_map say "panel of Home".
+- **🗺 Screens' outline folds, and lists the screens shot last.** ⊟ Collapse all and ⊞ Expand all shut or open every
+  line; Inputs that open a screen folds away each input tried that opened nothing (All inputs shows them again).
+  Recent, at the top, lists the 10 screens whose shot was taken last, the newest first, and moves as a shot is
+  retaken.
+- **🗺 Screens makes a strip or a tree as an input.** ＋ Strip… and ＋ Tree…, beside ＋ Hotkey…, tick the screen's
+  buttons in no strip or tree, in order, and say how it scrolls (the wheel by some notches, or a drag; a tree may
+  also fit on the screen). In the cut form, every cut marked a new strip makes one strip, in order, and every cut
+  marked a new tree one tree (before, each made its own); with several cuts, *Buttons → one new strip* and
+  *Buttons → one new tree* mark them all at once.
+
+### Changed
+
+- **The plugin's types and managed values are named by their classes**: `.types(SdkTypes.class, FlowTypes.class,
+  ScreenTypes.class, CaptureTypes.class, SettingsTypes.class)` and `.values(SdkValues.class)`. `SdkTypes.ALL`,
+  `SdkTypes.PARTS`, `SdkValues.ALL` and each part holder's `ALL` are gone; a new type, shape or value is its
+  field. The type menu keeps its order; `managedValues()` now lists `CAPTURE` where it is declared, after
+  `LAUNCH_TARGETS`. Needs the contract's next release.
+- **🗺 Screens' live feed and the `Screens.java` tab no longer freeze Studio.** The map is read once and kept until
+  the bot's code changes (a history step, a write, `Screens.java` changed on disk): a map of fifty screens took
+  300–900 ms on the FX thread, and the feed read it every second, each card at each draw.
+- **edit_map's `popup` and `start` are one action, `set_kind`**, `as` `screen`, `popup`, `start` or `panel`.
+  `screen` takes whichever mark the screen had off.
+- **🗺 Screens goes full screen, and its live game runs at about 30 frames a second.** ☰ Outline and ▤ Panel hide
+  either side, and this computer remembers which; ⛶ or F11 makes the window full screen (Esc leaves it). ● Live
+  reads the game every 33 ms, not 125, and draws each frame into the same image; the line under the board says how
+  many frames a second it draws and what a read of the game takes, "the capture is the limit" when a read takes
+  longer than a frame. ❄ Freeze still keeps the frame lossless.
+- **🗺 Screens' cuts close, move and say why.**
+  - **A free shape** closes on a click on its first corner (drawn as a ring), on ✓ Close shape, a double-click or
+    Enter. The line under the board says how.
+  - **A drawn cut** is picked by a click (on its number, for a free shape): a drag moves it, its corners resize a
+    box or an oval, and Delete or ✕ Take it off removes it.
+  - **A save says what it answered** on the board itself, red when refused. A refused cut stays drawn to fix and
+    save again, and the cuts that saved are dropped.
+  - **The cut form and New screen** open again with the reason at the top instead of closing silently.
+- **🗺 Screens' ❄ Freeze names a new screen first.** A frame that shows no screen of the map offers New screen…
+  first; once it is written, the frame is that screen's and cutting starts on it, its marker first, so the cut form
+  offers it. New screen from here… on a known screen does the same.
+
+### Fixed
+
+- **🎮 Game shows the game just picked.** The dialog remembered the pick before writing it, so the toolbar
+  relabelled from the old first launcher; it remembers after the write now, and a refused pick is not remembered.
+
 ## [1.6.0] — 2026-10-23
 
 ### Added
