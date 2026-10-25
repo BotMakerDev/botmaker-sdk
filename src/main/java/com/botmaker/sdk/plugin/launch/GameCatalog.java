@@ -60,7 +60,58 @@ public final class GameCatalog {
     private static final Object LISTED = new Object();
     private static final AtomicBoolean SCANNING = new AtomicBoolean();
 
+    /**
+     * What each game the last scan or the saved list named is called, by its spec as {@link #key} writes it: a
+     * launch choice reads its game's name here, never its raw id ({@code heroic:43d4ef20…}, 2026-10-25).
+     */
+    private static volatile Map<String, String> names = Map.of();
+
     private GameCatalog() {}
+
+    /** What {@code spec}'s game is called, as a scan or the saved list found it; reads a field only. */
+    public static Optional<String> nameOf(String spec) {
+        return spec == null ? Optional.empty() : Optional.ofNullable(names.get(key(spec)));
+    }
+
+    /** {@code spec} whatever its spacing, so two spellings of one launcher name one game. */
+    private static String key(String spec) {
+        LaunchSpec parsed = LaunchSpec.parse(spec);
+        return parsed == null ? spec.trim() : parsed.spec();
+    }
+
+    /**
+     * Reads the saved list's names once, before the toolbar's label is first asked, so {@link #nameOf} answers before
+     * any scan; a name a scan found is kept over the file's. Blocking (one small file); never throws.
+     */
+    public static void loadNames() {
+        if (!names.isEmpty()) return;
+        // On the class's lock, as remember(): a scan landing meanwhile is neither lost nor overwritten.
+        load(savedFile()).ifPresent(s -> {
+            synchronized (GameCatalog.class) {
+                Map<String, String> known = new HashMap<>();
+                addNames(known, s.shown());
+                known.putAll(names);
+                names = Map.copyOf(known);
+            }
+        });
+    }
+
+    /** Adds the names in {@code sections} to {@link #names}, a later one over an earlier one of the same game. */
+    static synchronized void remember(List<Section> sections) {
+        Map<String, String> known = new HashMap<>(names);
+        addNames(known, sections);
+        names = Map.copyOf(known);
+    }
+
+    private static void addNames(Map<String, String> known, List<Section> sections) {
+        for (Section section : sections) {
+            for (Item item : section.items()) {
+                if (item.spec() != null && item.name() != null && !item.name().isBlank()) {
+                    known.put(key(item.spec()), item.name());
+                }
+            }
+        }
+    }
 
     /** What a section holds, which decides where it goes and what the dialog adds to it. */
     public enum Kind {
@@ -151,6 +202,7 @@ public final class GameCatalog {
         synchronized (LISTED) {
             listed = found;
         }
+        remember(everything);
         save(savedFile(), shown, found);
         return shown;
     }
@@ -166,6 +218,7 @@ public final class GameCatalog {
             synchronized (LISTED) {
                 if (listed == null) listed = snapshot.listed();
             }
+            remember(snapshot.shown());
             return snapshot.shown();
         });
     }

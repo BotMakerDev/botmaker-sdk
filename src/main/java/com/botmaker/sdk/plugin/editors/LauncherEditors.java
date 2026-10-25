@@ -30,6 +30,7 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -177,6 +178,8 @@ public final class LauncherEditors {
      */
     private static Button launchButton(StudioServices services, String launcher) {
         Button launch = Styles.on(new Button("▶ Launch"), Styles.PILL);
+        // Whole beside a long pill, which gives way instead (2026-10-25: the Run window showed "...").
+        launch.setMinWidth(Region.USE_PREF_SIZE);
         LaunchSpec spec = launcher == null || services == null ? null : LaunchSpec.parse(launcher);
         Os os = Os.current();
         if (spec != null && !spec.runsOn(os)) {

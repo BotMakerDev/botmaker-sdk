@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- **A launch choice names its game** (2026-10-25): the toolbar's 🎮 and the Run window's *First available here*
+  say the game's name from the last game scan, not its id (`heroic:43d4ef20…`), and ▶ Launch beside a long choice
+  is no longer cut to "...".
+
 ## [1.7.0] — 2026-10-25
 
 ### Added

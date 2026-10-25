@@ -26,6 +26,9 @@ public final class GameButton {
     /** The project {@code bound} is open now. */
     public static void bind(StudioServices bound) {
         services = bound;
+        // The games' names from the last scan, read before the label is, so the button names a game the dialog
+        // never picked (2026-10-25).
+        GameCatalog.loadNames();
     }
 
     /** No project is open. */
@@ -59,9 +62,13 @@ public final class GameButton {
         return name.equals(describe) || describe.contains(name) ? describe : name + " · " + describe;
     }
 
-    /** What {@code spec} is called: the name it was picked under, else the spec's short label. */
+    /**
+     * What {@code spec} is called: the name it was picked under, else the name the last game scan found for it, else
+     * the spec's short label.
+     */
     public static String nameOf(StudioServices services, String spec) {
         return RecentTargets.find(services, spec).map(RecentTargets.Recent::name)
+                .or(() -> GameCatalog.nameOf(spec))
                 .orElseGet(() -> LaunchSpec.shortLabel(spec, null));
     }
 }

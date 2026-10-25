@@ -216,6 +216,15 @@ class GameCatalogTest {
                 "Dota 2 stays; TF2 renamed and Hades removed are remade; Counter-Strike 2 is simply new");
     }
 
+    /** A launch choice names its game, never its raw id (2026-10-25: "🎮 43d4ef20fcb94eb39a864d13164fe3ca"). */
+    @Test
+    void aScannedGameIsKnownByNameWhateverTheSpecsSpacing() {
+        GameCatalog.remember(List.of(new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Heroic", false,
+                List.of(new GameCatalog.Item("heroic:43d4ef20fcb94eb39a864d13164fe3ca", "Firestone", null)))));
+        assertEquals(Optional.of("Firestone"), GameCatalog.nameOf("heroic: 43d4ef20fcb94eb39a864d13164fe3ca"));
+        assertEquals(Optional.empty(), GameCatalog.nameOf("steam:1"));
+    }
+
     private static List<String> specs(GameCatalog.Section section) {
         return section.items().stream().map(GameCatalog.Item::spec).toList();
     }
