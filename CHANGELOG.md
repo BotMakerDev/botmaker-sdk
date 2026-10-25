@@ -19,9 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-No source changes since v1.6.0; re-released for updated upstream pins.
-
 ### Added
+
+- **The Run window says whether the game is ready** (`plugin.launch.GameReady`, the plugin's `Readiness`): "Ready
+  — game window found" when the bot's capture window is open, else what the game's launcher says: ready to
+  start with the bot, an update pending or running, signed out, or not installed.
 
 - **CI's plugin gate is named for the catalog** ("Plugin gate (the checks the catalog runs)"): the plugin registry
   became `botmaker-catalog`. Nothing changes for a bot.
