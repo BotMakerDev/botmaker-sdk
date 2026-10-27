@@ -10,7 +10,13 @@
          docs/refactor/43-real-versions.md). -->
     <version>1.7.2-SNAPSHOT</version>
 
+    <!-- What Studio shows for this plugin: a plugin's name is its pom's <name> (2026-10-27). -->
+    <name>BotMaker SDK</name>
+
     <properties>
+        <!-- The plugin class this jar is: the host reads it off the pom Maven copies into the jar, and this
+             pom's groupId:artifactId is the plugin's identity. Literal, and kept by flatten below. -->
+        <botmaker.plugin>com.botmaker.sdk.plugin.SdkPlugin</botmaker.plugin>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Stamped into the jar manifest (Build-Time) so a bot/editor can tell which SDK build it loaded;
@@ -513,7 +519,10 @@
                  by a consumer here — this module has no profiles; do not copy this to botmaker-shared,
                  whose OS-activated native profiles a consumer DOES need). It also strips repositories,
                  hence the explicit keep: the jitpack.io repo declared above is how a consumer reaches the
-                 transitive shared/session at all. The clean execution removes the generated file. -->
+                 transitive shared/session at all. The clean execution removes the generated file.
+
+                 It strips properties too, hence their keep: the jar's own META-INF/maven pom is this
+                 flattened one, and botmaker.plugin there is how a host knows the jar is a plugin. -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>flatten-maven-plugin</artifactId>
@@ -527,6 +536,7 @@
                     <flattenMode>oss</flattenMode>
                     <pomElements>
                         <repositories>keep</repositories>
+                        <properties>keep</properties>
                     </pomElements>
                 </configuration>
                 <executions>

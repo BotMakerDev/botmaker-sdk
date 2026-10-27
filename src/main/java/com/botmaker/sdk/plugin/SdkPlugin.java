@@ -45,12 +45,6 @@ import java.util.List;
  */
 public final class SdkPlugin extends DeclaredPlugin {
 
-    /** The stable identifier the host files this plugin's contributions under. */
-    public static final String ID = "com.botmaker.sdk";
-
-    /** What Studio shows in Manage Plugins. */
-    public static final String NAME = "BotMaker SDK";
-
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
      * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @SdkValue} values its windows keep
@@ -64,16 +58,15 @@ public final class SdkPlugin extends DeclaredPlugin {
      * that touched a JavaFX type fails there with:
      *
      * <pre>
-     * ServiceConfigurationError: Provider com.botmaker.sdk.plugin.SdkPlugin could not be instantiated
-     *   Caused by: NoClassDefFoundError: javafx/scene/Node
+     * NoClassDefFoundError: javafx/scene/Node
      * </pre>
      *
-     * <p>{@code PluginLoader} catches that, so the symptom is an empty palette and one line on stderr. It never
+     * <p>{@code PluginLoader} catches that, so the symptom is an empty palette and one refusal. It never
      * shows locally, because an {@code optional} dependency <em>is</em> on this module's own classpath
      * ({@code SdkPluginHeadlessTest}).
      */
     public SdkPlugin() {
-        super(StudioPlugin.id(ID).named(NAME)
+        super(StudioPlugin.declare()
                 .types(SdkTypes.class, FlowTypes.class, ScreenTypes.class, CaptureTypes.class, SettingsTypes.class)
                 .editors(() -> SdkEditors.ALL)
                 .values(SdkValues.class)

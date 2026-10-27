@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Changed
+
+- The SDK says it is a Studio plugin in its pom (`botmaker.plugin`, kept in the published pom), not in a
+  `META-INF/services` file; Studio knows it by its coordinate and shows the pom's name, *BotMaker SDK*.
+  `SdkPlugin.ID` and `SdkPlugin.NAME` are gone. Needs a Studio on contract 0.13.
+
 ## [1.7.1] — 2026-10-25
 
 ### Fixed

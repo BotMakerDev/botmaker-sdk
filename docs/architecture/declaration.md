@@ -1,8 +1,10 @@
 # Declaration
 
 - **`SdkPlugin` is one declaration** on the contract's `DeclaredPlugin`:
-  `StudioPlugin.id(ID).named(NAME).types(SdkTypes.class, FlowTypes.class, …).editors(…).values(SdkValues.class)
-  .toolbar(…).runOverlay(…).overlay(…).assistant(…).trial(Bot::trial).recorded(…)`. Types and values are named
+  `StudioPlugin.declare().types(SdkTypes.class, FlowTypes.class, …).editors(…).values(SdkValues.class)
+  .toolbar(…).runOverlay(…).overlay(…).assistant(…).trial(Bot::trial).readiness(…)`. It names no id and no
+  name: the pom's `botmaker.plugin` property names the class, its coordinate is the plugin's id and its
+  `<name>` (*BotMaker SDK*) what Studio shows (2026-10-27). Types and values are named
   by their holder classes, the rest are suppliers, so constructing it links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and `javafx-controls`, the toolkit,
   Javalin and ZXing are `optional` here). It adds only `projectClosing()`, which releases the Remote Pilot.
 - **The overlay editor's part is `plugin/overlay/SdkOverlay`.**

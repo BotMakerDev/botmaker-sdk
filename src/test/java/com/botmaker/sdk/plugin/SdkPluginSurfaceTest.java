@@ -35,7 +35,10 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -126,11 +129,15 @@ class SdkPluginSurfaceTest {
 
     private final SdkPlugin plugin = new SdkPlugin();
 
+    /** The host knows the plugin by its pom: the property names this class, the coordinate is its id. */
     @Test
-    void the_plugin_identifies_itself_by_the_id_a_registry_entry_would_claim() {
-        assertEquals("com.botmaker.sdk", plugin.id());
-        assertEquals(SdkPlugin.ID, plugin.id());
-        assertFalse(plugin.displayName().isBlank());
+    void the_pom_names_this_plugin_and_the_name_studio_shows() throws IOException {
+        String pom = Files.readString(Path.of("pom.xml"));
+        assertTrue(pom.contains("<botmaker.plugin>" + SdkPlugin.class.getName() + "</botmaker.plugin>"),
+                "pom.xml's botmaker.plugin must name " + SdkPlugin.class.getName());
+        assertTrue(pom.contains("<name>BotMaker SDK</name>"), "pom.xml's <name> is what Studio shows");
+        assertTrue(pom.contains("<properties>keep</properties>"),
+                "flatten must keep properties, or the jar's pom loses botmaker.plugin");
     }
 
     /**
