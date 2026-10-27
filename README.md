@@ -64,12 +64,15 @@ public static Activities.Collect body() {           // one activity: do one unit
 
 A bot's facts are Java in its own project:
 
+The SDK's files are in the bot's `plugins/com_github_botmakerdev/botmaker_sdk/` (its coordinate; `plugins/sdk/`
+before 2026-10-27, still found):
+
 - **activities** are `public static` methods, each returning a constant of its own enum in
-  `plugins/sdk/Activities.java` — a body cannot report another activity's outcome;
-- **the flow, capture source and settings** are `@SdkValue` methods in `plugins/sdk/Sdk.java`, each
+  `Activities.java` — a body cannot report another activity's outcome;
+- **the flow, capture source and settings** are `@SdkValue` methods in `Sdk.java`, each
   `public static T id() { return <expr>; }`; the plugin hands Studio a value and Studio rewrites only that
   expression, so comments and helpers around it survive;
-- **pictures** are constants in `plugins/sdk/Pictures.java`, one per file under `src/main/resources/images`;
+- **pictures** are constants in `Pictures.java`, one per file under `src/main/resources/images`;
 - **parameters** are `@Param` static fields (the annotation is the plugin contract's, which the SDK brings).
   The run's own three — `flow`, `doSetup`, `skip` in `Sdk.java` — also carry `@SdkValue(…)`: the SDK declared
   them, so Studio writes one back if it goes missing and lets the runner change only its value.
