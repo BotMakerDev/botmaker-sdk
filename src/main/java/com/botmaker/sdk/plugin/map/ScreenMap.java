@@ -42,12 +42,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -684,15 +682,11 @@ public final class ScreenMap {
     }
 
     private void savePng() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save the screen map");
-        chooser.setInitialFileName("screen-map.png");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG picture", "*.png"));
-        File file = chooser.showSaveDialog(window);
-        if (file == null) return;
+        Optional<Path> file = services.dialogs().saveFile("Save the screen map", null, "screen-map.png", "png").path();
+        if (file.isEmpty()) return;
         try {
-            canvas.graph().savePng(file.toPath());
-            said.setText("Saved " + file.getName() + ".");
+            canvas.graph().savePng(file.get());
+            said.setText("Saved " + file.get().getFileName() + ".");
         } catch (IOException failed) {
             said.setText("Not saved: " + Objects.requireNonNullElse(failed.getMessage(), failed.toString()));
         }

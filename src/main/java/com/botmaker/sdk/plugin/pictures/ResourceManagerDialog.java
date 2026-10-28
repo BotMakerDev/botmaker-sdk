@@ -24,7 +24,6 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -509,16 +508,13 @@ public final class ResourceManagerDialog {
     /** Replaces a template's picture with an image file from disk. */
     private void replaceFromFile(Path file) {
         if (file == null) return;
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Replace " + TemplateLibrary.baseName(file));
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif"));
-        java.io.File picked = chooser.showOpenDialog(stage);
-        if (picked == null) return;
+        Optional<Path> picked = services.dialogs().chooseFile("Replace " + TemplateLibrary.baseName(file), null,
+                "png", "jpg", "jpeg", "bmp", "gif").path();
+        if (picked.isEmpty()) return;
         try {
-            BufferedImage img = ImageIO.read(picked);
+            BufferedImage img = ImageIO.read(picked.get().toFile());
             if (img == null) {
-                statusLabel.setText("Couldn't read " + picked.getName() + " as an image.");
+                statusLabel.setText("Couldn't read " + picked.get().getFileName() + " as an image.");
                 return;
             }
             // Unknown frame: the file came from outside, so its constant is written plain.
@@ -692,30 +688,22 @@ public final class ResourceManagerDialog {
             statusLabel.setText("There are no templates to export.");
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Export templates");
-        chooser.setInitialFileName(projectName() + TemplateArchive.EXTENSION);
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("BotMaker templates", "*" + TemplateArchive.EXTENSION));
-        java.io.File target = chooser.showSaveDialog(stage);
-        if (target == null) return;
+        Optional<Path> target = services.dialogs().saveFile("Export templates", null,
+                projectName() + TemplateArchive.EXTENSION, TemplateArchive.EXTENSION).path();
+        if (target.isEmpty()) return;
         try {
-            TemplateArchive.export(files, target.toPath());
-            statusLabel.setText("Exported " + files.size() + " template(s) to " + target.getName());
+            TemplateArchive.export(files, target.get());
+            statusLabel.setText("Exported " + files.size() + " template(s) to " + target.get().getFileName());
         } catch (IOException e) {
             statusLabel.setText("Failed to export: " + e.getMessage());
         }
     }
 
     private void importArchive() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Import templates");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("BotMaker templates", "*" + TemplateArchive.EXTENSION));
-        java.io.File source = chooser.showOpenDialog(stage);
-        if (source == null) return;
+        Optional<Path> source = services.dialogs().chooseFile("Import templates", null, TemplateArchive.EXTENSION).path();
+        if (source.isEmpty()) return;
         try {
-            TemplateArchive.ImportResult result = TemplateArchive.importInto(resources(), source.toPath());
+            TemplateArchive.ImportResult result = TemplateArchive.importInto(resources(), source.get());
             for (String name : result.imported()) TemplateUses.declare(values(), name).ifPresent(services::status);
             reload();
             gallery.reveal(result.imported().stream()

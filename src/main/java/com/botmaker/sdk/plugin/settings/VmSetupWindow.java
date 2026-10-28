@@ -35,12 +35,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -246,14 +244,10 @@ final class VmSetupWindow {
         page.setOnAction(e -> browse(VmSetup.WINDOWS_DOWNLOAD_PAGE));
         Button choose = new Button("Choose the .iso…");
         choose.setOnAction(e -> {
-            FileChooser chooser = new FileChooser();
-            chooser.setTitle("The Windows 11 disc image");
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Disc images", "*.iso"));
-            File picked = chooser.showOpenDialog(stage);
-            if (picked != null) {
-                iso = picked.toPath();
+            services.dialogs().chooseFile("The Windows 11 disc image", null, "iso").path().ifPresent(picked -> {
+                iso = picked;
                 isoPath.setText(iso.toString());
-            }
+            });
         });
         Label how = note("On Microsoft's page, under \"Download Windows 11 Disk Image (ISO)\", pick Windows 11 and "
                 + "your language, and download the 64-bit file (about 7 GB). Then choose it here.");

@@ -24,6 +24,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The flow canvas's cards, ports and arrows have accessible names (`card Start`, `port Start DONE`, `arrow Start
   DONE → Idle`), which screen readers and Studio's `ui` driver read.
 
+### Changed
+
+- The Screen map's *Save*, the Picture manager's *Replace*, *Export* and *Import*, and the VM setup's *Choose the
+  .iso…* ask Studio for their file chooser (`Dialogs`), so Studio's `ui choose` can answer them. *Save* and
+  *Export* use `Dialogs.saveFile`, so this SDK needs a Studio whose contract has it; an older Studio refuses
+  to load it and says to update Studio.
+
 ## [1.8.0] — 2026-10-28
 
 ### Added
