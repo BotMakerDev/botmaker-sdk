@@ -6,7 +6,6 @@ import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedOpenSet;
 import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
-import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
@@ -295,32 +294,31 @@ class SdkPluginSurfaceTest {
     // second by fresh() or freshCall(). The two tests above are what it became.
 
     /**
-     * The nine buttons, their sections and their order within them. ⚙ Bot Settings joined on 2026-09-27, when
-     * the settings became this plugin's managed value.
+     * The nine bar buttons in their one flat order, then the overlay's two. ⚙ Bot Settings joined on 2026-09-27,
+     * when the settings became this plugin's managed value; the groups went on 2026-10-28, when each plugin got
+     * a tab of its own on the bar.
      *
-     * <p>The order values are asserted rather than only the sequence, because a bar assembled from two
-     * plugins interleaves by order and ties break on the plugin id — so a wrong number here moves a button
-     * on a bar this test cannot see. {@code activity-flow} takes {@link ToolbarGroup#AUTHORING} at 10, which
-     * is the slot Studio's own 🔀 Flow button vacated when the graph editor moved here on 2026-09-11; 🗺 Screens
-     * ({@code screen-map}) follows it at 20 (2026-10-14).
+     * <p>The order values are asserted rather than only the sequence, because the host sorts on them, not on
+     * declaration order — so a wrong number here moves a button on a bar this test cannot see.
      *
-     * <p>The last two are {@link ToolbarGroup#OVERLAY}: they are drawn on the overlay editor's own row rather
-     * than on the main bar, and their subject is the window the HUD is drawn over.     */
+     * <p>The last two are {@link ToolbarItem.Place#OVERLAY}: they are drawn on the overlay editor's Actions row
+     * rather than on the main bar, and their subject is the window the HUD is drawn over.
+     */
     @Test
-    void the_toolbar_contributes_eleven_items_in_their_groups_and_orders() {
+    void the_toolbar_contributes_eleven_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("pilot", "capture-templates", "manage-templates",
-                        "activity-flow", "screen-map", "capture-source", "bot-settings", "game", "project-setup",
+        assertEquals(List.of("game", "project-setup", "capture-source", "bot-settings", "activity-flow",
+                        "screen-map", "manage-templates", "capture-templates", "pilot",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
-        assertEquals(List.of(ToolbarGroup.RUN, ToolbarGroup.TOOLS, ToolbarGroup.TOOLS,
-                        ToolbarGroup.AUTHORING, ToolbarGroup.AUTHORING, ToolbarGroup.PROJECT, ToolbarGroup.PROJECT,
-                        ToolbarGroup.PROJECT, ToolbarGroup.PROJECT, ToolbarGroup.OVERLAY, ToolbarGroup.OVERLAY),
-                items.stream().map(ToolbarItem::group).toList());
+        ToolbarItem.Place bar = ToolbarItem.Place.BAR;
+        ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
+                items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 10, 20, 50, 60, 30, 40, 10, 20),
+        assertEquals(List.of(10, 20, 30, 40, 50, 60, 70, 80, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {
@@ -333,12 +331,6 @@ class SdkPluginSurfaceTest {
             assertNotNull(item.onClick(), item::id);
             assertNotNull(item.enabledWhen(), item::id);
         }
-    }
-
-    /** {@link ToolbarGroup#STUDIO} is the host's own section and an item in it is refused by name. */
-    @Test
-    void no_toolbar_item_claims_the_hosts_own_section() {
-        assertTrue(plugin.toolbarItems().stream().noneMatch(i -> i.group() == ToolbarGroup.STUDIO));
     }
 
     /**

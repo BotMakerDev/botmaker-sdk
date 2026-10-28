@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin;
 
-import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
@@ -33,7 +32,7 @@ class SdkOverlayItemsTest {
     void the_overlay_row_reads_point_then_picture() {
         // Declaration order is not the bar's reading order — the host sorts on the order field.
         List<String> ids = new SdkPlugin().toolbarItems().stream()
-                .filter(item -> item.group() == ToolbarGroup.OVERLAY)
+                .filter(item -> item.place() == ToolbarItem.Place.OVERLAY)
                 .sorted((a, b) -> Integer.compare(a.order(), b.order()))
                 .map(ToolbarItem::id)
                 .toList();

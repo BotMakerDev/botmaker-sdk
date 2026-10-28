@@ -40,4 +40,5 @@
 - **Toolbar buttons are `SdkToolbarItems`**: one `ToolbarItem.id(…)` constant per button, each pressing its
   feature's own `open(ActionContext)` (`RemotePilotUi.open`, `CaptureTemplates.open`, `SourcePicker.choose`,
   `CaptureValue.pointHere`, …). Nothing holds a project in a static: a feature takes `StudioServices` from
-  the context it is handed.
+  the context it is handed. The bar's nine read in one flat order (`onBar(10)` to `onBar(90)`, 2026-10-28, when
+  toolbar groups went: Studio gives the plugin a tab of its own); the overlay's two are `inOverlay`.

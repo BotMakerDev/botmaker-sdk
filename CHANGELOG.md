@@ -26,6 +26,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `ValueHolder`, `SdkEditors`, `SdkToolbarItems`, `SdkRunOverlay` and `SdkOverlay` their surfaces' holders, and the
   assistant's tools `SdkAssistant`. What it did on opening and closing a project are the `onProjectOpened` and
   `onProjectClosing` steps. `SdkPluginSurfaceTest` holds every holder to listing every field.
+- **The toolbar buttons read in one order** (contract 0.13.0, toolbar groups gone): the game, 📋 Project Setup,
+  🎯 Capture Source, ⚙ Bot Settings, 🔀 Activity Flow, 🗺 Screens, 🖼 Manage Pictures, ✂ Capture Templates and
+  🎮 Pilot, on the SDK's own tab of Studio's bar. ⌖ Point bot here and ✂ Picture of this stay in the overlay
+  editor's Actions row.
 - The plugin half's warnings (the Remote Pilot, capture, the picture library) go to the open project's plugin
   log, `StudioServices.log()`, through `SdkLog`, instead of standard error.
 - The jar carries this changelog as `META-INF/botmaker/changelog.md` (was `whats-new.md`), where Studio reads every

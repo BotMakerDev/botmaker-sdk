@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
-import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.launch.GameButton;
@@ -19,8 +18,13 @@ import com.botmaker.sdk.plugin.source.SourcePicker;
 import java.util.List;
 
 /**
- * The SDK's toolbar buttons. The host keeps the bar itself — the grouping, the order, the packing and the
- * overflow — which is why an item is contributed as data rather than as a {@code Node}.
+ * The SDK's toolbar buttons. The host keeps the bar itself — the plugin's tab, the packing and the overflow —
+ * which is why an item is contributed as data rather than as a {@code Node}.
+ *
+ * <p>The bar items read in one flat order (2026-10-28, when toolbar groups went): what the bot plays, what it
+ * still needs, where it looks and how it clicks, then what it does (the flow and its screens), the pictures it
+ * looks for, and last the phone that watches it run. The order values are steps of ten so a button can be put
+ * between two without renumbering.
  *
  * <p>Each press names the {@code open(ActionContext)} of the feature it opens, behind the extra arrow
  * {@link com.botmaker.plugin.api.toolbar.Pressed} asks for: building this list must link no JavaFX, because a
@@ -31,102 +35,97 @@ import java.util.List;
  */
 public final class SdkToolbarItems implements ToolbarHolder {
 
-    public static final String PILOT_ID = "pilot";
-    public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
-    public static final String MANAGE_PICTURES_ID = "manage-templates";
-    public static final String ACTIVITY_FLOW_ID = "activity-flow";
-    public static final String SCREEN_MAP_ID = "screen-map";
+    public static final String GAME_ID = "game";
+    public static final String PROJECT_SETUP_ID = "project-setup";
     public static final String CAPTURE_SOURCE_ID = "capture-source";
     public static final String BOT_SETTINGS_ID = "bot-settings";
-    public static final String PROJECT_SETUP_ID = "project-setup";
-    public static final String GAME_ID = "game";
+    public static final String ACTIVITY_FLOW_ID = "activity-flow";
+    public static final String SCREEN_MAP_ID = "screen-map";
+    public static final String MANAGE_PICTURES_ID = "manage-templates";
+    public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
+    public static final String PILOT_ID = "pilot";
     public static final String POINT_HERE_ID = "point-here";
     public static final String PICTURE_HERE_ID = "picture-here";
 
-    /** Streams what the bot sees to a phone; the pilot is kept per project, see {@link RemotePilotUi#open}. */
-    public static final ToolbarItem PILOT = ToolbarItem.id(PILOT_ID).label("🎮 Pilot")
-            .tooltip("Stream what the bot sees to your phone or browser — watch it, start/stop it, "
-                    + "or turn on Interact to click and drag in the game yourself")
-            .in(ToolbarGroup.RUN, 10)
-            .onPress(() -> RemotePilotUi::open);
-
     /**
-     * In {@link ToolbarGroup#TOOLS}, whose own definition names a template cutter: it is opened <em>over</em> a
-     * running target rather than beside the code.
+     * First: you pick what the bot plays, then where it looks — and a game's window can only be picked as a
+     * capture source once the game is up. Says the current game's name and shows its cover ({@link GameButton}).
      */
-    public static final ToolbarItem CAPTURE_TEMPLATES = ToolbarItem.id(CAPTURE_TEMPLATES_ID)
-            .label("✂ Capture Templates")
-            .tooltip("Draw regions over the game and save them as pictures the bot can look for — "
-                    + "one at a time, several in a pass, or an object cut out of its background")
-            .in(ToolbarGroup.TOOLS, 20)
-            .onPress(() -> CaptureTemplates::open);
+    public static final ToolbarItem GAME = ToolbarItem.id(GAME_ID).label(GameButton::label)
+            .tooltip("Which game this bot plays on this computer — pick it from Steam, Heroic, Faugus, Lutris, "
+                    + "Waydroid or the app menu, and start it without running the bot")
+            .onBar(10)
+            .enabledWhen(EnabledWhen.PROJECT_OPEN)
+            .icon(GameButton::icon)
+            .onPress(() -> GameDialog::open);
 
-    public static final ToolbarItem MANAGE_PICTURES = ToolbarItem.id(MANAGE_PICTURES_ID).label("🖼 Manage Pictures")
-            .tooltip("Rename, retag, replace, delete, import and export the pictures the bot looks for — "
-                    + "a rename carries every block that uses it")
-            .in(ToolbarGroup.TOOLS, 30)
-            .onPress(() -> ResourceManagerDialog::open);
-
-    /** {@link ToolbarGroup#AUTHORING} at 10. */
-    public static final ToolbarItem ACTIVITY_FLOW = ToolbarItem.id(ACTIVITY_FLOW_ID).label("🔀 Activity Flow")
-            .tooltip("Define what this bot does, one card per activity, and wire each outcome to what "
-                    + "runs next — the graph, its loop safety, and which activities are on")
-            .in(ToolbarGroup.AUTHORING, 10)
-            .onPress(() -> ActivityFlowDialog::open);
-
-    /** {@link ToolbarGroup#AUTHORING} at 20, after the flow: the screens the activities are done on. */
-    public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
-            .tooltip("The game's screens as the bot knows them — how each was reached, its inputs and what they "
-                    + "did; try, cut and go to one, and see where a run is")
-            .in(ToolbarGroup.AUTHORING, 20)
-            .onPress(() -> ScreenMap::open);
+    /** Immediately before Capture Source, because it is the window that sends a user to that one. */
+    public static final ToolbarItem PROJECT_SETUP = ToolbarItem.id(PROJECT_SETUP_ID).label("📋 Project Setup")
+            .tooltip("What this project still needs before it can run — something to launch, something "
+                    + "to capture, and the pictures it looks for")
+            .onBar(20)
+            .onPress(() -> ProjectSetup::open);
 
     public static final ToolbarItem CAPTURE_SOURCE = ToolbarItem.id(CAPTURE_SOURCE_ID).label("🎯 Capture Source")
             .tooltip("Choose what the bot looks at — a monitor, an application window or an emulator instance")
-            .in(ToolbarGroup.PROJECT, 50)
+            .onBar(30)
             .onPress(() -> SourcePicker::choose);
 
     public static final ToolbarItem BOT_SETTINGS = ToolbarItem.id(BOT_SETTINGS_ID).label("⚙ Bot Settings")
             .tooltip("How the bot clicks and looks — delays, match confidence, real input for games, and "
                     + "whether it runs on a private display")
-            .in(ToolbarGroup.PROJECT, 60)
+            .onBar(40)
             .onPress(() -> BotSettingsWindow::open);
 
-    /**
-     * At 30, first in the project group: you pick what the bot plays, then where it looks — and a game's window
-     * can only be picked as a capture source once the game is up. Says the current game's name and shows its
-     * cover ({@link GameButton}).
-     */
-    public static final ToolbarItem GAME = ToolbarItem.id(GAME_ID).label(GameButton::label)
-            .tooltip("Which game this bot plays on this computer — pick it from Steam, Heroic, Faugus, Lutris, "
-                    + "Waydroid or the app menu, and start it without running the bot")
-            .in(ToolbarGroup.PROJECT, 30)
-            .enabledWhen(EnabledWhen.PROJECT_OPEN)
-            .icon(GameButton::icon)
-            .onPress(() -> GameDialog::open);
+    public static final ToolbarItem ACTIVITY_FLOW = ToolbarItem.id(ACTIVITY_FLOW_ID).label("🔀 Activity Flow")
+            .tooltip("Define what this bot does, one card per activity, and wire each outcome to what "
+                    + "runs next — the graph, its loop safety, and which activities are on")
+            .onBar(50)
+            .onPress(() -> ActivityFlowDialog::open);
 
-    /** At 40, immediately before Capture Source, because it is the window that sends a user to that one. */
-    public static final ToolbarItem PROJECT_SETUP = ToolbarItem.id(PROJECT_SETUP_ID).label("📋 Project Setup")
-            .tooltip("What this project still needs before it can run — something to launch, something "
-                    + "to capture, and the pictures it looks for")
-            .in(ToolbarGroup.PROJECT, 40)
-            .onPress(() -> ProjectSetup::open);
+    /** After the flow: the screens the activities are done on. */
+    public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
+            .tooltip("The game's screens as the bot knows them — how each was reached, its inputs and what they "
+                    + "did; try, cut and go to one, and see where a run is")
+            .onBar(60)
+            .onPress(() -> ScreenMap::open);
 
-    /** Drawn on the overlay editor's own row; its subject is the window the HUD is drawn over. */
+    public static final ToolbarItem MANAGE_PICTURES = ToolbarItem.id(MANAGE_PICTURES_ID).label("🖼 Manage Pictures")
+            .tooltip("Rename, retag, replace, delete, import and export the pictures the bot looks for — "
+                    + "a rename carries every block that uses it")
+            .onBar(70)
+            .onPress(() -> ResourceManagerDialog::open);
+
+    /** Opened <em>over</em> a running target rather than beside the code. */
+    public static final ToolbarItem CAPTURE_TEMPLATES = ToolbarItem.id(CAPTURE_TEMPLATES_ID)
+            .label("✂ Capture Templates")
+            .tooltip("Draw regions over the game and save them as pictures the bot can look for — "
+                    + "one at a time, several in a pass, or an object cut out of its background")
+            .onBar(80)
+            .onPress(() -> CaptureTemplates::open);
+
+    /** Streams what the bot sees to a phone; the pilot is kept per project, see {@link RemotePilotUi#open}. */
+    public static final ToolbarItem PILOT = ToolbarItem.id(PILOT_ID).label("🎮 Pilot")
+            .tooltip("Stream what the bot sees to your phone or browser — watch it, start/stop it, "
+                    + "or turn on Interact to click and drag in the game yourself")
+            .onBar(90)
+            .onPress(() -> RemotePilotUi::open);
+
+    /** Drawn on the overlay editor's Actions row; its subject is the window the HUD is drawn over. */
     public static final ToolbarItem POINT_HERE = ToolbarItem.id(POINT_HERE_ID).label("⌖ Point bot here")
             .tooltip("Make the window the overlay is drawn over this project's capture source")
-            .in(ToolbarGroup.OVERLAY, 10)
+            .inOverlay(10)
             .onPress(() -> CaptureValue::pointHere);
 
     public static final ToolbarItem PICTURE_HERE = ToolbarItem.id(PICTURE_HERE_ID).label("✂ Picture of this")
             .tooltip("Cut a picture out of the window the overlay is drawn over, whatever the project's "
                     + "capture target is")
-            .in(ToolbarGroup.OVERLAY, 20)
+            .inOverlay(20)
             .onPress(() -> CaptureTemplates::pictureHere);
 
-    /** Every item, in declaration order; the host sorts on each item's group and order. */
-    public static final List<ToolbarItem> ALL = List.of(PILOT, CAPTURE_TEMPLATES, MANAGE_PICTURES, ACTIVITY_FLOW,
-            SCREEN_MAP, CAPTURE_SOURCE, BOT_SETTINGS, GAME, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
+    /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
+    public static final List<ToolbarItem> ALL = List.of(GAME, PROJECT_SETUP, CAPTURE_SOURCE, BOT_SETTINGS,
+            ACTIVITY_FLOW, SCREEN_MAP, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 
