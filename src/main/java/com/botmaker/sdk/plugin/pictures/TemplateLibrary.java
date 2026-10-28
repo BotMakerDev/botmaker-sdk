@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.flow.FlowValue;
 
 import javax.imageio.ImageIO;
@@ -173,7 +174,7 @@ public final class TemplateLibrary {
                     .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .toList();
         } catch (IOException e) {
-            System.err.println("Failed to list image templates: " + e.getMessage());
+            SdkLog.warn("Failed to list image templates: " + e.getMessage());
             return List.of();
         }
     }

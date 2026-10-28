@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
@@ -50,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * for itself out of shared and session.
  *
  * <p><b>Closeable, and it must be closed.</b> One is built per project the pilot is opened in, and the
- * plugin closes it from {@code projectClosing()}. Nothing used to release either resource, so switching
+ * plugin closes it when the project closes ({@code onProjectClosing}). Nothing used to release either resource, so switching
  * projects left a bound port serving a project that no longer exists and a nested display with the game
  * still running inside it.
  */
@@ -196,7 +197,7 @@ public final class RemotePilotUi implements AutoCloseable {
             try {
                 nestedLauncher.close();
             } catch (Exception e) {
-                System.err.println("Couldn't stop the private display session: " + e.getMessage());
+                SdkLog.warn("Couldn't stop the private display session: " + e.getMessage());
             }
             nestedLauncher = null;
         }
@@ -204,7 +205,7 @@ public final class RemotePilotUi implements AutoCloseable {
             try {
                 pilotServer.close();
             } catch (Exception e) {
-                System.err.println("Couldn't stop the Remote Pilot server: " + e.getMessage());
+                SdkLog.warn("Couldn't stop the Remote Pilot server: " + e.getMessage());
             }
             pilotServer = null;
         }

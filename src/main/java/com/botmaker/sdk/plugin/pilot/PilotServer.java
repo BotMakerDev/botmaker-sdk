@@ -6,6 +6,7 @@ import com.botmaker.shared.Diag;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.TraceLine;
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
 import com.botmaker.shared.ipc.TelemetryFrame;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -409,7 +410,7 @@ public final class PilotServer implements AutoCloseable {
             kind = PilotInputService.Kind.valueOf(named.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException unknownKind) {
             // A newer phone's gesture: ignored, never a dropped connection, and said once in the log.
-            System.err.println("Pilot: ignoring input of unknown kind \"" + named + "\"");
+            SdkLog.warn("Pilot: ignoring input of unknown kind \"" + named + "\"");
             return;
         }
         if (kind == PilotInputService.Kind.KEY || kind == PilotInputService.Kind.TEXT) {

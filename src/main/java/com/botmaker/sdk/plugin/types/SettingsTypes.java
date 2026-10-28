@@ -1,8 +1,12 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.api.bot.BotSettings;
+
+import java.util.List;
 
 
 /**
@@ -19,9 +23,19 @@ import com.botmaker.sdk.api.bot.BotSettings;
  * <p>A link nothing here declares is not this shape and builds nothing: the host shows it read-only, exactly as
  * written.
  */
-public final class SettingsTypes {
+public final class SettingsTypes implements TypeHolder {
 
     private SettingsTypes() {}
+
+    @Override
+    public List<PluginType<?>> types() {
+        return List.of();
+    }
+
+    @Override
+    public List<ComponentType<?>> components() {
+        return List.of(SETTINGS);
+    }
 
     /**
      * {@code BotSettings.defaults()} and its links, in the order they are written. The deprecated {@code debug}

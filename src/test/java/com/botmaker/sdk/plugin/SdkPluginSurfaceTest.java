@@ -12,6 +12,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.EditableType;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
+import com.botmaker.plugin.toolkit.testing.PluginTests;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -30,7 +31,16 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.api.vision.Matches;
 import com.botmaker.sdk.api.vision.Precision;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.launch.Game;
+import com.botmaker.sdk.plugin.editors.SdkEditors;
+import com.botmaker.sdk.plugin.overlay.SdkOverlay;
+import com.botmaker.sdk.plugin.run.SdkRunOverlay;
+import com.botmaker.sdk.plugin.types.CaptureTypes;
+import com.botmaker.sdk.plugin.types.FlowTypes;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
+import com.botmaker.sdk.plugin.types.SdkTypes;
+import com.botmaker.sdk.plugin.types.SettingsTypes;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -192,6 +202,20 @@ class SdkPluginSurfaceTest {
         // One declaration per constant, and nothing else.
         assertEquals(SdkValue.Id.values().length, byId.size());
         assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
+    }
+
+    /**
+     * What a host checks when it loads this plugin, and that each holder lists every declaration it holds: a field
+     * left out of its holder's method is declared nowhere.
+     */
+    @Test
+    void a_host_can_load_the_plugin_and_every_holder_lists_every_field() {
+        PluginTests.assertDeclared(SdkPlugin.class);
+        for (Class<?> holder : List.of(SdkTypes.class, FlowTypes.class, ScreenTypes.class, CaptureTypes.class,
+                SettingsTypes.class, SdkValues.class, SdkEditors.class, SdkToolbarItems.class, SdkRunOverlay.class,
+                SdkOverlay.class, SdkAssistant.class)) {
+            PluginTests.assertListsEveryField(holder);
+        }
     }
 
     /** The palette is the host's to discover from {@code @Palette}; {@link ApiCatalogTest} checks what it finds. */

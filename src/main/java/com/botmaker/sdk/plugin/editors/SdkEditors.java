@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.editors;
 
+import com.botmaker.plugin.api.EditorHolder;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.api.flow.ActivityClass;
@@ -31,9 +32,14 @@ import java.util.List;
  * and the one rule inside it is that a narrower match comes before a wider one. Every drawing is
  * {@code () -> X::method}, so building this list links no JavaFX.
  */
-public final class SdkEditors {
+public final class SdkEditors implements EditorHolder {
 
     private SdkEditors() {}
+
+    @Override
+    public List<SlotEditor> editors() {
+        return ALL;
+    }
 
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(

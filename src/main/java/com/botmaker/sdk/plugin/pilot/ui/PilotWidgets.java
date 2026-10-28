@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot.ui;
 
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.SdkLog;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -51,7 +52,7 @@ final class PilotWidgets {
     static void openInBrowser(String url) {
         if (url == null || url.isBlank()) return;
         if (com.botmaker.shared.launch.UriLauncher.open(url)) return;
-        System.err.println("Could not open a browser for " + url + " — open it manually.");
+        SdkLog.warn("Could not open a browser for " + url + " — open it manually.");
     }
 
     static Button copyCmdBtn(String command) {

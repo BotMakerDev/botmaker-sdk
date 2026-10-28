@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  * sure a VM that shuts down with Studio has its watcher, and shuts down a VM nothing has used for as long as its
  * settings allow. A VM set up but not running is left alone, and so is one still installing Windows.
  *
- * <p>Bound to the open project ({@code SdkPlugin.projectOpened}/{@code projectClosing}), as the plugin's classes
+ * <p>Bound to the open project ({@code SdkPlugin}'s {@code onProjectOpened}/{@code onProjectClosing} steps), as the plugin's classes
  * are: the watcher it starts is a process of its own, which outlives this class's loader and Studio.
  */
 public final class VmKeeper {

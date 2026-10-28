@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.screen;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.plugin.toolkit.ZoomPan;
+import com.botmaker.sdk.plugin.SdkLog;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -253,7 +254,7 @@ public final class ObjectCaptureSurface {
         busySpinner.setVisible(true);
         updateHud();
         Async.load("grabcut-solve", work, this::solved, why -> {
-            System.err.println("GrabCut failed: " + why);
+            SdkLog.warn("GrabCut failed: " + why);
             solved(null);
         });
     }

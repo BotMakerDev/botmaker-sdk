@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarGroup;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
@@ -28,7 +29,7 @@ import java.util.List;
  * <p>The ids are constants because the host prefixes each with the plugin's id and keeps it: a renamed id is
  * a button whose remembered state is lost.
  */
-public final class SdkToolbarItems {
+public final class SdkToolbarItems implements ToolbarHolder {
 
     public static final String PILOT_ID = "pilot";
     public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
@@ -128,4 +129,9 @@ public final class SdkToolbarItems {
             SCREEN_MAP, CAPTURE_SOURCE, BOT_SETTINGS, GAME, PROJECT_SETUP, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
+
+    @Override
+    public List<ToolbarItem> toolbar() {
+        return ALL;
+    }
 }

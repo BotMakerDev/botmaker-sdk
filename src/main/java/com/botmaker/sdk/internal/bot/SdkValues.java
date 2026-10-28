@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.bot;
 
+import com.botmaker.plugin.api.ValueHolder;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.plugin.api.source.ManagedClasses;
@@ -39,8 +40,8 @@ import java.util.Set;
  * The SDK's managed values, each declared once, and what a run does with each one.
  *
  * <p>One declaration per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
- * plugin names this class ({@code .values(SdkValues.class)}), so each {@code public static final} field is one of
- * its {@code managedValues()}, in field order; its windows open each one through a toolkit
+ * plugin names this class ({@code .values(SdkValues.class)}), so each value {@link #values()} lists is one of
+ * its {@code managedValues()}, in list order; its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
@@ -54,7 +55,7 @@ import java.util.Set;
  * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
  * {@link #claim()} before installing, which is the only ordering anyone has to get right.
  */
-public final class SdkValues {
+public final class SdkValues implements ValueHolder {
 
     /** The class the method-shaped values live in: {@code plugins/sdk/Sdk.java}, named by the bot's {@code main}. */
     public static final String HOLDER = "Sdk";
@@ -273,6 +274,12 @@ public final class SdkValues {
     private static boolean claimed;
 
     private SdkValues() {}
+
+    @Override
+    public List<ManagedValue<?>> values() {
+        return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, SCREEN_MAP,
+                SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
+    }
 
     /** {@link #FLOW}'s type and first value: no flow until the runner picks one of {@code Flows}. */
     private static Flow noFlow() {

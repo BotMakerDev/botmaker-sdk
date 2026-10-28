@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -193,7 +194,7 @@ public final class PilotInputService implements AutoCloseable {
             }
             return true;
         } catch (Exception e) {
-            System.err.println("Pilot interact " + kind + " failed: " + e.getMessage());
+            SdkLog.warn("Pilot interact " + kind + " failed: " + e.getMessage());
             // A throw part-way through a drag is exactly the case that leaves a button down.
             releaseHeld();
             return false;
@@ -250,7 +251,7 @@ public final class PilotInputService implements AutoCloseable {
             }
             return Typed.SENT;
         } catch (Exception e) {
-            System.err.println("Pilot interact " + kind + " failed: " + e.getMessage());
+            SdkLog.warn("Pilot interact " + kind + " failed: " + e.getMessage());
             return Typed.FAILED;
         }
     }
@@ -302,7 +303,7 @@ public final class PilotInputService implements AutoCloseable {
             nc.mouseButton(btn, false);
             PointerPolicy.restoreTo(nc, sessionOf(route), origin);
         } catch (Exception e) {
-            System.err.println("Pilot interact could not release button " + btn + ": " + e.getMessage());
+            SdkLog.warn("Pilot interact could not release button " + btn + ": " + e.getMessage());
         }
     }
 
@@ -351,7 +352,7 @@ public final class PilotInputService implements AutoCloseable {
             }
             return true;
         } catch (Exception e) {
-            System.err.println("Pilot interact " + kind + " on emulator failed: " + e.getMessage());
+            SdkLog.warn("Pilot interact " + kind + " on emulator failed: " + e.getMessage());
             return false;
         }
     }
@@ -396,12 +397,12 @@ public final class PilotInputService implements AutoCloseable {
             try {
                 NativeController nc = NativeControllerFactory.get();
                 if (!nc.useReliableInput()) {
-                    System.err.println("Pilot interact: no reliable input backend available — taps may not "
+                    SdkLog.warn("Pilot interact: no reliable input backend available — taps may not "
                             + "reach the game (see LinuxController.useReliableInput).");
                 }
                 host = nc;
             } catch (Exception e) {
-                System.err.println("Pilot interact unavailable: " + e.getMessage());
+                SdkLog.warn("Pilot interact unavailable: " + e.getMessage());
             }
         }
         return host;

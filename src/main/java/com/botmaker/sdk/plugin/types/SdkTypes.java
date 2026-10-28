@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
@@ -40,6 +41,7 @@ import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -50,10 +52,10 @@ import java.util.List;
  * declares them.
  *
  * <p>{@code SdkPlugin} names this class and the other holders ({@code .types(SdkTypes.class, …)}); the host
- * takes every {@code public static final} declaration, and every one in a list field, in field order. So the
- * types are declared in the order a menu offers them: the vision types, the geometry ones, the input types,
- * the capture source and the picture group. A host offers plugin-basics' types before them. Two shapes of one
- * class are tried in field order too.
+ * takes what {@link #types()} and {@link #components()} list, in their order. So the types are listed in the
+ * order a menu offers them: the vision types, the geometry ones, the input types, the capture source and the
+ * picture group. A host offers plugin-basics' types before them. Two shapes of one class are tried in list
+ * order too.
  *
  * <p>Each type is one {@link PluginType#value} declaration, whose steps ask in order for what a fresh one is,
  * how a person edits it and how its Java is written. A factory is a method reference and each part an
@@ -74,9 +76,24 @@ import java.util.List;
  * @see CaptureTypes the calls a {@code CaptureSource} is written as
  * @see SettingsTypes the calls a {@code BotSettings} is written as
  */
-public final class SdkTypes {
+public final class SdkTypes implements TypeHolder {
 
     private SdkTypes() {
+    }
+
+    @Override
+    public List<PluginType<?>> types() {
+        return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, POINT, RECT, SIZE, ZONE, KEY,
+                MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
+                ACTIVITY, OUTCOME);
+    }
+
+    @Override
+    public List<ComponentType<?>> components() {
+        List<ComponentType<?>> all = new ArrayList<>(List.of(PICTURE_TAG, COMBO_HELD, STEP));
+        all.addAll(PRECISION_WITHERS);
+        all.add(OCR_CHAIN);
+        return all;
     }
 
     private static ImageTemplate placeholder() {

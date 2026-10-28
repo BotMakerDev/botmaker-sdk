@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.run;
 
+import com.botmaker.plugin.api.RunOverlayHolder;
 import com.botmaker.plugin.api.run.RunOverlayContext;
 import com.botmaker.plugin.api.run.RunOverlayPart;
 import com.botmaker.shared.ipc.TelemetryEvent;
@@ -27,7 +28,7 @@ import java.util.function.Consumer;
  * over the desktop. Both read the run's telemetry, the frames this SDK's own runtime wrote, so the host decodes
  * none of it.
  */
-public final class SdkRunOverlay {
+public final class SdkRunOverlay implements RunOverlayHolder {
 
     /** Declared through {@code PluginDeclaration.runOverlay}, which only a host with an overlay calls. */
     public static final RunOverlayPart PART = RunOverlayPart.id("sdk.run").bar(SdkRunOverlay::bar)
@@ -38,6 +39,11 @@ public final class SdkRunOverlay {
     private static final double CLICK_RADIUS = 9;
 
     private SdkRunOverlay() {}
+
+    @Override
+    public List<RunOverlayPart> runOverlay() {
+        return List.of(PART);
+    }
 
     /** One line: the activity and the last thing the bot did there. */
     static Node bar(RunOverlayContext context) {

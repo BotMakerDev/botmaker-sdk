@@ -1,7 +1,9 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -12,6 +14,8 @@ import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.capture.RegionSource;
+
+import java.util.List;
 
 
 /**
@@ -25,12 +29,22 @@ import com.botmaker.sdk.internal.capture.RegionSource;
  * {@code CaptureSource} slot as whichever of them the Java is, and writes a value back through the one
  * matching its class — which is what {@code writtenAsParts()} on the type says.
  *
- * <p>{@code SdkPlugin} names this class; the host tries the fields in their order: the six it writes, then the
- * chained region, which it only reads.
+ * <p>{@code SdkPlugin} names this class; the host tries the shapes in {@link #components()}'s order: the six it
+ * writes, then the chained region, which it only reads.
  */
-public final class CaptureTypes {
+public final class CaptureTypes implements TypeHolder {
 
     private CaptureTypes() {}
+
+    @Override
+    public List<PluginType<?>> types() {
+        return List.of();
+    }
+
+    @Override
+    public List<ComponentType<?>> components() {
+        return List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
+    }
 
     /**
      * {@code Source.current()}. Built as the ambient source itself rather than by calling the factory, which

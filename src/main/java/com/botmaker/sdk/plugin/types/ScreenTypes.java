@@ -1,8 +1,10 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -49,9 +51,26 @@ import java.util.regex.Pattern;
  * <p>An input named inside a setup — the {@code HOME.market} of {@code .from(HOME.market)} — is a reference to that
  * field, held by its screen and field ({@code BotConstants.input}) and written back as the field, never spelled out.
  */
-public final class ScreenTypes {
+public final class ScreenTypes implements TypeHolder {
 
     private ScreenTypes() {}
+
+    @Override
+    public List<PluginType<?>> types() {
+        return List.of();
+    }
+
+    @Override
+    public List<ComponentType<?>> components() {
+        return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, BUTTON_SHAPE,
+                BUTTON_BESIDE_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE, PLACE_BELOW_SHAPE,
+                PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
+                PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
+                PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CAPTION_SHAPE,
+                READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE, BESIDE_SHAPE, NODE_SHAPE,
+                TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
+                PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE);
+    }
 
     /**
      * {@code Setup.named(String)} and its links, each written only when the screen has it: {@code .panelOf(…)},

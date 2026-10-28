@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -253,7 +254,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
                 controller.restoreWindow(window);
                 settle();
             } catch (Throwable notRaised) {
-                System.err.println("Could not focus window: " + notRaised.getMessage());
+                SdkLog.warn("Could not focus window: " + notRaised.getMessage());
             }
             GenericWindow refreshed = findWindow(named);
             if (refreshed != null) window = refreshed;
@@ -264,7 +265,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
         try {
             image = controller.captureWindow(window);
         } catch (Throwable notCaptured) {
-            System.err.println("Native window capture failed: " + notCaptured.getMessage());
+            SdkLog.warn("Native window capture failed: " + notCaptured.getMessage());
         }
         if (!usable(image)) image = cropped(ScreenCapture.captureDesktop(), bounds);
         return usable(image) ? new EditorFrame(image, label, bounds, true) : null;

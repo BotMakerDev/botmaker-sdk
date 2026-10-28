@@ -4,9 +4,14 @@
   `StudioPlugin.declare().types(SdkTypes.class, FlowTypes.class, …).editors(…).values(SdkValues.class)
   .toolbar(…).runOverlay(…).overlay(…).assistant(…).trial(Bot::trial).readiness(…)`. It names no id and no
   name: the pom's `botmaker.plugin` property names the class, its coordinate is the plugin's id and its
-  `<name>` (*BotMaker SDK*) what Studio shows (2026-10-27). Types and values are named
-  by their holder classes, the rest are suppliers, so constructing it links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and `javafx-controls`, the toolkit,
-  Javalin and ZXing are `optional` here). It adds only `projectClosing()`, which releases the Remote Pilot.
+  `<name>` (*BotMaker SDK*) what Studio shows (2026-10-27). Every surface is named by its holder class
+  (2026-10-28), which implements the step's holder interface and lists what it gives (`SdkTypes.types()`,
+  `SdkEditors.editors()`, `SdkToolbarItems.toolbar()`, `SdkAssistant.tools()`, …); the host builds it only when it
+  asks, so constructing the plugin links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and
+  `javafx-controls`, the toolkit, Javalin and ZXing are `optional` here). `onProjectOpened`/`onProjectClosing`
+  bind the game button, readiness, the VM keeper and `SdkLog` (the plugin half's warnings, to
+  `StudioServices.log()`) to the open project, and release the Remote Pilot. `SdkPluginSurfaceTest` runs the
+  toolkit's `PluginTests.assertDeclared` and `assertListsEveryField` over every holder.
 - **The overlay editor's part is `plugin/overlay/SdkOverlay`.**
   - Targets come from the `ActivityBody` type.
   - The watched screen is `Sdk.captureSource()`.
@@ -21,8 +26,8 @@
   X::part, …)`, `writtenAsRecord()`, `writtenAsEach` or `writtenAsConstant()`). A result nobody edits is
   declared by the host: its method carries `@Fills(label = …)` (`Vision.lastMatch()`). A part never picked on its own is `ComponentType.part(X.class).writtenAs(…)`, a
   field of a holder `SdkPlugin` names; a `Flow` is five parts (`FlowTypes`), a `CaptureSource` six calls
-  (`CaptureTypes`). The host takes each `public static final` field (or list field) in field order, which is the
-  menu's order and the order two shapes of one class are tried. Adding a type is one constant and nothing else.
+  (`CaptureTypes`). The host takes what each holder's `types()` and `components()` list, in that order, which
+  is the menu's order and the order two shapes of one class are tried. Adding a type is one constant, listed.
 - **Factories are method references, with two string exceptions that stay**:
   - `CaptureTypes`' `REGION` and `REGION_CHAIN` name `CaptureSource.region` through `Ref.member`, because the static
     `region(src, r)` and the instance `src.region(r)` share a name and an arity and javac cannot reference

@@ -1,8 +1,10 @@
 package com.botmaker.sdk.plugin.types;
 
+import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
+import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.ActivityBody;
@@ -56,9 +58,21 @@ import java.util.Map;
  * already follows the binding. A contract {@code MethodName} type was considered and declined. Do not propose
  * it again without new facts.
  */
-public final class FlowTypes {
+public final class FlowTypes implements TypeHolder {
 
     private FlowTypes() {}
+
+    @Override
+    public List<PluginType<?>> types() {
+        return List.of();
+    }
+
+    @Override
+    public List<ComponentType<?>> components() {
+        return List.of(FLOW_SHAPE, FLOW_FROM_SUBFLOW_SHAPE, RUN_SHAPE, STEP_SHAPE, SUBFLOW_STEP_SHAPE, EDGE_SHAPE,
+                EDGE_INTO_SUBFLOW_SHAPE, EDGE_OUT_OF_SUBFLOW_SHAPE, EDGE_BETWEEN_SUBFLOWS_SHAPE, LIMITS_SHAPE,
+                LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
+    }
 
     /**
      * The parts the host holds as something the factory does not take — an activity's class literal as its

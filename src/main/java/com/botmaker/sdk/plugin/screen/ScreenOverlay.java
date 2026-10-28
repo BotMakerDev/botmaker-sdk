@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.SdkLog;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Rectangle2D;
@@ -141,7 +142,7 @@ public final class ScreenOverlay {
             try {
                 return source.grab(owner);
             } catch (Throwable ex) {
-                System.err.println("Screen capture failed: " + ex.getMessage());
+                SdkLog.warn("Screen capture failed: " + ex.getMessage());
                 return Grab.failed();
             }
         }, grab -> finishGrab(owner, grab, onShot));

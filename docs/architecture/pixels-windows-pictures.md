@@ -30,7 +30,7 @@
   it. A path literal a user wrote is not rewritten. Naming a capture (`TemplateNaming`, one class for one crop
   and a batch) refuses blank, taken and reserved names with one wording.
 - **The Remote Pilot is this plugin's feature** (`plugin/pilot`, the web client under
-  `src/main/resources/pilot/`): a toolbar button opens it and `projectClosing()` releases its port and nested
+  `src/main/resources/pilot/`): a toolbar button opens it and the plugin's `onProjectClosing` step releases its port and nested
   display. Telemetry crosses as `TelemetryFrame` bytes (`Runs.onTelemetry`), decoded with the shared codec the
   bot encoded it with — **strings and bytes cross the contract, shapes do not**. It needed nothing added to
   `StudioServices`, which is the test for the next feature that wants to move here.

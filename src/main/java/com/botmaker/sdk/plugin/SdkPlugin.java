@@ -8,7 +8,6 @@ import com.botmaker.sdk.plugin.launch.GameReady;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
-import com.botmaker.sdk.plugin.map.MapReport;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
@@ -20,8 +19,6 @@ import com.botmaker.sdk.plugin.types.FlowTypes;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import com.botmaker.sdk.plugin.types.SettingsTypes;
-
-import java.util.List;
 
 /**
  * The BotMaker SDK, as a Studio plugin.
@@ -48,11 +45,11 @@ public final class SdkPlugin extends DeclaredPlugin {
     /**
      * The whole plugin, stated once: the types it owns and the parts inside its values ({@link SdkTypes}), the
      * editors a type cannot choose for itself ({@link SdkEditors}), the {@code @SdkValue} values its windows keep
-     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}) and its part of the run overlay
-     * ({@link SdkRunOverlay}).
+     * ({@link SdkValues}), its buttons ({@link SdkToolbarItems}), its part of the run overlay
+     * ({@link SdkRunOverlay}), and what it does while a project is open ({@link #opened}, {@link #closing}).
      *
-     * <p><b>Constructing a plugin must not link an optional dependency</b>, so each list is behind a supplier
-     * and the types and values are named by class, initialised only when the host asks.
+     * <p><b>Constructing a plugin must not link an optional dependency</b>, so every surface is named by its
+     * holder class, built and asked only when the host asks.
      * {@code javafx-controls} is {@code optional} here, so the classpath a headless host resolves this plugin
      * onto — the CLI's {@code validate} and {@code run}, the registry's CI — does not have it, and a constructor
      * that touched a JavaFX type fails there with:
@@ -68,15 +65,29 @@ public final class SdkPlugin extends DeclaredPlugin {
     public SdkPlugin() {
         super(StudioPlugin.declare()
                 .types(SdkTypes.class, FlowTypes.class, ScreenTypes.class, CaptureTypes.class, SettingsTypes.class)
-                .editors(() -> SdkEditors.ALL)
+                .editors(SdkEditors.class)
                 .values(SdkValues.class)
-                .toolbar(() -> SdkToolbarItems.ALL)
-                .runOverlay(() -> List.of(SdkRunOverlay.PART))
-                .overlay(() -> SdkOverlay.PART)
-                .assistant(() -> SdkAssist.and(MapReport.TOOLS))
+                .toolbar(SdkToolbarItems.class)
+                .runOverlay(SdkRunOverlay.class)
+                .overlay(SdkOverlay.class)
+                .assistant(SdkAssistant.class)
                 .assistantGuide(SdkAssist.GUIDE)
                 .trial(Bot::trial)
-                .readiness(GameReady::now));
+                .readiness(GameReady::now)
+                .onProjectOpened(SdkPlugin::opened)
+                .onProjectClosing(SdkPlugin::closing));
+    }
+
+    /**
+     * The toolbar's game button names what this project launches, so it is told which project that is, and the
+     * plugin half's warnings go to its log. On Windows, the game VMs' shutdown settings are applied while a project
+     * is open.
+     */
+    private static void opened(StudioServices services) {
+        SdkLog.bind(services);
+        GameButton.bind(services);
+        GameReady.bind(services);
+        if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }
 
     /**
@@ -84,22 +95,11 @@ public final class SdkPlugin extends DeclaredPlugin {
      * instance is reused for the next project, and a pilot still answering on the old port would be streaming
      * a project nobody has open.
      */
-    @Override
-    public void projectClosing() {
+    private static void closing() {
         RemotePilotUi.release();
         GameButton.unbind();
         GameReady.unbind();
         VmKeeper.stop();
-    }
-
-    /**
-     * The toolbar's game button names what this project launches, so it is told which project that is. On Windows, the
-     * game VMs' shutdown settings are applied while a project is open.
-     */
-    @Override
-    public void projectOpened(StudioServices services) {
-        GameButton.bind(services);
-        GameReady.bind(services);
-        if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
+        SdkLog.unbind();
     }
 }

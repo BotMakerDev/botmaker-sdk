@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.overlay;
 
+import com.botmaker.plugin.api.OverlayHolder;
 import com.botmaker.plugin.api.overlay.OverlayContext;
 import com.botmaker.plugin.api.overlay.OverlayFrame;
 import com.botmaker.plugin.api.overlay.OverlayPart;
@@ -41,7 +42,7 @@ import java.util.Optional;
  * <p>Building {@link #PART} links JavaFX through the tool panes, so it sits behind
  * {@code PluginDeclaration.overlay}'s supplier.
  */
-public final class SdkOverlay {
+public final class SdkOverlay implements OverlayHolder {
 
     public static final OverlayPart PART = OverlayPart.of()
             .targets(ActivityBody.class, "Activities")
@@ -59,6 +60,11 @@ public final class SdkOverlay {
             .probe(ImageWaiter::waitAndClick, ImageTemplate.class, Duration.class, Probe.acting(SdkProbes::wouldClick));
 
     private SdkOverlay() {}
+
+    @Override
+    public OverlayPart overlay() {
+        return PART;
+    }
 
     /** The screen {@code Sdk.captureSource} names, when it is one the overlay can open over. */
     public static Optional<Watched> watched(OverlayContext context) {

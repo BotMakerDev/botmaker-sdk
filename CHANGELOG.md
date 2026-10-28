@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **`SdkPlugin` names every surface by its holder class** (contract 0.13.0): `SdkTypes`, `FlowTypes`,
+  `ScreenTypes`, `CaptureTypes` and `SettingsTypes` are `TypeHolder`s listing their declarations, `SdkValues` a
+  `ValueHolder`, `SdkEditors`, `SdkToolbarItems`, `SdkRunOverlay` and `SdkOverlay` their surfaces' holders, and the
+  assistant's tools `SdkAssistant`. What it did on opening and closing a project are the `onProjectOpened` and
+  `onProjectClosing` steps. `SdkPluginSurfaceTest` holds every holder to listing every field.
+- The plugin half's warnings (the Remote Pilot, capture, the picture library) go to the open project's plugin
+  log, `StudioServices.log()`, through `SdkLog`, instead of standard error.
 - The SDK says it is a Studio plugin in its pom (`botmaker.plugin`, kept in the published pom), not in a
   `META-INF/services` file; Studio knows it by its coordinate and shows the pom's name, *BotMaker SDK*.
   `SdkPlugin.ID` and `SdkPlugin.NAME` are gone. Needs a Studio on contract 0.13.

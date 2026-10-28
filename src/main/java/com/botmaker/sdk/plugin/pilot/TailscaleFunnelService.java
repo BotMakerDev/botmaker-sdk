@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.shared.Executables;
 import com.botmaker.shared.platform.Os;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -126,7 +127,7 @@ public final class TailscaleFunnelService {
     public void disable() {
         Exec e = run(OFF, 10);
         if (!turnedOff(e.exit, e.err + e.out)) {
-            System.err.println("[Pilot] Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
+            SdkLog.warn("Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
                     + " — run `" + String.join(" ", command(OFF)) + "` to do it by hand.");
         }
     }
