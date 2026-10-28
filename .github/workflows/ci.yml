@@ -61,6 +61,13 @@ jobs:
       #
       # After the toolkit, because it declares the toolkit at compile scope and the contract `provided`:
       # both have to be installed before it rather than arriving transitively.
+      # Basics' <parent> (2026-10-28), and the archetype's below, at its main -SNAPSHOT, which nothing publishes.
+      - name: Check out botmaker-plugin-parent
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-parent
+          path: .deps/botmaker-plugin-parent
+
       - name: Check out botmaker-plugin-basics
         uses: actions/checkout@v7
         with:
@@ -93,6 +100,7 @@ jobs:
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install
           mvn_retry mvn -B -f .deps/botmaker-plugin-basics/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
