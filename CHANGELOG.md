@@ -9,7 +9,7 @@ bullets per version, and it is read by two things besides you:
 - **`release.sh` refuses to cut a version with no section here** (`check_changelog`, in the decide pass,
   before anything is tagged). If the top section still says `## [Unreleased]`, rename it to the version being
   cut and date it.
-- **The whole file ships inside the jar** as `META-INF/botmaker/whats-new.md`, so Studio's *Project ▸ Upgrade
+- **The whole file ships inside the jar** as `META-INF/botmaker/changelog.md`, so Studio's *Project ▸ Upgrade
   SDK…* can lead with what a release **gives** you before it lists what it costs — read offline, out of the
   jar it already downloads to diff. Whole, not one section: a bot may jump several releases at once, so the
   jar must be able to answer every span ending at its own version.
@@ -28,6 +28,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `onProjectClosing` steps. `SdkPluginSurfaceTest` holds every holder to listing every field.
 - The plugin half's warnings (the Remote Pilot, capture, the picture library) go to the open project's plugin
   log, `StudioServices.log()`, through `SdkLog`, instead of standard error.
+- The jar carries this changelog as `META-INF/botmaker/changelog.md` (was `whats-new.md`), where Studio reads every
+  plugin's, and an icon (`META-INF/botmaker/icon.png`) shown beside *BotMaker SDK* in Plugins & Libraries.
 - The SDK says it is a Studio plugin in its pom (`botmaker.plugin`, kept in the published pom), not in a
   `META-INF/services` file; Studio knows it by its coordinate and shows the pom's name, *BotMaker SDK*.
   `SdkPlugin.ID` and `SdkPlugin.NAME` are gone. Needs a Studio on contract 0.13.

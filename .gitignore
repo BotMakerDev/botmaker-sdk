@@ -15,6 +15,8 @@ repomix-output.xml
 images
 /resources
 *.png
+# The plugin's icon, copied into the jar as META-INF/botmaker/icon.png.
+!/icon.png
 # ── Gradle (legacy, no longer used) ───────────────────────
 .gradle/
 build/

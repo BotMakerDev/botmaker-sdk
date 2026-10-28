@@ -59,7 +59,8 @@ The SDK is consumed by **bot projects** (not by Studio), via JitPack as
 coordinate; a tag's pom carries its release version and `main` a `-SNAPSHOT` (umbrella doc 43). **The maintainer
 owns the SDK → JitPack publish — don't push or publish the SDK yourself;** releases are cut from the
 umbrella with `../release.sh`. The whole `CHANGELOG.md` is copied into the jar as
-`META-INF/botmaker/whats-new.md`.
+`META-INF/botmaker/changelog.md` and `icon.png` as `META-INF/botmaker/icon.png`, where Studio reads every
+plugin's (the parent copies them for a plugin that names it; this pom does it itself).
 
 ### Local dev (test SDK changes without pushing a tag)
 

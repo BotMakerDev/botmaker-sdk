@@ -396,13 +396,15 @@
                 </executions>
             </plugin>
 
-            <!-- Antrun: TWO executions, unrelated to each other beyond sharing a plugin. `whats-new`
-                 copies the changelog into the jar; `stage-linux-ocr-natives` finishes the OCR native
-                 staging the dependency plugin above started. They are one <plugin> because Maven takes a
-                 single declaration per plugin per pom, not because they belong together.
+            <!-- Antrun: TWO executions, unrelated to each other beyond sharing a plugin. `plugin-files`
+                 copies the changelog and the icon into the jar; `stage-linux-ocr-natives` finishes the OCR
+                 native staging the dependency plugin above started. They are one <plugin> because Maven takes
+                 a single declaration per plugin per pom, not because they belong together.
 
-                 whats-new: put this module's CHANGELOG.md inside the jar, as
-                 META-INF/botmaker/whats-new.md.
+                 plugin-files: what botmaker-plugin-parent does for every plugin that names it, which this pom
+                 does not (2026-10-28; the changelog went in as whats-new.md before): CHANGELOG.md as
+                 META-INF/botmaker/changelog.md, and icon.png, shown beside the plugin's name in Plugins &
+                 Libraries, as META-INF/botmaker/icon.png.
 
                  Studio's Project > Upgrade SDK... leads with what a release GIVES you, before it lists
                  what it costs. It reads that out of the target jar it has already downloaded to diff, so
@@ -427,7 +429,7 @@
                 <version>3.1.0</version>
                 <executions>
                     <execution>
-                        <id>whats-new</id>
+                        <id>plugin-files</id>
                         <phase>process-resources</phase>
                         <goals>
                             <goal>run</goal>
@@ -435,7 +437,10 @@
                         <configuration>
                             <target>
                                 <copy file="${project.basedir}/CHANGELOG.md"
-                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/whats-new.md"
+                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/changelog.md"
+                                      failonerror="false" overwrite="true"/>
+                                <copy file="${project.basedir}/icon.png"
+                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/icon.png"
                                       failonerror="false" overwrite="true"/>
                             </target>
                         </configuration>
