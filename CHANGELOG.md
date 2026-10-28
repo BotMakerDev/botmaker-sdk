@@ -17,6 +17,13 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Added
+
+- The flow canvas's cards, ports and arrows have accessible names (`card Start`, `port Start DONE`, `arrow Start
+  DONE → Idle`), which screen readers and Studio's `ui` driver read.
+
 ## [1.8.0] — 2026-10-28
 
 ### Added

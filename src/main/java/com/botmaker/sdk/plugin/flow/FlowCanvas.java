@@ -5,6 +5,7 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.plugin.toolkit.graph.Routes;
 import com.botmaker.sdk.api.flow.Flow;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -888,6 +889,8 @@ public final class FlowCanvas extends StackPane {
 
         Group wire = new Group(hit, curve, head);
         wire.getStyleClass().add("flow-wire-group");
+        // Its name for screen readers and Studio's ui driver (2026-10-28), shorter than the tooltip.
+        wire.setAccessibleText("arrow " + edge.from() + " " + edge.outcome() + " → " + edge.to());
         Tooltip.install(wire, new Tooltip(edge.from() + " — " + edge.outcome() + " → " + edge.to()
                 + (broken ? "\nBroken: " + FlowNames.subflowOf(edge.from()) + " no longer ends on " + edge.outcome()
                 + ", so the run never takes this wire." : "") + "  (click to remove it)"));
@@ -1143,6 +1146,8 @@ public final class FlowCanvas extends StackPane {
             });
             draft.nameProperty().addListener((o, was, is) -> renamed(was, is));
 
+            // Its name for screen readers and Studio's ui driver (2026-10-28).
+            body.accessibleTextProperty().bind(Bindings.concat("card ", draft.nameProperty()));
             body.setOnMousePressed(this::beginDrag);
             body.setOnMouseDragged(this::continueDrag);
             body.setOnMouseReleased(this::endDrag);
@@ -1287,6 +1292,7 @@ public final class FlowCanvas extends StackPane {
 
         private void installPortHandlers(Circle circle, String outcome) {
             Tooltip.install(circle, new Tooltip(portTooltip(outcome)));
+            circle.accessibleTextProperty().bind(Bindings.concat("port ", draft.nameProperty(), " " + outcome));
             circle.setOnMousePressed(e -> {
                 startPendingArrow(draft, outcome, outPortCenter(outcome));
                 e.consume();
