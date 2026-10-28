@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- **`plugin/Migrations`, the SDK's own `@Migrate` rules** (empty for now). Removing or reshaping an `api`
+  element takes two releases: one keeps it `@Deprecated(forRemoval = true)` with its rule here, and Studio reads
+  the rule from the SDK's sources jar and rewrites a bot's uses; the next deletes both.
+
 ### Changed
 
 - **`SdkPlugin` names every surface by its holder class** (contract 0.13.0): `SdkTypes`, `FlowTypes`,

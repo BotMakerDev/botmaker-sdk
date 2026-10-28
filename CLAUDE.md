@@ -94,8 +94,12 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 
 - **A type a bot can only receive, never write down, is `internal`**; the package tree is `api` / `internal`
   / `plugin` and nothing else (`PluginLayersTest`, `../docs/refactor/34-plugin-package-tree.md`).
-- **No `api` signature names an `internal`, shared or OpenCV type.** `api.*` breaks freely; delete outright
-  (`api-vs-internal.md`).
+- **No `api` signature names an `internal`, shared or OpenCV type.** `api.*` breaks freely (`api-vs-internal.md`).
+- **Removing or reshaping an `api` element takes two releases** (2026-10-28): release N keeps it
+  `@Deprecated(forRemoval = true)` and adds its `@Migrate` rule to `plugin/Migrations` (written with `value =`,
+  compiled here against the element still present); release N+1 deletes the element and its rule together. Studio
+  reads the rules from the SDK's sources jar; a bot's own rule wins (`../docs/refactor/25-compatibility.md` §8).
+  Move the sample bot off the deprecated element in N, so `SampleBotCompileTest` stays green in N+1.
 - **The palette is discovered, never listed**: `@Palette` marks what is offered, value types carry nothing.
 - **No class under `plugin/` reads or writes Java text**; an editor reads the value and hands one back.
 - **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`) and run properties; no reader of
