@@ -30,6 +30,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   .iso…* ask Studio for their file chooser (`Dialogs`), so Studio's `ui choose` can answer them. *Save* and
   *Export* use `Dialogs.saveFile`, so this SDK needs a Studio whose contract has it; an older Studio refuses
   to load it and says to update Studio.
+- The sample bot's `@Param` drops `min` (2026-10-29): the contract's `@Param` describes the field only.
 
 ## [1.8.0] — 2026-10-28
 

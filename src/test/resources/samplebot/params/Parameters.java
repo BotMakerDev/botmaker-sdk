@@ -13,7 +13,7 @@ public final class Parameters {
     public static Duration restBetween = java.time.Duration.ofMillis(60000L);
 
     /** How many times an activity polls for a picture before it gives up. */
-    @Param(category = "Limits", visibility = Param.PUBLIC, min = 1,
+    @Param(category = "Limits", visibility = Param.PUBLIC,
             description = "How many times an activity looks for a picture before giving up")
     public static int maxAttempts = 20;
 
