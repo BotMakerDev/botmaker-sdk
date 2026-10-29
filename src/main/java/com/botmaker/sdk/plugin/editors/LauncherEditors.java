@@ -94,7 +94,16 @@ public final class LauncherEditors {
             boolean any = false;
             for (String spec : LaunchTargetValue.all(services)) {
                 LaunchSpec parsed = LaunchSpec.parse(spec);
-                if (parsed == null || !parsed.runsOn(os)) continue;
+                if (parsed == null) continue;
+                // A launcher this system retired (Heroic on Linux) is shown, greyed, saying what to do instead.
+                Optional<String> retired = parsed.kind().retiredOn(os);
+                if (retired.isPresent()) {
+                    MenuItem item = new MenuItem(label(services, spec) + " (use Lutris)");
+                    item.setDisable(true);
+                    items.add(item);
+                    continue;
+                }
+                if (!parsed.runsOn(os)) continue;
                 any = true;
                 boolean missing = GameCatalog.installed(spec).map(has -> !has).orElse(false);
                 boolean refused = !missing && SessionBootstrap.placeRefusal(parsed, place).isPresent();
@@ -182,9 +191,10 @@ public final class LauncherEditors {
         launch.setMinWidth(Region.USE_PREF_SIZE);
         LaunchSpec spec = launcher == null || services == null ? null : LaunchSpec.parse(launcher);
         Os os = Os.current();
-        if (spec != null && !spec.runsOn(os)) {
+        Optional<String> notHere = spec == null ? Optional.empty() : spec.notHere(os);
+        if (notHere.isPresent()) {
             launch.setDisable(true);
-            launch.setTooltip(new Tooltip(spec.describe() + " does not run on " + os.displayName()));
+            launch.setTooltip(new Tooltip(notHere.get()));
             return launch;
         }
         QuickLaunch.bind(launch, spec, services, (ok, message) -> services.status(message));

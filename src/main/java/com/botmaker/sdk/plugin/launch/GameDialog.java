@@ -7,20 +7,16 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.EmulatorPicker;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
-import com.botmaker.shared.Spawn;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorProbe;
-import com.botmaker.shared.game.FaugusEntries;
+import com.botmaker.shared.launch.GameLauncher;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
@@ -42,7 +38,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -59,7 +54,7 @@ import java.util.function.Consumer;
  *
  * <p>Opened from the toolbar's game button and from Project Setup's launch row. A row of radio buttons picks
  * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
- * (Steam, Epic, Heroic, Faugus, Lutris, …), one per emulator instance (its apps by name, dimmed while it is
+ * (Lutris alone on Linux; Steam, Epic, Heroic, … elsewhere), one per emulator instance (its apps by name, dimmed while it is
  * stopped), Waydroid's Android apps, the menu's games, and every other app,
  * which All leaves out. A pick becomes the first of the games the bot supports — its {@code launchTargets} in
  * {@code Sdk.java} ({@link LaunchTargetValue}), held once — and is remembered in {@link RecentTargets}. Above the grid
@@ -67,8 +62,8 @@ import java.util.function.Consumer;
  * Runner ({@code LaunchChoice}).
  *
  * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of
- * its entries, and the launcher already knows how to start it. The one thing it adds to a launcher is
- * <b>Add a Windows program…</b>, which puts an {@code .exe} into Faugus with Faugus's own defaults. An Android
+ * its entries, and the launcher already knows how to start it. On Linux <b>Add a game in Lutris…</b> opens Lutris,
+ * where a game is added or installed (Faugus's own path went on 2026-10-29). An Android
  * game on no instance yet is searched on Google Play or picked as a file and installed ({@link InstallGame}).
  */
 public final class GameDialog {
@@ -83,11 +78,6 @@ public final class GameDialog {
     private static final double TILE_GAP = 4;
     private static final double TILE_WIDTH = COVER_WIDTH + 2 * TILE_PADDING;
     private static final double TILE_HEIGHT = COVER_HEIGHT + TILE_GAP + CAPTION_HEIGHT + 2 * TILE_PADDING;
-
-    /** A Flathub download of Faugus and its runtime; a slow mirror, not a hang. */
-    private static final Duration FAUGUS_INSTALL_TIMEOUT = Duration.ofMinutes(20);
-
-    private static final ButtonType INSTALL = new ButtonType("Install", ButtonBar.ButtonData.OK_DONE);
 
     private static GameDialog active;
 
@@ -106,6 +96,8 @@ public final class GameDialog {
     private Group shown;
     private String query = "";
     private boolean emulatorsRefreshed;
+    /** Set by Add a game in Lutris…: the next time this window is focused, the libraries are read again once. */
+    private boolean lutrisOpened;
     private List<GameCatalog.Section> lastScan;
     private final Label current = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
     private final Label status = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
@@ -221,11 +213,11 @@ public final class GameDialog {
         HBox bottom = new HBox(8);
         bottom.setAlignment(Pos.CENTER_LEFT);
         if (Os.current() == Os.LINUX) {
-            Button addExe = new Button("Add a Windows program…");
-            addExe.setTooltip(new javafx.scene.control.Tooltip("Pick an .exe; it is added to Faugus Launcher, "
-                    + "which runs it under Proton, and becomes what this computer launches"));
-            addExe.setOnAction(e -> addWindowsProgram());
-            bottom.getChildren().add(addExe);
+            Button addInLutris = new Button("Add a game in Lutris…");
+            addInLutris.setTooltip(new javafx.scene.control.Tooltip("Opens Lutris: add the game there (a store's "
+                    + "tab, an installer, or a Windows program from its .exe) and it is listed here"));
+            addInLutris.setOnAction(e -> openLutris());
+            bottom.getChildren().add(addInLutris);
         }
         Button fromFile = new Button("Install from file…");
         fromFile.setTooltip(new javafx.scene.control.Tooltip("Pick an .apk, .xapk or .apks file and the emulator or "
@@ -245,6 +237,12 @@ public final class GameDialog {
         root.setPadding(new Insets(16));
         stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 760, 640, 520, 420), root);
         stage.setOnHidden(e -> active = null);
+        // Back from Lutris with a game added: read the libraries again, once per visit to Lutris.
+        stage.focusedProperty().addListener((o, was, is) -> {
+            if (!is || !lutrisOpened) return;
+            lutrisOpened = false;
+            rescan();
+        });
         refreshCurrent();
         stage.show();
         Async.load("game-dialog-saved", GameCatalog::saved, saved -> {
@@ -318,8 +316,10 @@ public final class GameDialog {
         if (!recent.isEmpty()) groups.add(new Group("Recent", recent, null));
         groups.addAll(launchers);
 
-        notice.setText("No launcher on this computer lists a game: Steam, Epic, Heroic, Faugus, Lutris, GOG and "
-                + "the app menu were looked at. Pick an emulator app below, or type a target.");
+        notice.setText(Os.current() == Os.LINUX
+                ? "Lutris lists no game on this computer. Press Add a game in Lutris…, or pick an emulator app below."
+                : "No launcher on this computer lists a game: Steam, Epic, Heroic, GOG and the app menu were looked "
+                        + "at. Pick an emulator app below, or type a target.");
         Styles.pick(notice, Styles.DIALOG_HINT, Styles.ERROR_TEXT);
         boolean none = GameCatalog.nothingListed(scanned);
         notice.setVisible(none);
@@ -531,10 +531,11 @@ public final class GameDialog {
         Os os = Os.current();
         for (String spec : games) {
             LaunchSpec parsed = LaunchSpec.parse(spec);
-            boolean here = parsed != null && parsed.runsOn(os);
+            Optional<String> notHere = parsed == null
+                    ? Optional.of(spec + " is not a launch target.") : parsed.notHere(os);
             Button prefer = Styles.on(new Button((spec.equals(now) ? "▶ " : "") + GameButton.caption(services, spec)
-                    + (here ? "" : " (not on " + os.displayName() + ")")), Styles.PILL);
-            prefer.setTooltip(new javafx.scene.control.Tooltip("Make it the bot's preferred game"));
+                    + (notHere.isEmpty() ? "" : " (not on " + os.displayName() + ")")), Styles.PILL);
+            prefer.setTooltip(new javafx.scene.control.Tooltip(notHere.orElse("Make it the bot's preferred game")));
             prefer.setOnAction(e -> prefer(spec));
             Button drop = Styles.on(new Button("✕"), Styles.PILL);
             drop.setTooltip(new javafx.scene.control.Tooltip("Remove it from the games this bot supports"));
@@ -594,63 +595,17 @@ public final class GameDialog {
     }
 
     /**
-     * Picks an {@code .exe}, adds it to Faugus under its file name, and makes it the target. Faugus missing: the
-     * offer to install it from Flathub first.
+     * Opens Lutris for the user to add a game, the one launcher on Linux (2026-10-29). Its library is read again
+     * when this window is focused next ({@code pga.db} changed), so the game appears without a button.
      */
-    private void addWindowsProgram() {
-        // installed() may ask flatpak, so off the JavaFX thread.
-        Async.load("faugus-installed", FaugusEntries::installed, installed -> {
-            if (installed) pickWindowsProgram();
-            else offerFaugus();
+    private void openLutris() {
+        Async.load("open-lutris", GameLauncher::openLutris, opened -> {
+            lutrisOpened = opened;
+            report(opened, opened
+                    ? "Lutris is open: add the game there, then come back to pick it."
+                    : "Lutris isn't installed. Install it from your distribution or Flathub (net.lutris.Lutris): it "
+                            + "runs native, Steam, Epic, GOG and Windows games.");
         });
-    }
-
-    private void pickWindowsProgram() {
-        services.dialogs().chooseFile("Choose a Windows program", Path.of(System.getProperty("user.home", "")),
-                "exe").path().ifPresent(exe -> {
-            String file = exe.getFileName().toString();
-            String title = file.toLowerCase(Locale.ROOT).endsWith(".exe") ? file.substring(0, file.length() - 4)
-                    : file;
-            try {
-                String gameId = FaugusEntries.add(exe, title);
-                choose(new GameCatalog.Item(new LaunchSpec(LaunchKind.FAUGUS, gameId).spec(), title, null));
-                report(true, title + " is in Faugus now, with Faugus's default prefix and runner — change them in "
-                        + "Faugus. This computer launches it.");
-                rescan();
-            } catch (Exception ex) {
-                report(false, "Couldn't add " + file + " to Faugus: " + ex.getMessage());
-            }
-        });
-    }
-
-    private void offerFaugus() {
-        List<String> command = FaugusEntries.installCommand();
-        if (command.isEmpty()) {
-            Alert info = services.theme().alert(Alert.AlertType.INFORMATION, "A Windows program runs here through "
-                    + "Faugus Launcher, which isn't installed, and neither is Flatpak to fetch it. Install Faugus "
-                    + "Launcher with your package manager, then try again.", ButtonType.CLOSE);
-            info.initOwner(stage);
-            info.setHeaderText("Faugus Launcher isn't installed");
-            info.showAndWait();
-            return;
-        }
-        Alert ask = services.theme().alert(Alert.AlertType.CONFIRMATION, "A Windows program runs here through "
-                + "Faugus Launcher, which runs it under Proton. BotMaker will run\n\n" + String.join(" ", command)
-                + "\n\nwhich downloads it from Flathub.", ButtonType.CANCEL, INSTALL);
-        ask.initOwner(stage);
-        ask.setHeaderText("Install Faugus Launcher?");
-        if (ask.showAndWait().orElse(ButtonType.CANCEL) != INSTALL) return;
-        report(true, "Installing Faugus Launcher…");
-        Async.load("install-faugus", () -> {
-            try {
-                Spawn.Completed done = Spawn.run(FAUGUS_INSTALL_TIMEOUT, command);
-                return done != null && done.ok() && FaugusEntries.installed();
-            } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage() == null ? e.toString() : e.getMessage(), e);
-            }
-        }, ok -> report(ok, ok ? "Faugus Launcher is installed — press Add a Windows program… again."
-                : "Faugus Launcher wasn't installed. Run " + String.join(" ", command) + " in a terminal to see why."),
-                why -> report(false, "Couldn't install Faugus Launcher: " + why));
     }
 
     private void report(boolean ok, String message) {

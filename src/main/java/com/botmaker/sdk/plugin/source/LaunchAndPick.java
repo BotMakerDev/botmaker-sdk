@@ -151,8 +151,7 @@ final class LaunchAndPick {
             return spec.describe() + " is captured from its device, not a window: picking it in 🎮 Game already "
                     + "pointed capture there.";
         }
-        if (!spec.runsOn(Os.current())) return spec.describe() + " does not run on " + Os.current().displayName() + ".";
-        return null;
+        return spec.notHere(Os.current()).orElse(null);
     }
 
     /**

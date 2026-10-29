@@ -31,6 +31,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   *Export* use `Dialogs.saveFile`, so this SDK needs a Studio whose contract has it; an older Studio refuses
   to load it and says to update Studio.
 - The sample bot's `@Param` drops `min` (2026-10-29): the contract's `@Param` describes the field only.
+- **On Linux the 🎮 Game dialog lists Lutris alone** (2026-10-29): Lutris runs native, Steam, Epic, GOG and Windows
+  games, and a game it runs through Steam is picked as `steam:<appid>`, the target a bot written on Windows
+  lists. *Add a Windows program…* (Faugus) is replaced by *Add a game in Lutris…*, which opens Lutris; the list
+  is read again when the dialog is focused. A Heroic, Faugus, Bottles or link target is refused on Linux with
+  "add the game to Lutris, then pick it again"; a bot listing several launchers takes its first that runs.
 
 ## [1.8.0] — 2026-10-28
 

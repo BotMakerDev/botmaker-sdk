@@ -62,9 +62,11 @@ class InstalledGameTest {
 
     @Test
     void eachSystemTakesTheFirstLauncherItCanStart() {
-        List<String> launchers = List.of("faugus:abc", "steam:570");
-        assertEquals("faugus:abc", InstalledGame.firstRunnable(launchers, Os.LINUX));
-        assertEquals("steam:570", InstalledGame.firstRunnable(launchers, Os.WINDOWS), "Faugus is Linux's");
+        List<String> launchers = List.of("lutris:3", "steam:570");
+        assertEquals("lutris:3", InstalledGame.firstRunnable(launchers, Os.LINUX));
+        assertEquals("steam:570", InstalledGame.firstRunnable(launchers, Os.WINDOWS), "Lutris is Linux's");
+        assertEquals("steam:570", InstalledGame.firstRunnable(List.of("faugus:abc", "steam:570"), Os.LINUX),
+                "Faugus retired for Lutris (2026-10-29): passed over");
         assertNull(InstalledGame.firstRunnable(List.of("lutris:3"), Os.MAC));
         assertEquals("steam:570", InstalledGame.firstRunnable(List.of("nonsense", "steam:570"), Os.LINUX),
                 "a spec that does not parse is passed over");
@@ -73,10 +75,12 @@ class InstalledGameTest {
     @Test
     void theRunnersPickWinsWhenTheBotListsItAndTheSystemStartsIt() {
         List<String> launchers = List.of("faugus:abc", "steam:570", "lutris:3");
-        assertEquals("steam:570", InstalledGame.pick(launchers, " steam: 570", Os.LINUX));
-        assertEquals("faugus:abc", InstalledGame.pick(launchers, "", Os.LINUX), "no pick: the first available");
-        assertEquals("faugus:abc", InstalledGame.pick(launchers, "epic:x", Os.LINUX),
+        assertEquals("lutris:3", InstalledGame.pick(launchers, " lutris: 3", Os.LINUX));
+        assertEquals("steam:570", InstalledGame.pick(launchers, "", Os.LINUX), "no pick: the first available");
+        assertEquals("steam:570", InstalledGame.pick(launchers, "epic:x", Os.LINUX),
                 "a pick the author no longer lists is none");
+        assertEquals("steam:570", InstalledGame.pick(launchers, "faugus:abc", Os.LINUX),
+                "a pick this system no longer starts is none");
         assertEquals("steam:570", InstalledGame.pick(launchers, "lutris:3", Os.WINDOWS),
                 "a pick this system cannot start is none");
     }

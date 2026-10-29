@@ -181,16 +181,15 @@ public final class SessionBootstrap {
     /** {@link #placeRefusal(LaunchSpec, BotSettings.Where)} on {@code os}, with its probes given. Pure, for the tests. */
     static Optional<String> placeRefusal(LaunchSpec spec, BotSettings.Where where, Os os, boolean gameVms,
                                          Function<LaunchSpec, LaunchIsolation.Verdict> isolation) {
-        boolean runsHere = spec.runsOn(os);
+        Optional<String> notHere = spec.notHere(os);
         return switch (where) {
-            case MY_DESKTOP -> runsHere ? Optional.empty()
-                : Optional.of(spec.describe() + " does not run on " + os.displayName() + ".");
+            case MY_DESKTOP -> notHere;
             case PRIVATE_DISPLAY -> {
                 if (os != Os.LINUX) {
                     yield Optional.of("A private display is Linux's: on " + os.displayName()
                         + " a game VM keeps the game off your desktop.");
                 }
-                if (!runsHere) yield Optional.of(spec.describe() + " does not run on " + os.displayName() + ".");
+                if (notHere.isPresent()) yield notHere;
                 // As a run takes them (launchIsolated): nothing to hand a display to runs on :0, as it would anyway.
                 LaunchIsolation.Verdict verdict = isolation.apply(spec);
                 yield switch (verdict.blocker()) {

@@ -167,7 +167,8 @@ public final class GameCatalog {
      */
     public static List<Section> scan() {
         Set<String> epicIds = new HashSet<>();
-        List<GameLibraryProvider> providers = GameLibraries.all().stream()
+        // On Linux, Lutris alone (2026-10-29): it lists Steam's, Epic's, GOG's and Windows games itself.
+        List<GameLibraryProvider> providers = GameLibraries.pickable(Os.current()).stream()
                 .filter(p -> !p.platform().equals(DesktopEntryScanner.PLATFORM)).toList();
         List<List<InstalledGame>> libraries = providers.stream().map(GameCatalog::safely).toList();
         for (int i = 0; i < providers.size(); i++) {
@@ -198,6 +199,15 @@ public final class GameCatalog {
         for (int i = 0; i < providers.size(); i++) {
             everything.add(new Section(Kind.LAUNCHER, "", false, items(providers.get(i), libraries.get(i))));
         }
+        // Whether a target is installed reads every library whose kind still runs here, picked from or not: on
+        // Linux a steam: target is installed when Steam has it, whether or not Lutris lists it.
+        Os os = Os.current();
+        for (GameLibraryProvider extra : GameLibraries.all()) {
+            boolean read = providers.stream().anyMatch(p -> p.getClass() == extra.getClass());
+            if (read || extra.platform().equals(DesktopEntryScanner.PLATFORM)
+                    || !LaunchKind.fromId(extra.platform()).runsOn(os)) continue;
+            everything.add(new Section(Kind.LAUNCHER, "", false, items(extra, safely(extra))));
+        }
         Set<String> found = listedIn(everything);
         synchronized (LISTED) {
             listed = found;
@@ -227,7 +237,7 @@ public final class GameCatalog {
     record Snapshot(List<Section> shown, Set<String> listed) {}
 
     /** Bumped when the file's shape changes: an older file is then read as none. */
-    static final int SAVED_VERSION = 1;
+    static final int SAVED_VERSION = 2;   // 2: Linux lists Lutris alone (2026-10-29); an older list has Heroic's
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -472,10 +482,14 @@ public final class GameCatalog {
                 new Section(Kind.OTHER_APPS, Kind.OTHER_APPS.title(), true, other));
     }
 
-    /** The target a library entry is, or empty for an entry with no id or a launcher with no kind. */
+    /**
+     * The target a library entry is, or empty for an entry with no id or a launcher with no kind. The entry's own
+     * platform first: Lutris lists a game it runs through Steam as the Steam game it is.
+     */
     static Optional<String> specOf(GameLibraryProvider provider, InstalledGame game) {
         if (game == null || game.id() == null || game.id().isBlank()) return Optional.empty();
-        LaunchKind kind = LaunchKind.fromId(provider.platform());
+        LaunchKind kind = LaunchKind.fromId(game.platform() == null || game.platform().isBlank()
+                ? provider.platform() : game.platform());
         if (kind == LaunchKind.UNKNOWN) return Optional.empty();
         return Optional.of(new LaunchSpec(kind, game.id().trim()).spec());
     }
