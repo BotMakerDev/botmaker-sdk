@@ -57,6 +57,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A screen reads as its name in a run's trace: `[Navigate] to(Options)`, no longer
+  `to(…Screens$Options@480e5c3b)`. It is the class's name, so the trace never builds the setup.
 - Screens on TrackMania, Hades II and Ubisoft Connect (2026-10-30):
   - a launch whose launcher runs in another private display asks *Close it and launch* instead of failing with no
     window; the session's id rides in the run's hand-off, so a reloaded plugin rejoins its own display;

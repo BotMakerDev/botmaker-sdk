@@ -34,4 +34,14 @@ public abstract class Screen {
 
     /** Everything about the screen but its inputs, as one chain: {@code Setup.named("Market").markers(…)…}. */
     public abstract Setup setup();
+
+    /**
+     * The screen's class name, {@code Options}, as a run's trace line shows it. Before, the line read
+     * {@code Screens$Options@480e5c3b}. Not the setup's name: a trace renders every call's arguments, a poll loop's
+     * too, and building the setup each time costs, and can recurse through a setup that names another screen.
+     */
+    @Override
+    public String toString() {
+        return getClass().getSimpleName();
+    }
 }
