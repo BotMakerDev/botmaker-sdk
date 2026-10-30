@@ -4,6 +4,14 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Left from the `ui` sweep of 2026-10-30**:
+  - The 🎮 button and the Game dialog name a target by its id once the saved list is of an older version: "🎮
+    com.zjcs.android.us@Waydroid" for Sword x Staff, "Heroic game 43d4ef20…" for Firestone. The names come back
+    only after a scan, and the dialog's own rows are not redrawn when it lands.
+  - The Game dialog's *Other apps* has a tile with no name; *Games in the app menu* and *Other apps* are still
+    listed on Linux beside Lutris.
+  - The Parameters card for `launchTargets` cuts its *Category*, *Value* and *Note* labels to "...".
+  - The Screens window at its 1180-wide default cuts most of its toolbar and the side panel's buttons to "...".
 - **macOS: OCR has never run on a Mac** (natives staged 2026-10-11 without one). Owed on Apple Silicon:
   `OcrEngine.recognize` and `getWords` load the `darwin-aarch64/` natives and read text; whether dyld maps
   Leptonica once or twice (`vmmap <pid> | grep lepton`), and that OCR works either way.

@@ -102,6 +102,8 @@ final class ScreenPanel {
     private final ScreenHands hands;
 
     private ScreenGraph graph = ScreenGraph.of(Map.of());
+    /** Whether {@link #show} gave the map yet: before, the empty graph is unread, not a bot without a map. */
+    private boolean read;
     private String selected;
     /** What the panel last drew, so a poll that changed nothing redraws nothing. */
     private Object drawn;
@@ -232,6 +234,7 @@ final class ScreenPanel {
     /** Shows {@code constant} of {@code graph}; null for none. Draws again only when something it shows changed. */
     void show(ScreenGraph graph, String constant) {
         this.graph = graph;
+        read = true;
         String now = constant != null && graph.screens().containsKey(constant) ? constant : null;
         // Another screen picks none of its inputs; an input gone from the screen is picked no more.
         if (now == null || !now.equals(selected) || picked != null && graph.input(now, picked).isEmpty()) {
@@ -313,7 +316,8 @@ final class ScreenPanel {
         long boarded = System.nanoTime();
         // Everything the panel shows: that, its card, its way from the first screen, its ways in, how wide it is
         // drawn, and whether a try runs.
-        Object now = selected == null ? List.of(graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
+        Object now = selected == null
+                ? List.of(read, graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
                 : List.of(shown, card(selected), ScreenCards.path(graph, selected), ways(selected), width, busy);
         if (now.equals(drawn)) {
             if (Objects.equals(picked, pickedDrawn)) return;
@@ -491,6 +495,8 @@ final class ScreenPanel {
     }
 
     private List<Node> none() {
+        // Read off the FX thread: a bot of 49 screens said "No map yet" with a name field for a second (2026-10-30).
+        if (!read) return List.of(heading("Screens"), text("Reading the map…"));
         // Popups alone start no tree: the first screen is still to be cut.
         if (!graph.screens().values().stream().allMatch(MapScreen::isPopup)) {
             return List.of(heading("Screens"), text("Pick a screen to see it big, its inputs, try them, cut more and "

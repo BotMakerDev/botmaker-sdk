@@ -37,6 +37,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   is read again when the dialog is focused. A Heroic, Faugus, Bottles or link target is refused on Linux with
   "add the game to Lutris, then pick it again"; a bot listing several launchers takes its first that runs.
 
+### Fixed
+
+- The Screens window says "Reading the map…" until the map is read, not "No map yet" with a field to name the first
+  screen (2026-10-30).
+
 ## [1.8.0] — 2026-10-28
 
 ### Added
