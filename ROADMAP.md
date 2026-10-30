@@ -4,6 +4,15 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Left from Screens on TrackMania, Hades II, Ubisoft Connect (phase 6b, 2026-10-30)**:
+  - the assistant's `launch_game` answers "Bringing up…" before *Close it and launch* ends, and its done-callback can
+    be lost: the assistant is not told the game came up;
+  - Steam shows "Sign in to Steam" first in each new private display;
+  - an input whose kind changes (a scroll over an untried button) is removed and declared again: it moves to the end
+    of its screen's class, and the removal is refused while the bot names the field. Change the field's type in place;
+  - *Close it and launch* without user systemd stops nothing and waits 30 s before refusing: say so up front;
+  - TrackMania's `white_series` matches the black series icon at 0.83: a cut, not a tool, but `read_map` does not
+    say when two inputs of one screen match each other.
 - **Left from Screens on game kinds (phase 6, 2026-10-30)**:
   - `try_input` reads every click on a screen whose background moves all over (Balatro's swirling menu) as a new
     screen. The motion mask is read over 400 ms before the input, but a swirl moves into pixels that were still

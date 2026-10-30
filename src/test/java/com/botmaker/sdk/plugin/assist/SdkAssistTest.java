@@ -841,6 +841,9 @@ class SdkAssistTest {
         assertTrue(run("setup", "action", "set_launch_target", "target", "steam:570;reboot").isRefused());
         assertTrue(run("setup", "action", "set_launch_target", "target", "emu-app:com.x;rm -rf /@Pixel").isRefused());
         assertTrue(run("setup", "action", "set_launch_target", "target", "steam:-applaunch").isRefused(), "never an option");
+        // Lutris, as list_games names Ubisoft Connect.
+        assertFalse(run("setup", "action", "set_launch_target", "target", "lutris:2").isRefused());
+        assertTrue(run("setup", "action", "set_launch_target", "target", "lutris:2 --x").isRefused());
         assertTrue(text(run("setup", "action", "set_launch_target", "target", "emu-app:com.example.game@no-such-emulator-here"))
                 .contains("not an emulator set up here"));
         assertFalse(run("setup", "action", "set_launch_target", "target", "steam:570").isRefused());

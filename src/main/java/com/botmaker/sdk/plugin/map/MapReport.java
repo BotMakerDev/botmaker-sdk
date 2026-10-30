@@ -99,7 +99,7 @@ public final class MapReport {
             MapAudit.of(resources, confidence, cuts, c, read.graph().screens().get(c)).ifPresent(a -> audits.put(c, a));
         }
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,
-                audits, only));
+                audits, MapAudit.clashes(resources, confidence, read.graph(), only), only));
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));
@@ -118,6 +118,12 @@ public final class MapReport {
     /** {@link #text}, with what each screen's shot does not show ({@code audits}, by constant) among what it cannot do. */
     static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
                        Predicate<String> shot, Map<String, Audit> audits, String only) {
+        return text(graph, stages, named, file, shot, audits, List.of(), only);
+    }
+
+    /** {@link #text}, with the markers other screens' shots show too ({@link MapAudit#clashes}). */
+    static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
+                       Predicate<String> shot, Map<String, Audit> audits, List<String> clashes, String only) {
         StringBuilder out = new StringBuilder();
         Set<String> written = new LinkedHashSet<>();
         if (only != null) {
@@ -146,6 +152,7 @@ public final class MapReport {
         }
         List<String> problems = new ArrayList<>(problems(graph, named, file, only));
         problems.addAll(misfits(graph, audits, only));
+        problems.addAll(clashes);
         out.append(problems.isEmpty() ? "\nNothing the map cannot do.\n" : "\nWhat the map cannot do:\n");
         for (String problem : problems) out.append("- ").append(problem).append('\n');
         return out.toString().stripTrailing();

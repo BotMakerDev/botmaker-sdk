@@ -109,6 +109,8 @@ class ScreenWalkTest {
         String greyed;
         /** How many clicks in a row the game misses: lag. */
         int deaf;
+        /** A picture drawn only from a time on, after its screen's marker: a menu fading in. */
+        final Map<String, Long> drawnAt = new HashMap<>();
 
         Game(String screen) {
             this(screen, map());
@@ -184,6 +186,7 @@ class ScreenWalkTest {
         @Override
         public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
             if (!shows.getOrDefault(showing(), Set.of()).contains(picture.id())) return Optional.empty();
+            if (now < drawnAt.getOrDefault(picture.id(), 0L)) return Optional.empty();
             if (!places.contains(picture.id())) places.add(picture.id());
             return Optional.of(new Rect(places.indexOf(picture.id()) * 20, 0, 10, 10));
         }
@@ -226,6 +229,19 @@ class ScreenWalkTest {
 
     private static ScreenWalk.Result go(Game game, String target, List<String> reached) {
         return new ScreenWalk(game.map, game, STEP_MS, reached::add).go(target, null);
+    }
+
+    /** Back on Hades II's title, its logo shows before the menu fades in: the walk waits for Options to draw. */
+    @Test
+    void aButtonDrawnAfterItsScreensMarkerIsWaitedFor() {
+        Game game = new Game("CAMPAIGN");
+        game.drawnAt.put("engineer", STEP_MS / 2);
+        List<String> reached = new ArrayList<>();
+
+        ScreenWalk.Result result = go(game, "ENGINEER", reached);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
+        assertEquals(List.of("key ESCAPE", "click engineer"), game.done);
     }
 
     /** Home with a Claim the game shows, greyed as claim_off once it runs out. */

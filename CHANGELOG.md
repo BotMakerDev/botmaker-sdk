@@ -57,6 +57,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Screens on TrackMania, Hades II and Ubisoft Connect (2026-10-30):
+  - a launch whose launcher runs in another private display asks *Close it and launch* instead of failing with no
+    window; the session's id rides in the run's hand-off, so a reloaded plugin rejoins its own display;
+  - `read_map` says when a screen's marker also shows on another screen's shot (Hades II's Options skull on Save
+    slots), where it said "Nothing the map cannot do";
+  - a walk waits for the button it presses next, up to the way's time: Hades II's title shows its logo before its
+    menu fades in, and *Options* was missed on the frame the walk planned from;
+  - a scroll over an untried button retypes its field to a `Strip` ("could not write that value (Strip) as Button",
+    Ubisoft Connect's library);
+  - `set_launch_target` takes `lutris:<gameId>`.
 - The assistant's *launch game* after the bot's launch target changed no longer answers that the new game is "running
   already" while the private display still runs the old one: the display remembers what it was brought up for, and
   one running another target is closed and the new target launched.

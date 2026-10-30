@@ -672,7 +672,13 @@ public final class ScreenWalk {
             if (edge.state() != null && edge.state() != seen.get().state()) return false;
             return reach.press(button, seen.get().place(), frame);
         }
-        return reach.perform(edge.via(), stripOf(edge).orElse(null), edge.pick(), frame);
+        Optional<Strip> strip = stripOf(edge);
+        // A screen told by its marker may draw its buttons after it: back on Hades II's title, its logo shows before
+        // its menu fades in, and Options was missed on the frame the walk planned from (2026-10-30).
+        BufferedImage now = edge.via() instanceof Button button && strip.isEmpty()
+                ? awaited(f -> reach.seen(button, null, edge.pick(), f).isPresent(), Optional.of(frame)).orElse(frame)
+                : frame;
+        return reach.perform(edge.via(), strip.orElse(null), edge.pick(), now);
     }
 
     /** The strip of the screen holding {@code edge}'s input that its input is a member of; empty for one at its place. */

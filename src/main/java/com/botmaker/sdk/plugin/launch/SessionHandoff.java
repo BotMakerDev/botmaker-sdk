@@ -34,6 +34,11 @@ public final class SessionHandoff {
      * Staff).
      */
     private static final RunProperty<String> TARGET = RunProperty.text("botmaker.session.target");
+    /**
+     * The session the offered display was brought up in: once the window offered has closed, a process of it still
+     * drawing on the display says the display is still that game's ({@link BackgroundLauncher#adopt}).
+     */
+    private static final RunProperty<String> SESSION = RunProperty.text("botmaker.session.id");
 
     private SessionHandoff() {}
 
@@ -46,6 +51,10 @@ public final class SessionHandoff {
         List<String> args = Sessions.handoffArguments(session);
         for (RunProperty<String> property : PROPERTIES) services.runs().set(property, value(args, property.name()));
         services.runs().set(TARGET, session == null || launched == null ? null : launched.spec());
+        // A display joined has no id of its own here: the one it was brought up in stays offered.
+        if (session == null || session.sessionId() != null) {
+            services.runs().set(SESSION, session == null ? null : session.sessionId());
+        }
     }
 
     /**
@@ -75,7 +84,7 @@ public final class SessionHandoff {
         String window = services.runs().get(WINDOW).orElse(null);
         SessionBackend backend = services.runs().get(BACKEND).flatMap(SessionBackend::fromId)
                 .orElse(SessionBackend.GAMESCOPE);
-        PrivateSession joined = launcher.adopt(display, window, backend);
+        PrivateSession joined = launcher.adopt(display, window, backend, services.runs().get(SESSION).orElse(null));
         // A display that has gone is withdrawn, so the next look does not try to join it again.
         if (joined == null) offer(services, null, null);
         return joined;

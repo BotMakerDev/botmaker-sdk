@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
 import com.botmaker.sdk.plugin.assist.MapAudit.Where;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -100,6 +102,42 @@ class MapAuditTest {
         assertFalse(event.sure(), "one that comes and goes, missing, is only a note");
         // Made once for the same files and places.
         assertSame(audit, MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow());
+    }
+
+    /** Hades II: the Options skull crowns Save slots too, whose shot came after the skull was cut. */
+    @Test
+    void aMarkerAnotherScreensShotShowsIsSaid() throws IOException {
+        BufferedImage skull = noise(SIZE, SIZE, 20);
+        BufferedImage choose = noise(SIZE, SIZE, 21);
+        for (Map.Entry<String, BufferedImage> picture : Map.of("skull", skull, "choose", choose).entrySet()) {
+            Path file = TemplateLibrary.fileForName(resources, picture.getKey());
+            Files.createDirectories(file.getParent());
+            ImageIO.write(picture.getValue(), "png", file.toFile());
+        }
+        writeShot("screens/OPTIONS.png", Map.of(skull, new Rect(300, 10, SIZE, SIZE)));
+        writeShot("screens/SAVE_SLOTS.png", Map.of(skull, new Rect(300, 10, SIZE, SIZE),
+                choose, new Rect(200, 100, SIZE, SIZE)));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("OPTIONS", MapFixtures.screen(Setup.named("Options").markers(marks("skull"))
+                .shot("screens/OPTIONS.png")));
+        screens.put("SAVE_SLOTS", MapFixtures.screen(Setup.named("Save slots").markers(marks("choose"))
+                .shot("screens/SAVE_SLOTS.png")));
+
+        List<String> said = MapAudit.clashes(resources, 0.9, ScreenGraph.of(screens), null);
+
+        assertEquals(1, said.size(), said.toString());
+        assertTrue(said.getFirst().startsWith("Options: "), said.toString());
+        assertTrue(said.getFirst().contains("Save slots's shot too"), said.toString());
+    }
+
+    private void writeShot(String path, Map<BufferedImage, Rect> pictures) throws IOException {
+        BufferedImage shot = noise(WIDTH, HEIGHT, 2);
+        Graphics2D g = shot.createGraphics();
+        pictures.forEach((picture, at) -> g.drawImage(picture, at.x(), at.y(), null));
+        g.dispose();
+        Path file = resources.resolve(path);
+        Files.createDirectories(file.getParent());
+        ImageIO.write(shot, "png", file.toFile());
     }
 
     /** In a list, anywhere in it is its place, and one scrolled out of the shot is only a note. */

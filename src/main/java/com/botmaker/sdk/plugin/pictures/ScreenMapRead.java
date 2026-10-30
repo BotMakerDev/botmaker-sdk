@@ -137,6 +137,15 @@ public final class ScreenMapRead {
                 continue;
             }
             if (before.equals(e.getValue())) continue;
+            if (before.getClass() != e.getValue().getClass()) {
+                // Another kind is another field type: a Button's field cannot hold the Strip a scroll over it made
+                // (2026-10-30, Ubisoft Connect's library refused "(Strip) as Button"). Declared again, by its name,
+                // at once: a later field refused would leave it removed.
+                Optional<String> refused = values.remove(SdkValues.SCREEN_MAP, Member.of(constant, e.getKey()))
+                        .or(() -> add(values, constant, Map.of(e.getKey(), e.getValue())));
+                if (refused.isPresent()) return refused;
+                continue;
+            }
             Optional<String> refused = values.open(SdkValues.SCREEN_MAP, Member.of(constant, e.getKey()))
                     .map(ctx -> ctx.write(e.getValue()))
                     .orElse(Optional.of(HOLDER + "." + constant + "." + e.getKey() + " is written by hand, so it is "

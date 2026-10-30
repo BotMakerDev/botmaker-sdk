@@ -162,8 +162,9 @@ final class SetupTools {
     }
 
     @Describe("make a launcher the bot's first in Sdk.launchTargets: each computer starts the first its system can")
-    record SetLaunchTarget(@Describe("what to launch: steam:<appId>, epic:<appName>, heroic:<appName>, "
-            + "faugus:<gameId> or emu-app:<package>@<emulator>; a command line or an executable is the user's to set")
+    record SetLaunchTarget(@Describe("what to launch, as list_games names it: steam:<appId>, lutris:<gameId>, "
+            + "epic:<appName>, heroic:<appName>, faugus:<gameId> or emu-app:<package>@<emulator>; a command line or an "
+            + "executable is the user's to set")
                            String target) implements Step {
     }
 
@@ -549,10 +550,11 @@ final class SetupTools {
     /**
      * The launch kinds the assistant may set: each names an entry a launcher already knows. Not {@code cli:} or
      * {@code exe:} — those run whatever they say on the next Run, and the assistant reads text off the game's
-     * screen, so a line there could have it plant a command. The user sets those in the launch chooser.
+     * screen, so a line there could have it plant a command. The user sets those in the launch chooser. Lutris, Linux's
+     * launcher since 2026-10-29, was missing: list_games named Ubisoft Connect {@code lutris:2}, which this refused.
      */
-    static final Set<LaunchKind> ASSISTANT_KINDS = Set.of(LaunchKind.STEAM, LaunchKind.EPIC, LaunchKind.HEROIC,
-            LaunchKind.FAUGUS, LaunchKind.EMULATOR_APP);
+    static final Set<LaunchKind> ASSISTANT_KINDS = Set.of(LaunchKind.STEAM, LaunchKind.LUTRIS, LaunchKind.EPIC,
+            LaunchKind.HEROIC, LaunchKind.FAUGUS, LaunchKind.EMULATOR_APP);
 
     /** An Android package: dot-separated Java-like names, at least two. */
     private static final java.util.regex.Pattern PACKAGE =

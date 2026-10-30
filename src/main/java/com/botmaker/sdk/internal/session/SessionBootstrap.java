@@ -193,7 +193,7 @@ public final class SessionBootstrap {
                 // As a run takes them (launchIsolated): nothing to hand a display to runs on :0, as it would anyway.
                 LaunchIsolation.Verdict verdict = isolation.apply(spec);
                 yield switch (verdict.blocker()) {
-                    case NONE, NO_CHILD_COMMAND, HOST_LAUNCHER_OPEN -> Optional.empty();
+                    case NONE, NO_CHILD_COMMAND, HOST_LAUNCHER_OPEN, LAUNCHER_IN_OTHER_SESSION -> Optional.empty();
                     case PORTAL_WOULD_ESCAPE, NOT_INSTALLED -> Optional.of(verdict.reason());
                 };
             }

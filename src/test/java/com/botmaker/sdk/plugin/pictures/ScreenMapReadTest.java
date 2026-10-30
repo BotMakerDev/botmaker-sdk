@@ -7,6 +7,14 @@ import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.MapFixtures;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -102,8 +110,34 @@ class ScreenMapReadTest {
         assertEquals(2, values.reads);
     }
 
+    /** Ubisoft Connect's library: a scroll over an untried tile made its Button a Strip, which its field could not hold. */
+    @Test
+    void anInputOfAnotherKindIsDeclaredAgainByItsName() {
+        List<String> calls = new ArrayList<>();
+        PluginValues values = new Values() {
+            @Override
+            public Optional<String> remove(ManagedValue<?> set, Member member) {
+                calls.add("remove " + member);
+                return Optional.empty();
+            }
+
+            @Override
+            public <E> Optional<String> add(ManagedValue<E> set, Member member, E value) {
+                calls.add("add " + member + " " + value.getClass().getSimpleName());
+                return Optional.empty();
+            }
+        };
+        ImageTemplate tile = new ImageTemplate("images/tile.png");
+        MapScreen was = MapFixtures.screen(Setup.named("Library"), Button.of(tile));
+        String field = MapFixtures.fieldOf(Button.of(tile));
+        MapScreen now = was.withInput(field, Strip.of(Scroll.wheel(-5), List.of(tile)));
+
+        assertEquals(Optional.empty(), ScreenMapRead.write(values, "LIBRARY", was, now));
+        assertEquals(List.of("remove LIBRARY." + field, "add LIBRARY." + field + " Strip"), calls);
+    }
+
     /** A bot's values with no screens, counting the reads of the map. */
-    private static final class Values implements PluginValues {
+    private static class Values implements PluginValues {
         int reads;
         boolean broken;
 

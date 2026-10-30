@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Whether each screen's shot shows what the screen names: its marker, and each input's and its way back's picture, at
@@ -186,6 +187,12 @@ public final class MapAudit {
      */
     public static Optional<Clash> clash(Path resources, double confidence, ScreenGraph graph, String constant,
                                         Markers set) {
+        return clash(resources, confidence, graph, constant, set, screen -> shot(resources, screen));
+    }
+
+    /** {@link #clash(Path, double, ScreenGraph, String, Markers)} reading each screen's shot through {@code shots}. */
+    private static Optional<Clash> clash(Path resources, double confidence, ScreenGraph graph, String constant,
+                                         Markers set, Function<MapScreen, Optional<BufferedImage>> shots) {
         if (resources == null || !set.any()) return Optional.empty();
         List<String> shown = files(resources, set.shown());
         List<String> absent = files(resources, set.absent());
@@ -195,7 +202,7 @@ public final class MapAudit {
         for (Map.Entry<String, MapScreen> other : graph.screens().entrySet()) {
             String c = other.getKey();
             if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
-            Optional<BufferedImage> shot = shot(resources, other.getValue());
+            Optional<BufferedImage> shot = shots.apply(other.getValue());
             if (shot.isEmpty()) continue;
             List<Fit> fits = fits(resources, confidence, Map.of(), names, shot.get());
             boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
@@ -208,6 +215,28 @@ public final class MapAudit {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Each screen ({@code only}, or every one) whose markers another screen's shot shows too, said as cutting one
+     * says it: a run takes that other screen for it. A marker is checked against the shots there are when it is cut,
+     * so a screen whose shot came later went unseen: Hades II's Options skull crowns its Save slots too, and a walk
+     * from Save slots believed it was on Options (2026-10-30).
+     */
+    public static List<String> clashes(Path resources, double confidence, ScreenGraph graph, String only) {
+        List<String> lines = new ArrayList<>();
+        // Each shot is read once: every screen's markers are looked for on every other screen's shot.
+        Map<MapScreen, Optional<BufferedImage>> read = new IdentityHashMap<>();
+        Function<MapScreen, Optional<BufferedImage>> shots = screen -> read.computeIfAbsent(screen,
+                s -> shot(resources, s));
+        for (Map.Entry<String, MapScreen> each : graph.screens().entrySet()) {
+            String c = each.getKey();
+            if (only != null && !only.equals(c) || each.getValue().isPopup()) continue;
+            Markers set = Markers.of(each.getValue());
+            clash(resources, confidence, graph, c, set, shots)
+                    .ifPresent(clash -> lines.add(graph.shown(c) + ": " + MapTools.clashSaid(graph, c, set, clash)));
+        }
+        return lines;
     }
 
     /** {@code other}'s markers not on {@code screen}'s shot; empty while it has none. */
