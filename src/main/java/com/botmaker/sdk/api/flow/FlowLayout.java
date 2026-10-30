@@ -8,7 +8,7 @@ import java.util.Map;
  * Where each card sits on the Activity Flow canvas, one arrangement per flow, as a value (2026-09-27; per flow
  * 2026-10-11).
  *
- * <p>It is written in {@code plugins/sdk/Sdk.java} beside the flows, and the flow editor rewrites the one
+ * <p>It is written in {@code Sdk.java} beside the flows, and the flow editor rewrites the one
  * expression the {@code @SdkValue(FLOW_LAYOUT)} method returns:
  *
  * <pre>{@code

@@ -1,7 +1,7 @@
 package samplebot;
 
 import samplebot.params.Parameters;
-import samplebot.plugins.sdk.Activities;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Activities;
 import com.botmaker.sdk.api.time.Wait;
 
 /** Does nothing, for as long as {@link Parameters#restBetween} says. */

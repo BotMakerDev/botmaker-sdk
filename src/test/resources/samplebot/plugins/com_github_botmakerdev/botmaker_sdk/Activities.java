@@ -1,4 +1,4 @@
-package samplebot.plugins.sdk;
+package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.bot.SdkValue;

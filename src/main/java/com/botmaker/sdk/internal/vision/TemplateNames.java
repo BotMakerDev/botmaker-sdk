@@ -32,7 +32,7 @@ public final class TemplateNames {
 
     /**
      * The class the constants live in, which is the one this plugin <b>ships</b> — {@code Pictures}, written
-     * into {@code <bot package>/plugins/sdk/} the first time the SDK is added.
+     * into {@code <bot package>/plugins/com_github_botmakerdev/botmaker_sdk/} the first time the SDK is added.
      *
      * <p>It was {@code "Templates"} and it was a <em>guess</em>: nothing generated that class, nothing
      * required a project to have one, and a bot whose author called theirs anything else had its picture

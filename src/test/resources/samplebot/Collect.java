@@ -1,8 +1,8 @@
 package samplebot;
 
-import samplebot.plugins.sdk.Activities;
-import samplebot.plugins.sdk.Pictures;
-import samplebot.plugins.sdk.Screens;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Activities;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Pictures;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Screens;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;

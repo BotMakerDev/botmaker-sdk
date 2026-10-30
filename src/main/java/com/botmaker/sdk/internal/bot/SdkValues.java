@@ -57,7 +57,7 @@ import java.util.Set;
  */
 public final class SdkValues implements ValueHolder {
 
-    /** The class the method-shaped values live in: {@code plugins/sdk/Sdk.java}, named by the bot's {@code main}. */
+    /** The class the method-shaped values live in: {@code Sdk.java} under {@code plugins/}, named by the bot's {@code main}. */
     public static final String HOLDER = "Sdk";
 
     /**

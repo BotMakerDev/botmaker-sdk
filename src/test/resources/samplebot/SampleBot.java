@@ -1,8 +1,8 @@
 package samplebot;
 
 import samplebot.params.Parameters;
-import samplebot.plugins.sdk.Pictures;
-import samplebot.plugins.sdk.Sdk;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Pictures;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Sdk;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageClicker;
@@ -11,8 +11,8 @@ import com.botmaker.sdk.api.vision.ImageClicker;
  * A bot shaped as Studio writes one, compiled by {@code SampleBotCompileTest} against the SDK under test: an
  * {@code api.*} change that breaks a bot fails the SDK's own tests. Test data only; nothing ships it.
  *
- * <p>Three activities and a flow deciding which of them runs next ({@code plugins/sdk/Flows.java}), the run's
- * values ({@code plugins/sdk/Sdk.java}), the pictures, texts and screens Studio keeps, and the parameters.
+ * <p>Three activities and a flow deciding which of them runs next ({@code Flows.java} in {@code plugins/}), the run's
+ * values ({@code Sdk.java} beside it), the pictures, texts and screens Studio keeps, and the parameters.
  */
 public final class SampleBot {
 

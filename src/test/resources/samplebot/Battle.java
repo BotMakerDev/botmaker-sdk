@@ -1,7 +1,7 @@
 package samplebot;
 
-import samplebot.plugins.sdk.Activities;
-import samplebot.plugins.sdk.Pictures;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Activities;
+import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Pictures;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;

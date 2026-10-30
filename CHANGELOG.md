@@ -26,6 +26,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- The sample bot's holders are in `plugins/com_github_botmakerdev/botmaker_sdk/`, where Studio writes them, not
+  in `plugins/sdk/`. The flow editor's refusal no longer says the `Sdk` class must be in `plugins/sdk/`: Studio
+  finds it by its `@SdkValue` marks.
+
 - The Screen map's *Save*, the Picture manager's *Replace*, *Export* and *Import*, and the VM setup's *Choose the
   .iso…* ask Studio for their file chooser (`Dialogs`), so Studio's `ui choose` can answer them. *Save* and
   *Export* use `Dialogs.saveFile`, so this SDK needs a Studio whose contract has it; an older Studio refuses

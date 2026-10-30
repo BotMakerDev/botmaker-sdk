@@ -123,7 +123,7 @@ public final class FlowValue {
             // is one of three, and the host's reason does not reach a plugin through openOrCreate.
             return Target.refused("BotMaker has no @SdkValue(RUN) method it can write, so there is nothing to save "
                     + "the flow into. Either the project is open read-only, Sdk.run() is hand-written in a form "
-                    + "this editor cannot read, or the Sdk class is outside plugins/sdk/.");
+                    + "this editor cannot read, or no Sdk class carries the @SdkValue marks.");
         }
         Optional<Run> run = RUN.read(runValue.get());
         if (run.isEmpty()) {
