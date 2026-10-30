@@ -7,6 +7,7 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **Left from Screens on TrackMania, Hades II, Ubisoft Connect (phase 6b, 2026-10-30)**:
   - the assistant's `launch_game` answers "Bringing up…" before *Close it and launch* ends, and its done-callback can
     be lost: the assistant is not told the game came up;
+  - Silksong was not walked; TrackMania, Hades II and Ubisoft Connect were;
   - Steam shows "Sign in to Steam" first in each new private display;
   - an input whose kind changes (a scroll over an untried button) is removed and declared again: it moves to the end
     of its screen's class, and the removal is refused while the bot names the field. Change the field's type in place;
