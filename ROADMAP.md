@@ -12,6 +12,9 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
     listed on Linux beside Lutris.
   - The Parameters card for `launchTargets` cuts its *Category*, *Value* and *Note* labels to "...".
   - The Screens window at its 1180-wide default cuts most of its toolbar and the side panel's buttons to "...".
+  - Naming Firestone's 49 old shots in one step (`ScreenShots.adopt`) held Studio's FX thread 12.3 s, in
+    `ProjectAnalyzer.createCompilationUnits` ×179: each setup write re-parses the project. Once per old map, but a
+    batch of writes should parse once.
 - **macOS: OCR has never run on a Mac** (natives staged 2026-10-11 without one). Owed on Apple Silicon:
   `OcrEngine.recognize` and `getWords` load the `darwin-aarch64/` natives and read text; whether dyld maps
   Leptonica once or twice (`vmmap <pid> | grep lepton`), and that OCR works either way.

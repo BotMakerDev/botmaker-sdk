@@ -116,8 +116,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   constant was lost by any rename that did not move the file too. The first save (`ScreenShots.save`) picks a path
   no screen names (`ScreenShots.fresh`: `screens/<CONSTANT>.png`, `screens/<CONSTANT>@<look>.png`, then `_2`…),
   writes the file and then the path into the setup, one history step; a later save writes over the file the Java
-  names. A screen whose Java names no shot has none, whatever files the folder holds: a map made before shows its
-  markers until a shot is taken again. A delete removes the files its Java names.
+  names. A screen whose Java names no shot has none, whatever files the folder holds, with one exception
+  (2026-10-30): the first read of a 🗺 Screens window or pane, once a project and Studio session, names a map's old shots (`ScreenShots.unnamed`, then
+  `adopt` through `ScreenBook.updateAll`, one history step), `screens/<CONSTANT>.png` for a screen naming none and
+  `screens/<CONSTANT>@<look>.png` for a look naming none, each only while the file is there and no screen or look
+  names it. A delete removes the files its Java names.
 - **A rename renames the constant** (2026-10-22): `edit_map rename` and the card's ⋯ *Rename* give the screen its
   name and the constant and class that name makes (`ScreenBook.constantFor(graph, name, own)`), every use renamed
   by binding (`PluginValues.renameGroup`), one history step; a name that makes the same constant keeps it. Studio's

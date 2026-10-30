@@ -16,6 +16,7 @@ import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -87,6 +88,29 @@ final class ScreenBook {
         // Named for Studio's ↶; a drag or a new screen around it is one step under its own name instead.
         return step(services, "Edit " + now.get().name(),
                 () -> ScreenMapRead.write(values, constant, now.get(), next));
+    }
+
+    /**
+     * Each screen of {@code changes} as its change makes it, the map read once, all in one step named {@code label}:
+     * one a screen is gone or written by hand is left. Empty when written, else the first why not.
+     */
+    static Optional<String> updateAll(StudioServices services, String label,
+                                      Map<String, UnaryOperator<MapScreen>> changes) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return Optional.of("Studio has no source tree open.");
+        ScreenGraph graph = read(services);
+        return step(services, label, () -> {
+            Optional<String> first = Optional.empty();
+            for (Map.Entry<String, UnaryOperator<MapScreen>> change : changes.entrySet()) {
+                String constant = change.getKey();
+                Optional<MapScreen> now = graph.screen(constant)
+                        .filter(s -> ScreenMapRead.setup(values, constant).isPresent());
+                Optional<String> why = now.isEmpty() ? Optional.of(HOLDER + "." + constant + " is gone or written by hand.")
+                        : ScreenMapRead.write(values, constant, now.get(), change.getValue().apply(now.get()));
+                if (first.isEmpty()) first = why;
+            }
+            return first;
+        });
     }
 
     /** {@code write} as one step of Studio's undo named {@code label}, or part of the batch already open. */

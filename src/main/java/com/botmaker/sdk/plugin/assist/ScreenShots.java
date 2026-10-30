@@ -13,11 +13,16 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * A picture of each whole screen of the map, for 🗺 Screens' cards and side panel: the marker alone says which screen
@@ -33,7 +38,8 @@ import java.util.Set;
  * {@code ScreenVariant.shot(…)} (the user's call, 2026-10-22): a file found by the screen's constant was lost by any
  * rename that did not move it too, Studio's or the IDE's. The first save picks a file no other screen names,
  * {@code screens/<CONSTANT>.png} or {@code screens/<CONSTANT>@<look>.png}, and writes its path in; a rename leaves both
- * as they are. A screen whose Java names no shot has none, whatever files sit in the folder.
+ * as they are. A screen whose Java names no shot has none, whatever files sit in the folder, except that a map made
+ * before that names its old files once when 🗺 Screens opens it ({@link #unnamed}, 2026-10-30).
  */
 public final class ScreenShots {
 
@@ -108,11 +114,7 @@ public final class ScreenShots {
      * screen names is nobody's, and is written over.
      */
     static String fresh(ScreenGraph graph, String constant, String look) {
-        Set<String> taken = new HashSet<>();
-        for (MapScreen screen : graph.screens().values()) {
-            if (screen.setup().shot() != null) taken.add(screen.setup().shot());
-            for (ScreenVariant variant : screen.variants()) if (variant.shot() != null) taken.add(variant.shot());
-        }
+        Set<String> taken = taken(graph);
         String id = lookId(look);
         String base = FOLDER + "/" + constant + (id.isEmpty() ? "" : "@" + id);
         String path = base + ".png";
@@ -174,6 +176,71 @@ public final class ScreenShots {
         } catch (IOException ignored) {
             // A stray shot is named by no screen: nothing reads it.
         }
+    }
+
+    /**
+     * A shot taken before the screen's Java named it (2026-10-30): {@code path} is {@code constant}'s own shot, or its
+     * look {@code look}'s.
+     */
+    public record Unnamed(String constant, String look, String path) {}
+
+    /**
+     * The shots a map made before 2026-10-22 kept by its constant alone: for a screen naming no shot,
+     * {@code screens/<CONSTANT>.png}, and for a look naming none, {@code screens/<CONSTANT>@<look>.png}, each while the
+     * file is in {@code resources} and no other screen or look names it. Off the FX thread: it states files.
+     */
+    public static List<Unnamed> unnamed(Path resources, ScreenGraph graph) {
+        if (resources == null || graph == null) return List.of();
+        Set<String> taken = taken(graph);
+        List<Unnamed> found = new ArrayList<>();
+        for (Map.Entry<String, MapScreen> entry : graph.screens().entrySet()) {
+            String constant = entry.getKey();
+            MapScreen screen = entry.getValue();
+            if (screen.setup().shot() == null) {
+                unnamed(resources, taken, constant, null).ifPresent(found::add);
+            }
+            for (ScreenVariant variant : screen.variants()) {
+                if (variant.shot() == null && !lookId(variant.name()).isEmpty()) {
+                    unnamed(resources, taken, constant, variant.name()).ifPresent(found::add);
+                }
+            }
+        }
+        return found;
+    }
+
+    private static Optional<Unnamed> unnamed(Path resources, Set<String> taken, String constant, String look) {
+        String id = lookId(look);
+        String path = FOLDER + "/" + constant + (id.isEmpty() ? "" : "@" + id) + ".png";
+        if (!Files.isRegularFile(resources.resolve(path)) || !taken.add(path)) return Optional.empty();
+        return Optional.of(new Unnamed(constant, look, path));
+    }
+
+    /**
+     * Writes each of {@code shots} into its screen's Java, as {@link #save} names a first shot: one step of Studio's
+     * history. On the FX thread. Empty when written, else why not.
+     */
+    public static Optional<String> adopt(StudioServices services, List<Unnamed> shots) {
+        if (services == null || shots.isEmpty()) return Optional.empty();
+        Map<String, UnaryOperator<MapScreen>> changes = new LinkedHashMap<>();
+        for (Unnamed shot : shots) {
+            // Read again by then: a shot the screen or look has come to name since is kept.
+            UnaryOperator<MapScreen> named = s -> s.setup(x -> shot.look() == null
+                    ? x.shot() == null ? x.shot(shot.path()) : x
+                    : x.variants().stream().filter(v -> v.name().equals(shot.look()) && v.shot() == null).findFirst()
+                    .map(v -> x.withVariant(v.shot(shot.path()))).orElse(x));
+            changes.merge(shot.constant(), named, (was, then) -> s -> then.apply(was.apply(s)));
+        }
+        return ScreenBook.updateAll(services, "Name the screens' shots", changes);
+    }
+
+    /** Every path a screen or look of {@code graph} names for its shot. */
+    private static Set<String> taken(ScreenGraph graph) {
+        Set<String> taken = new HashSet<>();
+        for (MapScreen screen : graph.screens().values()) {
+            if (screen.setup().shot() != null) taken.add(screen.setup().shot());
+            for (ScreenVariant variant : screen.variants()) if (variant.shot() != null) taken.add(variant.shot());
+        }
+        return taken;
     }
 
     /** The path {@code screen}'s Java names for its shot in {@code look}, its own for null or blank; null for none. */

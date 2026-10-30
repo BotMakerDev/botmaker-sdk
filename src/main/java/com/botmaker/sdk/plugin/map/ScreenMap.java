@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.sdk.plugin.HistoryKeys;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
@@ -50,10 +51,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -85,6 +88,11 @@ public final class ScreenMap {
 
     /** The window open on each project, by its folder. On the FX thread. */
     private static final Map<Path, ScreenMap> OPEN = new HashMap<>();
+    /**
+     * The projects whose shots taken before their Java named them were looked for (2026-10-30): once a Studio
+     * session, by whichever window or pane read first, so a ↶ of it stays taken back. On the FX thread.
+     */
+    private static final Set<Path> SHOTS_NAMED = new HashSet<>();
 
     private final StudioServices services;
     private final ScreenCanvas canvas;
@@ -425,9 +433,10 @@ public final class ScreenMap {
         // Asked of what is drawn now, answered off the FX thread: stating every shot and picture held it each poll.
         BooleanSupplier cardFiles = canvas.filesCheck();
         Supplier<ScreenPanel.Written> panelFiles = panel == null ? () -> null : panel.filesCheck();
+        boolean nameShots = project != null && !SHOTS_NAMED.contains(project);
         Thread.ofVirtual().name("screen-map-read").start(() -> {
             try {
-                readOff(asked, was, due, cardFiles, panelFiles);
+                readOff(asked, was, due, cardFiles, panelFiles, nameShots);
             } catch (RuntimeException lost) {
                 // Lost before it could answer (a file that could not be stated): the next poll reads again.
                 Platform.runLater(() -> {
@@ -437,9 +446,12 @@ public final class ScreenMap {
         });
     }
 
-    /** {@link #readLater}'s read, off the FX thread: {@code asked} is its number, drawn only while still the latest. */
+    /**
+     * {@link #readLater}'s read, off the FX thread: {@code asked} is its number, drawn only while still the latest.
+     * With {@code nameShots}, the map's shots taken before its Java named them are named in it, once.
+     */
     private void readOff(long asked, ScreensFile was, boolean due, BooleanSupplier cardFiles,
-                         Supplier<ScreenPanel.Written> panelFiles) {
+                         Supplier<ScreenPanel.Written> panelFiles, boolean nameShots) {
         Optional<ScreensFile> file = ScreensFile.of(project, was == null ? null : was.file());
         if (!due && file.isPresent() && file.get().equals(was)) {
             // Screens.java as it was: only a picture or shot rewritten since is drawn again.
@@ -468,6 +480,9 @@ public final class ScreenMap {
             read = new Read(null, null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
         }
         Read done = read;
+        // Null while there is nothing to look in: no source tree yet reads as an empty map, not a failed one.
+        List<ScreenShots.Unnamed> unnamed = nameShots && done.failed() == null && services.pluginValues() != null
+                ? ScreenShots.unnamed(services.resourcesDir(), done.graph()) : null;
         Platform.runLater(() -> {
             // Only the latest read frees the next: an older one ending early would let a poll start beside it.
             if (asked != reads) return;
@@ -480,6 +495,7 @@ public final class ScreenMap {
                 lastFile = file.orElse(null);
                 pollsSinceRead = 0;
             }
+            if (unnamed != null) nameShots(unnamed);
         });
     }
 
@@ -673,6 +689,19 @@ public final class ScreenMap {
             tell(ScreenEdits.tidy(services));
             refresh();
         });
+    }
+
+    /**
+     * Names {@code unnamed} in the screens' Java, one step of ↶: a map made before 2026-10-22 kept its shots by the
+     * screen's constant, and shows none until its Java names them. On the FX thread; done once a project and session.
+     */
+    private void nameShots(List<ScreenShots.Unnamed> unnamed) {
+        if (!SHOTS_NAMED.add(project)) return;
+        if (unnamed.isEmpty()) return;
+        Optional<String> failed = ScreenShots.adopt(services, unnamed);
+        tell(failed.map(why -> "Some old shots were not named: " + why).orElse("Named " + unnamed.size()
+                + (unnamed.size() == 1 ? " old shot" : " old shots") + " in Screens.java (↶ takes it back)."));
+        readLater(true);
     }
 
     /** {@code text} in the toolbar, kept over the next read's summary. */

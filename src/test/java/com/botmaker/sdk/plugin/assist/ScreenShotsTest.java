@@ -84,6 +84,28 @@ class ScreenShotsTest {
         assertFalse(Files.exists(look), "a screen gone takes its looks' shots along");
     }
 
+    @Test
+    void aShotTakenBeforeTheJavaNamedItIsFoundByItsConstantOnce(@TempDir Path resources) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home")));
+        // Shop was Arena once: renamed, it names Arena's file, which is no longer Arena's.
+        screens.put("SHOP", MapScreen.of(Setup.named("Shop").shot("screens/ARENA.png")));
+        screens.put("ARENA", MapScreen.of(Setup.named("Arena")));
+        screens.put("BAG", MapScreen.of(Setup.named("Bag")));
+        screens.put("EVENT", MapScreen.of(Setup.named("Event").shot("screens/EVENT.png")
+                .variants(List.of(ScreenVariant.named("Halloween"), ScreenVariant.named("Winter")))));
+        for (String file : List.of("HOME", "ARENA", "EVENT", "EVENT@halloween")) {
+            ScreenShots.write(resources.resolve("screens/" + file + ".png"),
+                    new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB));
+        }
+
+        assertEquals(List.of(new ScreenShots.Unnamed("HOME", null, "screens/HOME.png"),
+                        new ScreenShots.Unnamed("EVENT", "Halloween", "screens/EVENT@halloween.png")),
+                ScreenShots.unnamed(resources, graph(screens)),
+                "Arena's file is Shop's, Bag has no file, Winter has no file, Event names its own already");
+        assertEquals(List.of(), ScreenShots.unnamed(null, graph(screens)));
+    }
+
     private static ScreenGraph graph(Map<String, MapScreen> screens) {
         return ScreenGraph.of(screens);
     }

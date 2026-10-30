@@ -23,6 +23,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - The flow canvas's cards, ports and arrows have accessible names (`card Start`, `port Start DONE`, `arrow Start
   DONE → Idle`), which screen readers and Studio's `ui` driver read.
+- A map made before shots were named in the Java gets them back: the first time 🗺 Screens opens it in a Studio
+  session, each screen that names no shot while `screens/<CONSTANT>.png` is there and no other screen names that
+  file has it written into its setup, and each look likewise with `screens/<CONSTANT>@<look>.png`, all in one step
+  ↶ takes back.
 
 ### Changed
 
