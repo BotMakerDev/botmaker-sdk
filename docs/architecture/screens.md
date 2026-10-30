@@ -303,6 +303,13 @@ map tool against the hand path that covers it, and fails on one with none.
   file's time). A start screen heads the tree, a screen that follows another on its own sits beside it, and a panel
   says "panel of Home".
 - **The window** hides the outline (☰) or the panel (▤), remembered per computer, and ⛶/F11 makes it full screen.
+- **Screen tabs** (`ScreenTabs`, apart from JavaFX; 2026-10-30, the user's pick, spec
+  `../docs/superpowers/specs/2026-10-30-screen-tabs-design.md` in the umbrella): after *Graph*, a tab per screen
+  open. A screen opened goes into the one *italic* preview tab, which the next one replaces; editing it (any step of
+  ↶ while it is in front) or double-clicking its header keeps it. Inputs never get a tab. One board moves into
+  whichever tab is in front. Above it the jump bar: ◀ ▶ through the screens looked at, a ▾ of every screen, *ways
+  out* (the screens its links lead to) and *recent* (the last 5). A chip opens a screen in the map, never on the
+  game; Live still only lights the screen it sees. Nothing is kept once the window closes.
 - **The board** (`ScreenBoard`, the Screen tab): the picked screen's shot as big as the tab, each input's cut boxed,
   its markers in their own colour; a box clicked picks its input. A card clicked on the graph brings this tab up at
   once (`ScreenMap`, a still primary click on `ScreenCanvas.CARD_VIEW`), so folding is in the card's right-click menu

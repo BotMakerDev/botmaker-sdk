@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🗺 Screens opens screens as tabs, after *Graph*. A screen you open goes into one *italic* tab that the next one
+  replaces, so tabs stay few; edit the screen or double-click its tab to keep it. Inputs never get a tab. A bar above
+  the shot reaches another screen without going back to the graph: ◀ ▶ through the screens you looked at, a list of
+  every screen, the screens this one's ways lead to, and the last 5 you visited.
 - The SDK's files live in its own folder of the resources, `plugins/com_github_botmakerdev/botmaker_sdk/`, and the
   Java names them short: `new ImageTemplate("images/ore.png")`, `new DigitSet("digits/gold")`. A run looks for a
   path in that folder first, then at the resources' root, on disk and on the classpath, whichever way it is written,

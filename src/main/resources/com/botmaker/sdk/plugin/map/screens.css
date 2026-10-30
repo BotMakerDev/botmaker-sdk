@@ -22,6 +22,23 @@
     -fx-border-width: 0 0 1 0;
 }
 
+/* --- the screen tabs and their jump bar --- */
+
+/* The preview tab, which the next screen opened replaces, reads as one in italic. */
+.tab.screen-tab-preview .tab-label {
+    -fx-font-style: italic;
+}
+
+.screen-jumps {
+    -fx-border-color: transparent transparent -bm-screen-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.screen-jump {
+    -fx-background-radius: 10;
+    -fx-padding: 1 8 1 8;
+}
+
 /* --- a screen's card --- */
 
 .screen-card {

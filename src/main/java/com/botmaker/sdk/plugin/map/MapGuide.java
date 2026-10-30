@@ -50,6 +50,15 @@ final class MapGuide {
     static final String LOCKED = "Every way in is locked on this account";
     static final String FOLDED = "Folded: Unfold in its right-click menu, or double-click it in the overlay's pane";
 
+    // --- the screen tabs and their jump bar ---
+    static final String SCREEN_TAB = "A screen opened shows in the italic tab, which the next one opened replaces; "
+            + "editing the screen or double-clicking its tab keeps it. × closes it";
+    static final String JUMP_BACK = "Back to the screen looked at before";
+    static final String JUMP_FORWARD = "Forward again";
+    static final String JUMP_ANY = "Open any screen of the map by its name";
+    static final String JUMP_CHIPS = "Open a screen this one's ways lead to, or one looked at lately, in the map; the "
+            + "game is not moved";
+
     // --- the toolbar's ▶▶ ---
     static final String NEXT_UNTRIED = "Pick the next input to try, on the screen Discovery explores next, and show "
             + "it big: ▶ Try then tries it";
@@ -224,6 +233,11 @@ final class MapGuide {
                             + "computer remembers which."),
                     new Entry("⛶", null, FULL_SCREEN + ". ↶ ↷, Tidy, ⤓ PNG, ☰ ▤ and ⛶ are in the 🗺 Screens "
                             + "window, not the overlay's tab."))),
+            new Section("Screen tabs", List.of(
+                    new Entry("GUILD (italic)", null, SCREEN_TAB + "."),
+                    new Entry("◀ ▶", null, JUMP_BACK + "; " + JUMP_FORWARD + "."),
+                    new Entry("GUILD ▾", null, JUMP_ANY + "."),
+                    new Entry("ways out · recent", null, JUMP_CHIPS + "."))),
             new Section("The outline", List.of(
                     new Entry("Filter screens and inputs…", null, "Keeps the screens and inputs whose words have the "
                             + "text, and the lines down to them. Under each screen are its inputs, and under an "

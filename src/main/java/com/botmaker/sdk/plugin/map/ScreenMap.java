@@ -23,11 +23,14 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.VPos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -39,6 +42,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -52,6 +56,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -98,9 +103,29 @@ public final class ScreenMap {
     private final ScreenCanvas canvas;
     private final ScreenPanel panel;
     private final ScreenOutline outline;
-    /** The full window's centre: the graph, or the picked screen big. */
+    /** The full window's centre: the graph, then a tab per screen open ({@link ScreenTabs}). */
     private final TabPane tabs = new TabPane();
-    private final Tab screenTab = new Tab("Screen");
+    private final Tab graphTab = new Tab("Graph");
+    /** Which screens are open as tabs and where ◀ ▶ go; the tabs are drawn from it. */
+    private final ScreenTabs opened = new ScreenTabs();
+    /** Each screen tab drawn, by its constant. */
+    private final Map<String, Tab> screenTabs = new HashMap<>();
+    /** The one board with its jump bar above, moved into whichever screen tab is in front. */
+    private final BorderPane screenView = new BorderPane();
+    /** Wrapped, not squeezed: in a narrow centre an HBox cut every chip to "...". */
+    private final FlowPane jumps = new FlowPane(6, 4);
+    /** The tab the board was last put in, or the graph's. */
+    private Tab fronted;
+    /** Set while the tabs are drawn again: the pane's own selection changes meanwhile are not the user's. */
+    private boolean drawingTabs;
+    /** Set while ◀ or ▶ opens a screen: not a new step of them. */
+    private boolean stepping;
+    /** What the jump bar shows, as last drawn. */
+    private Jumps jumpsDrawn;
+
+    /** What the jump bar shows: its screen, the ▾'s screens, its ways out (each "to\nlabel"), recent, ◀ and ▶. */
+    private record Jumps(String selected, List<String> screens, List<String> out, List<String> recent, boolean back,
+                         boolean forward) {}
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
     /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
@@ -146,7 +171,7 @@ public final class ScreenMap {
         project = services.projectDir();
         canvas = new ScreenCanvas(services.resourcesDir());
         panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh,
-                () -> tabs.getSelectionModel().select(screenTab), this::inputPicked, this::liveOn) : null;
+                this::showScreen, this::inputPicked, this::liveOn) : null;
         root.getStyleClass().add("screen-map");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setTop(toolbar(withPanel));
@@ -155,15 +180,24 @@ public final class ScreenMap {
         outline = withPanel ? new ScreenOutline((constant, field) -> {
             canvas.select(constant);
             panel.pickInput(field);
-            tabs.getSelectionModel().select(screenTab);
+            showScreen();
         }, panel::menuFor, panel::rowMenuFor, canvas::shotTime) : null;
         if (outline != null) {
-            Tab graphTab = new Tab("Graph", canvas.graph());
-            screenTab.setContent(panel.board());
-            for (Tab tab : List.of(graphTab, screenTab)) tab.setClosable(false);
-            tabs.getTabs().setAll(graphTab, screenTab);
-            screenTab.selectedProperty().addListener((o, was, is) -> {
-                if (!is) panel.boardHidden();
+            graphTab.setContent(canvas.graph());
+            graphTab.setClosable(false);
+            jumps.getStyleClass().add("screen-jumps");
+            jumps.setAlignment(Pos.CENTER_LEFT);
+            jumps.setRowValignment(VPos.CENTER);
+            jumps.setPadding(new Insets(4, 8, 4, 8));
+            screenView.setTop(jumps);
+            screenView.setCenter(panel.board());
+            tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+            tabs.getTabs().setAll(graphTab);
+            tabs.addEventFilter(MouseEvent.MOUSE_CLICKED, this::keepOnDoubleClick);
+            // After the pane's own change: a tab closing fronts its neighbour while the pane still removes it, and the
+            // screen picked then draws the tabs again.
+            tabs.getSelectionModel().selectedItemProperty().addListener((o, was, is) -> {
+                if (!drawingTabs) Platform.runLater(() -> fronted(tabs.getSelectionModel().getSelectedItem()));
             });
             // A card clicked shows its screen big at once (the user's call, 2026-10-22); a drag, a Ctrl or Shift pick
             // and a double-click's second click do not. Folding is in the card's right-click menu. A filter: the
@@ -175,7 +209,7 @@ public final class ScreenMap {
                     return;
                 }
                 Platform.runLater(() -> {
-                    if (canvas.graph().selectedProperty().get() != null) tabs.getSelectionModel().select(screenTab);
+                    if (canvas.graph().selectedProperty().get() != null) showScreen();
                 });
             });
             split = new SplitPane(outline.node(), tabs);
@@ -193,7 +227,16 @@ public final class ScreenMap {
             // A screen picked, on the map or through an input that opens it: the board shows its shot, inputs boxed,
             // and the panel what it is and does.
             if (panel != null) panel.show(graph, selected);
-            if (outline != null) outline.select(selected);
+            if (outline != null) {
+                outline.select(selected);
+                if (selected != null) {
+                    // Opened in its tab, or the preview; brought to the front unless the graph is.
+                    opened.open(selected, !stepping);
+                    drawTabs();
+                    if (tabs.getSelectionModel().getSelectedItem() != graphTab) showScreen();
+                }
+                drawJumps();
+            }
         });
         if (panel != null) {
             canvas.setMenus(panel::menuFor, panel::linkMenu);
@@ -242,6 +285,178 @@ public final class ScreenMap {
     /** An input picked on the board or in the panel, its line picked in the outline; null {@code field}: none. */
     private void inputPicked(String constant, String field) {
         if (outline != null) outline.selectInput(constant, field);
+    }
+
+    /** The selected screen's tab brought to the front, its board in it; none selected, nothing changes. */
+    private void showScreen() {
+        if (selected == null || outline == null) return;
+        if (!screenTabs.containsKey(selected)) {
+            // Its tab was closed while it stayed picked: picking it again changes no selection, so it opens here.
+            opened.open(selected, false);
+            drawTabs();
+        }
+        Tab tab = screenTabs.get(selected);
+        if (tab != null) tabs.getSelectionModel().select(tab);
+    }
+
+    /**
+     * {@code tab} came to the front: a screen's, the board moves into it and its screen is picked; the graph's, the
+     * live board stops reading the game.
+     */
+    private void fronted(Tab tab) {
+        if (tab == null || tab == fronted && (tab == graphTab || tab.getContent() == screenView)) return;
+        fronted = tab;
+        if (tab == graphTab) {
+            panel.boardHidden();
+            return;
+        }
+        // One node has one parent: the tab it was in lets it go, or coming back to that tab would show nothing.
+        for (Tab other : screenTabs.values()) if (other != tab) other.setContent(null);
+        tab.setContent(screenView);
+        String constant = (String) tab.getUserData();
+        if (!constant.equals(selected)) canvas.select(constant);
+    }
+
+    /** The screen tabs drawn as {@link #opened} has them; the one in front stays there while it is still open. */
+    private void drawTabs() {
+        List<Tab> now = new ArrayList<>();
+        now.add(graphTab);
+        for (ScreenTabs.Open each : opened.tabs()) {
+            Tab tab = screenTabs.computeIfAbsent(each.constant(), this::screenTab);
+            tab.getStyleClass().remove("screen-tab-preview");
+            if (!each.kept()) tab.getStyleClass().add("screen-tab-preview");
+            now.add(tab);
+        }
+        screenTabs.values().removeIf(tab -> {
+            if (now.contains(tab)) return false;
+            // A tab let go of lets go of the board too.
+            tab.setContent(null);
+            return true;
+        });
+        Tab front = tabs.getSelectionModel().getSelectedItem();
+        drawingTabs = true;
+        try {
+            if (!tabs.getTabs().equals(now)) tabs.getTabs().setAll(now);
+            if (now.contains(front)) tabs.getSelectionModel().select(front);
+        } finally {
+            drawingTabs = false;
+        }
+        if (!now.contains(front)) {
+            Tab instead = selected == null ? null : screenTabs.get(selected);
+            tabs.getSelectionModel().select(instead == null ? graphTab : instead);
+        }
+        fronted(tabs.getSelectionModel().getSelectedItem());
+    }
+
+    /** A double-click on a screen tab's header keeps it: the skin keeps each header's tab in its properties. */
+    private void keepOnDoubleClick(MouseEvent click) {
+        if (click.getButton() != MouseButton.PRIMARY || click.getClickCount() != 2) return;
+        for (Node at = click.getPickResult().getIntersectedNode(); at != null && at != tabs; at = at.getParent()) {
+            if (!(at.getProperties().get(Tab.class) instanceof Tab tab) || tab == graphTab) continue;
+            opened.keep((String) tab.getUserData());
+            drawTabs();
+            return;
+        }
+    }
+
+    /** {@code constant}'s tab: its name, kept by a double-click, closed by ×. */
+    private Tab screenTab(String constant) {
+        Tab tab = new Tab(constant);
+        tab.setUserData(constant);
+        tab.setTooltip(new Tooltip(MapGuide.SCREEN_TAB));
+        // Forgotten before the pane lets the tab go and fronts another, so drawing them again does not bring it back.
+        tab.setOnCloseRequest(e -> opened.close(constant));
+        tab.setOnClosed(e -> Platform.runLater(this::drawTabs));
+        return tab;
+    }
+
+    /**
+     * A step of ↶ made from this window while a preview tab is in front: that screen was edited, so its tab is kept.
+     * One made elsewhere — the code editor, the assistant — keeps nothing.
+     */
+    private void keepFront() {
+        Tab front = tabs.getSelectionModel().getSelectedItem();
+        if (outline == null || front == null || front == graphTab || window == null || !window.isFocused()) return;
+        String constant = (String) front.getUserData();
+        if (!opened.isPreview(constant)) return;
+        opened.keep(constant);
+        drawTabs();
+    }
+
+    /**
+     * The jump bar above the screen: ◀ ▶ through the screens looked at, any screen by name, the screens its ways lead
+     * to, and the last few visited.
+     */
+    private void drawJumps() {
+        Map<String, Link> out = new LinkedHashMap<>();
+        for (Link link : links == null || selected == null ? List.<Link>of() : links) {
+            if (link.from().equals(selected) && !link.to().equals(selected)) out.putIfAbsent(link.to(), link);
+        }
+        List<String> recent = selected == null ? List.of() : opened.recent(selected);
+        // Drawn again only when it changed: each read would close the ▾ list under the user's pointer.
+        Jumps now = new Jumps(selected, cards == null ? List.of() : cards.stream().map(Card::constant).toList(),
+                out.entrySet().stream().map(e -> e.getKey() + "\n" + e.getValue().label()).toList(), recent,
+                opened.canBack(), opened.canForward());
+        if (now.equals(jumpsDrawn)) return;
+        jumpsDrawn = now;
+        Button back = new Button("◀");
+        back.setTooltip(new Tooltip(MapGuide.JUMP_BACK));
+        back.setDisable(!opened.canBack());
+        back.setOnAction(e -> stepTo(opened.back()));
+        Button ahead = new Button("▶");
+        ahead.setTooltip(new Tooltip(MapGuide.JUMP_FORWARD));
+        ahead.setDisable(!opened.canForward());
+        ahead.setOnAction(e -> stepTo(opened.forward()));
+        MenuButton any = new MenuButton(selected == null ? "Pick a screen" : selected);
+        any.setTooltip(new Tooltip(MapGuide.JUMP_ANY));
+        // A constant's "_" is a letter, not a mnemonic: TAVERN_CHOICE read "TAVERNCHOICE".
+        any.setMnemonicParsing(false);
+        for (String constant : now.screens()) {
+            MenuItem item = new MenuItem(constant);
+            item.setMnemonicParsing(false);
+            item.setOnAction(e -> jump(constant));
+            any.getItems().add(item);
+        }
+        jumps.getChildren().setAll(back, ahead, any);
+        if (!out.isEmpty()) jumps.getChildren().add(jumpLabel("ways out:"));
+        out.forEach((to, link) -> jumps.getChildren().add(jumpChip("→ " + to, to, link.label())));
+        if (!recent.isEmpty()) jumps.getChildren().add(jumpLabel("recent:"));
+        for (String constant : recent) jumps.getChildren().add(jumpChip(constant, constant, graph.shown(constant)));
+    }
+
+    private static Label jumpLabel(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("screen-panel-path");
+        return label;
+    }
+
+    /** A chip of the jump bar: a click opens {@code constant} in the map, never on the game. */
+    private Button jumpChip(String text, String constant, String tip) {
+        Button chip = new Button(text);
+        chip.setMnemonicParsing(false);
+        chip.getStyleClass().add("screen-jump");
+        chip.setTooltip(new Tooltip(tip));
+        chip.setOnAction(e -> jump(constant));
+        return chip;
+    }
+
+    /** {@code constant} opened from the jump bar: picked, and its tab in front. */
+    private void jump(String constant) {
+        canvas.select(constant);
+        showScreen();
+    }
+
+    /** ◀ or ▶'s screen opened, not as a new step of them. */
+    private void stepTo(Optional<String> constant) {
+        if (constant.isEmpty()) return;
+        stepping = true;
+        try {
+            canvas.select(constant.get());
+        } finally {
+            stepping = false;
+        }
+        showScreen();
+        drawJumps();
     }
 
     /** The screen the live board sees the game on, lit on the graph and in the outline; null lights none. */
@@ -347,6 +562,7 @@ public final class ScreenMap {
             subscriptions.add(services.history().onChanged(() -> Platform.runLater(() -> {
                 showHistory();
                 panel.historyChanged();
+                keepFront();
             })));
         }
     }
@@ -541,6 +757,12 @@ public final class ScreenMap {
         saidOnce = false;
         if (selected != null && !read.screens().containsKey(selected)) selected = null;
         if (panel != null) panel.show(read, selected);
+        if (outline != null) {
+            // A screen deleted closes its tab and leaves ◀ ▶; a way added or gone changes the jump bar.
+            opened.retain(read.screens().keySet());
+            drawTabs();
+            drawJumps();
+        }
         if (firstDrawn != null && !cards.isEmpty()) {
             // Once there are cards to fit and pick: a first read that failed or found none leaves it to the next.
             Runnable first = firstDrawn;
@@ -662,7 +884,7 @@ public final class ScreenMap {
         canvas.select(constant);
         panel.pickInput(field);
         inputPicked(constant, field);
-        tabs.getSelectionModel().select(screenTab);
+        showScreen();
         tell(field == null ? graph.shown(constant) + " has nothing cut yet: ✂ Cut inputs on it."
                 : "Next to try: " + graph.shown(constant) + " · " + field + ". ▶ Try it in the panel.");
     }

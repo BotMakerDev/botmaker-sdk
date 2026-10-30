@@ -29,7 +29,8 @@ class MapGuideTest {
                 MapGuide.CUT_SAVE, MapGuide.ADD_HOTKEY, MapGuide.REPEATED, MapGuide.CYCLES, MapGuide.WAY_COPY,
                 MapGuide.TRY_HOW, MapGuide.STRIP_MEMBERS, MapGuide.STRIP_SCROLL, MapGuide.MEASURE,
                 MapGuide.IN_STRIP, MapGuide.IN_TREE, MapGuide.TREE_NODES, MapGuide.UNLOCKED_BY, MapGuide.PLACE_NODE,
-                MapGuide.TREE_SCROLL, MapGuide.MEASURE_TREE)) {
+                MapGuide.TREE_SCROLL, MapGuide.MEASURE_TREE, MapGuide.SCREEN_TAB, MapGuide.JUMP_BACK,
+                MapGuide.JUMP_FORWARD, MapGuide.JUMP_ANY, MapGuide.JUMP_CHIPS)) {
             assertTrue(said.contains(tip), tip);
         }
     }
