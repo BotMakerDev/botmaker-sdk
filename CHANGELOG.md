@@ -57,6 +57,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The assistant's *launch game* after the bot's launch target changed no longer answers that the new game is "running
+  already" while the private display still runs the old one: the display remembers what it was brought up for, and
+  one running another target is closed and the new target launched.
+- Reloading the SDK (a local build, or another version) no longer leaves an open 🗺 Screens window running the old
+  copy's code, which threw on every run and on its keys: the window stops following and says its project is closed.
+- The assistant's *list windows* lists the private display's windows first when the game runs in one, and *set
+  capture source* finds the game's window there: they read the desktop only, where the game is not.
+- A plugin reloaded in place joins the private display its old copy launched through a store launcher: the display
+  was offered by the launcher's first window, which closes once the game's opens.
 - The Screens window says "Reading the map…" until the map is read, not "No map yet" with a field to name the first
   screen (2026-10-30).
 

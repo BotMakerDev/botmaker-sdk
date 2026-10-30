@@ -7,6 +7,8 @@ import com.botmaker.session.SessionBackend;
 import com.botmaker.session.Sessions;
 import com.botmaker.session.impl.AdoptedSession;
 import com.botmaker.session.launch.BackgroundLauncher;
+import com.botmaker.shared.launch.LaunchSpec;
+import javafx.application.Platform;
 
 import java.util.List;
 
@@ -26,14 +28,37 @@ public final class SessionHandoff {
     private static final RunProperty<String> WINDOW = RunProperty.text(AdoptedSession.WINDOW_PROPERTY);
     private static final RunProperty<String> BACKEND = RunProperty.text(AdoptedSession.BACKEND_PROPERTY);
     private static final List<RunProperty<String>> PROPERTIES = List.of(DISPLAY, WINDOW, BACKEND);
+    /**
+     * The launch target the offered display was brought up for: once the bot's target changes, that display runs
+     * another game, and a launch must not take it for this one (2026-10-30, Firestone's display still held Sword x
+     * Staff).
+     */
+    private static final RunProperty<String> TARGET = RunProperty.text("botmaker.session.target");
 
     private SessionHandoff() {}
 
-    /** Offers {@code session} to every later run; {@code null} withdraws the offer. FX thread. */
-    public static void offer(StudioServices services, PrivateSession session) {
+    /**
+     * Offers {@code session}, brought up for {@code launched}, to every later run; a {@code null} session withdraws
+     * the offer. FX thread.
+     */
+    public static void offer(StudioServices services, PrivateSession session, LaunchSpec launched) {
         if (services == null) return;
         List<String> args = Sessions.handoffArguments(session);
         for (RunProperty<String> property : PROPERTIES) services.runs().set(property, value(args, property.name()));
+        services.runs().set(TARGET, session == null || launched == null ? null : launched.spec());
+    }
+
+    /**
+     * Whether the display offered runs another target than {@code wanted}. One with no target recorded (offered
+     * before 2026-10-30) counts as another: nothing says which game it holds, and relaunching once costs less than
+     * a bot looking at the wrong game.
+     */
+    public static boolean runsOther(StudioServices services, LaunchSpec wanted) {
+        return services != null && differs(services.runs().get(TARGET).orElse(null), wanted);
+    }
+
+    static boolean differs(String launched, LaunchSpec wanted) {
+        return launched == null || launched.isBlank() || !launched.equals(wanted.spec());
     }
 
     /**
@@ -43,6 +68,7 @@ public final class SessionHandoff {
      */
     public static PrivateSession rejoin(StudioServices services, BackgroundLauncher launcher) {
         PrivateSession held = launcher.session();
+        if (held != null && services != null) keepWindow(services, held);
         if (held != null || services == null) return held;
         String display = services.runs().get(DISPLAY).orElse(null);
         if (display == null || display.isBlank()) return null;
@@ -51,8 +77,19 @@ public final class SessionHandoff {
                 .orElse(SessionBackend.GAMESCOPE);
         PrivateSession joined = launcher.adopt(display, window, backend);
         // A display that has gone is withdrawn, so the next look does not try to join it again.
-        if (joined == null) offer(services, null);
+        if (joined == null) offer(services, null, null);
         return joined;
+    }
+
+    /**
+     * Offers the window {@code held} is attached to now. A store launcher's game is attached first to the launcher's
+     * own window, then to the game's when it opens; the offer kept the first, which closes, so a plugin reloaded in
+     * place could not join the display (2026-10-30, Balatro through Steam).
+     */
+    private static void keepWindow(StudioServices services, PrivateSession held) {
+        String now = value(Sessions.handoffArguments(held), WINDOW.name());
+        if (now == null || now.equals(services.runs().get(WINDOW).orElse(null))) return;
+        Platform.runLater(() -> services.runs().set(WINDOW, now));
     }
 
     /** What {@code -D<name>=<value>} among {@code args} sets, or null. */

@@ -220,7 +220,15 @@ final class SetupTools {
 
     static AgentReply setCaptureSource(SetCaptureSource title, AgentContext context) {
         if (title.window() == null || title.window().isBlank()) return AgentReply.refused("Name a window.");
-        Optional<CaptureSource> window = CaptureValue.windowTitled(title.window());
+        PrivateSession display = liveDisplay(context.services());
+        // The game's private display first: it holds the game, and the desktop may show a copy of its title.
+        Optional<CaptureSource> window = display == null ? CaptureValue.windowTitled(title.window())
+                : CaptureValue.windowTitled(title.window(), display.controller());
+        if (window.isEmpty() && display != null) {
+            // A run looks inside the display: a desktop window of that title is not one it would find.
+            return AgentReply.refused("No window \"" + title.window().trim() + "\" is open in the private display "
+                    + display.displayName() + ", where the game runs: list_windows lists the ones there.");
+        }
         if (window.isEmpty()) {
             return AgentReply.refused("No open window \"" + title.window().trim() + "\" has a window class to find it "
                     + "by: list_windows lists the ones that do.");
@@ -237,7 +245,29 @@ final class SetupTools {
         } catch (RuntimeException | LinkageError e) {
             return AgentReply.refused("The open windows cannot be listed here: " + e.getMessage());
         }
-        // One line per title, with the class the bot would find it by; BotMaker's own windows are never the game.
+        List<String> desktop = windowLines(found);
+        // The game runs in a private display: its windows are there, not on the desktop (2026-10-30, Balatro).
+        PrivateSession display = liveDisplay(context.services());
+        if (display != null) {
+            List<GenericWindow> inside;
+            try {
+                inside = display.controller().getAllWindows();
+            } catch (RuntimeException | LinkageError e) {
+                inside = List.of();
+            }
+            List<String> lines = new ArrayList<>();
+            lines.add("In the private display " + display.displayName() + ", where the game runs:");
+            List<String> game = windowLines(inside);
+            lines.addAll(game.isEmpty() ? List.of("  no named window yet") : game.stream().map(l -> "  " + l).toList());
+            lines.add("On your desktop:");
+            lines.addAll(desktop.isEmpty() ? List.of("  no named window") : desktop.stream().map(l -> "  " + l).toList());
+            return AgentReply.text(String.join("\n", lines));
+        }
+        return AgentReply.text(desktop.isEmpty() ? "No named window is open." : String.join("\n", desktop));
+    }
+
+    /** One line per title, with the class the bot would find it by; BotMaker's own windows are never the game. */
+    private static List<String> windowLines(List<GenericWindow> found) {
         Set<String> seen = new LinkedHashSet<>();
         List<String> lines = new ArrayList<>();
         for (GenericWindow window : OpenWindows.pickable(found)) {
@@ -248,7 +278,20 @@ final class SetupTools {
                     : window.getWindowClass()) + (r == null ? "" : ", " + r.width + "×" + r.height + " at " + r.x
                     + "," + r.y));
         }
-        return AgentReply.text(lines.isEmpty() ? "No named window is open." : String.join("\n", lines));
+        return lines;
+    }
+
+    /** The private display the game runs in, when the settings say one and it is up; null otherwise. */
+    private static PrivateSession liveDisplay(StudioServices services) {
+        if (services == null || services.resourcesDir() == null) return null;
+        BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
+        if (settings.where() != BotSettings.Where.PRIVATE_DISPLAY) return null;
+        try {
+            return SessionHandoff.rejoin(services,
+                    BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir())));
+        } catch (RuntimeException | LinkageError noDisplay) {
+            return null;    // the desktop's windows are still listed
+        }
     }
 
     /** One line a setting, its id, value and label, then the choices the choice settings take. */
@@ -403,7 +446,7 @@ final class SetupTools {
         }
         // On this desktop: a run must not join a private display an earlier launch offered.
         FxCall.call(() -> {
-            SessionHandoff.offer(services, null);
+            SessionHandoff.offer(services, null, null);
             return null;
         });
         // Off this thread: a cold emulator app is minutes of start, and the call answers within MAX_LAUNCH_WAIT.
@@ -442,9 +485,18 @@ final class SetupTools {
      */
     private static AgentReply launchPrivately(LaunchSpec spec, Launch launch, StudioServices services) {
         if (services.resourcesDir() == null) return AgentReply.refused(Frames.noProject());
-        PrivateSession live = SessionHandoff.rejoin(services,
-                BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir())));
-        if (live != null) {
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir()));
+        PrivateSession live = SessionHandoff.rejoin(services, launcher);
+        String replaced = "";
+        if (live != null && FxCall.call(() -> SessionHandoff.runsOther(services, spec))) {
+            // The bot's target changed since the display came up: the game there is not the one asked for.
+            replaced = "Closed the private display " + live.displayName() + ", which ran the bot's earlier target. ";
+            launcher.stop();
+            FxCall.call(() -> {
+                SessionHandoff.offer(services, null, null);
+                return null;
+            });
+        } else if (live != null) {
             return AgentReply.text(spec.describe() + " is running already in the private display "
                     + live.displayName() + ".");
         }
@@ -467,11 +519,12 @@ final class SetupTools {
             // The waiting said as waiting, and the note on why a private display is not resized left to the windows
             // that show one: an assistant drags nothing.
             String up = ToolTiming.timed(ToolTiming.Phase.WAIT, () -> done.get(Math.max(wait, 2), TimeUnit.SECONDS));
-            return AgentReply.text(up.replace(" " + SessionBackends.FIXED_SIZE_NOTE, ""));
+            return AgentReply.text(replaced + up.replace(" " + SessionBackends.FIXED_SIZE_NOTE, ""));
         } catch (ExecutionException refused) {
-            return AgentReply.refused(spec.describe() + " could not be launched: " + refused.getCause().getMessage());
+            return AgentReply.refused(replaced + spec.describe() + " could not be launched: "
+                    + refused.getCause().getMessage());
         } catch (TimeoutException starting) {
-            return AgentReply.text("Bringing up a private display and launching " + spec.describe() + " in it. "
+            return AgentReply.text(replaced + "Bringing up a private display and launching " + spec.describe() + " in it. "
                     + (wait > 0 ? "It is not up after " + wait + "s; " : "")
                     + "screenshot shows it once it is.");
         } catch (InterruptedException e) {

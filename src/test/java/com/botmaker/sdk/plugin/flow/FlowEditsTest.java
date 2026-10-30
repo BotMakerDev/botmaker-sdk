@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +41,15 @@ class FlowEditsTest {
         assertEquals("DailyReward", FlowNames.typeFor("DailyReward"));
         assertEquals("BAG", FlowNames.typeFor("BAG"), "a type name typed is that name");
         assertEquals("BagFull", FlowNames.typeFor("BAG full"));
+    }
+
+    @Test
+    void anActivityIsFoundByTheNameItWasAddedBy() {
+        // add_activity BrowseCollection made the card Browse collection; set_activity BrowseCollection refused it.
+        Board added = FlowEdits.addActivity(NONE, "BrowseCollection", "");
+        assertEquals(Set.of("Browse collection"), FlowEdits.labels(added.flow()));
+        assertEquals(Optional.of("Browse collection"), FlowEdits.labelOf(added.flow(), "BrowseCollection"));
+        assertEquals(Optional.empty(), FlowEdits.labelOf(added.flow(), "Browse"));
     }
 
     @Test

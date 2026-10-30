@@ -62,6 +62,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -719,12 +721,46 @@ public final class ScreenMap {
     private boolean stillOpen() {
         if (Objects.equals(project, services.projectDir())) return true;
         // Another project is open now: this map is of the one that closed.
+        letGo();
+        return false;
+    }
+
+    /** Stops following: the window stays as it was, but is no longer the one its project opens again. */
+    private void letGo() {
         stop();
-        // The window stays as it was, but is no longer the one its project opens again.
         OPEN.remove(project, this);
         if (panel != null) panel.closed();
         said.setText("The project this map was of is closed.");
-        return false;
+    }
+
+    /**
+     * Every open map stops following, as when its project closes: the plugin is closing it, or being reloaded, and a
+     * map left listening ran this copy's classes after its jar was replaced (2026-10-30, {@code ScreenStep} not
+     * found on each run). Any thread: a reload closes the plugin on its own, and waits here while the FX thread lets
+     * go, since the loader is closed right after.
+     */
+    public static void letGoAll() {
+        if (Platform.isFxApplicationThread()) {
+            List.copyOf(OPEN.values()).forEach(ScreenMap::letGo);
+            return;
+        }
+        CountDownLatch done = new CountDownLatch(1);
+        try {
+            Platform.runLater(() -> {
+                try {
+                    letGoAll();
+                } finally {
+                    done.countDown();
+                }
+            });
+        } catch (IllegalStateException noToolkit) {
+            return;    // a headless host, or the toolkit gone: no window was open
+        }
+        try {
+            done.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void apply(Read map) {

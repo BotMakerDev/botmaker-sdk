@@ -182,7 +182,7 @@ public final class QuickLaunch {
     private static void onDesktop(LaunchSpec spec, StudioServices services, Report report, Consumer<Boolean> ended) {
         report.accept(true, "Launching " + spec.describe() + "…");
         // On this desktop: a run must not join a private display an earlier launch offered.
-        SessionHandoff.offer(services, null);
+        SessionHandoff.offer(services, null, null);
         // The answer is the last thing the launcher said about its own progress. An emulator app narrates
         // ("starting Waydroid…", "waiting for Android…"); every other kind says nothing (null) and falls back to
         // the generic line. Launcher.start throws the underlying failure (Steam not installed, no protocol
@@ -269,7 +269,9 @@ public final class QuickLaunch {
                     (ok, message) -> Platform.runLater(() -> {
                         button.setDisable(false);
                         report.accept(ok, message);
-                        if (ok && launcher.session() != null) SessionHandoff.offer(services, launcher.session());
+                        if (ok && launcher.session() != null) {
+                            SessionHandoff.offer(services, launcher.session(), spec);
+                        }
                     }));
         }, (ok, why) -> {
             button.setDisable(false);
@@ -308,7 +310,7 @@ public final class QuickLaunch {
             if (progress) return;
             Platform.runLater(() -> {
                 PrivateSession session = launcher.session();
-                if (ok && session != null) SessionHandoff.offer(services, session);
+                if (ok && session != null) SessionHandoff.offer(services, session, spec);
                 done.accept(ok && session != null, message);
             });
         });

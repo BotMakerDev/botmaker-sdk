@@ -8,6 +8,7 @@ import com.botmaker.sdk.plugin.launch.GameReady;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pictures.MoveOffer;
@@ -103,6 +104,7 @@ public final class SdkPlugin extends DeclaredPlugin {
         GameButton.unbind();
         GameReady.unbind();
         VmKeeper.stop();
+        ScreenMap.letGoAll();
         SdkLog.unbind();
     }
 }

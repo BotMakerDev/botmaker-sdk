@@ -344,10 +344,14 @@ public final class FlowEdits {
         for (Flow.Step step : flow.steps()) {
             if (step.label().equalsIgnoreCase(name == null ? "" : name.trim())) return step;
         }
+        // The name add_activity was given, BrowseCollection, labels the card as add_activity labelled it.
+        String added = name == null || name.isBlank() ? "" : FlowNames.activityLabel(name.trim());
+        for (Flow.Step step : flow.steps()) {
+            if (step.label().equalsIgnoreCase(added)) return step;
+        }
         throw new IllegalArgumentException("No activity called '" + name + "'; there are "
                 + flow.steps().stream().map(Flow.Step::label).toList());
     }
-
     /** The activity a wire on one of its own outcomes leaves; a sub-flow card leaves on an exit instead. */
     private static Flow.Step wireSource(Flow flow, String name) {
         Flow.Step source = step(flow, name);

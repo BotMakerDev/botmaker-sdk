@@ -4,6 +4,19 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Left from Screens on game kinds (phase 6, 2026-10-30)**:
+  - `try_input` reads every click on a screen whose background moves all over (Balatro's swirling menu) as a new
+    screen. The motion mask is read over 400 ms before the input, but a swirl moves into pixels that were still
+    then, and a mask over half of the frame is dropped anyway. Neither a larger mask nor a lower still threshold
+    fixed it live: "a new screen opened" needs another proof there, such as the screen's own inputs being covered
+    or gone, instead of the frame's changed share. Until then, map such a screen by `click` and look, then
+    `crop_pictures` the screen that opened.
+  - A changed launch target is caught only by `launch_game`: ▶ Launch and a run's hand-off still name the old
+    private display (▶ Launch refuses with "stop it first").
+  - The orphan sweep now spares any session of this JVM whose display server still runs, including one whose holder
+    leaked it; it is reaped when Studio exits.
+  - The first click into a freshly launched Balatro was dropped (likely focus), and the walk's first `Navigate.to`
+    took 12.5 s cold against 1.9 s warm.
 - **Left from the `ui` sweep of 2026-10-30**:
   - The 🎮 button and the Game dialog name a target by its id once the saved list is of an older version: "🎮
     com.zjcs.android.us@Waydroid" for Sword x Staff, "Heroic game 43d4ef20…" for Firestone. The names come back

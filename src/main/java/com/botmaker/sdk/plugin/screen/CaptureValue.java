@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.shared.capture.GenericWindow;
+import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -96,10 +97,15 @@ public final class CaptureValue {
      * would pick "#tools | Firestone Idle RPG - Discord" for "Firestone".
      */
     public static Optional<CaptureSource> windowTitled(String title) {
+        return windowTitled(title, NativeControllerFactory.get());
+    }
+
+    /** As {@link #windowTitled(String)}, among {@code controller}'s windows: a private display's, say. */
+    public static Optional<CaptureSource> windowTitled(String title, NativeController controller) {
         if (title == null || title.isBlank()) return Optional.empty();
         List<GenericWindow> open;
         try {
-            open = OpenWindows.pickable(NativeControllerFactory.get().getAllWindows());
+            open = OpenWindows.pickable(controller.getAllWindows());
         } catch (RuntimeException | LinkageError noWindows) {
             return Optional.empty();
         }
