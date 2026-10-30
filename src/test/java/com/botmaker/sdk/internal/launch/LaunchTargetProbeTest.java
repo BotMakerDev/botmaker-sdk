@@ -56,7 +56,7 @@ class LaunchTargetProbeTest {
     void aSteamTargetMatchesItsWrapperNotItsBareId() {
         // `570` alone would match any command line carrying that number by accident; Steam's own reaper spells
         // it `SteamLaunch AppId=570 --`, which is what makes the command-line layer usable at all.
-        assertEquals("AppId=570", LaunchTarget.parse("steam:570").runningToken());
+        assertEquals("AppId=570 --", LaunchTarget.parse("steam:570").runningToken());
     }
 
     @Test
