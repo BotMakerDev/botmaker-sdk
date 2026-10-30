@@ -57,10 +57,10 @@ public final class TemplateCache {
     }
 
     static Mat load(String path, Path workingDirectory, ClassLoader loader) {
-        Path file = workingDirectory.resolve(path).normalize();
+        Path file = TemplateSource.file(path, workingDirectory).orElse(null);
         String key;
         Stamp stamp;
-        if (Files.isRegularFile(file)) {
+        if (file != null) {
             key = file.toString();
             try {
                 BasicFileAttributes seen = Files.readAttributes(file, BasicFileAttributes.class);

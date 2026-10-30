@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  *
  * @SdkValue(SdkValue.Id.PICTURES)
  * public final class Pictures {
- *     public static final ImageTemplate COLLECT = new ImageTemplate("src/main/resources/images/collect.png");
+ *     public static final ImageTemplate COLLECT = new ImageTemplate("images/collect.png");
  * }
  * }</pre>
  *

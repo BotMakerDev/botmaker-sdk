@@ -13,6 +13,7 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
@@ -258,7 +259,7 @@ public final class QuickLaunch {
             // screen the game inside sees, so another size caps the game's own resolution options at it — and
             // makes the capture a scaled copy of what the pictures were cut from.
             SessionBackends.DisplaySize size = ScreenSize.display(services);
-            BackgroundLauncher launcher = BackgroundLauncher.forProject(resourcesDir);
+            BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resourcesDir));
             launcher.start(
                     backend, spec,
                     size.width(),
@@ -297,7 +298,7 @@ public final class QuickLaunch {
     private static void startPrivately(LaunchSpec spec, StudioServices services, SessionBackend backend,
                                        BiConsumer<Boolean, String> done) {
         SessionBackends.DisplaySize size = ScreenSize.display(services);
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(services.resourcesDir());
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir()));
         // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then.
         // Counted here, as it is reported, since the session may be held by the time the FX thread reads it.
         boolean[] first = {true};

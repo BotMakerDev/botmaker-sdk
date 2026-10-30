@@ -253,7 +253,7 @@ public final class TemplateUses {
             String path = SET.read(values, member)
                     .map(ImageTemplate::filePath)
                     .orElse(null);
-            if (TemplateNames.pathFor(baseName).equals(path)) gone.add(baseName);
+            if (TemplateNames.isPathFor(baseName, path)) gone.add(baseName);
         }
         return List.copyOf(gone);
     }
@@ -268,7 +268,7 @@ public final class TemplateUses {
             String baseName = TemplateNames.baseNameFor(member.name());
             if (baseName == null) continue;
             SET.read(values, member)
-                    .filter(held -> TemplateNames.pathFor(baseName).equals(held.filePath()))
+                    .filter(held -> TemplateNames.isPathFor(baseName, held.filePath()))
                     .ifPresent(held -> cuts.put(baseName, new FrameCut(held.frame(), held.place())));
         }
         return cuts;
@@ -291,7 +291,7 @@ public final class TemplateUses {
         Member constant = name == null ? null : constantFor(name);
         if (constant == null) return Optional.empty();
         return SET.read(values, constant)
-                .filter(held -> TemplateNames.pathFor(name).equals(held.filePath()))
+                .filter(held -> TemplateNames.isPathFor(name, held.filePath()))
                 .map(held -> new FrameCut(held.frame(), held.place()));
     }
 

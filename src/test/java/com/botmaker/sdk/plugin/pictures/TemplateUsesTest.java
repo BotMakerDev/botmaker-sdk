@@ -49,7 +49,7 @@ class TemplateUsesTest {
         assertEquals(Optional.empty(), TemplateUses.declare(host, "gold"));
         assertEquals(Optional.empty(), TemplateUses.declare(host, "ore"));
         assertEquals(Optional.empty(), TemplateUses.declare(host, "Gold-Ore"));
-        assertEquals(List.of("add GOLD src/main/resources/images/gold.png"), host.calls);
+        assertEquals(List.of("add GOLD images/gold.png"), host.calls);
     }
 
     @Test
@@ -58,7 +58,7 @@ class TemplateUsesTest {
 
         assertEquals(Optional.empty(), TemplateUses.rename(host, "ore", "iron"));
         assertEquals(List.of("rename ORE IRON"), host.calls);
-        assertEquals("src/main/resources/images/iron.png", ((ImageTemplate) host.opened.value()).filePath());
+        assertEquals("images/iron.png",((ImageTemplate) host.opened.value()).filePath());
     }
 
     @Test
@@ -76,7 +76,7 @@ class TemplateUsesTest {
         host.uses.put("ORE", List.of(use("Main.java", 4)));
 
         assertEquals(Optional.empty(), TemplateUses.repoint(host, "ore", "gold"));
-        assertEquals(List.of("add GOLD src/main/resources/images/gold.png",
+        assertEquals(List.of("add GOLD images/gold.png",
                 "repoint ORE GOLD " + TemplateUses.repointNote("ore", "gold")), host.calls);
     }
 

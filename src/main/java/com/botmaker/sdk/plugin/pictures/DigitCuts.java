@@ -23,16 +23,16 @@ import java.util.Optional;
  */
 public final class DigitCuts {
 
-    /** The folder under {@code src/main/resources} the sets are in. */
+    /** The folder under the SDK's folder of the resources the sets are in. */
     public static final String FOLDER = "digits";
     /** How far one channel strays from the background before a pixel is ink. */
     private static final int INK = 64;
 
     private DigitCuts() {}
 
-    /** The project-relative folder of the set {@code name}, as {@code new DigitSet("…")} takes it. */
+    /** The folder of the set {@code name}, as {@code new DigitSet("…")} takes it: {@code digits/gold}. */
     public static String pathFor(String name) {
-        return "src/main/resources/" + FOLDER + "/" + name;
+        return FOLDER + "/" + name;
     }
 
     /** The folder of the set {@code name} on disk. */

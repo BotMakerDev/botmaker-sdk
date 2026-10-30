@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.settings.VmChoice;
@@ -196,7 +197,8 @@ final class LaunchAndPick {
             case PRIVATE_DISPLAY -> QuickLaunch.launchPrivately(spec, services, (ok, message) -> {
                 status.setText(message);
                 PrivateSession session = ok
-                        ? SessionHandoff.rejoin(services, BackgroundLauncher.forProject(services.resourcesDir())) : null;
+                        ? SessionHandoff.rejoin(services, BackgroundLauncher.forProject(
+                        ResourceMove.resourcesRoot(services.resourcesDir()))) : null;
                 // Everything in a display of the game's own is the game's: no window was there before.
                 if (session != null) watch(session.controller(), Set.of());
                 else failed.run();

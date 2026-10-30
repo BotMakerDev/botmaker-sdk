@@ -161,11 +161,11 @@ public final class SdkTypes implements TypeHolder {
             .writtenAsRecord();
 
     /**
-     * A game font's digits as pictures: {@code new DigitSet("src/main/resources/digits/gold")}, and {@code .in(…)}
+     * A game font's digits as pictures: {@code new DigitSet("digits/gold")}, and {@code .in(…)}
      * only when they were cut from a frame of another size than the bot's (2026-10-11).
      */
     public static final DeclaredCallType<DigitSet> DIGIT_SET = PluginType.value(DigitSet.class)
-            .fresh(() -> new DigitSet("src/main/resources/digits/digits"))
+            .fresh(() -> new DigitSet("digits/digits"))
             .editor(() -> OcrEditors::digits)
             .writtenAs(DigitSet::new, DigitSet::folder)
             .with(DigitSet::in, DigitSet::frame);

@@ -5,7 +5,7 @@ import com.botmaker.sdk.api.geometry.Size;
 import java.util.Objects;
 
 /**
- * A game font's digits as pictures — {@code new DigitSet("src/main/resources/digits/gold")}, a folder holding
+ * A game font's digits as pictures — {@code new DigitSet("digits/gold")}, a folder holding
  * {@code 0.png} to {@code 9.png}, one per digit, cut from the game (2026-10-11). {@link Text#readDigits} reads a
  * number with it where OCR cannot read the game's font.
  *

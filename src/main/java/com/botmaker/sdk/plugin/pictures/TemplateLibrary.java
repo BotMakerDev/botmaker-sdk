@@ -28,12 +28,13 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Reads the project's saved image templates (PNG files under {@code src/main/resources/images}) and maps
- * between a template file and the path string an SDK {@code ImageTemplate(String)} expects.
+ * Reads the project's saved image templates (PNG files under {@code images/} of the SDK's folder of the
+ * resources, {@code StudioServices.resourcesDir}) and maps between a template file and the path string an SDK
+ * {@code ImageTemplate(String)} expects.
  *
- * <p>The SDK loads templates from the filesystem relative to the working directory (which is the project
- * root at run time), so the path embedded in code is relative to the project root, e.g.
- * {@code "src/main/resources/images/accept_button.png"} — always forward-slashed for cross-platform use.
+ * <p>The path embedded in code is relative to that folder, e.g. {@code "images/accept_button.png"}, and the SDK
+ * puts the folder in front when it loads one ({@code TemplateSource}, 2026-10-30; from the project root until
+ * then) — always forward-slashed for cross-platform use.
  *
  * <p><b>Adding a picture writes no Java.</b> Nothing is generated per file, so there is no constant to keep
  * in step with the folder.
@@ -66,10 +67,10 @@ public final class TemplateLibrary {
     public static final String DEFAULT_TEMPLATE_FILE = TemplateNames.DEFAULT_TEMPLATE_FILE;
 
     /**
-     * Project-root-relative path a fresh {@code new ImageTemplate(...)} references so a newly-dropped vision
+     * The path a fresh {@code new ImageTemplate(...)} references so a newly-dropped vision
      * block compiles immediately against a real (if placeholder) template rather than a missing file.
      */
-    public static final String DEFAULT_TEMPLATE_PATH = "src/main/resources/images/" + DEFAULT_TEMPLATE_FILE;
+    public static final String DEFAULT_TEMPLATE_PATH = TemplateNames.IMAGE_PREFIX + DEFAULT_TEMPLATE_FILE;
 
     /** The default template's base name — what a value that names a template by name is seeded with. */
     public static final String DEFAULT_TEMPLATE_NAME =
@@ -180,19 +181,19 @@ public final class TemplateLibrary {
     }
 
     /**
-     * The project-root-relative, forward-slashed path string for {@code templateFile}.
+     * The forward-slashed path string for {@code templateFile}, under the SDK's folder of the resources.
      *
      * <p>Built from the file's own <em>name</em> and the one prefix every template shares
-     * ({@link TemplateNames#IMAGE_PREFIX}) rather than by relativizing against a project root, which is what let
+     * ({@link TemplateNames#IMAGE_PREFIX}) rather than by relativizing against a folder, which is what let
      * this class stop needing one. The two agree by construction — a template is a PNG directly inside
-     * {@code src/main/resources/images} and there is nowhere else for one to be.
+     * {@code images/} and there is nowhere else for one to be.
      */
     public static String pathFor(Path templateFile) {
         return TemplateNames.IMAGE_PREFIX + templateFile.getFileName().toString();
     }
 
     /**
-     * The <b>project-root-relative</b> path string for a template named {@code baseName} (without extension) —
+     * The path string, under the SDK's folder of the resources, for a template named {@code baseName} (without extension) —
      * what gets <em>stored</em>, in a bot's source and in a variable's wire value, so a project stays portable.
      *
      * <p>It is not a path you can open. Two callers did anyway, handing it to {@code Path.of} and resolving it
@@ -232,8 +233,8 @@ public final class TemplateLibrary {
     }
 
     /**
-     * Saves {@code img} as {@code <imagesRoot>/<baseName>.png} and returns the template's project-root-relative
-     * path (the string for {@code new ImageTemplate("…")}). Where it was cut is written on its constant, not
+     * Saves {@code img} as {@code <imagesRoot>/<baseName>.png} and returns the template's path
+     * (the string for {@code new ImageTemplate("…")}). Where it was cut is written on its constant, not
      * beside it ({@link TemplateUses#cut}). {@code baseName} must already be sanitized. Does not check for an
      * existing file — callers gate that via {@link #exists}.
      */

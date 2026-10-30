@@ -55,13 +55,16 @@ public final class TemplateNames {
     public static final String DEFAULT_TEMPLATE_FILE = DEFAULT_TEMPLATE_NAME + ".png";
 
     /**
-     * Where a bot's image templates sit, relative to the project root.
+     * Where a bot's image templates sit, relative to the SDK's folder of the resources
+     * ({@link TemplateSource#FOLDER}, 2026-10-30; from the project root until then).
      *
      * <p>The editor's own template manager puts the files there; this is the half of that agreement every
-     * reader needs, so that a picture named {@code ore} resolves to
-     * {@code src/main/resources/images/ore.png}.
+     * reader needs, so that a picture named {@code ore} is {@code images/ore.png}.
      */
-    public static final String IMAGE_PREFIX = "src/main/resources/images/";
+    public static final String IMAGE_PREFIX = "images/";
+
+    /** What a path written from the project's root starts with, as every picture's was until 2026-10-30. */
+    public static final String OLD_PREFIX = "src/main/resources/";
 
     private TemplateNames() {}
 
@@ -116,8 +119,7 @@ public final class TemplateNames {
     }
 
     /**
-     * The project-relative path a picture's base name stands for — {@code ore} to
-     * {@code src/main/resources/images/ore.png}.
+     * The path a picture's base name stands for — {@code ore} to {@code images/ore.png}.
      *
      * <p>Total, and never {@code null}: unlike {@link #pathForConstant} it asks nothing about the name
      * beyond it being one. A blank name answers the folder plus {@code .png}, which is a path that does not
@@ -127,10 +129,24 @@ public final class TemplateNames {
         return IMAGE_PREFIX + (baseName == null ? "" : baseName.trim()) + ".png";
     }
 
-    /** The constant for a project-relative template path, or {@code null} when that path has none. */
+    /** The constant for a template path, either spelling ({@link #current}), or {@code null} when that path has none. */
     public static String constantForPath(String path) {
         String prefix = IMAGE_PREFIX;
-        if (path == null || !path.startsWith(prefix) || !path.endsWith(".png")) return null;
-        return constantFor(path.substring(prefix.length(), path.length() - ".png".length()));
+        String now = current(path);
+        if (now == null || !now.startsWith(prefix) || !now.endsWith(".png")) return null;
+        return constantFor(now.substring(prefix.length(), now.length() - ".png".length()));
+    }
+
+    /**
+     * {@code path} as the SDK writes it now: {@code src/main/resources/images/ore.png}, written from the project root
+     * before 2026-10-30, is {@code images/ore.png}. Any other path is itself; null is null.
+     */
+    public static String current(String path) {
+        return path != null && path.startsWith(OLD_PREFIX) ? path.substring(OLD_PREFIX.length()) : path;
+    }
+
+    /** Whether {@code path} is the one {@code baseName}'s picture is written as, either spelling. */
+    public static boolean isPathFor(String baseName, String path) {
+        return path != null && pathFor(baseName).equals(current(path));
     }
 }

@@ -4,6 +4,7 @@ import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.SessionBackend;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.session.launch.BackgroundLauncher;
 import javafx.application.Platform;
 
@@ -45,7 +46,7 @@ public final class NestedSessionLauncher implements AutoCloseable {
      */
     public NestedSessionLauncher(Path resourcesDir, Supplier<String> launchTarget) {
         this.launchTarget = launchTarget;
-        this.launcher = BackgroundLauncher.forProject(resourcesDir);
+        this.launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resourcesDir));
     }
 
     /** True while a nested session is live (so the UI can show Stop rather than Start). */

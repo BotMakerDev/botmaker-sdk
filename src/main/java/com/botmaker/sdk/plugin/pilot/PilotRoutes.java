@@ -7,6 +7,7 @@ import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.shared.emulator.AdbEmulatorSurface;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.shared.emulator.ScrcpyEmulatorSurface;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 
 import java.util.function.Function;
@@ -81,7 +82,7 @@ public final class PilotRoutes implements AutoCloseable {
     public static PilotRoutes forProject(PilotProject project) {
         Supplier<DesktopSession> session = project == null
                 ? () -> null
-                : BackgroundLauncher.forProject(project.resourcesDir())::session;
+                : BackgroundLauncher.forProject(ResourceMove.resourcesRoot(project.resourcesDir()))::session;
         return new PilotRoutes(session,
                 () -> configuredInstanceName(project),
                 PilotRoutes::openAdbSurface);

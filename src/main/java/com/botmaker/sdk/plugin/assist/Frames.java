@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.vision.Images;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
@@ -139,7 +140,8 @@ final class Frames {
     static PrivateSession session(AgentContext context) {
         Path resources = context.services().resourcesDir();
         return resources == null ? null
-                : SessionHandoff.rejoin(context.services(), BackgroundLauncher.forProject(resources));
+                : SessionHandoff.rejoin(context.services(),
+                        BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resources)));
     }
 
     /** The capture source when it names an emulator, or null. */

@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
+import com.botmaker.sdk.plugin.pictures.MoveOffer;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
@@ -80,13 +81,15 @@ public final class SdkPlugin extends DeclaredPlugin {
 
     /**
      * The toolbar's game button names what this project launches, so it is told which project that is, and the
-     * plugin half's warnings go to its log. On Windows, the game VMs' shutdown settings are applied while a project
-     * is open.
+     * plugin half's warnings go to its log. A project whose pictures are still at its resources' root is asked about
+     * moving them into the SDK's folder ({@link MoveOffer}). On Windows, the game VMs' shutdown settings are applied
+     * while a project is open.
      */
     private static void opened(StudioServices services) {
         SdkLog.bind(services);
         GameButton.bind(services);
         GameReady.bind(services);
+        MoveOffer.offer(services);
         if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }
 

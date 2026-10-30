@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The SDK's files live in its own folder of the resources, `plugins/com_github_botmakerdev/botmaker_sdk/`, and the
+  Java names them short: `new ImageTemplate("images/ore.png")`, `new DigitSet("digits/gold")`. A run looks for a
+  path in that folder first, then at the resources' root, on disk and on the classpath, whichever way it is written,
+  so a bot written the old way keeps running. A project with the SDK's files at its root asks once a session to move
+  them (Move / Not now): the files move, then every picture's and digit set's path is written short, one ↶ step.
+
 - The flow canvas's cards, ports and arrows have accessible names (`card Start`, `port Start DONE`, `arrow Start
   DONE → Idle`), which screen readers and Studio's `ui` driver read.
 - A map made before shots were named in the Java gets them back: the first time 🗺 Screens opens it in a Studio

@@ -55,7 +55,7 @@ class DigitCutsTest {
         List<Integer> saved = DigitCuts.save(resources, "gold", number, boxes, "12,50");
         assertEquals(List.of(1, 2, 5, 0), saved, "the comma is not a digit");
         assertTrue(Files.isRegularFile(resources.resolve("digits/gold/5.png")));
-        assertEquals("src/main/resources/digits/gold", DigitCuts.pathFor("gold"));
+        assertEquals("digits/gold", DigitCuts.pathFor("gold"));
     }
 
     @Test

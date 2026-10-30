@@ -13,6 +13,7 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.OpenWindows;
@@ -441,7 +442,8 @@ final class SetupTools {
      */
     private static AgentReply launchPrivately(LaunchSpec spec, Launch launch, StudioServices services) {
         if (services.resourcesDir() == null) return AgentReply.refused(Frames.noProject());
-        PrivateSession live = SessionHandoff.rejoin(services, BackgroundLauncher.forProject(services.resourcesDir()));
+        PrivateSession live = SessionHandoff.rejoin(services,
+                BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir())));
         if (live != null) {
             return AgentReply.text(spec.describe() + " is running already in the private display "
                     + live.displayName() + ".");

@@ -23,7 +23,9 @@
   contract. The capture surfaces are deliberately ownerless, so a user can minimise the editor and keep
   capturing, and opt out of theming with the toolkit's `Styles.UNTHEMED`.
 - **The pictures are this plugin's folder** (`plugin/pictures/TemplateLibrary`, keyed on
-  `StudioServices.resourcesDir()`, with `TagCatalog` and `TemplateManifest`), and **their names are
+  `StudioServices.resourcesDir()`, with `TagCatalog` and `TemplateManifest`; since 2026-10-30 that is
+  `plugins/com_github_botmakerdev/botmaker_sdk/` of the resources, a path in the Java is under it, `images/ore.png`,
+  and `TemplateSource` looks there first, then at the root; `ResourceMove` moves an older bot's), and **their names are
   `Pictures` constants changed by binding**: `TemplateUses` maps a file to its constant and calls the
   contract's `PluginValues` open-set operations on `SdkValues.PICTURES` (`uses`, `add`, `rename`, `repoint`,
   `remove`); Studio resolves the constant, compiles each change as the whole bot and refuses one that breaks

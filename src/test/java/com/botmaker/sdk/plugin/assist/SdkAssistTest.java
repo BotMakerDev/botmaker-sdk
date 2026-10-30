@@ -521,10 +521,10 @@ class SdkAssistTest {
                 .isRefused(), "four characters in the box, three named");
         AgentReply saved = run("save_digits", "name", "gold", "x", 94, "y", 76, "width", 64, "height", 30,
                 "shows", "4071");
-        assertTrue(text(saved).startsWith("Saved digits 0 1 4 7 into Digits.GOLD (src/main/resources/digits/gold) of"
+        assertTrue(text(saved).startsWith("Saved digits 0 1 4 7 into Digits.GOLD (digits/gold) of"
                 + " the bot's 400×300 screen. It holds 0 1 4 7; it lacks 2 3 5 6 8 9"), text(saved));
         assertTrue(text(saved).contains("It reads this box as 4071."), text(saved));
-        assertEquals(new DigitSet("src/main/resources/digits/gold"), host.set("digits").get("GOLD").value());
+        assertEquals(new DigitSet("digits/gold"), host.set("digits").get("GOLD").value());
     }
 
     // ── the flow ────────────────────────────────────────────────────────────────────────────────────────

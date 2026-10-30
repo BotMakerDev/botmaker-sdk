@@ -74,7 +74,7 @@ class TemplateEditorTest {
                 ImageTemplate.class, "new ImageTemplate(\"\")");
         TemplateEditors.commit(ctx, "gold");
 
-        assertEquals("src/main/resources/images/gold.png",
+        assertEquals("images/gold.png",
                 ((ImageTemplate) ctx.value()).filePath());
     }
 
@@ -82,7 +82,7 @@ class TemplateEditorTest {
     void writingAValueWithNoCallSiteCarriesTheSamePath() {
         TestContexts.Recording ctx = TestContexts.row(ImageTemplate.class, "");
         TemplateEditors.commit(ctx, "gold");
-        assertEquals("src/main/resources/images/gold.png",
+        assertEquals("images/gold.png",
                 ((ImageTemplate) ctx.value()).filePath());
     }
 

@@ -13,8 +13,21 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   - The Parameters card for `launchTargets` cuts its *Category*, *Value* and *Note* labels to "...".
   - The Screens window at its 1180-wide default cuts most of its toolbar and the side panel's buttons to "...".
   - Naming Firestone's 49 old shots in one step (`ScreenShots.adopt`) held Studio's FX thread 12.3 s, in
-    `ProjectAnalyzer.createCompilationUnits` ×179: each setup write re-parses the project. Once per old map, but a
-    batch of writes should parse once.
+    `ProjectAnalyzer.createCompilationUnits` ×179: each setup write re-parses the project. Once per old map; not
+    measured again since a batch reads the bot's types once (2026-10-30).
+  - Moving Firestone's files into the SDK's folder (`ResourceMove.rewritePaths`, 334 picture writes in one batch)
+    held the FX thread 24.7 s, in `SourceFormatter.snippet` ×444 and `JavaExpressions.parse` ×252: each write
+    formats and parses its expression (`JavaValue.built`, the host's `ShortNames`). Once per bot; a batch should
+    format each value once, or not until it is shown.
+- **Left from the resources move (2026-10-30, phase 5d's review)**:
+  - After *Not now*, the SDK's editors look in its folder only: Manage Pictures and Screens show none of the old
+    files, and `ScreenShots.saveIfMissing` takes a new shot into the folder for a screen whose shot is still at the
+    root. A run finds both. Reading the root as well in `TemplateLibrary` and `ScreenShots` would make *Not now*
+    cost nothing.
+  - `TemplateSource.FOLDER` spells the SDK's folder from its coordinate today; Studio derives it from the coordinate
+    the plugin loaded under (`PluginOwners.folder`), so an SDK built under another groupId (a fork) would save
+    pictures where its run does not look. The run could read its own coordinate from its jar's
+    `META-INF/maven/.../pom.properties`.
 - **macOS: OCR has never run on a Mac** (natives staged 2026-10-11 without one). Owed on Apple Silicon:
   `OcrEngine.recognize` and `getWords` load the `darwin-aarch64/` natives and read text; whether dyld maps
   Leptonica once or twice (`vmmap <pid> | grep lepton`), and that OCR works either way.

@@ -11,6 +11,7 @@ import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.session.launch.BackgroundLauncher;
 
@@ -97,7 +98,7 @@ public final class TargetCapture {
         if (resourcesDir == null) {
             return new TargetCapture(project);
         }
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(resourcesDir);
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resourcesDir));
         return new TargetCapture(project, launcher::hostWindowId);
     }
 

@@ -137,7 +137,7 @@ public final class SdkValues implements ValueHolder {
                     + " name, to move it.");
 
     /**
-     * The game fonts' digits — {@code static final DigitSet GOLD = new DigitSet("src/main/resources/digits/gold")},
+     * The game fonts' digits — {@code static final DigitSet GOLD = new DigitSet("digits/gold")},
      * a folder of {@code 0.png} to {@code 9.png} that {@code Text.readDigits} reads a number with. The assistant's
      * {@code save_digits} cuts the digits of a number on screen into it and adds the constant.
      */

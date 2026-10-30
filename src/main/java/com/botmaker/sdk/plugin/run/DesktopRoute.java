@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.run;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.session.launch.BackgroundLauncher;
@@ -28,7 +29,7 @@ final class DesktopRoute {
         } catch (RuntimeException unreadable) {
             // the source is mid-save: the desktop, as the pilot assumes
         }
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(project.resourcesDir());
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(project.resourcesDir()));
         return () -> {
             try {
                 return launcher.session() == null;
