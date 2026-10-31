@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Drag;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -32,11 +33,15 @@ import com.botmaker.sdk.internal.ocr.OcrEngine;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Places;
+import com.botmaker.shared.emulator.tree.UiNode;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +178,11 @@ public interface Reach {
      * digits spell there. Empty when nothing is read.
      */
     default Optional<String> readout(Readout readout, BufferedImage frame) {
+        if (readout != null && readout.element() != null) {
+            return onlyOne(readout.element(), elements(readout.element(), frame))
+                    .map(node -> node.text().isBlank() ? node.label().strip() : node.text().strip())
+                    .filter(text -> !text.isEmpty());
+        }
         if (readout == null || readout.zone() == null) return Optional.empty();
         Optional<Rect> zone = onFrame(readout.zone(), frame);
         if (zone.isEmpty()) return Optional.empty();
@@ -321,6 +331,40 @@ public interface Reach {
         return findWithin(picture, area, frame).map(place -> new Found(place, 1));
     }
 
+    /** Whether the target tells what its screen holds, an app's tree: an emulator does, a game window does not. */
+    default boolean readsTrees() {
+        return false;
+    }
+
+    /**
+     * The tree of the app as {@code frame} shows it, ready to find elements in: read once for that frame, so every
+     * element a look names is found in one read, and never in a tree read for another frame. Empty when it could not
+     * be read, and for a target that {@link #readsTrees reads none}.
+     */
+    default Optional<ElementMatch.Matcher> treeOn(BufferedImage frame) {
+        return Optional.empty();
+    }
+
+    /**
+     * Stops whatever acts, saying {@code why}: what only the bot's author can change, an element the tree finds twice.
+     * A run ends with it as its error; the assistant's tool answers it.
+     */
+    default void stop(String why) {
+        throw new IllegalStateException(why);
+    }
+
+    /**
+     * The nodes {@code element} finds in the tree read for {@code frame}, in the tree's order; none when it could not
+     * be read. A target with no tree {@link #stop stops}: the bot names an element on a game window.
+     */
+    default List<UiNode> elements(Element element, BufferedImage frame) {
+        if (!readsTrees()) {
+            stop(ElementMatch.named(element) + ": this target shows no tree; an element is found only in an app's");
+            return List.of();
+        }
+        return treeOn(frame).map(tree -> tree.matches(element)).orElse(List.of());
+    }
+
     /** {@link #seen(Button, Strip, Pick, BufferedImage)} of a button at its place, in no strip, its first copy. */
     default Optional<Seen> seen(Button button, BufferedImage frame) {
         return seen(button, null, null, frame);
@@ -337,6 +381,10 @@ public interface Reach {
     default Optional<Seen> seen(Button button, Strip strip, Pick pick, BufferedImage frame) {
         Pick p = pick == null ? Pick.first() : pick;
         if (p.mode() == Pick.Mode.CELL) return cell(button, p, frame);
+        if (button.isElement() && !button.repeats() && button.place() == null && p.place() == null) {
+            return onlyOne(button.element(), elements(button.element(), frame))
+                    .map(node -> seenAs(button, node));
+        }
         if (button.repeats() || button.place() != null || p.place() != null) {
             List<Seen> all = copies(button, strip, p.order(), frame);
             List<Seen> copies = p.place() == null ? all : placed(all, p.place(), frame);
@@ -367,6 +415,30 @@ public interface Reach {
         return best < 0 ? Optional.empty()
                 : Optional.of(new Seen(order.get(best).state(), button.spots(placeOf(button, order.get(best),
                 found.get(best).get().place())).getFirst(), order.get(best).picture()));
+    }
+
+    /**
+     * The one node of {@code nodes}, what {@code element} found; empty for none. More than one {@link #stop stops}:
+     * an input the bot does not say is repeated must be one, or the run would press whichever came first.
+     */
+    private Optional<UiNode> onlyOne(Element element, List<UiNode> nodes) {
+        if (nodes.size() > 1) {
+            stop(ElementMatch.named(element) + ": " + nodes.size() + " elements match; pick it again in 🗺 Screens,"
+                    + " or mark its button repeated");
+            return Optional.empty();
+        }
+        return nodes.stream().findFirst();
+    }
+
+    /**
+     * {@code button} as the tree shows it at {@code node}: its state and place read from the node, and as its picture
+     * its look of that state when it has one, so {@link Pick#until} a picked look is met as on a picture button.
+     */
+    private static Seen seenAs(Button button, UiNode node) {
+        State state = ElementMatch.state(node);
+        ImageTemplate picture = button.looks().stream().filter(look -> look.state() == state).map(Look::picture)
+                .findFirst().orElse(button.picture());
+        return new Seen(state, ElementMatch.place(node), picture);
     }
 
     /**
@@ -447,7 +519,9 @@ public interface Reach {
      * place, nearest the anchor first.
      */
     default List<Seen> copies(Button button, Strip strip, Order order, BufferedImage frame) {
-        List<Seen> found = pictureCopies(button, strip, frame);
+        List<Seen> found = button.isElement()
+                ? elements(button.element(), frame).stream().map(node -> seenAs(button, node)).toList()
+                : pictureCopies(button, strip, frame);
         if (button.isBeside()) {
             found = found.stream().flatMap(copy -> button.spots(copy.place()).stream()
                     .map(spot -> new Seen(copy.state(), spot, copy.picture()))).toList();
@@ -598,11 +672,9 @@ public interface Reach {
             // A tree is walked to one of its nodes, never pressed as a whole.
             case Tree ignored -> false;
             case Strip scrolled -> {
-                Map<String, Rect> shown = members(scrolled, frame);
-                Rect band = band(scrolled);
-                Point over = !shown.isEmpty() ? shown.values().iterator().next().center()
-                        : band == null ? null : band.center();
-                if (over == null || scrolled.scroll() == null) yield false;
+                if (scrolled.scroll() == null) yield false;
+                Point over = over(scrolled, members(scrolled, frame), null, frame);
+                if (over == null) yield false;
                 scroll(over, scrolled.scroll());
                 yield true;
             }
@@ -660,8 +732,8 @@ public interface Reach {
         Map<String, Rect> members = members(strip, frame);
         // Scrolled past every member, the wheel stays where the last one showed: a point in the strip. With none
         // showing yet (scrolled to an end of icons the strip does not name), it turns over the middle of the band.
-        Rect band = band(strip);
-        Point over = band == null ? null : band.center();
+        Point over = null;
+        BufferedImage on = frame;
         Scroll scroll = strip.scroll();
         int done = 0;
         boolean first = true;
@@ -671,13 +743,14 @@ public interface Reach {
             done = 0;
             int blind = 0;
             for (int i = 0; i < most; i++) {
-                if (!members.isEmpty()) over = members.values().iterator().next().center();
+                over = over(strip, members, over, on);
                 if (over == null) return Optional.empty();
                 scroll(over, way);
                 done++;
                 Optional<Settled> next = settled(strip, members);
                 if (next.isEmpty()) return Optional.empty();
-                Optional<Seen> seen = seen(button, strip, pick, next.get().frame());
+                on = next.get().frame();
+                Optional<Seen> seen = seen(button, strip, pick, on);
                 if (seen.isPresent()) return seen;
                 Map<String, Rect> now = next.get().members();
                 boolean end = !now.isEmpty() && still(members, now, endPx(scroll));
@@ -785,8 +858,30 @@ public interface Reach {
         return Optional.of(scroll.step(step).settle(Duration.ofMillis(settle)));
     }
 
-    /** Where each member of {@code strip} that shows is on {@code frame}, by its id, in the strip's order. */
+    /**
+     * Where {@code strip} is scrolled over on {@code frame}: the middle of its app's list, found in the tree; else a
+     * member of {@code shown}, else {@code last}, where the last one showed, else the middle of its band. Null when
+     * there is none of these.
+     */
+    private Point over(Strip strip, Map<String, Rect> shown, Point last, BufferedImage frame) {
+        if (strip.scroll() != null && strip.scroll().in() != null) {
+            Element in = strip.scroll().in();
+            return onlyOne(in, elements(in, frame)).map(list -> ElementMatch.place(list).center()).orElse(null);
+        }
+        if (!shown.isEmpty()) return shown.values().iterator().next().center();
+        if (last != null) return last;
+        Rect band = band(strip);
+        return band == null ? null : band.center();
+    }
+
+    /**
+     * Where each member of {@code strip} that shows is on {@code frame}, by its id, in the strip's order. A strip
+     * scrolled {@link Scroll#in in} an app's list has what that list holds as its members, read from the tree: each
+     * node in it with an id or words, keyed by them (a copy by its count too), so a scroll that showed nothing new
+     * met the list's end.
+     */
     private Map<String, Rect> members(Strip strip, BufferedImage frame) {
+        if (strip.scroll() != null && strip.scroll().in() != null) return listed(strip.scroll().in(), frame);
         Rect band = band(strip);
         Map<String, Rect> found = new LinkedHashMap<>();
         for (ImageTemplate member : strip.members()) {
@@ -796,7 +891,27 @@ public interface Reach {
         return found;
     }
 
-    /** Whether the same members show at the same places, to {@link #STILL_PX}: the strip did not move. */
+    /**
+     * What the node {@code list} finds holds on {@code frame}, as {@link #members} keys a list's members; a list it
+     * finds more than once {@link #stop stops}, as an input does.
+     */
+    private Map<String, Rect> listed(Element list, BufferedImage frame) {
+        Map<String, Rect> found = new LinkedHashMap<>();
+        Optional<UiNode> one = onlyOne(list, elements(list, frame));
+        if (one.isEmpty()) return found;
+        Map<String, Integer> copies = new HashMap<>();
+        Deque<UiNode> left = new ArrayDeque<>(one.get().children().reversed());
+        while (!left.isEmpty()) {
+            UiNode node = left.pop();
+            node.children().reversed().forEach(left::push);
+            if (node.id().isEmpty() && node.text().isEmpty() && node.label().isEmpty()) continue;
+            String key = node.id() + "|" + node.text() + "|" + node.label();
+            int n = copies.merge(key, 1, Integer::sum);
+            found.put(n == 1 ? key : key + "#" + n, ElementMatch.place(node));
+        }
+        return found;
+    }
+
     /**
      * Whether a member seen both {@code before} and {@code after} moved more than {@link #STILL_PX}: one gone behind a
      * popup or a tooltip is no move.
@@ -812,6 +927,7 @@ public interface Reach {
         return false;
     }
 
+    /** Whether the same members show at the same places, to {@link #STILL_PX}: the strip did not move. */
     static boolean still(Map<String, Rect> before, Map<String, Rect> after) {
         return still(before, after, STILL_PX);
     }

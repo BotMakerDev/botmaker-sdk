@@ -1,6 +1,8 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.ocr.LineMatch;
 import com.botmaker.shared.emulator.tree.Trait;
@@ -191,5 +193,30 @@ public final class ElementMatch {
 
     private static boolean same(String said, Words words) {
         return !said.isEmpty() && LineMatch.sameText(said, words.text());
+    }
+
+    /** Where {@code node} is on the frame its tree was read for: the screen's pixels, as a frame's. */
+    public static Rect place(UiNode node) {
+        Rectangle b = node.bounds();
+        return new Rect(b.x, b.y, b.width, b.height);
+    }
+
+    /** What {@code node} says of itself: greyed out when not enabled, picked when selected or checked. */
+    public static State state(UiNode node) {
+        if (!node.has(Trait.ENABLED)) return State.DISABLED;
+        return node.has(Trait.SELECTED) || node.has(Trait.CHECKED) ? State.SELECTED : State.NORMAL;
+    }
+
+    /**
+     * What a run's error calls {@code element}: the name of its picture's file, which a pick names after its constant
+     * ({@code elements/battery.png} → {@code battery}), else its words or its id.
+     */
+    public static String named(Element element) {
+        if (element.shot() != null) {
+            String file = element.shot().substring(element.shot().lastIndexOf('/') + 1);
+            int dot = file.lastIndexOf('.');
+            return dot > 0 ? file.substring(0, dot) : file;
+        }
+        return "element " + element.shown();
     }
 }

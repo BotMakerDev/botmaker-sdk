@@ -92,7 +92,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
             case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.comesAndGoes(), null,
                     t.when(), t.gesture(), t.hold());
@@ -109,7 +109,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
                     b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
                     null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
@@ -127,7 +127,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
                     b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
                     h.lock(), h.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
@@ -671,7 +671,7 @@ public final class ScreenEdits {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
                 button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
-                button.grid());
+                button.grid(), button.element());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
@@ -1117,8 +1117,9 @@ public final class ScreenEdits {
                     + ": remove it from there first.";
         }
         if (holds(absent ? was.absent() : was.shown(), id)) return "It is told by " + was.said() + " already.";
-        Markers now = absent ? new Markers(was.shown(), plus(was.absent(), picture), was.texts())
-                : new Markers(plus(was.shown(), picture), was.absent(), was.texts());
+        Markers now = absent
+                ? new Markers(was.shown(), plus(was.absent(), picture), was.texts(), was.elements(), was.picked())
+                : new Markers(plus(was.shown(), picture), was.absent(), was.texts(), was.elements(), was.picked());
         return toldBy(services, constant, now);
     }
 
@@ -1134,7 +1135,8 @@ public final class ScreenEdits {
         if (!holds(was.shown(), id) && !holds(was.absent(), id)) {
             return NOT_WRITTEN + "it is told by " + was.said() + ", not " + id + ".";
         }
-        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id), was.texts());
+        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id), was.texts(), was.elements(),
+                was.picked());
         if (!now.any()) return NOT_WRITTEN + id + " is its last marker: add another first.";
         return toldBy(services, constant, now);
     }

@@ -13,6 +13,10 @@ import java.time.Duration;
  * hold still (2026-10-17). A strip's own numbers make a fast one quick to judge and a slow one judged only once it
  * stopped.
  *
+ * <p>An app's list is scrolled {@link #in in} its element: {@code Scroll.drag(Order.NORTH, 600,
+ * Duration.ofMillis(300)).in(Elements.SETTINGS_LIST)}. The list is found in the screen's tree, the scroll done from
+ * its middle, and what it holds, read from the tree, says whether it moved (2026-10-31).
+ *
  * @param notches how far each turn of the wheel goes: negative down or toward you, positive up or away; 0 for a drag
  * @param drag    which way the pointer is dragged, the way the members move; null for the wheel
  * @param px      how far the pointer is dragged; 0 for the wheel
@@ -20,8 +24,9 @@ import java.time.Duration;
  * @param step    how far the members move on one scroll, in the frame's pixels; 0 when not measured
  * @param settle  the longest the strip is looked at after a scroll for its members to hold still
  * @param most    the most scrolls each way looking for a member
+ * @param in      the app's list it scrolls, found in the screen's tree; null for a strip told by its pictures
  */
-public record Scroll(int notches, Order drag, int px, Duration time, int step, Duration settle, int most) {
+public record Scroll(int notches, Order drag, int px, Duration time, int step, Duration settle, int most, Element in) {
 
     /**
      * How long a strip not measured yet is looked at after a scroll: Firestone's column glides for over a second, and
@@ -42,27 +47,32 @@ public record Scroll(int notches, Order drag, int px, Duration time, int step, D
 
     /** The wheel turned {@code notches} over a member that shows. */
     public static Scroll wheel(int notches) {
-        return new Scroll(notches, null, 0, Duration.ZERO, 0, SETTLE, MOST);
+        return new Scroll(notches, null, 0, Duration.ZERO, 0, SETTLE, MOST, null);
     }
 
     /** The pointer dragged {@code px} toward {@code way} over {@code time}, from a member that shows. */
     public static Scroll drag(Order way, int px, Duration time) {
-        return new Scroll(0, way, px, time, 0, SETTLE, MOST);
+        return new Scroll(0, way, px, time, 0, SETTLE, MOST, null);
     }
 
     /** This scroll, its members moving {@code px} on each. */
     public Scroll step(int px) {
-        return new Scroll(notches, drag, this.px, time, px, settle, most);
+        return new Scroll(notches, drag, this.px, time, px, settle, most, in);
     }
 
     /** This scroll, its strip looked at for up to {@code time} to hold still after each. */
     public Scroll settle(Duration time) {
-        return new Scroll(notches, drag, px, this.time, step, time, most);
+        return new Scroll(notches, drag, px, this.time, step, time, most, in);
     }
 
     /** This scroll, done at most {@code n} times each way looking for a member. */
     public Scroll most(int n) {
-        return new Scroll(notches, drag, px, time, step, settle, n);
+        return new Scroll(notches, drag, px, time, step, settle, n, in);
+    }
+
+    /** This scroll, done over the app's list {@code list}, found in the screen's tree; null: over a member. */
+    public Scroll in(Element list) {
+        return new Scroll(notches, drag, px, time, step, settle, most, list);
     }
 
     /** Whether it scrolls at all: a wheel that turns, or a drag that goes somewhere. */
@@ -72,13 +82,14 @@ public record Scroll(int notches, Order drag, int px, Duration time, int step, D
 
     /** This scroll the other way: the wheel turned back, or the drag the opposite way. */
     public Scroll back() {
-        return drag == null ? new Scroll(-notches, null, px, time, step, settle, most)
-                : new Scroll(notches, opposite(drag), px, time, step, settle, most);
+        return drag == null ? new Scroll(-notches, null, px, time, step, settle, most, in)
+                : new Scroll(notches, opposite(drag), px, time, step, settle, most, in);
     }
 
-    /** How the scroll reads in a reply: {@code wheel -5} or {@code drag NORTH 300px}. */
+    /** How the scroll reads in a reply: {@code wheel -5} or {@code drag NORTH 300px}, then {@code in "Settings"}. */
     public String label() {
-        return drag == null ? "wheel " + notches : "drag " + drag + " " + px + "px";
+        return (drag == null ? "wheel " + notches : "drag " + drag + " " + px + "px")
+                + (in == null ? "" : " in " + in.shown());
     }
 
     private static Order opposite(Order way) {

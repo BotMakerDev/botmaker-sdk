@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Synthetic: a screen written by hand, no device content. A greyed-out Save, a picked tab beside one not picked, a
+     switch that is on, and a battery level to read; one image has only its label. -->
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1000,2000]">
+    <node index="0" text="Save" resource-id="com.example.app:id/save" class="android.widget.Button" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="true" enabled="false" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[100,100][300,200]" />
+    <node index="1" text="Today" resource-id="com.example.app:id/tab" class="android.view.View" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="true" bounds="[0,300][500,400]" />
+    <node index="2" text="Week" resource-id="com.example.app:id/tab" class="android.view.View" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[500,300][1000,400]" />
+    <node index="3" text="" resource-id="com.example.app:id/wifi" class="android.widget.Switch" package="com.example.app" content-desc="" checkable="true" checked="true" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[800,500][1000,600]" />
+    <node index="4" text=" 85 % " resource-id="com.example.app:id/level" class="android.widget.TextView" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[100,700][400,760]" />
+    <node index="5" text="" resource-id="com.example.app:id/avatar" class="android.widget.ImageView" package="com.example.app" content-desc="Profile" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[100,800][200,900]" />
+  </node>
+</hierarchy>

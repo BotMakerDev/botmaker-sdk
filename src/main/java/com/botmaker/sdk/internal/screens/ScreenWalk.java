@@ -423,7 +423,7 @@ public final class ScreenWalk {
                         seen = reach.inView(button, strip, p, frame.get());
                     }
                     if (seen.isEmpty()) break;
-                    if (p.mode() == Pick.Mode.UNTIL && p.look() != null
+                    if (p.mode() == Pick.Mode.UNTIL && p.look() != null && seen.get().picture() != null
                             && seen.get().picture().id().equals(p.look().id())) {
                         shows = true;
                         break;
@@ -869,7 +869,14 @@ public final class ScreenWalk {
             return Optional.empty();
         }
         List<Button> closes = closeButtons();
-        List<Optional<Rect>> found = reach.findEach(closes.stream().map(Button::picture).toList(), frame);
+        // A close button of an app is found in the tree, the others all at once by their pictures.
+        List<Optional<Rect>> pictured = reach.findEach(closes.stream().filter(b -> !b.isElement())
+                .map(Button::picture).toList(), frame);
+        List<Optional<Rect>> found = new ArrayList<>();
+        int next = 0;
+        for (Button b : closes) {
+            found.add(b.isElement() ? reach.seen(b, frame).map(Reach.Seen::place) : pictured.get(next++));
+        }
         for (int i = 0; i < closes.size(); i++) {
             if (found.get(i).isEmpty()) continue;
             reach.press(closes.get(i), found.get(i).get(), frame);

@@ -59,9 +59,20 @@ public final class Screens {
         }
     }
 
+    public static final class Settings extends Screen {
+        public final Button sound = Button.of(Elements.SOUND).tried();
+        public final Readout volume = Readout.element(Elements.VOLUME);
+
+        @Override
+        public Setup setup() {
+            return Setup.named("Settings").elements(List.of(Elements.SETTINGS_LIST)).from(HOME.collect);
+        }
+    }
+
     public static final Home HOME = new Home();
     public static final Shop SHOP = new Shop();
     public static final Items ITEMS = new Items();
+    public static final Settings SETTINGS = new Settings();
 
     private Screens() {}
 }

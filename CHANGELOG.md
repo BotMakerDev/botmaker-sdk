@@ -28,7 +28,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Its words match whatever their case and end marks, but letter for letter: the tree states its text, so `Sound`
   never finds `Round` as OCR's forgiving match would. 🗺 Screens names a picked input with the fewest clues that find only it: its
   id, its id and words, inside its list, below a neighbour, then as a repeated input when it is one of a list's
-  copies, its index only as the last resort. Nothing presses an element yet: Screens finds them next.
+  copies, its index only as the last resort.
+- **A screen's inputs, markers, readouts and lists can be elements**: `Button.of(Elements.SOUND)`,
+  `Setup.elements(List.of(Elements.LIST))`, `Readout.element(Elements.VOLUME)` and a `Scroll`'s `.in(Elements.LIST)`.
+  A run finds them in the app's tree, read once per frame and shared by every check on it, and taps an input at
+  the centre of its bounds. Greyed out and picked are read from the tree (`enabled`, `selected`, `checked`), so
+  no look is cut for them; a readout gives the node's text exactly, or its label for an image. A repeated element
+  input's copies are ordered by their bounds, as pictures' are by place. A list scrolls from its own middle until
+  the input shows, and stops when a scroll shows nothing new. One screen mixes element and picture inputs freely.
+  The run stops, saying why, when an element input that is not repeated matches two inputs (pick it again, or
+  mark it repeated) or when the target shows no tree (a game window).
 
 - 🗺 Screens opens screens as tabs, after *Graph*. A screen you open goes into one *italic* tab that the next one
   replaces, so tabs stay few; edit the screen or double-click its tab to keep it. Inputs never get a tab. A bar above

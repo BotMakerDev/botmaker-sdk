@@ -9,6 +9,7 @@ public final class Texts {
 
     public static final Words GUILD = Words.of("Guild");
     public static final Words SHOP = Words.of("Shop");
+    public static final Words SOUND = Words.of("Sound");
 
     private Texts() {}
 }

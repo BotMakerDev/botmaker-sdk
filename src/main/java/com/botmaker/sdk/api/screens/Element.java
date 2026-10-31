@@ -103,6 +103,12 @@ public record Element(String id, Words label, Words text, Words holding, Element
         return new Element(id, label, text, holding, inside, below, index, path);
     }
 
+    /** What a window or a tool calls it: its words in quotes, else its id. */
+    public String shown() {
+        Words words = text != null ? text : label != null ? label : holding;
+        return words != null ? "\"" + words.text() + "\"" : id;
+    }
+
     private static String requiredId(String id) {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("An element's id is blank");
         return id;

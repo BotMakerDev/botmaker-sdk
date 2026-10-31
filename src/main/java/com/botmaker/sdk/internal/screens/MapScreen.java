@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Readout;
@@ -169,6 +170,11 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
     /** The words that tell it, each read in its zone. */
     public List<Caption> texts() {
         return setup.texts();
+    }
+
+    /** The app's elements that tell it, each found in the screen's tree. */
+    public List<Element> elements() {
+        return setup.elements();
     }
 
     /** Its ways in: its {@code from}, then each {@code alsoFrom}. */

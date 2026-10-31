@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
@@ -18,6 +19,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.emulator.ReadableSource;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -37,9 +39,30 @@ public final class RunReach implements Reach {
     /** Between a double tap's two taps on an emulator: well inside a phone's double-tap time. */
     private static final long DOUBLE_TAP_MS = 80;
 
+    /** The tree read for the last frame an element was looked for on. */
+    private final FrameTree trees = new FrameTree();
+
     @Override
     public Optional<BufferedImage> look() {
         return Optional.ofNullable(Source.current().capture());
+    }
+
+    @Override
+    public boolean readsTrees() {
+        return Source.current().base() instanceof ReadableSource;
+    }
+
+    /** The source's tree, read once per frame; read after the frame was taken, at the next element looked for. */
+    @Override
+    public Optional<ElementMatch.Matcher> treeOn(BufferedImage frame) {
+        if (!(Source.current().base() instanceof ReadableSource source)) return Optional.empty();
+        return trees.on(frame, source::tree);
+    }
+
+    /** The run ends, {@code why} its error: retrying cannot change what the bot says. */
+    @Override
+    public void stop(String why) {
+        Bot.stop(why);
     }
 
     @Override

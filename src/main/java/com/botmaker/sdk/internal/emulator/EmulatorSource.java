@@ -5,11 +5,18 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
+import com.botmaker.shared.emulator.tree.TreeReader;
+import com.botmaker.shared.emulator.tree.TreeReaders;
+import com.botmaker.shared.emulator.tree.UiTree;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * A {@link CaptureSource} that targets an emulator <em>by instance name</em>, connecting lazily on first use —
@@ -22,7 +29,7 @@ import java.util.Optional;
  * visible yet" and retries, and a later capture connects once the instance has booted. A dropped connection
  * re-resolves on the next call.
  */
-public final class EmulatorSource implements CaptureSource {
+public final class EmulatorSource implements CaptureSource, ReadableSource {
 
     /** How old a scan of the emulators may be to answer whether this one is up. */
     private static final Duration RECENT = Duration.ofSeconds(2);
@@ -34,6 +41,9 @@ public final class EmulatorSource implements CaptureSource {
 
     private volatile Emulator connected;
     private volatile boolean launchDispatched;
+    /** The tree reader of {@link #readerOf}'s connection; guarded by this. */
+    private TreeReader reader;
+    private Emulator readerOf;
 
     public EmulatorSource(String instanceName) {
         this.instanceName = instanceName == null ? "" : instanceName.trim();
@@ -100,6 +110,34 @@ public final class EmulatorSource implements CaptureSource {
     public void key(int keyCode) {
         Emulator emu = resolve();
         if (emu != null) emu.key(keyCode);
+    }
+
+    /**
+     * The focused app's tree, read by one {@link TreeReader} per connection, which a new connection closes; the
+     * reader's process on the device ends with this JVM. The focused package is asked while the tree is read, so the
+     * read takes no longer than the slower of the two.
+     */
+    @Override
+    @Hidden("what Screens finds a bot's Elements in; a bot names an element, never a tree")
+    public synchronized Optional<UiTree> tree() {
+        Emulator emu = resolve();
+        if (emu == null) return Optional.empty();
+        if (reader == null || readerOf != emu) {
+            if (reader != null) reader.close();
+            reader = TreeReaders.open(emu.device());
+            readerOf = emu;
+        }
+        try (ExecutorService both = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<Optional<String>> focused = both.submit(() -> emu.device().focusedPackage());
+            Optional<UiTree> tree = reader.read();
+            Optional<String> app = focused.get();
+            return tree.map(read -> app.map(read::app).orElse(read));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (ExecutionException e) {
+            return Optional.empty();
+        }
     }
 
     /**

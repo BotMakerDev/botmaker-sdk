@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -63,12 +64,12 @@ public final class ScreenTypes implements TypeHolder {
     @Override
     public List<ComponentType<?>> components() {
         return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, BUTTON_SHAPE,
-                BUTTON_BESIDE_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE, PLACE_BELOW_SHAPE,
-                PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
+                BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
+                PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
                 PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CAPTION_SHAPE,
-                READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE, BESIDE_SHAPE, NODE_SHAPE,
-                TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
+                READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, READOUT_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
+                BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE);
     }
 
@@ -85,6 +86,7 @@ public final class ScreenTypes implements TypeHolder {
             .<List<ImageTemplate>>with(Setup::markers, Setup::markers)
             .<List<ImageTemplate>>with(Setup::absent, Setup::absent)
             .<List<Caption>>with(Setup::texts, Setup::texts)
+            .<List<Element>>with(Setup::elements, Setup::elements)
             .<Input>with(Setup::from, Setup::fromInput)
             .<Screen>with(Setup::after, Setup::fromAfter)
             .<Pick>with(Setup::fromPick, setup -> setup.from() == null ? null : setup.from().pick())
@@ -179,7 +181,36 @@ public final class ScreenTypes implements TypeHolder {
             .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
             .<Place>with(Button::place, Button::place)
             .<Grid>with(Button::grid, Button::grid)
-            .when(button -> BotConstants.inputName(button) == null && !button.cycles() && button.beside() == null);
+            .when(button -> BotConstants.inputName(button) == null && !button.cycles() && button.beside() == null
+                    && !button.isElement());
+
+    /**
+     * {@code Button.of(Element)} and the links an element keeps: an app's input found in the screen's tree. Its
+     * picture is the element's shot, so it is never written; nor a spot, a grid or a cycle, which an element has none
+     * of.
+     */
+    public static final DeclaredCall<Button> BUTTON_ELEMENT_SHAPE = ComponentType.part(Button.class)
+            .<Element, Button>writtenAs(Button::of, Button::element)
+            .flag(Button::tried, Button::isTried)
+            .flag(Button::leaves, Button::isLeaving)
+            .flag(Button::info, Button::isInfo)
+            .<String>with(Button::never, Button::never)
+            .flag(Button::sometimes, Button::comesAndGoes)
+            .<ImageTemplate>with(Button::locked, Button::lock)
+            .<List<Look>>with(Button::looks, Button::looks)
+            .<BooleanSupplier>with(Button::when, Parts.BUTTON_WHEN.part(ScreenTypes::condition))
+            .flag(Button::repeated, ScreenTypes::repeatedWritten)
+            .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
+            .<Duration>with(Button::hold, Button::hold)
+            .<Words>with(Button::types, Button::text)
+            .flag(Button::typed, Button::typedByBody)
+            .flag(Button::submits, Button::isSubmitting)
+            .flag(Button::clears, Button::isClearing)
+            .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
+            .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
+            .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
+            .<Place>with(Button::place, Button::place)
+            .when(Button::isElement);
 
     /**
      * {@code Button.beside(ImageTemplate, double, double)} and the same links: a spot with no picture of its own, or a
@@ -334,7 +365,13 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = ComponentType.part(Readout.class)
             .<Zone, Readout>writtenAs(Readout::text, Readout::zone)
             .flag(Readout::subject, Readout::isSubject)
-            .when(readout -> !readout.isNumber());
+            .when(readout -> !readout.isNumber() && readout.element() == null);
+
+    /** {@code Readout.element(Element)}: an app's text read from the screen's tree, and the same link. */
+    public static final DeclaredCall<Readout> READOUT_ELEMENT_SHAPE = ComponentType.part(Readout.class)
+            .<Element, Readout>writtenAs(Readout::element, Readout::element)
+            .flag(Readout::subject, Readout::isSubject)
+            .when(readout -> readout.element() != null);
 
     /** {@code Readout.digits(Zone, DigitSet)}: a number read with one of the bot's {@code Digits}, and the same link. */
     public static final DeclaredCall<Readout> READOUT_DIGITS_SHAPE = ComponentType.part(Readout.class)
@@ -400,6 +437,7 @@ public final class ScreenTypes implements TypeHolder {
             .<Integer>with(Scroll::step, Scroll::step)
             .<Duration>with(Scroll::settle, Scroll::settle)
             .<Integer>with(Scroll::most, Scroll::most)
+            .<Element>with(Scroll::in, Scroll::in)
             .when(scroll -> scroll.drag() == null);
 
     /** {@code Scroll.drag(Order, int, Duration)} and the same links. */
@@ -408,6 +446,7 @@ public final class ScreenTypes implements TypeHolder {
             .<Integer>with(Scroll::step, Scroll::step)
             .<Duration>with(Scroll::settle, Scroll::settle)
             .<Integer>with(Scroll::most, Scroll::most)
+            .<Element>with(Scroll::in, Scroll::in)
             .when(scroll -> scroll.drag() != null);
 
     /** {@code Pick.first(Order)}. */

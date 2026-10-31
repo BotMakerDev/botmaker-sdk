@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -378,6 +379,23 @@ class ScreenTypesTest {
         assertEquals(event, roundTrip(ScreenTypes.SETUP_SHAPE, event));
         assertEquals("", ScreenTypes.sourceOf(() -> true), "a live method has nothing to be written as");
         assertNull(ScreenTypes.condition(" "));
+    }
+
+    @Test
+    void anElementsInputMarkerReadoutAndListComeApartAndGoBackTogether() {
+        Element list = Element.byId("settings_list");
+        Element sound = Element.byId("title").text(Words.of("Sound")).inside(list).shot("elements/sound.png");
+        Button tap = Button.of(sound).tried().repeated();
+        assertEquals(tap, roundTrip(ScreenTypes.BUTTON_ELEMENT_SHAPE, tap));
+        assertTrue(ScreenTypes.BUTTON_ELEMENT_SHAPE.writes(tap));
+        assertFalse(ScreenTypes.BUTTON_SHAPE.writes(tap), "a picture button's shape never writes an element");
+        Readout volume = Readout.element(Element.byId("volume"));
+        assertEquals(volume, roundTrip(ScreenTypes.READOUT_ELEMENT_SHAPE, volume));
+        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.writes(volume));
+        Scroll drag = Scroll.drag(Order.NORTH, 400, Duration.ofMillis(100)).in(list);
+        assertEquals(drag, roundTrip(ScreenTypes.SCROLL_DRAG_SHAPE, drag));
+        Setup settings = Setup.named("Settings").elements(List.of(list));
+        assertEquals(settings, roundTrip(ScreenTypes.SETUP_SHAPE, settings));
     }
 
     @Test

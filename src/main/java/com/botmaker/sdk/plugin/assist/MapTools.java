@@ -812,9 +812,10 @@ final class MapTools {
     /** {@code set} as {@code mark} changes it by {@code cut}: replaced, added to, or given an absent picture. */
     private static Markers marked(Markers set, Mark mark, ImageTemplate cut) {
         return switch (mark) {
-            case SET -> new Markers(List.of(cut), set.absent(), set.texts());
-            case ADD -> new Markers(with(set.shown(), cut), set.absent(), set.texts());
-            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut), set.texts());
+            case SET -> new Markers(List.of(cut), set.absent(), set.texts(), set.elements(), set.picked());
+            case ADD -> new Markers(with(set.shown(), cut), set.absent(), set.texts(), set.elements(), set.picked());
+            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut), set.texts(), set.elements(),
+                    set.picked());
         };
     }
 
