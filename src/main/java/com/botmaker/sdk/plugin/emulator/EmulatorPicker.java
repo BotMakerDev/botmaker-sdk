@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.shared.emulator.AvdPlatform;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
 import com.botmaker.shared.emulator.EmulatorLiveness;
@@ -152,8 +153,9 @@ public final class EmulatorPicker {
         Async.load("emulator-picker-scan", () -> {
             // A phone on a cable is listed only by an adb server: started before the scan, so the scan has it.
             AdbTools.wake();
-            return new EmulatorInstanceScanner().scan();
-        }, scan -> {
+            return new Scanned(new EmulatorInstanceScanner().scan(), AvdPlatform.kvmNeed());
+        }, scanned -> {
+            EmulatorInstanceScanner.Scan scan = scanned.scan();
             rows.getChildren().clear();
             if (scan.instances().isEmpty()) {
                 // No instances — show what each product's discovery actually saw so the user can tell
@@ -161,7 +163,7 @@ public final class EmulatorPicker {
                 rows.getChildren().add(buildStatusSummary(scan.statuses(), dialog));
             } else {
                 for (EmulatorInstance instance : scan.instances()) {
-                    rows.getChildren().add(buildRow(instance, dialog));
+                    rows.getChildren().add(buildRow(instance, avdNote(instance, scanned.kvmNeed()), dialog));
                 }
                 // A product that is installed and listed nothing would otherwise be indistinguishable from one
                 // this picker can't see at all — which is how a machine with six emulators looked like it had one.
@@ -178,6 +180,14 @@ public final class EmulatorPicker {
             rows.getChildren().add(connectPhoneRow(rows, dialog));
         }, why -> rows.getChildren().setAll(new Label("Couldn't scan for emulators: " + why),
                 connectPhoneRow(rows, dialog)));
+    }
+
+    /** One opening's scan, with what the machine lacks: both read off the FX thread, once. */
+    private record Scanned(EmulatorInstanceScanner.Scan scan, String kvmNeed) {}
+
+    /** What a stopped AVD's row says it needs, or null: the emulator won't boot without KVM; Start stays offered. */
+    static String avdNote(EmulatorInstance instance, String kvmNeed) {
+        return instance.platformId() == PlatformId.AVD && instance.state() == EmulatorState.STOPPED ? kvmNeed : null;
     }
 
     /**
@@ -211,7 +221,7 @@ public final class EmulatorPicker {
     private record RowUi(Circle dot, Label state, Label clash, Button action, ImageView thumb, VBox apps) {}
 
     /** One instance row: a clickable header (preview + dot + brand + name) plus a lazily-filled installed-apps list. */
-    private static VBox buildRow(EmulatorInstance instance, Dialog<Selection> dialog) {
+    private static VBox buildRow(EmulatorInstance instance, String needs, Dialog<Selection> dialog) {
         ImageView thumb = new ImageView();
         thumb.setPreserveRatio(true);
         thumb.setFitWidth(THUMB_W);
@@ -277,6 +287,13 @@ public final class EmulatorPicker {
         apps.setPadding(new Insets(0, 8, 4, 26));
 
         VBox row = new VBox(2, header, clash, apps);
+        if (needs != null) {
+            Label need = new Label(needs);
+            need.getStyleClass().add("emulator-picker-state");
+            need.setWrapText(true);
+            need.setPadding(new Insets(0, 8, 0, 26));
+            row.getChildren().add(1, need);
+        }
 
         // Show any cached apps immediately (so a stopped instance still lists its last scan), then probe liveness
         // and — if up — refresh the apps from the live device and fill in the preview thumbnail.

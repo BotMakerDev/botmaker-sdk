@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Android Studio's emulators in the picker**: every AVD is a row, *Android Studio emulator: <name>*, running or not,
+  with Start and Stop, and a bot's launch target boots a stopped one. On Linux, a stopped AVD's row says when KVM is
+  out of reach: no `/dev/kvm`, or not in the `kvm` group.
 - **The assistant maps an app by its tree**: `list_elements` lists what the emulator's tree holds on the screen
   (kind, words, how each is found; never an id or a bound), and `save_element` saves one by its words as 🗺 Screens'
   picker does, a marker starting an empty map. `try_input` presses an element button by its field, found in the
