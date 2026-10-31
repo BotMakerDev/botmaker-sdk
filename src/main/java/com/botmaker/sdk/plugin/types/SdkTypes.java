@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.text.OcrOptions;
@@ -38,6 +39,7 @@ import com.botmaker.sdk.plugin.editors.InputEditors;
 import com.botmaker.sdk.plugin.editors.LauncherEditors;
 import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
+import com.botmaker.sdk.plugin.editors.ScreenEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
 
 import java.time.Duration;
@@ -83,7 +85,7 @@ public final class SdkTypes implements TypeHolder {
 
     @Override
     public List<PluginType<?>> types() {
-        return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, POINT, RECT, SIZE, ZONE, KEY,
+        return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, ZONE, KEY,
                 MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
                 ACTIVITY, OUTCOME);
     }
@@ -92,6 +94,7 @@ public final class SdkTypes implements TypeHolder {
     public List<ComponentType<?>> components() {
         List<ComponentType<?>> all = new ArrayList<>(List.of(PICTURE_TAG, COMBO_HELD, STEP));
         all.addAll(PRECISION_WITHERS);
+        all.addAll(ELEMENT_BY_OTHER_CLUES);
         all.add(OCR_CHAIN);
         return all;
     }
@@ -175,6 +178,52 @@ public final class SdkTypes implements TypeHolder {
             .fresh(() -> Words.of(""))
             .editor(() -> OcrEditors::words)
             .writtenAs(Words::of, Words::text);
+
+    /**
+     * An app's input found in the screen's tree, {@code Element.byId("title").text(Texts.BATTERY)}, and each other clue
+     * only when it has it (2026-10-31). Written by its first clue's factory, id, label, text then holding:
+     * {@code byText} here, the others in {@link #ELEMENT_BY_OTHER_CLUES}. An element it is inside or below is written
+     * as its constant. A fresh one is found by no words; picking it on a frozen frame in 🗺 Screens names it.
+     */
+    public static final DeclaredCallType<Element> ELEMENT = PluginType.value(Element.class)
+            .fresh(() -> Element.byText(Words.of("")))
+            .editor(() -> ScreenEditors::element)
+            .writtenAs(Element::byText, Element::text)
+            .<Words>with(Element::holding, Element::holding)
+            .<Element>with(Element::inside, Element::inside)
+            .<Element>with(Element::below, Element::below)
+            .<Integer>with(Element::index, Element::index)
+            .<String>with(Element::shot, Element::shot)
+            .when(element -> element.id() == null && element.label() == null && element.text() != null);
+
+    /** {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)} or {@code byHolding(…)}. */
+    public static final List<DeclaredCall<Element>> ELEMENT_BY_OTHER_CLUES = List.of(
+            ComponentType.part(Element.class)
+                    .<String, Element>writtenAs(Element::byId, Element::id)
+                    .<Words>with(Element::label, Element::label)
+                    .<Words>with(Element::text, Element::text)
+                    .<Words>with(Element::holding, Element::holding)
+                    .<Element>with(Element::inside, Element::inside)
+                    .<Element>with(Element::below, Element::below)
+                    .<Integer>with(Element::index, Element::index)
+                    .<String>with(Element::shot, Element::shot)
+                    .when(element -> element.id() != null),
+            ComponentType.part(Element.class)
+                    .<Words, Element>writtenAs(Element::byLabel, Element::label)
+                    .<Words>with(Element::text, Element::text)
+                    .<Words>with(Element::holding, Element::holding)
+                    .<Element>with(Element::inside, Element::inside)
+                    .<Element>with(Element::below, Element::below)
+                    .<Integer>with(Element::index, Element::index)
+                    .<String>with(Element::shot, Element::shot)
+                    .when(element -> element.id() == null && element.label() != null),
+            ComponentType.part(Element.class)
+                    .<Words, Element>writtenAs(Element::byHolding, Element::holding)
+                    .<Element>with(Element::inside, Element::inside)
+                    .<Element>with(Element::below, Element::below)
+                    .<Integer>with(Element::index, Element::index)
+                    .<String>with(Element::shot, Element::shot)
+                    .when(element -> element.id() == null && element.label() == null && element.text() == null));
 
     /**
      * A point on the screen. Its editor asks the host for this declaration ({@code ValueContext.declared}),

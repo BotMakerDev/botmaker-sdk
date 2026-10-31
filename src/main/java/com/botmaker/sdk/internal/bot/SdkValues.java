@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -46,7 +47,7 @@ import java.util.Set;
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
  * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
- * {@code ZONES}, {@code DIGITS}, {@code TEXTS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
+ * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
  * run's {@code @Param} fields in {@code Sdk.java}, which {@code Bot.runFlow} reads by their marks and nothing
  * claims; {@code LAUNCH_TARGETS}, {@code CAPTURE} (where pixels are read from) and {@code VM} the game's,
  * which {@code Bot.runFlow} reads by their marks.
@@ -156,6 +157,17 @@ public final class SdkValues implements ValueHolder {
             .of(Words.class)
             .in("Texts")
             .because("Texts.java holds the texts the bot types. Set a text field's text in 🗺 Screens to add one.");
+
+    /**
+     * An app's inputs found in the screen's tree — {@code static final Element BATTERY =
+     * Element.byId("title").text(Texts.BATTERY)}, which a button of the map presses on an emulator's app. Picking one
+     * on a frozen frame in 🗺 Screens adds one (2026-10-31).
+     */
+    public static final ManagedOpenSet.OfConstants<Element> ELEMENTS = ManagedValue.openSet(SdkValue.Id.ELEMENTS)
+            .of(Element.class)
+            .in("Elements")
+            .because("Elements.java holds the app inputs the bot finds in the screen's tree. Pick one on a frozen"
+                    + " frame in 🗺 Screens to add one.");
 
     /**
      * The game's screens — {@code static final class Campaign extends Screen} with its constant {@code CAMPAIGN}: its
@@ -277,7 +289,7 @@ public final class SdkValues implements ValueHolder {
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, SCREEN_MAP,
+        return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS, SCREEN_MAP,
                 SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
     }
 

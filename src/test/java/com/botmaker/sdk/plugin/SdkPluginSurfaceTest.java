@@ -22,6 +22,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ColorMatch;
@@ -110,7 +111,7 @@ class SdkPluginSurfaceTest {
      */
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, com.botmaker.sdk.api.text.DigitSet.class,
-            com.botmaker.sdk.api.text.Words.class,
+            com.botmaker.sdk.api.text.Words.class, Element.class,
             Point.class, Rect.class, Size.class,
             com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
@@ -198,6 +199,8 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.text.DigitSet.class, byId.get(SdkValue.Id.DIGITS).type());
         assertEquals("Texts", byId.get(SdkValue.Id.TEXTS).holder());
         assertEquals(com.botmaker.sdk.api.text.Words.class, byId.get(SdkValue.Id.TEXTS).type());
+        assertEquals("Elements", byId.get(SdkValue.Id.ELEMENTS).holder());
+        assertEquals(Element.class, byId.get(SdkValue.Id.ELEMENTS).type());
         // One declaration per constant, and nothing else.
         assertEquals(SdkValue.Id.values().length, byId.size());
         assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
@@ -373,9 +376,10 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(20, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
-                + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22");
+                + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22;"
+                + " Element 2026-10-31");
     }
 
     /**

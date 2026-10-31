@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **`Element`, an app's input found in the screen's tree**, a constant of the bot's new `Elements` class
+  (`@SdkValue(ELEMENTS)`): `Element.byId("title").text(Texts.BATTERY)`, `Element.byText(Texts.NETWORK)
+  .inside(Elements.LIST)`, `Element.byLabel(…)`, `Element.byHolding(…)`, then `.below(…)`, `.index(n)` and
+  `.shot(path)`. It says how the input is found, never what kind it is, and holds no position or view class.
+  Its words match whatever their case and end marks, but letter for letter: the tree states its text, so `Sound`
+  never finds `Round` as OCR's forgiving match would. 🗺 Screens names a picked input with the fewest clues that find only it: its
+  id, its id and words, inside its list, below a neighbour, then as a repeated input when it is one of a list's
+  copies, its index only as the last resort. Nothing presses an element yet: Screens finds them next.
+
 - 🗺 Screens opens screens as tabs, after *Graph*. A screen you open goes into one *italic* tab that the next one
   replaces, so tabs stay few; edit the screen or double-click its tab to keep it. Inputs never get a tab. A bar above
   the shot reaches another screen without going back to the graph: ◀ ▶ through the screens you looked at, a list of

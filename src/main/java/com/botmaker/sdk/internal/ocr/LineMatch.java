@@ -14,6 +14,18 @@ public final class LineMatch {
 
     /** Whether {@code line} is {@code words}, as the map reads them. */
     public static boolean same(String line, String words) {
+        return match(line, words, true);
+    }
+
+    /**
+     * Whether {@code text}, read exactly (an app's tree states it), is {@code words}: whatever its case and the
+     * spaces or marks at its ends, but no letter forgiven: {@code Sound} is never {@code Round} (2026-10-31).
+     */
+    public static boolean sameText(String text, String words) {
+        return match(text, words, false);
+    }
+
+    private static boolean match(String line, String words, boolean forgiving) {
         if (line == null || words == null) return false;
         String read = plain(line);
         String said = plain(words);
@@ -22,7 +34,7 @@ public final class LineMatch {
             String marks = words.strip().replaceAll("\\s+", "");
             return !marks.isEmpty() && line.strip().replaceAll("\\s+", "").equalsIgnoreCase(marks);
         }
-        return distance(read, said) <= edits(said.length());
+        return forgiving ? distance(read, said) <= edits(said.length()) : read.equals(said);
     }
 
     /** How many edits words of {@code length} letters are forgiven: a misread {@code l↔1}, a dropped letter. */

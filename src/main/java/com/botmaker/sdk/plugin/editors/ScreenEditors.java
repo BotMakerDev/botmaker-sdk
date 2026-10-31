@@ -6,10 +6,12 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -261,5 +263,22 @@ public final class ScreenEditors {
         ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true, true));
         view.setPreserveRatio(true);
         return view;
+    }
+
+    /**
+     * An element of the bot's {@code Elements}: its words, read only. It is picked again on a frozen frame in 🗺
+     * Screens to change it, never typed as clues (2026-10-31).
+     */
+    public static Node element(ValueContext ctx) {
+        Label said = new Label(ctx.value(Element.class).map(ScreenEditors::said).orElse("No element"));
+        said.setTooltip(new Tooltip("An input found in the app's tree: pick it again in 🗺 Screens to change it."));
+        return said;
+    }
+
+    /** An element as a person reads it: its words, never its id. */
+    static String said(Element element) {
+        Words words = element.text() != null ? element.text()
+                : element.label() != null ? element.label() : element.holding();
+        return words == null ? "Element" : "Element \"" + words.text() + "\"";
     }
 }

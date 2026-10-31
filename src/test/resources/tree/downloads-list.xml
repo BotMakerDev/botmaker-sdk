@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Synthetic: a downloads list written by hand, no device content. Three rows are copies, each holding a Remove
+     button; two Share icons share an id from different places, one in a toolbar under the list. Last, a tappable
+     row whose title sits in a wrapper. -->
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1000,2000]">
+    <node index="0" text="" resource-id="com.example.files:id/downloads" class="androidx.recyclerview.widget.RecyclerView" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="true" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,0][1000,1000]">
+      <node index="0" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1000,100]">
+        <node index="0" text="Remove" resource-id="com.example.files:id/remove" class="android.widget.Button" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[800,0][1000,100]" />
+      </node>
+      <node index="1" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,100][1000,200]">
+        <node index="0" text="Remove" resource-id="com.example.files:id/remove" class="android.widget.Button" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[800,100][1000,200]" />
+      </node>
+      <node index="2" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,200][1000,300]">
+        <node index="0" text="Remove" resource-id="com.example.files:id/remove" class="android.widget.Button" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[800,200][1000,300]" />
+      </node>
+    </node>
+    <node index="1" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1000][1000,1100]">
+      <node index="0" text="" resource-id="com.example.files:id/share" class="android.widget.ImageView" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[900,1000][1000,1100]" />
+    </node>
+    <node index="2" text="" resource-id="com.example.files:id/share" class="android.widget.ImageView" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[900,1500][1000,1600]" />
+    <node index="3" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1000,1800]">
+      <node index="0" text="" resource-id="" class="android.widget.RelativeLayout" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[20,1700][980,1800]">
+        <node index="0" text="Storage settings" resource-id="" class="android.widget.TextView" package="com.example.files" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,1720][600,1780]" />
+      </node>
+    </node>
+  </node>
+</hierarchy>
