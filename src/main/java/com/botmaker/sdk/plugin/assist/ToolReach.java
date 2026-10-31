@@ -1,6 +1,8 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
+import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
@@ -10,7 +12,10 @@ import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.input.Hands;
+import com.botmaker.sdk.internal.screens.ElementMatch;
+import com.botmaker.sdk.internal.screens.FrameTree;
 import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
@@ -24,22 +29,67 @@ import java.util.Optional;
 
 /**
  * The assistant's reach: the frame the look tools read ({@link Frames#look}), each picture matched as a run matches
- * it at the project's confidence, and the {@link Hands} for where the game is.
+ * it at the project's confidence, and the {@link Hands} for where the game is. On an emulator, the app's tree too,
+ * read once per frame as a run reads it, so the assistant finds an element where a run would.
  *
  * @param resources  the bot's resources, where its pictures are
  * @param confidence the score a run needs
+ * @param readable   the target's tree, null for one that shows none (a game window)
+ * @param trees      the tree read for the last frame an element was looked for on
  */
-record ToolReach(AgentContext context, Path resources, double confidence, Hands hands) implements Reach {
+record ToolReach(AgentContext context, Path resources, double confidence, Hands hands, ReadableSource readable,
+                 FrameTree trees) implements Reach {
 
     /** The reach for {@code context}'s game; empty when no project is open. */
     static Optional<ToolReach> of(AgentContext context) {
-        return Frames.resources(context).map(resources -> new ToolReach(context, resources,
-                Frames.confidence(context.services()), ActTools.hands(context)));
+        return Frames.resources(context).map(resources -> {
+            // Read once: the hands and the tree are the same target's.
+            CaptureSource emulator = Frames.emulator(context);
+            return new ToolReach(context, resources, Frames.confidence(context.services()),
+                    ActTools.hands(context, emulator), Frames.readable(emulator).orElse(null), new FrameTree());
+        });
     }
 
     @Override
     public Optional<BufferedImage> look() {
         return Frames.look(context);
+    }
+
+    @Override
+    public boolean readsTrees() {
+        return readable != null;
+    }
+
+    /** The target's tree, read once per frame, after the frame was taken: as a run's reach reads it. */
+    @Override
+    public Optional<ElementMatch.Matcher> treeOn(BufferedImage frame) {
+        return readable == null ? Optional.empty() : trees.on(frame, readable::tree);
+    }
+
+    /**
+     * What only the bot's author can change (an element the tree finds twice, an element on a target with no tree):
+     * the tool's call ends, answered with it ({@link ToolTiming#time}).
+     */
+    @Override
+    public void stop(String why) {
+        throw new Stopped(why);
+    }
+
+    /**
+     * A tool's call stopped by what the bot says. Not an {@link IllegalStateException}: the catches for Studio being
+     * busy must never take it for that.
+     */
+    static final class Stopped extends RuntimeException {
+        Stopped(String why) {
+            super(why);
+        }
+
+        /** The tool's answer: why, and that it may have acted before. */
+        AgentReply reply() {
+            return AgentReply.refused("Stopped: " + getMessage() + ". Only the bot's author can change that (🗺 "
+                    + "Screens' ❄ Freeze names an element anew). The call may have acted before it stopped: look "
+                    + "where the game is and read_map before going on.");
+        }
     }
 
     /** The bot's picture {@code name}'s best place on {@code frame}, at any score. */

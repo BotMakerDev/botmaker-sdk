@@ -114,7 +114,7 @@ public final class ElementRows {
         return "Found by its words: a translated app shows others, so each language needs its own in Texts.";
     }
 
-    private static String clues(Element element) {
+    static String clues(Element element) {
         List<String> clues = new ArrayList<>();
         if (element.id() != null) clues.add("its id");
         if (element.label() != null) clues.add("its label \"" + element.label().text() + "\"");

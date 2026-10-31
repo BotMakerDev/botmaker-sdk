@@ -254,6 +254,30 @@ final class ActTools {
         return new Spotted(frame.get(), reach.get().pointOn(at), base.get() + " #" + nth, null);
     }
 
+    /**
+     * {@code copy}, an app's input, found in the tree read for a fresh look as a run finds it: the copy {@code pick}
+     * names (null: the first), along {@code strip} for a member of one; {@code field} names it in the reply. Refused on
+     * a target with no tree; one the tree holds twice stops the call ({@link ToolReach.Stopped}).
+     */
+    private static Spotted spotElement(String field, Button copy, Pick pick, Strip strip, String acted,
+                                       AgentContext context) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noProject()));
+        if (!reach.get().readsTrees()) {
+            return Spotted.no(AgentReply.refused(field + " is an app's element, found in its tree, and this target "
+                    + "shows none: point the bot at the emulator. Nothing was " + acted + "."));
+        }
+        Optional<BufferedImage> frame = reach.get().look();
+        if (frame.isEmpty()) return Spotted.no(AgentReply.refused(Frames.noScreen()));
+        Optional<Reach.Seen> seen = reach.get().seen(copy, strip, pick, frame.get());
+        String named = field + (pick == null ? "" : " " + pick.label());
+        if (seen.isEmpty()) {
+            return Spotted.no(AgentReply.text(named + " (" + copy.label() + ") is not in the app's tree on the "
+                    + "screen; nothing was " + acted + "."));
+        }
+        return new Spotted(frame.get(), reach.get().pointOn(seen.get().place()), named, null);
+    }
+
     /** Why the game is not on {@code screen}, when its {@code marker} is not on a fresh look: try_input refuses. */
     static Optional<AgentReply> notOn(AgentContext context, String marker, String screen) {
         Spotted spotted = spot(marker, "done", context);
@@ -270,9 +294,14 @@ final class ActTools {
 
     /**
      * Whether a run would tell {@code markers}' screen on {@code frame}: every marker found, no absent one, and every
-     * one of its words read, by the run's own reading.
+     * one of its words read, by the run's own reading. A set with elements is read in the target's tree, as a run reads
+     * it; on a target with none, it never shows.
      */
     static boolean shows(AgentContext context, Markers markers, BufferedImage frame) {
+        // An element the tree finds twice stops the tool's call, said as the bot's: never "not on the screen".
+        if (!markers.elements().isEmpty() || !markers.picked().isEmpty()) {
+            return ToolReach.of(context).filter(Reach::readsTrees).map(r -> markers.on(r, frame)).orElse(false);
+        }
         Optional<ToolReach> reach = markers.texts().isEmpty() ? Optional.empty() : ToolReach.of(context);
         return markers.on(p -> shows(context, p.id(), frame),
                 words -> reach.flatMap(r -> r.findText(words, frame)).isPresent());
@@ -327,7 +356,8 @@ final class ActTools {
         String verb = notches == 0 ? "clicked" : "scrolled";
         // A spot beside its picture, or a button only found at its place, is where a run finds it, not on the picture.
         boolean placed = copy != null && (copy.isBeside() || copy.place() != null);
-        Spotted spotted = copy == null || pick == null && !placed ? spot(picture, verb, context)
+        Spotted spotted = copy != null && copy.isElement() ? spotElement(picture, copy, pick, strip, verb, context)
+                : copy == null || pick == null && !placed ? spot(picture, verb, context)
                 : spotCopy(picture, copy, pick == null ? Pick.first() : pick, strip, verb, context);
         if (spotted.refusal() != null) return Entered.no(spotted.refusal());
         Point at = spotted.at();
@@ -631,9 +661,13 @@ final class ActTools {
 
     /** The hands for where {@link Frames#look} reads, in its order. */
     static Hands hands(AgentContext context) {
+        return hands(context, Frames.emulator(context));
+    }
+
+    /** {@link #hands(AgentContext)}, {@code emulator} the capture source read already (null: none). */
+    static Hands hands(AgentContext context, CaptureSource emulator) {
         PrivateSession session = Frames.session(context);
         if (session != null) return new InSession(session);
-        CaptureSource emulator = Frames.emulator(context);
         if (emulator != null) return new OnEmulator(emulator);
         return new OnDesktop(context.watchedArea().map(at -> new Point(at.x(), at.y())).orElse(new Point(0, 0)));
     }

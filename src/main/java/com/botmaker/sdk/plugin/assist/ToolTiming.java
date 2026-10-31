@@ -127,7 +127,13 @@ final class ToolTiming {
         long started = System.currentTimeMillis();
         long start = System.nanoTime();
         try {
-            AgentReply reply = call.get();
+            AgentReply reply;
+            try {
+                reply = call.get();
+            } catch (ToolReach.Stopped stopped) {
+                // What only the bot's author can change ends the call, wherever in it it was met.
+                reply = stopped.reply();
+            }
             long total = System.nanoTime() - start;
             if (tool != null && project != null) timing.write(project.resolve(FILE), tool, started, total);
             if (total < saidNanos) return reply;

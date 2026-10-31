@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The assistant maps an app by its tree**: `list_elements` lists what the emulator's tree holds on the screen
+  (kind, words, how each is found; never an id or a bound), and `save_element` saves one by its words as 🗺 Screens'
+  picker does, a marker starting an empty map. `try_input` presses an element button by its field, found in the
+  tree, and a screen told by elements is checked in the tree, so Discovery runs on an app as on a game. A screenshot
+  of an app says its tree is read.
 - **`Element`, an app's input found in the screen's tree**, a constant of the bot's new `Elements` class
   (`@SdkValue(ELEMENTS)`): `Element.byId("title").text(Texts.BATTERY)`, `Element.byText(Texts.NETWORK)
   .inside(Elements.LIST)`, `Element.byLabel(…)`, `Element.byHolding(…)`, then `.below(…)`, `.index(n)` and

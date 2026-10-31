@@ -57,6 +57,8 @@ final class LookTools {
     private static final int POLL_MS = 250;
     private static final int MOST_LISTED = 20;
     private static final String SHOW = "true adds the screenshot with the places boxed; the text already gives them";
+    /** What a look on an app says: its inputs are in its tree, listed rather than cut. */
+    static final String TREE = "An app: its tree is read, so list_elements gives its inputs to save rather than cut.";
 
     record Shot(@Describe(value = "draw a labelled grid every this many pixels, 25 or more", optional = true)
                 Integer grid,
@@ -216,6 +218,8 @@ final class LookTools {
             said.append(" Shrunk to ").append(image.getWidth()).append('×').append(image.getHeight())
                     .append(": multiply what you see by ").append(Frames.undo(scale)).append('.');
         }
+        // Said, not read: the tree is read when list_elements asks for it, never on every look.
+        if (ScreenDesk.readsTree(context)) said.append(' ').append(TREE);
         return AgentReply.text(said.toString()).and(AgentReply.image(image));
     }
 

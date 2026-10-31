@@ -24,7 +24,8 @@ public final class SdkAssist {
 
     /** Every tool, by group, each timed ({@link ToolTiming}). */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
-            TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS, MapEdits.TOOLS);
+            ElementTools.TOOLS, TagTools.TOOLS, FlowTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS,
+            MapEdits.TOOLS);
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its activities, and a

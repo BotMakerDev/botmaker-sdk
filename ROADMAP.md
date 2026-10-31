@@ -4,6 +4,17 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Web pages as a target (`botmaker-plugin-web`, after screen elements, 2026-10-31)**: the same `Element` found
+  in a page's DOM (ids, ARIA labels, text) through Playwright for Java, in a plugin of its own so its ~200 MB driver
+  never reaches a game bot. Review `Element` against the DOM before it is frozen. Spec
+  `../docs/superpowers/specs/2026-10-31-screen-elements-design.md` (its non-goals).
+- **Left from screen elements (2026-10-31)**:
+  - tree bounds are not scaled for a capture region or a scaled source: an element on such a target is pressed off
+    its place;
+  - a strip's settle polls read a tree each;
+  - `list_elements` and `save_element` read the tree, then the frame, once: a screen moving between the two cuts
+    the shot off (❄ Freeze retries; the tools do not).
+
 - **Left from Screens on TrackMania, Hades II, Ubisoft Connect (phase 6b, 2026-10-30)**:
   - the assistant's `launch_game` answers "Bringing up…" before *Close it and launch* ends, and its done-callback can
     be lost: the assistant is not told the game came up;

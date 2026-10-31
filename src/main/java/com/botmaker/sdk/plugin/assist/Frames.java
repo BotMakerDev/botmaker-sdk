@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -148,6 +149,12 @@ final class Frames {
     static CaptureSource emulator(AgentContext context) {
         CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
         return source != null && source.base() instanceof EmulatorSource ? source : null;
+    }
+
+    /** The tree {@code emulator} (null: none) gives its app's screen by; empty for a target that shows none. */
+    static Optional<ReadableSource> readable(CaptureSource emulator) {
+        return emulator != null && emulator.base() instanceof ReadableSource tree ? Optional.of(tree)
+                : Optional.empty();
     }
 
     /** The confidence a run holds a match to: the project's {@code Sdk.settings()}, else the SDK's default. */

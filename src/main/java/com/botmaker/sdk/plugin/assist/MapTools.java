@@ -19,6 +19,7 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -261,8 +262,9 @@ final class MapTools {
         Optional<Input> held = ScreenBook.find(graph, input.screen() == null ? "" : input.screen().strip())
                 .flatMap(screen -> graph.input(screen, field));
         return held.map(named -> switch (named) {
-            case Button button -> button.picture() == null ? input : input.named(button.picture().id(), input.scroll(),
-                    null);
+            // An app's element is pressed by its field, found in the tree; its picture is a shot, never matched.
+            case Button button -> button.picture() == null || button.isElement() ? input
+                    : input.named(button.picture().id(), input.scroll(), null);
             case Strip strip when strip.scroll() != null && strip.scroll().drag() != null && input.scroll() == null ->
                     null;
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
@@ -351,13 +353,19 @@ final class MapTools {
         if (owing.isPresent()) return Tried.refused(owes(graph.shown(owing.get())));
         MapScreen on = graph.screens().get(screen);
         String what = byPicture ? input.picture().strip() : null;
-        Optional<String> held = held(on, what, key.orElse(null), notches, graph, screen);
+        Optional<String> element = elementField(on, what);
+        boolean byElement = element.isPresent();
+        Optional<String> held = element.or(() -> held(on, what, key.orElse(null), notches, graph, screen));
         boolean untried = held.filter(f -> !graph.tried(screen, f)).isPresent();
         boolean byWords = held.map(on.inputs()::get).filter(TextButton.class::isInstance).isPresent();
         if (byWords && (notches != 0 || match > 0)) {
             return Tried.refused("Words are clicked where they are read: leave scroll and match out. Nothing was done.");
         }
-        if (byPicture && !byWords && !ActTools.exists(context, what)) {
+        if (byElement && (notches != 0 || match > 0)) {
+            return Tried.refused("An app's element is pressed where its tree finds it: leave scroll and match out. "
+                    + "Nothing was done.");
+        }
+        if (byPicture && !byWords && !byElement && !ActTools.exists(context, what)) {
             if (!untried) return Tried.refused(Frames.noPicture(what));
             Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withoutInput(held.get())));
             // Nothing clicked: the game is where it was.
@@ -373,7 +381,8 @@ final class MapTools {
             return Tried.refused(Frames.noPicture(input.locked().strip()));
         }
         // A hotkey names nothing: when it opens a screen, it is tried again with opens.
-        String child = opens != null ? opens : byPicture ? nameFrom(what, name) : null;
+        String child = opens != null ? opens : byElement ? nameOf((Button) on.inputs().get(element.get()), what)
+                : byPicture ? nameFrom(what, name) : null;
         if (byPicture && !never && !locked && notches == 0 && opens == null
                 && (!isName(child) || ScreenBook.find(graph, child).isPresent())) {
             return Tried.refused(what + " would name the screen it opens \"" + child + "\"" + (isName(child)
@@ -1444,9 +1453,33 @@ final class MapTools {
         if (input instanceof Strip || input instanceof Tree || input.never() != null || input.lock() != null) {
             return false;
         }
-        if (!(input instanceof Button button) || button.picture() == null) return true;
-        String child = nameFrom(button.picture().id(), graph.shown(screen));
+        if (!(input instanceof Button button) || button.picture() == null && !button.isElement()) return true;
+        // Named from its field, as try_input names it: an element found by its id alone has no words.
+        String child = button.isElement() ? nameOf(button, graph.screens().get(screen).inputs().entrySet().stream()
+                .filter(e -> e.getValue().equals(input)).map(Map.Entry::getKey).findFirst().orElse(button.label()))
+                : nameFrom(button.picture().id(), graph.shown(screen));
         return !isName(child) || ScreenBook.find(graph, child).isPresent();
+    }
+
+    /**
+     * The field of {@code on} that {@code typed} names when it holds an app's element ({@code Button.of(Elements.X)}):
+     * try_input presses it by its field, found in the tree. Empty for any other input, and for none.
+     */
+    static Optional<String> elementField(MapScreen on, String typed) {
+        if (typed == null || typed.isBlank()) return Optional.empty();
+        return on.inputs().entrySet().stream()
+                .filter(e -> e.getKey().equalsIgnoreCase(typed.strip()) && e.getValue() instanceof Button b
+                        && b.isElement())
+                .map(Map.Entry::getKey).findFirst();
+    }
+
+    /** The screen an element opens, named from its words ({@code "Battery"}), else from its field. */
+    static String nameOf(Button element, String field) {
+        Words words = element.element().text() != null ? element.element().text()
+                : element.element().label() != null ? element.element().label() : element.element().holding();
+        String said = words == null ? "" : words.text().strip();
+        return said.isEmpty() || !isName(said) ? nameFrom(field, "") : Character.toUpperCase(said.charAt(0))
+                + said.substring(1);
     }
 
     /** The screen a picture opens, named from the picture: {@code engineer_home} on Home is {@code Engineer}. */

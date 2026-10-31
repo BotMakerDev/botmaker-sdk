@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
-import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -180,15 +179,17 @@ public final class ScreenDesk {
      * when it could not be read. Off the FX thread: it reads the device.
      */
     public static Optional<UiTree> tree(AgentContext context) {
-        CaptureSource emulator = Frames.emulator(context);
-        return emulator != null && emulator.base() instanceof ReadableSource readable ? readable.tree()
-                : Optional.empty();
+        return readable(context).flatMap(ReadableSource::tree);
     }
 
     /** Whether the look tools' target gives a tree at all: an emulator does, a game window does not. */
     public static boolean readsTree(AgentContext context) {
-        CaptureSource emulator = Frames.emulator(context);
-        return emulator != null && emulator.base() instanceof ReadableSource;
+        return readable(context).isPresent();
+    }
+
+    /** The look tools' target's tree, read when asked; empty for a target that gives none. */
+    static Optional<ReadableSource> readable(AgentContext context) {
+        return Frames.readable(Frames.emulator(context));
     }
 
     /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */

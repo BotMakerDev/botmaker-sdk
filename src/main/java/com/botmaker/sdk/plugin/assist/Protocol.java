@@ -75,6 +75,10 @@ final class Protocol {
                      it was cut, scaled with the frame: a panel whose content sits elsewhere is not told by it.
                      A view an input opens that does another job is a screen of its own, not a look (a running
                      mission's Cancel where a new one has Start).
+                     On an app (an emulator: screenshot says its tree is read), list_elements instead: save_element
+                     every input row with that screen (as button), and a text only it shows as its marker (as
+                     marker, which starts the map too); then try_input each by its field. Cut pictures only for
+                     what the tree lacks (a canvas, a game view).
                   2. try_input each one, by its picture or its hotkey (several in one call, stopping at the first
                      that leaves the screen); try_input with scroll every list and
                      panel to its end both ways. Claim buttons and other free spends are clicked; an input that
