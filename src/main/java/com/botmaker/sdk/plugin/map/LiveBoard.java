@@ -12,7 +12,12 @@ import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.MissFrames;
+import com.botmaker.sdk.internal.vision.FrameChange;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
+import com.botmaker.sdk.plugin.assist.ElementRows;
+import com.botmaker.sdk.plugin.assist.ElementRows.Row;
+import com.botmaker.sdk.plugin.assist.ElementSaves;
+import com.botmaker.sdk.plugin.assist.ElementSaves.Pick;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
@@ -24,8 +29,10 @@ import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import com.botmaker.shared.capture.FrameGrab;
+import com.botmaker.shared.emulator.tree.UiTree;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
@@ -82,6 +89,10 @@ import java.util.function.Supplier;
  *
  * <p>✂ Cut draws pictures on the frozen frame itself ({@link CutLayer}), each then said what it is ({@link CutForm})
  * and saved as the tools save it ({@link BoardCuts}); a screen's shot is cut on the same way.
+ *
+ * <p>On an app's target, ❄ Freeze reads its tree with the frame, again while the screen moves between them, and lists
+ * what it holds beside the frame ({@link ElementList}, layout B, 2026-10-31): a row or a node clicked on the frame
+ * ({@link ElementLayer}) is picked in both, and the rows ticked are saved together ({@link ElementSaves}).
  */
 final class LiveBoard {
 
@@ -118,6 +129,11 @@ final class LiveBoard {
     private final ImageView frozenView = new ImageView();
     /** Cuts drawn on the frozen frame. */
     private final CutLayer cutter = new CutLayer(frozenView, this::showLine);
+    /** The frozen frame's elements, outlined on it; the list beside it picks them too. */
+    private final ElementLayer elementLayer = new ElementLayer(frozenView, this::pickedOnFrame);
+    private final ElementList elementList;
+    /** The frozen frame as the board draws it: its cuts, and its elements over them. */
+    private final StackPane frozenStack = new StackPane(cutter.node(), elementLayer.node());
     private final Work work;
     /** Counts each start and stop: a frame loop of an earlier start ends, and what it read is dropped. */
     private final AtomicLong generation = new AtomicLong();
@@ -151,6 +167,10 @@ final class LiveBoard {
     /** Whether the game is on the user's own desktop, where an input here takes their mouse. */
     private boolean onDesktop;
     private BufferedImage frozen;
+    /** The app's tree ❄ Freeze read with the frozen frame; null when the target gives none, or it is not read yet. */
+    private UiTree frozenTree;
+    /** The frame {@link #frozenTree} was read with: its elements' shots are cut off it, the frame shown or not. */
+    private BufferedImage frozenTreeFrame;
     /** The screen the frozen frame shows, by its markers. */
     private String frozenOn;
     /** Whether {@link #frozenOn} was read off the frozen frame itself yet: until then nothing is offered on it. */
@@ -181,6 +201,8 @@ final class LiveBoard {
 
     /** How long after ❄ Freeze the game is taken to show the frame still: a cut is watched still only until then. */
     private static final long WATCHED_MS = 60_000;
+    /** How many times ❄ Freeze reads the tree and a frame again while the screen moves between them. */
+    private static final int TREE_READS = 3;
 
     /**
      * @param done   what an action answered, said on the panel
@@ -198,6 +220,9 @@ final class LiveBoard {
         this.done = done;
         this.select = select;
         this.lit = lit;
+        elementList = new ElementList(services, graph, elementLayer::outline, this::saveElements);
+        frozenStack.setAlignment(Pos.TOP_LEFT);
+        frozenStack.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         liveButton.setTooltip(new Tooltip(MapGuide.LIVE));
         liveButton.setOnAction(e -> {
             if (liveButton.isSelected()) start();
@@ -249,6 +274,7 @@ final class LiveBoard {
         liveButton.setSelected(true);
         frozen = null;
         cutter.reset(0, 0);
+        forgetElements();
         board.holdStill(false);
         blind = null;
         // Nothing of the last time shows until the first frame comes.
@@ -487,7 +513,8 @@ final class LiveBoard {
     private Node drawFrozen(double width) {
         frozenView.setFitWidth(width);
         cutter.redraw();
-        return cutter.node();
+        elementLayer.redraw();
+        return frozenStack;
     }
 
     private void drawBoxes() {
@@ -796,24 +823,114 @@ final class LiveBoard {
             return;
         }
         frozen(image, null, false, true);
+        elementList.reading();
+        board.side(elementList.node());
         // Read again off this very frame: the live read may be a second older, of the screen before.
         PanelContext reads = context();
         Thread.ofVirtual().name("live-frozen").start(() -> {
+            Settled settled = settle(reads, image);
+            List<Row> rows = settled.tree() == null ? List.of() : rowsOf(settled.tree());
             String shows;
             try {
-                shows = ScreenDesk.here(reads, image).map(ScreenDesk.Here::screen).orElse(null);
+                shows = ScreenDesk.here(reads, settled.image()).map(ScreenDesk.Here::screen).orElse(null);
             } catch (RuntimeException unread) {
                 shows = null;
             }
             String read = shows;
+            boolean treeless = settled.tree() == null && !ScreenDesk.readsTree(reads);
             Platform.runLater(() -> {
                 if (frozen != image) return;
+                // The frame the tree was read with, unless a cut is drawn on the one shown: the list then says so.
+                boolean moved = !settled.sure();
+                if (settled.image() != image) {
+                    if (cutter.cuts().isEmpty() && !cutter.isOn()) {
+                        frozen = settled.image();
+                        frozenView.setImage(ScreenCapture.toFxImage(frozen));
+                        cutter.reset(frozen.getWidth(), frozen.getHeight());
+                    } else {
+                        moved = true;
+                    }
+                }
                 frozenOn = read;
                 frozenRead = true;
+                frozenTree = settled.tree();
+                frozenTreeFrame = settled.image();
+                if (frozenTree == null) {
+                    elementList.none(treeless ? ElementRows.NO_TREE : ElementRows.UNREAD);
+                    elementLayer.clear();
+                } else {
+                    elementList.show(rows, read, moved);
+                    elementLayer.show(frozenTree, rows, frozen.getWidth());
+                    elementLayer.setOn(!cutter.isOn());
+                }
                 lit.accept(read);
                 showLine();
             });
         });
+    }
+
+    /** A frame and the tree read with it; {@code sure} when the screen did not move while it was read. */
+    private record Settled(BufferedImage image, UiTree tree, boolean sure) {}
+
+    /**
+     * The tree read after {@code shown}, and a frame read after it: the same frame again, the tree is {@code shown}'s;
+     * else read again off the later frame, {@link #TREE_READS} times at most, then not sure. A null tree when the
+     * target gives none. Off the FX thread.
+     */
+    private static Settled settle(PanelContext reads, BufferedImage shown) {
+        BufferedImage frame = shown;
+        // The last tree read and the frame before it: a later read that fails keeps them, not sure.
+        Settled last = null;
+        for (int i = 0; i < TREE_READS; i++) {
+            UiTree tree;
+            try {
+                tree = ScreenDesk.tree(reads).orElse(null);
+            } catch (RuntimeException unread) {
+                tree = null;
+            }
+            if (tree == null) return last != null ? last : new Settled(frame, null, true);
+            Optional<BufferedImage> after = ScreenDesk.look(reads);
+            if (after.isEmpty() || !FrameChange.changed(frame, after.get())) return new Settled(frame, tree, true);
+            last = new Settled(frame, tree, false);
+            frame = after.get();
+        }
+        return last;
+    }
+
+    /** {@code tree}'s rows; none when naming them failed. Off the FX thread: it names every node. */
+    private static List<Row> rowsOf(UiTree tree) {
+        try {
+            return ElementRows.of(tree);
+        } catch (RuntimeException unnamed) {
+            return List.of();
+        }
+    }
+
+    /** A row clicked on the frame: picked in the list. */
+    private void pickedOnFrame(Row row) {
+        elementList.pick(row);
+    }
+
+    /** The frozen frame's elements dropped: a new frame, or the game live again. */
+    private void forgetElements() {
+        frozenTree = null;
+        frozenTreeFrame = null;
+        elementLayer.clear();
+        elementList.clear();
+        board.side(null);
+    }
+
+    /** The rows ticked saved on {@code screen} (null: none) as {@code picks} say, off the FX thread. */
+    private void saveElements(String screen, List<Pick> picks) {
+        UiTree tree = frozenTree;
+        BufferedImage image = frozenTreeFrame;
+        if (tree == null || image == null || picks.isEmpty()) return;
+        PanelContext reads = context();
+        ScreenGraph map = graph.get();
+        String where = screen == null ? "" : " on " + (map.screens().containsKey(screen) ? map.shown(screen) : screen);
+        boolean started = work.run("Saving " + (picks.size() == 1 ? "an element" : picks.size() + " elements") + where
+                + "…", screen, () -> ElementSaves.save(reads, screen, tree, image, picks));
+        if (!started) done.accept("A try or a walk is running: the ticks are kept; ✓ Save again once it ends.");
     }
 
     /**
@@ -830,6 +947,7 @@ final class LiveBoard {
         frozenAtMs = System.currentTimeMillis();
         frozenView.setImage(ScreenCapture.toFxImage(image));
         cutter.reset(image.getWidth(), image.getHeight());
+        forgetElements();
         board.holdStill(false);
         on = null;
         lit.accept(shows);
@@ -843,6 +961,7 @@ final class LiveBoard {
         frozenOn = null;
         frozenView.setImage(null);
         cutter.reset(0, 0);
+        forgetElements();
         board.holdStill(false);
         lit.accept(null);
         board.cover(null, false);
@@ -867,12 +986,15 @@ final class LiveBoard {
     private void newScreen() {
         String parent = frozenOn != null ? frozenOn : lastKnown;
         String via = lastClick != null && parent != null && parent.equals(lastClick.screen()) ? lastClick.field() : null;
-        BufferedImage image = frozen;
+        // The same freeze, by its time: ❄ Freeze may swap the frame for the one its tree was read with meanwhile.
+        long at = frozenAtMs;
         hands.newScreen(parent, via, false, name -> ScreenDesk.find(ScreenDesk.read(services), name)
                 .ifPresent(made -> {
-                    if (frozen == image) {
+                    BufferedImage image = frozen;
+                    if (image != null && frozenAtMs == at) {
                         frozenOn = made;
                         frozenRead = true;
+                        elementList.named(made);
                         lit.accept(made);
                         beginCut(made, CutForm.Kind.MARKER);
                     }
@@ -959,6 +1081,7 @@ final class LiveBoard {
         cutScreen = screen;
         cutFirst = first;
         cutter.setOn(true);
+        elementLayer.setOn(false);
         board.holdStill(true);
         showLine();
     }
@@ -966,6 +1089,7 @@ final class LiveBoard {
     private void endCut() {
         cutter.clear();
         cutter.setOn(false);
+        elementLayer.setOn(true);
         board.holdStill(false);
         showLine();
     }

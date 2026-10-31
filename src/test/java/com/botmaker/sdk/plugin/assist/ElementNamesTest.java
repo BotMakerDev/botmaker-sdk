@@ -1,9 +1,9 @@
-package com.botmaker.sdk.plugin.map;
+package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.screens.ElementMatch;
-import com.botmaker.sdk.plugin.map.ElementNames.Named;
+import com.botmaker.sdk.plugin.assist.ElementNames.Named;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;

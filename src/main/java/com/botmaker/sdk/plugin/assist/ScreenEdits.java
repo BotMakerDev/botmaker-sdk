@@ -957,7 +957,7 @@ public final class ScreenEdits {
     }
 
     /** {@code words} as a constant of the bot's {@code Texts}: the one holding it already, else a new one. */
-    private static Optional<String> keptText(StudioServices services, Words words) {
+    static Optional<String> keptText(StudioServices services, Words words) {
         PluginValues values = services.pluginValues();
         List<Member> members = TEXTS.members(values);
         if (members.stream().anyMatch(m -> TEXTS.read(values, m).filter(words::equals).isPresent())) {

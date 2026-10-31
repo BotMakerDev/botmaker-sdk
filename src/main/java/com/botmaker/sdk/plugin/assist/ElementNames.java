@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.map;
+package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.Words;

@@ -3,16 +3,19 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.session.PrivateSession;
+import com.botmaker.shared.emulator.tree.UiTree;
 
 import java.awt.image.BufferedImage;
 import java.util.LinkedHashMap;
@@ -170,6 +173,22 @@ public final class ScreenDesk {
     /** The private display the look tools read, or null when they read this desktop or an emulator. Blocking. */
     public static PrivateSession session(AgentContext context) {
         return Frames.session(context);
+    }
+
+    /**
+     * The tree of the app the look tools read, when their target gives one (an emulator); empty for a game window, or
+     * when it could not be read. Off the FX thread: it reads the device.
+     */
+    public static Optional<UiTree> tree(AgentContext context) {
+        CaptureSource emulator = Frames.emulator(context);
+        return emulator != null && emulator.base() instanceof ReadableSource readable ? readable.tree()
+                : Optional.empty();
+    }
+
+    /** Whether the look tools' target gives a tree at all: an emulator does, a game window does not. */
+    public static boolean readsTree(AgentContext context) {
+        CaptureSource emulator = Frames.emulator(context);
+        return emulator != null && emulator.base() instanceof ReadableSource;
     }
 
     /** Which screen {@code frame} shows, as which_screen reads it first; empty with no map. Off the FX thread. */

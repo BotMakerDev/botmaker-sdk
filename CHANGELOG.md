@@ -38,6 +38,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   the input shows, and stops when a scroll shows nothing new. One screen mixes element and picture inputs freely.
   The run stops, saying why, when an element input that is not repeated matches two inputs (pick it again, or
   mark it repeated) or when the target shows no tree (a game window).
+- **Pick an app's inputs on a frozen frame in 🗺 Screens.** On an emulator, ❄ Freeze also reads the app's tree, and
+  reads it again while the screen moves; a list beside the frame says what it found (*Found on Settings: 15 inputs,
+  1 text, 2 lists*), one row per input, text and scrolling list, each its kind and words (*Button "Battery"*), never
+  an id. The pointer outlines the node under it on the frame, and a click picks the row of the input it is in; a row
+  picked is outlined and says how it is found, with a warning when that is by words a translated app changes or by
+  its place. Tick several rows and ✓ Save them together, each as a button, a marker or a readout of the screen
+  picked: each becomes a constant of `Elements` with a picture of it under `elements/`, the list it is inside saved
+  first, and a constant the bot holds with the same clues is used, never saved twice. A game window's frame says it
+  has no tree: ✂ Cut is the way there, as before.
 
 - 🗺 Screens opens screens as tabs, after *Graph*. A screen you open goes into one *italic* tab that the next one
   replaces, so tabs stay few; edit the screen or double-click its tab to keep it. Inputs never get a tab. A bar above

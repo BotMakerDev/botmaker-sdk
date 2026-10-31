@@ -136,6 +136,11 @@ final class ScreenBoard {
         bar.getChildren().addAll(bar.getChildren().size() - 1, List.of(controls));
     }
 
+    /** {@code side} beside the board, out of its scroller so it never zooms; null takes it off. */
+    void side(Node side) {
+        root.setRight(side);
+    }
+
     /** What the line under the bar says and offers; nothing hides it. */
     void line(Node... said) {
         line.getChildren().setAll(said);
