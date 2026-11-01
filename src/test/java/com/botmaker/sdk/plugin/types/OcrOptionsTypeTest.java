@@ -19,9 +19,9 @@ class OcrOptionsTypeTest {
 
     @Test
     void theConstructorGivesEveryPartBack() {
-        OcrOptions value = OcrOptions.defaults().withLanguages("eng+jpn").withUpscale(3.0)
-                .withBinarize(OcrOptions.BinarizeMode.ADAPTIVE).withInvert(true).withCharWhitelist("0123456789")
-                .withLevel(TextResult.Level.LINE);
+        OcrOptions value = OcrOptions.defaults().languages("eng+jpn").upscale(3.0)
+                .binarize(OcrOptions.BinarizeMode.ADAPTIVE).invert(true).charWhitelist("0123456789")
+                .level(TextResult.Level.LINE);
         assertEquals(value, SdkTypes.OCR_OPTIONS.build(SdkTypes.OCR_OPTIONS.components(value)));
     }
 
@@ -29,7 +29,7 @@ class OcrOptionsTypeTest {
     @Test
     void aFreshOneIsWhatTextReadsWithAndHasNoNullPart() {
         OcrOptions fresh = SdkTypes.OCR_OPTIONS.fresh();
-        assertEquals(Text.DEFAULT_OPTIONS.withCharWhitelist(""), fresh);
+        assertEquals(Text.DEFAULT_OPTIONS.charWhitelist(""), fresh);
         for (Object part : SdkTypes.OCR_OPTIONS.components(fresh)) assertNotNull(part);
     }
 
@@ -43,8 +43,8 @@ class OcrOptionsTypeTest {
         assertEquals("defaults", chain.factory().getName());
         assertEquals(9, chain.withers().size());
         assertEquals(OcrOptions.defaults(), chain.build(chain.components(OcrOptions.defaults())));
-        OcrOptions value = OcrOptions.defaults().withLanguages("eng+kor").withUpscale(3.0)
-                .withLevel(TextResult.Level.LINE).withCharWhitelist("0123456789").withInvert(true);
+        OcrOptions value = OcrOptions.defaults().languages("eng+kor").upscale(3.0)
+                .level(TextResult.Level.LINE).charWhitelist("0123456789").invert(true);
         assertEquals(value, chain.build(chain.components(value)));
     }
 

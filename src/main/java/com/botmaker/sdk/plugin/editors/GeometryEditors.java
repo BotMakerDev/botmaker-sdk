@@ -86,7 +86,7 @@ public final class GeometryEditors {
      * again ({@code save_region}) or in its Java.
      */
     public static Node zone(ValueContext ctx) {
-        return anchorPill(ctx, Zone.class, GeometryEditors::zoneLabel, Zone::anchor, Zone::anchored);
+        return anchorPill(ctx, Zone.class, GeometryEditors::zoneLabel, Zone::anchored, Zone::anchored);
     }
 
     private static <T> Node anchorPill(ValueContext ctx, Class<T> type, Function<T, String> label,
@@ -114,7 +114,7 @@ public final class GeometryEditors {
     }
 
     static String zoneLabel(Zone zone) {
-        return zone.x() + ", " + zone.y() + "  " + zone.width() + "×" + zone.height() + kept(zone.anchor());
+        return zone.x() + ", " + zone.y() + "  " + zone.width() + "×" + zone.height() + kept(zone.anchored());
     }
 
     private static String kept(Anchor anchor) {

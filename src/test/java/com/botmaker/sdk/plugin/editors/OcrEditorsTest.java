@@ -28,12 +28,12 @@ class OcrEditorsTest {
 
         OcrEditors.commit(slot, OcrOptions.defaults());
 
-        assertEquals(OcrOptions.defaults().withCharWhitelist(""), slot.value());
+        assertEquals(OcrOptions.defaults().charWhitelist(""), slot.value());
     }
 
     @Test
     void a_picked_setting_round_trips_wherever_the_value_is() {
-        OcrOptions picked = Text.DEFAULT_OPTIONS.withCharWhitelist(OcrEditors.DIGITS).withUpscale(3.0);
+        OcrOptions picked = Text.DEFAULT_OPTIONS.charWhitelist(OcrEditors.DIGITS).upscale(3.0);
 
         TestContexts.Recording slot = TestContexts.typedSlot(OcrOptions.class, "");
         OcrEditors.commit(slot, picked);
@@ -56,11 +56,11 @@ class OcrEditorsTest {
     void the_label_says_the_setting_in_words() {
         assertEquals("English, lines, ×2", OcrEditors.label(Text.DEFAULT_OPTIONS));
         assertEquals("English + Japanese, words, digits only, ×2.5",
-                OcrEditors.label(OcrOptions.defaults().withLanguages(OcrLanguage.ENGLISH, OcrLanguage.JAPANESE)
-                        .withCharWhitelist(OcrEditors.DIGITS).withUpscale(2.5)));
+                OcrEditors.label(OcrOptions.defaults().languages(OcrLanguage.ENGLISH, OcrLanguage.JAPANESE)
+                        .charWhitelist(OcrEditors.DIGITS).upscale(2.5)));
         assertEquals("English + fra, lines, only \"ABC\", ×1",
-                OcrEditors.label(Text.DEFAULT_OPTIONS.withLanguages("eng+fra").withCharWhitelist("ABC")
-                        .withUpscale(1.0).withLevel(TextResult.Level.LINE)));
+                OcrEditors.label(Text.DEFAULT_OPTIONS.languages("eng+fra").charWhitelist("ABC")
+                        .upscale(1.0).level(TextResult.Level.LINE)));
     }
 
     /** A language the SDK does not bundle is kept as written: a bot may have installed it system-wide. */

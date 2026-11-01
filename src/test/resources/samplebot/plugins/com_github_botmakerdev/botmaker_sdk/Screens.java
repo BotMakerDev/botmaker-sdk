@@ -25,7 +25,7 @@ public final class Screens {
     public static final class Home extends Screen {
         public final Button collect = Button.of(Pictures.COLLECT).tried().occasional();
         public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE);
-        public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clears().submits();
+        public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried();
         public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),

@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
  *
  * // Read a numeric HUD counter tuned for digits only.
  * CaptureSource gold = game.region(new Rect(1700, 30, 120, 40));
- * OcrOptions digits = OcrOptions.defaults().withCharWhitelist("0123456789").withUpscale(3.0);
+ * OcrOptions digits = OcrOptions.defaults().charWhitelist("0123456789").upscale(3.0);
  * String amount = Text.read(gold, digits);
  * }</pre>
  *
@@ -68,7 +68,7 @@ public final class Text {
      * Default OCR options for the facade: {@link OcrOptions#defaults()} at {@link TextResult.Level#LINE},
      * so a whole line is one match and multi-word phrases like {@code "Game Over"} match via substring.
      */
-    public static final OcrOptions DEFAULT_OPTIONS = OcrOptions.defaults().withLevel(TextResult.Level.LINE);
+    public static final OcrOptions DEFAULT_OPTIONS = OcrOptions.defaults().level(TextResult.Level.LINE);
 
     // Text results are tracked in their own slot, separate from Vision's template and colour ones: a bot
     // commonly interleaves all three (find a button by template, check its colour, read its label), and

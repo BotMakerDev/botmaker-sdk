@@ -514,7 +514,7 @@ final class MapEdits {
         if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
         if (drags && now instanceof Button b) now = dragged(context, b, edit);
         if (typed && now instanceof Button b) {
-            Words text = edit.types() == null ? b.text() : edit.types().isBlank() ? null : Words.of(edit.types());
+            Words text = edit.types() == null ? b.types() : edit.types().isBlank() ? null : Words.of(edit.types());
             return said(ScreenEdits.setField(context.services(), screen, field, b.typing(new Typing(text,
                     edit.submits() == null ? b.isSubmitting() : edit.submits(),
                     edit.clears() == null ? b.isClearing() : edit.clears()))));

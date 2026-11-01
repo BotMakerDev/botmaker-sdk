@@ -509,7 +509,7 @@ final class LookTools {
     static List<TextMatch> recognise(BufferedImage image, OcrLanguage language) {
         return ToolTiming.timed(ToolTiming.Phase.TEXT, () -> {
             try {
-                Text.readAll(new StillSource(image), Text.DEFAULT_OPTIONS.withLanguages(language));
+                Text.readAll(new StillSource(image), Text.DEFAULT_OPTIONS.languages(language));
                 return List.copyOf(Text.lastMatchList());
             } finally {
                 Text.clearLastMatch();

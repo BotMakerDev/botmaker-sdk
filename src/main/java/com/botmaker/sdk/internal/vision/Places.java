@@ -34,7 +34,7 @@ public final class Places {
     public static Rect inSource(Zone zone, Size bot, Size live) {
         if (!scales(bot, live)) return new Rect(zone.x(), zone.y(), zone.width(), zone.height());
         Scale scale = Scale.of(bot, live);
-        return new Rect(scale.x(zone.x(), across(zone.anchor())), scale.y(zone.y(), down(zone.anchor())),
+        return new Rect(scale.x(zone.x(), across(zone.anchored())), scale.y(zone.y(), down(zone.anchored())),
                 (int) Math.round(zone.width() * scale.sx), (int) Math.round(zone.height() * scale.sy));
     }
 
@@ -46,9 +46,9 @@ public final class Places {
         Zone zone = new Zone(area.x(), area.y(), area.width(), area.height()).anchored(anchor);
         if (!scales(bot, live)) return zone;
         Scale scale = Scale.of(bot, live);
-        return new Zone(scale.backX(area.x(), across(zone.anchor())), scale.backY(area.y(), down(zone.anchor())),
+        return new Zone(scale.backX(area.x(), across(zone.anchored())), scale.backY(area.y(), down(zone.anchored())),
                 (int) Math.round(area.width() / scale.sx), (int) Math.round(area.height() / scale.sy))
-                .anchored(zone.anchor());
+                .anchored(zone.anchored());
     }
 
     /** Whether the two sizes differ in shape: scaling then keeps a place with its anchor. */

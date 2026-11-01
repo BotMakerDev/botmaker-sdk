@@ -25,8 +25,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `.types(Texts.GUILD)`, a `Words` constant of the bot's `Texts` class (`@SdkValue(TEXTS)`, the user's call: texts
   kept as pictures are), which a walk types on its way through; or `.typed()`, the text a body gives
   (`Navigate.type(field, text)`, a `@Param` when the runner picks it), which `ScreenWalk` never walks through and
-  ends NOT_NOW naming. `.clears()` selects what it holds first (Ctrl+A; an emulator, with no select-all, keeps it),
-  `.submits()` presses Enter after (2026-10-22). A drag is a button too (`Drag`, built as a trait like the field so
+  ends NOT_NOW naming. `.clearing()` selects what it holds first (Ctrl+A; an emulator, with no select-all, keeps
+  it), `.submitting()` presses Enter after (2026-10-22; `.clears()`/`.submits()` until 2026-11-01). A drag is a button too (`Drag`, built as a trait like the field so
   pictures, looks, copies and strips stay as they are): `.dragsOnto(Pictures.SLOT)`, let go on a picture found on the
   same frame, or `.dragsInto(Zones.END)`, at a zone's centre placed on the frame as `source.region` places it
   (a slider, a swipe); `.dragTime(Duration)`, else `Button.DRAG_TIME`. It takes the place of the gesture and the

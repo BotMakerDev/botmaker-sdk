@@ -17,6 +17,16 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- **More names read like the rest.** A text field's `.submits()` and `.clears()` are `.submitting()` and
+  `.clearing()`, its `text()` is `types()` and `typedByBody()` is `isTyped()`; a zone's `anchor()` is
+  `anchored()`; `OcrOptions`' `withUpscale(3.0)` and the other `with…` copies are `upscale(3.0)` and so on. The old
+  names still compile in this release, deprecated; *Project ▸ Migrate…* rewrites them. The next release removes
+  them.
+- A screen's and a button's links are written in their record's order now: one Studio writes again after an edit
+  may reorder its links once (`.from(…)` goes last, `.panelOf(…)` after `.loads(…)`). What it does is unchanged.
+
 ## [1.9.1] — 2026-11-01
 
 - **Four input names now read like the rest.** `.leaves()` is `.leaving()`, `.sometimes()` is `.occasional()`

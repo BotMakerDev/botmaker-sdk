@@ -18,7 +18,7 @@ class TextOptionsTest {
 
     @Test
     void given_options_are_kept() {
-        OcrOptions digits = OcrOptions.defaults().withCharWhitelist("0123456789");
+        OcrOptions digits = OcrOptions.defaults().charWhitelist("0123456789");
         assertSame(digits, Text.orDefault(digits));
     }
 }

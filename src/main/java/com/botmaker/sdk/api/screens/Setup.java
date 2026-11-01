@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -111,18 +112,21 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, told by {@code markers}: all of them show while the game shows it. */
+    @Link
     public Setup markers(List<ImageTemplate> markers) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, told apart by {@code absent}: none of them shows while the game shows it. */
+    @Link
     public Setup absent(List<ImageTemplate> absent) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, told by {@code texts} too: all of them show, each in its zone, while the game shows it. */
+    @Link
     public Setup texts(List<Caption> texts) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -132,6 +136,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      * This screen, told by {@code elements} too: each found in the screen's tree, once or more, while the app shows
      * it. A tree is read once per look, so they cost little beside a picture.
      */
+    @Link
     public Setup elements(List<Element> elements) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -179,24 +184,28 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, reached by {@code ways} too. */
+    @Link
     public Setup alsoFrom(List<Way> ways) {
         return new Setup(name, markers, absent, texts, elements, from, ways, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, left by {@code back}: {@code MARKET.close}. */
+    @Link
     public Setup back(Input back) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, looking as each of {@code variants} at times. */
+    @Link
     public Setup variants(List<ScreenVariant> variants) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, opening on its own: a reward, a level up, an offer. It is no start screen or panel then. */
+    @Link
     public Setup popup() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, true, false, loads,
                 null, notes, reached, owes, at, false, takes, shot);
@@ -209,6 +218,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, the one the game opens on: its loading screen, with no way in. It is no popup or panel then. */
+    @Link
     public Setup start() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, false, true, loads,
                 null, notes, reached, owes, at, false, takes, shot);
@@ -221,6 +231,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, giving the screen after it {@code loads} to show; null for {@link #LOADS}. */
+    @Link
     public Setup loads(Duration loads) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -235,6 +246,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      * This screen, a panel shown inside {@code screen}: {@code .panelOf(HOME)}; null for a screen of its own. It is no
      * popup or start screen then.
      */
+    @Link
     public Setup panelOf(Screen screen) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants,
                 screen == null && isPopup, screen == null && isStart, loads, screen, notes, reached, owes, at, isTab,
@@ -247,24 +259,28 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, with {@code notes} on it; blank for none. */
+    @Link
     public Setup notes(String notes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, automated as far as {@code reached}; null while it is not surveyed. */
+    @Link
     public Setup reached(Reached reached) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, still owing {@code owes}. */
+    @Link
     public Setup owes(List<String> owes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
     /** This screen, its card on 🗺 Screens' map with its top-left corner at {@code at}; null: where the layout puts it. */
+    @Link
     public Setup at(Point at) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -274,6 +290,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      * This screen, a tab of the screen its way in is on: told by the tab button its way in presses, in that button's
      * {@link State#SELECTED} look. It is no popup or start screen then.
      */
+    @Link
     public Setup tab() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, false, false, loads,
                 panelOf, notes, reached, owes, at, true, takes, shot);
@@ -289,6 +306,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      * This screen, showing within {@code takes} once its way in is done: what a walk plans its path by and waits
      * twice of for each step into it; null while not measured.
      */
+    @Link
     public Setup takes(Duration takes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -298,6 +316,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      * This screen, its picture of the whole screen at {@code shot} in the bot's resources: {@code "screens/HOME.png"};
      * null for none. A run never reads it.
      */
+    @Link
     public Setup shot(String shot) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);

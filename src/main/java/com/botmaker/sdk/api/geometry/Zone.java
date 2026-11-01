@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.geometry;
 
+import com.botmaker.plugin.api.value.Link;
+
 import java.util.Objects;
 
 /**
@@ -31,6 +33,7 @@ public final class Zone {
     }
 
     /** This area, staying with {@code anchor} when the game shows another shape than the bot's screen. */
+    @Link
     public Zone anchored(Anchor anchor) {
         return new Zone(x, y, width, height, anchor);
     }
@@ -51,9 +54,15 @@ public final class Zone {
         return height;
     }
 
-    /** The part of the screen it stays with. */
-    public Anchor anchor() {
+    /** The part of the screen it stays with ({@link #anchored(Anchor)}). */
+    public Anchor anchored() {
         return anchor;
+    }
+
+    /** Was {@link #anchored()}, named as its link {@link #anchored(Anchor)} is. */
+    @Deprecated(forRemoval = true)
+    public Anchor anchor() {
+        return anchored();
     }
 
     @Override

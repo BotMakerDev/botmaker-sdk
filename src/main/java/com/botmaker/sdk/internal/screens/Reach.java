@@ -246,9 +246,9 @@ public interface Reach {
             return true;
         }
         press(pointOn(place), button.gesture(), button.holdTime());
-        if (button.text() == null) return true;
+        if (button.types() == null) return true;
         pause(FIELD_FOCUS_MS);
-        type(button.text().text(), button.isClearing(), button.isSubmitting());
+        type(button.types().text(), button.isClearing(), button.isSubmitting());
         return true;
     }
 

@@ -36,7 +36,7 @@ class OcrLanguageTest {
         assertEquals("eng", OcrLanguage.spec(OcrLanguage.ENGLISH));
         assertEquals("eng+chi_sim", OcrLanguage.spec(OcrLanguage.ENGLISH, OcrLanguage.SIMPLIFIED_CHINESE));
         assertEquals("jpn+kor",
-                OcrOptions.defaults().withLanguages(OcrLanguage.JAPANESE, OcrLanguage.KOREAN).languages());
+                OcrOptions.defaults().languages(OcrLanguage.JAPANESE, OcrLanguage.KOREAN).languages());
     }
 
     @Test

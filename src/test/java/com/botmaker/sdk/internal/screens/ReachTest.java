@@ -457,13 +457,13 @@ class ReachTest {
     @Test
     void aFieldIsClickedClearedTypedAndSubmitted() {
         Column column = new Column(Map.of("arena", 1), 4);
-        assertTrue(column.perform(Button.of(ARENA).types(Words.of("Dragons")).clears().submits(),
+        assertTrue(column.perform(Button.of(ARENA).types(Words.of("Dragons")).clearing().submitting(),
                 column.look().orElseThrow()));
         assertEquals(List.of("click 240", "clear", "type \"Dragons\"", "enter"), column.done);
         assertEquals(Reach.FIELD_FOCUS_MS, column.now, "the field took the click before the typing");
         column.done.clear();
         assertTrue(column.perform(Button.of(ARENA).types(Words.of("x")), column.look().orElseThrow()));
-        assertTrue(column.perform(Button.of(ARENA).typed().submits(), column.look().orElseThrow()));
+        assertTrue(column.perform(Button.of(ARENA).typed().submitting(), column.look().orElseThrow()));
         assertEquals(List.of("click 240", "type \"x\"", "click 240"), column.done);
     }
 

@@ -82,7 +82,7 @@ class OcrEngineTest {
     @Test
     void respectsCharWhitelist() {
         // A numeric HUD counter: whitelisting digits keeps letters from creeping in.
-        OcrOptions digits = OcrOptions.defaults().withCharWhitelist("0123456789").withUpscale(3.0);
+        OcrOptions digits = OcrOptions.defaults().charWhitelist("0123456789").upscale(3.0);
         String recognized = OcrEngine.text(render("12345"), digits);
         assertTrue(recognized.contains("12345"), "expected 12345 in: '" + recognized + "'");
     }

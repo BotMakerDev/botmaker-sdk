@@ -1,12 +1,18 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.meta.Migrate;
+import com.botmaker.sdk.api.geometry.Anchor;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.text.OcrLanguage;
+import com.botmaker.sdk.api.text.OcrOptions;
+import com.botmaker.sdk.api.text.TextResult;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 /**
@@ -24,7 +30,10 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  * <p>2026-11-01: an input's traits are named as their readers are, so each is a {@code @Link} the SDK declares
  * once — {@code .leaves()} is {@code .leaving()}, {@code .sometimes()} is {@code .occasional()} (read by
  * {@code isOccasional()}, was {@code comesAndGoes()}), {@code lock()} is {@code locked()}, and a tree's
- * {@code notches()} is {@code wheel()}.
+ * {@code notches()} is {@code wheel()}. Then the rest of the SDK's values: a field's {@code .submits()} and
+ * {@code .clears()} are {@code .submitting()} and {@code .clearing()} (read by {@code isSubmitting()},
+ * {@code isClearing()}), its {@code text()} is {@code types()} and {@code typedByBody()} is {@code isTyped()}; a
+ * zone's {@code anchor()} is {@code anchored()}; {@code OcrOptions}' {@code withX(…)} is {@code x(…)}.
  */
 final class Migrations {
 
@@ -103,5 +112,80 @@ final class Migrations {
     @Migrate(Tree.class)
     static int notches(@Migrate.Self Tree self) {
         return self.wheel();
+    }
+
+    @Migrate(Button.class)
+    static Button submits(@Migrate.Self Button self) {
+        return self.submitting();
+    }
+
+    @Migrate(Button.class)
+    static Button clears(@Migrate.Self Button self) {
+        return self.clearing();
+    }
+
+    @Migrate(Button.class)
+    static Words text(@Migrate.Self Button self) {
+        return self.types();
+    }
+
+    @Migrate(Button.class)
+    static boolean typedByBody(@Migrate.Self Button self) {
+        return self.isTyped();
+    }
+
+    @Migrate(Zone.class)
+    static Anchor anchor(@Migrate.Self Zone self) {
+        return self.anchored();
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withLanguages(@Migrate.Self OcrOptions self, String languages) {
+        return self.languages(languages);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withLanguages(@Migrate.Self OcrOptions self, OcrLanguage... languages) {
+        return self.languages(languages);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withPageSegMode(@Migrate.Self OcrOptions self, int pageSegMode) {
+        return self.pageSegMode(pageSegMode);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withOcrEngineMode(@Migrate.Self OcrOptions self, int ocrEngineMode) {
+        return self.ocrEngineMode(ocrEngineMode);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withGrayscale(@Migrate.Self OcrOptions self, boolean grayscale) {
+        return self.grayscale(grayscale);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withUpscale(@Migrate.Self OcrOptions self, double upscale) {
+        return self.upscale(upscale);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withBinarize(@Migrate.Self OcrOptions self, OcrOptions.BinarizeMode binarize) {
+        return self.binarize(binarize);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withInvert(@Migrate.Self OcrOptions self, boolean invert) {
+        return self.invert(invert);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withCharWhitelist(@Migrate.Self OcrOptions self, String charWhitelist) {
+        return self.charWhitelist(charWhitelist);
+    }
+
+    @Migrate(OcrOptions.class)
+    static OcrOptions withLevel(@Migrate.Self OcrOptions self, TextResult.Level level) {
+        return self.level(level);
     }
 }

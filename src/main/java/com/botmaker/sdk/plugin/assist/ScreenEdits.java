@@ -948,7 +948,7 @@ public final class ScreenEdits {
     static String setField(StudioServices services, String constant, String field, Button now) {
         Typing typing = now.typing();
         Optional<String> failed = ScreenBook.step(services, "Type in " + field,
-                () -> (now.text() == null ? Optional.<String>empty() : keptText(services, now.text()))
+                () -> (now.types() == null ? Optional.<String>empty() : keptText(services, now.types()))
                         .or(() -> ScreenBook.update(services, constant, s -> s.withInput(field, now))));
         return said(failed, typing == null ? field + " is only clicked now."
                 : field + " types " + (typing.text() == null ? "the text its body gives (Navigate.type)"

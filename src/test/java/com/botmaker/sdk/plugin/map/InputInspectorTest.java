@@ -139,7 +139,7 @@ class InputInspectorTest {
         assertEquals(new Typing(Words.of("Dragons"), true, false), InputInspector.typingOf(true, "Dragons", true, false));
         assertEquals(new Typing(null, false, true), InputInspector.typingOf(true, "  ", false, true));
         assertEquals("types \"Dragons\", then Enter",
-                ScreenCards.fieldTrait(MapFixtures.click("search").types(Words.of("Dragons")).submits()));
+                ScreenCards.fieldTrait(MapFixtures.click("search").types(Words.of("Dragons")).submitting()));
         assertEquals("types the body's text", ScreenCards.fieldTrait(MapFixtures.click("search").typed()));
     }
 

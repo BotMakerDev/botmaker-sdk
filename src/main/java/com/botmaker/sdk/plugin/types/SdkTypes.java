@@ -155,11 +155,11 @@ public final class SdkTypes implements TypeHolder {
      * How {@code Text} reads the screen: languages, lines or words, a character whitelist, the upscale and the
      * clean-up. A fresh one is what {@code Text} reads with when handed none, except that "any character" is
      * {@code ""}: the value is written as the record's constructor, and the host writes no {@code null} part.
-     * A chain a person writes — {@code OcrOptions.defaults().withUpscale(3.0)} — is read through
+     * A chain a person writes — {@code OcrOptions.defaults().upscale(3.0)} — is read through
      * {@link #OCR_CHAIN}.
      */
     public static final DeclaredCallType<OcrOptions> OCR_OPTIONS = PluginType.value(OcrOptions.class)
-            .fresh(() -> Text.DEFAULT_OPTIONS.withCharWhitelist(""))
+            .fresh(() -> Text.DEFAULT_OPTIONS.charWhitelist(""))
             .editor(() -> OcrEditors::options)
             .writtenAsRecord();
 
@@ -232,8 +232,7 @@ public final class SdkTypes implements TypeHolder {
     public static final DeclaredCallType<Zone> ZONE = PluginType.value(Zone.class)
             .fresh(() -> new Zone(0, 0, 0, 0))
             .editor(() -> GeometryEditors::zone)
-            .writtenAs(Zone::new)
-            .with(Zone::anchored, Zone::anchor);
+            .writtenAs(Zone::new);
 
     /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
     public static final PluginType<Key> KEY = PluginType.value(Key.class)
@@ -361,21 +360,12 @@ public final class SdkTypes implements TypeHolder {
             ComponentType.part(Precision.class).writtenAs(Precision::minCount, p -> p, Precision::minCount));
 
     /**
-     * {@code OcrOptions.defaults()} and its withers, the chain a person writes
-     * ({@code OcrOptions.defaults().withLevel(TextResult.Level.LINE).withCharWhitelist("0123456789")}), read as
+     * {@code OcrOptions.defaults()} and its {@code @Link}s, the chain a person writes
+     * ({@code OcrOptions.defaults().level(TextResult.Level.LINE).charWhitelist("0123456789")}), read as
      * the value it builds, its links in any order. Never what an edited value is written as: {@link #OCR_OPTIONS}
-     * is declared first and its record constructor writes every value. {@code withLanguages(OcrLanguage...)} is
+     * is declared first and its record constructor writes every value. {@code languages(OcrLanguage...)} is
      * not among the links; its {@code String} twin is.
      */
     public static final DeclaredCall<OcrOptions> OCR_CHAIN = ComponentType.part(OcrOptions.class)
-            .writtenAs(OcrOptions::defaults)
-            .with(OcrOptions::withLanguages, OcrOptions::languages)
-            .with(OcrOptions::withPageSegMode, OcrOptions::pageSegMode)
-            .with(OcrOptions::withOcrEngineMode, OcrOptions::ocrEngineMode)
-            .with(OcrOptions::withGrayscale, OcrOptions::grayscale)
-            .with(OcrOptions::withUpscale, OcrOptions::upscale)
-            .with(OcrOptions::withBinarize, OcrOptions::binarize)
-            .with(OcrOptions::withInvert, OcrOptions::invert)
-            .with(OcrOptions::withCharWhitelist, OcrOptions::charWhitelist)
-            .with(OcrOptions::withLevel, OcrOptions::level);
+            .writtenAs(OcrOptions::defaults);
 }

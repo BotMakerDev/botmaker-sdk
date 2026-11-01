@@ -382,8 +382,8 @@ final class ActTools {
         // A button of the map is pressed by its gesture, as a run presses it.
         Gesture gesture = copy == null ? Gesture.CLICK : copy.gesture();
         // A text field of the map types its text once clicked, as a run types it; one whose body gives it is clicked.
-        if (copy != null && copy.text() != null) {
-            String text = copy.text().text();
+        if (copy != null && copy.types() != null) {
+            String text = copy.types().text();
             return acted(context, screen, spotted.frame(), at, desktop, settleMs, false, "Typed \"" + text + "\" in "
                     + spotted.name() + " at " + at.x() + "," + at.y(), "type " + spotted.name(), share, hands -> {
                 hands.press(at.x(), at.y(), gesture, copy.holdTime().toMillis());

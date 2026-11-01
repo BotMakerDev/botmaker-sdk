@@ -67,9 +67,9 @@ public record Pick(Mode mode, int nth, Order order, ImageTemplate look, int colu
         return new Pick(Mode.FIRST, 0, order);
     }
 
-    /** The {@code n}th copy along {@code order}, from 1. */
-    public static Pick nth(int n, Order order) {
-        return new Pick(Mode.NTH, n, order);
+    /** The {@code nth} copy along {@code order}, from 1. */
+    public static Pick nth(int nth, Order order) {
+        return new Pick(Mode.NTH, nth, order);
     }
 
     /** Every copy along {@code order}, once each. */

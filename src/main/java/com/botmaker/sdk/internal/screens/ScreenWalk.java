@@ -371,7 +371,7 @@ public final class ScreenWalk {
         if (typed != null && !(input instanceof Button b && b.isField())) {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is no text field: nothing is typed in it.");
         }
-        if (typed == null && input instanceof Button b && b.typedByBody()) {
+        if (typed == null && input instanceof Button b && b.isTyped()) {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " types the text its body gives: "
                     + "Navigate.type it.");
         }
@@ -468,7 +468,7 @@ public final class ScreenWalk {
                 if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
                     // A field that keeps what it holds is never typed twice: its text would be there twice. Nor is a
                     // drag done twice: what it moved is gone from where it was, and another may sit there now.
-                    boolean retypes = acted instanceof Button typing && typing.text() != null && !typing.isClearing();
+                    boolean retypes = acted instanceof Button typing && typing.types() != null && !typing.isClearing();
                     boolean redrags = acted instanceof Button dragging && dragging.isDrag();
                     if (retried || retypes || redrags) {
                         return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "
@@ -619,7 +619,7 @@ public final class ScreenWalk {
 
     /** Whether {@code edge} goes through a text field whose text only a body gives: no walk types it. */
     private static boolean typedByBody(ScreenGraph.Edge edge) {
-        return edge.via() instanceof Button button && button.typedByBody();
+        return edge.via() instanceof Button button && button.isTyped();
     }
 
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */

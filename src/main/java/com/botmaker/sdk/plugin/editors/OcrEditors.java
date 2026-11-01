@@ -169,12 +169,12 @@ public final class OcrEditors {
             BinarizeMode mode = cleanButtons.entrySet().stream().filter(e -> e.getValue().isSelected())
                     .map(Map.Entry::getKey).findFirst().orElse(current.binarize());
             return current
-                    .withLanguages(spec(picked, others))
-                    .withLevel(words.isSelected() ? TextResult.Level.WORD : TextResult.Level.LINE)
-                    .withCharWhitelist(whitelist.getText())
-                    .withUpscale(upscale.getValue() == null ? current.upscale() : upscale.getValue())
-                    .withBinarize(mode)
-                    .withInvert(invert.isSelected());
+                    .languages(spec(picked, others))
+                    .level(words.isSelected() ? TextResult.Level.WORD : TextResult.Level.LINE)
+                    .charWhitelist(whitelist.getText())
+                    .upscale(upscale.getValue() == null ? current.upscale() : upscale.getValue())
+                    .binarize(mode)
+                    .invert(invert.isSelected());
         };
 
         VBox content = new VBox(10);
@@ -265,7 +265,7 @@ public final class OcrEditors {
 
     /** Writes the setting, with "any character" as {@code ""}: the host has no way to write a {@code null}. */
     static void commit(ValueContext ctx, OcrOptions options) {
-        ctx.set(options.charWhitelist() == null ? options.withCharWhitelist("") : options);
+        ctx.set(options.charWhitelist() == null ? options.charWhitelist("") : options);
     }
 
     /** The value the host read, or what {@code Text} reads with when it could not read one. */

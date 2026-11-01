@@ -23,7 +23,6 @@ import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
-import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Screen;
@@ -81,30 +80,12 @@ public final class ScreenTypes implements TypeHolder {
      * {@code .start()}, {@code .loads(…)}, … and {@code .at(new Point(…))} once its card was moved on 🗺 Screens' map.
      */
     public static final DeclaredCall<Setup> SETUP_SHAPE = ComponentType.part(Setup.class)
-            .<String, Setup>writtenAs(Setup::named, Setup::name)
-            .<Screen>with(Setup::panelOf, Setup::panelOf)
-            .<List<ImageTemplate>>with(Setup::markers, Setup::markers)
-            .<List<ImageTemplate>>with(Setup::absent, Setup::absent)
-            .<List<Caption>>with(Setup::texts, Setup::texts)
-            .<List<Element>>with(Setup::elements, Setup::elements)
+            .writtenAs(Setup::named)
             .<Input>with(Setup::from, Setup::fromInput)
             .<Screen>with(Setup::after, Setup::fromAfter)
             .<Pick>with(Setup::fromPick, setup -> setup.from() == null ? null : setup.from().pick())
             .<State>with(Setup::fromLooks, setup -> setup.from() == null ? null : setup.from().state())
-            .<BooleanSupplier>with(Setup::fromWhen, Parts.SETUP_FROM_WHEN.part(ScreenTypes::condition))
-            .<List<Way>>with(Setup::alsoFrom, Setup::alsoFrom)
-            .<Input>with(Setup::back, Setup::back)
-            .<List<ScreenVariant>>with(Setup::variants, Setup::variants)
-            .flag(Setup::popup, Setup::isPopup)
-            .flag(Setup::start, Setup::isStart)
-            .flag(Setup::tab, Setup::isTab)
-            .<Duration>with(Setup::loads, Setup::loads)
-            .<Duration>with(Setup::takes, Setup::takes)
-            .<String>with(Setup::notes, Setup::notes)
-            .<Reached>with(Setup::reached, Setup::reached)
-            .<List<String>>with(Setup::owes, Setup::owes)
-            .<Point>with(Setup::at, Setup::at)
-            .<String>with(Setup::shot, Setup::shot);
+            .<BooleanSupplier>with(Setup::fromWhen, Parts.SETUP_FROM_WHEN.part(ScreenTypes::condition));
 
     /**
      * The conditions, each a method reference crossing as the text it is written as, {@code Firestone::eventOn}: a
@@ -182,15 +163,9 @@ public final class ScreenTypes implements TypeHolder {
                 .<BooleanSupplier>with(Button::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
                 .flag(Button::repeated, ScreenTypes::repeatedWritten)
                 .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
-                .<Duration>with(Button::hold, Button::hold)
-                .<Words>with(Button::types, Button::text)
-                .flag(Button::typed, Button::typedByBody)
-                .flag(Button::submits, Button::isSubmitting)
-                .flag(Button::clears, Button::isClearing)
                 .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
                 .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
-                .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten)
-                .<Place>with(Button::place, Button::place);
+                .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten);
     }
 
     /** Whether a button is written repeated: a grid's cells are its copies, which {@code .grid(…)} says alone. */
@@ -324,21 +299,21 @@ public final class ScreenTypes implements TypeHolder {
             .<Order, Integer, Duration, Scroll>writtenAs(Scroll::drag);
 
     /*
-     * A pick's mode is told apart by which factory rebuilds it equal. Their parts are read under other names than the
-     * factories' parameters (Pick.nth(n, order) by nth()), so each is given.
+     * A pick's mode is told apart by which factory rebuilds it equal. The type arguments pick a factory among the
+     * accessors of the same name (Pick::nth is also the reader nth()); a cell's row is read by nth(), so it is given.
      */
 
     /** {@code Pick.first(Order)}. */
     public static final DeclaredCall<Pick> PICK_FIRST_SHAPE = ComponentType.part(Pick.class)
-            .<Order, Pick>writtenAs(Pick::first, Pick::order);
+            .<Order, Pick>writtenAs(Pick::first);
 
     /** {@code Pick.nth(int, Order)}. */
     public static final DeclaredCall<Pick> PICK_NTH_SHAPE = ComponentType.part(Pick.class)
-            .<Integer, Order, Pick>writtenAs(Pick::nth, Pick::nth, Pick::order);
+            .<Integer, Order, Pick>writtenAs(Pick::nth);
 
     /** {@code Pick.each(Order)}. */
     public static final DeclaredCall<Pick> PICK_EACH_SHAPE = ComponentType.part(Pick.class)
-            .<Order, Pick>writtenAs(Pick::each, Pick::order);
+            .<Order, Pick>writtenAs(Pick::each);
 
     /** {@code Pick.untilNone()}. */
     public static final DeclaredCall<Pick> PICK_UNTIL_NONE_SHAPE = ComponentType.part(Pick.class)

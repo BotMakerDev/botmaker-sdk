@@ -133,7 +133,7 @@ public final class Navigate {
     private static Pressed pressed(Input input, Pick pick, Words typed) {
         // Refused before any walk: a field with no text to type, or text for a button that is no field.
         boolean field = input instanceof Button button && button.isField();
-        if (typed == null ? field && ((Button) input).typedByBody() : !field) {
+        if (typed == null ? field && ((Button) input).isTyped() : !field) {
             Debug.log(input.label() + (field ? " types the text its body gives: Navigate.type it."
                     : " is no text field: nothing is typed in it."));
             return new Pressed(Pressed.Result.NOT_NOW, null, 0);

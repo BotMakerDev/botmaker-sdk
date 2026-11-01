@@ -803,7 +803,7 @@ class ScreenWalkTest {
     @Test
     void aScreenOnlyBehindAFieldEndsNotNow() {
         Map<String, MapScreen> screens = screens();
-        screens.put("HOME", with(screens.get("HOME"), click("search").typed().submits()));
+        screens.put("HOME", with(screens.get("HOME"), click("search").typed().submitting()));
         screens.put("RESULTS", screen(named("Results", "results_title", "HOME", "search")));
         Game game = new Game("HOME", ScreenGraph.of(screens));
         game.leads.put("HOME type Dragons", "RESULTS");
@@ -829,7 +829,7 @@ class ScreenWalkTest {
     @Test
     void aFieldWithItsOwnTextIsWalkedThrough() {
         Map<String, MapScreen> screens = screens();
-        screens.put("HOME", with(screens.get("HOME"), click("search").types(Words.of("Dragons")).submits()));
+        screens.put("HOME", with(screens.get("HOME"), click("search").types(Words.of("Dragons")).submitting()));
         screens.put("RESULTS", screen(named("Results", "results_title", "HOME", "search")));
         Game game = new Game("HOME", ScreenGraph.of(screens));
         game.leads.put("HOME type Dragons", "RESULTS");

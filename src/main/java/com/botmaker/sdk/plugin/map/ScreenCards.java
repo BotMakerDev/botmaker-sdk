@@ -413,7 +413,7 @@ final class ScreenCards {
 
     /** What a text field types: {@code types "Dragons", then Enter}, or {@code types the body's text}. */
     static String fieldTrait(Button field) {
-        return "types " + (field.text() == null ? "the body's text" : "\"" + field.text().text() + "\"")
+        return "types " + (field.types() == null ? "the body's text" : "\"" + field.types().text() + "\"")
                 + (field.isSubmitting() ? ", then Enter" : "");
     }
 

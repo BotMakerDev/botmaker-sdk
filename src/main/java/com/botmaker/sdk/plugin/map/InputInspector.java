@@ -479,7 +479,7 @@ final class InputInspector {
         CheckBox isField = new CheckBox("Types text");
         isField.setSelected(button.isField());
         isField.setTooltip(new Tooltip(MapGuide.FIELD));
-        TextField text = new TextField(button.text() == null ? "" : button.text().text());
+        TextField text = new TextField(button.types() == null ? "" : button.types().text());
         text.setPromptText("blank: the body gives it (Navigate.type)");
         HBox.setHgrow(text, Priority.ALWAYS);
         CheckBox clears = new CheckBox("Clear first");

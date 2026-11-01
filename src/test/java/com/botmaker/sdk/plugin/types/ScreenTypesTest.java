@@ -63,6 +63,14 @@ class ScreenTypesTest {
         return shape.build(shape.components(value));
     }
 
+    /** The part a button's link {@code method} writes for {@code button}, read by the link's name, not its place. */
+    private static Object link(Button button, String method) {
+        return ScreenTypes.BUTTON_SHAPE.withers().stream()
+                .filter(wither -> wither.method().getName().equals(method))
+                .findFirst().orElseThrow()
+                .part(button);
+    }
+
     private static Setup campaign() {
         return Setup.named("Campaign").markers(marks("campaign_title"))
                 .from(BotConstants.input("HOME", "campaign"))
@@ -164,10 +172,8 @@ class ScreenTypesTest {
     void aButtonWithNoGestureWritesNone() {
         Button plain = Button.of(picture("claim"));
         assertEquals(Gesture.CLICK, plain.gesture());
-        // Its gesture and hold links, before the text field's four, the drag's three, its place and its grid.
-        List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(plain);
-        assertNull(parts.get(parts.size() - 11));
-        assertNull(parts.get(parts.size() - 10));
+        assertNull(link(plain, "gesture"));
+        assertNull(link(plain, "hold"));
 
         Button twice = Button.of(picture("hero")).gesture(Gesture.DOUBLE).repeated();
         Button held = Button.of(picture("charge")).hold(Duration.ofSeconds(2));
@@ -175,11 +181,9 @@ class ScreenTypesTest {
         assertEquals(twice, roundTrip(ScreenTypes.BUTTON_SHAPE, twice));
         assertEquals(held, roundTrip(ScreenTypes.BUTTON_SHAPE, held));
         assertEquals(heldLong, roundTrip(ScreenTypes.BUTTON_SHAPE, heldLong));
-        List<Object> heldParts = ScreenTypes.BUTTON_SHAPE.components(held);
-        assertNull(heldParts.get(heldParts.size() - 11), "a hold of its own time says it alone");
-        assertEquals(Duration.ofSeconds(2), heldParts.get(heldParts.size() - 10));
-        List<Object> twiceParts = ScreenTypes.BUTTON_SHAPE.components(twice);
-        assertEquals(Gesture.DOUBLE, twiceParts.get(twiceParts.size() - 11));
+        assertNull(link(held, "gesture"), "a hold of its own time says it alone");
+        assertEquals(Duration.ofSeconds(2), link(held, "hold"));
+        assertEquals(Gesture.DOUBLE, link(twice, "gesture"));
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).gesture(Gesture.RIGHT);
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling));
     }
@@ -190,14 +194,13 @@ class ScreenTypesTest {
      */
     @Test
     void aTextFieldIsWrittenByItsTextAndItsTraits() {
-        Button search = Button.of(picture("search")).types(Words.of("Dragons")).clears().submits();
-        Button byBody = Button.of(picture("search")).typed().submits();
+        Button search = Button.of(picture("search")).types(Words.of("Dragons")).clearing().submitting();
+        Button byBody = Button.of(picture("search")).typed().submitting();
         assertEquals(search, roundTrip(ScreenTypes.BUTTON_SHAPE, search));
         assertEquals(byBody, roundTrip(ScreenTypes.BUTTON_SHAPE, byBody));
-        assertEquals(Words.of("Dragons"), ScreenTypes.BUTTON_SHAPE.components(search)
-                .get(ScreenTypes.BUTTON_SHAPE.components(search).size() - 9));
-        assertTrue(byBody.typedByBody());
-        assertFalse(search.typedByBody(), "a text of its own is walked through");
+        assertTrue(ScreenTypes.BUTTON_SHAPE.components(search).contains(Words.of("Dragons")));
+        assertTrue(byBody.isTyped());
+        assertFalse(search.isTyped(), "a text of its own is walked through");
         Button old = Button.of(picture("claim")).tried();
         assertEquals(old, roundTrip(ScreenTypes.BUTTON_SHAPE, old));
         assertFalse(old.isField());
@@ -215,9 +218,8 @@ class ScreenTypesTest {
         Button into = Button.of(picture("knob")).dragsInto(new Zone(600, 300, 40, 40));
         assertEquals(onto, roundTrip(ScreenTypes.BUTTON_SHAPE, onto));
         assertEquals(into, roundTrip(ScreenTypes.BUTTON_SHAPE, into));
-        List<Object> parts = ScreenTypes.BUTTON_SHAPE.components(into);
-        assertEquals(new Zone(600, 300, 40, 40), parts.get(parts.size() - 4));
-        assertNull(parts.get(parts.size() - 3), "the usual time is not written");
+        assertEquals(new Zone(600, 300, 40, 40), link(into, "dragsInto"));
+        assertNull(link(into, "dragTime"), "the usual time is not written");
         assertNull(Button.of(picture("knob")).dragsInto(new Zone(0, 0, 1, 1)).dragTime(Button.DRAG_TIME).drag().time());
         Button typed = Button.of(picture("search")).types(Words.of("a")).dragsOnto(picture("slot"));
         assertNull(typed.typing(), "a drag types nothing");

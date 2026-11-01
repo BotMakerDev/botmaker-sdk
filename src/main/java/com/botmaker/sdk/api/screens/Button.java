@@ -237,6 +237,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
+    @Link
     public Button hold(Duration time) {
         return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 Gesture.HOLD, time, typing, null, place, beside, grid, element);
@@ -264,23 +265,39 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     /** This button, a text field: clicked, then {@code text} typed into it, one of the bot's {@code Texts}. */
+    @Link
     public Button types(Words text) {
         return typing(new Typing(text, isSubmitting(), isClearing()));
     }
 
     /** This button, a text field whose text the body gives: {@code Navigate.type(Screens.GUILD.search, name)}. */
+    @Link
     public Button typed() {
         return typing(new Typing(null, isSubmitting(), isClearing()));
     }
 
     /** This button, a text field Enter is pressed in once its text is typed. */
+    @Link
+    public Button submitting() {
+        return typing(new Typing(types(), true, isClearing()));
+    }
+
+    /** Was {@link #submitting()}, named as its reader {@link #isSubmitting()} is. */
+    @Deprecated(forRemoval = true)
     public Button submits() {
-        return typing(new Typing(text(), true, isClearing()));
+        return submitting();
     }
 
     /** This button, a text field emptied before its text is typed. */
+    @Link
+    public Button clearing() {
+        return typing(new Typing(types(), isSubmitting(), true));
+    }
+
+    /** Was {@link #clearing()}, named as its reader {@link #isClearing()} is. */
+    @Deprecated(forRemoval = true)
     public Button clears() {
-        return typing(new Typing(text(), isSubmitting(), true));
+        return clearing();
     }
 
     /** This button, typing as {@code typing} says once clicked, a drag clicked again; null: typing nothing. */
@@ -290,6 +307,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     /** This button, only ever found where {@code place} says: the Claim right of a row's title; null: anywhere. */
+    @Link
     public Button place(Place place) {
         return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
@@ -335,13 +353,25 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     /** What it types, one of the bot's {@code Texts}; null when it is no field, or its body gives the text. */
-    public Words text() {
+    public Words types() {
         return typing == null ? null : typing.text();
     }
 
-    /** Whether it is a text field whose text only a body gives: no walk goes through it. */
-    public boolean typedByBody() {
+    /** Was {@link #types()}, named as its link {@link #types(Words)} is. */
+    @Deprecated(forRemoval = true)
+    public Words text() {
+        return types();
+    }
+
+    /** Whether it is a text field whose text only a body gives ({@link #typed()}): no walk goes through it. */
+    public boolean isTyped() {
         return typing != null && typing.text() == null;
+    }
+
+    /** Was {@link #isTyped()}, named as its link {@link #typed()} is. */
+    @Deprecated(forRemoval = true)
+    public boolean typedByBody() {
+        return isTyped();
     }
 
     /** Whether Enter is pressed once its text is typed. */
