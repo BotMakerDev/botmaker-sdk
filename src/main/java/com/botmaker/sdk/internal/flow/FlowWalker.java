@@ -257,8 +257,8 @@ public final class FlowWalker {
 
     /** The screen a stuck {@code step} walks back to: the one it says it works on, else the last one it reached. */
     static String backTo(Flow.Step step) {
-        if (step.screen() != null) {
-            Optional<String> said = ScreenMaps.installed().constantOf(step.screen());
+        if (step.on() != null) {
+            Optional<String> said = ScreenMaps.installed().constantOf(step.on());
             if (said.isPresent()) return said.get();
         }
         return ScreenMaps.reached();

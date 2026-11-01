@@ -34,7 +34,7 @@ public final class ActivityScreens {
             for (Flow.Step step : read.steps()) {
                 String body = step.activity().isNone() ? "" : FlowTypes.sourceOf(step.body());
                 if (body.isEmpty()) continue;
-                String screen = step.screen() == null ? null : graph.constantOf(step.screen()).orElse(null);
+                String screen = step.on() == null ? null : graph.constantOf(step.on()).orElse(null);
                 found.putIfAbsent(body, new Target(step.label(), body, screen));
             }
         }

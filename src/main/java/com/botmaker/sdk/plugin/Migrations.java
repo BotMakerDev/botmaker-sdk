@@ -1,11 +1,13 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.meta.Migrate;
+import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -33,7 +35,8 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  * {@code notches()} is {@code wheel()}. Then the rest of the SDK's values: a field's {@code .submits()} and
  * {@code .clears()} are {@code .submitting()} and {@code .clearing()} (read by {@code isSubmitting()},
  * {@code isClearing()}), its {@code text()} is {@code types()} and {@code typedByBody()} is {@code isTyped()}; a
- * zone's {@code anchor()} is {@code anchored()}; {@code OcrOptions}' {@code withX(…)} is {@code x(…)}.
+ * zone's {@code anchor()} is {@code anchored()}; {@code OcrOptions}' {@code withX(…)} is {@code x(…)}; a flow
+ * step's {@code description()} is {@code described()} and its {@code screen()} is {@code on()}.
  */
 final class Migrations {
 
@@ -187,5 +190,15 @@ final class Migrations {
     @Migrate(OcrOptions.class)
     static OcrOptions withLevel(@Migrate.Self OcrOptions self, TextResult.Level level) {
         return self.level(level);
+    }
+
+    @Migrate(Flow.Step.class)
+    static String description(@Migrate.Self Flow.Step self) {
+        return self.described();
+    }
+
+    @Migrate(Flow.Step.class)
+    static Screen screen(@Migrate.Self Flow.Step self) {
+        return self.on();
     }
 }

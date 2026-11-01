@@ -83,7 +83,7 @@ class FlowTypesTest {
         assertNull(run().home(null).home());
         assertEquals("MyBot::setup", FlowTypes.sourceOf(run().home(null).setup()), "and the other way round");
         assertEquals(3, FlowTypes.RUN_SHAPE.withers().size());
-        assertEquals(List.of(Runnable.class, Runnable.class, String.class),
+        assertEquals(List.of(String.class, Runnable.class, Runnable.class),
                 FlowTypes.RUN_SHAPE.componentTypes());
         Run noted = run().notes("Q opens Quests.\nNever press Escape on Home.");
         assertEquals(noted, roundTrip(FlowTypes.RUN_SHAPE, noted), "the game's notes, kept on the run");
@@ -193,8 +193,9 @@ class FlowTypesTest {
         assertEquals(List.of(List.class, List.class, Class.class, Flow.Limits.class),
                 FlowTypes.FLOW_SHAPE.componentTypes());
         assertEquals(4, FlowTypes.FLOW_SHAPE.components(collectBattleRest()).size());
-        assertEquals(List.of(Class.class, ActivityBody.class, String.class, boolean.class, boolean.class,
-                boolean.class, boolean.class, Class.class, Flow.class, Screen.class),
+        // The card and body, the @Link parts (described, on, off, switchable), then goesHome, checksPopups, whenOff.
+        assertEquals(List.of(Class.class, ActivityBody.class, String.class, Screen.class, boolean.class,
+                boolean.class, boolean.class, boolean.class, Class.class, Flow.class),
                 FlowTypes.STEP_SHAPE.componentTypes());
         assertEquals(List.of(Outcome.class, Class.class), FlowTypes.EDGE_SHAPE.componentTypes());
     }

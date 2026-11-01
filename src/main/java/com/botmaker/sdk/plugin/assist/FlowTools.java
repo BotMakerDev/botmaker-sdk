@@ -216,7 +216,7 @@ final class FlowTools {
             if (step.goHome()) switches.add("goes home first");
             if (step.runnerSwitch()) switches.add("the runner may switch it off");
             String switched = switches.isEmpty() ? "" : ", " + String.join(", ", switches);
-            String described = step.description().isBlank() ? "" : ". " + step.description();
+            String described = step.described().isBlank() ? "" : ". " + step.described();
             String inner = FlowRefs.flowOf(step.node());
             if (inner != null) {
                 // A card's exits are its flow's ends, read off that flow; a wire on one it no longer ends on stays.

@@ -127,7 +127,7 @@ class SubflowCardsTest {
         assertEquals(Map.of("Collect", List.of("Next", "Bag full")), board.exits(), "no enum is written for the card");
         Flow.Step card = flow.steps().get(1);
         assertNull(card.body());
-        assertEquals("Once a day", card.description());
+        assertEquals("Once a day", card.described());
         assertEquals(new Activity("Collect"), card.whenOff());
         Flow.Edge out = flow.edges().get(1);
         assertEquals(BotConstants.flow("DAILY"), out.via());

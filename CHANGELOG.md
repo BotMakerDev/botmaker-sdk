@@ -21,11 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **More names read like the rest.** A text field's `.submits()` and `.clears()` are `.submitting()` and
   `.clearing()`, its `text()` is `types()` and `typedByBody()` is `isTyped()`; a zone's `anchor()` is
-  `anchored()`; `OcrOptions`' `withUpscale(3.0)` and the other `with…` copies are `upscale(3.0)` and so on. The old
+  `anchored()`; `OcrOptions`' `withUpscale(3.0)` and the other `with…` copies are `upscale(3.0)` and so on; a flow
+  step's `description()` is `described()` and its `screen()` is `on()`, as the links that set them. The old
   names still compile in this release, deprecated; *Project ▸ Migrate…* rewrites them. The next release removes
-  them.
-- A screen's and a button's links are written in their record's order now: one Studio writes again after an edit
-  may reorder its links once (`.from(…)` goes last, `.panelOf(…)` after `.loads(…)`). What it does is unchanged.
+  them. A step also answers `isOff()` and `isSwitchable()`.
+- A screen's, a button's, a flow card's, the run's and the bot settings' links are written in a fixed order now:
+  one Studio writes again after an edit may reorder its links once (`.from(…)` goes last, `.panelOf(…)` after
+  `.loads(…)`; a card's `.described(…)` and `.on(…)` come before `.goesHome()`; the run's `.notes(…)` before
+  `.home(…)`; the settings' `.maxRetryAttempts(…)` first and the others by name). What it does is unchanged.
 
 ## [1.9.1] — 2026-11-01
 

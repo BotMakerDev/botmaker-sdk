@@ -38,24 +38,17 @@ public final class SettingsTypes implements TypeHolder {
     }
 
     /**
-     * {@code BotSettings.defaults()} and its links, in the order they are written. The deprecated {@code debug}
-     * is still one: the bot's Java writes it, and a value read must be written back.
+     * {@code BotSettings.defaults()} and its links: those marked {@code @Link} on {@code BotSettings} first
+     * ({@code .maxRetryAttempts(…)}, then the others by name), then these, which read a part another way — a
+     * negative flag, a nested part, or a flag whose reader is not {@code isX()}. The deprecated {@code debug} is
+     * still one: the bot's Java writes it, and a value read must be written back.
      */
     @SuppressWarnings("deprecation")
     public static final DeclaredCall<BotSettings> SETTINGS = ComponentType.part(BotSettings.class)
             .writtenAs(BotSettings::defaults)
-            .with(BotSettings::foundDelay, BotSettings::foundDelay)
-            .with(BotSettings::notFoundDelay, BotSettings::notFoundDelay)
             .flag(BotSettings::centredClicks, settings -> !settings.randomizeClicks())
-            .with(BotSettings::confidence, BotSettings::confidence)
-            .with(BotSettings::compareMargin, BotSettings::compareMargin)
-            .with(BotSettings::maxRounds, BotSettings::maxRounds)
-            .with(BotSettings::patience, BotSettings::patience)
-            .with(BotSettings::frozenAfter, BotSettings::frozenAfter)
-            .with(BotSettings::where, BotSettings::where)
             .flag(BotSettings::takesOver, BotSettings::takeOver)
             .with(BotSettings::displayBackend, settings -> settings.runIn().displayBackend())
             .with(BotSettings::inputBackend, settings -> settings.runIn().inputBackend())
-            .with(BotSettings::maxRetryAttempts, BotSettings::maxRetryAttempts)
             .flag(BotSettings::debugOff, settings -> !settings.debug());
 }

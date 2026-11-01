@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.Diag;
@@ -421,10 +422,12 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     // --- one setting changed: a copy ---
 
+    @Link
     public BotSettings foundDelay(int milliseconds) {
         return withClicks(new Clicks(milliseconds, clicks.notFoundDelay, clicks.randomize));
     }
 
+    @Link
     public BotSettings notFoundDelay(int milliseconds) {
         return withClicks(new Clicks(clicks.foundDelay, milliseconds, clicks.randomize));
     }
@@ -433,27 +436,33 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
         return withClicks(new Clicks(clicks.foundDelay, clicks.notFoundDelay, randomize));
     }
 
+    @Link
     public BotSettings confidence(double confidence) {
         return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), loops, runIn, maxRetryAttempts,
                 debug);
     }
 
+    @Link
     public BotSettings compareMargin(double margin) {
         return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, maxRetryAttempts, debug);
     }
 
+    @Link
     public BotSettings maxRounds(int rounds) {
         return withLoops(new Loops(rounds, loops.patience, loops.frozenAfter));
     }
 
+    @Link
     public BotSettings patience(int milliseconds) {
         return withLoops(new Loops(loops.maxRounds, milliseconds, loops.frozenAfter));
     }
 
+    @Link
     public BotSettings frozenAfter(int milliseconds) {
         return withLoops(new Loops(loops.maxRounds, loops.patience, milliseconds));
     }
 
+    @Link
     public BotSettings maxRetryAttempts(int attempts) {
         return new BotSettings(clicks, vision, loops, runIn, attempts, debug);
     }
@@ -472,6 +481,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     /** The game runs {@code where}. */
+    @Link
     public BotSettings where(Where where) {
         return withRunIn(new RunIn(where, runIn.takeOver, runIn.displayBackend, runIn.inputBackend));
     }

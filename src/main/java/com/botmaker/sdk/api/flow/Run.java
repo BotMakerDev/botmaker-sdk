@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.value.Link;
+
 /**
  * What a run of the bot does around its flows: how the game gets back to a known screen, and how it is made ready
  * for the bot (2026-10-11).
@@ -54,6 +56,7 @@ public record Run(Runnable home, Runnable setup, String notes) {
      * This run, with {@code notes} on the game as a whole: what holds across its screens (hotkeys, currencies, what
      * never to press). A screen's own notes are in its {@code Setup}. Blank for none.
      */
+    @Link
     public Run notes(String notes) {
         return new Run(home, setup, notes);
     }

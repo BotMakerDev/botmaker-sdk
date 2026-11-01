@@ -92,10 +92,10 @@ public final class ActivityDraft {
      * {@code exits} are its enum's outcomes ({@link Board#exitsOf}).
      */
     public static ActivityDraft of(Flow.Step step, List<String> exits, double x, double y) {
-        ActivityDraft draft = new ActivityDraft(step.label(), step.description(), step.enabled(), exits,
+        ActivityDraft draft = new ActivityDraft(step.label(), step.described(), step.enabled(), exits,
                 step.goHome(), x, y, FlowTypes.sourceOf(step.body()));
         draft.runnerSwitch.set(step.runnerSwitch());
-        draft.screen = step.screen();
+        draft.screen = step.on();
         return draft;
     }
 

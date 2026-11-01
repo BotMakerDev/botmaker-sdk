@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.flow;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.flow.BotConstants;
@@ -227,22 +228,44 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
      *
      * @param node        which card this is: an {@link Activity}, or a {@link Sub}
      * @param body        the work, as a method reference — {@code Collect::body}; null for a sub-flow
-     * @param description one line, shown on the canvas and nowhere else
+     * @param described   one line, shown on the canvas and nowhere else ({@link #described(String)})
      * @param enabled     whether it runs; a disabled card takes its off-wire rather than its work
      * @param goHome      whether the bot's {@link Run#home} runs before this card
      * @param runnerSwitch whether the person running the bot may switch it off (or back on) for their machine,
      *                    without opening the project ({@link #switchable()})
      * @param whenOff     where the run goes when this card is switched off or has no body yet;
      *                    {@link Activity#NONE} ends the run there
-     * @param screen      the screen of the map this activity works on ({@link #on}), or null for none said
+     * @param on          the screen of the map this activity works on ({@link #on(Screen)}), or null for none said
      */
-    public record Step(Node node, ActivityBody<?> body, String description, boolean enabled,
-                       boolean goHome, boolean runnerSwitch, Node whenOff, Screen screen) {
+    public record Step(Node node, ActivityBody<?> body, String described, boolean enabled,
+                       boolean goHome, boolean runnerSwitch, Node whenOff, Screen on) {
 
         public Step {
             node = node == null ? Activity.NONE : node;
-            description = description == null ? "" : description;
+            described = described == null ? "" : described;
             whenOff = whenOff == null ? Activity.NONE : whenOff;
+        }
+
+        /** Was {@link #described()}, named as its link {@link #described(String)} is. */
+        @Deprecated(forRemoval = true)
+        public String description() {
+            return described;
+        }
+
+        /** Was {@link #on()}, named as its link {@link #on(Screen)} is. */
+        @Deprecated(forRemoval = true)
+        public Screen screen() {
+            return on;
+        }
+
+        /** Whether it is switched off ({@link #off()}): the run takes its off-wire rather than its work. */
+        public boolean isOff() {
+            return !enabled;
+        }
+
+        /** Whether the person running the bot may switch it off or back on ({@link #switchable()}). */
+        public boolean isSwitchable() {
+            return runnerSwitch;
         }
 
         /** A step that names no screen. */
@@ -257,26 +280,29 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
         }
 
         /** This step with {@code description}, the one line the canvas shows. */
+        @Link
         public Step described(String description) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff, screen);
+            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff, on);
         }
 
         /** This step switched off: the run takes its off-wire rather than its work. */
+        @Link
         public Step off() {
-            return new Step(node, body, description, false, goHome, runnerSwitch, whenOff, screen);
+            return new Step(node, body, described, false, goHome, runnerSwitch, whenOff, on);
         }
 
         /** This step with the bot's {@link Run#home} run before it. */
         public Step goesHome() {
-            return new Step(node, body, description, enabled, true, runnerSwitch, whenOff, screen);
+            return new Step(node, body, described, enabled, true, runnerSwitch, whenOff, on);
         }
 
         /**
          * This step working on {@code screen} of the map — {@code .on(Screens.TAVERN)}: 🗺 lights it for this
          * activity and records into its body there, and a stuck run walks back to it before retrying.
          */
+        @Link
         public Step on(Screen screen) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, whenOff, screen);
+            return new Step(node, body, described, enabled, goHome, runnerSwitch, whenOff, screen);
         }
 
         /**
@@ -292,18 +318,19 @@ public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits
         }
 
         /** This step offered to the person running the bot, who may switch it off or back on for their machine. */
+        @Link
         public Step switchable() {
-            return new Step(node, body, description, enabled, goHome, true, whenOff, screen);
+            return new Step(node, body, described, enabled, goHome, true, whenOff, on);
         }
 
         /** This step going on to {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Class<? extends Outcome> to) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, Activity.of(to), screen);
+            return new Step(node, body, described, enabled, goHome, runnerSwitch, Activity.of(to), on);
         }
 
         /** This step going on to the sub-flow card {@code to} when it is switched off or has no body yet. */
         public Step whenOff(Flow to) {
-            return new Step(node, body, description, enabled, goHome, runnerSwitch, new Sub(to), screen);
+            return new Step(node, body, described, enabled, goHome, runnerSwitch, new Sub(to), on);
         }
 
         /** The card's label, which is what the canvas and the trace show. */

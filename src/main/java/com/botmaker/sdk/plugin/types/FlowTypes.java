@@ -174,7 +174,6 @@ public final class FlowTypes implements TypeHolder {
             .writtenAs(Run::of)
             .<Runnable>with(Run::home, Parts.HOME.part(FlowTypes::method))
             .<Runnable>with(Run::setup, Parts.SETUP.part(FlowTypes::method))
-            .<String>with(Run::notes, Run::notes)
             .constants(Run.NONE);
 
     /**
@@ -202,20 +201,17 @@ public final class FlowTypes implements TypeHolder {
             .when(step -> step.node() instanceof Flow.Sub);
 
     /**
-     * {@code call} with every card's links, in the order they are written: one list for both cards, so a link
-     * added to one is never missing from the other.
+     * {@code call} with the card links {@code Flow.Step} does not mark {@code @Link}: one list for both cards, so
+     * a link added to one is never missing from the other. The marked ones ({@code .described(…)}, {@code .on(…)},
+     * {@code .off()}, {@code .switchable()}) are written first.
      */
     private static DeclaredCall<Flow.Step> cardLinks(DeclaredCall<Flow.Step> call) {
         return call
-                .with(Flow.Step::described, Flow.Step::description)
-                .flag(Flow.Step::off, step -> !step.enabled())
                 .flag(Flow.Step::goesHome, Flow.Step::goHome)
                 // Read in a flow written before 2026-10-14, never written: popups are handled in every activity.
                 .flag(Flow.Step::checksPopups, step -> false)
-                .flag(Flow.Step::switchable, Flow.Step::runnerSwitch)
                 .<Class<? extends Outcome>, Activity>with(Flow.Step::whenOff, Parts.OFF, FlowTypes::whenOff)
-                .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()))
-                .with(Flow.Step::on, Flow.Step::screen);
+                .<Flow>with(Flow.Step::whenOff, step -> innerOf(step.whenOff()));
     }
 
     /** Where {@code step} goes switched off, when that is an activity: {@link Activity#NONE} for a sub-flow. */
@@ -231,8 +227,8 @@ public final class FlowTypes implements TypeHolder {
 
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */
     public static Flow.Step whenOff(Flow.Step step, Flow.Node to) {
-        return new Flow.Step(step.node(), step.body(), step.description(), step.enabled(), step.goHome(),
-                step.runnerSwitch(), to, step.screen());
+        return new Flow.Step(step.node(), step.body(), step.described(), step.enabled(), step.goHome(),
+                step.runnerSwitch(), to, step.on());
     }
 
     /** {@code Flow.edge(Outcome, Class)}: the activity it leaves is the outcome's. */
