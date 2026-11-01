@@ -27,6 +27,7 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
@@ -52,8 +53,12 @@ final class InstallRow {
     private final Button update = new Button("Update");
     private final CheckBox apkPure = new CheckBox("Download from APKPure");
     private final Button googlePlay = new Button("Get Google Play…");
-    private final HBox row;
+    private final VBox row;
     private LaunchSpec spec;
+    /** What the user calls {@link #spec}'s game: the name it was picked under, never its spec. */
+    private String name;
+    /** Whether the last readiness read found {@link #spec}'s game installed: Install stays greyed out. */
+    private boolean installed;
     private boolean busy;
 
     /** {@code onDone} runs on the JavaFX thread after an install or update, whatever it ended in. */
@@ -62,15 +67,24 @@ final class InstallRow {
         this.report = report;
         this.onDone = onDone;
         state.setWrapText(true);
-        HBox.setHgrow(state, Priority.ALWAYS);
         install.setOnAction(e -> run("Installing", GameInstall::install));
         update.setOnAction(e -> run("Updating", GameInstall::update));
         apkPure.setTooltip(new Tooltip("When the emulator has no Google Play, BotMaker downloads the game from APKPure "
                 + "with apkeep"));
         apkPure.setOnAction(e -> apkPureChanged());
         googlePlay.setOnAction(e -> showGooglePlay());
-        row = new HBox(8, state, apkPure, googlePlay, install, update);
-        row.setAlignment(Pos.CENTER_LEFT);
+        // The state on a line of its own: beside four controls it left them too little, cut at 760 px (2026-11-01).
+        HBox controls = new HBox(8, apkPure, googlePlay, install, update);
+        controls.setAlignment(Pos.CENTER_LEFT);
+        for (Node control : controls.getChildren()) {
+            if (control instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
+        }
+        row = new VBox(4, state, controls);
+    }
+
+    /** {@code message} with {@code target}'s spec said as {@code game}, its name: shared's messages name the spec. */
+    private static String named(LaunchSpec target, String game, String message) {
+        return message == null || game == null ? message : message.replace(target.describe(), game);
     }
 
     Node node() {
@@ -90,29 +104,38 @@ final class InstallRow {
             own.setManaged(android);
         }
         apkPure.setSelected(ApkDownload.acknowledged());
+        installed = false;
+        install.setDisable(busy);
+        name = GameButton.nameOf(services, target);
+        String game = name;
         LaunchSpec asked = spec;
-        state.setText("Checking " + spec.describe() + "…");
+        state.setText("Checking " + game + "…");
         Async.load("game-install-readiness", () -> GameReadiness.of(asked), readiness -> {
             if (asked != spec) return;
-            state.setText(readiness.state() == GameReadiness.State.READY ? "Installed."
+            installed = readiness.state() == GameReadiness.State.READY;
+            install.setDisable(busy || installed);
+            state.setText(installed ? game + " is installed."
                     : readiness.state() == GameReadiness.State.UNKNOWN ? "From " + GameInstall.of(asked,
                     apkPure.isSelected()).source() + "."
-                    : readiness.reason());
+                    : named(asked, game, readiness.reason()));
         }, why -> state.setText(""));
     }
 
     private void run(String doing, BiFunction<GameInstall, Consumer<String>, GameInstall.Result> work) {
         if (spec == null || busy) return;
         LaunchSpec target = spec;
+        // Its name now: the dialog may show another game before this one is done.
+        String called = name;
         GameInstall game = GameInstall.of(target, ApkDownload.acknowledged());
         busy(true);
-        report.say(true, doing + " " + target.describe() + " from " + game.source() + "…");
-        Async.load("game-install", () -> work.apply(game, line -> Platform.runLater(() -> report.say(true, line))),
+        report.say(true, doing + " " + called + " from " + game.source() + "…");
+        Async.load("game-install", () -> work.apply(game, line -> Platform.runLater(() -> report.say(true,
+                        named(target, called, line)))),
                 result -> {
                     busy(false);
                     boolean ok = result.outcome() != GameInstall.Outcome.FAILED
                             && result.outcome() != GameInstall.Outcome.NO_STORE;
-                    report.say(ok, result.message());
+                    report.say(ok, named(target, called, result.message()));
                     onDone.run();
                 }, why -> {
                     busy(false);
@@ -122,7 +145,7 @@ final class InstallRow {
 
     private void busy(boolean on) {
         busy = on;
-        install.setDisable(on);
+        install.setDisable(on || installed);
         update.setDisable(on);
     }
 

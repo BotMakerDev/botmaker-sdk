@@ -4,9 +4,12 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.emulator.SystemDialogs;
 import com.botmaker.sdk.internal.observe.BotObserver;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
+
+import java.util.Optional;
 
 /**
  * Detects when a bot is <em>stuck</em> — no progress across many consecutive vision checks — and throws
@@ -52,6 +55,9 @@ public final class Watchdog {
     /** Start watching (idempotent). Registers the counting observer. */
     public static synchronized void enable() {
         if (!enabled) {
+            // A run starts owing no restart: one an earlier run in this JVM left is not this run's.
+            SystemDialogs.clear();
+            restartNext = false;
             Bots.addObserver(COUNTER);
             enabled = true;
             Debug.log("enabled");
@@ -78,6 +84,13 @@ public final class Watchdog {
      * counter when it throws so recovery starts from a clean slate. Safe to call when disabled (never throws).
      */
     public static void checkpoint() {
+        Optional<String> dialog = SystemDialogs.takeRestart();
+        if (dialog.isPresent()) {
+            progress();
+            restartNext = true;
+            Debug.error(dialog.get());
+            throw new BotStuckException(dialog.get());
+        }
         State s = STATE.get();
         if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
             int repeats = s.repeats;
@@ -87,6 +100,19 @@ public final class Watchdog {
             throw new BotStuckException("Bot appears stuck: no progress for " + repeats
                     + " consecutive checks (repeating " + sig + ")");
         }
+    }
+
+    /**
+     * Whether the recovery must restart the game rather than walk home, once: Android said it crashed or stopped
+     * answering ({@link SystemDialogs}), and no screen of it is there to walk.
+     */
+    private static volatile boolean restartNext;
+
+    /** {@link #restartNext}, cleared. */
+    public static boolean takeRestartNext() {
+        boolean owed = restartNext;
+        restartNext = false;
+        return owed;
     }
 
     /** Signal that the bot advanced; clears the no-progress counter. */

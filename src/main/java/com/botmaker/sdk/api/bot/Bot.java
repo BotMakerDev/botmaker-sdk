@@ -18,6 +18,8 @@ import com.botmaker.sdk.internal.flow.FlowTree;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.flow.SkippedActivities;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -292,6 +294,11 @@ public class Bot {
         }
         // The game is up: a window of another size than the pictures were cut at is resized, else the trace says.
         BotScreen.fit(Source.current());
+        // An emulator's other apps are kept off it: no notification covers the game, and it asks no permission.
+        if (Source.current() instanceof EmulatorSource emulator
+                && Target.current() instanceof LaunchTarget.EmulatorApp app) {
+            emulator.quiet(app.packageName());
+        }
     }
 
     /**
@@ -377,12 +384,20 @@ public class Bot {
     static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         observe();
         Runnable restart = () -> {
+            // Whichever path restarts it (a cold start that failed, a recovery whose goHome threw), the restart a
+            // system dialog owed is paid: left set, the next ordinary recovery would restart instead of going home.
+            Watchdog.takeRestartNext();
             Debug.log("restarting the game");
             startGame.accept(StartMode.RESTART);
         };
         Runnable recovery = () -> {
             // Each step is announced because a recovery is where a bot spends its most confusing time: without
             // these, "goHome" navigating a game that is gone and "restart" waiting on a launch are one silence.
+            if (Watchdog.takeRestartNext()) {
+                // Android said the game crashed or stopped answering: no screen of it to walk home through.
+                restart.run();
+                return;
+            }
             Debug.log("goHome");
             try {
                 goHome.run();

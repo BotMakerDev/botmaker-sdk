@@ -3,8 +3,11 @@ package com.botmaker.sdk.internal.emulator;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
+import com.botmaker.shared.emulator.QuietRun;
 import com.botmaker.shared.emulator.tree.TreeReader;
 import com.botmaker.shared.emulator.tree.TreeReaders;
 import com.botmaker.shared.emulator.tree.UiTree;
@@ -12,11 +15,15 @@ import com.botmaker.shared.emulator.tree.UiTree;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link CaptureSource} that targets an emulator <em>by instance name</em>, connecting lazily on first use —
@@ -39,11 +46,16 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
 
     private final String instanceName;
 
+    /**
+     * The tree reader of each instance, by its name, shared by every source naming it. Android grants one
+     * UiAutomation at a time, and a reader's process holds it until the reader closes: Studio builds a new source
+     * from {@code Sdk.java} for each tool call, so a reader per source left the last one holding it and the next read
+     * failed until a collection closed it (measured on Waydroid, 2026-11-01).
+     */
+    private static final Map<String, TreeLease> READERS = new ConcurrentHashMap<>();
+
     private volatile Emulator connected;
     private volatile boolean launchDispatched;
-    /** The tree reader of {@link #readerOf}'s connection; guarded by this. */
-    private TreeReader reader;
-    private Emulator readerOf;
 
     public EmulatorSource(String instanceName) {
         this.instanceName = instanceName == null ? "" : instanceName.trim();
@@ -59,7 +71,10 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
             + "carries none of the interface's annotations")
     public BufferedImage capture() {
         Emulator emu = resolve();
-        return emu == null ? null : emu.capture();
+        if (emu == null) return null;
+        // A run answers Android's own dialogs over the game; Studio's look tools never do.
+        if (Watchdog.isEnabled()) SystemDialogs.watch(emu, () -> lease().read(emu, false));
+        return emu.capture();
     }
 
     /** The emulator a capture has already connected to, or null: never connects or launches one. */
@@ -113,30 +128,90 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
     }
 
     /**
-     * The focused app's tree, read by one {@link TreeReader} per connection, which a new connection closes; the
+     * Keeps other apps off {@code packageName} for the rest of the run (the user's call, 2026-11-01): its
+     * notification permission denied for good, and Do Not Disturb on until this JVM ends, then put back as it was.
+     * Once per instance whatever the restarts; the permission again each time, which is cheap.
+     */
+    public void quiet(String packageName) {
+        Emulator emu = resolve();
+        if (emu == null) return;
+        QuietRun.denyNotifications(emu.device(), packageName);
+        // The device asked outside the map's lock: a slow ADB must not hold up another instance's entry.
+        if (QUIET.containsKey(instanceName)) return;
+        QuietRun.Was was = QuietRun.start(emu.device());
+        if (QUIET.putIfAbsent(instanceName, was) != null) return;
+        Debug.log("Do Not Disturb on " + instanceName + " while the bot runs");
+        Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> {
+            if (emu.isPresent()) QuietRun.end(emu.device(), was);
+        }));
+    }
+
+    /** Do Not Disturb as each instance had it before this run quieted it. */
+    private static final Map<String, QuietRun.Was> QUIET = new ConcurrentHashMap<>();
+
+    /**
+     * The focused app's tree, read by the instance's one {@link TreeReader}, which a new connection closes; the
      * reader's process on the device ends with this JVM. The focused package is asked while the tree is read, so the
      * read takes no longer than the slower of the two.
      */
     @Override
     @Hidden("what Screens finds a bot's Elements in; a bot names an element, never a tree")
-    public synchronized Optional<UiTree> tree() {
+    public Optional<UiTree> tree() {
         Emulator emu = resolve();
         if (emu == null) return Optional.empty();
-        if (reader == null || readerOf != emu) {
-            if (reader != null) reader.close();
-            reader = TreeReaders.open(emu.device());
-            readerOf = emu;
+        return lease().read(emu, true);
+    }
+
+    private TreeLease lease() {
+        return READERS.computeIfAbsent(instanceName, name -> new TreeLease());
+    }
+
+    /**
+     * One instance's tree reader and the connection it reads through; reads one at a time. The reader stays while its
+     * connection is up, whichever source asks: each source connects on its own, and a reader opened per connection
+     * would start the device's reader again on every tool call. Unread for {@link #IDLE}, it is closed: its process
+     * holds the device's one UiAutomation, which a bot's run, another tool or {@code uiautomator dump} then could not
+     * get while Studio stayed open (2026-11-01).
+     */
+    private static final class TreeLease {
+        private static final Duration IDLE = Duration.ofSeconds(30);
+        private static final ScheduledExecutorService CLOSER = Executors.newSingleThreadScheduledExecutor(
+                Thread.ofPlatform().daemon().name("tree-reader-idle").factory());
+
+        private TreeReader reader;
+        private Emulator of;
+        private long readAt;
+
+        /** {@code app}: only the focused app's windows; else the whole tree, Android's own dialogs and all. */
+        synchronized Optional<UiTree> read(Emulator emu, boolean app) {
+            if (reader == null || !of.isPresent()) {
+                if (reader != null) reader.close();
+                reader = TreeReaders.open(emu.device());
+                of = emu;
+            }
+            long now = System.nanoTime();
+            readAt = now;
+            CLOSER.schedule(() -> closeIfIdleSince(now), IDLE.toMillis(), TimeUnit.MILLISECONDS);
+            if (!app) return reader.read();
+            Emulator through = of;
+            try (ExecutorService both = Executors.newVirtualThreadPerTaskExecutor()) {
+                Future<Optional<String>> focused = both.submit(() -> through.device().focusedPackage());
+                Optional<UiTree> tree = reader.read();
+                Optional<String> focusedApp = focused.get();
+                return tree.map(read -> focusedApp.map(read::app).orElse(read));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Optional.empty();
+            } catch (ExecutionException e) {
+                return Optional.empty();
+            }
         }
-        try (ExecutorService both = Executors.newVirtualThreadPerTaskExecutor()) {
-            Future<Optional<String>> focused = both.submit(() -> emu.device().focusedPackage());
-            Optional<UiTree> tree = reader.read();
-            Optional<String> app = focused.get();
-            return tree.map(read -> app.map(read::app).orElse(read));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (ExecutionException e) {
-            return Optional.empty();
+
+        /** Closes the reader when no read came after the one at {@code since}; the next read opens one again. */
+        private synchronized void closeIfIdleSince(long since) {
+            if (readAt != since || reader == null) return;
+            reader.close();
+            reader = null;
         }
     }
 

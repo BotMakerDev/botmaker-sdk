@@ -43,7 +43,7 @@ public final class ElementRows {
 
         /** How the list shows it: {@code Button "Battery"}, {@code Scrolling list}. */
         public String said() {
-            return kind.displayName() + (words.isEmpty() ? "" : " \"" + words + "\"");
+            return kind.displayName() + (words.isEmpty() ? "" : " \"" + shortened(words) + "\"");
         }
 
         /** Whether a click on it presses something: what a click on the frame walks up to. */
@@ -115,15 +115,37 @@ public final class ElementRows {
     }
 
     static String clues(Element element) {
+        return clues(element, null);
+    }
+
+    /**
+     * {@link #clues(Element)} for a row already showing {@code words}: a clue of the same words is not said again (a
+     * consent page's paragraph was listed twice in full, 2026-11-01).
+     */
+    static String clues(Element element, String words) {
         List<String> clues = new ArrayList<>();
         if (element.id() != null) clues.add("its id");
-        if (element.label() != null) clues.add("its label \"" + element.label().text() + "\"");
-        if (element.text() != null) clues.add("its text \"" + element.text().text() + "\"");
-        if (element.holding() != null) clues.add("the text \"" + element.holding().text() + "\" in it");
+        if (element.label() != null) clues.add("its label" + quoted(element.label(), words));
+        if (element.text() != null) clues.add("its text" + quoted(element.text(), words));
+        if (element.holding() != null) clues.add("the text" + quoted(element.holding(), words) + " in it");
         if (element.inside() != null) clues.add("inside " + anchor(element.inside()));
         if (element.below() != null) clues.add("below " + anchor(element.below()));
         if (element.index() != null) clues.add("number " + (element.index() + 1) + " of those");
         return String.join(", ", clues);
+    }
+
+    /** {@code " \"words\""}, shortened, or nothing when they are the row's own {@code shown} words. */
+    private static String quoted(Words clue, String shown) {
+        return clue.text().equals(shown) ? "" : " \"" + shortened(clue.text()) + "\"";
+    }
+
+    /** The most of a text a row says: past it, the text is cut and ends in {@code …}. */
+    static final int SHOWN = 80;
+
+    /** {@code text} on one line, its spaces collapsed, cut at {@value #SHOWN} characters. */
+    static String shortened(String text) {
+        String line = text.strip().replaceAll("\\s+", " ");
+        return line.length() <= SHOWN ? line : line.substring(0, SHOWN).stripTrailing() + "…";
     }
 
     private static String anchor(Element element) {

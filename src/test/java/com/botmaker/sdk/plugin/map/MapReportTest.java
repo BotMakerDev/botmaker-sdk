@@ -2,6 +2,9 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Beside;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
@@ -36,6 +39,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MapReportTest {
 
     /** Home opens Tavern, which opens Market; Reward is a popup closed by a button written inline. */
+    /**
+     * An app's screen told by its tree: its element marker is said, and its element button's shot, kept beside
+     * Elements, is no picture missing from Pictures (Sword x Staff's consent page, 2026-11-01).
+     */
+    @Test
+    void anAppsElementsAreItsMarkerAndNoMissingPicture() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("CONSENT", screen(Setup.named("Consent").elements(List.of(Element.byLabel(
+                Words.of("User Agreement")))).start(), Button.of(Element.byText(Words.of("Confirm"))
+                .shot("elements/confirm.png"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        String text = MapReport.text(graph, Map.of(), id -> false, id -> false, id -> false, "CONSENT");
+        assertTrue(text.contains("marker element \"User Agreement\""), text);
+        assertEquals(List.of(), MapReport.problems(graph, id -> false, id -> false, "CONSENT"));
+    }
+
     private static Map<String, MapScreen> screens() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("tavern"),

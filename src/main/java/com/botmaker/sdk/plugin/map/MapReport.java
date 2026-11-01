@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -174,7 +175,7 @@ public final class MapReport {
         out.append(indent).append(card.name()).append(" [").append(constant).append("] ")
                 .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
                 .append('\n');
-        out.append(indent).append("  ").append(markers(screen.markers(), screen.absent()))
+        out.append(indent).append("  ").append(markers(screen.markers(), screen.absent(), screen.elements()))
                 .append(screen.texts().isEmpty() ? "" : " · reads " + String.join(" + ",
                         screen.texts().stream().map(Caption::said).toList()))
                 .append(" · back ").append(graph.backOf(constant).filter(b -> b.via() != null)
@@ -273,9 +274,16 @@ public final class MapReport {
 
     /** What tells a screen or a look: {@code markers shop_title + shop_tab, not close_x}, or {@code marker none}. */
     static String markers(List<ImageTemplate> markers, List<ImageTemplate> absent) {
-        if (markers.isEmpty()) return "marker none";
-        String shown = String.join(" + ", markers.stream().map(ImageTemplate::id).toList());
-        return (markers.size() == 1 ? "marker " : "markers ") + shown
+        return markers(markers, absent, List.of());
+    }
+
+    /** {@link #markers(List, List)}, with the app's elements that tell it too: {@code marker element "Battery"}. */
+    static String markers(List<ImageTemplate> markers, List<ImageTemplate> absent, List<Element> elements) {
+        if (markers.isEmpty() && elements.isEmpty()) return "marker none";
+        List<String> told = new ArrayList<>(markers.stream().map(ImageTemplate::id).toList());
+        elements.forEach(element -> told.add("element " + element.shown()));
+        String shown = String.join(" + ", told);
+        return (told.size() == 1 ? "marker " : "markers ") + shown
                 + (absent.isEmpty() ? "" : ", not " + String.join(", ", absent.stream().map(ImageTemplate::id).toList()));
     }
 
@@ -324,7 +332,10 @@ public final class MapReport {
                         + tree.members().getFirst().id() + ", so a run cannot bring " + (unplaced.size() == 1 ? "it"
                         : "them") + " into view: link them, then try_input scroll over a node.");
             });
+            // An element's shot is only drawn on 🗺 Screens: it lives beside Elements, never in Pictures.
             Set<String> told = new HashSet<>();
+            screen.inputs().values().stream().filter(i -> i instanceof Button b && b.isElement())
+                    .forEach(i -> told.addAll(ScreenGraph.pictureIds(i)));
             for (String id : graph.pictures(c)) {
                 if (!told.add(id)) continue;
                 if (!named.test(id)) {

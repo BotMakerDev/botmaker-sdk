@@ -101,7 +101,9 @@ final class ElementTools {
      */
     static Chosen chosen(List<Row> rows, String words, String kind, String as) {
         String typed = words.strip();
-        List<Row> worded = rows.stream().filter(r -> r.words().strip().equalsIgnoreCase(typed)).toList();
+        // Its words as the tree holds them, or as list_elements said them, shortened.
+        List<Row> worded = rows.stream().filter(r -> r.words().strip().equalsIgnoreCase(typed)
+                || ElementRows.shortened(r.words()).equalsIgnoreCase(typed)).toList();
         // With no kind, an input wins over a text or a list of the same words (a list says its first row's): kind
         // names the others.
         List<Row> inputs = worded.stream().filter(Row::tappable).toList();
@@ -116,8 +118,10 @@ final class ElementTools {
                     + kind.strip()) + " in the app's tree." + (near.isEmpty() ? " list_elements gives what it holds."
                     : " Close: " + said(near) + ".") + " Nothing was saved.");
         }
-        boolean copies = matching.size() > 1 && matching.stream().allMatch(r -> r.named().repeated()
-                && r.kind() == matching.getFirst().kind());
+        // Rows that name one element are one input whatever the tree holds twice (a popup's title in its window and
+        // in the window's own node, Android's permission dialog, Waydroid 2026-11-01): list_elements says them once.
+        boolean copies = matching.size() > 1 && matching.stream().allMatch(r -> r.kind() == matching.getFirst().kind()
+                && (r.named().repeated() || r.named().element().equals(matching.getFirst().named().element())));
         if (matching.size() > 1 && !copies) {
             return new Chosen(null, "\"" + typed + "\" is " + matching.size() + " rows: " + said(matching)
                     + ". Give kind to pick one. Nothing was saved.");
@@ -140,7 +144,7 @@ final class ElementTools {
         List<String> lines = new ArrayList<>();
         for (Row row : rows) {
             StringBuilder line = new StringBuilder("- ").append(row.said()).append(": by ")
-                    .append(ElementRows.clues(row.named().element()));
+                    .append(ElementRows.clues(row.named().element(), row.words()));
             if (row.named().repeated()) line.append("; one of a list's copies, saved repeated");
             if (row.named().byIndex()) line.append("; told apart by its place only");
             line.append("; as ").append(As.offered(row).stream().map(a -> a.name().toLowerCase(Locale.ROOT))

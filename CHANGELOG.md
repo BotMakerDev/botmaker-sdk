@@ -19,6 +19,26 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run answers Android's own dialogs on an emulator, with nothing mapped by the bot.**
+  - "isn't responding" gets Wait. If it shows 3 times, or for a minute, the game is restarted.
+  - "keeps stopping" gets Close app, and the game is restarted at once.
+  - A permission the game asks gets Don't allow.
+  - Another app's dialog is closed and never restarts the game.
+  - Each answer is written to the trace.
+- **A run on an emulator keeps other apps off the game.** Do Not Disturb is on while the bot runs and is put back
+  as it was when the run ends. The game's notification permission is denied for good, so the game never asks.
+- **The app's tree is read reliably on an emulator.**
+  - One reader per instance is shared by every tool call. A reader per call kept Android's only UiAutomation, and
+    the next read failed.
+  - The reader closes after 30 s unused, so a run or another tool can read the tree while Studio stays open.
+- **`list_elements` keeps rows short.** A long text is shown on one line, cut at 80 characters, and not repeated
+  in its clue. `save_element` accepts the words as listed.
+- **`save_element` takes a row the tree holds twice**, such as a permission dialog's title. Before, it refused and
+  asked for a kind that could not tell the two rows apart.
+- **`read_map` shows an app screen's element marker** (`marker element "User Agreement"`). An element button's
+  shot is no longer reported as a picture written inline with no file.
+- **The Game dialog's install line** names the game, not its target spec. It sits above its buttons, so their
+  labels are no longer cut, and Install is greyed out once the game is installed.
 - **Install and update the game from the Game dialog.** Under the picked game, a line says whether it is installed,
   with **Install** and **Update** through its launcher (Steam, Lutris, Heroic, or an Android emulator). An Android
   game comes from BotMaker's APK library, Google Play, APKPure (once you tick **Download from APKPure** and accept

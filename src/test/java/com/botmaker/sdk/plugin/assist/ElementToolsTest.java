@@ -7,7 +7,9 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.plugin.assist.ElementRows.Row;
 import com.botmaker.sdk.plugin.assist.ElementSaves.As;
+import com.botmaker.shared.emulator.tree.UiTree;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,7 +28,7 @@ class ElementToolsTest {
     @Test
     void listElementsHidesIdsAndBounds() {
         String listed = ElementTools.listed(ElementRows.of(SETTINGS));
-        assertTrue(listed.contains("- Button \"Battery\": by its id, its text \"Battery\"; as button or marker"),
+        assertTrue(listed.contains("- Button \"Battery\": by its id, its text; as button or marker"),
                 listed);
         for (String never : List.of("title", "108", "306", "TextView", "com.example", "android:")) {
             assertFalse(listed.contains(never), listed + " holds " + never);
@@ -55,6 +57,32 @@ class ElementToolsTest {
         assertTrue(copy.pick().row().named().repeated());
         assertEquals(ElementKind.LIST, ElementTools.chosen(ElementRows.of(DOWNLOADS), "Remove", "Scrolling list", null)
                 .pick().row().kind(), "kind names the list that says its first row's words");
+    }
+
+    /** Two rows naming one element are one input: Android's permission dialog held its title twice (2026-11-01). */
+    @Test
+    void rowsOfOneElementAreOneInput() {
+        Row battery = ElementTools.chosen(ElementRows.of(SETTINGS), "Battery", null, null).pick().row();
+        ElementTools.Chosen chosen = ElementTools.chosen(List.of(battery, battery), "Battery", null, null);
+        assertNull(chosen.refusal());
+        assertFalse(chosen.pick().row().named().repeated(), "one element, not a list's copies");
+    }
+
+    /** A paragraph is said once, on one line and cut; save_element takes it as said. */
+    @Test
+    void aLongTextIsSaidOnceAndShort() {
+        String paragraph = "Please ensure you read and agree to the following agreements and data permission\n"
+                + "statement, then tap \"Agree and Continue\" to proceed with the game.";
+        UiTree tree = UiTree.parse("<hierarchy rotation=\"0\"><node index=\"0\" text=\"" + paragraph.replace("\"",
+                "&quot;") + "\" resource-id=\"\" class=\"android.widget.TextView\" package=\"com.example.game\" "
+                + "content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"false\" enabled=\"true\" "
+                + "focusable=\"false\" focused=\"false\" scrollable=\"false\" long-clickable=\"false\" "
+                + "password=\"false\" selected=\"false\" bounds=\"[0,0][1000,200]\" /></hierarchy>");
+        String listed = ElementTools.listed(ElementRows.of(tree));
+        String shown = ElementRows.shortened(paragraph);
+        assertTrue(shown.endsWith("…") && shown.length() == ElementRows.SHOWN + 1 && !shown.contains("\n"), shown);
+        assertEquals(1, listed.split("Please ensure", -1).length - 1, listed);
+        assertNull(ElementTools.chosen(ElementRows.of(tree), shown, null, null).refusal());
     }
 
     @Test
