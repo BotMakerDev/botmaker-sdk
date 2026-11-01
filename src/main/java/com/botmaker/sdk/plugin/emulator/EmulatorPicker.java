@@ -105,6 +105,8 @@ public final class EmulatorPicker {
      * reach, only the services it was handed.
      */
     private static StudioServices host;
+    /** How the diagnostics window's Fix starts Waydroid, kept with {@link #host}. */
+    private static ChecksRow.Starter hostStarter;
 
     /**
      * The start/stop polls of the showing on screen, interrupted when it closes. A poll can wait out an
@@ -113,8 +115,9 @@ public final class EmulatorPicker {
     private static final Set<Thread> POLLS = ConcurrentHashMap.newKeySet();
 
     /** Shows the picker; resolves to the chosen instance (and optional app), or empty if cancelled. */
-    public static Optional<Selection> show(StudioServices services, Window owner) {
+    public static Optional<Selection> show(StudioServices services, Window owner, ChecksRow.Starter starter) {
         host = services;
+        hostStarter = starter;
         Dialog<Selection> dialog = new Dialog<>();
         dialog.setOnHidden(e -> {
             POLLS.forEach(Thread::interrupt);
@@ -268,7 +271,7 @@ public final class EmulatorPicker {
             // button consumes the click so it doesn't also pick the instance.
             Button diagnose = new Button("Diagnose…");
             diagnose.getStyleClass().add("emulator-picker-state");
-            diagnose.setOnAction(e -> WaydroidReport.show(host, windowOf(dialog)));
+            diagnose.setOnAction(e -> WaydroidReport.show(host, windowOf(dialog), hostStarter));
             // The row itself is the "pick this instance" click target, so the button has to swallow the click
             // that reaches it — otherwise asking why Waydroid is broken would also select it and close.
             diagnose.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
@@ -416,7 +419,7 @@ public final class EmulatorPicker {
                     return;
                 }
                 if (!settled && start && instance.platformId() == PlatformId.WAYDROID) {
-                    WaydroidReport.show(host, windowOf(dialog));
+                    WaydroidReport.show(host, windowOf(dialog), hostStarter);
                 }
                 probeAndLoad(instance, ui, dialog);
             });
@@ -608,7 +611,7 @@ public final class EmulatorPicker {
                 .anyMatch(s -> s.platformId() == PlatformId.WAYDROID && s.installed());
         if (waydroidInstalled) {
             Button diagnose = new Button("Diagnose Waydroid…");
-            diagnose.setOnAction(e -> WaydroidReport.show(host, windowOf(dialog)));
+            diagnose.setOnAction(e -> WaydroidReport.show(host, windowOf(dialog), hostStarter));
             box.getChildren().add(diagnose);
         }
         return box;

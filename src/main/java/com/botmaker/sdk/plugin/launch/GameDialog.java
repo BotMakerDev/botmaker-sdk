@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.ChecksRow;
 import com.botmaker.sdk.plugin.emulator.EmulatorPicker;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorAppCache;
@@ -106,6 +107,8 @@ public final class GameDialog {
     private final Button launch;
     /** The current target's readiness, Install and Update. */
     private final InstallRow installRow;
+    /** The current target's emulator: what is wrong with it, and Fix. */
+    private final ChecksRow checksRow;
     private Stage stage;
 
     /** One tile, kept for the search and for marking the current target. */
@@ -125,6 +128,7 @@ public final class GameDialog {
             rescan();
             refreshCurrent();
         });
+        this.checksRow = new ChecksRow(services, QuickLaunch::startAndWait);
     }
 
     /** The toolbar's press. */
@@ -177,7 +181,7 @@ public final class GameDialog {
         HBox currentRow = new HBox(8, current, spacer, launch);
         currentRow.setAlignment(Pos.CENTER_LEFT);
         // Picking for an editor: the bot's games are not what is being chosen, and a ✕ would write them.
-        for (Node own : List.of(currentRow, installRow.node(), supported)) {
+        for (Node own : List.of(currentRow, installRow.node(), checksRow.node(), supported)) {
             own.setVisible(picked == null);
             own.setManaged(picked == null);
         }
@@ -239,7 +243,7 @@ public final class GameDialog {
         HBox closeRow = new HBox(close);
         closeRow.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox root = new VBox(10, heading, hint, currentRow, installRow.node(), supported, search, filters, scroll, bottom, status,
+        VBox root = new VBox(10, heading, hint, currentRow, installRow.node(), checksRow.node(), supported, search, filters, scroll, bottom, status,
                 closeRow);
         root.setPadding(new Insets(16));
         stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 760, 640, 520, 420), root);
@@ -411,7 +415,7 @@ public final class GameDialog {
         Button other = Styles.on(new Button(), Styles.TILE);
         other.setGraphic(cover("Other emulator or phone…", null, "+", null));
         fixSize(other);
-        other.setOnAction(e -> EmulatorPicker.show(services, stage).ifPresent(chosen -> {
+        other.setOnAction(e -> EmulatorPicker.show(services, stage, QuickLaunch::startAndWait).ifPresent(chosen -> {
             if (!chosen.hasApp()) {
                 report(false, "Pick an app inside " + chosen.instance().name() + ", not only the device.");
                 return;
@@ -526,6 +530,7 @@ public final class GameDialog {
         if (picked == null) {
             refreshSupported(spec);
             installRow.show(spec);
+            checksRow.show(spec);
         }
     }
 

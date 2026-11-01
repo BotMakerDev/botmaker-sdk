@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Emulator checks in the Game dialog and the Waydroid diagnostics window** (`ChecksRow`): each check's mark and what
+  was found, Fix on a failure BotMaker repairs (with its progress, and Cancel until the system is being changed), Undo
+  while a translator backup is left, and the commands to copy otherwise. Nothing runs until a button is pressed.
 - **A run answers Android's own dialogs on an emulator, with nothing mapped by the bot.**
   - "isn't responding" gets Wait. If it shows 3 times, or for a minute, the game is restarted.
   - "keeps stopping" gets Close app, and the game is restarted at once.

@@ -28,6 +28,10 @@ import javafx.stage.Window;
 
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -295,6 +299,39 @@ public final class QuickLaunch {
         ReadinessPrompt.clearThen(services, Modals.owner(services), spec, (ok, line) -> { },
                 () -> HostLauncherPrompt.clearThen(services, Modals.owner(services), spec,
                         () -> startPrivately(spec, services, backend, done), done), done);
+    }
+
+    /**
+     * Starts {@code spec} where ▶ Launch game would, and waits: a Fix's step that needs Waydroid up. Null when it
+     * started, else why not. Off the FX thread.
+     */
+    public static String startAndWait(LaunchSpec spec, StudioServices services, Consumer<String> words) {
+        CompletableFuture<String> ended = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            try {
+                BotSettings settings = BotSettingsWindow.current(services);
+                if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
+                    words.accept("Starting it in a private display");
+                    launchPrivately(spec, services, (ok, why) -> ended.complete(ok ? null : why));
+                    return;
+                }
+                Async.load("fix-start", () -> {
+                    Launcher.start(spec, words);
+                    return "";
+                }, done -> ended.complete(null), ended::complete);
+            } catch (RuntimeException e) {
+                // Thrown here it would reach only the FX thread's handler, and the Fix would wait out the ten minutes.
+                ended.complete("Couldn't start it: " + e);
+            }
+        });
+        try {
+            return ended.get(10, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "Stopped while starting it.";
+        } catch (ExecutionException | TimeoutException e) {
+            return "It did not come up in ten minutes.";
+        }
     }
 
     private static void startPrivately(LaunchSpec spec, StudioServices services, SessionBackend backend,

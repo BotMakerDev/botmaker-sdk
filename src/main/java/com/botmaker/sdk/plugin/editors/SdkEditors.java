@@ -6,6 +6,7 @@ import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.api.flow.ActivityClass;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
+import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.map.ScreenConstantView;
 
 import java.awt.Color;
@@ -44,7 +45,7 @@ public final class SdkEditors implements EditorHolder {
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
             SlotEditor.when(SettingHints::claims).draw(() -> SettingsEditors::setting),
-            SlotEditor.onParameter(EmulatorName.class).draw(() -> EmulatorEditors::instanceName),
+            SlotEditor.onParameter(EmulatorName.class).draw(() -> ctx -> EmulatorEditors.instanceName(ctx, QuickLaunch::startAndWait)),
             // An activity is its enum's class literal, which no type of this plugin's can claim: a Class.
             SlotEditor.onParameter(ActivityClass.class).draw(() -> ActivityEditors::activity),
             // The bot's run choices, @Params Bot.runFlow reads: which flow, and the activities it skips. Only a

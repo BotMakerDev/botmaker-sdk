@@ -37,10 +37,10 @@ public final class EmulatorEditors {
      * from a name alone: the name comes out of a string literal in the user's own source, so the product
      * behind it is unknown, and a paired phone reached this editor exactly the way an emulator did.
      */
-    public static Node instanceName(ValueContext ctx) {
+    public static Node instanceName(ValueContext ctx, ChecksRow.Starter starter) {
         Button pill = Pills.button(label(ctx), null);
         pill.setOnAction(e ->
-                EmulatorPicker.show(ctx.services(), Modals.owner(ctx.services())).ifPresent(chosen -> {
+                EmulatorPicker.show(ctx.services(), Modals.owner(ctx.services()), starter).ifPresent(chosen -> {
                     // A phone by its serial, which stays when its model name appears: EmulatorInstance.reference.
                     String name = chosen.instance().reference();
                     if (name == null || name.isBlank()) return;
