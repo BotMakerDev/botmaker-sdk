@@ -2,8 +2,8 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
-import com.botmaker.shared.emulator.WaydroidDiagnostics;
-import com.botmaker.shared.emulator.WaydroidDiagnostics.Finding;
+import com.botmaker.shared.emulator.checks.CheckResult;
+import com.botmaker.shared.emulator.checks.WaydroidChecks;
 import com.botmaker.plugin.api.StudioServices;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -26,13 +26,9 @@ import java.awt.Desktop;
 import java.net.URI;
 
 /**
- * What is wrong with the local Waydroid setup, and the commands that fix it — <b>to copy, not to run</b>.
- *
- * <p>The probes are shared's {@link WaydroidDiagnostics}; this class is only their presentation. It keeps the
- * "never execute" rule of that class visible in the UI: each finding shows its commands in a read-only text
- * area with a <em>Copy</em> button and no Run button, because every one of them needs {@code sudo} and reaches
- * outside anything BotMaker owns (the host firewall, the Android system image). The user reads them, decides,
- * and runs them in their own terminal.
+ * What is wrong with the local Waydroid setup: each failed check of shared's {@link WaydroidChecks}, what fixes
+ * it, and its commands to copy. The Game dialog's Emulator checks run the fixes (2026-11-01); this window says
+ * where.
  *
  * <p>Reached two ways, per the same principle as the rest of the picker — <em>offered</em>, never forced: the
  * "Diagnose…" button on the Waydroid row, and automatically when Waydroid is installed but discovery came back
@@ -62,13 +58,14 @@ public final class WaydroidReport {
         dialog.getDialogPane().setContent(scroll);
 
         // The probes shell out (systemctl, waydroid status, ip route) — never on the FX thread.
-        Async.load("waydroid-diagnostics", WaydroidDiagnostics::run, findings -> {
+        Async.load("waydroid-diagnostics", () -> WaydroidChecks.run(null, null).stream()
+                .filter(CheckResult::failed).toList(), findings -> {
             body.getChildren().clear();
             if (findings.isEmpty()) {
                 body.getChildren().add(allClear());
                 return;
             }
-            for (Finding finding : findings) {
+            for (CheckResult finding : findings) {
                 body.getChildren().add(card(finding));
             }
         });
@@ -90,13 +87,14 @@ public final class WaydroidReport {
         return new VBox(6, title, detail);
     }
 
-    /** One finding: symptom, remedy, the commands (read-only) and a Copy button. Never a Run button. */
-    private static VBox card(Finding finding) {
-        Label symptom = new Label(finding.symptom());
+    /** One failed check: what was found, what fixes it, the commands (read-only) and a Copy button. */
+    private static VBox card(CheckResult finding) {
+        Label symptom = new Label(finding.reason());
         symptom.setWrapText(true);
         Styles.on(symptom, Styles.STRONG_TEXT);
 
-        Label remedy = new Label(finding.remedy());
+        Label remedy = new Label(finding.fixable()
+                ? finding.remedy() + " Fix is in the Game dialog's Emulator checks." : finding.remedy());
         remedy.setWrapText(true);
 
         VBox card = new VBox(6, symptom, remedy);
@@ -123,9 +121,9 @@ public final class WaydroidReport {
             HBox actions = new HBox(8, spacer, copy);
             actions.setAlignment(Pos.CENTER_RIGHT);
 
-            if (finding.docUrl() != null) {
+            if (finding.link() != null) {
                 Hyperlink docs = new Hyperlink("Upstream docs");
-                docs.setOnAction(e -> browse(finding.docUrl()));
+                docs.setOnAction(e -> browse(finding.link()));
                 actions.getChildren().add(0, docs);
             }
             card.getChildren().addAll(commands, actions);
