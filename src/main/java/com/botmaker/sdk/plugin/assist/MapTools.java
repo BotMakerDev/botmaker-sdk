@@ -174,9 +174,9 @@ final class MapTools {
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
                     .describedAs("Discovery's one way to act on a screen: does inputs cut on it (click, scroll, "
-                            + "hotkey) and records in Screens what each did: opened a new screen (owing its marker), "
+                            + "hotkey) and records what each did: opened a new screen (owing its marker), "
                             + "led to a mapped one, changed this one, or nothing. Breadth first: refused while a "
-                            + "screen owes its marker; with nothing left to try here, walks to the shallowest screen "
+                            + "screen owes its marker; with nothing left here, walks to the shallowest screen "
                             + "with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")

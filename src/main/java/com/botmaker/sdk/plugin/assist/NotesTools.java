@@ -59,20 +59,17 @@ final class NotesTools {
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_notes")
                     .describedAs("Read the bot's notes on its game: what holds across it, and each screen's notes, "
-                            + "how far it got and what it owes, kept on the bot's Screens constants. Read them before "
-                            + "exploring")
+                            + "how far it got and what it owes. Read them before exploring")
                     .takes(Section.class).handledBy(NotesTools::readNotes),
             AssistantTool.named("write_notes")
-                    .describedAs("Keep what you learnt in the bot, so the next session starts from it: a screen's "
-                            + "notes (what it spends and earns, what refills it, the badge that says it has work, "
-                            + "its unlock), how far it got (reached) and what it still owes; with no screen, what "
-                            + "holds across the game. Short lines, one fact each. The notes are replaced whole: "
-                            + "read_notes first to keep what holds")
+                    .describedAs("Keep what you learnt in the bot: a screen's notes (spends, earns, refills, work "
+                            + "badge, unlock), how far it got (reached) and what it owes; with no screen, what "
+                            + "holds across the game. Short lines, one fact each. Replaces the notes whole: "
+                            + "read_notes first")
                     .takes(Note.class).handledBy(NotesTools::writeNotes),
             AssistantTool.named("read_guide")
-                    .describedAs("The steps of the stage the bot is at, worked out from its home method "
-                            + "and its Screens (how far each screen got, what each owes), with where each screen "
-                            + "stands; or one stage's steps by its number or name. Read it before starting and "
+                    .describedAs("The steps of the bot's current stage, from its home method and Screens, with where "
+                            + "each screen stands; or one stage's by number or name. Read it before starting and "
                             + "whenever a stage's check passes")
                     .takes(Which.class).handledBy(NotesTools::readGuide));
 

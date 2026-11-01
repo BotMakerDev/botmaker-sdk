@@ -176,11 +176,11 @@ final class SetupTools {
                            String target) implements Step {
     }
 
-    @Describe("is the target's game installed, where it installs from, how the last install went")
+    @Describe("is the target's game installed, its source, how the last install went")
     record Readiness() implements Step {
     }
 
-    @Describe("install the target's game via its launcher, in the background")
+    @Describe("install the target's game in the background")
     record InstallGame(@Describe(value = "an .apk/.xapk the user named; Android only", optional = true) String file)
             implements Step {
     }
@@ -189,16 +189,27 @@ final class SetupTools {
     record UpdateGame() implements Step {
     }
 
-    record Launch(@Describe(value = "seconds to wait for the window the bot looks at to open, up to "
-            + MAX_LAUNCH_WAIT + "; 0 or left out: answer once it is launched", optional = true) Integer seconds) {
+    @Describe("the target emulator's checks: ok, and whether fix repairs it")
+    record EmulatorChecks() implements Step {
+    }
+
+    @Describe("run a failed check's fix in the background; the user may get a password window")
+    record Fix(@Describe("its id in emulator_checks") String check,
+               @Describe(value = "true: undo the last fix", optional = true) Boolean undo)
+            implements Step {
+    }
+
+    record Launch(@Describe(value = "seconds to wait for the bot's window, up to "
+            + MAX_LAUNCH_WAIT + "; left out: answer once launched", optional = true) Integer seconds) {
     }
 
     /** The longest launch_game waits: below the 60 s an MCP client commonly gives a call. */
     static final int MAX_LAUNCH_WAIT = 50;
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its settings, in "
-                    + "its Java; installs or updates its game", Step.class, SetupTools::setup),
+            ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its settings; "
+                    + "installs or updates its game; checks and fixes its emulator", Step.class,
+                    SetupTools::setup),
             AssistantTool.named("list_windows")
                     .describedAs("The windows open on the desktop now, each with its class and size, for "
                             + "setup's set_capture_source")
@@ -210,9 +221,9 @@ final class SetupTools {
                     .describedAs("The games this computer's launchers have, each with its set_launch_target target")
                     .takesNothing().handledBy(SetupTools::listGames),
             AssistantTool.named("launch_game")
-                    .describedAs("Starts the bot's launch target without running the bot: here, or in the private "
-                            + "display the settings say, which the look tools read and the next run joins; with "
-                            + "seconds, answers once the bot's window is open")
+                    .describedAs("Starts the bot's launch target without running it: here, or in the private display "
+                            + "the settings say, which the look tools read and the next run joins; with seconds, "
+                            + "answers once its window is open")
                     .takes(Launch.class).handledBy(SetupTools::launchGame));
 
     private SetupTools() {}
@@ -227,6 +238,8 @@ final class SetupTools {
             case Readiness readiness -> readiness(context);
             case InstallGame install -> install(install.file(), false, context);
             case UpdateGame update -> install(null, true, context);
+            case EmulatorChecks checks -> ChecksTools.checks(context);
+            case Fix fix -> ChecksTools.fix(fix.check(), Boolean.TRUE.equals(fix.undo()), context);
         };
     }
 
@@ -571,6 +584,9 @@ final class SetupTools {
         }
         LaunchSpec spec = LaunchSpec.parse(current);
         if (spec == null) return AgentReply.refused("\"" + current + "\" is not a launch target BotMaker reads.");
+        // Before unsafe, which calls a Waydroid it cannot discover "not set up" when the check knows why.
+        Optional<String> stopped = ChecksTools.stoppingLaunch(spec);
+        if (stopped.isPresent()) return AgentReply.refused(stopped.get());
         // The same line setup's set_launch_target draws: a command line or an executable the user set runs on their Run,
         // never because text read off a screen asked the assistant to start it now.
         String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe() + " is a command "
@@ -713,7 +729,7 @@ final class SetupTools {
             LaunchKind.HEROIC, LaunchKind.FAUGUS, LaunchKind.EMULATOR_APP);
 
     /** An Android package: dot-separated Java-like names, at least two. */
-    private static final java.util.regex.Pattern PACKAGE =
+    static final java.util.regex.Pattern PACKAGE =
             java.util.regex.Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");
 
     /**

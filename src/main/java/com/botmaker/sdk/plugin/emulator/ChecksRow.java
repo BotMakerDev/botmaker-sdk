@@ -127,8 +127,29 @@ public final class ChecksRow {
     }
 
     /** One read of what {@link #apply} shows. */
-    private record Read(LaunchSpec spec, EmulatorInstance instance, WaydroidResolution expected,
-                        List<CheckResult> results) {}
+    public record Read(LaunchSpec spec, EmulatorInstance instance, WaydroidResolution expected,
+                       List<CheckResult> results) {}
+
+    /** The checks on {@code asked}'s emulator; shells out, never on the FX thread. */
+    public static Read read(LaunchSpec asked, WaydroidResolution size) {
+        EmulatorInstance found = EmulatorInstances.find(asked.emulatorInstance()).orElse(null);
+        // A stopped Waydroid is often not discovered at all: that is a failure to show, not an emulator to skip.
+        List<CheckResult> results = found == null && isWaydroid(asked) ? WaydroidChecks.run(null, size)
+                : EmulatorChecks.run(found, size);
+        return new Read(asked, found, size, results);
+    }
+
+    /** What a Fix on {@code read}'s rows needs. */
+    public static Fixes.Context context(Read read, StudioServices services, Starter starter) {
+        return new Fixes.Context(read.instance(), read.expected(),
+                words -> starter.start(read.spec(), services, words));
+    }
+
+    /** The one runner of {@code instance}'s emulator; {@code null} is the Waydroid not discovered. */
+    public static FixRunner runnerOf(EmulatorInstance instance) {
+        boolean waydroid = instance == null || instance.platformId() == PlatformId.WAYDROID;
+        return FixRunner.of(waydroid ? WaydroidPlatform.INSTANCE_NAME : instance.identity());
+    }
 
     /** Reads the checks off the FX thread; a Fix under way keeps its row until it ends. */
     private void reload() {
@@ -136,13 +157,8 @@ public final class ChecksRow {
         LaunchSpec asked = spec;
         WaydroidResolution size = ScreenSize.read(services)
                 .map(screen -> new WaydroidResolution(screen.width(), screen.height())).orElse(null);
-        Async.load("emulator-checks", () -> {
-            EmulatorInstance found = EmulatorInstances.find(asked.emulatorInstance()).orElse(null);
-            // A stopped Waydroid is often not discovered at all: that is a failure to show, not an emulator to skip.
-            List<CheckResult> results = found == null && isWaydroid(asked) ? WaydroidChecks.run(null, size)
-                    : EmulatorChecks.run(found, size);
-            return new Read(asked, found, size, results);
-        }, this::apply, why -> said.setText("Couldn't read the checks: " + why));
+        Async.load("emulator-checks", () -> read(asked, size), this::apply,
+                why -> said.setText("Couldn't read the checks: " + why));
     }
 
     private void apply(Read read) {
@@ -166,8 +182,7 @@ public final class ChecksRow {
     }
 
     private Fixes.Context context() {
-        LaunchSpec target = spec;
-        return new Fixes.Context(instance, expected, words -> starter.start(target, services, words));
+        return context(new Read(spec, instance, expected, shown), services, starter);
     }
 
     private Node row(CheckResult result, Fixes.Context context) {
@@ -237,8 +252,7 @@ public final class ChecksRow {
     }
 
     private FixRunner runner() {
-        boolean waydroid = instance == null || instance.platformId() == PlatformId.WAYDROID;
-        return FixRunner.of(waydroid ? WaydroidPlatform.INSTANCE_NAME : instance.identity());
+        return runnerOf(instance);
     }
 
     private void run(Fix fix) {
@@ -280,7 +294,7 @@ public final class ChecksRow {
     }
 
     /** What a Fix ended in, for the line under the rows. */
-    static String ended(Fix fix, FixRunner.Progress end) {
+    public static String ended(Fix fix, FixRunner.Progress end) {
         String name = fix.check().displayName();
         if (end.outcome() != RootScript.Outcome.DONE) return name + ": " + end.outcome().displayName() + ".";
         return end.stillFailing() ? name + ": the fix ran, but the check still fails." : name + ": done.";

@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The assistant checks and fixes the emulator**: `setup`'s `emulator_checks` lists the rows the Game dialog shows and
+  `fix` runs one's fix in the background (`undo` puts the translator back); the password window still opens on the
+  user's desktop. `launch_game` refuses Waydroid missing or its container service down, naming the check and its fix.
 - **Emulator checks in the Game dialog and the Waydroid diagnostics window** (`ChecksRow`): each check's mark and what
   was found, Fix on a failure BotMaker repairs (with its progress, and Cancel until the system is being changed), Undo
   while a translator backup is left, and the commands to copy otherwise. Nothing runs until a button is pressed.
