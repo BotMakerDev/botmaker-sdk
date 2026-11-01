@@ -56,7 +56,7 @@ class InputInspectorTest {
         Button buy = MapFixtures.click("buy");
         assertEquals(Result.UNTRIED, Result.of(buy, false));
         assertEquals(Result.NOTHING, Result.of(buy.tried(), false));
-        assertEquals(Result.LEAVES, Result.of(buy.leaves(), false));
+        assertEquals(Result.LEAVES, Result.of(buy.leaving(), false));
         assertEquals(Result.OPENS, Result.of(buy, true), "a way it opens says it first");
     }
 
@@ -99,17 +99,17 @@ class InputInspectorTest {
 
     @Test
     void aTreesScrollIsADragTheWheelOrNoneAndKeepsItsTraits() {
-        Tree tree = Tree.of(List.of(Node.of(MapFixtures.picture("a")))).dragged().sometimes();
+        Tree tree = Tree.of(List.of(Node.of(MapFixtures.picture("a")))).dragged().occasional();
         assertEquals(TreeScroll.DRAG, TreeScroll.of(tree));
         Tree wheel = InputInspector.scrolled(tree, TreeScroll.WHEEL, -3);
         assertEquals(TreeScroll.WHEEL, TreeScroll.of(wheel));
-        assertEquals(-3, wheel.notches());
+        assertEquals(-3, wheel.wheel());
         assertFalse(wheel.isDragged());
-        assertTrue(wheel.comesAndGoes(), "its traits stay");
+        assertTrue(wheel.isOccasional(), "its traits stay");
         Tree fits = InputInspector.scrolled(wheel, TreeScroll.NONE, -3);
         assertEquals(TreeScroll.NONE, TreeScroll.of(fits));
         assertFalse(fits.scrolls(), "a tree that fits is still a tree, scrolled by nothing");
-        assertEquals(0, InputInspector.scrolled(tree, TreeScroll.DRAG, -3).notches(), "notches are the wheel's");
+        assertEquals(0, InputInspector.scrolled(tree, TreeScroll.DRAG, -3).wheel(), "notches are the wheel's");
     }
 
     @Test

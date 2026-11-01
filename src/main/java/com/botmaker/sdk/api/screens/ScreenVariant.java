@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.List;
@@ -37,11 +38,13 @@ public record ScreenVariant(String name, List<ImageTemplate> markers, List<Image
     }
 
     /** This look, told apart by {@code markers}: all of them show while the screen has it. */
+    @Link
     public ScreenVariant markers(List<ImageTemplate> markers) {
         return new ScreenVariant(name, markers, absent, inputs, when, shot);
     }
 
     /** This look, told apart by {@code absent}: none of them shows while the screen has it. */
+    @Link
     public ScreenVariant absent(List<ImageTemplate> absent) {
         return new ScreenVariant(name, markers, absent, inputs, when, shot);
     }
@@ -57,6 +60,7 @@ public record ScreenVariant(String name, List<ImageTemplate> markers, List<Image
     }
 
     /** This look, showing the screen's {@code inputs} that only it shows. */
+    @Link
     public ScreenVariant inputs(List<Input> inputs) {
         return new ScreenVariant(name, markers, absent, inputs, when, shot);
     }

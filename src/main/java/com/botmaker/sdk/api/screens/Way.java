@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
+
 import java.util.function.BooleanSupplier;
 
 /**
@@ -37,6 +39,7 @@ public record Way(Input via, Pick pick, State state, BooleanSupplier when, Scree
     }
 
     /** This way, through the copy of {@code via}'s button that {@code pick} names. */
+    @Link
     public Way pick(Pick pick) {
         return new Way(via, pick, state, when, after);
     }

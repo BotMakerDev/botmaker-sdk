@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
  * a screen's inputs with its information ones last.
  *
  * <p>What is not always there is read off the edges, never flagged on a screen ({@link #presence}): a screen every
- * way into which passes an input that {@link Input#comesAndGoes comes and goes} shows only at times, and one behind a
+ * way into which passes an input that {@link Input#isOccasional comes and goes} shows only at times, and one behind a
  * {@link Input#lock locked} input is locked.
  */
 public final class ScreenGraph {
@@ -528,7 +528,7 @@ public final class ScreenGraph {
         boolean opened = false;
         for (String field : fields(constant)) {
             Input input = input(constant, field).orElseThrow();
-            if (input.never() != null || input.lock() != null || input instanceof Strip || input instanceof Tree
+            if (input.never() != null || input.locked() != null || input instanceof Strip || input instanceof Tree
                     || isBack(constant, field)
                     || input.isLeaving() || !tried(constant, field)) {
                 continue;
@@ -578,7 +578,7 @@ public final class ScreenGraph {
 
     private static Presence of(Input input) {
         if (input == null) return Presence.ALWAYS;
-        return input.lock() != null ? Presence.LOCKED : input.comesAndGoes() ? Presence.SOMETIMES : Presence.ALWAYS;
+        return input.locked() != null ? Presence.LOCKED : input.isOccasional() ? Presence.SOMETIMES : Presence.ALWAYS;
     }
 
     private static Presence worst(Presence a, Presence b) {
@@ -766,7 +766,7 @@ public final class ScreenGraph {
         }
         if (input instanceof Strip strip) for (ImageTemplate member : strip.members()) ids.add(member.id());
         if (input instanceof Tree tree) for (ImageTemplate member : tree.members()) ids.add(member.id());
-        if (input.lock() != null) ids.add(input.lock().id());
+        if (input.locked() != null) ids.add(input.locked().id());
         return ids;
     }
 
@@ -809,7 +809,7 @@ public final class ScreenGraph {
             }
             if (kept instanceof Strip strip) kept = strip.members(butPicture(strip.members(), id));
             if (kept instanceof Tree tree) kept = tree.without(id);
-            if (is(kept.lock(), id)) kept = kept.locked(null);
+            if (is(kept.locked(), id)) kept = kept.locked(null);
             if (kept instanceof Strip strip && strip.members().isEmpty()
                     || kept instanceof Tree tree && tree.nodes().isEmpty()) {
                 now = now.withoutInput(e.getKey());
@@ -848,6 +848,6 @@ public final class ScreenGraph {
     }
 
     private boolean comesAndGoes(String constant, String field) {
-        return input(constant, field).filter(Input::comesAndGoes).isPresent();
+        return input(constant, field).filter(Input::isOccasional).isPresent();
     }
 }

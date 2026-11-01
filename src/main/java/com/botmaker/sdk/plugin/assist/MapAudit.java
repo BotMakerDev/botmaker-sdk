@@ -354,7 +354,7 @@ public final class MapAudit {
             // A node of a tree that scrolls may be anywhere off the shot.
             boolean scrolled = screen.treeOf(input).filter(Tree::scrolls).isPresent();
             Input its = screen.effective(input);
-            boolean sure = !looksOnly.contains(input) && !its.comesAndGoes() && its.lock() == null && band == null
+            boolean sure = !looksOnly.contains(input) && !its.isOccasional() && its.locked() == null && band == null
                     && !scrolled;
             if (input instanceof Button button) {
                 for (Look look : button.allLooks()) {
@@ -365,7 +365,7 @@ public final class MapAudit {
                 // A panel that scrolls: the picture it is scrolled over.
                 add(checks, resources, strip.members().getFirst(), false, sure, null);
             }
-            if (its.lock() != null) add(checks, resources, its.lock(), false, false, null);
+            if (its.locked() != null) add(checks, resources, its.locked(), false, false, null);
         }
         return checks;
     }

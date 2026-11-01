@@ -376,7 +376,7 @@ public final class ScreenWalk {
                     + "Navigate.type it.");
         }
         Input acted = typed == null ? input : ((Button) input).types(typed);
-        if (input.lock() != null) return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is locked.");
+        if (input.locked() != null) return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is locked.");
         if (input.never() != null) {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is never pressed: " + input.never());
         }
@@ -597,22 +597,22 @@ public final class ScreenWalk {
     private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame, boolean search) {
         Input via = edge.via();
         if (via == null) return Conditions.holds(edge.when());    // a way on its own may be open only while
-        if (via.lock() != null || typedByBody(edge)) return false;
+        if (via.locked() != null || typedByBody(edge)) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
         // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
-        if (!edge.from().equals(at)) return search || !via.comesAndGoes();
+        if (!edge.from().equals(at)) return search || !via.isOccasional();
         if (!(via instanceof Button button)) return true;
         Optional<Strip> strip = stripOf(edge);
         // A node of a tree out of view is walked to by the click, as a strip's member is scrolled to.
-        boolean searched = (strip.isPresent() || treeOf(edge).isPresent()) && (search || !via.comesAndGoes());
+        boolean searched = (strip.isPresent() || treeOf(edge).isPresent()) && (search || !via.isOccasional());
         if (edge.state() == null && button.looks().isEmpty()) {
             // One a strip scrolls to is looked for by the click, which scrolls first.
-            return !via.comesAndGoes() || searched || reach.seen(button, null, edge.pick(), frame).isPresent();
+            return !via.isOccasional() || searched || reach.seen(button, null, edge.pick(), frame).isPresent();
         }
         Optional<Reach.Seen> seen = reach.seen(button, strip.orElse(null), edge.pick(), frame);
         // A member out of view is looked at once the click scrolls to it.
-        if (seen.isEmpty()) return searched || strip.isEmpty() && !via.comesAndGoes() && edge.state() == null;
+        if (seen.isEmpty()) return searched || strip.isEmpty() && !via.isOccasional() && edge.state() == null;
         if (seen.get().state().blocks()) return false;
         return edge.state() == null || edge.state() == seen.get().state();
     }
@@ -627,7 +627,7 @@ public final class ScreenWalk {
                            List<String> walked) {
         Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge);
         String to = graph.shown(target);
-        Predicate<ScreenGraph.Edge> unlocked = edge -> edge.via() == null || edge.via().lock() == null;
+        Predicate<ScreenGraph.Edge> unlocked = edge -> edge.via() == null || edge.via().locked() == null;
         Optional<List<ScreenGraph.Edge>> typing = graph.pathTo(at, target, known.and(unlocked))
                 .filter(path -> path.stream().anyMatch(ScreenWalk::typedByBody))
                 .filter(path -> graph.pathTo(at, target, known.and(unlocked)

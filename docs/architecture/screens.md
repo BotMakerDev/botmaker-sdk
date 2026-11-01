@@ -14,8 +14,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
   way out only.
-- **`Input`**: a picture click, a key or a scroll, with `tried()` (opened nothing), `leaves()` (to a screen
-  reached otherwise), `info()` (only tells: tried last), `never`, `sometimes`, `locked`, `when` and button looks (`variants`). A
+- **`Input`**: a picture click, a key or a scroll, with `tried()` (opened nothing), `leaving()` (to a screen
+  reached otherwise), `info()` (only tells: tried last), `never`, `occasional`, `locked`, `when` and button looks (`variants`). A
   picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
   copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16). A button is
   pressed by its `Gesture` (`.gesture(Gesture.DOUBLE)`, right, middle, hover; `.hold(Duration)` a hold, else
@@ -153,7 +153,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 ## The graph and the walk (`internal/screens`)
 
 - **`ScreenGraph`** is the one pure model every consumer reads: edges, `pathTo`, `presence` (a screen only
-  behind a `sometimes` input shows at times, one behind a `locked` input is locked: read off the edges, never
+  behind an `occasional` input shows at times, one behind a `locked` input is locked: read off the edges, never
   flagged), shape, the pictures each screen uses, and what each screen owes (`owed`; an `owes` entry
   "marker — why" stands for the marker).
 - **Discovery's order** is breadth first (the user's call, 2026-10-16, in place of 2026-10-14's finish-each-opened-

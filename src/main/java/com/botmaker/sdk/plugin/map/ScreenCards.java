@@ -368,7 +368,7 @@ final class ScreenCards {
         if (input.never() != null) {
             state = RowState.NEVER;
             result = "never: " + input.never();
-        } else if (input.lock() != null) {
+        } else if (input.locked() != null) {
             state = RowState.LOCKED;
             result = "locked";
         } else if (graph.tried(constant, field)) {
@@ -378,14 +378,14 @@ final class ScreenCards {
                     .map(lead -> graph.shown(lead.to()) + said(lead.state(), lead.when())).distinct().toList())
                     : graph.isBack(constant, field) ? "way back"
                     : input.isLeaving() ? "leaves" : "tried";
-        } else if (input.comesAndGoes()) {
+        } else if (input.isOccasional()) {
             state = RowState.UNSEEN;
             result = "not seen yet";
         } else {
             state = RowState.UNTRIED;
             result = "untried";
         }
-        String kind = input.isInfo() ? "info" : input.comesAndGoes() ? "comes and goes" : "";
+        String kind = input.isInfo() ? "info" : input.isOccasional() ? "comes and goes" : "";
         MapScreen screen = graph.screens().get(constant);
         InputName self = new InputName(constant, field);
         String look = screen == null ? "" : screen.variants().stream()
@@ -401,7 +401,7 @@ final class ScreenCards {
             case Button button -> button.isDrag() ? dragTrait(button) : button.isField() ? fieldTrait(button)
                     : button.cycles() ? "cycling" : button.repeats() ? "repeated" : "";
             case com.botmaker.sdk.api.screens.Strip strip -> strip.scroll() == null ? "" : scrolled(strip.scroll());
-            case Tree tree -> (tree.isDragged() ? "dragged, " : tree.notches() != 0 ? "wheel " + tree.notches() + ", "
+            case Tree tree -> (tree.isDragged() ? "dragged, " : tree.wheel() != 0 ? "wheel " + tree.wheel() + ", "
                     : "") + tree.nodes().size() + " nodes" + (tree.unplaced().isEmpty() ? ""
                     : ", " + tree.unplaced().size() + " not placed");
             case Hotkey ignored -> "";

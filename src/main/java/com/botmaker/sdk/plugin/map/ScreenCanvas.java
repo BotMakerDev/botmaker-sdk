@@ -879,7 +879,7 @@ final class ScreenCanvas {
             picture.getStyleClass().add("screen-strip-member-" + row.state().name().toLowerCase(Locale.ROOT));
             pickable(picture, row.field(), "screen-strip-member-picked", picked);
             // Not on the screen at every time: drawn faint, as the game shows it only at times.
-            if (row.input().comesAndGoes()) picture.setOpacity(0.45);
+            if (row.input().isOccasional()) picture.setOpacity(0.45);
             Tooltip.install(picture, new Tooltip(row.label() + ": " + row.result()));
             picture.setOnMouseClicked(e -> {
                 onPick.accept(row);

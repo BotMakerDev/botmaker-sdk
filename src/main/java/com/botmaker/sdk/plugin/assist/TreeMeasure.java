@@ -147,7 +147,7 @@ final class TreeMeasure {
                 reach.drag(new Point(c.x() + mx / 2, c.y() + my / 2), new Point(c.x() - mx / 2, c.y() - my / 2),
                         DRAG_TIME);
             } else {
-                int turn = Math.abs(tree.notches());
+                int turn = Math.abs(tree.wheel());
                 reach.scroll(c, notches < 0 ? -turn : turn);
             }
             Optional<BufferedImage> next = settled(reach, tree, buttons, before);

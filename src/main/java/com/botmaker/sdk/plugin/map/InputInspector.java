@@ -163,7 +163,7 @@ final class InputInspector {
 
         /** How {@code tree} goes. */
         static TreeScroll of(Tree tree) {
-            return tree.isDragged() ? DRAG : tree.notches() != 0 ? WHEEL : NONE;
+            return tree.isDragged() ? DRAG : tree.wheel() != 0 ? WHEEL : NONE;
         }
     }
 
@@ -230,7 +230,7 @@ final class InputInspector {
             switch (now) {
                 case UNTRIED -> set(constant, field, ScreenEdits.untried(input));
                 case NOTHING -> set(constant, field, ScreenEdits.untried(input).tried());
-                case LEAVES -> set(constant, field, ScreenEdits.untried(input).leaves());
+                case LEAVES -> set(constant, field, ScreenEdits.untried(input).leaving());
                 // A screen it opens is a new one, or one of the map: the same choice ⋯ ▸ Result offers. Until it is
                 // written the combo says what the input did; the panel draws again once it is.
                 case OPENS -> {
@@ -244,7 +244,7 @@ final class InputInspector {
 
         CheckBox info = check("Information only", "It only tells: help, rules, a leaderboard. Tried last",
                 input.isInfo(), on -> set(constant, field, ScreenEdits.info(input, on)));
-        CheckBox sometimes = check("Comes and goes", "The screen shows it only at times", input.comesAndGoes(),
+        CheckBox sometimes = check("Comes and goes", "The screen shows it only at times", input.isOccasional(),
                 on -> set(constant, field, ScreenEdits.sometimes(input, on)));
 
         TextField why = new TextField(input.never() == null ? "" : input.never());
@@ -276,14 +276,14 @@ final class InputInspector {
         ComboBox<String> proof = new ComboBox<>(FXCollections.observableArrayList(ScreenEdits.pictures(services)));
         proof.setEditable(true);
         proof.setPromptText("the picture proving it (a padlock)");
-        proof.setValue(input.lock() == null ? null : input.lock().id());
+        proof.setValue(input.locked() == null ? null : input.locked().id());
         HBox.setHgrow(proof, Priority.ALWAYS);
         CheckBox locked = new CheckBox("Locked, shown by");
-        locked.setSelected(input.lock() != null);
+        locked.setSelected(input.locked() != null);
         locked.setTooltip(new Tooltip("Locked on this account: a run never presses it, and Discovery never tries it"));
         // The lock last written from here: an editable combo commits on focus loss too, and a click on the box after
         // typing would write it twice against the input as it was drawn.
-        String[] lock = {input.lock() == null ? null : input.lock().id()};
+        String[] lock = {input.locked() == null ? null : input.locked().id()};
         Runnable writeLock = () -> {
             String picture = proof.getValue() == null ? "" : proof.getValue().strip();
             if (!locked.isSelected()) {
@@ -1255,7 +1255,7 @@ final class InputInspector {
         ComboBox<TreeScroll> kind = new ComboBox<>(FXCollections.observableArrayList(TreeScroll.values()));
         kind.setConverter(named(TreeScroll::displayName));
         kind.setValue(TreeScroll.of(tree));
-        int turns = tree.notches() != 0 ? tree.notches() : -5;
+        int turns = tree.wheel() != 0 ? tree.wheel() : -5;
         Spinner<Integer> notches = new Spinner<>(Math.min(-20, turns), Math.max(20, turns), turns);
         notches.setEditable(true);
         notches.setPrefWidth(80);
@@ -1276,7 +1276,7 @@ final class InputInspector {
     static Tree scrolled(Tree tree, TreeScroll kind, int notches) {
         TreeScroll by = kind == null ? TreeScroll.NONE : kind;
         return new Tree(tree.nodes(), by == TreeScroll.DRAG, by == TreeScroll.WHEEL ? notches : 0, tree.isTried(),
-                tree.isLeaving(), tree.isInfo(), tree.never(), tree.comesAndGoes(), tree.lock(), tree.when());
+                tree.isLeaving(), tree.isInfo(), tree.never(), tree.isOccasional(), tree.locked(), tree.when());
     }
 
     // --- ▶ Try ---

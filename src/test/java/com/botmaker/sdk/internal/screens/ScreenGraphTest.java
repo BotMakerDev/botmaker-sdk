@@ -81,7 +81,7 @@ class ScreenGraphTest {
         Button claim = click("claim").looks(List.of(Look.of(picture("claim_badge"), State.BADGE)));
         screens.put("CAMPAIGN", screen(screens.get("CAMPAIGN").setup().variants(List.of(ScreenVariant.named("Halloween")
                 .markers(marks("pumpkin")).inputs(List.of(ref("CAMPAIGN", "candy"))))), claim, click("map"),
-                click("candy").sometimes()));
+                click("candy").occasional()));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         assertEquals(List.of("campaign_title", "pumpkin", "claim", "claim_badge", "map", "candy"),
@@ -154,7 +154,7 @@ class ScreenGraphTest {
         assertEquals(Optional.of("ENGINEER"), ScreenGraph.of(screens).nextToExplore(), "Engineer, a step down, "
                 + "before Map, two");
         Map<String, MapScreen> fickle = new LinkedHashMap<>(screens);
-        fickle.put("HOME", with(fickle.get("HOME"), click("engineer").sometimes()));
+        fickle.put("HOME", with(fickle.get("HOME"), click("engineer").occasional()));
         assertEquals(Optional.of("MAP"), ScreenGraph.of(fickle).nextToExplore(),
                 "a screen whose way in comes and goes waits for every other");
         fickle.put("HOME", with(fickle.get("HOME"), click("engineer").locked(picture("padlock"))));
@@ -270,7 +270,7 @@ class ScreenGraphTest {
     @Test
     void whatComesAndGoesOrIsLockedIsReadOffTheWaysIn() {
         Map<String, MapScreen> screens = firestone();
-        screens.put("HOME", with(screens.get("HOME"), click("event").sometimes(),
+        screens.put("HOME", with(screens.get("HOME"), click("event").occasional(),
                 click("guild").locked(picture("padlock"))));
         screens.put("CAMPAIGN", with(screens.get("CAMPAIGN"), click("guild")));
         screens.put("EVENT", screen(Setup.named("Event").from(ref("HOME", "event")), click("shop")));
@@ -295,14 +295,14 @@ class ScreenGraphTest {
     void aStripThatComesAndGoesMakesEachMemberComeAndGo() {
         Map<String, MapScreen> screens = firestone();
         screens.put("HOME", with(screens.get("HOME"),
-                Strip.of(Scroll.wheel(-5), marks("campaign", "engineer")).sometimes().info()));
+                Strip.of(Scroll.wheel(-5), marks("campaign", "engineer")).occasional().info()));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         Input campaign = graph.input("HOME", "campaign").orElseThrow();
-        assertTrue(campaign.comesAndGoes());
+        assertTrue(campaign.isOccasional());
         assertTrue(campaign.isInfo());
         assertEquals(ScreenGraph.Presence.SOMETIMES, graph.presence("CAMPAIGN"));
-        assertFalse(graph.input("HOME", "gold").orElseThrow().comesAndGoes(), "a button off the strip is its own");
+        assertFalse(graph.input("HOME", "gold").orElseThrow().isOccasional(), "a button off the strip is its own");
         assertEquals(Optional.of(graph.screens().get("HOME").strips().get("campaign_strip")),
                 graph.screens().get("HOME").stripOf(campaign));
     }
@@ -310,7 +310,7 @@ class ScreenGraphTest {
     @Test
     void anInputThatComesAndGoesNeverSeenIsOwedWithoutHoldingItsScreen() {
         Map<String, MapScreen> screens = firestone();
-        screens.put("MAP", with(screens.get("MAP"), click("loot").sometimes()));
+        screens.put("MAP", with(screens.get("MAP"), click("loot").occasional()));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         assertFalse(graph.unfinished("MAP"));

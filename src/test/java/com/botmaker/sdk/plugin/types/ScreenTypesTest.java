@@ -106,8 +106,8 @@ class ScreenTypesTest {
         assertEquals(home, roundTrip(ScreenTypes.SETUP_SHAPE, home));
         Way own = Way.onItsOwn(BotConstants.screen("LOADING")).when(ScreenTypes.condition("Firestone::eventOn"));
         assertEquals(own, roundTrip(ScreenTypes.WAY_ON_ITS_OWN_SHAPE, own));
-        assertFalse(ScreenTypes.WAY_SHAPE.writes(own));
-        assertTrue(ScreenTypes.WAY_ON_ITS_OWN_SHAPE.writes(own));
+        assertFalse(ScreenTypes.WAY_SHAPE.rebuilds(own));
+        assertTrue(ScreenTypes.WAY_ON_ITS_OWN_SHAPE.rebuilds(own));
     }
 
     /** A panel names the screen it is in, before its way in through that screen's input. */
@@ -123,8 +123,8 @@ class ScreenTypesTest {
 
     @Test
     void eachInputIsWrittenByItsOwnFactory() {
-        Button click = Button.of(picture("claim")).tried().sometimes().info();
-        Hotkey key = Hotkey.of(Key.ESCAPE).leaves();
+        Button click = Button.of(picture("claim")).tried().occasional().info();
+        Hotkey key = Hotkey.of(Key.ESCAPE).leaving();
         Strip strip = Strip.of(Scroll.wheel(4), marks("list")).locked(picture("padlock")).tried();
         Button never = Button.of(picture("gems")).never("spends gems").repeated();
 
@@ -142,15 +142,19 @@ class ScreenTypesTest {
     @Test
     void anOldHotkeyOfOneKeyStillReads() {
         Hotkey q = Hotkey.of(Key.Q).tried();
-        assertTrue(ScreenTypes.HOTKEY_KEY_SHAPE.writes(q));
-        assertFalse(ScreenTypes.HOTKEY_COMBO_SHAPE.writes(q));
+        assertEquals(ScreenTypes.HOTKEY_KEY_SHAPE, ComponentType.writer(
+                List.of(ScreenTypes.HOTKEY_KEY_SHAPE, ScreenTypes.HOTKEY_COMBO_SHAPE), q),
+                "both rebuild one key; the first declared writes it");
+        assertEquals(ScreenTypes.HOTKEY_COMBO_SHAPE, ComponentType.writer(
+                List.of(ScreenTypes.HOTKEY_KEY_SHAPE, ScreenTypes.HOTKEY_COMBO_SHAPE),
+                Hotkey.of(Combo.of(Key.CTRL, Key.Q))), "two keys are rebuilt by the combo alone");
         assertEquals(q, roundTrip(ScreenTypes.HOTKEY_KEY_SHAPE, q));
         assertEquals(Hotkey.of(Combo.of(Key.Q)), Hotkey.of(Key.Q), "one key is a combo of it");
 
         Hotkey save = Hotkey.of(Combo.of(Key.CTRL, Key.S)).info();
         Hotkey held = Hotkey.of(Combo.of(Key.W).held(Duration.ofMillis(500)));
-        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.writes(save));
-        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.writes(held), "a held key is no tap");
+        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.rebuilds(save));
+        assertFalse(ScreenTypes.HOTKEY_KEY_SHAPE.rebuilds(held), "a held key is no tap");
         assertEquals(save, roundTrip(ScreenTypes.HOTKEY_COMBO_SHAPE, save));
         assertEquals(held, roundTrip(ScreenTypes.HOTKEY_COMBO_SHAPE, held));
     }
@@ -246,9 +250,9 @@ class ScreenTypesTest {
         assertEquals(name, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, name));
         Readout number = Readout.digits(gold, new DigitSet("src/main/resources/digits/gold")).subject();
         assertEquals(number, roundTrip(ScreenTypes.READOUT_DIGITS_SHAPE, number));
-        assertTrue(ScreenTypes.READOUT_TEXT_SHAPE.writes(words));
-        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.writes(number));
-        assertTrue(ScreenTypes.READOUT_DIGITS_SHAPE.writes(number));
+        assertTrue(ScreenTypes.READOUT_TEXT_SHAPE.rebuilds(words));
+        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.rebuilds(number));
+        assertTrue(ScreenTypes.READOUT_DIGITS_SHAPE.rebuilds(number));
         assertEquals("digits gold, subject", number.label());
     }
 
@@ -260,7 +264,7 @@ class ScreenTypesTest {
         assertEquals(told, roundTrip(ScreenTypes.SETUP_SHAPE, told));
         assertTrue(told.hasMarker());
         assertTrue(Setup.named("Profile").texts(List.of(settings)).hasMarker(), "words alone tell a screen");
-        TextButton claim = TextButton.of(settings).hold(Duration.ofSeconds(2)).sometimes();
+        TextButton claim = TextButton.of(settings).hold(Duration.ofSeconds(2)).occasional();
         assertEquals(claim, roundTrip(ScreenTypes.TEXT_BUTTON_SHAPE, claim));
         TextButton twice = TextButton.of(settings).gesture(Gesture.DOUBLE).tried();
         assertEquals(twice, roundTrip(ScreenTypes.TEXT_BUTTON_SHAPE, twice));
@@ -271,7 +275,7 @@ class ScreenTypesTest {
 
     @Test
     void aStripIsWrittenByItsScrollAndItsMembers() {
-        Strip column = Strip.of(Scroll.wheel(-5), marks("tavern_home", "campaign_home")).sometimes();
+        Strip column = Strip.of(Scroll.wheel(-5), marks("tavern_home", "campaign_home")).occasional();
         assertEquals(column, roundTrip(ScreenTypes.STRIP_SHAPE, column));
         assertEquals(Scroll.wheel(-5), roundTrip(ScreenTypes.SCROLL_SHAPE, Scroll.wheel(-5)));
         assertTrue(column.has(picture("campaign_home")));
@@ -283,7 +287,7 @@ class ScreenTypesTest {
     void aTreeIsWrittenByItsNodesAndHowItScrolls() {
         Node health = Node.of(picture("health")).after(marks("damage"))
                 .beside(List.of(Beside.of(picture("damage"), 1.2, -0.6)));
-        Tree tree = Tree.of(List.of(Node.of(picture("damage")), health)).dragged().sometimes();
+        Tree tree = Tree.of(List.of(Node.of(picture("damage")), health)).dragged().occasional();
         assertEquals(tree, roundTrip(ScreenTypes.TREE_SHAPE, tree));
         assertEquals(health, roundTrip(ScreenTypes.NODE_SHAPE, health));
         assertEquals(Node.of(picture("damage")), roundTrip(ScreenTypes.NODE_SHAPE, Node.of(picture("damage"))));
@@ -302,7 +306,7 @@ class ScreenTypesTest {
         Caption daily = Caption.of(Words.of("Daily"), new Zone(100, 200, 300, 40));
         Button claim = Button.of(picture("claim")).repeated().place(Place.rightOf(daily));
         assertEquals(claim, roundTrip(ScreenTypes.BUTTON_SHAPE, claim));
-        Button avatar = Button.beside(picture("avatar_frame"), 1.5, -0.25).sometimes();
+        Button avatar = Button.beside(picture("avatar_frame"), 1.5, -0.25).occasional();
         assertEquals(avatar, roundTrip(ScreenTypes.BUTTON_BESIDE_SHAPE, avatar));
         Button slots = Button.beside(picture("bag"), 0, 2).grid(Grid.of(3, 5, 1.2, 1.1));
         assertTrue(slots.repeats(), "a grid's cells are its copies");
@@ -329,9 +333,9 @@ class ScreenTypesTest {
         assertEquals(wheel, roundTrip(ScreenTypes.SCROLL_SHAPE, wheel));
         Scroll drag = Scroll.drag(Order.WEST, 300, Duration.ofMillis(400)).step(280);
         assertEquals(drag, roundTrip(ScreenTypes.SCROLL_DRAG_SHAPE, drag));
-        assertTrue(ScreenTypes.SCROLL_SHAPE.writes(wheel));
-        assertFalse(ScreenTypes.SCROLL_SHAPE.writes(drag));
-        assertTrue(ScreenTypes.SCROLL_DRAG_SHAPE.writes(drag));
+        assertTrue(ScreenTypes.SCROLL_SHAPE.rebuilds(wheel));
+        assertFalse(ScreenTypes.SCROLL_SHAPE.rebuilds(drag));
+        assertTrue(ScreenTypes.SCROLL_DRAG_SHAPE.rebuilds(drag));
         assertEquals(Scroll.drag(Order.EAST, 300, Duration.ofMillis(400)).step(280), drag.back());
         assertEquals(Scroll.SETTLE, Scroll.wheel(-1).settle());
     }
@@ -343,8 +347,8 @@ class ScreenTypesTest {
         assertEquals(Pick.each(Order.EAST), roundTrip(ScreenTypes.PICK_EACH_SHAPE, Pick.each(Order.EAST)));
         assertEquals(Pick.first(Order.CENTER), roundTrip(ScreenTypes.PICK_FIRST_SHAPE, Pick.first(Order.CENTER)));
         assertEquals(Pick.untilNone(), roundTrip(ScreenTypes.PICK_UNTIL_NONE_SHAPE, Pick.untilNone()));
-        assertTrue(ScreenTypes.PICK_NTH_SHAPE.writes(nth));
-        assertFalse(ScreenTypes.PICK_EACH_SHAPE.writes(nth));
+        assertTrue(ScreenTypes.PICK_NTH_SHAPE.rebuilds(nth));
+        assertFalse(ScreenTypes.PICK_EACH_SHAPE.rebuilds(nth));
         Way way = Way.of(BotConstants.input("MISSIONS", "go")).pick(nth);
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
     }
@@ -356,7 +360,7 @@ class ScreenTypesTest {
         assertTrue(ScreenTypes.BUTTON_SHAPE.writes(Button.of(picture("campaign"))));
         assertEquals(new BotConstants.InputName("HOME", "campaign"), BotConstants.inputName(reference));
         assertNull(BotConstants.inputName(Button.of(picture("campaign"))));
-        assertNull(BotConstants.inputName(reference.sometimes()), "a reference with traits is a button of its own");
+        assertNull(BotConstants.inputName(reference.occasional()), "a reference with traits is a button of its own");
         assertEquals("HOME", BotConstants.screenName(BotConstants.screen("HOME")));
         assertEquals(BotConstants.screen("HOME"), BotConstants.screen("HOME"), "a reference equals one to the same");
     }
@@ -391,7 +395,7 @@ class ScreenTypesTest {
         assertFalse(ScreenTypes.BUTTON_SHAPE.writes(tap), "a picture button's shape never writes an element");
         Readout volume = Readout.element(Element.byId("volume"));
         assertEquals(volume, roundTrip(ScreenTypes.READOUT_ELEMENT_SHAPE, volume));
-        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.writes(volume));
+        assertFalse(ScreenTypes.READOUT_TEXT_SHAPE.rebuilds(volume));
         Scroll drag = Scroll.drag(Order.NORTH, 400, Duration.ofMillis(100)).in(list);
         assertEquals(drag, roundTrip(ScreenTypes.SCROLL_DRAG_SHAPE, drag));
         Setup settings = Setup.named("Settings").elements(List.of(list));

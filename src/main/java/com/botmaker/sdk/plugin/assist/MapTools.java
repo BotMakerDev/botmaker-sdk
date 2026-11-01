@@ -685,7 +685,7 @@ final class MapTools {
         if (up && back.isPresent() && !graph.isBack(screen, field)) {
             // A Confirm that also goes back is an input of its own: the close button stays the way back (Rooms,
             // 2026-10-15).
-            return noted(services, screen, field, base.leaves(), "leaves for " + to + "; the way back stays "
+            return noted(services, screen, field, base.leaving(), "leaves for " + to + "; the way back stays "
                     + back.get().label(), false);
         }
         if (up) {
@@ -696,7 +696,7 @@ final class MapTools {
                     "its way back to " + to, false));
         }
         if (graph.above(screen).contains(known)) {
-            return noted(services, screen, field, base.leaves(), "leaves for " + to + ", which this screen is "
+            return noted(services, screen, field, base.leaving(), "leaves for " + to + ", which this screen is "
                     + "reached through", false);
         }
         // A way taken whatever the button looks covers each look; one needing a look covers only that look.
@@ -925,7 +925,7 @@ final class MapTools {
                 Optional<String> had = buttonOf(screen, cut);
                 boolean says = look.when() != null;
                 if (!marker && !back && had.isPresent()
-                        && (!sometimes || screen.inputs().get(had.get()).comesAndGoes() && !says)) {
+                        && (!sometimes || screen.inputs().get(had.get()).isOccasional() && !says)) {
                     return " " + at.name() + " has it as an input already.";
                 }
                 // An input seen to come and go is marked so in place.
@@ -933,8 +933,8 @@ final class MapTools {
                         ? s.setup(x -> at.popup() ? x.markers(now.shown()).absent(now.absent()).popup()
                         : x.markers(now.shown()).absent(now.absent()))
                         : back ? asBack(s, at.constant(), had.orElse(null), cut)
-                        : had.isPresent() ? s.withInput(had.get(), brought(s.inputs().get(had.get()).sometimes(), look))
-                        : s.withInput(s.fieldFor(cut.id()), sometimes ? brought(Button.of(cut).sometimes(), look)
+                        : had.isPresent() ? s.withInput(had.get(), brought(s.inputs().get(had.get()).occasional(), look))
+                        : s.withInput(s.fieldFor(cut.id()), sometimes ? brought(Button.of(cut).occasional(), look)
                         : Button.of(cut)));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
                 String popup = at.popup() ? "; a popup now, apart from the map's tree, closed on the way" : "";
@@ -1022,7 +1022,7 @@ final class MapTools {
                 ScreenVariant was = screen.variants().stream().filter(v -> v.name().equalsIgnoreCase(name)).findFirst()
                         .orElse(ScreenVariant.named(name));
                 // An input only the look shows is a field of the screen, the look naming it.
-                Input input = sometimes ? brought(Button.of(cut).sometimes(), look) : Button.of(cut);
+                Input input = sometimes ? brought(Button.of(cut).occasional(), look) : Button.of(cut);
                 String field = buttonOf(screen, cut).orElseGet(() -> screen.fieldFor(cut.id()));
                 Markers set = marker ? marked(Markers.of(was), mark, cut) : Markers.of(was);
                 ScreenVariant told = was.markers(set.shown()).absent(set.absent());
@@ -1116,8 +1116,8 @@ final class MapTools {
             for (String picture : sometimes) {
                 ImageTemplate cut = ScreenBook.picture(services, picture);
                 Optional<String> had = buttonOf(now, cut);
-                now = had.isPresent() ? now.withInput(had.get(), now.inputs().get(had.get()).sometimes())
-                        : now.withInput(now.fieldFor(cut.id()), Button.of(cut).sometimes());
+                now = had.isPresent() ? now.withInput(had.get(), now.inputs().get(had.get()).occasional())
+                        : now.withInput(now.fieldFor(cut.id()), Button.of(cut).occasional());
                 noted.add(picture + ": comes and goes");
             }
             return now;
@@ -1414,7 +1414,7 @@ final class MapTools {
         if (notches == 0) return Button.of(cut);
         Strip strip = Strip.of(Scroll.wheel(notches), List.of(cut));
         return held.map(button -> (Input) new Strip(strip.scroll(), strip.members(), false, false, button.isInfo(),
-                null, button.comesAndGoes(), null, button.when())).orElse(strip);
+                null, button.isOccasional(), null, button.when())).orElse(strip);
     }
 
     /** A write's failure, Studio's own refusal or its being busy; empty when written. */
@@ -1450,7 +1450,7 @@ final class MapTools {
      * or a click whose picture names no new screen ({@code close_x}, or a screen the map has).
      */
     static boolean asksWhatItOpens(ScreenGraph graph, String screen, Input input) {
-        if (input instanceof Strip || input instanceof Tree || input.never() != null || input.lock() != null) {
+        if (input instanceof Strip || input instanceof Tree || input.never() != null || input.locked() != null) {
             return false;
         }
         if (!(input instanceof Button button) || button.picture() == null && !button.isElement()) return true;

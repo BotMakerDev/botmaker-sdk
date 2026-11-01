@@ -60,18 +60,18 @@ public final class CaptureTypes implements TypeHolder {
 
     /** {@code CaptureSource.monitor(index)}. */
     public static final DeclaredCall<Monitor> MONITOR = ComponentType.part(Monitor.class)
-            .writtenAs(CaptureSource::monitor, Monitor::index);
+            .writtenAs(CaptureSource::monitor);
 
     /** {@code CaptureSource.window("class", "title")}. */
     public static final DeclaredCall<NamedWindow> WINDOW = ComponentType.part(NamedWindow.class)
-            .writtenAs(CaptureSource::window, NamedWindow::windowClass, NamedWindow::title);
+            .writtenAs(CaptureSource::window);
 
     /**
      * {@code CaptureSource.emulator("name")}: the class behind it is {@code internal}, and a bot writes the
      * factory, never the class.
      */
     public static final DeclaredCall<EmulatorSource> EMULATOR = ComponentType.part(EmulatorSource.class)
-            .writtenAs(CaptureSource::emulator, EmulatorSource::instanceName);
+            .writtenAs(CaptureSource::emulator);
 
     /**
      * {@code CaptureSource.region(source, new Rect(x, y, w, h))}: a region is a part of which pixels the bot

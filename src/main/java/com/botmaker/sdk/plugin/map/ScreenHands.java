@@ -77,22 +77,22 @@ final class ScreenHands {
                 pick("Tried, opens nothing", did, !opens && input.isTried(), () -> set(constant, field,
                         ScreenEdits.untried(input).tried())),
                 pick("Leaves for a screen reached otherwise", did, !opens && input.isLeaving(), () -> set(constant,
-                        field, ScreenEdits.untried(input).leaves())),
+                        field, ScreenEdits.untried(input).leaving())),
                 pick("Opens a new screen…", did, opens, () -> newScreen(constant, field)),
                 item("Leads to a screen on the map…", () -> addWay(constant, field)));
         CheckMenuItem info = new CheckMenuItem("Information only");
         info.setSelected(input.isInfo());
         info.setOnAction(e -> set(constant, field, ScreenEdits.info(input, info.isSelected())));
         CheckMenuItem sometimes = new CheckMenuItem("Comes and goes");
-        sometimes.setSelected(input.comesAndGoes());
+        sometimes.setSelected(input.isOccasional());
         sometimes.setOnAction(e -> set(constant, field, ScreenEdits.sometimes(input, sometimes.isSelected())));
         MenuItem never = item(input.never() == null ? "Never…" : "Not never", () -> {
             if (input.never() != null) set(constant, field, ScreenEdits.untried(input));
             else askText("Never clicked", "Why it is never clicked (it spends gems, real money)", "spends gems",
                     why -> set(constant, field, ScreenEdits.untried(input).never(why)));
         });
-        MenuItem locked = item(input.lock() == null ? "Locked by…" : "Not locked", () -> {
-            if (input.lock() != null) set(constant, field, ScreenEdits.untried(input));
+        MenuItem locked = item(input.locked() == null ? "Locked by…" : "Not locked", () -> {
+            if (input.locked() != null) set(constant, field, ScreenEdits.untried(input));
             else askPicture("Locked by", "The picture proving it locked (a padlock on it)",
                     lock -> set(constant, field, ScreenEdits.untried(input)
                             .locked(ScreenEdits.picture(services, lock))));

@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.List;
@@ -29,11 +30,13 @@ public record Node(ImageTemplate picture, List<ImageTemplate> after, List<Beside
     }
 
     /** This node, unlocked by {@code parents}: the nodes whose line leads to it. */
+    @Link
     public Node after(List<ImageTemplate> parents) {
         return new Node(picture, parents, beside);
     }
 
     /** This node, placed by {@code offsets} from the nodes it is connected to. */
+    @Link
     public Node beside(List<Beside> offsets) {
         return new Node(picture, after, offsets);
     }

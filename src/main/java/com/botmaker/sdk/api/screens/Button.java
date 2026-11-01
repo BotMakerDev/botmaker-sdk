@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.Words;
@@ -50,8 +51,8 @@ import java.util.function.BooleanSupplier;
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells
  * @param never        why it is never done; null when it may be
- * @param comesAndGoes whether it shows only at times
- * @param lock         the picture proving it locked on this account; null when it is not
+ * @param isOccasional whether it shows only at times
+ * @param locked       the picture proving it locked on this account; null when it is not
  * @param looks        the button's other looks, each with what it means
  * @param when         when it is there, for one that comes and goes; null when not known
  * @param repeats      whether the screen shows it more than once: copies a body picks among; a grid always does
@@ -66,7 +67,7 @@ import java.util.function.BooleanSupplier;
  * @param element      what finds it in the screen's tree; null for a button found by its picture
  */
 public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, boolean isInfo, String never,
-                     boolean comesAndGoes, ImageTemplate lock, List<Look> looks, BooleanSupplier when,
+                     boolean isOccasional, ImageTemplate locked, List<Look> looks, BooleanSupplier when,
                      boolean repeats, boolean cycles, Gesture gesture, Duration hold, Typing typing, Drag drag,
                      Place place, Beside beside, Grid grid, Element element)
         implements Input {
@@ -80,7 +81,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     public Button {
         looks = looks == null ? List.of() : List.copyOf(looks);
         // When it is there is said only of what comes and goes.
-        comesAndGoes = comesAndGoes || when != null;
+        isOccasional = isOccasional || when != null;
         // A drag with nowhere to go is none; a drag is its own press: no gesture, nothing typed.
         if (drag != null && drag.onto() == null && drag.into() == null) drag = null;
         if (drag != null) {
@@ -156,49 +157,62 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     @Override
     public Button tried() {
-        return new Button(picture, true, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, true, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
     @Override
-    public Button leaves() {
-        return new Button(picture, isTried, true, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+    public Button leaving() {
+        return new Button(picture, isTried, true, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
+    public Button leaves() {
+        return leaving();
     }
 
     @Override
     public Button info() {
-        return new Button(picture, isTried, isLeaving, true, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, true, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
     @Override
     public Button never(String why) {
-        return new Button(picture, isTried, isLeaving, isInfo, why, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, why, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
     @Override
+    public Button occasional() {
+        return new Button(picture, isTried, isLeaving, isInfo, never, true, locked, looks, when, repeats, cycles,
+                gesture, hold, typing, drag, place, beside, grid, element);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
     public Button sometimes() {
-        return new Button(picture, isTried, isLeaving, isInfo, never, true, lock, looks, when, repeats, cycles,
-                gesture, hold, typing, drag, place, beside, grid, element);
+        return occasional();
     }
 
     @Override
-    public Button locked(ImageTemplate lock) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+    public Button locked(ImageTemplate proof) {
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, proof, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
     @Override
     public Button when(BooleanSupplier condition) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, condition, repeats,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, condition, repeats,
                 cycles, gesture, hold, typing, drag, place, beside, grid, element);
     }
 
     /** This button, also looking as each of {@code looks} says. */
+    @Link
     public Button looks(List<Look> looks) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
@@ -209,7 +223,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** This button, shown more than once on its screen or not. */
     public Button repeats(boolean repeats) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
@@ -218,13 +232,13 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
      * pressed by a gesture no more.
      */
     public Button gesture(Gesture gesture) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, null, place, beside, grid, element);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public Button hold(Duration time) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 Gesture.HOLD, time, typing, null, place, beside, grid, element);
     }
 
@@ -245,7 +259,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** This button, dragged as {@code drag} says once pressed, in place of its gesture and typing; null: pressed. */
     public Button drag(Drag drag) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
@@ -271,13 +285,13 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** This button, typing as {@code typing} says once clicked, a drag clicked again; null: typing nothing. */
     public Button typing(Typing typing) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, typing == null ? drag : null, place, beside, grid, element);
     }
 
     /** This button, only ever found where {@code place} says: the Claim right of a row's title; null: anywhere. */
     public Button place(Place place) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when, repeats, cycles,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element);
     }
 
@@ -286,7 +300,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
      * {@link #beside} puts it (else on the anchor), the others as {@code grid} steps; null: one spot.
      */
     public Button grid(Grid grid) {
-        return new Button(picture, isTried, isLeaving, isInfo, never, comesAndGoes, lock, looks, when,
+        return new Button(picture, isTried, isLeaving, isInfo, never, isOccasional, locked, looks, when,
                 grid == null && this.grid != null ? false : repeats, cycles, gesture, hold, typing, drag, place,
                 beside, grid, element);
     }

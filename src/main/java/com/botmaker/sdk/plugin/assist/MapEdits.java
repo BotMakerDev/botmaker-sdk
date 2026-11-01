@@ -491,7 +491,7 @@ final class MapEdits {
         if (edit.did() != null) {
             now = switch (edit.did()) {
                 case TRIED -> ScreenEdits.untried(in).tried();
-                case LEAVES -> ScreenEdits.untried(in).leaves();
+                case LEAVES -> ScreenEdits.untried(in).leaving();
                 case UNTRIED -> ScreenEdits.untried(in);
             };
         }

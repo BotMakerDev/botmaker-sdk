@@ -80,7 +80,7 @@ class MapAuditTest {
 
     private static MapScreen screen() {
         return MapFixtures.screen(Setup.named("Home").markers(marks("home")).shot(SHOT), Button.of(picture("here")),
-                Button.of(picture("moved")), Button.of(picture("gone")), Button.of(picture("event")).sometimes());
+                Button.of(picture("moved")), Button.of(picture("gone")), Button.of(picture("event")).occasional());
     }
 
     @Test

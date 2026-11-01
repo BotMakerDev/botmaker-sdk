@@ -39,7 +39,7 @@ class MapReportTest {
     private static Map<String, MapScreen> screens() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("tavern"),
-                click("event").sometimes()));
+                click("event").occasional()));
         screens.put("TAVERN", screen(Setup.named("Tavern").markers(marks("tavern_title")).from(ref("HOME", "tavern"))
                         .back(ref("TAVERN", "close")),
                 click("market"), click("play").tried(), click("close")));

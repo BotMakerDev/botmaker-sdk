@@ -62,10 +62,10 @@ class ScreenWalkTest {
     private static Map<String, MapScreen> screens() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(named("Home", "home", null, null), click("campaign"), click("engineer"),
-                click("mail"), click("event").sometimes(), click("arena").locked(picture("padlock")), click("lobby")));
+                click("mail"), click("event").occasional(), click("arena").locked(picture("padlock")), click("lobby")));
         screens.put("CAMPAIGN", screen(named("Campaign", "campaign_title", "HOME", "campaign")
                         .alsoFrom(List.of(Way.of(ref("MAIL", "mail_campaign")))),
-                click("map"), click("bonus").sometimes()));
+                click("map"), click("bonus").occasional()));
         screens.put("BONUS", screen(named("Bonus", "bonus_title", "CAMPAIGN", "bonus")));
         screens.put("LOBBY", screen(named("Lobby", null, "HOME", "lobby")));
         screens.put("MAP", screen(named("Map", "map_title", "CAMPAIGN", "map")));
@@ -122,7 +122,7 @@ class ScreenWalkTest {
             map.screens().forEach((c, s) -> {
                 Set<String> on = new HashSet<>();
                 s.markers().forEach(m -> on.add(m.id()));
-                s.inputs().values().stream().filter(i -> i instanceof Button && !i.comesAndGoes())
+                s.inputs().values().stream().filter(i -> i instanceof Button && !i.isOccasional())
                         .forEach(i -> on.add(((Button) i).picture().id()));
                 if (s.back() instanceof Button back && BotConstants.inputName(back) == null) {
                     on.add(back.picture().id());
@@ -493,7 +493,7 @@ class ScreenWalkTest {
         Game game = new Game("HOME");
         game.shows.get("HOME").remove("campaign");
         Map<String, MapScreen> screens = screens();
-        screens.put("HOME", with(screens.get("HOME"), click("campaign").sometimes(),
+        screens.put("HOME", with(screens.get("HOME"), click("campaign").occasional(),
                 Strip.of(Scroll.wheel(-1), marks("engineer", "campaign"))));
 
         ScreenWalk.Result walked = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, s -> {}).go("CAMPAIGN", null);

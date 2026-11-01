@@ -34,7 +34,7 @@ class OutlineTest {
     private static ScreenGraph map() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), click("engineer"),
-                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").sometimes()));
+                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").occasional()));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
                 .from(ref("HOME", "campaign")), click("claim").tried(), click("map")));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))

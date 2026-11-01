@@ -15,18 +15,18 @@ import java.util.function.BooleanSupplier;
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells
  * @param never        why it is never done; null when it may be
- * @param comesAndGoes whether it shows only at times
- * @param lock         the picture proving it locked on this account; null when it is not
+ * @param isOccasional whether it shows only at times
+ * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when it is there, for one that comes and goes; null when not known
  * @param gesture      how it is pressed; {@link Gesture#CLICK} when null
  * @param hold         how long a {@link Gesture#HOLD} is held; {@link Button#HOLD_TIME} when null, none for any other
  */
 public record TextButton(Caption caption, boolean isTried, boolean isLeaving, boolean isInfo, String never,
-                         boolean comesAndGoes, ImageTemplate lock, BooleanSupplier when, Gesture gesture,
+                         boolean isOccasional, ImageTemplate locked, BooleanSupplier when, Gesture gesture,
                          Duration hold) implements Input {
 
     public TextButton {
-        comesAndGoes = comesAndGoes || when != null;
+        isOccasional = isOccasional || when != null;
         gesture = gesture == null ? Gesture.CLICK : gesture;
         if (gesture != Gesture.HOLD) hold = null;
     }
@@ -38,52 +38,64 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
 
     @Override
     public TextButton tried() {
-        return new TextButton(caption, true, isLeaving, isInfo, never, comesAndGoes, lock, when, gesture, hold);
+        return new TextButton(caption, true, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold);
     }
 
     @Override
+    public TextButton leaving() {
+        return new TextButton(caption, isTried, true, isInfo, never, isOccasional, locked, when, gesture, hold);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
     public TextButton leaves() {
-        return new TextButton(caption, isTried, true, isInfo, never, comesAndGoes, lock, when, gesture, hold);
+        return leaving();
     }
 
     @Override
     public TextButton info() {
-        return new TextButton(caption, isTried, isLeaving, true, never, comesAndGoes, lock, when, gesture, hold);
+        return new TextButton(caption, isTried, isLeaving, true, never, isOccasional, locked, when, gesture, hold);
     }
 
     @Override
     public TextButton never(String why) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, why, comesAndGoes, lock, when, gesture, hold);
+        return new TextButton(caption, isTried, isLeaving, isInfo, why, isOccasional, locked, when, gesture, hold);
     }
 
     @Override
+    public TextButton occasional() {
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, true, locked, when, gesture, hold);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
     public TextButton sometimes() {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, true, lock, when, gesture, hold);
+        return occasional();
     }
 
     @Override
-    public TextButton locked(ImageTemplate lock) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when, gesture, hold);
+    public TextButton locked(ImageTemplate proof) {
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, proof, when, gesture, hold);
     }
 
     @Override
     public TextButton when(BooleanSupplier condition) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, comesAndGoes, lock, condition, gesture, hold);
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, condition, gesture, hold);
     }
 
     /** This button, reading {@code caption} instead. */
     public TextButton caption(Caption caption) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when, gesture, hold);
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold);
     }
 
     /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
     public TextButton gesture(Gesture gesture) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when, gesture, hold);
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public TextButton hold(Duration time) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when, Gesture.HOLD, time);
+        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, Gesture.HOLD, time);
     }
 
     /** How long it is held when its gesture is a hold: its own time, else {@link Button#HOLD_TIME}. */

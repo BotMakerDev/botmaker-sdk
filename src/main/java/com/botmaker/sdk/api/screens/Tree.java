@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.ArrayDeque;
@@ -28,22 +29,22 @@ import java.util.function.BooleanSupplier;
  *
  * @param nodes        its nodes, in the order they are written
  * @param isDragged    whether the view is dragged to scroll it
- * @param notches      how far one wheel scroll turns, for a tree the wheel scrolls; 0 when it does not
+ * @param wheel        how many notches one wheel scroll turns, for a tree the wheel scrolls; 0 when it does not
  * @param isTried      whether Discovery scrolled it
  * @param isLeaving    whether its nodes go to screens mapped already that they are no way into
  * @param isInfo       whether its nodes only tell
  * @param never        why its nodes are never done; null when they may be
- * @param comesAndGoes whether its nodes each show only at times
- * @param lock         the picture proving it locked on this account; null when it is not
+ * @param isOccasional whether its nodes each show only at times
+ * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when its nodes are there; null when not known
  */
-public record Tree(List<Node> nodes, boolean isDragged, int notches, boolean isTried, boolean isLeaving,
-                   boolean isInfo, String never, boolean comesAndGoes, ImageTemplate lock, BooleanSupplier when)
+public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTried, boolean isLeaving,
+                   boolean isInfo, String never, boolean isOccasional, ImageTemplate locked, BooleanSupplier when)
         implements Input {
 
     public Tree {
         nodes = nodes == null ? List.of() : List.copyOf(nodes);
-        comesAndGoes = comesAndGoes || when != null;
+        isOccasional = isOccasional || when != null;
     }
 
     /** One step of a walk from a node to a connected one, by the offset written on either. */
@@ -55,53 +56,73 @@ public record Tree(List<Node> nodes, boolean isDragged, int notches, boolean isT
     }
 
     /** This tree, scrolled by dragging its view. */
+    @Link
     public Tree dragged() {
-        return new Tree(nodes, true, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
+        return new Tree(nodes, true, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
     }
 
     /** This tree, scrolled by the wheel, {@code notches} a scroll: how far only, a walk turns it the way a node lies. */
+    @Link
     public Tree wheel(int notches) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
+        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+    }
+
+    /** How many notches one wheel scroll turns; 0 when the wheel does not scroll it. */
+    @Deprecated(forRemoval = true)
+    public int notches() {
+        return wheel;
     }
 
     @Override
     public Tree tried() {
-        return new Tree(nodes, isDragged, notches, true, isLeaving, isInfo, never, comesAndGoes, lock, when);
+        return new Tree(nodes, isDragged, wheel, true, isLeaving, isInfo, never, isOccasional, locked, when);
     }
 
     @Override
+    public Tree leaving() {
+        return new Tree(nodes, isDragged, wheel, isTried, true, isInfo, never, isOccasional, locked, when);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
     public Tree leaves() {
-        return new Tree(nodes, isDragged, notches, isTried, true, isInfo, never, comesAndGoes, lock, when);
+        return leaving();
     }
 
     @Override
     public Tree info() {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, true, never, comesAndGoes, lock, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, true, never, isOccasional, locked, when);
     }
 
     @Override
     public Tree never(String why) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, why, comesAndGoes, lock, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, why, isOccasional, locked, when);
     }
 
     @Override
+    public Tree occasional() {
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, true, locked, when);
+    }
+
+    @Override
+    @Deprecated(forRemoval = true)
     public Tree sometimes() {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, true, lock, when);
+        return occasional();
     }
 
     @Override
-    public Tree locked(ImageTemplate lock) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
+    public Tree locked(ImageTemplate proof) {
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, proof, when);
     }
 
     @Override
     public Tree when(BooleanSupplier condition) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, condition);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, condition);
     }
 
     /** This tree, its nodes {@code nodes}. */
     public Tree nodes(List<Node> nodes) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, comesAndGoes, lock, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
     }
 
     /** This tree without the node whose picture is {@code id}, and with no unlock line or offset naming it. */
@@ -118,7 +139,7 @@ public record Tree(List<Node> nodes, boolean isDragged, int notches, boolean isT
 
     /** Whether it scrolls at all: dragged or by the wheel. */
     public boolean scrolls() {
-        return isDragged || notches != 0;
+        return isDragged || wheel != 0;
     }
 
     /** The pictures of its nodes, in order. */

@@ -336,11 +336,11 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         if (group.isEmpty()) return input;
         Input s = group.get();
         Input now = input;
-        if (s.comesAndGoes() && !now.comesAndGoes()) now = now.sometimes();
+        if (s.isOccasional() && !now.isOccasional()) now = now.occasional();
         if (now.when() == null && s.when() != null) now = now.when(s.when());
         if (!now.isInfo() && s.isInfo()) now = now.info();
         if (now.never() == null && s.never() != null) now = now.never(s.never());
-        if (now.lock() == null && s.lock() != null) now = now.locked(s.lock());
+        if (now.locked() == null && s.locked() != null) now = now.locked(s.locked());
         return now;
     }
 }

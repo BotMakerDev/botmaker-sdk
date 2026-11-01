@@ -23,7 +23,7 @@ import java.util.List;
 public final class Screens {
 
     public static final class Home extends Screen {
-        public final Button collect = Button.of(Pictures.COLLECT).tried().sometimes();
+        public final Button collect = Button.of(Pictures.COLLECT).tried().occasional();
         public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE);
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clears().submits();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));

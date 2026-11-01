@@ -17,6 +17,17 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- **Four input names now read like the rest.** `.leaves()` is `.leaving()`, `.sometimes()` is `.occasional()`
+  (read back by `isOccasional()`, was `comesAndGoes()`), `lock()` is `locked()`, and a tree's `notches()` is
+  `wheel()`. The old names still compile in this release, deprecated; Studio's *Project ▸ Migrate…* rewrites them
+  with the rules this release ships. The next release removes them.
+- `Scroll.drag`'s first parameter is named `drag`, `Element.byHolding`'s `holding`; nothing changes for a bot.
+- Studio writes a screen's inputs, scrolls, picks, readouts, elements, zones and launchers as before. The SDK now
+  declares them by `@Link` and the factory's own parameter names, and Studio picks the factory that rebuilds
+  each value.
+
 ## [1.9.0] — 2026-11-01
 
 ### Added

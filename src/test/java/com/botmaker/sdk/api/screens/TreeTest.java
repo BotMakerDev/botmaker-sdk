@@ -62,7 +62,7 @@ class TreeTest {
     @Test
     void aTreeScrollsByDragOrWheelOrNot() {
         assertTrue(TREE.scrolls());
-        assertEquals(-3, Tree.of(List.of()).wheel(-3).notches());
+        assertEquals(-3, Tree.of(List.of()).wheel(-3).wheel());
         assertTrue(Tree.of(List.of()).wheel(-3).scrolls());
         assertFalse(Tree.of(List.of()).scrolls());
     }

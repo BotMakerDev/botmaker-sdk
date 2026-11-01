@@ -49,7 +49,7 @@ class ScreenCardsTest {
     private static Map<String, MapScreen> screens() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), click("engineer"),
-                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").sometimes()));
+                click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").occasional()));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
                         .from(ref("HOME", "campaign")),
                 click("claim").tried(), click("map"),
@@ -263,7 +263,7 @@ class ScreenCardsTest {
         ImageTemplate arena = picture("arena").at(new Rect(12, 340, 100, 100));
         ImageTemplate library = picture("library");
         Setup setup = Setup.named("Home").markers(marks("home"));
-        MapScreen home = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).sometimes(),
+        MapScreen home = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).occasional(),
                 click("mail"), Strip.of(Scroll.wheel(-5), List.of(arena, tavern, library)));
         ScreenGraph graph = ScreenGraph.of(Map.of("HOME", home));
         List<ScreenCards.Row> rows = ScreenCards.rows(graph, "HOME");
@@ -278,7 +278,7 @@ class ScreenCardsTest {
         assertTrue(column.has(rows.get(0)));
         assertFalse(column.has(rows.get(3)), "mail is boxed on the shot as before");
 
-        MapScreen nowhere = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).sometimes(),
+        MapScreen nowhere = screen(setup, Button.of(tavern), Button.of(arena), Button.of(library).occasional(),
                 click("mail"), Strip.of(Scroll.wheel(-5), List.of(library, picture("mail"))));
         assertEquals(List.of(), ScreenCards.strips(ScreenGraph.of(Map.of("HOME", nowhere)), "HOME", rows),
                 "no member has a place: no strip");

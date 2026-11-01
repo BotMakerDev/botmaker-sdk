@@ -271,7 +271,7 @@ public final class FlowTypes implements TypeHolder {
 
     /** {@code Flow.limits(int, int)}. */
     public static final DeclaredCall<Flow.Limits> LIMITS_SHAPE = ComponentType.part(Flow.Limits.class)
-            .writtenAs(Flow::limits, Flow.Limits::maxSteps, Flow.Limits::stepDelayMs);
+            .<Integer, Integer, Flow.Limits>writtenAs(Flow::limits);
 
     /**
      * {@code FlowLayout.of(Map<String, Cards>, boolean)}: the card positions, the {@code FLOW_LAYOUT} value beside
@@ -288,7 +288,7 @@ public final class FlowTypes implements TypeHolder {
 
     /** {@code FlowLayout.at(int, int)}. */
     public static final DeclaredCall<FlowLayout.Spot> SPOT_SHAPE = ComponentType.part(FlowLayout.Spot.class)
-            .writtenAs(FlowLayout::at, FlowLayout.Spot::x, FlowLayout.Spot::y);
+            .writtenAs(FlowLayout::at);
 
 
 

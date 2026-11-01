@@ -1216,7 +1216,7 @@ class SdkAssistTest {
         tryOne("screen", "Home", "picture", "feed", "scroll", -2, "desktop", true, "settleMs", 0);
         Input scrolled = input("HOME", "feed");
         assertTrue(scrolled instanceof Strip strip && strip.scroll().notches() == -2, "the feed's cut is its strip now");
-        assertTrue(scrolled.comesAndGoes(), "the scroll still comes and goes");
+        assertTrue(scrolled.isOccasional(), "the scroll still comes and goes");
 
         String still = text(tryOne("screen", "Home", "key", "Q", "desktop", true, "settleMs", 0));
         assertTrue(still.contains("tried keyQ, no visible effect"), still);
@@ -1590,12 +1590,12 @@ class SdkAssistTest {
         assertTrue(text(run("edit_map", "screen", "Home", "action", "set_input", "picture", "nope", "did", "tried"))
                 .contains("its inputs: gem, key_q, tab"));
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "locked", "lock");
-        assertEquals("lock", input("HOME", "tab").lock().id());
+        assertEquals("lock", input("HOME", "tab").locked().id());
         assertNull(input("HOME", "tab").never());
         run("edit_map", "screen", "Home", "action", "reset_input", "picture", "tab");
         assertFalse(input("HOME", "tab").settled(), "untried again");
         run("edit_map", "screen", "Home", "action", "set_input", "picture", "tab", "sometimes", true);
-        assertTrue(input("HOME", "tab").comesAndGoes());
+        assertTrue(input("HOME", "tab").isOccasional());
         run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method", "Bot::eventOn");
         assertEquals("Bot::eventOn", ScreenTypes.sourceOf(input("HOME", "tab").when()));
         // The method goes into Screens.java as written: anything but a method reference is refused.
@@ -1785,7 +1785,7 @@ class SdkAssistTest {
         run("edit_map", "screen", "Tree", "action", "group", "kind", "tree", "members", List.of("damage", "health"),
                 "by", "wheel", "notches", -3);
         Tree regrouped = screen("TREE").trees().get("damageTree");
-        assertEquals(-3, regrouped.notches());
+        assertEquals(-3, regrouped.wheel());
         assertFalse(regrouped.isDragged());
         assertEquals(List.of("damage"), regrouped.node(picture("health")).orElseThrow().after().stream()
                 .map(ImageTemplate::id).toList(), "a node kept keeps its lines");

@@ -144,7 +144,7 @@ final class TreeWalk {
                             + "scrolls it up and down.");
                 }
                 // Negative notches scroll down, as a strip's do; the tree's own say only how far.
-                int notches = Math.abs(tree.notches());
+                int notches = Math.abs(tree.wheel());
                 reach.scroll(c, my > 0 ? -notches : notches);
                 // How far a notch moves the view is not known: only the pixels tell.
                 moved = null;

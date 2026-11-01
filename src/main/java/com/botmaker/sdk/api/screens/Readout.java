@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.DigitSet;
 
@@ -38,6 +39,7 @@ public record Readout(Zone zone, DigitSet digits, boolean isSubject, Element ele
     }
 
     /** This readout, naming which one its screen shows: the hero's name on a hero's page. */
+    @Link
     public Readout subject() {
         return new Readout(zone, digits, true, element);
     }

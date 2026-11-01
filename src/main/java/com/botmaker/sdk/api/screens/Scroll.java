@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
+
 import java.time.Duration;
 
 /**
@@ -50,27 +52,31 @@ public record Scroll(int notches, Order drag, int px, Duration time, int step, D
         return new Scroll(notches, null, 0, Duration.ZERO, 0, SETTLE, MOST, null);
     }
 
-    /** The pointer dragged {@code px} toward {@code way} over {@code time}, from a member that shows. */
-    public static Scroll drag(Order way, int px, Duration time) {
-        return new Scroll(0, way, px, time, 0, SETTLE, MOST, null);
+    /** The pointer dragged {@code px} toward {@code drag} over {@code time}, from a member that shows. */
+    public static Scroll drag(Order drag, int px, Duration time) {
+        return new Scroll(0, drag, px, time, 0, SETTLE, MOST, null);
     }
 
     /** This scroll, its members moving {@code px} on each. */
+    @Link
     public Scroll step(int px) {
         return new Scroll(notches, drag, this.px, time, px, settle, most, in);
     }
 
     /** This scroll, its strip looked at for up to {@code time} to hold still after each. */
+    @Link
     public Scroll settle(Duration time) {
         return new Scroll(notches, drag, px, this.time, step, time, most, in);
     }
 
     /** This scroll, done at most {@code n} times each way looking for a member. */
+    @Link
     public Scroll most(int n) {
         return new Scroll(notches, drag, px, time, step, settle, n, in);
     }
 
     /** This scroll, done over the app's list {@code list}, found in the screen's tree; null: over a member. */
+    @Link
     public Scroll in(Element list) {
         return new Scroll(notches, drag, px, time, step, settle, most, list);
     }

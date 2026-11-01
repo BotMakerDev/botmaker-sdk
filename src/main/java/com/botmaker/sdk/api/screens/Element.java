@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.text.Words;
 
 /**
@@ -55,50 +56,58 @@ public record Element(String id, Words label, Words text, Words holding, Element
         return new Element(null, null, required(text, "text"), null, null, null, null, null);
     }
 
-    /** The element holding {@code text} in one of its descendants: a row, by the words in it. */
-    public static Element byHolding(Words text) {
-        return new Element(null, null, null, required(text, "holding"), null, null, null, null);
+    /** The element holding {@code holding} in one of its descendants: a row, by the words in it. */
+    public static Element byHolding(Words holding) {
+        return new Element(null, null, null, required(holding, "holding"), null, null, null, null);
     }
 
     /** This element, with the resource id {@code id} too. */
+    @Link
     public Element id(String id) {
         return new Element(requiredId(id), label, text, holding, inside, below, index, shot);
     }
 
     /** This element, called {@code label} too. */
+    @Link
     public Element label(Words label) {
         return new Element(id, required(label, "label"), text, holding, inside, below, index, shot);
     }
 
     /** This element, showing {@code text} too. */
+    @Link
     public Element text(Words text) {
         return new Element(id, label, required(text, "text"), holding, inside, below, index, shot);
     }
 
-    /** This element, holding {@code text} too. */
-    public Element holding(Words text) {
-        return new Element(id, label, this.text, required(text, "holding"), inside, below, index, shot);
+    /** This element, holding {@code holding} too. */
+    @Link
+    public Element holding(Words holding) {
+        return new Element(id, label, text, required(holding, "holding"), inside, below, index, shot);
     }
 
     /**
      * This element, inside {@code container}: the "Network &amp; internet" of the list, not of the page beside it.
      * {@code container} is declared above this one: one declared below is still null here.
      */
+    @Link
     public Element inside(Element container) {
         return new Element(id, label, text, holding, required(container, "inside"), below, index, shot);
     }
 
     /** This element, the nearest one under {@code neighbour}, declared above this one. */
+    @Link
     public Element below(Element neighbour) {
         return new Element(id, label, text, holding, inside, required(neighbour, "below"), index, shot);
     }
 
     /** This element, the {@code index}-th, from 0, of what its other clues find: it breaks when the list changes. */
+    @Link
     public Element index(int index) {
         return new Element(id, label, text, holding, inside, below, index, shot);
     }
 
     /** This element, shown in Studio as the picture at {@code path}. */
+    @Link
     public Element shot(String path) {
         return new Element(id, label, text, holding, inside, below, index, path);
     }

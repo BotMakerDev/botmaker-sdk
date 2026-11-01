@@ -121,7 +121,7 @@ public final class SdkTypes implements TypeHolder {
             .fresh(SdkTypes::placeholder)
             .editor(() -> TemplateEditors::template)
             .preview(() -> TemplateEditors::preview)
-            .writtenAs(ImageTemplate::new, ImageTemplate::filePath)
+            .writtenAs(ImageTemplate::new)
             .with(ImageTemplate::at, ImageTemplate::place)
             .with(ImageTemplate::in, ImageTemplate::frame)
             .with(ImageTemplate::tags, ImageTemplate::tags)
@@ -170,14 +170,14 @@ public final class SdkTypes implements TypeHolder {
     public static final DeclaredCallType<DigitSet> DIGIT_SET = PluginType.value(DigitSet.class)
             .fresh(() -> new DigitSet("digits/digits"))
             .editor(() -> OcrEditors::digits)
-            .writtenAs(DigitSet::new, DigitSet::folder)
+            .writtenAs(DigitSet::new)
             .with(DigitSet::in, DigitSet::frame);
 
     /** A text of the bot's, {@code Words.of("Dragons")}: what a text field of the map types (2026-10-22). */
     public static final DeclaredCallType<Words> WORDS = PluginType.value(Words.class)
             .fresh(() -> Words.of(""))
             .editor(() -> OcrEditors::words)
-            .writtenAs(Words::of, Words::text);
+            .writtenAs(Words::of);
 
     /**
      * An app's input found in the screen's tree, {@code Element.byId("title").text(Texts.BATTERY)}, and each other clue
@@ -188,41 +188,19 @@ public final class SdkTypes implements TypeHolder {
     public static final DeclaredCallType<Element> ELEMENT = PluginType.value(Element.class)
             .fresh(() -> Element.byText(Words.of("")))
             .editor(() -> ScreenEditors::element)
-            .writtenAs(Element::byText, Element::text)
-            .<Words>with(Element::holding, Element::holding)
-            .<Element>with(Element::inside, Element::inside)
-            .<Element>with(Element::below, Element::below)
-            .<Integer>with(Element::index, Element::index)
-            .<String>with(Element::shot, Element::shot)
+            .writtenAs(Element::byText)
             .when(element -> element.id() == null && element.label() == null && element.text() != null);
 
-    /** {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)} or {@code byHolding(…)}. */
+    /**
+     * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)} or {@code byHolding(…)}.
+     * Every factory rebuilds an element with every clue, so a {@code when} says which first clue it is written by.
+     */
     public static final List<DeclaredCall<Element>> ELEMENT_BY_OTHER_CLUES = List.of(
-            ComponentType.part(Element.class)
-                    .<String, Element>writtenAs(Element::byId, Element::id)
-                    .<Words>with(Element::label, Element::label)
-                    .<Words>with(Element::text, Element::text)
-                    .<Words>with(Element::holding, Element::holding)
-                    .<Element>with(Element::inside, Element::inside)
-                    .<Element>with(Element::below, Element::below)
-                    .<Integer>with(Element::index, Element::index)
-                    .<String>with(Element::shot, Element::shot)
+            ComponentType.part(Element.class).<String, Element>writtenAs(Element::byId)
                     .when(element -> element.id() != null),
-            ComponentType.part(Element.class)
-                    .<Words, Element>writtenAs(Element::byLabel, Element::label)
-                    .<Words>with(Element::text, Element::text)
-                    .<Words>with(Element::holding, Element::holding)
-                    .<Element>with(Element::inside, Element::inside)
-                    .<Element>with(Element::below, Element::below)
-                    .<Integer>with(Element::index, Element::index)
-                    .<String>with(Element::shot, Element::shot)
+            ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byLabel)
                     .when(element -> element.id() == null && element.label() != null),
-            ComponentType.part(Element.class)
-                    .<Words, Element>writtenAs(Element::byHolding, Element::holding)
-                    .<Element>with(Element::inside, Element::inside)
-                    .<Element>with(Element::below, Element::below)
-                    .<Integer>with(Element::index, Element::index)
-                    .<String>with(Element::shot, Element::shot)
+            ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byHolding)
                     .when(element -> element.id() == null && element.label() == null && element.text() == null));
 
     /**
@@ -254,7 +232,7 @@ public final class SdkTypes implements TypeHolder {
     public static final DeclaredCallType<Zone> ZONE = PluginType.value(Zone.class)
             .fresh(() -> new Zone(0, 0, 0, 0))
             .editor(() -> GeometryEditors::zone)
-            .writtenAs(Zone::new, Zone::x, Zone::y, Zone::width, Zone::height)
+            .writtenAs(Zone::new)
             .with(Zone::anchored, Zone::anchor);
 
     /** A key on the keyboard. An enum's Java is its constant, so it needs no call. */
@@ -288,7 +266,7 @@ public final class SdkTypes implements TypeHolder {
 
     /** {@code KeySequence.step(combo, after)}: one step of a sequence, never declared or picked on its own. */
     public static final DeclaredCall<KeySequence.Press> STEP = ComponentType.part(KeySequence.Press.class)
-            .writtenAs(KeySequence::step, KeySequence.Press::combo, KeySequence.Press::after);
+            .writtenAs(KeySequence::step);
 
     /**
      * Combos one after another, written {@code KeySequence.of(step(…), step(…))}: a run of {@link #STEP}s. A
@@ -333,7 +311,7 @@ public final class SdkTypes implements TypeHolder {
             .fresh(() -> Launcher.of(""))
             .editor(() -> LauncherEditors::launcher)
             .preview(() -> LauncherEditors::preview)
-            .writtenAs(Launcher::of, Launcher::spec);
+            .writtenAs(Launcher::of);
 
     /**
      * Which of the bot's launchers a run starts, {@code LaunchChoice.of("steam:570")}: drawn as a pill offering only
@@ -344,7 +322,7 @@ public final class SdkTypes implements TypeHolder {
             .fresh(() -> LaunchChoice.of(""))
             .editor(() -> LauncherEditors::choice)
             .preview(() -> LauncherEditors::choicePreview)
-            .writtenAs(LaunchChoice::of, LaunchChoice::spec);
+            .writtenAs(LaunchChoice::of);
 
     /**
      * One activity of the flow: the bot's {@code Activities.Collect} enum, which an editor holds by name

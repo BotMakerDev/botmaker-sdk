@@ -90,34 +90,34 @@ public final class ScreenEdits {
     /** {@code input} as it was cut, untried: tried, leaving, never and lock cleared, the rest kept. */
     public static Input untried(Input input) {
         return switch (input) {
-            case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.comesAndGoes(), null,
+            case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.isOccasional(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
-            case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.comesAndGoes(), null, h.when());
-            case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.comesAndGoes(), null,
+            case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.isOccasional(), null, h.when());
+            case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.isOccasional(), null,
                     t.when(), t.gesture(), t.hold());
-            case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.comesAndGoes(), null,
+            case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.isOccasional(), null,
                     s.when());
-            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), false, false, t.isInfo(), null,
-                    t.comesAndGoes(), null, t.when());
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), false, false, t.isInfo(), null,
+                    t.isOccasional(), null, t.when());
         };
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
-        if (sometimes) return input.sometimes();
+        if (sometimes) return input.occasional();
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
-                    b.lock(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
+                    b.locked(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
-            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.lock(),
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.locked(),
                     null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
-                    t.lock(), null, t.gesture(), t.hold());
+                    t.locked(), null, t.gesture(), t.hold());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
-                    false, s.lock(), null);
-            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), t.isInfo(),
-                    t.never(), false, t.lock(), null);
+                    false, s.locked(), null);
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), t.isInfo(),
+                    t.never(), false, t.locked(), null);
         };
     }
 
@@ -125,17 +125,17 @@ public final class ScreenEdits {
     public static Input info(Input input, boolean info) {
         if (info) return input.info();
         return switch (input) {
-            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.comesAndGoes(),
-                    b.lock(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
+            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.isOccasional(),
+                    b.locked(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
-            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.comesAndGoes(),
-                    h.lock(), h.when());
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.isOccasional(),
+                    h.locked(), h.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
-                    t.comesAndGoes(), t.lock(), t.when(), t.gesture(), t.hold());
+                    t.isOccasional(), t.locked(), t.when(), t.gesture(), t.hold());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
-                    s.comesAndGoes(), s.lock(), s.when());
-            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.notches(), t.isTried(), t.isLeaving(), false,
-                    t.never(), t.comesAndGoes(), t.lock(), t.when());
+                    s.isOccasional(), s.locked(), s.when());
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), false,
+                    t.never(), t.isOccasional(), t.locked(), t.when());
         };
     }
 
@@ -202,7 +202,7 @@ public final class ScreenEdits {
      */
     public static String setTree(StudioServices services, String constant, String field, Tree tree) {
         String names = tree.members().stream().map(ImageTemplate::id).collect(Collectors.joining(", "));
-        String scrolled = tree.isDragged() ? "dragged" : tree.notches() != 0 ? "scrolled by the wheel"
+        String scrolled = tree.isDragged() ? "dragged" : tree.wheel() != 0 ? "scrolled by the wheel"
                 : "fitting on the screen";
         return said(ScreenBook.update(services, constant, s -> withTree(s, field, tree)),
                 tree.nodes().isEmpty() ? "The tree is off " + constant + ": its buttons are looked for at their places."
@@ -241,8 +241,8 @@ public final class ScreenEdits {
         Tree made = tree.nodes(tree.nodes().stream()
                 .map(n -> n.picture() == null ? n : kept.getOrDefault(n.picture().id(), n)).toList());
         if (had != null) {
-            made = new Tree(made.nodes(), tree.isDragged(), tree.notches(), had.isTried(), had.isLeaving(),
-                    had.isInfo(), had.never(), had.comesAndGoes(), had.lock(), had.when());
+            made = new Tree(made.nodes(), tree.isDragged(), tree.wheel(), had.isTried(), had.isLeaving(),
+                    had.isInfo(), had.never(), had.isOccasional(), had.locked(), had.when());
         }
         for (String gone : kept.keySet()) {
             if (made.members().stream().noneMatch(p -> p != null && p.id().equals(gone))) made = made.without(gone);
@@ -669,7 +669,7 @@ public final class ScreenEdits {
     /** {@code button} stepping through its looks on each press ({@link Button#cycling}), or not. */
     public static Button cycles(Button button, boolean cycles) {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
-                button.comesAndGoes(), button.lock(), button.looks(), button.when(), button.repeats(), cycles,
+                button.isOccasional(), button.locked(), button.looks(), button.when(), button.repeats(), cycles,
                 button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
                 button.grid(), button.element());
     }
