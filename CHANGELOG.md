@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.9.1] — 2026-11-01
 
 - **Four input names now read like the rest.** `.leaves()` is `.leaving()`, `.sometimes()` is `.occasional()`
   (read back by `isOccasional()`, was `comesAndGoes()`), `lock()` is `locked()`, and a tree's `notches()` is
