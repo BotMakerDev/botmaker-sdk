@@ -69,8 +69,8 @@ final class InstallRow {
         state.setWrapText(true);
         install.setOnAction(e -> run("Installing", GameInstall::install));
         update.setOnAction(e -> run("Updating", GameInstall::update));
-        apkPure.setTooltip(new Tooltip("When the emulator has no Google Play, BotMaker downloads the game from APKPure "
-                + "with apkeep"));
+        apkPure.setTooltip(new Tooltip("When Google Play's files can't be had through goopdl and the emulator has no "
+                + "Google Play, BotMaker downloads the game from APKPure with apkeep"));
         apkPure.setOnAction(e -> apkPureChanged());
         googlePlay.setOnAction(e -> showGooglePlay());
         // The state on a line of its own: beside four controls it left them too little, cut at 760 px (2026-11-01).
@@ -169,7 +169,8 @@ final class InstallRow {
         alert.setHeaderText("APKPure is a third-party copy of Google Play");
         Label text = new Label("It has been found serving modified apps, which can carry malware. apkeep, the "
                 + "downloader BotMaker uses, warns about it on its own page. Allow BotMaker to download Android games "
-                + "from APKPure on this computer when an emulator has no Google Play? You can untick this later.");
+                + "from APKPure on this computer when Google Play's files can't be had and an emulator has no Google "
+                + "Play? You can untick this later.");
         text.setWrapText(true);
         text.setMaxWidth(460);
         Hyperlink link = new Hyperlink(ApkDownload.DANGERS);

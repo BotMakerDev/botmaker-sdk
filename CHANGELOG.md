@@ -44,6 +44,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   game comes from BotMaker's APK library, Google Play, APKPure (once you tick **Download from APKPure** and accept
   its warning; asked once) or its store page; **Get Google Play…** shows how to add Google Play to the emulator. A
   file installed with **Install from file…** is kept in the APK library.
+- **Android games come from Google Play's own files first.** After the APK library, BotMaker downloads the game from
+  Google Play with goopdl, with no Google account and no Google Play on the emulator; the Play app, APKPure and the
+  store page come after. The Game dialog's line and `install_game` say which source served the game.
 - **The assistant installs games too**: `setup`'s `readiness`, `install_game` (optionally a file the user named) and
   `update_game`, in the background. `launch_game` checks the game first and says the fix (not installed, signed
   out, updating) instead of failing. Some tool descriptions were shortened to stay in budget.
