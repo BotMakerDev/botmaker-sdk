@@ -20,10 +20,14 @@ import com.botmaker.sdk.plugin.screen.OpenWindows;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.emulator.ApkDownload;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.Platforms.PlatformStatus;
+import com.botmaker.shared.launch.AndroidInstall;
+import com.botmaker.shared.launch.GameInstall;
+import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
@@ -32,6 +36,9 @@ import com.botmaker.session.display.SessionBackends;
 import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.awt.Rectangle;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -41,10 +48,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -140,32 +150,43 @@ final class SetupTools {
     sealed interface Step {
     }
 
-    @Describe("where the bot looks and clicks, what this computer launches, and the bot's own settings")
+    @Describe("where the bot looks, what it launches, its settings")
     record Read() implements Step {
     }
 
-    @Describe("point the bot at an open window; it finds it again by its class (and its title when the class is "
-            + "shared), never by title alone")
+    @Describe("point the bot at an open window, found again by its class (and title when the class is shared)")
     record SetCaptureSource(@Describe("the window's title, as list_windows gives it") String window) implements Step {
     }
 
-    @Describe("change one of the bot's own settings in Sdk.settings(), as ⚙ Bot Settings does")
+    @Describe("change one of the bot's settings in Sdk.settings()")
     record SetSetting(@Describe("which setting; read lists them") Setting setting,
                       @Describe("its new value: a number, true or false, or a place's or backend's id")
                       String value) implements Step {
     }
 
-    @Describe("point the bot at an emulator, and with app make this computer launch that app on it")
+    @Describe("point the bot at an emulator; with app, launch that app on it")
     record UseEmulator(@Describe("the emulator's name, as list_emulators gives it") String name,
                        @Describe(value = "an app's package on it, com.example.game", optional = true) String app)
             implements Step {
     }
 
-    @Describe("make a launcher the bot's first in Sdk.launchTargets: each computer starts the first its system can")
-    record SetLaunchTarget(@Describe("what to launch, as list_games names it: steam:<appId>, lutris:<gameId>, "
-            + "epic:<appName>, heroic:<appName>, faugus:<gameId> or emu-app:<package>@<emulator>; a command line or an "
-            + "executable is the user's to set")
+    @Describe("make a target first in Sdk.launchTargets; each computer starts the first it can")
+    record SetLaunchTarget(@Describe("as list_games names it (steam:620, emu-app:<package>@<emulator>…); cli: and exe: "
+            + "are the user's to set")
                            String target) implements Step {
+    }
+
+    @Describe("is the target's game installed, where it installs from, how the last install went")
+    record Readiness() implements Step {
+    }
+
+    @Describe("install the target's game via its launcher, in the background")
+    record InstallGame(@Describe(value = "an .apk/.xapk the user named; Android only", optional = true) String file)
+            implements Step {
+    }
+
+    @Describe("update it, as install_game")
+    record UpdateGame() implements Step {
     }
 
     record Launch(@Describe(value = "seconds to wait for the window the bot looks at to open, up to "
@@ -176,8 +197,8 @@ final class SetupTools {
     static final int MAX_LAUNCH_WAIT = 50;
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its own settings, "
-                    + "all in the bot's Java; starts nothing", Step.class, SetupTools::setup),
+            ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its settings, in "
+                    + "its Java; installs or updates its game", Step.class, SetupTools::setup),
             AssistantTool.named("list_windows")
                     .describedAs("The windows open on the desktop now, each with its class and size, for "
                             + "setup's set_capture_source")
@@ -186,14 +207,12 @@ final class SetupTools {
                     .describedAs("The Android emulators set up on this computer, each with whether it is running")
                     .takesNothing().handledBy(SetupTools::listEmulators),
             AssistantTool.named("list_games")
-                    .describedAs("The games this computer's launchers have installed, each with the target "
-                            + "setup's set_launch_target takes, as the launch chooser lists them")
+                    .describedAs("The games this computer's launchers have, each with its set_launch_target target")
                     .takesNothing().handledBy(SetupTools::listGames),
             AssistantTool.named("launch_game")
-                    .describedAs("Starts the bot's launch target now, without running the bot, unless it is running "
-                            + "already: on this desktop, or in a private display when the settings say one, which the "
-                            + "look tools then read and the next run joins; given seconds, answers once the window the "
-                            + "bot looks at is open")
+                    .describedAs("Starts the bot's launch target without running the bot: here, or in the private "
+                            + "display the settings say, which the look tools read and the next run joins; with "
+                            + "seconds, answers once the bot's window is open")
                     .takes(Launch.class).handledBy(SetupTools::launchGame));
 
     private SetupTools() {}
@@ -205,7 +224,128 @@ final class SetupTools {
             case SetSetting setting -> setSetting(setting, context);
             case UseEmulator emulator -> useEmulator(emulator, context);
             case SetLaunchTarget target -> setLaunchTarget(target, context);
+            case Readiness readiness -> readiness(context);
+            case InstallGame install -> install(install.file(), false, context);
+            case UpdateGame update -> install(null, true, context);
         };
+    }
+
+    /** The install or update setup started last, until the next one; null before any. */
+    private static final AtomicReference<CompletableFuture<GameInstall.Result>> INSTALLING = new AtomicReference<>();
+
+    /** Installs on their own daemon thread: one waiting minutes on a download never holds up launch_game. */
+    private static final Executor INSTALLS = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "sdk-install-game");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** What the last install said while it runs; its result once done. */
+    private static final AtomicReference<String> INSTALL_LINE = new AtomicReference<>();
+
+    static AgentReply readiness(AgentContext context) {
+        LaunchSpec spec = launchSpec(context);
+        if (spec == null) return AgentReply.refused(NOTHING_LAUNCHED);
+        // The token reaches the launchers' probes and adb: held to the plain ids set_launch_target takes.
+        String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : null;
+        if (unsafe != null) return AgentReply.refused(unsafe);
+        GameInstall game = GameInstall.of(spec, ApkDownload.acknowledged());
+        GameReadiness readiness = game.readiness();
+        StringBuilder out = new StringBuilder(spec.describe() + ": " + readiness.state().displayName()
+                + (readiness.reason().isBlank() ? "." : " — " + readiness.reason()));
+        if (game instanceof GameInstall.None) {
+            out.append("\nBotMaker installs no ").append(spec.kind().displayName()).append(" game.");
+        } else {
+            out.append("\nInstalls from ").append(game.source()).append('.');
+        }
+        CompletableFuture<GameInstall.Result> last = INSTALLING.get();
+        if (last != null) {
+            out.append(last.isDone() ? "\nLast install: " : "\nInstalling now: ").append(INSTALL_LINE.get());
+        }
+        return AgentReply.text(out.toString());
+    }
+
+    /**
+     * install_game and update_game: started in the background, since a download or the user's press in a launcher
+     * takes minutes; readiness says how it went. A file is one the user named: only an app file, added to the APK
+     * library and installed.
+     */
+    static AgentReply install(String file, boolean update, AgentContext context) {
+        LaunchSpec spec = launchSpec(context);
+        if (spec == null) return AgentReply.refused(NOTHING_LAUNCHED);
+        String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe()
+                + " is a command line or an executable: BotMaker installs nothing for it.";
+        if (unsafe != null) return AgentReply.refused(unsafe);
+        GameInstall game = GameInstall.of(spec, ApkDownload.acknowledged());
+        if (game instanceof GameInstall.None) {
+            return AgentReply.refused("BotMaker installs no " + spec.kind().displayName() + " game: install it in its "
+                    + "launcher.");
+        }
+        Path app = null;
+        if (file != null && !file.isBlank()) {
+            if (!(game instanceof AndroidInstall)) {
+                return AgentReply.refused("A file installs an Android game only; " + spec.describe() + " comes from "
+                        + game.source() + ".");
+            }
+            try {
+                app = Path.of(file.strip());
+            } catch (InvalidPathException e) {
+                return AgentReply.refused(file + " is no path on this computer.");
+            }
+            String name = app.getFileName() == null ? "" : app.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (!Files.isRegularFile(app) || !(name.endsWith(".apk") || name.endsWith(".xapk")
+                    || name.endsWith(".apks"))) {
+                return AgentReply.refused(file + " is no .apk, .xapk or .apks file on this computer.");
+            }
+        }
+        Path named = app;
+        String doing = (update ? "Updating " : "Installing ") + spec.describe();
+        Consumer<String> progress = INSTALL_LINE::set;
+        CompletableFuture<GameInstall.Result> started;
+        // Checked and started as one: two calls at once start one install, never two in a row.
+        synchronized (INSTALLING) {
+            CompletableFuture<GameInstall.Result> running = INSTALLING.get();
+            if (running != null && !running.isDone()) {
+                return AgentReply.text("An install is still running: " + INSTALL_LINE.get() + " setup's readiness "
+                        + "says when it ends.");
+            }
+            INSTALL_LINE.set(doing + "…");
+            // The result line is written before the future completes, so a done future always has it.
+            started = CompletableFuture.supplyAsync(() -> {
+                try {
+                    GameInstall.Result result = named != null ? ((AndroidInstall) game).fromFile(named, progress)
+                            : update ? game.update(progress) : game.install(progress);
+                    INSTALL_LINE.set(result.outcome().displayName() + ": " + result.message());
+                    return result;
+                } catch (RuntimeException e) {
+                    INSTALL_LINE.set(doing + " failed: " + e);
+                    throw e;
+                }
+            }, INSTALLS);
+            INSTALLING.set(started);
+        }
+        try {
+            GameInstall.Result result = started.get(20, TimeUnit.SECONDS);
+            return result.outcome().done() || result.outcome() == GameInstall.Outcome.WAITING_FOR_USER
+                    ? AgentReply.text(result.outcome().displayName() + ": " + result.message())
+                    : AgentReply.refused(result.message());
+        } catch (TimeoutException slow) {
+            return AgentReply.text(doing + " from " + game.source() + " in the background: " + INSTALL_LINE.get()
+                    + " setup's readiness says when it ends.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return AgentReply.text(doing + " in the background.");
+        } catch (ExecutionException e) {
+            return AgentReply.refused(doing + " failed: " + e.getCause());
+        }
+    }
+
+    private static final String NOTHING_LAUNCHED = "The bot launches nothing on this computer. list_games and "
+            + "setup's set_launch_target pick what it starts.";
+
+    private static LaunchSpec launchSpec(AgentContext context) {
+        String current = FxCall.call(() -> LaunchTargetValue.current(context.services()));
+        return current == null ? null : LaunchSpec.parse(current);
     }
 
     /** The capture source, the launch target and every setting, in one answer. */
@@ -436,6 +576,22 @@ final class SetupTools {
         String unsafe = ASSISTANT_KINDS.contains(spec.kind()) ? unsafe(spec) : spec.describe() + " is a command "
                 + "line or an executable: it starts when you run the bot, not from the assistant.";
         if (unsafe != null) return AgentReply.refused(unsafe);
+        // As ▶ Launch asks first: a game not there, a launcher signed out or a download running is said with its fix.
+        // A game running already is past all of them.
+        GameReadiness readiness = Launcher.isRunning(spec) ? GameReadiness.ready() : GameReadiness.of(spec);
+        switch (readiness.state()) {
+            case NOT_INSTALLED -> {
+                return AgentReply.refused(readiness.reason() + " setup's install_game installs it.");
+            }
+            case SIGNED_OUT -> {
+                return AgentReply.refused(readiness.reason() + " The user signs in; then launch_game again.");
+            }
+            case UPDATING -> {
+                return AgentReply.refused(readiness.reason() + " launch_game again once it is done; setup's readiness "
+                        + "says when.");
+            }
+            default -> { }
+        }
         if (QuickLaunch.usesBackgroundSession(spec, settings.where() == BotSettings.Where.PRIVATE_DISPLAY)) {
             return launchPrivately(spec, launch, services);
         }

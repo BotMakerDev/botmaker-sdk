@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.shared.emulator.ApkLibrary;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstall;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -154,8 +155,17 @@ final class InstallGame {
                 "apk", "xapk", "apks").path().ifPresent(file -> chooseInstance(services, owner, null)
                 .ifPresent(instance -> {
                     report.say(true, "Installing " + file.getFileName() + " on " + instance.name() + "…");
-                    Async.load("file-install", () -> EmulatorInstall.fromFile(instance, file,
-                                    line -> Platform.runLater(() -> report.say(true, line))),
+                    // Kept in the APK library first, so an update or another instance finds it there.
+                    Async.load("file-install", () -> {
+                                Path kept;
+                                try {
+                                    kept = ApkLibrary.shared().add(file).file();
+                                } catch (IOException e) {
+                                    return new EmulatorInstall.Result(false, null, null, e.getMessage());
+                                }
+                                return EmulatorInstall.fromFile(instance, kept,
+                                        line -> Platform.runLater(() -> report.say(true, line)));
+                            },
                             result -> finished(result, instance, report, onInstalled),
                             why -> report.say(false, "Couldn't install " + file.getFileName() + ": " + why));
                 }));

@@ -104,6 +104,8 @@ public final class GameDialog {
     /** The games the bot supports, each with its ✕; hidden when picking for an editor. */
     private final FlowPane supported = new FlowPane(6, 6);
     private final Button launch;
+    /** The current target's readiness, Install and Update. */
+    private final InstallRow installRow;
     private Stage stage;
 
     /** One tile, kept for the search and for marking the current target. */
@@ -118,6 +120,11 @@ public final class GameDialog {
         this.picked = picked;
         this.launch = Styles.on(QuickLaunch.button(services, this::report), Styles.PRIMARY_BUTTON);
         launch.setText("▶ Launch game");
+        // An install changes the launcher's library or the instance's apps: both are read again.
+        this.installRow = new InstallRow(services, this::report, () -> {
+            rescan();
+            refreshCurrent();
+        });
     }
 
     /** The toolbar's press. */
@@ -170,7 +177,7 @@ public final class GameDialog {
         HBox currentRow = new HBox(8, current, spacer, launch);
         currentRow.setAlignment(Pos.CENTER_LEFT);
         // Picking for an editor: the bot's games are not what is being chosen, and a ✕ would write them.
-        for (Node own : List.of(currentRow, supported)) {
+        for (Node own : List.of(currentRow, installRow.node(), supported)) {
             own.setVisible(picked == null);
             own.setManaged(picked == null);
         }
@@ -232,7 +239,7 @@ public final class GameDialog {
         HBox closeRow = new HBox(close);
         closeRow.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox root = new VBox(10, heading, hint, currentRow, supported, search, filters, scroll, bottom, status,
+        VBox root = new VBox(10, heading, hint, currentRow, installRow.node(), supported, search, filters, scroll, bottom, status,
                 closeRow);
         root.setPadding(new Insets(16));
         stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 760, 640, 520, 420), root);
@@ -516,7 +523,10 @@ public final class GameDialog {
         String spec = LaunchTargetValue.current(services);
         current.setText(spec == null ? "Nothing picked yet." : "Launches here: " + GameButton.caption(services, spec));
         QuickLaunch.bind(launch, services, this::report);
-        if (picked == null) refreshSupported(spec);
+        if (picked == null) {
+            refreshSupported(spec);
+            installRow.show(spec);
+        }
     }
 
     /**

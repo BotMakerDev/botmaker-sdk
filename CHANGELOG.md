@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Install and update the game from the Game dialog.** Under the picked game, a line says whether it is installed,
+  with **Install** and **Update** through its launcher (Steam, Lutris, Heroic, or an Android emulator). An Android
+  game comes from BotMaker's APK library, Google Play, APKPure (once you tick **Download from APKPure** and accept
+  its warning; asked once) or its store page; **Get Google Play…** shows how to add Google Play to the emulator. A
+  file installed with **Install from file…** is kept in the APK library.
+- **The assistant installs games too**: `setup`'s `readiness`, `install_game` (optionally a file the user named) and
+  `update_game`, in the background. `launch_game` checks the game first and says the fix (not installed, signed
+  out, updating) instead of failing. Some tool descriptions were shortened to stay in budget.
 - **More names read like the rest.** A text field's `.submits()` and `.clears()` are `.submitting()` and
   `.clearing()`, its `text()` is `types()` and `typedByBody()` is `isTyped()`; a zone's `anchor()` is
   `anchored()`; `OcrOptions`' `withUpscale(3.0)` and the other `with…` copies are `upscale(3.0)` and so on; a flow
