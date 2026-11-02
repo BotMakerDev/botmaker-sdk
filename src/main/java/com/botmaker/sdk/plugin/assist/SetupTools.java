@@ -669,6 +669,14 @@ final class SetupTools {
                 SessionHandoff.offer(services, null, null);
                 return null;
             });
+        } else if (live != null && QuickLaunch.androidStopped(spec)) {
+            // A translator's Fix stops the session and the display outlives it: no game is on it any more.
+            replaced = "Closed the private display " + live.displayName() + ", whose Android had stopped. ";
+            launcher.stop();
+            FxCall.call(() -> {
+                SessionHandoff.offer(services, null, null);
+                return null;
+            });
         } else if (live != null) {
             return AgentReply.text(spec.describe() + " is running already in the private display "
                     + live.displayName() + ".");

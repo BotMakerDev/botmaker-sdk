@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A launch after a translator Fix or Undo works**: the private display left behind when Waydroid stopped is closed
+  and a new one opened, where `launch_game` said the game was running and ▶ Launch refused.
 - **The assistant checks and fixes the emulator**: `setup`'s `emulator_checks` lists the rows the Game dialog shows and
   `fix` runs one's fix in the background (`undo` puts the translator back); the password window still opens on the
   user's desktop. `launch_game` refuses Waydroid missing or its container service down, naming the check and its fix.

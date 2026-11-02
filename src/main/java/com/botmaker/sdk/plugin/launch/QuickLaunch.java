@@ -19,6 +19,10 @@ import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
 import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.settings.VmChoice;
+import com.botmaker.shared.emulator.EmulatorInstances;
+import com.botmaker.shared.emulator.EmulatorLiveness;
+import com.botmaker.shared.emulator.EmulatorState;
+import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import javafx.application.Platform;
@@ -264,7 +268,7 @@ public final class QuickLaunch {
             // makes the capture a scaled copy of what the pictures were cut from.
             SessionBackends.DisplaySize size = ScreenSize.display(services);
             BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resourcesDir));
-            launcher.start(
+            closeIfAndroidStoppedThen(spec, services, launcher, () -> launcher.start(
                     backend, spec,
                     size.width(),
                     size.height(),
@@ -276,7 +280,7 @@ public final class QuickLaunch {
                         if (ok && launcher.session() != null) {
                             SessionHandoff.offer(services, launcher.session(), spec);
                         }
-                    }));
+                    })));
         }, (ok, why) -> {
             button.setDisable(false);
             report.accept(ok, why);
@@ -334,6 +338,37 @@ public final class QuickLaunch {
         }
     }
 
+    /**
+     * Whether {@code spec}'s emulator has stopped, as a translator's Fix leaves it: a display held for it shows
+     * nothing. One still booting, or not found by this scan, has not. Scans and probes: never on the FX thread.
+     */
+    public static boolean androidStopped(LaunchSpec spec) {
+        return spec.kind() == LaunchKind.EMULATOR_APP && spec.emulatorInstance() != null
+                && EmulatorInstances.find(spec.emulatorInstance())
+                        .map(instance -> EmulatorLiveness.check(instance).state() == EmulatorState.STOPPED)
+                        .orElse(false);
+    }
+
+    /**
+     * Runs {@code next}, first closing a display whose Android stopped: it outlives the session, and a held display
+     * would refuse the new one. Holding none, {@code next} runs at once; else on the FX thread after the check.
+     */
+    private static void closeIfAndroidStoppedThen(LaunchSpec spec, StudioServices services,
+                                                  BackgroundLauncher launcher, Runnable next) {
+        if (launcher.session() == null) {
+            next.run();
+            return;
+        }
+        Thread.startVirtualThread(() -> {
+            boolean stopped = androidStopped(spec);
+            if (stopped) launcher.stop();
+            Platform.runLater(() -> {
+                if (stopped) SessionHandoff.offer(services, null, null);
+                next.run();
+            });
+        });
+    }
+
     private static void startPrivately(LaunchSpec spec, StudioServices services, SessionBackend backend,
                                        BiConsumer<Boolean, String> done) {
         SessionBackends.DisplaySize size = ScreenSize.display(services);
@@ -341,15 +376,16 @@ public final class QuickLaunch {
         // start reports "Bringing up…" first, at once, on success: only a refusal ends the launch then.
         // Counted here, as it is reported, since the session may be held by the time the FX thread reads it.
         boolean[] first = {true};
-        launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
-            boolean progress = ok && first[0];
-            first[0] = false;
-            if (progress) return;
-            Platform.runLater(() -> {
-                PrivateSession session = launcher.session();
-                if (ok && session != null) SessionHandoff.offer(services, session, spec);
-                done.accept(ok && session != null, message);
-            });
-        });
+        closeIfAndroidStoppedThen(spec, services, launcher, () ->
+                launcher.start(backend, spec, size.width(), size.height(), (ok, message) -> {
+                    boolean progress = ok && first[0];
+                    first[0] = false;
+                    if (progress) return;
+                    Platform.runLater(() -> {
+                        PrivateSession session = launcher.session();
+                        if (ok && session != null) SessionHandoff.offer(services, session, spec);
+                        done.accept(ok && session != null, message);
+                    });
+                }));
     }
 }
