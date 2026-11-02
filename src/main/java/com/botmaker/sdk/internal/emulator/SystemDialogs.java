@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Answers Android's own dialogs over the game while a bot runs, so no bot maps them (the user's call, 2026-11-01):
- * Wait on "isn't responding", Close app on "keeps stopping", Don't allow on a permission, each pressed by its id in the
+ * Wait on "isn't responding", Close app on "keeps stopping", Allow on a permission (2026-11-02), each pressed by its id in the
  * whole tree ({@link SystemDialog#answerIn}), else Back. A crash, or a game
  * that stops answering {@value #HUNG_TIMES} times or for {@value #HUNG_MS} ms, owes a restart, which
  * {@link com.botmaker.sdk.internal.bot.Watchdog#checkpoint()} turns into the run's recovery.

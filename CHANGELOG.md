@@ -30,11 +30,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **A run answers Android's own dialogs on an emulator, with nothing mapped by the bot.**
   - "isn't responding" gets Wait. If it shows 3 times, or for a minute, the game is restarted.
   - "keeps stopping" gets Close app, and the game is restarted at once.
-  - A permission the game asks gets Don't allow.
+  - A permission the game asks gets Allow.
   - Another app's dialog is closed and never restarts the game.
   - Each answer is written to the trace.
 - **A run on an emulator keeps other apps off the game.** Do Not Disturb is on while the bot runs and is put back
-  as it was when the run ends. The game's notification permission is denied for good, so the game never asks.
+  as it was when the run ends. Every permission the game asks for is granted before it asks.
 - **The app's tree is read reliably on an emulator.**
   - One reader per instance is shared by every tool call. A reader per call kept Android's only UiAutomation, and
     the next read failed.

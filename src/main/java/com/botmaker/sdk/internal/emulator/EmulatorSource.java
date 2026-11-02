@@ -128,14 +128,14 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
     }
 
     /**
-     * Keeps other apps off {@code packageName} for the rest of the run (the user's call, 2026-11-01): its
-     * notification permission denied for good, and Do Not Disturb on until this JVM ends, then put back as it was.
-     * Once per instance whatever the restarts; the permission again each time, which is cheap.
+     * Keeps other apps off {@code packageName} for the rest of the run (the user's call, 2026-11-01): every
+     * permission it asks for granted (2026-11-02), and Do Not Disturb on until this JVM ends, then put back as it
+     * was. Once per instance whatever the restarts; the permissions again each time, which is cheap.
      */
     public void quiet(String packageName) {
         Emulator emu = resolve();
         if (emu == null) return;
-        QuietRun.denyNotifications(emu.device(), packageName);
+        QuietRun.grantRequested(emu.device(), packageName);
         // The device asked outside the map's lock: a slow ADB must not hold up another instance's entry.
         if (QUIET.containsKey(instanceName)) return;
         QuietRun.Was was = QuietRun.start(emu.device());
