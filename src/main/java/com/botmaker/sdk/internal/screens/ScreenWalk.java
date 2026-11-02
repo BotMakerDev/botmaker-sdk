@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.text.Words;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Walks the bot's screen map on the game: which screen it is on ({@link #where}), and the way to another
@@ -71,6 +73,12 @@ public final class ScreenWalk {
     static final int MOST_POPUPS = 3;
     /** How many steps may land elsewhere before the walk gives up. */
     static final int MOST_REPLANS = 3;
+    /**
+     * How many times a walk may come onto one screen: more is a round it goes on for ever. A way back that opens
+     * another screen whose way out shows the first again counts each step as arrived (Sword x Staff's Character,
+     * Escape asking "Quit the game?", 309 s, 2026-11-03).
+     */
+    static final int MOST_VISITS = 2;
 
     private final ScreenGraph graph;
     private final Reach reach;
@@ -234,6 +242,7 @@ public final class ScreenWalk {
         Set<ScreenGraph.Edge> missed = new HashSet<>();     // its picture was not on the screen
         Set<ScreenGraph.Edge> strayed = new HashSet<>();    // done, and the game showed another screen
         Set<ScreenGraph.Edge> retried = new HashSet<>();    // done once already, its screen not shown
+        Map<String, Integer> visits = new HashMap<>();      // times the walk came onto each screen
         String at = near;
         String told = null;        // the screen the walk last said it is on
         String unmarked = null;    // a screen reached that has no marker to tell it by
@@ -281,6 +290,11 @@ public final class ScreenWalk {
             }
             at = here.get();
             if (!at.equals(told)) {
+                if (visits.merge(at, 1, Integer::sum) > MOST_VISITS) {
+                    return new Result(Outcome.STUCK, at, walked, "Going round: " + walked.stream()
+                            .map(graph::shown).collect(Collectors.joining(", ")) + "; a way here leads elsewhere "
+                            + "than the map says.");
+                }
                 // The screen it starts on is told too, so whoever shows where the run is knows from the first step.
                 if (told != null) walked.add(at);
                 reached.accept(at);

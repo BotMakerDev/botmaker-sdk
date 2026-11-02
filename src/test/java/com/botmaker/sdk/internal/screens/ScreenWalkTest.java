@@ -926,6 +926,26 @@ class ScreenWalkTest {
         assertEquals(ScreenWalk.Outcome.NOT_NOW, go(new Game("HOME"), "OFFER", new ArrayList<>()).outcome());
     }
 
+    /**
+     * Sword x Staff's Character: Escape, its way back as the map had it, asks "Quit the game?", whose Cancel shows
+     * Character again; each step left its screen, so each counted as arrived, and the walk went round 309 s.
+     */
+    @Test
+    void aWalkThatComesRoundToAScreenItLeftStopsGoingRound() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("MAIL", screen(screens.get("MAIL").setup(), click("mail_campaign"), click("quit")));
+        screens.put("QUIT", screen(named("Quit", "quit_title", "MAIL", "quit")));
+        Game game = new Game("CAMPAIGN", ScreenGraph.of(screens));
+        game.leads.put("CAMPAIGN key ESCAPE", "QUIT");
+        game.leads.put("QUIT key ESCAPE", "CAMPAIGN");
+
+        ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome(), walked.why());
+        assertTrue(game.done.size() <= 6, "went round: " + game.done);
+        assertTrue(walked.why().contains("Campaign"), walked.why());
+    }
+
     @Test
     void stepsThatKeepLandingElsewhereAreStuckNotMissing() {
         Game game = new Game("HOME");

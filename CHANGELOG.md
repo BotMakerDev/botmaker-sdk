@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A walk that goes round stops**: a walk that comes onto one screen a third time ends stuck, naming the round,
+  instead of going on to its step limit (a way back that asked "Quit the game?", whose Cancel showed the screen
+  again, went round 309 s).
 - **No Android popup over the game**: an emulator a game is started on, or a run joins, gets Gemini, the assist
   gestures and heads-up notifications shut off for good, besides Do Not Disturb for the run.
 - **🗺 Screens goes where you click**: a click on an input, its box on the Screen tab or its row in the panel, opens
