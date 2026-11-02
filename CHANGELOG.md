@@ -27,6 +27,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   dozens (Sword x Staff's plant: 25 poses at full size, 7 shrunk, wrong places at most 0.61) and each search is
   about 16 times cheaper. A still picture keeps every pixel. A watch lets a pose shift by 12 px, as a find does
   around its place, and a picture holds up to 16 frames, which cost about one still picture's search.
+  A shaped moving picture (oval, polygon) still skips what its shape cuts away once shrunk, its edge pixels
+  included (they scored a polygon-cut plant 0.76 where it shows at 0.9).
+- **A watch ends only once its loop has come round**: with several poses kept, frame 1's pose must show again
+  after another before the watch stops. A plant whose quick poses all came in its first 0.1 s was cut from 1 s
+  of its 1.5 s loop with 3 frames; it now keeps 5.
 - **A picture can hold several frames** of a thing that moves (an idle monster, a pulsing highlight):
   `new ImageTemplate("images/plant.png").at(…).frames(4)` reads its file as four frames side by side, and every
   find, click and screen check finds it wherever any frame shows, each at the bot's confidence. A still picture is

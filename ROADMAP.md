@@ -4,6 +4,13 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Pictures combined from a shared overlay (2026-11-02, the user's call: a future plan)**: a game draws one
+  overlay over many things — Sword x Staff's yellow selection brackets round the monster next to the hero, a
+  badge, a glow. Cut the overlay once, with its transparency (its alpha read from two grabs over different
+  backgrounds), and paste it onto each picture it can cover as another look, so no monster is cut twice. Open: where
+  the overlay lands (the brackets follow the monster's map cell, about 145 px a side, not the picture's box), and
+  the cost of a second look per picture. Until then a picture is cut inside the overlay (the plant and boar were).
+
 - **A recogniser trained from a watch, for 3D games (2026-11-02, the user's call: a future plan)**: a 3D monster
   turns, scales with distance and changes with light, so no picture, coarse or not, keeps matching it. Train a
   detector per bot instead, with nothing labelled by hand:

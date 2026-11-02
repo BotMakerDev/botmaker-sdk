@@ -115,6 +115,23 @@ class FrameWatchTest {
         assertTrue(watched.watched().compareTo(Duration.ofMillis(3400)) >= 0, "watched " + watched.watched());
     }
 
+    /**
+     * A, B and C in the first 0.1 s, C held to 1.4 s, D to 1.6 s, then A again: the time rule alone stopped at 1 s
+     * with three, as it did on Sword x Staff's plant (a 1.5 s loop watched 1.1 s); the loop must come round first.
+     */
+    @Test
+    void aLoopMustComeRoundBeforeItCloses() {
+        int period = 1700 / GRAB_MS;
+        Feed feed = new Feed(grab -> {
+            int at = grab % period * GRAB_MS;
+            return pose(at < 32 ? 'A' : at < 64 ? 'B' : at < 1400 ? 'C' : at < 1600 ? 'D' : 'A');
+        });
+        FrameWatch.Watched watched = FrameWatch.watch(feed, BOX, CONFIDENCE, feed);
+        assertEquals(4, watched.frames().size());
+        assertEquals(FrameWatch.Ending.LOOP_CLOSED, watched.ending());
+        assertTrue(watched.loop().isPresent());
+    }
+
     @Test
     void longerAddsToKept() {
         Feed feed = new Feed(grab -> pose('C'));

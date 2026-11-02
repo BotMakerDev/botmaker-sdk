@@ -4,9 +4,13 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Random;
 import java.util.function.IntBinaryOperator;
@@ -132,6 +136,36 @@ class FramedMatchTest {
             MatchResult found = ImageFinder.bestMatch(plant, still(background(three, 100, 60)));
             assertEquals(34, found.width());
             assertEquals(34, found.height());
+        }
+    }
+
+    /** {@code frame} with its lower-left quarter cut away: transparent, as a polygon cut leaves it. */
+    private static BufferedImage cornerCut(BufferedImage frame) {
+        BufferedImage cut = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                cut.setRGB(x, y, x < SIZE / 2 && y >= SIZE / 2 ? 0 : 0xFF000000 | frame.getRGB(x, y));
+            }
+        }
+        return cut;
+    }
+
+    @Test
+    void aShapedMovingPictureSkipsWhatItCutAway(@TempDir Path dir) throws IOException {
+        // The cut-away corner shows white on screen: the shrunk match must skip it, its edge pixels included.
+        BufferedImage strip = new BufferedImage(SIZE * 2, SIZE, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = strip.createGraphics();
+        g.drawImage(cornerCut(ONE), 0, 0, null);
+        g.drawImage(cornerCut(THREE), SIZE, 0, null);
+        g.dispose();
+        Path file = dir.resolve("plant.png");
+        ImageIO.write(strip, "png", file.toFile());
+        BufferedImage shown = pattern((x, y) -> x < SIZE / 2 && y >= SIZE / 2 ? 0xFFFFFF : THREE.getRGB(x, y));
+        try (ImageTemplate plant = new ImageTemplate(file.toString()).frames(2)) {
+            assertTrue(plant.coarse());
+            MatchResult found = ImageFinder.bestMatch(plant, still(background(shown, 100, 60)));
+            assertTrue(found.confidence() >= 0.97, "scored " + found.confidence());
+            assertEquals(new Point(100, 60), found.topLeft());
         }
     }
 

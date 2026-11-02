@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.vision;
 import com.botmaker.shared.opencv.OpenCvNative;
 import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
@@ -48,12 +49,27 @@ public final class Coarse {
         return Math.min(width, height) >= SMALLEST;
     }
 
-    /** {@code image} shrunk to {@link #SCALE} and blurred; a new {@code Mat} the caller releases. */
+    /**
+     * {@code image} shrunk to {@link #SCALE} and blurred; a new {@code Mat} the caller releases. A shaped picture's
+     * alpha stays opaque only where every pixel shrunk and blurred into it was: an edge pixel holds some of the
+     * cut-away part's colour, so it is skipped with that part (2026-11-02: kept, it dragged a polygon-cut plant from
+     * 0.9 to 0.8).
+     */
     public static Mat shrink(Mat image) {
         Mat small = new Mat();
         Imgproc.resize(image, small, new Size(side(image.cols()), side(image.rows())), 0, 0, Imgproc.INTER_AREA);
         Imgproc.GaussianBlur(small, small, new Size(3, 3), 0);
+        if (small.channels() == 4) opaqueOnly(small);
         return small;
+    }
+
+    /** {@code bgra}'s alpha set to 255 where it is 255, else 0, in place. */
+    private static void opaqueOnly(Mat bgra) {
+        List<Mat> channels = new ArrayList<>();
+        Core.split(bgra, channels);
+        Imgproc.threshold(channels.get(3), channels.get(3), 254, 255, Imgproc.THRESH_BINARY);
+        Core.merge(channels, bgra);
+        channels.forEach(Mat::release);
     }
 
     /** The frame size a picture was cut in as a shrunk frame has it; null stays null. */

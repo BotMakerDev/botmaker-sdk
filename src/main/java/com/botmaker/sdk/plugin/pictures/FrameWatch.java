@@ -21,8 +21,10 @@ import java.util.function.Supplier;
  *
  * <p>The rule: each grab is a new pose when no kept frame matches it at the bot's confidence, both shrunk and blurred
  * as a moving picture is found ({@link Coarse}: a sway of a few pixels is one pose), and is then kept.
- * Watching stops once, since the last new pose, at least as long has passed as from the start to that pose, and at
- * least {@link #SHORTEST} in all (the loop has come round: {@link Ending#LOOP_CLOSED}); at {@link #LONGEST}; at a
+ * Watching stops once, since the last new pose, at least as long has passed as from the start to that pose, at least
+ * {@link #SHORTEST} in all, and, when it kept several, frame 1's pose has come back after another (the loop has come
+ * round: {@link Ending#LOOP_CLOSED}; without that last rule a plant whose quick poses all came first was cut from 1 s
+ * of a 1.5 s loop, 2026-11-02); at {@link #LONGEST}; at a
  * pose past {@link #CAP}; or when the feed gives no frame.
  */
 public final class FrameWatch {
@@ -156,7 +158,7 @@ public final class FrameWatch {
                     ending = Ending.LONGEST_REACHED;
                     break;
                 }
-                if (all.compareTo(SHORTEST) >= 0
+                if (all.compareTo(SHORTEST) >= 0 && (frames.size() == 1 || loop != null)
                         && Duration.between(lastNew, now).compareTo(Duration.between(start, lastNew)) >= 0) {
                     ending = Ending.LOOP_CLOSED;
                     break;
