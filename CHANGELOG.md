@@ -31,7 +31,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   that failed, saying which.
 - **try_input keeps a screen that changes in place**: an input that changes most of the frame while every marker
   stays where it was, with the same pixels, changes the screen tried in place (a photo mode's zoom), not opening a
-  new screen. A panel over part of the screen, or a popup dimming it, still opens one.
+  new screen. Only the middle of each marker is compared, so a round button whose corners show the moving ground
+  still counts. A panel over part of the screen, or a popup dimming it, still opens one.
 - **read_map is quicker**: each screen's markers are matched on every other screen's shot once for the same files,
   all of one shot's in one batch whose pictures match side by side, and a picture with no place is looked for over
   the whole shot once, not twice. A screen's marker is looked for on the other shots near its place, as a run looks

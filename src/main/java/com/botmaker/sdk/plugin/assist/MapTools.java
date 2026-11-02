@@ -661,9 +661,18 @@ final class MapTools {
         if (markers.absent().stream().anyMatch(p -> found.apply(p.id()).isPresent())) return false;
         for (ImageTemplate marker : markers.shown()) {
             Optional<Rect> at = found.apply(marker.id());
-            if (at.isEmpty() || !samePixels(before, after, at.get())) return false;
+            if (at.isEmpty() || !samePixels(before, after, middle(at.get()))) return false;
         }
         return true;
+    }
+
+    /**
+     * The middle half of {@code box}, a quarter off each side: what a marker shows of itself. Photo's round shutter
+     * showed the island at its box's corners and through its ring, and the zoom moved it (2026-11-02).
+     */
+    private static Rect middle(Rect box) {
+        return new Rect(box.x() + box.width() / 4, box.y() + box.height() / 4, Math.max(1, box.width() / 2),
+                Math.max(1, box.height() / 2));
     }
 
     /** Whether {@code box} differs between the two frames by at most {@link #STILL} a channel on average. */

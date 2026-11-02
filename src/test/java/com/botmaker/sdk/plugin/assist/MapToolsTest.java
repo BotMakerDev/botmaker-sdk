@@ -201,6 +201,9 @@ class MapToolsTest {
         BufferedImage zoomed = filled(Color.BLUE, 40);
         Rect all = new Rect(0, 0, 320, 180);
         assertTrue(MapTools.stayed(markers, there, before, zoomed, all));
+        // The shutter is a round button: its box's corners and see-through ring show the island the zoom moves.
+        assertTrue(MapTools.stayed(markers, there, inset(Color.GREEN), inset(Color.BLUE), all),
+                "a round marker's corners show the ground under it");
 
         BufferedImage dimmed = filled(Color.BLUE, 0);
         Graphics2D g = dimmed.createGraphics();
@@ -215,6 +218,16 @@ class MapToolsTest {
                 "nothing tells it");
         assertFalse(MapTools.stayed(markers, there, before, zoomed, new Rect(160, 0, 160, 180)),
                 "a panel opened beside the marker spans only a part");
+    }
+
+    /** A {@code color} frame with a white 20×20 square in the middle of its top-left 40×40 box. */
+    private static BufferedImage inset(Color color) {
+        BufferedImage image = filled(color, 0);
+        Graphics2D g = image.createGraphics();
+        g.setColor(Color.WHITE);
+        g.fillRect(10, 10, 20, 20);
+        g.dispose();
+        return image;
     }
 
     /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */
