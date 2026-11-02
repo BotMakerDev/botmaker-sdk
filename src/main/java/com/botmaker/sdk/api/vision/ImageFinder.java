@@ -22,6 +22,7 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.BooleanSupplier;
@@ -96,7 +97,7 @@ public class ImageFinder {
             BufferedImage screenshot = source.capture();
             if (screenshot == null) return MatchResult.notFound();
             background = OpencvManager.bufferedImageToMat(screenshot);
-            RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+            RawMatch best = best(template, background);
             if (best == null) return MatchResult.notFound();
             Point origin = source.origin();
             return new MatchResult(new Point(best.x() + origin.x(), best.y() + origin.y()), best.width(),
@@ -143,8 +144,7 @@ public class ImageFinder {
             if (screenshot == null) return List.of();
             background = OpencvManager.bufferedImageToMat(screenshot);
             Point origin = source.origin();
-            return OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
-                            template.authoredSize()).stream()
+            return all(template, background, confidence).stream()
                     .map(r -> new MatchResult(new Point(r.x() + origin.x(), r.y() + origin.y()), r.width(),
                             r.height(), r.score(), template.id()))
                     .toList();
@@ -190,18 +190,94 @@ public class ImageFinder {
      * for each only {@link #near} its place.
      */
     private static List<RawMatch> bestEach(List<ImageTemplate> templates, Mat background, int margin) {
+        // One search per frame, side by side; each template's frames are folded back into its best below.
         List<OpencvManager.Search> searches = new ArrayList<>(templates.size());
-        for (ImageTemplate template : templates) {
-            OpencvManager.Search search;
+        int[] firsts = new int[templates.size() + 1];
+        for (int t = 0; t < templates.size(); t++) {
+            ImageTemplate template = templates.get(t);
+            firsts[t] = searches.size();
             try {
-                search = new OpencvManager.Search(template.getMat(), template.authoredSize(),
-                        near(template, margin, background.width(), background.height()));
+                Rectangle area = near(template, margin, background.width(), background.height());
+                for (Mat frame : template.frameMats()) {
+                    searches.add(new OpencvManager.Search(frame, template.authoredSize(), area));
+                }
             } catch (RuntimeException unreadable) {
-                search = null;
+                searches.add(null);
             }
-            searches.add(search);
         }
-        return OpencvManager.findBestEach(background, searches, false);
+        firsts[templates.size()] = searches.size();
+        List<RawMatch> each = OpencvManager.findBestEach(background, searches, false);
+        List<RawMatch> bests = new ArrayList<>(templates.size());
+        for (int t = 0; t < templates.size(); t++) {
+            RawMatch best = null;
+            for (int s = firsts[t]; s < firsts[t + 1]; s++) best = better(best, each.get(s));
+            bests.add(best);
+        }
+        return bests;
+    }
+
+    /** The higher-scored of two matches, either null; the first on a tie, so an earlier frame wins. */
+    private static RawMatch better(RawMatch best, RawMatch one) {
+        return one != null && (best == null || one.score() > best.score()) ? one : best;
+    }
+
+    /**
+     * {@code template}'s best place on {@code background} at any score, over all its frames, as
+     * {@link OpencvManager#findBest} gives one; null when nothing could be matched. Every frame is matched: the
+     * place a find answers is the best frame's, never the first that would do.
+     */
+    private static RawMatch best(ImageTemplate template, Mat background) {
+        RawMatch best = null;
+        for (Mat frame : template.frameMats()) {
+            best = better(best, OpencvManager.findBest(frame, background, false, template.authoredSize()));
+        }
+        return best;
+    }
+
+    /**
+     * {@link OpencvManager#findBestMatch} over {@code template}'s frames, its fallback scales included: the
+     * best-scored of the frames that clear {@code confidence}, or null when none does.
+     */
+    private static RawMatch bestOver(ImageTemplate template, Mat background, double confidence) {
+        RawMatch best = null;
+        for (Mat frame : template.frameMats()) {
+            best = better(best, OpencvManager.findBestMatch(frame, background, false, confidence,
+                    template.authoredSize()));
+        }
+        return best;
+    }
+
+    /**
+     * Every place any frame of {@code template} shows at or above {@code confidence}, as
+     * {@link OpencvManager#findMultipleMatches} gives them: one thing showing is one match, the frame that scores
+     * best there, so a place two frames both match is not counted twice.
+     */
+    private static List<RawMatch> all(ImageTemplate template, Mat background, double confidence) {
+        List<Mat> frames = template.frameMats();
+        if (frames.size() == 1) {
+            return OpencvManager.findMultipleMatches(frames.getFirst(), background, false, confidence,
+                    template.authoredSize());
+        }
+        List<RawMatch> found = new ArrayList<>();
+        for (Mat frame : frames) {
+            found.addAll(OpencvManager.findMultipleMatches(frame, background, false, confidence,
+                    template.authoredSize()));
+        }
+        found.sort(Comparator.comparingDouble(RawMatch::score).reversed());
+        List<RawMatch> kept = new ArrayList<>();
+        for (RawMatch one : found) {
+            if (kept.stream().noneMatch(k -> overlapsMostly(k, one))) kept.add(one);
+        }
+        return kept;
+    }
+
+    /** Whether two matches share more than half of the smaller one's area. */
+    private static boolean overlapsMostly(RawMatch a, RawMatch b) {
+        int w = Math.min(a.x() + a.width(), b.x() + b.width()) - Math.max(a.x(), b.x());
+        int h = Math.min(a.y() + a.height(), b.y() + b.height()) - Math.max(a.y(), b.y());
+        if (w <= 0 || h <= 0) return false;
+        long smaller = Math.min((long) a.width() * a.height(), (long) b.width() * b.height());
+        return (long) w * h * 2 > smaller;
     }
 
     /**
@@ -366,7 +442,7 @@ public class ImageFinder {
             background = OpencvManager.bufferedImageToMat(screenshot);
 
             // Get the raw best match (below-threshold included) so a miss can still report its real score.
-            RawMatch best = OpencvManager.findBest(template.getMat(), background, false, template.authoredSize());
+            RawMatch best = best(template, background);
 
             if (best != null && best.score() >= confidence) {
                 Point origin = source.origin();
@@ -589,8 +665,7 @@ public class ImageFinder {
 
             MatchResult best = MatchResult.notFound();
             for (ImageTemplate good : goods) {
-                RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
-                        good.authoredSize());
+                RawMatch gm = bestOver(good, background, confidence);
                 if (gm == null) {
                     continue;
                 }
@@ -634,8 +709,7 @@ public class ImageFinder {
             int offsetY = origin.y();
 
             for (ImageTemplate good : goods) {
-                RawMatch gm = OpencvManager.findBestMatch(good.getMat(), background, false, confidence,
-                        good.authoredSize());
+                RawMatch gm = bestOver(good, background, confidence);
                 if (gm == null) {
                     continue;
                 }
@@ -682,8 +756,7 @@ public class ImageFinder {
 
             List<MatchResult> results = new ArrayList<>();
             for (ImageTemplate good : goods) {
-                List<RawMatch> matches = OpencvManager.findMultipleMatches(good.getMat(), background, false,
-                        confidence, good.authoredSize());
+                List<RawMatch> matches = all(good, background, confidence);
                 for (RawMatch gm : matches) {
                     if (beatsAllBads(gm, bads, background, margin)) {
                         results.add(new MatchResult(
@@ -709,8 +782,11 @@ public class ImageFinder {
     /** Whether {@code good}'s match location out-scores every bad template (re-scored there) by {@code margin}. */
     private static boolean beatsAllBads(RawMatch good, List<ImageTemplate> bads, Mat background, double margin) {
         for (ImageTemplate bad : bads) {
-            double badScore = OpencvManager.scoreAround(
-                    bad.getMat(), background, false, good.x(), good.y(), COMPARE_PAD);
+            double badScore = Double.NEGATIVE_INFINITY;
+            for (Mat frame : bad.frameMats()) {
+                badScore = Math.max(badScore, OpencvManager.scoreAround(
+                        frame, background, false, good.x(), good.y(), COMPARE_PAD));
+            }
             if (badScore >= good.score() - margin) {
                 return false;
             }
@@ -785,8 +861,7 @@ public class ImageFinder {
             Mat pixels = background;
 
             List<RawMatch> matches =
-                    OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
-                            template.authoredSize());
+                    all(template, background, confidence);
 
             Point origin = source.origin();
             int offsetX = origin.x();

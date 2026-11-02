@@ -14,6 +14,7 @@ import org.opencv.core.Mat;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -48,9 +49,12 @@ public class ImageTemplate implements AutoCloseable {
     private final List<PictureTag> tags;
     /** The activities 🖼 Manage Pictures files it under; a run never reads them. */
     private final List<Activity> activities;
+    /** How many frames its file holds side by side; 1 for a picture that holds still. */
+    private final int frames;
 
-    // Lazily-loaded OpenCV image data. Null until getMat() is first called.
+    // Lazily-loaded OpenCV image data: the whole file, then one view of it per frame. Null until first asked for.
     private Mat mat;
+    private List<Mat> frameMats;
 
     /**
      * Constructor using file path.
@@ -70,14 +74,18 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     private ImageTemplate(String filePath, Size frame, Rect place, BufferedImage image) {
-        this(filePath, frame, place, image, List.of(), List.of());
+        this(filePath, frame, place, image, List.of(), List.of(), 1);
     }
 
     private ImageTemplate(String filePath, Size frame, Rect place, BufferedImage image, List<PictureTag> tags,
-                          List<Activity> activities) {
+                          List<Activity> activities, int frames) {
         if (filePath == null || filePath.isBlank()) {
             throw new IllegalArgumentException("File path cannot be empty");
         }
+        if (frames < 1) {
+            throw new IllegalArgumentException("A picture has at least one frame, not " + frames);
+        }
+        this.frames = frames;
         this.filePath = filePath;
         this.frame = frame == null || frame.empty() ? null : frame;
         this.place = place == null || place.empty() ? null : place;
@@ -106,7 +114,7 @@ public class ImageTemplate implements AutoCloseable {
      * 40))}. Written by the windows that cut it, so where a picture belongs is in the bot's Java.
      */
     public ImageTemplate at(Rect place) {
-        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities, frames);
     }
 
     /**
@@ -114,7 +122,7 @@ public class ImageTemplate implements AutoCloseable {
      * the matcher rescales it by the live frame against this size. Written only when the two differ.
      */
     public ImageTemplate in(Size frame) {
-        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities, frames);
     }
 
     /**
@@ -122,7 +130,7 @@ public class ImageTemplate implements AutoCloseable {
      * of the bot's {@code Tags} class. A run never reads them.
      */
     public ImageTemplate tags(List<PictureTag> tags) {
-        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities, frames);
     }
 
     /**
@@ -132,13 +140,31 @@ public class ImageTemplate implements AutoCloseable {
      */
     public ImageTemplate activities(List<Class<? extends Outcome>> activities) {
         return new ImageTemplate(filePath, frame, place, image, tags,
-                activities == null ? List.of() : activities.stream().map(Activity::of).toList());
+                activities == null ? List.of() : activities.stream().map(Activity::of).toList(), frames);
     }
 
     /** {@link #activities(List)} by the activities' names, as an editor holds them: it cannot load the bot's enums. */
     @Hidden("an editor's way of filing a picture; a bot names its activities by their enums")
     public ImageTemplate inActivities(List<Activity> activities) {
-        return new ImageTemplate(filePath, frame, place, image, tags, activities);
+        return new ImageTemplate(filePath, frame, place, image, tags, activities, frames);
+    }
+
+    /**
+     * This picture, a thing that moves, held as {@code count} frames side by side in its file —
+     * {@code new ImageTemplate("images/plant.png").at(…).frames(4)}: an idle monster, a pulsing highlight. It is found
+     * wherever any frame matches, each at the bot's confidence, and its size is one frame's. Frames carry no meaning
+     * and none is told from another; a button's picture per state is a {@code Look}, not a frame. Written by the
+     * windows and tools that watch it.
+     *
+     * @throws IllegalArgumentException when {@code count} is under 1
+     */
+    public ImageTemplate frames(int count) {
+        return new ImageTemplate(filePath, frame, place, image, tags, activities, count);
+    }
+
+    /** How many frames it holds; 1 for a picture that holds still. */
+    public int frames() {
+        return frames;
     }
 
     /** The tags it is filed under; empty when none. */
@@ -179,7 +205,18 @@ public class ImageTemplate implements AutoCloseable {
      * and link the native library. {@link OpenCvNative#ensureLoaded()} is idempotent and
      * synchronized, so paying it per call costs a volatile read after the first one.
      */
-    synchronized Mat getMat() {
+    Mat getMat() {
+        return frameMats().getFirst();
+    }
+
+    /**
+     * One {@link Mat} per frame, in the file's order, each a view of the file's pixels {@link #getMat()} also reads
+     * (for a still picture, the file itself): the matcher matches each and keeps the best. Owned by this template,
+     * as {@code getMat()}'s is.
+     *
+     * @throws IllegalStateException when the file's width is not {@link #frames()} times a frame's
+     */
+    synchronized List<Mat> frameMats() {
         // Locked: a Pictures constant is one object every thread of a run shares (the guard and the body, the
         // matcher's pool), and two first reads at once each decoded it, the later one leaking the other's pixels.
         OpenCvNative.ensureLoaded();
@@ -187,9 +224,30 @@ public class ImageTemplate implements AutoCloseable {
             // The file as written first, then the classpath (TemplateSource says why): a bot run from an IDE
             // rooted elsewhere, or from its own jar, has no src/main/resources relative to its working dir.
             // TemplateCache decodes each file once while it stays unchanged on disk.
+            releaseFrames();
             mat = image != null ? OpencvManager.bufferedImageToMat(image) : TemplateCache.load(filePath);
         }
-        return mat;
+        if (frameMats == null) {
+            if (frames == 1) {
+                frameMats = List.of(mat);
+            } else {
+                if (mat.cols() % frames != 0) {
+                    throw new IllegalStateException(filePath + " is " + mat.cols() + " px wide: " + frames
+                            + " frames need a width that is a multiple of " + frames);
+                }
+                int width = mat.cols() / frames;
+                List<Mat> each = new ArrayList<>(frames);
+                for (int i = 0; i < frames; i++) each.add(mat.colRange(i * width, (i + 1) * width));
+                frameMats = List.copyOf(each);
+            }
+        }
+        return frameMats;
+    }
+
+    /** Releases the frames' views of the file; the file's own pixels stay. */
+    private void releaseFrames() {
+        if (frameMats != null && frames > 1) frameMats.forEach(Mat::release);
+        frameMats = null;
     }
 
     /**
@@ -219,6 +277,7 @@ public class ImageTemplate implements AutoCloseable {
     @Hidden("memory management the runtime does on its own; a bot that unloads a template mid-run "
             + "pays a reload on the next find and gains nothing")
     public synchronized void unload() {
+        releaseFrames();
         if (mat != null) {
             mat.release();
             mat = null;
@@ -239,18 +298,19 @@ public class ImageTemplate implements AutoCloseable {
     public boolean equals(Object other) {
         return other instanceof ImageTemplate that && filePath.equals(that.filePath)
                 && Objects.equals(frame, that.frame) && Objects.equals(place, that.place) && image == that.image
-                && Set.copyOf(tags).equals(Set.copyOf(that.tags))
+                && frames == that.frames && Set.copyOf(tags).equals(Set.copyOf(that.tags))
                 && Set.copyOf(activities).equals(Set.copyOf(that.activities));
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(filePath, frame, place);
+        return Objects.hash(filePath, frame, place, frames);
     }
 
     @Override
     public String toString() {
         return "ImageTemplate{id='" + id + "', path='" + filePath + "'"
-                + (place == null ? "" : ", at=" + place) + (frame == null ? "" : ", in=" + frame) + "}";
+                + (place == null ? "" : ", at=" + place) + (frame == null ? "" : ", in=" + frame)
+                + (frames == 1 ? "" : ", frames=" + frames) + "}";
     }
 }

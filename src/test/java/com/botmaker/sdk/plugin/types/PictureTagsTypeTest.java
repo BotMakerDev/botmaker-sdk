@@ -36,6 +36,22 @@ class PictureTagsTypeTest {
     }
 
     @Test
+    void framedPictureComesApartAndGoesBackTogether() {
+        ImageTemplate plant = new ImageTemplate("src/main/resources/images/plant.png").at(new Rect(1, 2, 30, 40))
+                .frames(4);
+        assertEquals(plant, SdkTypes.IMAGE_TEMPLATE.build(SdkTypes.IMAGE_TEMPLATE.components(plant)));
+    }
+
+    @Test
+    void stillPictureWritesNoFrames() {
+        ImageTemplate plain = new ImageTemplate("src/main/resources/images/plant.png");
+        List<Object> parts = SdkTypes.IMAGE_TEMPLATE.components(plain);
+        assertTrue(parts.contains(1), "a still picture's frames part is 1, the factory's own: " + parts);
+        assertEquals(plain, SdkTypes.IMAGE_TEMPLATE.build(parts.subList(0, 1)),
+                "the factory alone makes it, so no link is written");
+    }
+
+    @Test
     void tagsAndActivitiesAreHowAPictureDiffersAndTheirOrderIsNot() {
         ImageTemplate untagged = new ImageTemplate("src/main/resources/images/ore.png").at(new Rect(1, 2, 3, 4));
         assertNotEquals(untagged, ORE, "a picture filed elsewhere is written again");

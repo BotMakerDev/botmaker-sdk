@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A picture can hold several frames** of a thing that moves (an idle monster, a pulsing highlight):
+  `new ImageTemplate("images/plant.png").at(…).frames(4)` reads its file as four frames side by side, and every
+  find, click and screen check finds it wherever any frame shows, each at the bot's confidence. A still picture is
+  written as before. Cutting one by watching the game comes next.
 - **The assistant prefers objects to text**: its guide asks for an icon, arrow or frame as a marker or an input
   before a box of words, which change with the language, the line said and the letters still typing in; text
   only when what comes next depends on it.

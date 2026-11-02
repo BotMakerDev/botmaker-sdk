@@ -18,6 +18,7 @@ public final class Pictures {
     public static final ImageTemplate ITEM = new ImageTemplate("images/item.png");
     public static final ImageTemplate BUY = new ImageTemplate("images/buy.png");
     public static final ImageTemplate ITEMS_TAB = new ImageTemplate("images/items_tab.png");
+    public static final ImageTemplate SLIME = new ImageTemplate("images/slime.png").frames(3);
 
     private Pictures() {}
 }

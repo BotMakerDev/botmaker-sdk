@@ -128,7 +128,8 @@ public final class SdkTypes implements TypeHolder {
             // The part's type spelled out: a held link names it only in the wither, an overloaded method
             // reference javac cannot infer from (the tags link above infers it from its accessor).
             .<List<Class<? extends Outcome>>, List<Activity>>with(ImageTemplate::activities, PICTURE_ACTIVITIES,
-                    ImageTemplate::inActivities);
+                    ImageTemplate::inActivities)
+            .with(ImageTemplate::frames, ImageTemplate::frames);
 
     /**
      * A tag spelled out, {@code PictureTag.named("UI")}: what a {@code Tags} constant holds. A tag inside a picture is
