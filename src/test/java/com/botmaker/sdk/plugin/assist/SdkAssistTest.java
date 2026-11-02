@@ -1378,6 +1378,27 @@ class SdkAssistTest {
     }
 
     /**
+     * A click that changes little of the screen but takes its marker away left it: a tab whose title and rows change
+     * opened Destiny exploration, not World chest changed in place (Sword x Staff, 2026-11-03).
+     */
+    @Test
+    void aSmallChangeThatTakesTheMarkerAwayLeavesTheScreen() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 41);
+        BufferedImage tab = covered(home, 0, 0, 70, 70, 42);
+        agent.frame = home;
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("other_tab", 200, 120, 48, 48)));
+        game.then(tab);
+        String tried = text(tryOne("screen", "Home", "picture", "other_tab", "opens", "Other", "desktop", true,
+                "settleMs", 0));
+        assertFalse(tried.contains("changes this screen in place"), tried);
+        assertEquals(List.of("HOME", "OTHER"), constants(), tried);
+    }
+
+    /**
      * An input deep in one branch that opens a screen mapped earlier in another is a way into it, named wherever
      * either is declared: a setup is read once every constant is set (Squads under Engineer, 2026-10-16).
      */

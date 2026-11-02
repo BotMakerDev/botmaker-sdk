@@ -73,6 +73,11 @@ final class MapTools {
     private static final int FLASH_POLL_MS = 250;
     /** How long each step of a walk is given for the next screen's marker, as {@code Navigate.to} gives it. */
     private static final long STEP_MS = ScreenWalk.STEP_MS;
+    /**
+     * How long the screen given as opens is read on for its marker when the settled frame lacks it: a web page held
+     * still on "Loading, please wait." (Sword x Staff's Privacy Policy from the menu, 2026-11-03).
+     */
+    private static final long OPENS_WAIT_MS = 10_000;
 
     /** What a screen's name cannot hold: a line break, a tab, any control character. */
     private static final Pattern NOT_A_NAME = Pattern.compile("\\p{Cntrl}");
@@ -436,7 +441,12 @@ final class MapTools {
         }
         Optional<AgentReply> away = notOn(context, graph, screen);
         // Left on a screen below it, finished with nothing to try (a rules panel): walked back to it first.
-        if (away.isPresent() && !walkedTo(context, graph, screen, input.desktop())) return Tried.left(away.get());
+        Optional<String> notWalked = away.isEmpty() ? Optional.empty()
+                : walkedTo(context, graph, screen, input.desktop());
+        if (notWalked.isPresent()) {
+            return Tried.left(notWalked.get().isEmpty() ? away.get() : AgentReply.refused(away.get().parts()
+                    .getFirst().text() + notWalked.get()));
+        }
         // A scroll over a node of a tree measures where its nodes sit, and moves its view once.
         Optional<Map.Entry<String, Tree>> tree = notches == 0 ? Optional.empty() : on.trees().entrySet().stream()
                 .filter(e -> e.getValue().members().stream().anyMatch(p -> p != null && p.id().equalsIgnoreCase(what)))
@@ -532,13 +542,17 @@ final class MapTools {
             return new Tried(up(context, said.and(AgentReply.text("Nothing moved: that end is reached. Its other end "
                     + "too, when not scrolled to yet.")), screen, input), true);
         }
-        if (!flashed && entered.share() >= SCREEN_SHARE) {
+        // A change too small to be a screen still left this one when its markers went (a tab whose title and rows
+        // change: World chest's Explore, 2026-11-03).
+        boolean markersGone = !flashed && entered.share() < SCREEN_SHARE && onMarkers.any()
+                && !ActTools.shows(context, onMarkers, entered.after());
+        if (!flashed && (entered.share() >= SCREEN_SHARE || markersGone)) {
             // The screen opens names first, when the map has it and its marker shows.
             Optional<String> named = opens == null ? Optional.empty() : ScreenBook.find(graph, opens)
                     .filter(c -> !c.equals(screen));
             if (named.isPresent()) {
                 MapScreen to = graph.screens().get(named.get());
-                if (to.hasMarker() && !ActTools.shows(context, graph.markers(named.get()), entered.after())) {
+                if (to.hasMarker() && !showsWithin(context, graph.markers(named.get()), entered.after())) {
                     // Taken at its word, a fight's start panel was recorded as the fight (2026-10-15).
                     return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: "
                             + graph.shown(named.get()) + "'s marker " + graph.markers(named.get()).ids() + " does not show, so this "
@@ -613,6 +627,23 @@ final class MapTools {
                 + " shows over it. Go back to " + name + " first."));
     }
 
+    /** Whether {@code markers} show on {@code settled}, or on the game within {@link #OPENS_WAIT_MS} after it. */
+    private static boolean showsWithin(AgentContext context, Markers markers, BufferedImage settled) {
+        if (ActTools.shows(context, markers, settled)) return true;
+        long deadline = System.nanoTime() + OPENS_WAIT_MS * 1_000_000;
+        while (System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(FLASH_POLL_MS * 2L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            Optional<BufferedImage> now = Frames.look(context);
+            if (now.isPresent() && ActTools.shows(context, markers, now.get())) return true;
+        }
+        return false;
+    }
+
     /**
      * The screen of the map other than {@code screen} that {@code entered} left the game on: a popup that came into
      * view, else the one the markers say ({@link ScreenWalk#whereOn}), so a panel closed to the screen under it, whose
@@ -630,15 +661,18 @@ final class MapTools {
         return walk.whereOn(entered.after(), screen).filter(c -> !c.equals(screen));
     }
 
-    /** Walks the game to {@code screen} by the map, as go_to_screen does; whether it got there. */
-    private static boolean walkedTo(AgentContext context, ScreenGraph graph, String screen, Boolean desktop) {
+    /**
+     * Walks the game to {@code screen} by the map, as go_to_screen does: empty once there, else why not, as the walk
+     * says it (a walk back that failed in silence left only "not on the screen", 2026-11-03).
+     */
+    private static Optional<String> walkedTo(AgentContext context, ScreenGraph graph, String screen, Boolean desktop) {
         Optional<ToolReach> reach = ToolReach.of(context);
         if (reach.isEmpty() || ActTools.desktopRefusal(context, reach.get().hands(), desktop).isPresent()) {
-            return false;
+            return Optional.of("");
         }
         ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(screen, null);
         seen(graph, walked.at());
-        return walked.arrived();
+        return walked.arrived() ? Optional.empty() : Optional.of(" Walking back: " + walked.why());
     }
 
     /**

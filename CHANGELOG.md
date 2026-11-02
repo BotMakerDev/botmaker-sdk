@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **try_input reads what a click opened more surely**: a screen named by `opens` is waited on up to 10 s for
+  its marker (a web page still loading); a click that changes little but takes the screen's markers away left
+  it (a tab whose title and rows change), instead of being noted as a change in place; a failed walk back says
+  why.
 - **A walk that goes round stops**: a walk that comes onto one screen a third time ends stuck, naming the round,
   instead of going on to its step limit (a way back that asked "Quit the game?", whose Cancel showed the screen
   again, went round 309 s).
