@@ -314,6 +314,8 @@ class SdkAssistTest {
         agent.frame = noise(WATCHED.width(), WATCHED.height(), 9);
         AgentReply refused = cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE);
         assertTrue(refused.isRefused() && text(refused).startsWith("That box changes"), text(refused));
+        assertTrue(text(refused).contains("cut it again with moving: true"), "cropMovingWithoutFieldExplains: "
+                + text(refused));
         assertFalse(TemplateLibrary.exists(resources, "gold"));
         assertTrue(run("edit_pictures", "action", "replace", "picture", "ore", "x", 120, "y", 80, "width", SIZE, "height", SIZE)
                 .isRefused());
@@ -321,6 +323,94 @@ class SdkAssistTest {
         agent.frame = withPatchAt(120, 80);
         assertFalse(cropOne("name", "gold", "x", 120, "y", 80, "width", SIZE, "height", SIZE)
                 .isRefused(), "the same frame again is still");
+    }
+
+    @Test
+    void cropMovingSavesStrip() throws IOException {
+        BufferedImage a = withPatchAt(120, 80);
+        BufferedImage b = withNoiseAt(120, 80, 5);
+        agent.frame = a;
+        run("screenshot");
+        int[] grab = {0};
+        agent.live = () -> copy(grab[0]++ / 3 % 2 == 0 ? a : b);
+        AgentReply saved = cropOne("name", "slime", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
+        assertFalse(saved.isRefused(), text(saved));
+        assertTrue(text(saved).matches("(?s)Watched [0-9.]+ s, \\d+ grabs \\(\\d+/s\\): 2 frames, loop \\d+ ms\\. "
+                + "Saved slime as Pictures.SLIME.*"), text(saved));
+        BufferedImage strip = ImageIO.read(TemplateLibrary.fileForName(resources, "slime").toFile());
+        assertEquals(2 * SIZE, strip.getWidth(), "one strip of two frames");
+        assertEquals(2, ((ImageTemplate) host.set("pictures").get("SLIME").value()).frames(), ".frames(2)");
+
+        agent.live = () -> copy(a);
+        AgentReply still = cropOne("name", "rock", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
+        assertTrue(text(still).contains("it held still, so it is a still picture"), text(still));
+        assertEquals(SIZE, ImageIO.read(TemplateLibrary.fileForName(resources, "rock").toFile()).getWidth());
+
+        agent.live = () -> copy(b);
+        AgentReply moved = cropOne("name", "moved", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
+        assertTrue(moved.isRefused() && text(moved).contains("the screen moved since it"), text(moved));
+        assertTrue(cropOne("name", "ore", "moving", true).isRefused(), "a picture the bot has is not watched");
+    }
+
+    /** {@code frame} as a capture hands it out: a new image each grab. */
+    private static BufferedImage copy(BufferedImage frame) {
+        BufferedImage copy = new BufferedImage(frame.getWidth(), frame.getHeight(), frame.getType());
+        copy.getGraphics().drawImage(frame, 0, 0, null);
+        return copy;
+    }
+
+    @Test
+    void slowFeedWarns() {
+        BufferedImage a = withPatchAt(120, 80);
+        agent.frame = a;
+        run("screenshot");
+        agent.live = () -> {
+            try {
+                Thread.sleep(80);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return copy(a);
+        };
+        AgentReply saved = cropOne("name", "slow", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
+        assertTrue(text(saved).contains("a quick pose may be missed"), text(saved));
+    }
+
+    @Test
+    void cropMovingStopsWhenTheGameGoes() {
+        agent.frame = withPatchAt(120, 80);
+        run("screenshot");
+        agent.live = () -> null;
+        AgentReply lost = cropOne("name", "gone", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
+        assertTrue(lost.isRefused() && text(lost).contains("The watch broke off"), text(lost));
+        assertFalse(TemplateLibrary.exists(resources, "gone"));
+    }
+
+    @Test
+    void addFrameAction() throws IOException {
+        BufferedImage a = withPatchAt(120, 80);
+        BufferedImage b = withNoiseAt(120, 80, 5);
+        agent.frame = a;
+        run("screenshot");
+        agent.live = () -> copy(a);
+        assertFalse(cropOne("name", "slime", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true)
+                .isRefused());
+        agent.live = null;
+        agent.frame = b;
+        run("screenshot");
+        AgentReply added = run("edit_pictures", "action", "add_frame", "picture", "slime", "x", 120, "y", 80);
+        assertFalse(added.isRefused(), text(added));
+        assertTrue(text(added).startsWith("Added frame 2 to slime"), text(added));
+        assertEquals(2 * SIZE, ImageIO.read(TemplateLibrary.fileForName(resources, "slime").toFile()).getWidth());
+        assertTrue(run("edit_pictures", "action", "add_frame", "picture", "slime", "x", 120, "y", 80).isRefused(),
+                "the same pose again shows nothing new");
+    }
+
+    /** {@link #withPatchAt}'s background with noise of {@code seed} where the patch would be: another pose. */
+    private static BufferedImage withNoiseAt(int x, int y, long seed) {
+        BufferedImage frame = noise(WATCHED.width(), WATCHED.height(), 11);
+        frame.getGraphics().drawImage(noise(SIZE, SIZE, seed), x, y, null);
+        return frame;
     }
 
     @Test
@@ -1950,6 +2040,8 @@ class SdkAssistTest {
     private static final class Agent implements AgentContext {
         final Host host;
         BufferedImage frame;
+        /** The live game when it moves: each read the next frame; null reads {@link #frame}. */
+        java.util.function.Supplier<BufferedImage> live;
         final List<String> marks = new ArrayList<>();
 
         Agent(Host host) {
@@ -1957,7 +2049,7 @@ class SdkAssistTest {
         }
 
         @Override public StudioServices services() { return host; }
-        @Override public Optional<BufferedImage> frame() { return Optional.ofNullable(frame); }
+        @Override public Optional<BufferedImage> frame() { return Optional.ofNullable(live != null ? live.get() : frame); }
         @Override public Optional<Area> watchedArea() { return Optional.of(WATCHED); }
 
         @Override

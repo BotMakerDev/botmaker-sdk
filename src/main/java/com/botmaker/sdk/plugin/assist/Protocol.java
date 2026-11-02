@@ -128,8 +128,8 @@ final class Protocol {
                 - Cut every button and marker a chore will need from that one screenshot, not one per trip. Cut
                   a button's image, not its label: a label's text changes with the game's language and shows
                   through to a moving background; leave out the corner a badge (a red count or bell) comes and
-                  goes on, and any part that moves (crop_pictures refuses a box that changes within a second: cut
-                  a still part). Matching ignores colour: a lit button and its greyed-out twin both match
+                  goes on. A thing that moves (an idle monster) is cut with moving: true; ignore is for a
+                  changing part of a still thing (a timer). Matching ignores colour: a lit button and its greyed-out twin both match
                   (crop_pictures says where else a cut is found), so cut the twin too. A round button or an odd
                   icon over a moving background is cut with shape ellipse or polygon: a box's corners would carry
                   the background; the preview checkers what is left out, so check it clips none of the icon.

@@ -31,6 +31,8 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.DigitCuts;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.FrameStrip;
+import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.PictureEdits;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
@@ -46,6 +48,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -82,7 +85,7 @@ final class PictureTools {
     /** One picture cut: a box of crop_pictures with the call's tags and screen. */
     private record Crop(String name, Integer x, Integer y, Integer width, Integer height, List<String> tags, Skip ignore,
                         CutShape shape, List<Point> points, String screen, Mark marker, Boolean back, Boolean sometimes,
-                        Boolean popup, String variantOf, State state, String when, String screenLook) {
+                        Boolean popup, String variantOf, State state, String when, String screenLook, Boolean moving) {
 
         /** {@code box} with the call's tags and screen; a polygon's box is the one around its points. */
         static Crop of(Box box, List<String> tags, String screen) {
@@ -91,7 +94,13 @@ final class PictureTools {
             return new Crop(box.name(), around.map(Rect::x).orElse(box.x()), around.map(Rect::y).orElse(box.y()),
                     around.map(Rect::width).orElse(box.width()), around.map(Rect::height).orElse(box.height()), tags,
                     box.ignore(), shapeOf(box.shape(), points), points, screen, box.marker(), box.back(),
-                    box.sometimes(), box.popup(), box.variantOf(), box.state(), box.when(), box.screenLook());
+                    box.sometimes(), box.popup(), box.variantOf(), box.state(), box.when(), box.screenLook(),
+                    box.moving());
+        }
+
+        /** Whether it is watched for its frames rather than checked still. */
+        boolean watched() {
+            return Boolean.TRUE.equals(moving);
         }
 
         /** The box it cuts, in the screenshot's pixels. */
@@ -113,7 +122,7 @@ final class PictureTools {
         /** This cut as {@code mark} says instead. */
         Crop marked(Mark mark) {
             return new Crop(name, x, y, width, height, tags, ignore, shape, points, screen, mark, back, sometimes, popup,
-                    variantOf, state, when, screenLook);
+                    variantOf, state, when, screenLook, moving);
         }
 
         /** Whether it names a picture the bot has, to note as it is: no part of a box given. */
@@ -129,13 +138,13 @@ final class PictureTools {
         /** This cut under another name: a picture the bot has, put on the screen as its copy for that screen. */
         Crop named(String other) {
             return new Crop(other, x, y, width, height, tags, ignore, shape, points, screen, marker, back, sometimes,
-                    popup, variantOf, state, when, screenLook);
+                    popup, variantOf, state, when, screenLook, moving);
         }
 
         /** This cut, noted on no screen: crop_pictures notes such boxes together. */
         Crop unplaced() {
             return new Crop(name, x, y, width, height, tags, ignore, shape, points, null, null, null, null, null, null,
-                    null, null, null);
+                    null, null, null, moving);
         }
     }
 
@@ -196,10 +205,9 @@ final class PictureTools {
                @Describe(value = SHAPE, optional = true) CutShape shape,
                @Describe(value = POINTS, optional = true) List<Corner> points,
                @Describe(value = IGNORE, optional = true) Skip ignore,
-               @Describe(value = "what tells the screen: all its markers found, none of its absent ones. set: the "
-                       + "marker, several boxes when the screen shares its title or frame (a tab), replacing its "
-                       + "markers; pays a marker owed or starts the first screen. add: one more. absent: a picture it "
-                       + "never shows where a screen like it does", optional = true)
+               @Describe(value = "what tells the screen. set: its marker (several boxes when it shares a title with a "
+                       + "tab), replacing its markers; pays a marker owed or starts the first screen. add: one more. "
+                       + "absent: a picture it never shows where a screen like it does", optional = true)
                Mark marker,
                @Describe(value = "true for the screen's close button, its way back", optional = true)
                Boolean back,
@@ -208,20 +216,21 @@ final class PictureTools {
                @Describe(value = "true, with marker, for a popup the game opens on its own (a reward, an offer)",
                        optional = true)
                Boolean popup,
-               @Describe(value = "the input this is another look of, by its picture (badged, greyed, picked): one "
-                       + "input still; with state", optional = true)
+               @Describe(value = "the input this is another look of (badged, greyed, picked), by its picture; with "
+                       + "state", optional = true)
                String variantOf,
                @Describe(value = "with variantOf, what the look means (disabled, locked, done, busy: never pressed)",
                        optional = true)
                State state,
-               @Describe(value = "for an input that comes and goes, a method reference saying when it is there "
-                       + "(Firestone::eventOn); with screenLook and marker, when that look shows. add_method makes "
-                       + "one", optional = true)
+               @Describe(value = "a method reference saying when an input is there (Firestone::eventOn); with "
+                       + "screenLook and marker, when that look shows", optional = true)
                String when,
-               @Describe(value = "the look of the screen this belongs to (Halloween): the same screen dressed "
-                       + "otherwise, never a screen of its own. With marker, what tells that look; else an input only "
-                       + "it has", optional = true)
-               String screenLook) {
+               @Describe(value = "the screen's look this belongs to (Halloween): the same screen dressed otherwise. "
+                       + "With marker, what tells that look; else an input only it has", optional = true)
+               String screenLook,
+               @Describe(value = "true when it moves (an idle monster): watched until its loop repeats, its frames "
+                       + "kept", optional = true)
+               Boolean moving) {
     }
 
     record Crops(@Describe("the boxes to cut, in the last screenshot's pixels; one picture is a list of one")
@@ -254,7 +263,7 @@ final class PictureTools {
 
     @Describe("give a picture a new image cut from the last screenshot, keeping its name and every use")
     record Replace(String picture,
-                   @Describe(value = "left edge of the new image, in the last screenshot's pixels", optional = true)
+                   @Describe(value = "left edge, in the last screenshot's pixels", optional = true)
                    Integer x,
                    @Describe(value = "top edge", optional = true) Integer y,
                    @Describe(value = "width in pixels", optional = true) Integer width,
@@ -262,6 +271,12 @@ final class PictureTools {
                    @Describe(value = SHAPE, optional = true) CutShape shape,
                    @Describe(value = POINTS, optional = true) List<Corner> points,
                    @Describe(value = IGNORE, optional = true) Skip ignore) implements Edit {
+    }
+
+    @Describe("add a pose a moving picture missed, cut at its size from the last screenshot")
+    record AddFrame(String picture,
+                    @Describe("left edge, in the screenshot's pixels") int x,
+                    @Describe("top edge") int y) implements Edit {
     }
 
     @Describe("add a declared tag to pictures, keeping the tags they have")
@@ -279,8 +294,7 @@ final class PictureTools {
             implements Edit {
     }
 
-    private static final String IGNORE = "a part inside the box a run skips (a timer's digits, a count that "
-            + "differs from copy to copy)";
+    private static final String IGNORE = "a part of the box a run skips (a timer's digits, a count)";
 
     record NamedRegion(@Describe("the area's name: bag") String name,
                        @Describe("left edge, in the screenshot's pixels") int x,
@@ -308,9 +322,8 @@ final class PictureTools {
                     .describedAs("The pictures the bot can look for, each with the Pictures constant a block uses")
                     .takesNothing().handledBy(PictureTools::listPictures),
             AssistantTool.named("crop_pictures")
-                    .describedAs("Cuts boxes out of your last screenshot as Pictures constants the bot finds and "
-                            + "clicks: every input of a screen at once, its marker among them; a name with no box "
-                            + "notes a picture the bot has")
+                    .describedAs("Cuts boxes of your last screenshot into Pictures constants: a screen's inputs at "
+                            + "once, its marker among them; a name with no box notes a picture the bot has")
                     .takes(Crops.class).handledBy(PictureTools::cropPictures),
             AssistantTool.named("show_picture")
                     .describedAs("A picture's image, its size, its constant and how many places use it")
@@ -368,6 +381,10 @@ final class PictureTools {
             boolean boxed = box.x() != null || box.y() != null || box.width() != null || box.height() != null;
             Optional<String> shapeless = shapeProblem(box.name(), box.shape(), box.points(), boxed);
             if (shapeless.isPresent()) return AgentReply.refused(shapeless.get() + " Nothing was saved.");
+            if (!boxed && box.points() == null && Boolean.TRUE.equals(box.moving())) {
+                return AgentReply.refused(box.name() + ": moving is a new cut's, with its box; edit_pictures' "
+                        + "add_frame adds a pose to a picture the bot has. Nothing was saved.");
+            }
             if (!boxed && box.points() == null && box.shape() != null) {
                 return AgentReply.refused(box.name() + ": a shape is a new cut's, with its box; a picture the bot has "
                         + "keeps its own (edit_pictures' replace cuts it anew). Nothing was saved.");
@@ -668,13 +685,27 @@ final class PictureTools {
                     : ", tagged " + String.join(", ", tags)) + "." + noted
                     + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)));
         }
-        Optional<String> moving = moving(context, frame.get(), picture.get(), live);
-        if (moving.isPresent()) return AgentReply.refused(moving.get());
         Rect place = picture.get().place();
+        FrameWatch.Watched watched = null;
+        if (crop.watched()) {
+            Watch watch = watch(context, crop, frame.get(), picture.get().image());
+            if (watch.refusal() != null) return AgentReply.refused(watch.refusal());
+            watched = watch.watched();
+        } else {
+            Optional<String> moving = moving(context, frame.get(), picture.get(), live);
+            if (moving.isPresent()) {
+                return AgentReply.refused(moving.get() + " If it is animated, cut it again with moving: true, which "
+                        + "watches it and keeps its frames. Nothing was saved.");
+            }
+        }
         String alike = lookAlikes(context, frame.get(), picture.get().image(), place).map(a -> " " + a).orElse("");
         List<String> untagged = new ArrayList<>();
+        List<BufferedImage> frames = watched == null ? null : watched.frames();
+        Size screenSize = new Size(frame.get().getWidth(), frame.get().getHeight());
         PictureCuts.Cut saved = FxCall.call(() -> {
-            PictureCuts.Cut cut = PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get());
+            PictureCuts.Cut cut = frames == null
+                    ? PictureCuts.save(context.services(), picture.get(), crop.name(), frame.get())
+                    : PictureCuts.saveFrames(context.services(), frames, place, crop.name(), screenSize);
             if (!tags.isEmpty()) untagged.addAll(TemplateLibrary.applyTags(context.services(), Map.of(cut.name(), tags)));
             return cut;
         });
@@ -684,11 +715,148 @@ final class PictureTools {
         MapTools.Look look = new MapTools.Look(variantOf, state.orElse(null), when, screenLook);
         String noted = section.map(s -> MapTools.noteCut(context.services(), s, saved.name(), mark, back,
                 comes, look)).orElse("");
-        return AgentReply.text("Saved " + saved.name() + (constant == null ? "" : " as " + TemplateNames.CLASS_NAME
-                        + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? "" : ", tagged " + String.join(", ", tags))
+        String seen = watched == null ? "" : watchSaid(watched) + " ";
+        return AgentReply.text(seen + "Saved " + saved.name() + (constant == null ? "" : " as "
+                        + TemplateNames.CLASS_NAME + "." + constant) + (tags.isEmpty() || !untagged.isEmpty() ? ""
+                        : ", tagged " + String.join(", ", tags))
                         + saved.note().map(n -> " — " + n).orElse("") + "." + noted + alike
                         + (untagged.isEmpty() ? "" : " Not tagged: " + String.join(" ", untagged)))
-                .and(preview(picture.get()));
+                .and(frames == null || frames.size() == 1 ? preview(picture.get())
+                        : AgentReply.image(PictureCuts.checkered(FrameStrip.join(frames))));
+    }
+
+    /** A watch of a moving cut: what it kept, or why nothing is saved (null: it is). */
+    private record Watch(FrameWatch.Watched watched, String refusal) {
+    }
+
+    /**
+     * The frames of the thing {@code crop} boxes in {@code shown}, watched on the live game ({@link FrameWatch}) until
+     * its loop comes round, each cut with the crop's shape and its ignored part. Blocking, for seconds.
+     */
+    private static Watch watch(AgentContext context, Crop crop, BufferedImage shown, BufferedImage cut) {
+        Supplier<Optional<BufferedImage>> feed = fresh(Frames.feed(context));
+        boolean[] resized = {false};
+        Supplier<Optional<BufferedImage>> poses = () -> feed.get().flatMap(live -> {
+            if (live.getWidth() != shown.getWidth() || live.getHeight() != shown.getHeight()) {
+                resized[0] = true;
+                return Optional.empty();
+            }
+            return PictureCuts.cut(live, crop.box(), crop.shape(), crop.points())
+                    .map(p -> crop.ignore() == null ? p : PictureCuts.masked(p, crop.ignore().rect()))
+                    .map(PictureCuts.Piece::image);
+        });
+        double needs = Frames.confidence(context.services());
+        FrameWatch.Watched watched = FrameWatch.poses(poses, needs, InstantSource.system(), List.of());
+        if (resized[0] && !watched.saveable()) {
+            return new Watch(null, "The game is not the screenshot's " + shown.getWidth() + "×" + shown.getHeight()
+                    + " any more: take a new one. Nothing was saved.");
+        }
+        return switch (watched.ending()) {
+            case FEED_LOST -> new Watch(null, "The watch broke off after " + watched.grabs() + " grabs: "
+                    + watched.ending().displayName() + ". Nothing was saved.");
+            case TOO_MANY_POSES -> new Watch(null, String.format(Locale.ROOT, "It showed more than %d poses in "
+                    + "%.1f s: cut a smaller part of it, one that loops through fewer. Nothing was saved.",
+                    FrameWatch.CAP, watched.watched().toMillis() / 1000.0));
+            // The box the screenshot showed must be among its poses: else the screen moved since, not the thing.
+            case LOOP_CLOSED, LONGEST_REACHED -> watched.frames().stream().anyMatch(f -> alike(f, cut, needs))
+                    ? new Watch(watched, null)
+                    : new Watch(null, "None of the " + watched.frames().size() + " poses watched is what the "
+                    + "screenshot shows in that box: the screen moved since it. Take a new one. Nothing was saved.");
+        };
+    }
+
+    /** Whether {@code pose} matches {@code kept}, both one size, at {@code needs}. */
+    private static boolean alike(BufferedImage pose, BufferedImage kept, double needs) {
+        if (pose.getWidth() != kept.getWidth() || pose.getHeight() != kept.getHeight()) return false;
+        try (ImageTemplate template = ImageTemplate.of("shown", kept)) {
+            MatchResult match = ImageFinder.bestMatch(template, new StillSource(pose));
+            return match.isFound() && match.confidence() >= needs;
+        }
+    }
+
+    /** How long a watch waits for a frame the capture has not handed out yet before it reads the same one again. */
+    private static final long FRESH_MS = 100;
+
+    /**
+     * {@code feed}, a frame it hands out again (a capture's cached shot) waited past rather than counted as a grab of
+     * its own: the grab rate is the game's, and a slow one is said. Empty passes at once.
+     */
+    private static Supplier<Optional<BufferedImage>> fresh(Supplier<Optional<BufferedImage>> feed) {
+        BufferedImage[] last = {null};
+        return () -> {
+            long until = System.nanoTime() + FRESH_MS * 1_000_000;
+            Optional<BufferedImage> frame = feed.get();
+            try {
+                while (frame.isPresent() && frame.get() == last[0] && System.nanoTime() < until) {
+                    Thread.sleep(2);
+                    frame = feed.get();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Optional.empty();
+            }
+            frame.ifPresent(f -> last[0] = f);
+            return frame;
+        };
+    }
+
+    /** {@code "Watched 1.2 s, 70 grabs (58/s): 3 frames, loop 480 ms."}, and what a reader should know of it. */
+    private static String watchSaid(FrameWatch.Watched watched) {
+        int n = watched.frames().size();
+        String said = String.format(Locale.ROOT, "Watched %.1f s, %d grabs (%.0f/s): ", watched.watched().toMillis()
+                / 1000.0, watched.grabs(), watched.grabsPerSecond())
+                + (n == 1 ? "it held still, so it is a still picture." : n + " frames"
+                + watched.loop().map(l -> ", loop " + l.toMillis() + " ms").orElse("") + ".");
+        if (watched.ending() == FrameWatch.Ending.LONGEST_REACHED) {
+            said += " Its loop did not come round in " + FrameWatch.LONGEST.toSeconds() + " s: these are the poses "
+                    + "it showed.";
+        }
+        if (watched.slow()) {
+            said += " The game gave under " + FrameWatch.SLOW_FEED + " grabs a second, so a quick pose may be "
+                    + "missed: edit_pictures' add_frame adds one.";
+        }
+        return said;
+    }
+
+    /**
+     * {@code add}'s box of {@code shown}, at the picture's frame size, added as the picture's last frame. What frame 1
+     * leaves out (its shape, its ignored part) the new frame leaves out too.
+     */
+    static AgentReply addFrame(AddFrame add, AgentContext context, Optional<BufferedImage> shown) {
+        Optional<Path> resources = Frames.resources(context);
+        if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
+        Optional<String> base = Frames.picture(resources.get(), add.picture());
+        if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(add.picture()));
+        if (shown.isEmpty()) return AgentReply.refused("Take a screenshot first: the box is in its pixels.");
+        BufferedImage first;
+        try {
+            BufferedImage strip = ImageIO.read(TemplateLibrary.fileForName(resources.get(), base.get()).toFile());
+            if (strip == null) return AgentReply.refused(base.get() + ".png is not an image.");
+            first = FrameStrip.first(strip, Frames.frames(context, base.get()));
+        } catch (IOException | IllegalArgumentException e) {
+            return AgentReply.refused("Could not read " + base.get() + ".png: " + e.getMessage());
+        }
+        Optional<Rect> box = Frames.within(shown.get(), add.x(), add.y(), first.getWidth(), first.getHeight());
+        if (box.isEmpty() || box.get().width() != first.getWidth() || box.get().height() != first.getHeight()) {
+            return AgentReply.refused("A " + first.getWidth() + "×" + first.getHeight() + " frame at " + add.x() + ","
+                    + add.y() + " is outside the " + shown.get().getWidth() + "×" + shown.get().getHeight()
+                    + " screenshot.");
+        }
+        BufferedImage frame = shapedAs(Images.cut(shown.get(), box.get()), first);
+        PictureEdits.Done done = FxCall.call(() -> PictureEdits.addFrame(context.services(), base.get(), frame));
+        return done.ok() ? AgentReply.text(done.said()).and(AgentReply.image(PictureCuts.checkered(frame)))
+                : AgentReply.refused(done.said());
+    }
+
+    /** {@code frame} with {@code like}'s transparency, both one size: what a cut's shape left out stays out. */
+    private static BufferedImage shapedAs(BufferedImage frame, BufferedImage like) {
+        BufferedImage out = new BufferedImage(frame.getWidth(), frame.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < frame.getHeight(); y++) {
+            for (int x = 0; x < frame.getWidth(); x++) {
+                out.setRGB(x, y, like.getRGB(x, y) & 0xFF000000 | frame.getRGB(x, y) & 0x00FFFFFF);
+            }
+        }
+        return out;
     }
 
     /** A cut picture as the reply shows it: what the cut leaves out checkered, so a clipped icon is seen. */
@@ -761,6 +929,7 @@ final class PictureTools {
             case Rename rename -> renamePicture(rename, context);
             case Delete delete -> deletePicture(delete, context);
             case Replace replace -> replacePicture(replace, context);
+            case AddFrame add -> addFrame(add, context, Frames.shown());
             case Tag tag -> TagTools.onPictures(tag.tag(), tag.pictures(), context, true);
             case Untag untag -> TagTools.onPictures(untag.tag(), untag.pictures(), context, false);
             case SetTags set -> TagTools.setTags(set.picture(), set.tags(), context);
@@ -811,7 +980,10 @@ final class PictureTools {
         if (picture.isEmpty()) return AgentReply.refused("That box is outside the "
                 + frame.get().getWidth() + "×" + frame.get().getHeight() + " screenshot.");
         Optional<String> moving = moving(context, frame.get(), picture.get(), live);
-        if (moving.isPresent()) return AgentReply.refused(moving.get());
+        if (moving.isPresent()) {
+            return AgentReply.refused(moving.get() + " If it is animated, crop_pictures with moving: true cuts its "
+                    + "frames under a new name. Nothing was saved.");
+        }
         PictureEdits.Done done = FxCall.call(() -> PictureEdits.replace(context.services(), base.get(),
                 picture.get().image(), FrameCut.of(frame.get().getWidth(), frame.get().getHeight(),
                         picture.get().place())));
@@ -981,8 +1153,8 @@ final class PictureTools {
                 if (score < needs) {
                     return Optional.of("That box changes: " + (look * STILL_MS / (STILL_LOOKS - 1)) + " ms into "
                             + "the watch a run would score it " + Frames.score(score) + " where it was cut, under the "
-                            + Frames.score(needs) + " it needs. It is animated, or the screen moved since the "
-                            + "screenshot: take a new one and cut a part that holds still. Nothing was saved.");
+                            + Frames.score(needs) + " it needs: it is animated, or the screen moved since the "
+                            + "screenshot (take a new one).");
                 }
             }
             return Optional.empty();

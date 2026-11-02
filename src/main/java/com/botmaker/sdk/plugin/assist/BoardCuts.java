@@ -359,7 +359,7 @@ public final class BoardCuts {
                 mark, cut.as() instanceof Back ? Boolean.TRUE : null,
                 press != null && press.sometimes() ? Boolean.TRUE : null, popup ? Boolean.TRUE : null,
                 lookOf == null ? null : lookOf.input(), lookOf == null ? null : lookOf.state(), when,
-                screenLook == null ? null : blankless(screenLook.look()));
+                screenLook == null ? null : blankless(screenLook.look()), null);
     }
 
     /** edit_pictures' replace of {@code picture} by {@code cut}. */

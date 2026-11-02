@@ -28,6 +28,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   frames; replacing it with a still cut makes it still again; a frame can be added to it (refused when another
   size, the eighth already or nothing new); and a `.bmtemplates` export carries its frame count, so an import
   declares `.frames(n)` again.
+- **The assistant cuts a moving thing**: `crop_pictures` with `moving: true` watches the box on the live game until
+  its loop comes round (at least 1 s, at most 10 s, 8 poses at most) and saves one picture of its frames, saying how
+  many grabs it read and warning when the game gave under 20 a second; a box that never moved is saved still. A
+  box that changes, cut without it, is refused with that advice. `edit_pictures`' `add_frame` adds a pose the watch
+  missed, cut from the last screenshot at the picture's size and shape.
 - **The assistant prefers objects to text**: its guide asks for an icon, arrow or frame as a marker or an input
   before a box of words, which change with the language, the line said and the letters still typing in; text
   only when what comes next depends on it.
