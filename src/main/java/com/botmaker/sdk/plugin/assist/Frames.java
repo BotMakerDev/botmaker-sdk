@@ -15,6 +15,7 @@ import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.session.PrivateSession;
@@ -160,6 +161,11 @@ final class Frames {
     /** The confidence a run holds a match to: the project's {@code Sdk.settings()}, else the SDK's default. */
     static double confidence(StudioServices services) {
         return SETTINGS.read(services).orElse(BotSettings.DEFAULTS).confidence();
+    }
+
+    /** How many frames the picture {@code name}'s file holds, as its constant says; 1 when it says not. */
+    static int frames(AgentContext context, String name) {
+        return FxCall.call(() -> TemplateUses.frames(context.services().pluginValues(), name));
     }
 
     /** The resources folder, when a project is open. */

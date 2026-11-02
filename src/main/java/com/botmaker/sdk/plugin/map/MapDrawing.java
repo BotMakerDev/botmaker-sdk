@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import javafx.scene.Scene;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
@@ -26,7 +27,7 @@ final class MapDrawing {
 
     /** {@code graph} as the window draws it, in Studio's theme, shrunk to {@link #MOST_WIDTH}. On the FX thread. */
     static BufferedImage of(StudioServices services, ScreenGraph graph, Map<String, String> stages) {
-        ScreenCanvas canvas = new ScreenCanvas(services.resourcesDir());
+        ScreenCanvas canvas = new ScreenCanvas(services.resourcesDir(), name -> FrameViews.frames(services, name));
         canvas.loadNow();
         canvas.show(ScreenCards.cards(graph, stages), ScreenCards.links(graph), ScreenCards.root(graph).orElse(null));
         Scene scene = new Scene(canvas.graph(), 1600, 1000);

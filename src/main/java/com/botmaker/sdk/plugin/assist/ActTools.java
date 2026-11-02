@@ -312,7 +312,7 @@ final class ActTools {
         Optional<Path> resources = Frames.resources(context);
         Optional<String> base = resources.flatMap(r -> Frames.picture(r, picture));
         if (base.isEmpty()) return false;
-        MatchResult match = LookTools.best(resources.get(), base.get(), frame);
+        MatchResult match = LookTools.best(context, resources.get(), base.get(), frame);
         return match.isFound() && match.confidence() >= Frames.confidence(context.services());
     }
 

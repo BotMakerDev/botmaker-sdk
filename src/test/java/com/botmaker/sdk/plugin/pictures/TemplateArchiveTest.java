@@ -31,7 +31,7 @@ class TemplateArchiveTest {
         save(to, "ore", Color.RED);
         save(to, "gold", Color.BLUE);
         Path archive = out.resolve("pictures" + TemplateArchive.EXTENSION);
-        TemplateArchive.export(TemplateLibrary.list(from), archive);
+        TemplateArchive.export(TemplateLibrary.list(from), Map.of(), archive);
 
         TemplateArchive.ImportResult result = TemplateArchive.importInto(to, archive);
 
@@ -56,6 +56,33 @@ class TemplateArchiveTest {
 
         assertEquals(List.of("ore"), result.imported());
         assertFalse(Files.exists(to.resolve("images").resolve("templates.json")));
+    }
+
+    @Test
+    void framedPictureSurvivesExportImport(@TempDir Path from, @TempDir Path to, @TempDir Path out)
+            throws IOException {
+        TemplateLibrary.saveTemplate(from, FrameStrip.join(List.of(image(Color.RED), image(Color.GREEN),
+                image(Color.BLUE))), "plant");
+        save(from, "ore", Color.YELLOW);
+        Path archive = out.resolve("pictures" + TemplateArchive.EXTENSION);
+        TemplateArchive.export(TemplateLibrary.list(from), Map.of("plant", 3, "ore", 1), archive);
+
+        TemplateArchive.ImportResult result = TemplateArchive.importInto(to, archive);
+
+        assertEquals(3, result.framesOf("plant"), "the import declares .frames(3) again");
+        assertEquals(1, result.framesOf("ore"));
+        assertEquals(12, ImageIO.read(TemplateLibrary.fileForName(to, "plant").toFile()).getWidth());
+        assertFalse(Files.exists(to.resolve("images").resolve(TemplateArchive.FRAMES_FILE)));
+    }
+
+    @Test
+    void aCountThatDoesNotSplitItsFileImportsStill(@TempDir Path from, @TempDir Path to, @TempDir Path out)
+            throws IOException {
+        save(from, "plant", Color.RED);
+        Path archive = out.resolve("pictures" + TemplateArchive.EXTENSION);
+        TemplateArchive.export(TemplateLibrary.list(from), Map.of("plant", 3), archive);
+
+        assertEquals(1, TemplateArchive.importInto(to, archive).framesOf("plant"), "4 px do not split into 3");
     }
 
     private static BufferedImage image(Color colour) {

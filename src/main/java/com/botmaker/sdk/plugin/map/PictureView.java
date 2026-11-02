@@ -257,10 +257,14 @@ final class PictureView {
     private String where(String name) {
         FrameCut cut = services.pluginValues() == null ? null
                 : TemplateUses.cut(services.pluginValues(), name).orElse(null);
-        if (cut == null || cut.place() == null) return "";
+        if (cut == null) return "";
+        // The view shows a moving picture's whole strip: every pose a run finds it in.
+        String moving = cut.frames() > 1 ? cut.frames() + " frames side by side, frame 1 at the left; a run finds "
+                + "it on any.\n" : "";
+        if (cut.place() == null) return moving;
         Rect r = cut.place();
         return "Cut at " + r.x() + "," + r.y() + " (" + r.width() + "×" + r.height() + ")"
                 + (cut.frame() == null ? "" : " of a " + cut.frame().width() + "×" + cut.frame().height() + " screen")
-                + ".\n";
+                + ".\n" + moving;
     }
 }

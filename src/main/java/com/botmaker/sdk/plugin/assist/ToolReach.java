@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.FrameTree;
 import com.botmaker.sdk.internal.screens.Reach;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
 import java.awt.image.BufferedImage;
@@ -94,7 +95,7 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
 
     /** The bot's picture {@code name}'s best place on {@code frame}, at any score. */
     MatchResult best(String name, BufferedImage frame) {
-        return LookTools.best(resources, name, frame);
+        return LookTools.best(context, resources, name, frame);
     }
 
     /** Whether {@code match} clears the score a run needs. */
@@ -168,8 +169,8 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
 
     /** Every place the bot's picture {@code name} clears the score a run needs on {@code frame}, in no order. */
     List<Rect> findAll(String name, BufferedImage frame) {
-        return all(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()), frame).stream()
-                .map(Found::place).toList();
+        return all(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())
+                .frames(Frames.frames(context, name)), frame).stream().map(Found::place).toList();
     }
 
     /** {@code file}'s places on {@code frame}, each with its score; it is released after the match. */
@@ -200,11 +201,12 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
         }
     }
 
-    /** The bot's picture file {@code name}, with the place and the frame size {@code picture}'s constant gives it. */
+    /**
+     * The bot's picture file {@code name}, with the place, the frame size and the frames {@code picture}'s constant
+     * gives it.
+     */
     private ImageTemplate placed(String name, ImageTemplate picture) {
-        ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString());
-        if (picture.place() != null) file = file.at(picture.place());
-        return picture.frame() == null ? file : file.in(picture.frame());
+        return FrameCut.of(picture).onto(new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()));
     }
 
     @Override

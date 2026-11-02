@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -692,7 +693,12 @@ public final class ResourceManagerDialog {
                 projectName() + TemplateArchive.EXTENSION, TemplateArchive.EXTENSION).path();
         if (target.isEmpty()) return;
         try {
-            TemplateArchive.export(files, target.get());
+            Map<String, Integer> frames = new HashMap<>();
+            for (Path file : files) {
+                String name = TemplateLibrary.baseName(file);
+                frames.put(name, TemplateUses.frames(values(), name));
+            }
+            TemplateArchive.export(files, frames, target.get());
             statusLabel.setText("Exported " + files.size() + " template(s) to " + target.get().getFileName());
         } catch (IOException e) {
             statusLabel.setText("Failed to export: " + e.getMessage());
@@ -704,7 +710,11 @@ public final class ResourceManagerDialog {
         if (source.isEmpty()) return;
         try {
             TemplateArchive.ImportResult result = TemplateArchive.importInto(resources(), source.get());
-            for (String name : result.imported()) TemplateUses.declare(values(), name).ifPresent(services::status);
+            for (String name : result.imported()) {
+                int frames = result.framesOf(name);
+                (frames > 1 ? TemplateUses.cut(services, name, FrameCut.unknown().withFrames(frames))
+                        : TemplateUses.declare(values(), name)).ifPresent(services::status);
+            }
             reload();
             gallery.reveal(result.imported().stream()
                     .map(name -> TemplateLibrary.fileForName(resources(), name)).toList());
@@ -731,7 +741,7 @@ public final class ResourceManagerDialog {
         arrived.setPrefWrapLength(520);
         for (String name : result.imported()) {
             Path file = TemplateLibrary.fileForName(resources(), name);
-            VBox tile = TemplateGallery.plainTile(file, 84);
+            VBox tile = TemplateGallery.plainTile(file, 84, result.framesOf(name));
             List<String> others = duplicates.getOrDefault(name, List.of());
             if (!others.isEmpty()) {
                 Label same = new Label("same picture as " + String.join(", ", others));

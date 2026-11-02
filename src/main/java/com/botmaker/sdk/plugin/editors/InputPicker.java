@@ -23,6 +23,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
@@ -150,7 +151,6 @@ public final class InputPicker {
     private static void screenMenu(ValueContext ctx, Class<? extends Input> kind, ScreenGraph graph,
                                    javafx.scene.control.Button button) {
         ContextMenu menu = new ContextMenu();
-        Path resources = ctx.services().resourcesDir();
         // In an activity's body, the screen its flow card says it works on comes first (.on(Screens.X)).
         Optional<String> first = activityScreen(ctx, graph);
         List<MenuItem> rest = new ArrayList<>();
@@ -159,7 +159,7 @@ public final class InputPicker {
             // Nothing walks to a popup: its inputs are offered only where any input is taken (a way out).
             if (screen.isPopup() && kind != Input.class) return;
             MenuItem item = new MenuItem(graph.shown(constant),
-                    thumb(resources, screen.firstMarkerId()));
+                    thumb(ctx.services(), screen.firstMarkerId()));
             item.setOnAction(a -> showScreen(ctx, kind, graph, constant, button));
             if (first.filter(constant::equals).isPresent()) menu.getItems().add(item);
             else rest.add(item);
@@ -198,7 +198,7 @@ public final class InputPicker {
         for (Choice choice : choices) {
             boolean pickable = pickable(choice, kind);
             javafx.scene.control.Button row = new javafx.scene.control.Button(rowText(choice, pickable),
-                    choice.input() instanceof Button b ? thumb(resources, b.label()) : null);
+                    choice.input() instanceof Button b ? thumb(services, b.label()) : null);
             row.setMaxWidth(Double.MAX_VALUE);
             row.setAlignment(Pos.CENTER_LEFT);
             if (choice.strip() != null) VBox.setMargin(row, new Insets(0, 0, 0, 16));
@@ -323,11 +323,14 @@ public final class InputPicker {
     }
 
     /** The picture {@code id} as a small image; null when its file is missing. */
-    private static Node thumb(Path resources, String id) {
+    private static Node thumb(StudioServices services, String id) {
+        Path resources = services.resourcesDir();
         if (resources == null || id == null) return null;
         Path file = TemplateLibrary.fileForName(resources, id);
         if (!Files.isRegularFile(file)) return null;
-        ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true, true));
+        int frames = FrameViews.frames(services, id);
+        ImageView view = FrameViews.firstFrame(new ImageView(FrameViews.load(file, THUMB, THUMB, frames, true)),
+                frames);
         view.setPreserveRatio(true);
         return view;
     }

@@ -44,7 +44,7 @@ public final class ScreenSize {
      * needs no {@code .in}. On the FX thread, since it may write {@code Sdk.java}.
      */
     public static ImageTemplate cut(StudioServices services, ImageTemplate plain, FrameCut cut) {
-        ImageTemplate picture = cut.place() == null ? plain : plain.at(cut.place());
+        ImageTemplate picture = (cut.place() == null ? plain : plain.at(cut.place())).frames(cut.frames());
         Size frame = cut.frame();
         if (frame == null || frame.empty()) return picture;
         return adopt(services, frame).filter(frame::equals).isPresent() ? picture : picture.in(frame);

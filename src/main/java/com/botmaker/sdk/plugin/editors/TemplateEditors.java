@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.pictures.ChooserSelection;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.TemplateGalleryDialog;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
@@ -103,9 +104,10 @@ public final class TemplateEditors {
      */
     public static Node preview(ValueContext ctx) {
         String name = nameOf(ctx);
-        Image picture = picture(ctx.services(), name, TILE);
+        int frames = FrameViews.frames(ctx.services(), name);
+        Image picture = picture(ctx.services(), name, TILE, frames);
         if (picture == null) return null;
-        ImageView view = new ImageView(picture);
+        ImageView view = FrameViews.firstFrame(new ImageView(picture), frames);
         view.setFitWidth(TILE);
         view.setFitHeight(TILE);
         view.setPreserveRatio(true);
@@ -386,8 +388,10 @@ public final class TemplateEditors {
      */
     private static void showPicture(Control pill, ImageView view, StudioServices services, String baseName,
                                     double size) {
-        Image picture = picture(services, baseName, size);
+        int frames = FrameViews.frames(services, baseName);
+        Image picture = picture(services, baseName, size, frames);
         view.setImage(picture);
+        FrameViews.firstFrame(view, frames);
         view.setVisible(picture != null);
         view.setManaged(picture != null);
         pill.setTooltip(picture == null && baseName != null && !baseName.isBlank()
@@ -403,16 +407,16 @@ public final class TemplateEditors {
      * was captured. Every caller shows the name alone in that case rather than a broken frame, because "this
      * picture is gone" is information and an empty box is not.
      */
-    private static Image picture(StudioServices services, String baseName, double size) {
+    private static Image picture(StudioServices services, String baseName, double size, int frames) {
         Path resources = resourcesDir(services);
         if (resources == null || baseName == null || baseName.isBlank()) return null;
-        return decode(TemplateLibrary.fileForName(resources, baseName), size);
+        return decode(TemplateLibrary.fileForName(resources, baseName), size, frames);
     }
 
-    private static Image decode(Path file, double size) {
+    private static Image decode(Path file, double size, int frames) {
         try {
             if (file == null || !Files.exists(file)) return null;
-            return new Image(file.toUri().toString(), size * 2, size * 2, true, true);
+            return FrameViews.load(file, size * 2, size * 2, frames, false);
         } catch (RuntimeException e) {
             // A file that is not a picture at all, or one deleted between the listing and the decode. Both are
             // ordinary; neither is worth losing the editor over. (Rule 2: nothing throws while building a node.)

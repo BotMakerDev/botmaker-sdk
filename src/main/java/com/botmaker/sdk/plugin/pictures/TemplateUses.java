@@ -207,7 +207,7 @@ public final class TemplateUses {
             // Where it was cut and its tags stay: the same picture under a new name.
             ImageTemplate held = SET.read(value).orElse(null);
             ImageTemplate renamed = picture(newName);
-            value.set(held == null ? renamed : filed(renamed.at(held.place()).in(held.frame()), held));
+            value.set(held == null ? renamed : filed(FrameCut.of(held).onto(renamed), held));
             return Optional.<String>empty();
         }).orElse(Optional.of(TemplateNames.CLASS_NAME + "." + to + " was renamed, but its path could not be "
                 + "rewritten."));
@@ -269,7 +269,7 @@ public final class TemplateUses {
             if (baseName == null) continue;
             SET.read(values, member)
                     .filter(held -> TemplateNames.isPathFor(baseName, held.filePath()))
-                    .ifPresent(held -> cuts.put(baseName, new FrameCut(held.frame(), held.place())));
+                    .ifPresent(held -> cuts.put(baseName, FrameCut.of(held)));
         }
         return cuts;
     }
@@ -292,7 +292,12 @@ public final class TemplateUses {
         if (constant == null) return Optional.empty();
         return SET.read(values, constant)
                 .filter(held -> TemplateNames.isPathFor(name, held.filePath()))
-                .map(held -> new FrameCut(held.frame(), held.place()));
+                .map(FrameCut::of);
+    }
+
+    /** How many frames {@code baseName}'s file holds, as its constant says; 1 when it says not. On the FX thread. */
+    public static int frames(PluginValues values, String baseName) {
+        return values == null ? 1 : cut(values, baseName).map(FrameCut::frames).orElse(1);
     }
 
     /**

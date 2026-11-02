@@ -10,6 +10,7 @@ import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
@@ -75,7 +76,7 @@ public final class ScreenConstantView {
         open.setOnAction(e -> ScreenMap.open(services, constant));
         HBox head = new HBox(8, toggle);
         head.setAlignment(Pos.CENTER_LEFT);
-        thumb(services.resourcesDir(), card.marker()).ifPresent(head.getChildren()::add);
+        thumb(services,card.marker()).ifPresent(head.getChildren()::add);
         head.getChildren().addAll(name, state, open);
         // A narrow pane cuts the pills short, never the button.
         HBox.setHgrow(state, Priority.SOMETIMES);
@@ -113,13 +114,13 @@ public final class ScreenConstantView {
             String when = ScreenTypes.sourceOf(look.when());
             HBox line = new HBox(8, new Label("Look " + look.name() + (when.isEmpty() ? "" : ", while " + when)));
             line.setAlignment(Pos.CENTER_LEFT);
-            thumb(services.resourcesDir(), look.hasMarker() ? look.firstMarker().id() : null)
+            thumb(services,look.hasMarker() ? look.firstMarker().id() : null)
                     .ifPresent(line.getChildren()::addFirst);
             box.getChildren().add(line);
         }
         for (Row row : ScreenCards.rows(graph, constant)) {
             Label leads = new Label(row.result());
-            Node picture = LookToggle.of(row.looks(), id -> thumb(services.resourcesDir(), id)
+            Node picture = LookToggle.of(row.looks(), id -> thumb(services,id)
                     .orElseGet(Region::new), leads, row.result());
             String about = (row.kind().isEmpty() ? "" : " (" + row.kind() + ")")
                     + (row.traits().isEmpty() ? "" : " {" + row.traits() + "}")
@@ -158,12 +159,15 @@ public final class ScreenConstantView {
         else OPEN.remove(key);
     }
 
-    private static Optional<Node> thumb(Path resources, String picture) {
+    private static Optional<Node> thumb(StudioServices services, String picture) {
+        Path resources = services.resourcesDir();
         if (resources == null || picture == null) return Optional.empty();
         Path file = TemplateLibrary.fileForName(resources, picture);
         if (!Files.isRegularFile(file)) return Optional.empty();
         // In the background, as the shot: a file of fifty screens draws at once, each picture as it arrives.
-        ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true, true));
+        int frames = FrameViews.frames(services, picture);
+        ImageView view = FrameViews.firstFrame(new ImageView(FrameViews.load(file, THUMB, THUMB, frames, true)),
+                frames);
         return Optional.of(view);
     }
 

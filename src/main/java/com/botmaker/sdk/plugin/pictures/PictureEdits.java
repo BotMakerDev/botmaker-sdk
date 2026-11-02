@@ -1,10 +1,20 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.toolkit.ManagedHandle;
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.vision.ImageFinder;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.vision.TemplateNames;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +25,8 @@ import java.util.Optional;
  * written there.
  */
 public final class PictureEdits {
+
+    private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     private PictureEdits() {}
 
@@ -115,5 +127,61 @@ public final class PictureEdits {
         String note = TemplateUses.cut(services, name, cut).map(n -> " " + n).orElse("");
         return Done.ok("Replaced the image of " + name + "; every block that uses it now looks for the new one."
                 + note);
+    }
+
+    /**
+     * Adds {@code frame} as the last frame of the picture {@code name}: a pose its watch missed. Refused when it is
+     * not the picture's frame size, when the picture holds {@link FrameStrip#MOST} already, or when a frame it holds
+     * matches it at the bot's confidence — it shows nothing new. The constant is written first, as everywhere here.
+     */
+    public static Done addFrame(StudioServices services, String name, BufferedImage frame) {
+        Path file = TemplateLibrary.fileForName(services.resourcesDir(), name);
+        if (TemplateLibrary.isDefaultTemplate(file)) return Done.refused("The default picture cannot move.");
+        Optional<FrameCut> held = TemplateUses.cut(services.pluginValues(), name);
+        if (held.isEmpty()) return Done.refused("Pictures." + TemplateNames.constantFor(name)
+                + " is not written as one of ours, so no frame can be added to it.");
+        int count = held.get().frames();
+        if (count >= FrameStrip.MOST) {
+            return Done.refused(name + " holds " + count + " frames already, the most a picture holds.");
+        }
+        List<BufferedImage> frames;
+        try {
+            BufferedImage strip = ImageIO.read(file.toFile());
+            if (strip == null) return Done.refused(name + ".png is not an image.");
+            frames = FrameStrip.split(strip, count);
+        } catch (IOException | IllegalArgumentException e) {
+            return Done.refused("Could not read " + name + ".png: " + e.getMessage());
+        }
+        BufferedImage kept = frames.getFirst();
+        if (frame.getWidth() != kept.getWidth() || frame.getHeight() != kept.getHeight()) {
+            return Done.refused("A frame of " + name + " is " + kept.getWidth() + "×" + kept.getHeight() + ", not "
+                    + frame.getWidth() + "×" + frame.getHeight() + ": cut it in the picture's own box.");
+        }
+        double confidence = SETTINGS.read(services).orElse(BotSettings.DEFAULTS).confidence();
+        for (int i = 0; i < frames.size(); i++) {
+            if (shows(frames.get(i), frame, confidence)) {
+                return Done.refused("It shows nothing new: frame " + (i + 1) + " of " + name + " already matches it.");
+            }
+        }
+        List<BufferedImage> grown = new ArrayList<>(frames);
+        grown.add(frame);
+        Optional<String> refused = TemplateUses.cut(services, name, held.get().withFrames(count + 1));
+        if (refused.isPresent()) return Done.refused("No frame added: " + refused.get());
+        try {
+            TemplateLibrary.replaceImage(file, FrameStrip.join(grown));
+        } catch (IOException e) {
+            Optional<String> back = TemplateUses.cut(services, name, held.get());
+            return Done.refused("Failed to add the frame: " + e.getMessage()
+                    + back.map(why -> " — and the bot still says " + (count + 1) + " frames: " + why).orElse(""));
+        }
+        return Done.ok("Added frame " + (count + 1) + " to " + name + "; a run finds it on any of them.");
+    }
+
+    /** Whether {@code kept} is found on {@code frame}, of its size, at {@code confidence}. */
+    private static boolean shows(BufferedImage kept, BufferedImage frame, double confidence) {
+        try (ImageTemplate template = ImageTemplate.of("kept", kept)) {
+            MatchResult match = ImageFinder.bestMatch(template, new StillSource(frame));
+            return match.isFound() && match.confidence() >= confidence;
+        }
     }
 }

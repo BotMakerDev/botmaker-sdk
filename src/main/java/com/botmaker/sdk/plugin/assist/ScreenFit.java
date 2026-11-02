@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -9,8 +10,10 @@ import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.plugin.assist.MapAudit.Fit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.FrameStrip;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -214,7 +217,13 @@ final class ScreenFit {
         if (image == null) return Optional.of(copy.picture() + ".png is not an image.");
         PictureCuts.Piece piece = new PictureCuts.Piece(image, copy.at());
         try {
-            FxCall.call(() -> PictureCuts.save(context.services(), piece, copy.name(), frame));
+            // A moving picture's copy moves too: its strip, its count.
+            FxCall.call(() -> {
+                int frames = TemplateUses.frames(context.services().pluginValues(), copy.picture());
+                return frames > 1 ? PictureCuts.saveFrames(context.services(), FrameStrip.split(image, frames),
+                        copy.at(), copy.name(), new Size(frame.getWidth(), frame.getHeight()))
+                        : PictureCuts.save(context.services(), piece, copy.name(), frame);
+            });
             return Optional.empty();
         } catch (IllegalArgumentException refused) {
             return Optional.of(refused.getMessage());

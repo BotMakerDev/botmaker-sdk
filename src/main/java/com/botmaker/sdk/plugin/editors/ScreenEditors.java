@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.geometry.Pos;
@@ -28,7 +29,6 @@ import javafx.scene.control.Spinner;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -101,12 +101,11 @@ public final class ScreenEditors {
     /** The picker. The map is read again each time the list opens: a screen mapped since then is offered. */
     public static Node screen(ValueContext ctx) {
         StudioServices services = ctx.services();
-        Path resources = services.resourcesDir();
         Button button = Styles.on(new Button(), Styles.INSET_FIELD_FLAT);
         // What the button shows: the screen picked, by the name the game shows and its marker, or the prompt.
         Consumer<Optional<Choice>> show = picked -> {
             button.setText(picked.map(choice -> choice.name() + "  ▾").orElse(PROMPT));
-            button.setGraphic(picked.map(choice -> thumb(resources, choice.marker())).orElse(null));
+            button.setGraphic(picked.map(choice -> thumb(services, choice.marker())).orElse(null));
         };
         boolean popups = takesPopups(ctx);
         // A constant the map does not list (it will not read, or the screen is gone) still shows by its name: the
@@ -124,7 +123,7 @@ public final class ScreenEditors {
                 menu.getItems().add(none);
             }
             for (Choice choice : choices) {
-                MenuItem item = new MenuItem(choice.name(), thumb(resources, choice.marker()));
+                MenuItem item = new MenuItem(choice.name(), thumb(services, choice.marker()));
                 item.setOnAction(a -> {
                     Optional<String> refused = SCREENS.pick(ctx, Member.of(choice.constant()));
                     refused.ifPresent(services::status);
@@ -255,12 +254,15 @@ public final class ScreenEditors {
     }
 
     /** The marker {@code picture} as a small image; null when the screen has none or its file is missing. */
-    private static Node thumb(Path resources, String picture) {
+    private static Node thumb(StudioServices services, String picture) {
+        Path resources = services.resourcesDir();
         if (resources == null || picture == null) return null;
         Path file = TemplateLibrary.fileForName(resources, picture);
         if (!Files.isRegularFile(file)) return null;
         // Loaded in the background: a long map's list opens at once, each marker drawn as it arrives.
-        ImageView view = new ImageView(new Image(file.toUri().toString(), THUMB, THUMB, true, true, true));
+        int frames = FrameViews.frames(services, picture);
+        ImageView view = FrameViews.firstFrame(new ImageView(FrameViews.load(file, THUMB, THUMB, frames, true)),
+                frames);
         view.setPreserveRatio(true);
         return view;
     }

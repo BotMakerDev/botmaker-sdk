@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.plugin.screen.CutShape;
 
 import java.awt.AlphaComposite;
@@ -174,6 +175,28 @@ public final class PictureCuts {
      * @throws IllegalArgumentException with the sentence to show: no name, a name taken or reserved, no project
      */
     public static Cut save(StudioServices services, Piece piece, String typed, BufferedImage frame) {
+        return store(services, piece.image(), typed, FrameCut.of(frame.getWidth(), frame.getHeight(), piece.place()));
+    }
+
+    /**
+     * Saves {@code frames}, the poses of one thing that moves, as one picture {@code typed}: a {@link FrameStrip} and
+     * its constant written {@code .at(place)} and {@code .frames(n)}. One frame saves a still picture, as
+     * {@link #save} does. {@code screen} is the size of the frames they were cut from. On the FX thread.
+     *
+     * @throws IllegalArgumentException with the sentence to show: as {@link #save}, and frames of different sizes,
+     *                                  none, or more than {@link FrameStrip#MOST}
+     */
+    public static Cut saveFrames(StudioServices services, List<BufferedImage> frames, Rect place, String typed,
+                                 Size screen) {
+        if (frames == null || frames.isEmpty()) throw new IllegalArgumentException("Nothing to save: no frame.");
+        if (frames.size() > FrameStrip.MOST) {
+            throw new IllegalArgumentException(frames.size() + " frames: a picture holds at most " + FrameStrip.MOST
+                    + ".");
+        }
+        return store(services, FrameStrip.join(frames), typed, new FrameCut(screen, place, frames.size()));
+    }
+
+    private static Cut store(StudioServices services, BufferedImage image, String typed, FrameCut cut) {
         Path resources = services == null ? null : services.resourcesDir();
         if (resources == null) throw new IllegalArgumentException("No project is open to save a picture into.");
         String name = TemplateLibrary.sanitizeName(typed);
@@ -182,9 +205,8 @@ public final class PictureCuts {
             throw new IllegalArgumentException("A picture called \"" + name + "\" already exists.");
         }
         try {
-            String path = TemplateLibrary.saveTemplate(resources, piece.image(), name);
-            return new Cut(name, path, TemplateUses.cut(services, name,
-                    FrameCut.of(frame.getWidth(), frame.getHeight(), piece.place())));
+            String path = TemplateLibrary.saveTemplate(resources, image, name);
+            return new Cut(name, path, TemplateUses.cut(services, name, cut));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not save " + name + ".png: " + e.getMessage(), e);
         }

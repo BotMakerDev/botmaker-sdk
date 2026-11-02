@@ -15,6 +15,7 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.shared.ipc.TelemetryFrame;
@@ -171,7 +172,7 @@ public final class ScreenMap {
     ScreenMap(StudioServices services, boolean withPanel) {
         this.services = services;
         project = services.projectDir();
-        canvas = new ScreenCanvas(services.resourcesDir());
+        canvas = new ScreenCanvas(services.resourcesDir(), name -> FrameViews.frames(services, name));
         panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh,
                 this::showScreen, this::inputPicked, this::liveOn) : null;
         root.getStyleClass().add("screen-map");

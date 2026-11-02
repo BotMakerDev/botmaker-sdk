@@ -303,6 +303,7 @@ public final class MapAudit {
                 FrameCut cut = cuts.get(picture);
                 ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, picture).toString());
                 if (near && cut != null && cut.place() != null) file = file.at(cut.place());
+                if (cut != null) file = file.frames(cut.frames());
                 templates.add(cut == null || cut.frame() == null ? file : file.in(cut.frame()));
             }
             StillSource still = new StillSource(frame);

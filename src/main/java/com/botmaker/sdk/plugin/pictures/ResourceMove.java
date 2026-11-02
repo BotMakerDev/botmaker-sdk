@@ -147,8 +147,8 @@ public final class ResourceMove {
         PluginValues values = services.pluginValues();
         if (values == null) return 0;
         List<Pending> pending = new ArrayList<>();
-        pending.addAll(opened(values, PICTURES, ImageTemplate::filePath, left, (held, path) -> new ImageTemplate(path)
-                .at(held.place()).in(held.frame()).tags(held.tags()).inActivities(held.activities())));
+        pending.addAll(opened(values, PICTURES, ImageTemplate::filePath, left, (held, path) -> FrameCut.of(held)
+                .onto(new ImageTemplate(path)).tags(held.tags()).inActivities(held.activities())));
         pending.addAll(opened(values, DIGITS, DigitSet::folder, left,
                 (held, path) -> new DigitSet(path).in(held.frame())));
         if (pending.isEmpty()) return 0;

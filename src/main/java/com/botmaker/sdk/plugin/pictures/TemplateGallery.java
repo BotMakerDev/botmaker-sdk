@@ -23,7 +23,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -364,10 +363,14 @@ public final class TemplateGallery extends HBox {
         if (twins == null) {
             Map<String, BufferedImage> pictures = new HashMap<>();
             for (Path file : byTag.getOrDefault(TemplateManifest.ALL, List.of())) {
+                String name = TemplateLibrary.baseName(file);
                 try {
-                    pictures.put(TemplateLibrary.baseName(file), ImageIO.read(file.toFile()));
-                } catch (IOException ignored) {
-                    // a picture that won't decode has no twin
+                    // A moving picture is its first frame here: two strips of one sprite are twins.
+                    BufferedImage strip = ImageIO.read(file.toFile());
+                    pictures.put(name, strip == null ? null
+                            : FrameStrip.first(strip, TemplateUses.frames(services.pluginValues(), name)));
+                } catch (IOException | IllegalArgumentException ignored) {
+                    // a picture that won't decode, or a strip its count does not split, has no twin
                 }
             }
             twins = PictureTwins.groups(pictures);
@@ -544,13 +547,14 @@ public final class TemplateGallery extends HBox {
     }
 
     /**
-     * A template as a picture with its name under it, at {@code size} pixels — the tile without the behaviour.
+     * A template as a picture with its name under it, at {@code size} pixels — the tile without the behaviour. A
+     * moving one, whose file holds {@code frames} frames, shows its first and says how many it has.
      *
      * <p>Public and static because "what does a template look like in a list" is asked outside the grid too:
      * the resource manager's end-of-import summary shows what arrived, and it should look like the gallery it
      * arrived into rather than be a second, worse rendering of the same thing.
      */
-    public static VBox plainTile(Path file, double size) {
+    public static VBox plainTile(Path file, double size, int frames) {
         VBox box = new VBox(4);
         box.getStyleClass().add("template-tile");
         box.setAlignment(Pos.TOP_CENTER);
@@ -561,11 +565,11 @@ public final class TemplateGallery extends HBox {
         StackPane picture = new StackPane();
         picture.setMinHeight(size);
         picture.setPrefHeight(size);
-        ImageView thumb = thumbnail(file, size);
+        ImageView thumb = thumbnail(file, size, frames);
         if (thumb != null) picture.getChildren().add(thumb);
         box.getChildren().add(picture);
 
-        Label name = new Label(TemplateLibrary.baseName(file));
+        Label name = new Label(TemplateLibrary.baseName(file) + (frames > 1 ? "  ·  " + frames + " frames" : ""));
         name.getStyleClass().add("template-tile-name");
         name.setMaxWidth(size + 16);
         box.getChildren().add(name);
@@ -577,7 +581,7 @@ public final class TemplateGallery extends HBox {
      * are shown, the names of its twins.
      */
     private Node tile(Path file, List<String> tags, List<String> twinNames) {
-        VBox box = plainTile(file, 96);
+        VBox box = plainTile(file, 96, FrameViews.frames(services, TemplateLibrary.baseName(file)));
         if (!twinNames.isEmpty()) {
             Label like = new Label("like " + String.join(", ", twinNames));
             like.getStyleClass().add("template-gallery-empty");
@@ -719,10 +723,10 @@ public final class TemplateGallery extends HBox {
      * {@code ImageTemplatePicker.thumbnail}; it is six lines and reaching back across the plugin boundary
      * for them would be the only thing tying this gallery to a host.
      */
-    private static ImageView thumbnail(Path file, double size) {
+    private static ImageView thumbnail(Path file, double size, int frames) {
         try {
             if (!Files.exists(file)) return null;
-            return new ImageView(new Image(file.toUri().toString(), size, size, true, true));
+            return FrameViews.firstFrame(new ImageView(FrameViews.load(file, size, size, frames, false)), frames);
         } catch (Exception e) {
             return null;
         }

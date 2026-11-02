@@ -23,6 +23,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `new ImageTemplate("images/plant.png").at(…).frames(4)` reads its file as four frames side by side, and every
   find, click and screen check finds it wherever any frame shows, each at the bot's confidence. A still picture is
   written as before. Cutting one by watching the game comes next.
+- **A moving picture is one picture everywhere else too**: thumbnails, previews and screen cards show its first
+  frame and the Pictures window says how many it holds; renaming, moving, copying and look-alike checks keep its
+  frames; replacing it with a still cut makes it still again; a frame can be added to it (refused when another
+  size, the eighth already or nothing new); and a `.bmtemplates` export carries its frame count, so an import
+  declares `.frames(n)` again.
 - **The assistant prefers objects to text**: its guide asks for an icon, arrow or frame as a marker or an input
   before a box of words, which change with the language, the line said and the letters still typing in; text
   only when what comes next depends on it.

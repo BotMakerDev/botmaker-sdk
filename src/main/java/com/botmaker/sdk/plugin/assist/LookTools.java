@@ -230,7 +230,7 @@ final class LookTools {
         if (base.isEmpty()) return AgentReply.refused(Frames.noPicture(name.picture()));
         Optional<BufferedImage> frame = Frames.look(context);
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-        MatchResult best = best(resources.get(), base.get(), frame.get());
+        MatchResult best = best(context, resources.get(), base.get(), frame.get());
         if (!best.isFound()) return AgentReply.text(base.get() + " could not be matched on this screen at all.");
         double needs = Frames.confidence(context.services());
         boolean found = best.confidence() >= needs;
@@ -299,7 +299,7 @@ final class LookTools {
         long deadline = start + wait.timeoutMs() * 1_000_000L;
         double best = 0;
         try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources.get(), base.get())
-                .toString())) {
+                .toString()).frames(Frames.frames(context, base.get()))) {
             while (true) {
                 Optional<BufferedImage> frame = Frames.look(context);
                 if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
@@ -490,16 +490,16 @@ final class LookTools {
 
     /** {@code template} as cut at {@code cut}; as it is when the cut is not known. */
     private static ImageTemplate cutAt(ImageTemplate template, FrameCut cut) {
-        if (cut == null) return template;
-        ImageTemplate placed = cut.place() == null ? template : template.at(cut.place());
-        return cut.frame() == null ? placed : placed.in(cut.frame());
+        return cut == null ? template : cut.onto(template);
     }
 
-    /** The best match of the picture {@code name} on {@code frame}, in the frame's pixels. */
-    static MatchResult best(Path resources, String name, BufferedImage frame) {
+    /** The best match of the picture {@code name}, on any of its frames, on {@code frame}, in the frame's pixels. */
+    static MatchResult best(AgentContext context, Path resources, String name, BufferedImage frame) {
+        int frames = Frames.frames(context, name);
         return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> {
             // Released after each match: an unreleased template is native memory.
-            try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())) {
+            try (ImageTemplate template = new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString())
+                    .frames(frames)) {
                 return ImageFinder.bestMatch(template, new StillSource(frame));
             }
         });

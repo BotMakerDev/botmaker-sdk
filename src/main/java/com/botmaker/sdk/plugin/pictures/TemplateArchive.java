@@ -1,14 +1,19 @@
 package com.botmaker.sdk.plugin.pictures;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -17,7 +22,8 @@ import java.util.zip.ZipOutputStream;
  * Import/export of image templates on their own — a {@code .bmtemplates} zip — so a set of templates can move
  * between projects without carrying a whole bot with it.
  *
- * <p>Smaller than a published project: the PNGs alone. Where a picture was cut and the tags it is filed under are
+ * <p>Smaller than a published project: the PNGs, and {@value #FRAMES_FILE} saying how many frames each moving one
+ * holds, which the import writes back as {@code .frames(n)}. Where a picture was cut and the tags it is filed under are
  * its constant's ({@code .at}, {@code .in}, {@code .tags}), which stays in the bot it came from: an imported
  * picture is declared plain, untagged, and is matched at the bot's screen size. An archive written before
  * 2026-10-14 also holds a {@code templates.json}, which an import skips.
@@ -52,10 +58,16 @@ public final class TemplateArchive {
      * <p>Four outcomes, because they need four different reactions from the user: {@code imported} arrived
      * under its own name, {@code renamed} arrived beside a different template of the same name (and is the
      * one thing here worth looking at afterwards), {@code unchanged} was already in the project pixel for
-     * pixel, and {@code skipped} could not be given a usable name at all.
+     * pixel, and {@code skipped} could not be given a usable name at all. {@code frames} says, by the name each
+     * arrived under, how many frames each moving one holds, for its constant's {@code .frames(n)}.
      */
     public record ImportResult(List<String> imported, Map<String, String> renamed,
-                               List<String> unchanged, List<String> skipped) {
+                               List<String> unchanged, List<String> skipped, Map<String, Integer> frames) {
+
+        /** How many frames {@code name}, as it arrived, holds; 1 for a still picture. */
+        public int framesOf(String name) {
+            return frames.getOrDefault(name, 1);
+        }
 
         public int count() {
             return imported.size();
@@ -92,18 +104,67 @@ public final class TemplateArchive {
         }
     }
 
-    /** Writes {@code templates} (PNG paths from the project's images root) to {@code destination}. */
-    public static void export(Collection<Path> templates, Path destination) throws IOException {
+    /**
+     * Writes {@code templates} (PNG paths from the project's images root) to {@code destination}, and {@value #FRAMES_FILE} saying how many frames each moving
+     * one holds ({@code frames}, by picture name; a name not in it is still): a strip's count is its constant's, which
+     * stays behind, and without it the import would read the strip as one wide picture.
+     */
+    public static void export(Collection<Path> templates, Map<String, Integer> frames, Path destination)
+            throws IOException {
+        Properties counts = new Properties();
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
             for (Path png : templates) {
                 writeEntry(zip, IMAGES_PREFIX + png.getFileName(), Files.readAllBytes(png));
+                Integer count = frames.get(TemplateLibrary.baseName(png));
+                if (count != null && count > 1) counts.setProperty(TemplateLibrary.baseName(png), count.toString());
+            }
+            if (!counts.isEmpty()) {
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                counts.store(bytes, "frames each moving picture holds side by side");
+                writeEntry(zip, FRAMES_FILE, bytes.toByteArray());
             }
         }
+    }
+
+    /** How many frames each moving picture in an archive holds, by name: {@code plant=4}. */
+    static final String FRAMES_FILE = "frames.properties";
+
+    /**
+     * Whether the PNG {@code png} splits into {@code count} frames: a count that does not fit its file (a picture
+     * recut after the count was written) imports it still, never as a strip a run cannot cut.
+     */
+    private static boolean splits(byte[] png, int count) {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+            return image != null && image.getWidth() % count == 0;
+        } catch (IOException unreadable) {
+            return false;
+        }
+    }
+
+    /** {@code entries}' frame counts, by picture name; empty for an archive without them, or a count unreadable. */
+    private static Map<String, Integer> frameCounts(Map<String, byte[]> entries) throws IOException {
+        byte[] file = entries.get(FRAMES_FILE);
+        if (file == null) return Map.of();
+        Properties counts = new Properties();
+        counts.load(new ByteArrayInputStream(file));
+        Map<String, Integer> frames = new HashMap<>();
+        for (String name : counts.stringPropertyNames()) {
+            try {
+                int count = Integer.parseInt(counts.getProperty(name).trim());
+                if (count > 1 && count <= FrameStrip.MOST) frames.put(name, count);
+            } catch (NumberFormatException unreadable) {
+                // imported still: the user sees a wide picture and can recut it
+            }
+        }
+        return frames;
     }
 
     /** Unpacks {@code archive}'s pictures into the project's images root, renaming around existing names. */
     public static ImportResult importInto(Path resourcesDir, Path archive) throws IOException {
         Map<String, byte[]> entries = readEntries(archive);
+        Map<String, Integer> counts = frameCounts(entries);
+        Map<String, Integer> frames = new LinkedHashMap<>();
 
         Path imagesRoot = resourcesDir.resolve("images");
         Files.createDirectories(imagesRoot);
@@ -135,8 +196,10 @@ public final class TemplateArchive {
             Files.write(imagesRoot.resolve(target + ".png"), entry.getValue());
             imported.add(target);
             if (!target.equals(sanitized)) renamed.put(sanitized, target);
+            Integer count = counts.get(source);
+            if (count != null && splits(entry.getValue(), count)) frames.put(target, count);
         }
-        return new ImportResult(imported, renamed, unchanged, skipped);
+        return new ImportResult(imported, renamed, unchanged, skipped, frames);
     }
 
     /**

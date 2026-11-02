@@ -744,8 +744,13 @@ final class PictureTools {
         }
         if (image == null) return AgentReply.refused(base.get() + ".png is not an image.");
         TemplateUses.Scan scan = FxCall.call(() -> TemplateUses.find(context.services().pluginValues(), base.get()));
+        int frames = FxCall.call(() -> TemplateUses.frames(context.services().pluginValues(), base.get()));
         String constant = TemplateNames.constantFor(base.get());
-        return AgentReply.text(base.get() + ": " + image.getWidth() + "×" + image.getHeight()
+        // A moving picture is shown whole, its frames side by side: each is a pose a run finds it in.
+        String size = frames > 1 && image.getWidth() % frames == 0
+                ? image.getWidth() / frames + "×" + image.getHeight() + ", " + frames + " frames shown side by side"
+                : image.getWidth() + "×" + image.getHeight();
+        return AgentReply.text(base.get() + ": " + size
                         + (constant == null ? ", no constant" : ", " + TemplateNames.CLASS_NAME + "." + constant)
                         + ", " + (scan.isEmpty() ? "unused" : scan.describe()) + ".")
                 .and(AgentReply.image(image));

@@ -24,6 +24,7 @@ import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.map.ScreenCards.Strip;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import javafx.animation.Animation;
 import javafx.animation.FadeTransition;
@@ -73,6 +74,7 @@ import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 /**
  * The map drawn: one card per screen on the toolkit's {@link GraphCanvas}, laid out in ranks from the first screen by
@@ -111,6 +113,7 @@ final class ScreenCanvas {
     private static final int MOST_IMAGES = 400;
 
     private final Path resources;
+    private final ToIntFunction<String> frames;
     private final GraphCanvas<Card, Link> graph;
     private final Map<String, FadeTransition> pulses = new HashMap<>();
     /** Each picture and shot read, by its file's name and time: a recut or a retake is a new key. */
@@ -151,9 +154,13 @@ final class ScreenCanvas {
     private record Laid(List<GraphLayout.Card> shown, List<ElkLayout.Way> ways, Set<String> popups, String root,
                         Set<String> hidden) {}
 
-    /** A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none). */
-    ScreenCanvas(Path resources) {
+    /**
+     * A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none); {@code frames}
+     * says how many frames a picture's file holds, so a moving one shows its first.
+     */
+    ScreenCanvas(Path resources, ToIntFunction<String> frames) {
         this.resources = resources;
+        this.frames = frames;
         graph = new GraphCanvas<>(Card::constant, this::view, this::arrow, this::arrange);
         graph.getStylesheets().add(SHEET);
         graph.getStyleClass().add("screen-map");
@@ -593,9 +600,10 @@ final class ScreenCanvas {
         box.setMinSize(size, size);
         box.setPrefSize(size, size);
         box.setMaxSize(size, size);
-        Image image = id == null ? null : image(id);
+        int count = id == null ? 1 : frames.applyAsInt(id);
+        Image image = id == null ? null : image(id, count);
         if (image != null) {
-            ImageView view = new ImageView(image);
+            ImageView view = FrameViews.firstFrame(new ImageView(image), count);
             view.setPreserveRatio(true);
             view.setFitWidth(size - 4);
             view.setFitHeight(size - 4);
@@ -609,7 +617,7 @@ final class ScreenCanvas {
         return box;
     }
 
-    private Image image(String id) {
+    private Image image(String id, int count) {
         if (resources == null) return null;
         Path file = TemplateLibrary.fileForName(resources, id);
         long time = modified(file);
@@ -617,7 +625,7 @@ final class ScreenCanvas {
         drawnTimes.put(PICTURE_KEY + id, time);
         if (time == 0) return null;
         // Keyed by the file's time: a picture recut by the assistant's crop_pictures reads afresh, not from the cache.
-        return thumbs.computeIfAbsent(id + "@" + time, key -> new Image(file.toUri().toString(), 96, 96, true, true,
+        return thumbs.computeIfAbsent(id + "@" + time + "#" + count, key -> FrameViews.load(file, 96, 96, count,
                 !loadNow));
     }
 
@@ -627,9 +635,12 @@ final class ScreenCanvas {
         redraw();
     }
 
-    /** The picture {@code id}'s size as cut, in the game's pixels; empty when it is not cut. */
+    /** The picture {@code id}'s size as cut, one frame of a moving one, in the game's pixels; empty when not cut. */
     Size pictureSize(String id) {
-        return resources == null ? new Size() : ScreenShots.size(TemplateLibrary.fileForName(resources, id));
+        if (resources == null) return new Size();
+        Size file = ScreenShots.size(TemplateLibrary.fileForName(resources, id));
+        int count = frames.applyAsInt(id);
+        return count > 1 && file.width() % count == 0 ? new Size(file.width() / count, file.height()) : file;
     }
 
     /** When the picture {@code id} was written, 0 for none: a recut changes it. */
