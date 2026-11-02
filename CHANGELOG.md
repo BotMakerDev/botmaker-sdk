@@ -33,11 +33,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   bot's blocking look is `Pressed.Result.BLOCKED`, and `Pressed.state()` says which look stopped or carried it, so
   a flow can `switch` on it. Deprecated, with rules: `State.BADGE`, `LOCKED`, `DONE`, `BUSY` (`@Migrate.Dropped`:
   name them in `States`), `Pressed.Result.LOCKED`, `FINISHED`, `BUSY` (migrated to BLOCKED).
-- **A dimmed or greyed button is seen Disabled without a picture of it**: a button's usual look that matches where
-  the frame is under 0.7 of its picture's light, or under half its colour (a colourful picture only), is taken as
-  Disabled, so a run never presses it — a tutorial dimming every button but one, or a greyed-out one. Matching
-  alone scores a darkened copy as well as the button. A look cut as Disabled still wins by its score; a very dark
-  picture is never judged. which_screen says `dimmed` beside such a match.
+- **A version of a button computed by colour, learned once per bot**: `@SdkValue(SHADES) Shades shades()` in
+  `Sdk.java` lists the game's `Shade`s — dim, grey, bright, tint or fade, each a gain and an offset per channel
+  (`shown = gain × cut + offset`), a tolerance, a cause and the state it means. A button's usual look that matches
+  where its pixels fit a shade (least squares over the picture's opaque pixels) shows that shade's state, so one
+  button seen dimmed teaches a run that every dimmed one is `Disabled`, with nothing else cut. A shade the bot's own
+  input causes (`HOVER`, `PRESS`, `FOCUS`) means `Normal` and applies only to the button the cursor, the last press or
+  the focus is on; an emulator has no hover. A tint can drop a match below the confidence, so a run matches the cut
+  tinted too, one more match per tint shade. which_screen says the version beside a match (`dimmed → Disabled`). A
+  bot with no shade sees none: the built-in dim check (0.7 of the light, half the colour) is gone. Discovery learns
+  shades in a later release.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

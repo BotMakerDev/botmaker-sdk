@@ -18,7 +18,8 @@ import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.StillSource;
-import com.botmaker.sdk.internal.screens.Dim;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.ColorText;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -257,6 +259,7 @@ final class LookTools {
         List<Rect> found = new ArrayList<>();
         // Copies are counted all over the frame, one more match each: only when the call asks for everywhere.
         Optional<ToolReach> reach = Boolean.TRUE.equals(shown.everywhere()) ? ToolReach.of(context) : Optional.empty();
+        List<Shade> shades = Frames.shades(context.services());
         for (Scored s : scored) {
             boolean on = s.match().confidence() >= needs;
             if (on) {
@@ -265,9 +268,8 @@ final class LookTools {
             }
             if (lines.size() < MOST_LISTED) {
                 lines.add((on ? "✓ " : "  ") + s.name() + " " + Frames.score(s.match().confidence()) + " at "
-                        + Frames.box(s.match().rect()) + (on && Dim.shows(TemplateLibrary.fileForName(
-                        resources.get(), s.name()).toString(), s.match().rect(), frame.get())
-                        ? " dimmed (a run takes it as Disabled)" : "")
+                        + Frames.box(s.match().rect())
+                        + (on ? shade(resources.get(), s, frame.get(), shades) : "")
                         + (on ? reach.map(r -> copies(r, s.name(), frame.get())).orElse("") : ""));
             }
         }
@@ -275,6 +277,19 @@ final class LookTools {
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
         return Frames.found(onMap + head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND,
                 shown.show());
+    }
+
+    /**
+     * The version a learned shade makes of {@code s} where it matched — {@code " dimmed → Disabled"} — as a run takes
+     * it; empty for none. The game's shades only: the assistant's own hover is not tracked here.
+     */
+    private static String shade(Path resources, Scored s, BufferedImage frame, List<Shade> shades) {
+        if (shades.isEmpty()) return "";
+        ImageTemplate picture = new ImageTemplate(TemplateLibrary.fileForName(resources, s.name()).toString());
+        return ShadeFit.shown(picture, s.match().rect(), frame, shades, Set.of(Shade.Cause.GAME))
+                .map(shade -> " " + shade.kind().displayName() + " → " + shade.state().displayName()
+                        + " (a learned version of it)")
+                .orElse("");
     }
 
     /**

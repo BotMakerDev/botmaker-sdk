@@ -9,6 +9,8 @@ import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
@@ -45,6 +47,12 @@ import java.util.function.Supplier;
 final class Frames {
 
     private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
+    private static final ManagedHandle<Shades> SHADES = ManagedHandle.of(SdkValues.SHADES);
+
+    /** The shades the bot learned, none when it learned none. */
+    static List<Shade> shades(StudioServices services) {
+        return SHADES.read(services).map(Shades::list).orElse(List.of());
+    }
 
     static final Color FOUND = new Color(0x3f, 0xb9, 0x50);
     static final Color NOTE = new Color(0xe3, 0xa0, 0x08);

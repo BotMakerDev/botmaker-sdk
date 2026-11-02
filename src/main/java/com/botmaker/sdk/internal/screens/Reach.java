@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
@@ -95,20 +96,21 @@ public interface Reach {
     record Found(Rect place, double score) {}
 
     /**
-     * Whether {@code picture}, matched at {@code found} on {@code frame}, shows there dimmed or greyed out ({@link Dim}):
-     * a button the game darkens matches as its usual picture. By default never; a reach that reads the pictures' files
-     * tells it.
+     * The learned {@link Shade} {@code picture} shows where it matched {@code frame} at {@code found} ({@link
+     * ShadeFit}): a button the game dims matches as its usual picture. By default none; a reach that reads the
+     * pictures' files and knows the bot's shades tells it.
      */
-    default boolean dimmed(ImageTemplate picture, Rect found, BufferedImage frame) {
-        return false;
+    default Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {
+        return Optional.empty();
     }
 
     /**
-     * {@code look}'s state where it matched at {@code found}: its usual look dimmed or greyed out is {@link
-     * State#DISABLED}, so a run never presses a button the game shows off without a look cut for it (2026-11-02).
+     * {@code look}'s state where it matched at {@code found}: its usual look in a learned shade means that shade's
+     * state, so a run never presses a button the game shows dimmed without a look cut for it (2026-11-02).
      */
     private ButtonState stateOf(Look look, Rect found, BufferedImage frame) {
-        return look.state() == State.NORMAL && dimmed(look.picture(), found, frame) ? State.DISABLED : look.state();
+        if (look.state() != State.NORMAL) return look.state();
+        return shade(look.picture(), found, frame).map(Shade::state).orElse(look.state());
     }
 
     /** {@link #findAll} with each match's score; by default each scores 1. */

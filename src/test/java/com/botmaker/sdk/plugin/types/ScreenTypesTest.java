@@ -25,6 +25,8 @@ import com.botmaker.sdk.plugin.SdkPlugin;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
@@ -415,6 +417,21 @@ class ScreenTypesTest {
         assertEquals(drag, roundTrip(ScreenTypes.SCROLL_DRAG_SHAPE, drag));
         Setup settings = Setup.named("Settings").elements(List.of(list));
         assertEquals(settings, roundTrip(ScreenTypes.SETUP_SHAPE, settings));
+    }
+
+    @Test
+    void learnedShadesRoundTrip() {
+        Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0.08, Shade.Cause.GAME,
+                State.DISABLED);
+        Shade hover = new Shade(Shade.Kind.BRIGHT, new Shade.Channels(1.1, 1.1, 1.2), Shade.Channels.all(0.02), 0.05,
+                Shade.Cause.HOVER, State.NORMAL);
+        assertEquals(dim, roundTrip(ScreenTypes.SHADE_SHAPE, dim));
+        assertEquals(hover.gain(), roundTrip(ScreenTypes.CHANNELS_SHAPE, hover.gain()));
+        Shades both = Shades.of(dim, hover);
+        assertEquals(both, roundTrip(ScreenTypes.SHADES_SHAPE, both));
+        assertEquals(Shades.none(), roundTrip(ScreenTypes.SHADES_SHAPE, Shades.none()));
+        assertTrue(new SdkPlugin().componentTypes().containsAll(List.of(ScreenTypes.SHADES_SHAPE,
+                ScreenTypes.SHADE_SHAPE, ScreenTypes.CHANNELS_SHAPE)));
     }
 
     @Test

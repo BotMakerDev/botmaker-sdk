@@ -17,6 +17,8 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -626,6 +628,29 @@ class ReachTest {
 
         assertEquals(MapFixtures.MAXED, both.seen(node, both.look().orElseThrow()).orElseThrow().state());
         assertEquals(MapFixtures.MAXED, both.copies(node, null, Order.NORTH, both.look().orElseThrow()).getFirst().state());
+    }
+
+    /** A learned dim makes the usual look's match Disabled, so it is never pressed; no shade, it is Normal. */
+    @Test
+    void aLearnedShadeTellsTheStateOfTheUsualLook() {
+        Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0, Shade.Cause.GAME,
+                State.DISABLED);
+        Column dimmed = new Column(Map.of("tavern", 0), 0) {
+            @Override
+            public Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {
+                return Optional.of(dim);
+            }
+        };
+        Column plain = new Column(Map.of("tavern", 0), 0);
+        Button tavern = Button.of(TAVERN);
+
+        assertEquals(State.DISABLED, dimmed.seen(tavern, dimmed.look().orElseThrow()).orElseThrow().state());
+        assertFalse(dimmed.press(TAVERN, null), "a dimmed button is never pressed");
+        assertEquals(List.of(), dimmed.done);
+        assertEquals(State.NORMAL, plain.seen(tavern, plain.look().orElseThrow()).orElseThrow().state());
+        Button selected = Button.of(new ImageTemplate("images/arena.png")).looks(List.of(Look.of(TAVERN, State.SELECTED)));
+        assertEquals(State.SELECTED, dimmed.seen(selected, dimmed.look().orElseThrow()).orElseThrow().state(),
+                "a look cut for a state keeps it");
     }
 
     private static final Button GO = Button.of(new ImageTemplate("images/go.png")).repeated();

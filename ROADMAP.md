@@ -9,6 +9,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   fixtures) to parts. A look (`ScreenVariant`) is still told by marker lists: tell it by parts too. 🗺 Screens draws a
   `Mark` field only through its screen's markers; give it a row in the outline and a marking/absent toggle in the
   input inspector.
+- **Shades, the rest (2026-11-02)**: a tint shade is matched tinted only by `findEachScored`/`findAllScored`; a
+  strip's band (`findWithinScored`) and markers (`findEach*`) still look for the plain cut. A pointer is recorded only
+  for the map's presses, not a flow's own `Mouse` calls, nor the assistant's hands (`ToolReach.shade` tries the
+  game's shades only). Nothing yet writes `Sdk.shades()` but the author: Discovery
+  learns them (plan phase 5), and 🗺 Screens has no view of them.
 
 - **A shot's density (2026-11-02)**: read_map flags a shot whose file is another size than `Sdk.screen()`, but an
   emulator at the bot's size with another `wm density` lays the game out otherwise and is not seen. Record the

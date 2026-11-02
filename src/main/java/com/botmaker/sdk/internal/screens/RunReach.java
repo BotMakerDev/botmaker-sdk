@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.input.Keyboard;
 import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -23,6 +24,7 @@ import com.botmaker.sdk.internal.emulator.ReadableSource;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -81,11 +83,38 @@ public final class RunReach implements Reach {
     @Override
     public List<Optional<Found>> findEachScored(List<ImageTemplate> pictures, BufferedImage frame) {
         double needs = BotSettings.current().confidence();
-        return ImageFinder.bestMatches(pictures, new StillSource(frame)).stream()
+        List<Optional<Found>> found = new ArrayList<>(ImageFinder.bestMatches(pictures, new StillSource(frame)).stream()
                 .map(best -> best.isFound() && best.confidence() >= needs
                         ? Optional.of(new Found(best.rect(), best.confidence())) : Optional.<Found>empty())
-                .toList();
+                .toList());
+        // Each picture not found, tinted as each tint shade shows it, matched on the frame prepared once.
+        List<Integer> missing = new ArrayList<>();
+        List<ImageTemplate> copies = new ArrayList<>();
+        for (Shade tint : tints()) {
+            for (int i = 0; i < found.size(); i++) {
+                if (found.get(i).isPresent()) continue;
+                Optional<ImageTemplate> copy = ShadeFit.tinted(pictures.get(i), tint);
+                if (copy.isEmpty()) continue;
+                missing.add(i);
+                copies.add(copy.get());
+            }
+        }
+        if (copies.isEmpty()) return found;
+        List<MatchResult> tinted = ImageFinder.bestMatches(copies, new StillSource(frame));
+        for (int k = 0; k < copies.size(); k++) {
+            MatchResult best = tinted.get(k);
+            if (found.get(missing.get(k)).isEmpty() && best.isFound() && best.confidence() >= needs) {
+                found.set(missing.get(k), Optional.of(new Found(best.rect(), best.confidence())));
+            }
+        }
+        return found;
     }
+
+    /** The bot's tint shades: a tint drops a match below the confidence, so the cut is matched tinted too. */
+    private static List<Shade> tints() {
+        return ShadeFit.learned().stream().filter(shade -> shade.kind() == Shade.Kind.TINT).toList();
+    }
+
 
     @Override
     public List<Optional<Rect>> findEachNear(List<ImageTemplate> pictures, BufferedImage frame) {
@@ -105,16 +134,31 @@ public final class RunReach implements Reach {
                 .map(MatchResult::rect).toList();
     }
 
+    /** Every copy, and when none shows, every copy tinted as the first tint shade that finds one shows it. */
     @Override
     public List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
-        return ImageFinder.allMatches(picture, new StillSource(frame), BotSettings.current().confidence()).stream()
+        double needs = BotSettings.current().confidence();
+        List<Found> all = ImageFinder.allMatches(picture, new StillSource(frame), needs).stream()
                 .map(match -> new Found(match.rect(), match.confidence())).toList();
+        for (Shade tint : all.isEmpty() ? tints() : List.<Shade>of()) {
+            Optional<ImageTemplate> copy = ShadeFit.tinted(picture, tint);
+            if (copy.isEmpty()) continue;
+            List<Found> tinted = ImageFinder.allMatches(copy.get(), new StillSource(frame), needs).stream()
+                    .map(match -> new Found(match.rect(), match.confidence())).toList();
+            if (!tinted.isEmpty()) return tinted;
+        }
+        return all;
     }
 
-    /** The picture's file against the frame where it matched; a picture with no file to read is never dimmed. */
+    /**
+     * The bot's learned shade the picture's file shows where it matched: the game's always, the ones its own input
+     * causes on the button that input is on.
+     */
     @Override
-    public boolean dimmed(ImageTemplate picture, Rect found, BufferedImage frame) {
-        return Dim.shows(picture.filePath(), found, frame);
+    public Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {
+        List<Shade> shades = ShadeFit.learned();
+        if (shades.isEmpty()) return Optional.empty();
+        return ShadeFit.shown(picture, found, frame, shades, ShadeFit.causes(found, ShadeFit.pointer(), nowMs()));
     }
 
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
@@ -151,7 +195,17 @@ public final class RunReach implements Reach {
     @Override
     public void press(Point at, Gesture gesture, Duration hold) {
         CaptureSource source = Source.current();
-        if (source.base() instanceof EmulatorSource && gesture != Gesture.HOLD) {
+        boolean emulator = source.base() instanceof EmulatorSource;
+        // Stamped when let go: a hold's press shows after it as a click's does.
+        try {
+            pressAs(source, emulator, at, gesture, hold);
+        } finally {
+            ShadeFit.moved(new ShadeFit.Pointer(at, nowMs(), gesture != Gesture.HOVER, !emulator));
+        }
+    }
+
+    private void pressAs(CaptureSource source, boolean emulator, Point at, Gesture gesture, Duration hold) {
+        if (emulator && gesture != Gesture.HOLD) {
             pressed(source, at, gesture);
             return;
         }
@@ -211,12 +265,15 @@ public final class RunReach implements Reach {
     public void scroll(Point at, int notches) {
         CaptureSource source = Source.current();
         source.scroll(onScreen(source, at), notches);
+        // The cursor rests where it scrolled; nothing there was pressed.
+        ShadeFit.moved(new ShadeFit.Pointer(at, nowMs(), false, !(source.base() instanceof EmulatorSource)));
     }
 
     @Override
     public void drag(Point from, Point to, Duration time) {
         CaptureSource source = Source.current();
         source.drag(onScreen(source, from), onScreen(source, to), time.toMillis());
+        ShadeFit.moved(new ShadeFit.Pointer(to, nowMs(), false, !(source.base() instanceof EmulatorSource)));
     }
 
     @Override

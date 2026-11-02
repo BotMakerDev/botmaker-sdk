@@ -11,6 +11,9 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.api.screens.Shades;
+import com.botmaker.sdk.api.screens.State;
 
 import java.util.List;
 import java.util.Map;
@@ -64,6 +67,12 @@ public final class Sdk {
     @SdkValue(SdkValue.Id.SETTINGS)
     public static BotSettings settings() {
         return BotSettings.defaults();
+    }
+
+    @SdkValue(SdkValue.Id.SHADES)
+    public static Shades shades() {
+        return Shades.of(new Shade(Shade.Kind.DIM, new Shade.Channels(0.45, 0.45, 0.45), new Shade.Channels(0, 0, 0),
+                0.08, Shade.Cause.GAME, State.DISABLED));
     }
 
     private Sdk() {}

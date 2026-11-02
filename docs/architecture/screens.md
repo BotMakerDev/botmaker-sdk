@@ -17,6 +17,15 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   moved to parts on any save (`MarkParts.move`) or all at once by `edit_map` `move_markers`. `MarkerSets` says, in
   `read_map`, two screens with equal sets and a set inside another with no absent part between them, naming the part
   to add. A look's (`ScreenVariant`) markers are still lists.
+- **A version computed by colour** (2026-11-02): `Sdk.shades()` (`@SdkValue(SHADES)`, `Shades.of(Shade…)`) holds the
+  shades learned on the game. `Reach.stateOf` asks `Reach.shade` after a `Normal` look matches; `RunReach` fits the
+  shown pixels against the cut (`internal/screens/ShadeFit`: per channel `gain × cut + offset`, or each channel from
+  the cut's light for a grey; a moving picture by the frame that fits best) and takes the closest shade within its
+  tolerance, a hover or press first (focus is weighed with the game's by distance). Input shades are tried only where
+  `ShadeFit.causes` allows: hover under the last pointer (not on an emulator), focus on the last press, press within
+  `PRESS_MS` of it — the pointer is run-wide (`ShadeFit.pointer`, reset when a run takes its shades), set by the map's
+  presses, drags and scrolls only. Tint shades also match the cut tinted (`ShadeFit.tinted`; cuts and copies kept by
+  file stamp, 64 at most) where the plain cut finds nothing. No shade: no computed version.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a

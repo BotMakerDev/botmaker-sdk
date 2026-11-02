@@ -25,12 +25,14 @@ import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenPart;
+import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.shared.platform.Os;
@@ -184,6 +186,17 @@ public final class SdkValues implements ValueHolder {
                     + " Name a new state on a look in 🗺 Screens to add one.");
 
     /**
+     * How the game shows a button changed by colour alone — {@code Shades.of(new Shade(Shade.Kind.DIM, …,
+     * State.DISABLED))}: learned on one button seen both ways and applied to all, never chosen (2026-11-02). None
+     * written: no button is seen in a shade.
+     */
+    public static final ManagedMethod<Shades> SHADES = ManagedValue.method(SdkValue.Id.SHADES)
+            .in(HOLDER)
+            .holds(Shades.class, Shades.none())
+            .because("These are how the game shows a button dimmed, greyed or tinted, each learned from one button"
+                    + " seen both ways. Discovery and the assistant write them; a run applies them to every button.");
+
+    /**
      * The game's screens — {@code static final class Campaign extends Screen} with its constant {@code CAMPAIGN}: its
      * inputs and readouts are its fields ({@code public final Button claim = Button.of(…)}), the rest its {@link
      * Screen#setup}. A
@@ -304,7 +317,7 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
+                SCREEN, SHADES, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
     }
 
     /** {@link #FLOW}'s type and first value: no flow until the runner picks one of {@code Flows}. */
@@ -364,6 +377,7 @@ public final class SdkValues implements ValueHolder {
         ManagedValues.claim(RUN, InstalledRun::use);
         ManagedValues.claim(SETTINGS, BotSettings::use);
         ManagedValues.claim(SCREEN, BotScreen::use);
+        ManagedValues.claim(SHADES, ShadeFit::use);
         // Where the flow editor's cards sit: the editor's, and nothing at runtime reads it. Claimed so a run
         // does not report it as a value nobody takes.
         ManagedValues.claim(FLOW_LAYOUT, layout -> { });

@@ -82,6 +82,11 @@ public @interface SdkValue {
          */
         STATES,
         /**
+         * How this game shows a button changed by colour alone — dimmed, greyed, tinted — learned on one button and
+         * applied to all: a {@code Shades} method, none for a bot that learned none.
+         */
+        SHADES,
+        /**
          * The game's screens and the inputs between them, as Discovery found them — {@code Screens}, a class of
          * {@code Screen} classes each with its constant, that a run walks to reach a screen.
          */

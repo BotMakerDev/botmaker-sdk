@@ -22,6 +22,8 @@ import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
+import com.botmaker.sdk.api.screens.Shade;
+import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
@@ -63,7 +65,8 @@ public final class ScreenTypes implements TypeHolder {
 
     @Override
     public List<ComponentType<?>> components() {
-        return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, BUTTON_SHAPE,
+        return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, SHADES_SHAPE,
+                SHADE_SHAPE, CHANNELS_SHAPE, BUTTON_SHAPE,
                 BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
@@ -126,6 +129,17 @@ public final class ScreenTypes implements TypeHolder {
 
     /** {@code Look.of(ImageTemplate, ButtonState)}: another look of a button, the SDK's state or the bot's. */
     public static final DeclaredCall<Look> LOOK_SHAPE = ComponentType.part(Look.class).writtenAs(Look::of);
+
+    /** {@code Shades.of(Shade...)}: the {@code SHADES} value, the shades the bot learned. */
+    public static final DeclaredCall<Shades> SHADES_SHAPE = ComponentType.part(Shades.class)
+            .writtenAsEach(Shades::of, Shades::list);
+
+    /** {@code new Shade(kind, gain, offset, tolerance, cause, state)}: one learned shade. */
+    public static final DeclaredCall<Shade> SHADE_SHAPE = ComponentType.part(Shade.class).writtenAsRecord();
+
+    /** {@code new Shade.Channels(red, green, blue)}: a shade's gain or offset. */
+    public static final DeclaredCall<Shade.Channels> CHANNELS_SHAPE = ComponentType.part(Shade.Channels.class)
+            .writtenAsRecord();
 
     /**
      * {@code Button.of(ImageTemplate)} and its links, in the order they are written. A reference to a field is written

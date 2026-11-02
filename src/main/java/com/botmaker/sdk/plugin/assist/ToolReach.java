@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
@@ -17,6 +18,7 @@ import com.botmaker.sdk.internal.input.Hands;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.FrameTree;
 import com.botmaker.sdk.internal.screens.Reach;
+import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The assistant's reach: the frame the look tools read ({@link Frames#look}), each picture matched as a run matches
@@ -106,6 +109,19 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
     @Override
     public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
         return findEach(List.of(picture), frame).getFirst();
+    }
+
+    /**
+     * The bot's learned shade that the picture's file shows where it matched: the game's only, since the assistant's
+     * hands are not followed as a run's presses are, so a hover shade under its cursor reads as the game's.
+     */
+    @Override
+    public Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {
+        List<Shade> shades = Frames.shades(context.services());
+        if (shades.isEmpty()) return Optional.empty();
+        return Frames.picture(resources, picture.id())
+                .map(name -> new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()))
+                .flatMap(file -> ShadeFit.shown(file, found, frame, shades, Set.of(Shade.Cause.GAME)));
     }
 
     /**
