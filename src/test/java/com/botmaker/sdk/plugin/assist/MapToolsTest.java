@@ -9,9 +9,12 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
@@ -27,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -180,6 +184,37 @@ class MapToolsTest {
         assertTrue(ScreenEdits.wayRefused(added, "REWARD", "HOME", "m_key").isPresent(), "a popup");
         assertTrue(ScreenEdits.wayRefused(added, "HOME", "CAMPAIGN", "home").isPresent(), "its way back");
         assertTrue(ScreenEdits.wayRefused(added, "HOME", "MAP", "up").isPresent(), "a screen it is reached through");
+    }
+
+    /**
+     * Photo's zoom moved the whole island under its shutter, and try_input recorded a new screen (2026-11-02): the
+     * screen stayed, as its marker's own pixels say. A popup's dimming changes them; a marker it never shows found, or
+     * its marker gone, is another screen.
+     */
+    @Test
+    void aScreenWhoseMarkerStaysPutStayedThoughMostOfItChanged() {
+        Rect shutter = new Rect(0, 0, 40, 40);
+        Function<String, Optional<Rect>> there = id -> Optional.of(shutter);
+        ImageTemplate marker = new ImageTemplate("images/shutter.png");
+        Markers markers = new Markers(List.of(marker), List.of());
+        BufferedImage before = filled(Color.GREEN, 40);
+        BufferedImage zoomed = filled(Color.BLUE, 40);
+        Rect all = new Rect(0, 0, 320, 180);
+        assertTrue(MapTools.stayed(markers, there, before, zoomed, all));
+
+        BufferedImage dimmed = filled(Color.BLUE, 0);
+        Graphics2D g = dimmed.createGraphics();
+        g.setColor(Color.GRAY);
+        g.fillRect(0, 0, 40, 40);
+        g.dispose();
+        assertFalse(MapTools.stayed(markers, there, before, dimmed, all), "a popup dims the marker");
+        assertFalse(MapTools.stayed(new Markers(List.of(marker), List.of(new ImageTemplate("images/other.png"))),
+                there, before, zoomed, all), "one it never shows is found");
+        assertFalse(MapTools.stayed(markers, id -> Optional.empty(), before, zoomed, all), "its marker went");
+        assertFalse(MapTools.stayed(new Markers(List.of(), List.of()), there, before, zoomed, all),
+                "nothing tells it");
+        assertFalse(MapTools.stayed(markers, there, before, zoomed, new Rect(160, 0, 160, 180)),
+                "a panel opened beside the marker spans only a part");
     }
 
     /** A {@code color} frame with its top-left {@code corner}×{@code corner} square white. */

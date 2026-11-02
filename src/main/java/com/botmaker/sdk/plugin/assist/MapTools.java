@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -21,6 +22,7 @@ import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
@@ -41,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -497,13 +500,20 @@ final class MapTools {
                 // A popup shows over the screen; anything else left it, maybe finished.
                 return Tried.left(graph.screens().get(known.get()).isPopup() ? said : up(context, said, screen, input));
             }
-            if (child == null) {
-                return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: " + base.label()
-                        + " opened a screen the map does not have, and a hotkey names none. Look at it (describe), "
-                        + "go back to " + name + " and try it again with opens, the name it shows.")));
+            // No screen the map has: one whose markers and buttons stayed put under a change over the rest changed in
+            // place (Photo's zoom), and is no new screen.
+            boolean inPlace = opens == null && stayed(onMarkers, id -> foundOn(context, id, entered.after()),
+                    entered.before(), entered.after(),
+                    FrameChange.box(entered.before(), entered.after(), entered.motion()).orElse(null));
+            if (!inPlace) {
+                if (child == null) {
+                    return Tried.left(entered.reply().and(AgentReply.text("Nothing was written: " + base.label()
+                            + " opened a screen the map does not have, and a hotkey names none. Look at it "
+                            + "(describe), go back to " + name + " and try it again with opens, the name it shows.")));
+                }
+                return Tried.left(entered.reply().and(opened(context, graph, screen, field, base, look, pick, child,
+                        entered.after(), entered.took())));
             }
-            return Tried.left(entered.reply().and(opened(context, graph, screen, field, base, look, pick, child,
-                    entered.after(), entered.took())));
         }
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
         AgentReply said = noted(services, screen, field, base.tried(),
@@ -604,6 +614,65 @@ final class MapTools {
                 + "end): go_to_screen " + left + ", cut it with screen " + left + " and try it."
                 : "Nothing left to try on " + left + ", but the way to " + back + ", the next screen to explore, "
                 + "failed: " + walked.why() + " Look where the game is (which_screen)."));
+    }
+
+    /** The most a marker's pixels may differ on average, out of 255, for it to have stayed put. */
+    private static final int STILL = 8;
+
+    /** The share of the frame a change spans for the screen under it to have stayed: all over, as a zoom moves it. */
+    private static final double ALL_OVER = 0.8;
+
+    /**
+     * Whether a screen stayed through a change {@code changed} spanning all of it: each of its picture
+     * {@code markers} {@code found} on {@code after} over pixels {@code before} had too, and none it never shows found.
+     * Photo's zoom moved the whole island under its shutter, and try_input recorded a new screen (2026-11-02). A popup
+     * over the screen dims its markers, a panel opened beside them spans only a part, and a full screen hides them.
+     * Its buttons are not compared: Photo's slider knob ran from its + to its - on each zoom. False when words or
+     * elements tell it, which are read, not compared.
+     */
+    static boolean stayed(Markers markers, Function<String, Optional<Rect>> found, BufferedImage before,
+                          BufferedImage after, Rect changed) {
+        if (markers.shown().isEmpty() || !markers.texts().isEmpty() || !markers.elements().isEmpty()
+                || !markers.picked().isEmpty() || before == null || after == null || changed == null
+                || before.getWidth() != after.getWidth() || before.getHeight() != after.getHeight()
+                || (double) changed.width() * changed.height() < ALL_OVER * after.getWidth() * after.getHeight()) {
+            return false;
+        }
+        if (markers.absent().stream().anyMatch(p -> found.apply(p.id()).isPresent())) return false;
+        for (ImageTemplate marker : markers.shown()) {
+            Optional<Rect> at = found.apply(marker.id());
+            if (at.isEmpty() || !samePixels(before, after, at.get())) return false;
+        }
+        return true;
+    }
+
+    /** Whether {@code box} differs between the two frames by at most {@link #STILL} a channel on average. */
+    private static boolean samePixels(BufferedImage before, BufferedImage after, Rect box) {
+        int x0 = Math.max(0, box.x());
+        int y0 = Math.max(0, box.y());
+        int x1 = Math.min(before.getWidth(), box.x() + box.width());
+        int y1 = Math.min(before.getHeight(), box.y() + box.height());
+        if (x1 <= x0 || y1 <= y0) return false;
+        long diff = 0;
+        for (int y = y0; y < y1; y++) {
+            for (int x = x0; x < x1; x++) {
+                int a = before.getRGB(x, y);
+                int b = after.getRGB(x, y);
+                diff += Math.abs((a >> 16 & 0xFF) - (b >> 16 & 0xFF)) + Math.abs((a >> 8 & 0xFF) - (b >> 8 & 0xFF))
+                        + Math.abs((a & 0xFF) - (b & 0xFF));
+            }
+        }
+        return diff <= (long) STILL * 3 * (x1 - x0) * (y1 - y0);
+    }
+
+    /** Where a run would find {@code picture} on {@code frame}; empty when it would not. */
+    private static Optional<Rect> foundOn(AgentContext context, String picture, BufferedImage frame) {
+        Optional<Path> resources = Frames.resources(context);
+        Optional<String> base = resources.flatMap(r -> Frames.picture(r, picture));
+        if (base.isEmpty()) return Optional.empty();
+        MatchResult match = LookTools.best(context, resources.get(), base.get(), frame);
+        return match.isFound() && match.confidence() >= Frames.confidence(context.services())
+                ? Optional.of(match.rect()) : Optional.empty();
     }
 
     /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
