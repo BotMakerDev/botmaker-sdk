@@ -41,6 +41,7 @@ import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.assist.MapTools.Mark;
+import com.botmaker.sdk.plugin.assist.BoardCuts.Watch;
 import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
@@ -58,6 +59,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -375,6 +377,15 @@ final class PictureTools {
      */
     static AgentReply cropPictures(Crops crops, AgentContext context, Optional<BufferedImage> shown,
                                    Supplier<List<BufferedImage>> live) {
+        return cropPictures(crops, context, shown, live, Map.of());
+    }
+
+    /**
+     * As {@link #cropPictures(Crops, AgentContext, Optional, Supplier)}, a box named in {@code watched} saved with the
+     * frames watched for it already (🗺's ◉ Watch, its frames ticked), never watched again.
+     */
+    static AgentReply cropPictures(Crops crops, AgentContext context, Optional<BufferedImage> shown,
+                                   Supplier<List<BufferedImage>> live, Map<String, FrameWatch.Watched> watched) {
         List<Box> boxes = crops.boxes() == null ? List.of() : crops.boxes();
         if (boxes.isEmpty()) return AgentReply.refused("Give the boxes to cut: name, x, y, width and height each.");
         for (Box box : boxes) {
@@ -405,7 +416,7 @@ final class PictureTools {
                 || context.services().projectDir() == null ? null
                 : MapTools.markers(context.services(), screen).orElse(null);
         if (cuts.size() == 1) {
-            AgentReply one = cropPicture(cuts.getFirst(), context, live, shown);
+            AgentReply one = cropPicture(cuts.getFirst(), context, live, shown, given(watched, cuts.getFirst()));
             return said(one.isRefused() || !cuts.getFirst().screenMarker() ? one
                     : said(one, told(context, screen, before, cuts, shown)), fitted);
         }
@@ -424,7 +435,7 @@ final class PictureTools {
             // A note declined in words (a look of an input already) is no refusal: the set it was to start is read.
             Markers prior = first && crop.screenMarker() ? MapTools.markers(context.services(), screen).orElse(null)
                     : null;
-            AgentReply one = cropPicture(as, context, live, shown);
+            AgentReply one = cropPicture(as, context, live, shown, given(watched, crop));
             if (!one.isRefused()) {
                 boolean wrote = !first || !crop.screenMarker() || MapTools.markers(context.services(), screen)
                         .filter(now -> prior == null || !now.same(prior)).isPresent();
@@ -450,7 +461,7 @@ final class PictureTools {
                 }
                 if (at.refusal() != null) return or(all, at.refusal());
             }
-            AgentReply one = cropPicture(crop.unplaced(), context, live, shown);
+            AgentReply one = cropPicture(crop.unplaced(), context, live, shown, given(watched, crop));
             if (!one.isRefused() && at != null) {
                 String name = TemplateLibrary.sanitizeName(crop.name());
                 if (Boolean.TRUE.equals(crop.back())) backCut = name;
@@ -468,9 +479,16 @@ final class PictureTools {
         }
         // Then another look of an input, or one with a when: what it belongs to is noted by now.
         for (Crop crop : cuts) {
-            if (crop.alone() && crop.marker() == null) all = joined(all, crop, cropPicture(crop, context, live, shown));
+            if (crop.alone() && crop.marker() == null) {
+                all = joined(all, crop, cropPicture(crop, context, live, shown, given(watched, crop)));
+            }
         }
         return said(all, fitted);
+    }
+
+    /** The frames watched for {@code crop} already, or null: it is cut as it says. */
+    private static FrameWatch.Watched given(Map<String, FrameWatch.Watched> watched, Crop crop) {
+        return crop.name() == null ? null : watched.get(crop.name());
     }
 
     /**
@@ -597,7 +615,7 @@ final class PictureTools {
 
     /** One box cut out of {@code shown}, checked still on {@code live}, the screen watched once for every box of a call. */
     private static AgentReply cropPicture(Crop crop, AgentContext context, Supplier<List<BufferedImage>> live,
-                                          Optional<BufferedImage> shown) {
+                                          Optional<BufferedImage> shown, FrameWatch.Watched given) {
         if (crop.partial()) {
             return AgentReply.refused(crop.name() + ": give x, y, width and height, or none of them for a picture the "
                     + "bot has. Nothing was saved.");
@@ -687,8 +705,12 @@ final class PictureTools {
         }
         Rect place = picture.get().place();
         FrameWatch.Watched watched = null;
-        if (crop.watched()) {
-            Watch watch = watch(context, crop, frame.get(), picture.get().image());
+        if (given != null && !given.frames().isEmpty()) {
+            watched = given;
+        } else if (crop.watched()) {
+            Watch watch = watch(context, crop.box(), crop.shape(), crop.points(),
+                    crop.ignore() == null ? null : crop.ignore().rect(), frame.get(), picture.get().image(), List.of(),
+                    seen -> {});
             if (watch.refusal() != null) return AgentReply.refused(watch.refusal());
             watched = watch.watched();
         } else {
@@ -725,15 +747,16 @@ final class PictureTools {
                         : AgentReply.image(PictureCuts.checkered(FrameStrip.join(frames))));
     }
 
-    /** A watch of a moving cut: what it kept, or why nothing is saved (null: it is). */
-    private record Watch(FrameWatch.Watched watched, String refusal) {
-    }
-
     /**
-     * The frames of the thing {@code crop} boxes in {@code shown}, watched on the live game ({@link FrameWatch}) until
-     * its loop comes round, each cut with the crop's shape and its ignored part. Blocking, for seconds.
+     * The frames of the thing {@code box} (its {@code shape}, a polygon's {@code points}, skipping {@code ignore})
+     * shows in {@code shown}, watched on the live game ({@link FrameWatch}) until its loop comes round, from the frames
+     * {@code kept}; {@code cut} is the box as {@code shown} shows it, which must be among the poses, and the game's
+     * first grab must be one of {@code kept} when there are some. {@code seen} hears of each grab. Blocking, for
+     * seconds: crop_pictures' moving and 🗺's ◉ Watch.
      */
-    private static Watch watch(AgentContext context, Crop crop, BufferedImage shown, BufferedImage cut) {
+    static Watch watch(AgentContext context, Rect box, CutShape shape, List<Point> points, Rect ignore,
+                       BufferedImage shown, BufferedImage cut, List<BufferedImage> kept,
+                       Consumer<FrameWatch.Progress> seen) {
         Supplier<Optional<BufferedImage>> feed = fresh(Frames.feed(context));
         boolean[] resized = {false};
         Supplier<Optional<BufferedImage>> poses = () -> feed.get().flatMap(live -> {
@@ -741,12 +764,23 @@ final class PictureTools {
                 resized[0] = true;
                 return Optional.empty();
             }
-            return PictureCuts.cut(live, crop.box(), crop.shape(), crop.points())
-                    .map(p -> crop.ignore() == null ? p : PictureCuts.masked(p, crop.ignore().rect()))
+            return PictureCuts.cut(live, box, shape, points)
+                    .map(p -> ignore == null ? p : PictureCuts.masked(p, ignore))
                     .map(PictureCuts.Piece::image);
         });
         double needs = Frames.confidence(context.services());
-        FrameWatch.Watched watched = FrameWatch.poses(poses, needs, InstantSource.system(), List.of());
+        if (!kept.isEmpty()) {
+            // Watched longer: the kept frames hold the screenshot's pose, so the check after proves nothing; the game
+            // must show one of them now, else it moved and every grab would be kept as a pose.
+            Optional<BufferedImage> now = Optional.empty();
+            for (int i = 0; i < 5 && now.isEmpty(); i++) now = poses.get();
+            BufferedImage first = now.orElse(null);
+            if (first == null || kept.stream().noneMatch(k -> alike(first, k, needs))) {
+                return new Watch(null, "The game does not show it as it was watched any more: the screen moved. "
+                        + "Nothing was added.");
+            }
+        }
+        FrameWatch.Watched watched = FrameWatch.poses(poses, needs, InstantSource.system(), kept, seen);
         if (resized[0] && !watched.saveable()) {
             return new Watch(null, "The game is not the screenshot's " + shown.getWidth() + "×" + shown.getHeight()
                     + " any more: take a new one. Nothing was saved.");

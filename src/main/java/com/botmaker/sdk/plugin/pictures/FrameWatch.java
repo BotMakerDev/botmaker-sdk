@@ -14,6 +14,7 @@ import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -75,6 +76,11 @@ public final class FrameWatch {
             return !frames.isEmpty() && (ending == Ending.LOOP_CLOSED || ending == Ending.LONGEST_REACHED);
         }
 
+        /** This watch keeping only {@code frames} of its own, in order: the ones ticked in 🗺's cut form. */
+        public Watched keeping(List<BufferedImage> frames) {
+            return new Watched(frames, grabs, grabsPerSecond, watched, loop, ending);
+        }
+
         /** Whether the feed was too slow to be sure no quick pose slipped by. */
         public boolean slow() {
             return grabsPerSecond < SLOW_FEED;
@@ -100,6 +106,16 @@ public final class FrameWatch {
      */
     public static Watched poses(Supplier<Optional<BufferedImage>> poses, double confidence, InstantSource clock,
                                 List<BufferedImage> kept) {
+        return poses(poses, confidence, clock, kept, seen -> {});
+    }
+
+    /** A watch under way: how long so far, how many grabs, how many frames kept. */
+    public record Progress(Duration watched, int grabs, int frames) {
+    }
+
+    /** As {@link #poses(Supplier, double, InstantSource, List)}, {@code progress} told after each grab. */
+    public static Watched poses(Supplier<Optional<BufferedImage>> poses, double confidence, InstantSource clock,
+                                List<BufferedImage> kept, Consumer<Progress> progress) {
         List<BufferedImage> frames = new ArrayList<>(kept);
         List<ImageTemplate> templates = new ArrayList<>();
         try {
@@ -137,6 +153,7 @@ public final class FrameWatch {
                 if (seen != 0) awayFromFirst = true;
                 else if (awayFromFirst && loop == null) loop = Duration.between(start, now);
                 Duration all = Duration.between(start, now);
+                progress.accept(new Progress(all, grabs, frames.size()));
                 if (all.compareTo(LONGEST) >= 0) {
                     ending = Ending.LONGEST_REACHED;
                     break;

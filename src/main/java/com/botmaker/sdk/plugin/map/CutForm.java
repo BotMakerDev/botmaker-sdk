@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Anchor;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.State;
@@ -17,13 +18,16 @@ import com.botmaker.sdk.plugin.assist.BoardCuts.As;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
+import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TagPicker;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -37,10 +41,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -137,6 +144,14 @@ final class CutForm {
     }
 
     /**
+     * The cut at {@code index} watched by ◉ Watch: what it kept; {@code longer}, which watches it again from the frames
+     * given (blocking: off the FX thread); and {@code grew}, told what a longer watch kept, on the FX thread.
+     */
+    record Watching(int index, FrameWatch.Watched watched,
+                    Function<List<BufferedImage>, BoardCuts.Watch> longer, Consumer<FrameWatch.Watched> grew) {
+    }
+
+    /**
      * The one thread the form reads cuts' words on: OCR keeps an engine per thread (tessdata loaded, never freed), so
      * a thread per read would leave one behind each time.
      */
@@ -162,15 +177,18 @@ final class CutForm {
     private final List<String> pictures;
     /** The bot's zones' constants, read once: a words' zone or a readout is saved as one. */
     private final List<String> zones;
+    /** The size of one frame of each bot's picture asked about, read once: a cut that size may join it. */
+    private final Map<String, Optional<Size>> frameSizes = new HashMap<>();
 
     /**
-     * @param shown  the screen the frame shows, or the one the cut was asked for; null: none
-     * @param first  what the first cut is
-     * @param save   the answer, on OK with every cut named
-     * @param say    why the form was opened again
+     * @param shown    the screen the frame shows, or the one the cut was asked for; null: none
+     * @param first    what the first cut is
+     * @param watching the cut ◉ Watch watched, its frames shown to tick; null: none
+     * @param save     the answer, on OK with every cut named
+     * @param say      why the form was opened again
      */
     private CutForm(StudioServices services, ScreenGraph graph, BufferedImage frame, List<Drawn> cuts, String shown,
-                    Kind first, Consumer<Answer> save, Consumer<String> say) {
+                    Kind first, Watching watching, Consumer<Answer> save, Consumer<String> say) {
         this.services = services;
         this.graph = graph;
         this.save = save;
@@ -197,10 +215,16 @@ final class CutForm {
                 .sorted().toList();
         zones = ScreenEdits.zones(services);
         GridPane grid = new GridPane(8, 8);
+        int row = 0;
         for (int i = 0; i < cuts.size(); i++) {
             Line line = new Line(i + 1, frame, cuts.get(i), i == 0 ? first : Kind.BUTTON);
             lines.add(line);
-            grid.addRow(i, line.thumb, line.name, line.intent, line.kind, line.details);
+            grid.addRow(row++, line.thumb, new VBox(4, line.name, line.asFrame), line.intent, line.kind, line.details);
+            if (watching != null && watching.index() == i) {
+                // Its frames under it, across the row: the picture's poses, each ticked to keep.
+                line.watched(watching);
+                grid.add(line.frames, 1, row++, 4, 1);
+            }
         }
         screen.getEditor().textProperty().addListener((o, was, is) -> lines.forEach(Line::fill));
         HBox top = new HBox(8, new Label("On the screen"), screen, new Label("Tags"), tags);
@@ -229,8 +253,8 @@ final class CutForm {
 
     /** Asks what {@code cuts}, drawn on {@code frame}, are. On the FX thread. */
     static void ask(StudioServices services, ScreenGraph graph, BufferedImage frame, List<Drawn> cuts, String shown,
-                    Kind first, Consumer<Answer> save, Consumer<String> say) {
-        new CutForm(services, graph, frame, cuts, shown, first, save, say).open();
+                    Kind first, Watching watching, Consumer<Answer> save, Consumer<String> say) {
+        new CutForm(services, graph, frame, cuts, shown, first, watching, save, say).open();
     }
 
     private void open() {
@@ -257,9 +281,16 @@ final class CutForm {
         for (Line line : lines) {
             String at = "Cut " + line.index + ": ";
             String name = TemplateLibrary.sanitizeName(line.name.getText());
+            // Frames of one picture share its name: several may join it in one save.
+            if (line.addsFrame()) continue;
             if (line.kind().named() && name.isEmpty()) return Optional.of(at + "give it a name.");
             if (line.kind().named() && names.contains(name)) return Optional.of(at + "another cut has that name.");
             names.add(name);
+            if (line.watched != null && !BoardCuts.picture(line.as())) {
+                return Optional.of(at + "it was watched for its frames, so it is a picture: a marker, a button or a "
+                        + "look, not " + line.kind().displayName().toLowerCase(Locale.ROOT) + ".");
+            }
+            if (line.watched != null && line.ticked().isEmpty()) return Optional.of(at + "tick one of its frames at least.");
             switch (line.kind()) {
                 case RECUT -> {
                     if (line.picture.getValue() == null) return Optional.of(at + "pick the picture it is a new image of.");
@@ -333,6 +364,24 @@ final class CutForm {
         return taken;
     }
 
+    /** The size of one frame of the bot's picture {@code name}; empty when it has none, or it cannot be read. */
+    private Optional<Size> frameSize(String name) {
+        Path resources = services.resourcesDir();
+        if (resources == null || !pictures.contains(name)) return Optional.empty();
+        return frameSizes.computeIfAbsent(name, n -> {
+            try {
+                BufferedImage strip = ImageIO.read(TemplateLibrary.fileForName(resources, n).toFile());
+                // Counted as add_frame counts them, so the size offered is the one it takes.
+                int count = services.pluginValues() == null ? 1
+                        : Math.max(1, TemplateUses.frames(services.pluginValues(), n));
+                return strip == null ? Optional.empty() : Optional.of(new Size(strip.getWidth() / count,
+                        strip.getHeight()));
+            } catch (IOException | RuntimeException unreadable) {
+                return Optional.empty();
+            }
+        });
+    }
+
     private static Label hint(String text) {
         Label label = new Label(text);
         label.setWrapText(true);
@@ -380,6 +429,13 @@ final class CutForm {
         private String words;
         /** The name last suggested: the name field still holding it takes the next suggestion. */
         private String suggested = "";
+        /** Offered when the name is a picture the bot has, one of whose frames is the cut's size. */
+        private final CheckBox asFrame = new CheckBox();
+        /** The frames ◉ Watch kept, each with its tick, the watch's line and ◉ Watch longer; empty when not watched. */
+        private final VBox frames = new VBox(6);
+        /** What ◉ Watch kept of this cut; null: not watched. */
+        private FrameWatch.Watched watched;
+        private final List<CheckBox> ticks = new ArrayList<>();
 
         Line(int index, BufferedImage frame, Drawn drawn, Kind first) {
             this.index = index;
@@ -432,12 +488,112 @@ final class CutForm {
             readout.setTooltip(new Tooltip(MapGuide.READOUT));
             subject.disableProperty().bind(readout.selectedProperty().not());
             details.setAlignment(Pos.CENTER_LEFT);
+            asFrame.managedProperty().bind(asFrame.visibleProperty());
+            asFrame.setVisible(false);
+            asFrame.setTooltip(new Tooltip(MapGuide.CUT_AS_FRAME));
+            name.textProperty().addListener((o, was, is) -> offerAsFrame());
+            asFrame.selectedProperty().addListener((o, was, is) -> {
+                intent.setDisable(is);
+                kind.setDisable(is);
+                details.setDisable(is);
+            });
             fill();
             readWords();
         }
 
         Kind kind() {
             return kind.getValue();
+        }
+
+        /** Whether it is saved as one more frame of the picture its name names. */
+        boolean addsFrame() {
+            return asFrame.isVisible() && asFrame.isSelected();
+        }
+
+        /** "Add as a frame of slime" offered while the name is a picture the bot has whose frames are the cut's size. */
+        private void offerAsFrame() {
+            String typed = TemplateLibrary.sanitizeName(name.getText());
+            boolean fits = watched == null && frameSize(typed)
+                    .filter(s -> s.width() == drawn.box().width() && s.height() == drawn.box().height()).isPresent();
+            asFrame.setText("Add as a frame of " + typed);
+            asFrame.setVisible(fits);
+            if (!fits) asFrame.setSelected(false);
+        }
+
+        /** Shows {@code watching}'s frames under the line, each ticked, its line and ◉ Watch longer. */
+        void watched(Watching watching) {
+            showFrames(watching.watched(), List.of());
+            javafx.scene.control.Button longer = new javafx.scene.control.Button("◉ Watch longer");
+            longer.setTooltip(new Tooltip(MapGuide.CUT_WATCH_LONGER));
+            Label saying = new Label();
+            saying.setWrapText(true);
+            longer.setOnAction(e -> {
+                List<BufferedImage> kept = watched.frames();
+                longer.setDisable(true);
+                // The ticks held while it watches: what they say when it ends is kept.
+                ticks.forEach(t -> t.setDisable(true));
+                saying.setText("Watching… the game, as it plays now");
+                Thread.ofPlatform().daemon().name("cut-watch").start(() -> {
+                    BoardCuts.Watch again = watching.longer().apply(kept);
+                    Platform.runLater(() -> {
+                        longer.setDisable(false);
+                        ticks.forEach(t -> t.setDisable(false));
+                        if (again.refusal() != null) {
+                            saying.setText(again.refusal());
+                            return;
+                        }
+                        saying.setText("");
+                        showFrames(again.watched(), ticks.stream().map(CheckBox::isSelected).toList());
+                        frames.getChildren().add(new HBox(8, longer, saying));
+                        watching.grew().accept(again.watched());
+                    });
+                });
+            });
+            frames.getChildren().add(new HBox(8, longer, saying));
+        }
+
+        /**
+         * {@code seen}'s frames as thumbnails, each with its tick: the first ones as {@code wasTicked} says, the rest
+         * ticked; then what the watch said.
+         */
+        private void showFrames(FrameWatch.Watched seen, List<Boolean> wasTicked) {
+            watched = seen;
+            ticks.clear();
+            HBox thumbs = new HBox(8);
+            for (int k = 0; k < seen.frames().size(); k++) {
+                ImageView view = new ImageView(ScreenCapture.toFxImage(PictureCuts.checkered(seen.frames().get(k))));
+                view.setPreserveRatio(true);
+                view.setFitWidth(Math.min(72, drawn.box().width()));
+                view.setFitHeight(48);
+                CheckBox tick = new CheckBox("frame " + (k + 1));
+                tick.setSelected(k >= wasTicked.size() || wasTicked.get(k));
+                ticks.add(tick);
+                VBox one = new VBox(2, view, tick);
+                one.setAlignment(Pos.CENTER);
+                thumbs.getChildren().add(one);
+            }
+            int n = seen.frames().size();
+            String how = seen.ending() == FrameWatch.Ending.LOOP_CLOSED
+                    ? seen.loop().map(l -> ", loop " + l.toMillis() + " ms").orElse(n == 1 ? ": it held still" : "")
+                    : "; " + seen.ending().displayName();
+            List<Node> said = new ArrayList<>(List.of(thumbs,
+                    hint(n + (n == 1 ? " frame" : " frames") + " kept of " + seen.grabs() + " grabs" + how
+                            + ". Untick a frame to drop it; one ticked saves a still picture.")));
+            if (seen.slow()) {
+                Label slow = hint("The game gave under " + FrameWatch.SLOW_FEED + " grabs a second: a quick pose may "
+                        + "be missed. ◉ Watch longer, or cut it later and add it as a frame.");
+                slow.setStyle("-fx-text-fill: -bm-severity-warning-text;");
+                said.add(slow);
+            }
+            frames.getChildren().setAll(said);
+            offerAsFrame();
+        }
+
+        /** The frames kept and ticked, in order. */
+        List<BufferedImage> ticked() {
+            List<BufferedImage> kept = new ArrayList<>();
+            for (int k = 0; k < ticks.size(); k++) if (ticks.get(k).isSelected()) kept.add(watched.frames().get(k));
+            return kept;
         }
 
         /** A button, or a member of a strip or tree, made a member of a new one: {@code as} a strip or a tree. */
@@ -526,9 +682,22 @@ final class CutForm {
         }
 
         BoardCuts.Cut cut() {
+            String named = kind().named() ? name.getText().strip() : picture.getValue();
+            if (addsFrame()) {
+                String of = TemplateLibrary.sanitizeName(name.getText());
+                return new BoardCuts.Cut(of, drawn.box(), drawn.shape(), drawn.points(), drawn.ignore(),
+                        new BoardCuts.FrameOf(of));
+            }
+            As as = as();
+            return new BoardCuts.Cut(named, drawn.box(), drawn.shape(), drawn.points(), drawn.ignore(), as,
+                    watched == null || !BoardCuts.picture(as) ? null : watched.keeping(ticked()));
+        }
+
+        /** What the form says the cut is. */
+        As as() {
             String method = ALWAYS.equals(when.getValue()) ? null : when.getValue();
             String field = NEW.equals(group.getValue()) ? null : group.getValue();
-            As as = switch (kind()) {
+            return switch (kind()) {
                 case MARKER -> new BoardCuts.Marker(popup.isSelected());
                 case MORE_MARKER -> new BoardCuts.MoreMarker(popup.isSelected());
                 case ABSENT -> new BoardCuts.Absent();
@@ -546,8 +715,6 @@ final class CutForm {
                 case DIGITS -> new BoardCuts.Digits(shows.getText(), readout.isSelected());
                 case RECUT -> new BoardCuts.Recut(picture.getValue());
             };
-            String named = kind().named() ? name.getText().strip() : picture.getValue();
-            return new BoardCuts.Cut(named, drawn.box(), drawn.shape(), drawn.points(), drawn.ignore(), as);
         }
 
         private static ListCell<Kind> kindCell() {

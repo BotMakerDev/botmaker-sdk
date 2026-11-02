@@ -180,6 +180,11 @@ final class CutLayer {
         return picked >= 0;
     }
 
+    /** The cut picked; null when none is. */
+    Drawn picked() {
+        return picked >= 0 && picked < cuts.size() ? cuts.get(picked) : null;
+    }
+
     void undo() {
         if (cuts.isEmpty()) return;
         cuts.removeLast();

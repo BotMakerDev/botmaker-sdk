@@ -28,6 +28,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   frames; replacing it with a still cut makes it still again; a frame can be added to it (refused when another
   size, the eighth already or nothing new); and a `.bmtemplates` export carries its frame count, so an import
   declares `.frames(n)` again.
+- **◉ Watch on 🗺's cut bar**: with one cut drawn or picked, ◉ Watch watches it on the live game until its loop
+  repeats, the line saying the seconds, grabs and frames so far, then opens the cut form with its frames as
+  thumbnails, each ticked: an unticked frame is dropped, one ticked saves a still picture, ◉ Watch longer watches
+  again from the frames kept, and a slow game is warned of. A cut named as a picture the bot has, of its frame size,
+  offers "Add as a frame of …", saved as `edit_pictures`' `add_frame` saves it.
 - **The assistant cuts a moving thing**: `crop_pictures` with `moving: true` watches the box on the live game until
   its loop comes round (at least 1 s, at most 10 s, 8 poses at most) and saves one picture of its frames, saying how
   many grabs it read and warning when the game gave under 20 a second; a box that never moved is saved still. A

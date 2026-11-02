@@ -24,6 +24,7 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.flow.ActivityScreens.Target;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.CutShape;
@@ -63,6 +64,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -182,6 +184,13 @@ final class LiveBoard {
     private String cutScreen;
     /** What the first cut is, first offered. */
     private CutForm.Kind cutFirst = CutForm.Kind.BUTTON;
+    /** The cut ◉ Watch watched and the frames it kept, shown in the form until the cuts are saved or dropped. */
+    private CutLayer.Drawn watchedCut;
+    private FrameWatch.Watched watchedFrames;
+    /** What the watch under way says on the line; null while none runs. */
+    private String watching;
+    /** Moved on by each start and end of cutting: a watch that ends in another cutting session asks nothing. */
+    private int cutting;
     private Point pressedAt;
     private long pressedMs;
     private double wheel;
@@ -1078,6 +1087,7 @@ final class LiveBoard {
     }
 
     private void beginCut(String screen, CutForm.Kind first) {
+        cutting++;
         cutScreen = screen;
         cutFirst = first;
         cutter.setOn(true);
@@ -1087,6 +1097,9 @@ final class LiveBoard {
     }
 
     private void endCut() {
+        cutting++;
+        watchedCut = null;
+        watchedFrames = null;
         cutter.clear();
         cutter.setOn(false);
         elementLayer.setOn(true);
@@ -1138,15 +1151,69 @@ final class LiveBoard {
                     : "click a cut to pick it"));
         }
         int drawn = cutter.cuts().size();
+        Button watch = button(watching != null ? watching : "◉ Watch", MapGuide.CUT_WATCH, this::watchCut);
+        watch.setDisable(watchTarget() == null || watching != null);
         Button undo = button("↶", "Take back the last cut", cutter::undo);
-        undo.setDisable(drawn == 0);
+        undo.setDisable(drawn == 0 || watching != null);
         Button save = button(drawn <= 1 ? "✓ Save it…" : "✓ Save " + drawn + "…", MapGuide.CUT_SAVE, this::askCuts);
-        save.setDisable(drawn == 0);
+        save.setDisable(drawn == 0 || watching != null);
         save.setDefaultButton(false);
+        tools.add(watch);
         tools.add(undo);
         tools.add(save);
         tools.add(button("✕ Stop cutting", "The cuts not saved are dropped", this::endCut));
         return tools;
+    }
+
+    /** The cut ◉ Watch watches: the one picked, else the only one drawn; null when neither. */
+    private CutLayer.Drawn watchTarget() {
+        if (cutter.picked() != null) return cutter.picked();
+        List<CutLayer.Drawn> drawn = cutter.cuts();
+        return drawn.size() == 1 ? drawn.getFirst() : null;
+    }
+
+    /**
+     * ◉ Watch: the cut watched on the live game until its loop repeats, off the FX thread, the line saying how far it
+     * is; then the form, its frames shown to tick.
+     */
+    private void watchCut() {
+        CutLayer.Drawn target = watchTarget();
+        BufferedImage image = frozen;
+        if (target == null || image == null || watching != null) return;
+        PanelContext reads = context();
+        int session = cutting;
+        watching = "Watching…";
+        showLine();
+        long[] saidAt = {0};
+        Thread.ofPlatform().daemon().name("cut-watch").start(() -> {
+            BoardCuts.Watch watch = BoardCuts.watch(reads, target.box(), target.shape(), target.points(),
+                    target.ignore(), image, List.of(), progress -> {
+                        // The line said five times a second, not at each grab.
+                        long now = System.nanoTime();
+                        if (now - saidAt[0] < 200_000_000L) return;
+                        saidAt[0] = now;
+                        String line = String.format(Locale.ROOT, "Watching… %.1f s, %d grabs, %d frames",
+                                progress.watched().toMillis() / 1000.0, progress.grabs(), progress.frames());
+                        Platform.runLater(() -> {
+                            if (watching == null) return;
+                            watching = line;
+                            showLine();
+                        });
+                    });
+            Platform.runLater(() -> {
+                watching = null;
+                showLine();
+                // Stopped cutting, or the frame closed, while it watched: nothing to ask.
+                if (session != cutting || !cutter.isOn() || frozen != image) return;
+                if (watch.refusal() != null) {
+                    done.accept(watch.refusal());
+                    return;
+                }
+                watchedCut = target;
+                watchedFrames = watch.watched();
+                askCuts();
+            });
+        });
     }
 
     /** Asks what the cuts are, then saves them as the tools do, off the FX thread. */
@@ -1155,7 +1222,22 @@ final class LiveBoard {
         BufferedImage image = frozen;
         if (drawn.isEmpty() || image == null) return;
         String shows = cutScreen != null ? cutScreen : frozenOn;
-        CutForm.ask(services, graph.get(), image, drawn, shows, cutFirst, answer -> {
+        int at = watchedCut == null ? -1 : drawn.indexOf(watchedCut);
+        if (watchedCut != null && at < 0) {
+            // Its frames are of the box as it was watched: moved, resized or taken off, they are no longer its.
+            watchedCut = null;
+            watchedFrames = null;
+            done.accept("The cut watched was moved or taken off: its frames are dropped; ◉ Watch it again.");
+        }
+        CutLayer.Drawn target = watchedCut;
+        PanelContext watches = context();
+        CutForm.Watching form = at < 0 ? null : new CutForm.Watching(at, watchedFrames,
+                kept -> BoardCuts.watch(watches, target.box(), target.shape(), target.points(), target.ignore(), image,
+                        kept, progress -> {}),
+                grown -> {
+                    if (target.equals(watchedCut)) watchedFrames = grown;
+                });
+        CutForm.ask(services, graph.get(), image, drawn, shows, cutFirst, form, answer -> {
             PanelContext reads = context();
             // Frozen a while ago, the game may show something else by now: the frame is then not watched.
             boolean watched = frozenWatched && System.currentTimeMillis() - frozenAtMs < WATCHED_MS;

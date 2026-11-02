@@ -166,6 +166,10 @@ final class MapGuide {
             + "back, a look, a strip's button, a zone, digits or a new image for a picture";
     static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
     static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
+    static final String CUT_WATCH = "For a thing that moves: watches it on the live game until its loop repeats and "
+            + "keeps its frames";
+    static final String CUT_WATCH_LONGER = "Watches it again, keeping the frames it has: for a pose it missed";
+    static final String CUT_AS_FRAME = "Saves the cut as one more frame of that picture, for a pose its watch missed";
     static final String ADD_HOTKEY = "A key this screen answers, noted untried";
     static final String ADD_STRIP = "A new strip of the screen's buttons in no strip or tree, ticked in order, and how "
             + "it scrolls";
@@ -285,7 +289,10 @@ final class MapGuide {
                     new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape (✎: click its corners, then "
                             + "its first corner again or ✓ Close shape); ▨ Skip a part: " + CUT_IGNORE + "; a click "
                             + "on a cut (its number, for a free shape) picks it: a drag moves it, its corners resize "
-                            + "it, Delete takes it off; ✓ Save: " + CUT_SAVE + ". A refused cut stays to fix."),
+                            + "it, Delete takes it off; ✓ Save: " + CUT_SAVE + ". A refused cut stays to fix. "
+                            + "◉ Watch, with one cut drawn or picked: " + CUT_WATCH + "; the form shows them, each "
+                            + "ticked, and ◉ Watch longer: " + CUT_WATCH_LONGER + ". A cut named as a picture the bot "
+                            + "has, of its size: " + CUT_AS_FRAME + "."),
                     new Entry("▶ Launch", null, "Starts the game the bot launches, when it is not up."))),
             new Section("A card", List.of(
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),

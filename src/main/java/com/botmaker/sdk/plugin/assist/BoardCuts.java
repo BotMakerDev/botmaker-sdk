@@ -20,6 +20,8 @@ import com.botmaker.sdk.plugin.assist.PictureTools.Box;
 import com.botmaker.sdk.plugin.assist.PictureTools.Corner;
 import com.botmaker.sdk.plugin.assist.PictureTools.Skip;
 import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.plugin.pictures.FrameWatch;
+import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.screen.CutShape;
 
@@ -30,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -115,15 +118,45 @@ public final class BoardCuts {
     public record Recut(String picture) implements As {
     }
 
+    /** One more frame of the moving picture {@code picture}, a pose its watch missed: edit_pictures' add_frame. */
+    public record FrameOf(String picture) implements As {
+    }
+
     /**
-     * One cut in the frame's pixels: {@code box} around it, {@code points} a polygon's corners (else none), and
-     * {@code ignore} the part of it matching skips (null: none).
+     * One cut in the frame's pixels: {@code box} around it, {@code points} a polygon's corners (else none),
+     * {@code ignore} the part of it matching skips (null: none), and {@code watched} the frames ◉ Watch kept of it that
+     * are ticked (null: a still cut).
      */
-    public record Cut(String name, Rect box, CutShape shape, List<Point> points, Rect ignore, As as) {
+    public record Cut(String name, Rect box, CutShape shape, List<Point> points, Rect ignore, As as,
+                      FrameWatch.Watched watched) {
 
         public Cut {
             points = points == null ? List.of() : List.copyOf(points);
         }
+
+        /** A still cut. */
+        public Cut(String name, Rect box, CutShape shape, List<Point> points, Rect ignore, As as) {
+            this(name, box, shape, points, ignore, as, null);
+        }
+    }
+
+    /** What ◉ Watch kept of a cut, or why it kept nothing (null: it kept them). */
+    public record Watch(FrameWatch.Watched watched, String refusal) {
+    }
+
+    /**
+     * The cut {@code box} ({@code shape}, a polygon's {@code points}, skipping {@code ignore}) drawn on {@code frame},
+     * watched on the live game from the frames {@code kept} until its loop comes round, as crop_pictures' moving
+     * watches it; {@code seen} hears of each grab. Blocking for seconds: off the FX thread.
+     */
+    public static Watch watch(AgentContext context, Rect box, CutShape shape, List<Point> points, Rect ignore,
+                              BufferedImage frame, List<BufferedImage> kept, Consumer<FrameWatch.Progress> seen) {
+        Optional<BufferedImage> cut = PictureCuts.cut(frame, box, shape, points)
+                .map(p -> ignore == null ? p : PictureCuts.masked(p, ignore)).map(PictureCuts.Piece::image);
+        if (cut.isEmpty()) {
+            return new Watch(null, "That cut is outside the " + frame.getWidth() + "×" + frame.getHeight() + " frame.");
+        }
+        return PictureTools.watch(context, box, shape, points, ignore, frame, cut.get(), kept, seen);
     }
 
     private BoardCuts() {}
@@ -156,8 +189,11 @@ public final class BoardCuts {
         List<Integer> refused = new ArrayList<>();
         List<Box> boxes = cuts.stream().filter(BoardCuts::picture).map(BoardCuts::box).toList();
         if (!boxes.isEmpty()) {
+            Map<String, FrameWatch.Watched> watchedCuts = new HashMap<>();
+            cuts.stream().filter(c -> picture(c) && c.watched() != null && c.name() != null)
+                    .forEach(c -> watchedCuts.put(c.name(), c.watched()));
             AgentReply cropped = PictureTools.cropPictures(new PictureTools.Crops(boxes, screen, tags), context, shown,
-                    live);
+                    live, watchedCuts);
             String text = ScreenDesk.text(cropped);
             for (int i = 0; i < cuts.size(); i++) {
                 // All refused, or each box refused on its own while the others were saved.
@@ -179,6 +215,8 @@ public final class BoardCuts {
                 case Digits digits -> PictureTools.saveDigits(new PictureTools.NamedDigits(cut.name(), b.x(), b.y(),
                         b.width(), b.height(), digits.shows()), context, shown);
                 case Recut recut -> PictureTools.replacePicture(replace(cut, recut.picture()), context, shown, live);
+                case FrameOf frameOf -> PictureTools.addFrame(new PictureTools.AddFrame(frameOf.picture(), b.x(),
+                        b.y()), context, shown);
                 default -> null;
             };
             // A member whose picture was not saved stays refused alone: the others join without it, as the first of
@@ -293,8 +331,13 @@ public final class BoardCuts {
 
     /** Whether {@code cut} is a picture of a screen, which crop_pictures saves. */
     static boolean picture(Cut cut) {
-        return !(cut.as() instanceof Place || cut.as() instanceof Reads || cut.as() instanceof Digits
-                || cut.as() instanceof Recut || cut.as() instanceof Spot);
+        return picture(cut.as());
+    }
+
+    /** Whether a cut that is {@code as} is a new picture of a screen, which crop_pictures saves and frames may make. */
+    public static boolean picture(As as) {
+        return !(as instanceof Place || as instanceof Reads || as instanceof Digits || as instanceof Recut
+                || as instanceof Spot || as instanceof FrameOf);
     }
 
     /** {@code cut}, a spot of {@code screen}, written beside its anchor. On the FX thread. */

@@ -48,9 +48,11 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.flow.FlowValue;
+import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateManifest;
+import com.botmaker.sdk.plugin.screen.CutShape;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.shared.capture.GenericWindow;
@@ -384,6 +386,66 @@ class SdkAssistTest {
         AgentReply lost = cropOne("name", "gone", "x", 120, "y", 80, "width", SIZE, "height", SIZE, "moving", true);
         assertTrue(lost.isRefused() && text(lost).contains("The watch broke off"), text(lost));
         assertFalse(TemplateLibrary.exists(resources, "gone"));
+    }
+
+    @Test
+    void watchedCutSavesStrip() throws IOException {
+        BufferedImage a = withPatchAt(120, 80);
+        BoardCuts.Saved saved = BoardCuts.save(agent, null, List.of(), List.of(watchedCut("slime", poses(3))), a,
+                false);
+        assertFalse(saved.anyRefused(), saved.said());
+        assertEquals(3 * SIZE, ImageIO.read(TemplateLibrary.fileForName(resources, "slime").toFile()).getWidth());
+        assertEquals(3, ((ImageTemplate) host.set("pictures").get("SLIME").value()).frames(), ".frames(3)");
+    }
+
+    @Test
+    void untickedFramesAreDropped() {
+        BufferedImage a = withPatchAt(120, 80);
+        List<BufferedImage> three = poses(3);
+        BoardCuts.Saved saved = BoardCuts.save(agent, null, List.of(),
+                List.of(watchedCut("slime", three.subList(0, 2))), a, false);
+        assertFalse(saved.anyRefused(), saved.said());
+        assertEquals(2, ((ImageTemplate) host.set("pictures").get("SLIME").value()).frames(), ".frames(2)");
+    }
+
+    @Test
+    void oneTickedFrameSavesStill() throws IOException {
+        BufferedImage a = withPatchAt(120, 80);
+        BoardCuts.Saved saved = BoardCuts.save(agent, null, List.of(),
+                List.of(watchedCut("slime", poses(3).subList(1, 2))), a, false);
+        assertFalse(saved.anyRefused(), saved.said());
+        assertEquals(SIZE, ImageIO.read(TemplateLibrary.fileForName(resources, "slime").toFile()).getWidth());
+        assertEquals(1, ((ImageTemplate) host.set("pictures").get("SLIME").value()).frames(), "no .frames");
+    }
+
+    @Test
+    void aCutAddedAsAFrameJoinsThePicture() throws IOException {
+        BufferedImage a = withPatchAt(120, 80);
+        assertFalse(BoardCuts.save(agent, null, List.of(), List.of(watchedCut("slime", poses(2))), a, false)
+                .anyRefused());
+        BoardCuts.Saved added = BoardCuts.save(agent, null, List.of(), List.of(new BoardCuts.Cut("slime",
+                new Rect(120, 80, SIZE, SIZE), CutShape.RECT, List.of(), null, new BoardCuts.FrameOf("slime"))),
+                withNoiseAt(120, 80, 9), false);
+        assertFalse(added.anyRefused(), added.said());
+        assertEquals(3 * SIZE, ImageIO.read(TemplateLibrary.fileForName(resources, "slime").toFile()).getWidth());
+    }
+
+    /** {@code frames} ◉ Watch kept of a button at 120,80, every one ticked. */
+    private static BoardCuts.Cut watchedCut(String name, List<BufferedImage> frames) {
+        FrameWatch.Watched watched = new FrameWatch.Watched(frames, 60, 60, Duration.ofSeconds(1),
+                Optional.of(Duration.ofMillis(300)), FrameWatch.Ending.LOOP_CLOSED);
+        return new BoardCuts.Cut(name, new Rect(120, 80, SIZE, SIZE), CutShape.RECT, List.of(), null,
+                new BoardCuts.Press(false, null, null), watched);
+    }
+
+    /** {@code n} different poses of the box at 120,80. */
+    private static List<BufferedImage> poses(int n) {
+        List<BufferedImage> poses = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            BufferedImage frame = i == 0 ? withPatchAt(120, 80) : withNoiseAt(120, 80, i);
+            poses.add(copy(frame).getSubimage(120, 80, SIZE, SIZE));
+        }
+        return poses;
     }
 
     @Test
