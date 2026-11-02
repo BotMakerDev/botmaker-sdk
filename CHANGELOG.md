@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A dimmed or greyed button is seen Disabled without a picture of it**: a button's usual look that matches where
+  the frame is under 0.7 of its picture's light, or under half its colour (a colourful picture only), is taken as
+  Disabled, so a run never presses it — a tutorial dimming every button but one, or a greyed-out one. Matching
+  alone scores a darkened copy as well as the button. A look cut as Disabled still wins by its score; a very dark
+  picture is never judged. which_screen says `dimmed` beside such a match.
+
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that
   look; one that never does stops the run saying which button and why. A popup's button keeps nothing.

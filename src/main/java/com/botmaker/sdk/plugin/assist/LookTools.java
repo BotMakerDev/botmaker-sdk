@@ -18,6 +18,7 @@ import com.botmaker.sdk.api.vision.Pixel;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.api.vision.Vision;
 import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.screens.Dim;
 import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.vision.ColorText;
@@ -264,8 +265,10 @@ final class LookTools {
             }
             if (lines.size() < MOST_LISTED) {
                 lines.add((on ? "✓ " : "  ") + s.name() + " " + Frames.score(s.match().confidence()) + " at "
-                        + Frames.box(s.match().rect()) + (on ? reach.map(r -> copies(r, s.name(), frame.get()))
-                        .orElse("") : ""));
+                        + Frames.box(s.match().rect()) + (on && Dim.shows(TemplateLibrary.fileForName(
+                        resources.get(), s.name()).toString(), s.match().rect(), frame.get())
+                        ? " dimmed (a run takes it as Disabled)" : "")
+                        + (on ? reach.map(r -> copies(r, s.name(), frame.get())).orElse("") : ""));
             }
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."

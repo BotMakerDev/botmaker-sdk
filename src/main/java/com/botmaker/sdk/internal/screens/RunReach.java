@@ -111,6 +111,12 @@ public final class RunReach implements Reach {
                 .map(match -> new Found(match.rect(), match.confidence())).toList();
     }
 
+    /** The picture's file against the frame where it matched; a picture with no file to read is never dimmed. */
+    @Override
+    public boolean dimmed(ImageTemplate picture, Rect found, BufferedImage frame) {
+        return Dim.shows(picture.filePath(), found, frame);
+    }
+
     /** Looked for only in {@code area}, scaled to the frame as the picture is: its place there, with no margin. */
     @Override
     public Optional<Rect> findWithin(ImageTemplate picture, Rect area, BufferedImage frame) {

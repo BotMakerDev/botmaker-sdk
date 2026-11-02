@@ -93,6 +93,23 @@ public interface Reach {
     /** A picture found: where, and how well it matched, from 0 to 1. */
     record Found(Rect place, double score) {}
 
+    /**
+     * Whether {@code picture}, matched at {@code found} on {@code frame}, shows there dimmed or greyed out ({@link Dim}):
+     * a button the game darkens matches as its usual picture. By default never; a reach that reads the pictures' files
+     * tells it.
+     */
+    default boolean dimmed(ImageTemplate picture, Rect found, BufferedImage frame) {
+        return false;
+    }
+
+    /**
+     * {@code look}'s state where it matched at {@code found}: its usual look dimmed or greyed out is {@link
+     * State#DISABLED}, so a run never presses a button the game shows off without a look cut for it (2026-11-02).
+     */
+    private State stateOf(Look look, Rect found, BufferedImage frame) {
+        return look.state() == State.NORMAL && dimmed(look.picture(), found, frame) ? State.DISABLED : look.state();
+    }
+
     /** {@link #findAll} with each match's score; by default each scores 1. */
     default List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
         return findAll(picture, frame).stream().map(place -> new Found(place, 1)).toList();
@@ -413,7 +430,8 @@ public interface Reach {
             }
         }
         return best < 0 ? Optional.empty()
-                : Optional.of(new Seen(order.get(best).state(), button.spots(placeOf(button, order.get(best),
+                : Optional.of(new Seen(stateOf(order.get(best), found.get(best).get().place(), frame),
+                button.spots(placeOf(button, order.get(best),
                 found.get(best).get().place())).getFirst(), order.get(best).picture()));
     }
 
@@ -545,10 +563,10 @@ public interface Reach {
                 }
                 // A place two looks match is the look that matches it best: a green Claim passed for a grey one too.
                 if (same < 0) {
-                    all.add(new Seen(look.state(), at, look.picture()));
+                    all.add(new Seen(stateOf(look, found.place(), frame), at, look.picture()));
                     scores.add(found.score());
                 } else if (found.score() > scores.get(same) + tie(look)) {
-                    all.set(same, new Seen(look.state(), at, look.picture()));
+                    all.set(same, new Seen(stateOf(look, found.place(), frame), at, look.picture()));
                     scores.set(same, found.score());
                 }
             }
