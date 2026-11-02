@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The assistant prefers objects to text**: its guide asks for an icon, arrow or frame as a marker or an input
+  before a box of words, which change with the language, the line said and the letters still typing in; text
+  only when what comes next depends on it.
 - **The assistant sets the bot's screen size**: `setup`'s `set_screen_size` writes `Sdk.screen()`, where until now
   only the first picture cut set it. Pictures and digits cut at the old size are written `.in(old)`, so they still
   scale; the answer says zones and spots are read at the new size. Studio's own control is still to come.

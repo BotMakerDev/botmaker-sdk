@@ -70,8 +70,11 @@ final class Protocol {
                      shares its title or frame with others (a tab, a dialog style), or marker add for one more;
                      marker absent for a picture only a screen like it shows (a button the other has). A set
                      another screen's shot shows too is put back, naming that screen. A marker is a picture only
-                     its screen shows, where it was cut: a title or an icon of its own, never a close, back or OK
-                     button, nor a picture the map uses on another screen. A marker is looked for near the place
+                     its screen shows, where it was cut: an icon, symbol or frame of its own, never a close, back or
+                     OK button, nor a picture the map uses on another screen. Prefer an object to text for a
+                     marker or an input (a reply's arrow, not its words): words change with the language, the
+                     line said and the letters still typing in. Cut text only when what comes next depends on
+                     it (which reply leads where), or the screen has no object of its own. A marker is looked for near the place
                      it was cut, scaled with the frame: a panel whose content sits elsewhere is not told by it.
                      A view an input opens that does another job is a screen of its own, not a look (a running
                      mission's Cancel where a new one has Start).
