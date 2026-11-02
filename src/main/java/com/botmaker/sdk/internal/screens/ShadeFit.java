@@ -149,6 +149,11 @@ public final class ShadeFit {
             return false;
         }
 
+        /** Whether the button shows as cut: a fit within {@link #MOST_ERROR} that changes nothing; a bad fit is not. */
+        public boolean asCut() {
+            return error <= MOST_ERROR && !offIdentity();
+        }
+
         /** Whether {@code other} is the same change: both grey or neither, each gain and offset within a tolerance. */
         public boolean alike(Fit other) {
             if (grey != other.grey) return false;

@@ -55,6 +55,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Sdk.shades()` (a dim, grey or fade means Disabled). A change on one button is only said. A part a button shows and
   its cut lacks (a lock, a badge) is said with its place. What was seen is kept between Studio starts. In 🗺 Screens,
   with no screen picked, *Shades the game shows* lists them: Learn with the state picked, ✕ to forget a learned one.
+- **Discovery learns what a version means**: try_input pressing a button that shows a version keeps what came of it.
+  Nothing changed means Disabled; a toast's words propose a state of the bot's (`Blocks.NOT_ENOUGH_GOLD`) for the
+  author to confirm; an answer (a screen opened) means it does not block, a `Presses` state. A version gone when its
+  button is seen again is Disabled; one still shown in a later Studio session proposes a lasting `Blocks` state. A part
+  a pressed button showed that blocked is cut as its Disabled look, `<picture>_disabled`. `edit_map learn_shade` takes
+  `state` (`Blocks.MAXED`, added to the bot's States), needed when the proposal asks for one; the map panel presets it.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

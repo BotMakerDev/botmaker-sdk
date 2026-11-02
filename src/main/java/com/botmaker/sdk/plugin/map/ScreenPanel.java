@@ -1190,7 +1190,8 @@ final class ScreenPanel {
             }
             ComboBox<ButtonState> meaning = new ComboBox<>(FXCollections.observableArrayList(states));
             InputInspector.typedStates(meaning);
-            meaning.setValue(shade.state());
+            // A state the game told (a toast's words, a version that lasts) is proposed for the author to confirm.
+            meaning.setValue(proposal.asks() == null ? shade.state() : proposal.asks());
             Button learn = action("Learn", "Every button shown " + shade.kind().displayName() + " like this means the "
                     + "state picked, for the whole bot", () -> {
                 // A typed name no state has reads as null: said, never learned as the kind's meaning instead.
@@ -1205,6 +1206,7 @@ final class ScreenPanel {
                 }));
             });
             all.add(line(swatches(shade), what));
+            if (proposal.why() != null) all.add(text(proposal.why()));
             all.add(line(meaning, learn));
         }
         for (Shade shade : shades.learned()) {

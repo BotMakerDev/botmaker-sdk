@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -41,12 +42,12 @@ import java.util.stream.Stream;
  */
 final class MapEdits {
 
-    private static final String SCREEN = "Home or HOME; new_screen: the one it opens from";
+    private static final String SCREEN = "Home or HOME; new_screen: the one opening it";
     private static final String PICTURE = "the input: its field (beerBuy) or picture";
     private static final String SCROLL = "with picture: a strip's notches to it";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
-    private static final String METHOD = "the bot's method true while it holds (Firestone::eventOn); blank: always";
+    private static final String METHOD = "a bot method true while it holds (Firestone::eventOn); blank: always";
 
     /**
      * What set_input records an input did, opening nothing: tried, or leaves for a screen reached otherwise; untried
@@ -89,7 +90,7 @@ final class MapEdits {
     record SetKind(String screen, Kind as) implements Edit {
     }
 
-    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture, text field, drag")
+    @Describe("an input's result, info, never, lock, sometimes, repeated, gesture, field, drag")
     record SetInput(String screen,
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
@@ -196,12 +197,12 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a marker (all show), or absent (never shows); refused if another shot shows the set")
+    @Describe("a marker (all show), or absent (never shows); refused if another shot shows the set")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
                      @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
 
-    @Describe("take a marker, or one it never shows, off")
+    @Describe("a marker, or one it never shows, off")
     record RemoveMarker(String screen, String picture) implements Edit {
     }
 
@@ -210,10 +211,12 @@ final class MapEdits {
     }
 
     @Describe("learn a fit which_screen proposes")
-    record LearnShade(@Describe(value = "", optional = true) String screen, String fit) implements Edit {
+    record LearnShade(@Describe(value = "", optional = true) String screen, String fit,
+                      @Describe(value = "", optional = true) String state)
+            implements Edit {
     }
 
-    @Describe("words in a zone: a marker, or with field a text button on them")
+    @Describe("words in a zone: a marker, or with field a text button")
     record AddText(String screen, @Describe("as the screen shows them") String text,
                    @Describe("a Zones constant") String zone,
                    @Describe(value = "", optional = true) String field) implements Edit {
@@ -223,7 +226,7 @@ final class MapEdits {
     record RemoveText(String screen, String text) implements Edit {
     }
 
-    @Describe("a pictureless button: across widths, down heights from anchor's centre; rows×columns a grid step apart")
+    @Describe("a pictureless button: across widths, down heights from anchor's centre; rows×columns a step apart")
     record AddSpot(String screen, String field, String anchor, Double across, Double down,
                    @Describe(value = "", optional = true) Integer rows,
                    @Describe(value = "", optional = true) Integer columns,
@@ -232,7 +235,7 @@ final class MapEdits {
     }
 
 
-    @Describe("a new screen, opened by an input of screen (added untried)")
+    @Describe("a new screen an input of screen opens (added untried)")
     record NewScreen(String screen, String name,
                      @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
@@ -240,8 +243,8 @@ final class MapEdits {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(
-            ToolTiming.actions("edit_map", "Fixes the bot's Screens by hand when try_input recorded something "
-                    + "wrong or the game changed; clicks nothing", Edit.class,
+            ToolTiming.actions("edit_map", "Fixes the bot's Screens when try_input recorded wrong or the game "
+                    + "changed; clicks nothing", Edit.class,
                     MapEdits::edit));
 
     private MapEdits() {}
@@ -259,7 +262,13 @@ final class MapEdits {
             if (edit instanceof LearnShade learn) {
                 // The sightings' file is read here, not on the FX thread.
                 Versions.warm(context.services().resourcesDir());
-                return FxCall.call(() -> said(Versions.learn(context.services(), learn.fit())));
+                boolean stated = learn.state() != null && !learn.state().isBlank();
+                Optional<ButtonState> state = stated ? BotStates.parse(learn.state()) : Optional.empty();
+                if (stated && state.isEmpty()) {
+                    return AgentReply.refused("No state " + learn.state().strip() + ": disabled, selected, "
+                            + "Blocks.NAME or Presses.NAME. Nothing was written.");
+                }
+                return FxCall.call(() -> said(Versions.learn(context.services(), learn.fit(), state.orElse(null))));
             }
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());

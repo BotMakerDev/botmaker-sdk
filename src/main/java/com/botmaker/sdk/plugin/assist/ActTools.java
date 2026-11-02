@@ -328,6 +328,11 @@ final class ActTools {
             return new Entered(reply, null, null, Motion.NONE, null, null, 0);
         }
 
+        /** This, {@code said} added to its answer. */
+        Entered and(String said) {
+            return new Entered(reply.and(AgentReply.text(said)), before, after, motion, how, done, tookMs);
+        }
+
         /** What it took, rounded to 100 ms, as a screen's {@code takes} is written. */
         Duration took() {
             return Duration.ofMillis(Math.round(tookMs / 100.0) * 100);

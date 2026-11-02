@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.ButtonState;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -452,8 +453,19 @@ final class MapTools {
                 keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = graph.markers(screen);
         ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
-        ActTools.Entered entered = notches == 0 ? flash(context, slow, onMarkers) : slow;
-        boolean flashed = entered != slow;    // its markers hidden a moment, then back: this screen, redrawn
+        ActTools.Entered shown = notches == 0 ? flash(context, slow, onMarkers) : slow;
+        boolean flashed = shown != slow;    // its markers hidden a moment, then back: this screen, redrawn
+        // A button pressed while it showed a version of its usual look tells what the version means; a part it
+        // showed that blocks is cut as its Disabled look, which the input is written with.
+        boolean pressedPlain = notches == 0 && shown.after() != null && !shown.reply().isRefused() && byPicture
+                && button != null && pick == null && (look == null || look == State.NORMAL);
+        Versions.Pressing pressing = !pressedPlain ? Versions.Pressing.NONE : foundOn(context, what, shown.before())
+                .map(at -> Versions.pressed(context, new Versions.Pressed(screen, held.orElse(null), button, what, at,
+                        shown.before(), shown.after(), shown.motion(), !flashed && shown.share() >= SCREEN_SHARE)))
+                .orElse(Versions.Pressing.NONE);
+        ActTools.Entered entered = pressing.said().isEmpty() ? shown : shown.and(pressing.said());
+        // A lambda: a method reference on button would read it, null for a hotkey, before any look is there.
+        Input written = pressing.look().<Input>map(l -> button.withLook(l)).orElse(base);
         if (entered.after() == null && notches != 0 && !entered.reply().isRefused() && onMarkers.any()
                 && Frames.look(context).filter(f -> ActTools.shows(context, onMarkers, f)).isPresent()) {
             // The screen is still there: what scrolled is the picture itself, carried off by the list it was on.
@@ -509,7 +521,7 @@ final class MapTools {
             boolean anew = opens != null && ScreenBook.find(graph, opens).isEmpty();
             Optional<String> known = anew ? Optional.empty() : named.or(() -> landed(context, graph, screen, entered));
             if (known.isPresent()) {
-                AgentReply said = entered.reply().and(reached(services, graph, screen, field, base, look, pick,
+                AgentReply said = entered.reply().and(reached(services, graph, screen, field, written, look, pick,
                         known.get(), entered.took()));
                 // A popup shows over the screen; anything else left it, maybe finished.
                 // A popup reached shows over the screen, whose markers still show under it, so the next input's look
@@ -530,12 +542,12 @@ final class MapTools {
                             + " opened a screen the map does not have, and a hotkey names none. Look at it "
                             + "(describe), go back to " + name + " and try it again with opens, the name it shows.")));
                 }
-                return Tried.left(entered.reply().and(opened(context, graph, screen, field, base, look, pick, child,
+                return Tried.left(entered.reply().and(opened(context, graph, screen, field, written, look, pick, child,
                         entered.after(), entered.took())));
             }
         }
         boolean changed = FrameChange.box(entered.before(), entered.after(), entered.motion()).isPresent();
-        AgentReply said = noted(services, screen, field, base.tried(),
+        AgentReply said = noted(services, screen, field, written.tried(),
                 changed ? "changes this screen in place" : "no visible effect", ask);
         return new Tried(up(context, entered.reply().and(changed ? said.and(AgentReply.text("Cut, with screen " + name
                 + ", each new input it shows (another state of a toggle, a tab's buttons): they are untried in turn."))

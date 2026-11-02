@@ -46,6 +46,15 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `edit_map learn_shade` appends it to `Sdk.shades()`, cause `GAME`, `Disabled` for a dim, grey or fade and `Selected`
   for a brightening or a tint until pressing says otherwise. A part the cut lacks (`ShadeFit.addition`: the largest
   patch off the fit, 2–50 % of the button, holding 60 % of what the refit leaves) is said with its place.
+- **What a version means** (2026-11-02, `Versions.meant`): try_input pressing a button by its usual picture fits it on
+  the frame before (`Versions.pressed`) and keeps a `Press`: no change past the button's own box (`OWN_MARGIN`) is
+  `NOTHING` (Disabled), words OCR reads in the change are a `TOAST` (a `Blocks` state named from its first four words,
+  asked of the author), a screen opened or a change with no words `ACTED` (a `Presses` state asked). Presses outrank
+  sightings: a version its button showed no more on a later frame is Disabled, one seen in two Studio sessions (each
+  sighting carries its session) asks for a `Blocks` state. A proposal that asks (`Proposal.asks`) is learned only with
+  a state (`learn_shade state`, the panel's preset), which `BotStates.declare` adds. An addition on a press that did
+  nothing is cut `<picture>_disabled` and written as the button's Disabled look before the input is recorded. Sightings
+  of a button shown as cut are kept only after it showed a version. The file is layout 2: layout-1 files read empty.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
