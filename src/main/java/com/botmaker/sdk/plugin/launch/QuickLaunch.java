@@ -12,6 +12,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.internal.emulator.Emulators;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
@@ -349,6 +350,28 @@ public final class QuickLaunch {
                         .orElse(false);
     }
 
+    /** Whether a private display held for {@code spec} shows no game: its Android stopped, or its app did. */
+    public static boolean gameStopped(LaunchSpec spec) {
+        return androidStopped(spec) || appStopped(spec);
+    }
+
+    /**
+     * Whether {@code spec}'s Android runs but its app does not: stopped (force-stopped, crashed) while the private
+     * display stayed up. The display's window went with it, so the bot captures nothing until it is launched again.
+     * False when it cannot tell (no adb answer).
+     */
+    public static boolean appStopped(LaunchSpec spec) {
+        if (spec.kind() != LaunchKind.EMULATOR_APP || spec.emulatorInstance() == null
+                || spec.emulatorPackage() == null || spec.emulatorPackage().isBlank()) {
+            return false;
+        }
+        try {
+            return !Emulators.named(spec.emulatorInstance()).runs(spec.emulatorPackage());
+        } catch (RuntimeException unreachable) {
+            return false;
+        }
+    }
+
     /**
      * Runs {@code next}, first closing a display whose Android stopped: it outlives the session, and a held display
      * would refuse the new one. Holding none, {@code next} runs at once; else on the FX thread after the check.
@@ -360,7 +383,7 @@ public final class QuickLaunch {
             return;
         }
         Thread.startVirtualThread(() -> {
-            boolean stopped = androidStopped(spec);
+            boolean stopped = gameStopped(spec);
             if (stopped) launcher.stop();
             Platform.runLater(() -> {
                 if (stopped) SessionHandoff.offer(services, null, null);

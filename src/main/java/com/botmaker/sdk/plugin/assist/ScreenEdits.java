@@ -1020,7 +1020,7 @@ public final class ScreenEdits {
         if (target.isStart()) {
             return Optional.of(graph.shown(to) + " is the screen the game opens on: no way leads into it.");
         }
-        if (graph.parent(from).filter(to::equals).isPresent()) {
+        if (!on.isPopup() && MapTools.goesBack(graph, from, to)) {
             return Optional.of(graph.shown(to) + " is the screen above it: use " + viaField + " as its way back.");
         }
         if (graph.above(from).contains(to)) {

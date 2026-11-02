@@ -282,7 +282,7 @@ final class MapTools {
             // An app's element is pressed by its field, found in the tree; its picture is a shot, never matched. A spot
             // by its field too: its picture is its anchor's, whose own button would be pressed instead.
             case Button button -> button.picture() == null || button.isElement() || button.isBeside() ? input
-                    : input.named(button.picture().id(), input.scroll(), null);
+                    : input.named(shownLook(button, context), input.scroll(), null);
             case Strip strip when strip.scroll() != null && strip.scroll().drag() != null && input.scroll() == null ->
                     null;
             case Strip strip -> strip.members().isEmpty() ? input : input.named(shownMember(strip, context),
@@ -313,6 +313,30 @@ final class MapTools {
         return strip.members().stream().map(ImageTemplate::id)
                 .filter(id -> frame.isPresent() && ActTools.shows(context, id, frame.get()))
                 .findFirst().orElse(strip.members().getFirst().id());
+    }
+
+    /**
+     * The picture of {@code button} a fresh look shows: its own, else the first of its looks (a toggle pressed once
+     * shows its selected look), else its own; a button with no looks is never looked for.
+     */
+    static String shownLook(Button button, AgentContext context) {
+        String own = button.picture().id();
+        if (button.looks().isEmpty()) return own;
+        Optional<BufferedImage> frame = Frames.look(context);
+        if (frame.isEmpty() || ActTools.shows(context, own, frame.get())) return own;
+        return button.looks().stream().map(look -> look.picture().id())
+                .filter(id -> ActTools.shows(context, id, frame.get())).findFirst().orElse(own);
+    }
+
+    /**
+     * Whether an input of {@code screen} that led to {@code known} is its way back: any way out of a popup, else one
+     * to the screen above it, when no other screen opens it. A screen opened from several (Gear details, from Replace
+     * gear and Character) goes back where it came from, so a button leading to one of them is a way in there, not
+     * back: Sword x Staff's Replace, whose screen's Escape returns to Gear details, looped a walk (2026-11-02).
+     */
+    static boolean goesBack(ScreenGraph graph, String screen, String known) {
+        if (graph.screens().get(screen).isPopup()) return true;
+        return graph.parent(screen).filter(known::equals).isPresent() && graph.opensFrom(screen).size() <= 1;
     }
 
     /** The constant {@code typed} names in the map; empty when none or Studio is busy. */
@@ -794,7 +818,7 @@ final class MapTools {
                     .and(AgentReply.text(to + " is a popup: close it before the next input."));
         }
         // A popup's way out is its back, whatever it uncovers: a popup is in no tree and names no screen.
-        boolean up = graph.screens().get(screen).isPopup() || graph.parent(screen).filter(known::equals).isPresent();
+        boolean up = goesBack(graph, screen, known);
         Optional<ScreenGraph.Edge> back = graph.backOf(screen).filter(edge -> edge.via() != null);
         if (up && back.isPresent() && !graph.isBack(screen, field)) {
             // A Confirm that also goes back is an input of its own: the close button stays the way back (Rooms,

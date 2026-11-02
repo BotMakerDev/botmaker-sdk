@@ -219,10 +219,14 @@ class VersionsTest {
 
     @Test
     void whatAPressDidIsReadFromWhatChanged() {
-        assertEquals(Versions.Answer.ACTED, Versions.answer(true, false, ""), "a screen opened");
-        assertEquals(Versions.Answer.NOTHING, Versions.answer(false, false, ""), "nothing beyond the button");
-        assertEquals(Versions.Answer.TOAST, Versions.answer(false, true, "Locked"), "words showed");
-        assertEquals(Versions.Answer.ACTED, Versions.answer(false, true, " "), "a change with no words");
+        assertEquals(Versions.Answer.ACTED, Versions.answer(true, false, "", ""), "a screen opened");
+        assertEquals(Versions.Answer.NOTHING, Versions.answer(false, false, "", ""), "nothing beyond the button");
+        assertEquals(Versions.Answer.TOAST, Versions.answer(false, true, "Locked", ""), "words showed");
+        assertEquals(Versions.Answer.ACTED, Versions.answer(false, true, " ", ""), "a change with no words");
+        assertEquals(Versions.Answer.ACTED, Versions.answer(false, true, "Loadout 2", "Loadout 1"),
+                "words there before changed in place: a label, not a toast");
+        assertEquals(Versions.Answer.TOAST, Versions.answer(false, true, "Locked", "~i Lv"),
+                "noise read from the art before is no label: still a toast");
         Rect button = new Rect(10, 10, 20, 10);
         assertTrue(Versions.inside(new Rect(8, 9, 24, 12), button), "the button's own pressed look");
         assertFalse(Versions.inside(new Rect(10, 40, 20, 10), button), "a toast below it");

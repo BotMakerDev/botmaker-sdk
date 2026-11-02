@@ -403,7 +403,8 @@ public final class Versions {
             Optional<Rect> changed = FrameChange.box(press.before(), press.after(), press.motion())
                     .filter(box -> !inside(box, press.at()));
             String read = press.opened() || changed.isEmpty() ? "" : read(press.after(), changed.get());
-            Answer answer = answer(press.opened(), changed.isPresent(), read);
+            String before = read.isBlank() ? "" : read(press.before(), changed.get());
+            Answer answer = answer(press.opened(), changed.isPresent(), read, before);
             if (added.isPresent()) return addition(context, press, added.get(), answer, read);
             Path store = MapAudit.store(resources.get(), MapAudit.Kept.VERSIONS);
             Fit shown = fit.get();
@@ -423,12 +424,20 @@ public final class Versions {
 
     /**
      * What a press tells from what changed: a screen {@code opened} or a change with no words answered, words
-     * {@code read} are a toast, and no change {@code beyond} the button itself is nothing.
+     * {@code read} where none were {@code before} are a toast (words there before changed in place, a label such as
+     * "Loadout 1" turning "Loadout 2": the button acted), and no change {@code beyond} the button itself is nothing.
      */
-    static Answer answer(boolean opened, boolean beyond, String read) {
+    static Answer answer(boolean opened, boolean beyond, String read, String before) {
         if (opened) return Answer.ACTED;
         if (!beyond) return Answer.NOTHING;
-        return read.isBlank() ? Answer.ACTED : Answer.TOAST;
+        return read.isBlank() || sharesAWord(read, before) ? Answer.ACTED : Answer.TOAST;
+    }
+
+    /** Whether {@code a} and {@code b} share a word of three letters or more: OCR noise from art shares none. */
+    private static boolean sharesAWord(String a, String b) {
+        Set<String> words = Arrays.stream(b.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
+                .filter(w -> w.length() >= 3).collect(Collectors.toSet());
+        return Arrays.stream(a.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")).anyMatch(words::contains);
     }
 
     /** Whether {@code box} lies within {@code button}, {@link #OWN_MARGIN} around it. */

@@ -73,6 +73,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`add_spot field slotWeapon`) kept its words, not `slotweapon`. `move_markers` names an element's mark from its
   words (`boltrayGamesPrivacyPolicy`), not `input`. The assistant's guide no longer says to cut a greyed-out twin:
   a dimmed or greyed look is a learned shade, and a slot whose content changes is a spot.
+  `try_input` by a toggle's field presses whichever of its looks shows (a lock pressed twice). A press that only
+  changed words already there ("Loadout 1" to "Loadout 2") is an answer, not a toast asking a bot state. An input
+  that opens the screen above is no longer its way back when several screens open it: Gear details' Replace, whose
+  screen's Escape comes back, looped every walk. `crop_pictures` with a marker the screen has, set again by name,
+  retakes its shot (a popup is never walked to). `launch_game` launches the game again when its app was stopped
+  while the private display stayed up, instead of saying it runs.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

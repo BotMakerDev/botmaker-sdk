@@ -499,12 +499,16 @@ final class PictureTools {
     /**
      * Once {@code screen}'s markers are all written: put back as {@code before} when another screen's shot shows them
      * too, else the frame they were cut from (the live game, for pictures the bot has) is its shot when it shows them.
-     * Said as sentences; blank when there is nothing to say.
+     * Said as sentences; blank when there is nothing to say. A marker the screen has already, set again by name,
+     * retakes its shot from the live game: a popup is never walked to, so this is how its shot is taken anew.
      */
     private static String told(AgentContext context, String screen, Markers before, List<Crop> cuts,
                                Optional<BufferedImage> shown) {
-        // Nothing written (each note declined): the shot stays as it is.
-        if (before != null && MapTools.markers(context.services(), screen).filter(before::same).isPresent()) return "";
+        // Nothing written (each note declined): the shot stays, unless a marker it has was set again by name.
+        if (before != null && MapTools.markers(context.services(), screen).filter(before::same).isPresent()) {
+            return cuts.stream().anyMatch(c -> c.screenMarker() && c.marker().shown() && c.kept())
+                    ? MapTools.markerShot(context, screen, Frames.look(context).orElse(null)) : "";
+        }
         String clash = before == null ? "" : MapTools.unique(context.services(), screen, before);
         if (!clash.isEmpty()) return clash;
         if (cuts.stream().noneMatch(c -> c.screenMarker() && c.marker().shown())) return "";

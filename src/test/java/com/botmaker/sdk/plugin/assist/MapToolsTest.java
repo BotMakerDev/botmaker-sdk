@@ -101,6 +101,22 @@ class MapToolsTest {
         assertFalse(seen.fits("HOME", 0, 640, 360), "a frame of another size is read again");
     }
 
+    /** A button leading up is the way back only from a screen one screen opens; from one several open, it leaves. */
+    @Test
+    void aScreenOpenedFromSeveralHasNoWayBackUp() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen("Home", MapFixtures.click("m_key")));
+        screens.put("CAMPAIGN", MapFixtures.screen("Campaign", MapFixtures.click("map")));
+        screens.put("MAP", MapScreen.of(Setup.named("Map").from(BotConstants.input("CAMPAIGN", "map"))
+                .alsoFrom(List.of(Way.of(BotConstants.input("HOME", "m_key"))))));
+        screens.put("STAGE", MapScreen.of(Setup.named("Stage").from(BotConstants.input("CAMPAIGN", "map"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertTrue(MapTools.goesBack(graph, "STAGE", "CAMPAIGN"), "one screen opens Stage: up is back");
+        assertFalse(MapTools.goesBack(graph, "MAP", "CAMPAIGN"), "Map opens from Campaign and Home: up is a way in");
+        assertFalse(MapTools.goesBack(graph, "STAGE", "HOME"), "not the screen above");
+    }
+
     /** Only the way in from that screen by that input is made conditional, whether it is the entrance or not. */
     @Test
     void aWayIsOpenOnlyWhileAMethodSaysSoAndTheOthersStayAlwaysOpen() {

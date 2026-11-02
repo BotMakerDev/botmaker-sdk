@@ -173,6 +173,27 @@ public final class Emulator implements CaptureSource {
         return device.isInstalled(packageName);
     }
 
+    /**
+     * Whether {@code packageName} has an activity in Android's task stack, or the stack cannot be read (true: it cannot
+     * tell): false once it was stopped. A dialog of another app over it (a permission, a sign-in) keeps it there. Its
+     * process alone says nothing: Sword x Staff kept two after {@code am force-stop} (2026-11-02).
+     */
+    public boolean runs(String packageName) {
+        if (packageName == null || packageName.isBlank()) return true;
+        String stack;
+        try {
+            stack = device.shell("dumpsys activity activities");
+        } catch (RuntimeException unread) {
+            return true;
+        }
+        return stack == null || stack.isBlank() || hasActivity(stack, packageName.trim());
+    }
+
+    /** Whether {@code dumpsys} lists an activity of {@code packageName} ({@code u0 <package>/<activity>}). */
+    static boolean hasActivity(String dumpsys, String packageName) {
+        return dumpsys.contains(" " + packageName + "/");
+    }
+
     /** The package name of the app currently in the foreground, or {@code ""} if none/unknown. */
     public String currentApp() {
         return device.currentApp();
