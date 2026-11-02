@@ -49,8 +49,8 @@ class FrameWatchTest {
     }
 
     @Test
-    void ninePosesStops() {
-        Feed feed = new Feed(grab -> pose((char) ('A' + grab / 2 % 9)));
+    void posesPastTheCapStop() {
+        Feed feed = new Feed(grab -> pose((char) ('A' + grab / 2 % (FrameWatch.CAP + 1))));
         FrameWatch.Watched watched = FrameWatch.watch(feed, BOX, CONFIDENCE, feed);
         assertEquals(FrameWatch.Ending.TOO_MANY_POSES, watched.ending());
         assertFalse(watched.saveable());

@@ -19,13 +19,17 @@ import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.session.PrivateSession;
+import com.botmaker.shared.capture.FrameGrab;
+import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -95,6 +99,84 @@ final class Frames {
      */
     static Supplier<Optional<BufferedImage>> feed(AgentContext context) {
         return away(context).orElse(context::frame);
+    }
+
+    /**
+     * The game's window on the private display read as 🗺's live board reads it, through a grab kept open whose frames
+     * cross no pipe (a whole frame down the display agent's pipe took ~200 ms, 2026-11-02); null when no private
+     * display has a window attached. Read and closed on one thread. Blocking.
+     */
+    static Grabbed grabbed(AgentContext context) {
+        PrivateSession session = session(context);
+        GenericWindow game = session == null ? null : session.attached();
+        if (game == null) return null;
+        try {
+            return new Grabbed(session.controller().grabWindow(game));
+        } catch (RuntimeException closing) {
+            return null;
+        }
+    }
+
+    /**
+     * Frames of a {@link FrameGrab}, each a new one the game drew: a read that gives the frame before again is read
+     * once more, for up to {@link #FRESH_MS}, so a watch counts the game's frames rather than its own reads. Two images
+     * are written in turn and handed out, each good until the read after next, so a reader copies what it keeps.
+     */
+    static final class Grabbed implements Supplier<Optional<BufferedImage>>, AutoCloseable {
+
+        /** How long a read waits for a frame the game has not drawn yet before it hands out the same one again. */
+        private static final long FRESH_MS = 100;
+
+        private final FrameGrab grab;
+        private final BufferedImage[] images = new BufferedImage[2];
+        /** Which of {@link #images} was handed out last; -1 before the first. */
+        private int last = -1;
+        private int writing;
+
+        private Grabbed(FrameGrab grab) {
+            this.grab = grab;
+        }
+
+        @Override
+        public Optional<BufferedImage> get() {
+            writing = last == 0 ? 1 : 0;
+            long until = System.nanoTime() + FRESH_MS * 1_000_000;
+            try {
+                while (true) {
+                    if (!grab.grab(this::pixels)) return Optional.empty();
+                    if (last < 0 || !sameFrame(images[writing], images[last]) || System.nanoTime() >= until) break;
+                    Thread.sleep(2);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Optional.empty();
+            } catch (RuntimeException closing) {
+                return Optional.empty();
+            }
+            last = writing;
+            return Optional.of(images[last]);
+        }
+
+        private int[] pixels(int width, int height) {
+            BufferedImage image = images[writing];
+            if (image == null || image.getWidth() != width || image.getHeight() != height) {
+                images[writing] = image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            }
+            return ints(image);
+        }
+
+        private static boolean sameFrame(BufferedImage a, BufferedImage b) {
+            return a.getWidth() == b.getWidth() && a.getHeight() == b.getHeight() && Arrays.equals(ints(a), ints(b));
+        }
+
+        private static int[] ints(BufferedImage image) {
+            return ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+        }
+
+        @Override
+        public void close() {
+            grab.close();
+        }
     }
 
     /**

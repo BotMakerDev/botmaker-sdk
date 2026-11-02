@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Watching a moving thing keeps up with the game**: `crop_pictures`' `moving` and 🗺's ◉ Watch read a game in a
+  private display as the live board does, about 55 grabs a second where it read 5, and a picture holds up to 16
+  frames. A watch that sees more poses than that says how fast it grabbed.
 - **A picture can hold several frames** of a thing that moves (an idle monster, a pulsing highlight):
   `new ImageTemplate("images/plant.png").at(…).frames(4)` reads its file as four frames side by side, and every
   find, click and screen check finds it wherever any frame shows, each at the bot's confidence. A still picture is
@@ -34,7 +37,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   again from the frames kept, and a slow game is warned of. A cut named as a picture the bot has, of its frame size,
   offers "Add as a frame of …", saved as `edit_pictures`' `add_frame` saves it.
 - **The assistant cuts a moving thing**: `crop_pictures` with `moving: true` watches the box on the live game until
-  its loop comes round (at least 1 s, at most 10 s, 8 poses at most) and saves one picture of its frames, saying how
+  its loop comes round (at least 1 s, at most 10 s, 16 poses at most) and saves one picture of its frames, saying how
   many grabs it read and warning when the game gave under 20 a second; a box that never moved is saved still. A
   box that changes, cut without it, is refused with that advice. `edit_pictures`' `add_frame` adds a pose the watch
   missed, cut from the last screenshot at the picture's size and shape.

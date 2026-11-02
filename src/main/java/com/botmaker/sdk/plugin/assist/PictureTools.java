@@ -757,7 +757,17 @@ final class PictureTools {
     static Watch watch(AgentContext context, Rect box, CutShape shape, List<Point> points, Rect ignore,
                        BufferedImage shown, BufferedImage cut, List<BufferedImage> kept,
                        Consumer<FrameWatch.Progress> seen) {
-        Supplier<Optional<BufferedImage>> feed = fresh(Frames.feed(context));
+        // The live board's grab when the game is in a private display: 5 grabs a second through the agent's pipe
+        // missed most of a 60 frames/s loop (Sword x Staff, 2026-11-02).
+        try (Frames.Grabbed grabbed = Frames.grabbed(context)) {
+            return watch(context, grabbed != null ? grabbed : fresh(Frames.feed(context)), box, shape, points, ignore,
+                    shown, cut, kept, seen);
+        }
+    }
+
+    private static Watch watch(AgentContext context, Supplier<Optional<BufferedImage>> feed, Rect box, CutShape shape,
+                               List<Point> points, Rect ignore, BufferedImage shown, BufferedImage cut,
+                               List<BufferedImage> kept, Consumer<FrameWatch.Progress> seen) {
         boolean[] resized = {false};
         Supplier<Optional<BufferedImage>> poses = () -> feed.get().flatMap(live -> {
             if (live.getWidth() != shown.getWidth() || live.getHeight() != shown.getHeight()) {
@@ -789,8 +799,9 @@ final class PictureTools {
             case FEED_LOST -> new Watch(null, "The watch broke off after " + watched.grabs() + " grabs: "
                     + watched.ending().displayName() + ". Nothing was saved.");
             case TOO_MANY_POSES -> new Watch(null, String.format(Locale.ROOT, "It showed more than %d poses in "
-                    + "%.1f s: cut a smaller part of it, one that loops through fewer. Nothing was saved.",
-                    FrameWatch.CAP, watched.watched().toMillis() / 1000.0));
+                    + "%.1f s (%d grabs, %.0f/s): cut a smaller part of it, one that loops through fewer. Nothing was "
+                    + "saved.", FrameWatch.CAP, watched.watched().toMillis() / 1000.0, watched.grabs(),
+                    watched.grabsPerSecond()));
             // The box the screenshot showed must be among its poses: else the screen moved since, not the thing.
             case LOOP_CLOSED, LONGEST_REACHED -> watched.frames().stream().anyMatch(f -> alike(f, cut, needs))
                     ? new Watch(watched, null)

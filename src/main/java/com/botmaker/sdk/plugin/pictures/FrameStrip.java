@@ -11,8 +11,11 @@ import java.util.List;
  */
 public final class FrameStrip {
 
-    /** The most frames one picture holds. */
-    public static final int MOST = 8;
+    /**
+     * The most frames one picture holds: 16, for a thing that sways smoothly, as the plant monster's tween showed more
+     * than 8 poses in 1.3 s of its loop at a run's confidence (the user's call, 2026-11-02).
+     */
+    public static final int MOST = 16;
 
     private FrameStrip() {}
 

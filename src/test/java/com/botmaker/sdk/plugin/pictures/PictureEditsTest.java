@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -110,13 +111,14 @@ class PictureEditsTest {
     }
 
     @Test
-    void addFrameRefusesANinth(@TempDir Path resources) throws IOException {
+    void addFrameRefusesOnePastTheMost(@TempDir Path resources) throws IOException {
         Host host = new Host();
         StudioServices services = host.services(resources);
-        PictureCuts.saveFrames(services, frames(1, 2, 3, 4, 5, 6, 7, 8), PLACE, "plant", null);
-        PictureEdits.Done done = PictureEdits.addFrame(services, "plant", noise(9, 16, 12));
+        PictureCuts.saveFrames(services, frames(IntStream.rangeClosed(1, FrameStrip.MOST).toArray()), PLACE, "plant",
+                null);
+        PictureEdits.Done done = PictureEdits.addFrame(services, "plant", noise(FrameStrip.MOST + 1, 16, 12));
         assertFalse(done.ok());
-        assertTrue(done.said().contains("8 frames"), done.said());
+        assertTrue(done.said().contains(FrameStrip.MOST + " frames"), done.said());
     }
 
     private static BufferedImage png(Path resources, String name) throws IOException {
