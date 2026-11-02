@@ -216,6 +216,10 @@ final class MapEdits {
             implements Edit {
     }
 
+    @Describe("hover, hold, Tab 2 shown buttons; proposes")
+    record LearnInteractions(String screen) implements Edit {
+    }
+
     @Describe("words in a zone: a marker, or with field a text button")
     record AddText(String screen, @Describe("as the screen shows them") String text,
                    @Describe("a Zones constant") String zone,
@@ -244,7 +248,7 @@ final class MapEdits {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             ToolTiming.actions("edit_map", "Fixes the bot's Screens when try_input recorded wrong or the game "
-                    + "changed; clicks nothing", Edit.class,
+                    + "changed", Edit.class,
                     MapEdits::edit));
 
     private MapEdits() {}
@@ -258,6 +262,12 @@ final class MapEdits {
                 return FxCall.call(() -> said(ScreenBook.moveMarkers(context.services())
                         .map(why -> ScreenEdits.NOT_WRITTEN + why)
                         .orElse("Every screen is told by its parts: what a setup named moved to marks and marking inputs.")));
+            }
+            if (edit instanceof LearnInteractions on) {
+                // Acts on the game and waits for it: off the FX thread, never on the user's own desktop.
+                Interactions.Tried tried = Interactions.tryOn(context, on.screen(), false);
+                return tried.answers().isEmpty() ? AgentReply.refused(tried.stopped())
+                        : AgentReply.text(Interactions.said(tried));
             }
             if (edit instanceof LearnShade learn) {
                 // The sightings' file is read here, not on the FX thread.
@@ -312,6 +322,7 @@ final class MapEdits {
             case RemoveMarker ignored -> marker(edit, context);
             case MoveMarkers ignored -> AgentReply.refused("move_markers runs on the whole map.");
             case LearnShade ignored -> AgentReply.refused("learn_shade runs on the whole bot.");
+            case LearnInteractions ignored -> AgentReply.refused("learn_interactions acts on the game.");
             case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
             case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),

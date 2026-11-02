@@ -55,6 +55,14 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   a state (`learn_shade state`, the panel's preset), which `BotStates.declare` adds. An addition on a press that did
   nothing is cut `<picture>_disabled` and written as the button's Disabled look before the input is recorded. Sightings
   of a button shown as cut are kept only after it showed a version. The file is layout 2: layout-1 files read empty.
+- **How buttons answer the bot** (2026-11-02, `Interactions`, spec
+  umbrella `docs/superpowers/specs/2026-11-02-learn-interactions-design.md`): `learn_interactions` and the screen panel's
+  Try on this screen find two of the screen's picture buttons shown as cut, then hover each (`SHOW_MS`), drag each from
+  its centre to past its box over `HOLD_MS` reading the frame at `MID_HOLD_MS`, and Tab twice; after each step the two
+  must be found where they were, else it stops. Two buttons fitted alike make an `Answer` with a shade of that cause
+  meaning Normal, its id the cause's (`hover-3fa2`). The last try per project is kept in memory only;
+  `Versions.learn` keeps its answer first (any state but Normal refused), replacing the shade of the same cause. The
+  assistant's call never acts on the user's own desktop; the panel's does, as ▶ Try.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a

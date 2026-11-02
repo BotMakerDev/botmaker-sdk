@@ -171,12 +171,11 @@ final class MapTools {
                             + "changing that one in place. Refused once anything is reached from it")
                     .takes(Mistake.class).handledBy(MapTools::notAScreen),
             AssistantTool.named("place_pictures")
-                    .describedAs("crop_pictures' map half for pictures the bot has already: notes them on a screen "
-                            + "as its marker, way back, or untried inputs, without cutting them again. A marker "
-                            + "starts the screen as a cut one does")
+                    .describedAs("Notes pictures the bot has on a screen as its marker, way back, or untried "
+                            + "inputs, without cutting them again; a marker starts the screen as a cut one does")
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
-                    .describedAs("Discovery's one way to act on a screen: does inputs cut on it (click, scroll, "
+                    .describedAs("Discovery's way to act on a screen: does its inputs (click, scroll, "
                             + "hotkey) and records what each did: opened a new screen (owing its marker), "
                             + "led to a mapped one, changed this one, or nothing. Breadth first: refused while a "
                             + "screen owes its marker; with nothing left here, walks to the shallowest screen "

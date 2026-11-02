@@ -79,6 +79,8 @@ final class MapGuide {
         WAY_BACK("Way back", "What a walk presses to leave it: its own input, else a close button, then Escape."),
         OWES("Owes", "What is left to cut or try here, as Discovery noted it."),
         NOTES("Notes", "Your notes on it: what it spends and earns, its timers, its quirks."),
+        ANSWERS("How buttons answer the bot", "How a button looks while the bot hovers, holds or focuses it, so a "
+                + "run never takes that for a version: tried on two of this screen's buttons, kept by hand."),
         PRESSED_BY("Pressed by", "How the run presses it: a click, a double or right click, a hold, a hover."),
         TEXT_FIELD("Text field", "A field the run types into: the words typed, the field cleared first, Enter "
                 + "after."),
@@ -124,7 +126,7 @@ final class MapGuide {
                      TREE_SCROLL, TRY -> true;
                 case TEXT_FIELD -> input instanceof Button button && button.isField();
                 case DRAG -> input instanceof Button button && button.isDrag();
-                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, COPIES, WHERE, GROUP -> false;
+                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, ANSWERS, COPIES, WHERE, GROUP -> false;
             };
         }
 

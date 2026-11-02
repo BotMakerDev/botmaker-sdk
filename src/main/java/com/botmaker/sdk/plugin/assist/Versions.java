@@ -505,6 +505,8 @@ public final class Versions {
     public static String learn(StudioServices services, String id, ButtonState meaning) {
         Path resources = services.resourcesDir();
         if (resources == null) return ScreenEdits.NOT_WRITTEN + Frames.noProject();
+        Optional<Interactions.Answer> tried = Interactions.proposed(resources, id);
+        if (tried.isPresent()) return keep(services, tried.get(), meaning);
         if (meaning == State.NORMAL) {
             return ScreenEdits.NOT_WRITTEN + "a shade the game shows never means Normal: pick what it means.";
         }
@@ -537,6 +539,24 @@ public final class Versions {
                 .orElse("Learned: every button shown " + shade.kind().displayName() + " is "
                         + BotStates.label(shade.state()) + " (seen on " + String.join(", ", proposal.get().pictures())
                         + "). Nothing else is cut.");
+    }
+
+    /**
+     * Writes the shade {@code tried} proposes, of the bot's own input, in place of one learned of the same cause; any
+     * {@code meaning} but {@code Normal} refused. On the FX thread.
+     */
+    private static String keep(StudioServices services, Interactions.Answer tried, ButtonState meaning) {
+        if (meaning != null && meaning != State.NORMAL) {
+            return ScreenEdits.NOT_WRITTEN + "a shade the bot's own " + Interactions.label(tried.cause())
+                    .toLowerCase(Locale.ROOT) + " causes means Normal: leave state out.";
+        }
+        List<Shade> all = new ArrayList<>(Frames.shades(services).stream()
+                .filter(s -> s.cause() != tried.cause()).toList());
+        all.add(tried.shade());
+        return Frames.writeShades(services, all).map(why -> ScreenEdits.NOT_WRITTEN + why)
+                .orElse("Learned: a button under the bot's " + Interactions.label(tried.cause()).toLowerCase(Locale.ROOT)
+                        + " shown " + tried.shade().kind().displayName() + " is Normal (seen on "
+                        + String.join(", ", tried.pictures()) + ").");
     }
 
     /**

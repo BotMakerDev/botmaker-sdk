@@ -21,6 +21,7 @@ import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.FxCall;
+import com.botmaker.sdk.plugin.assist.Interactions;
 import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
@@ -620,7 +621,55 @@ final class ScreenPanel {
                     changed.run();
                 });
         all.getChildren().add(PanelParts.of(Part.NOTES, null, edit, save));
+        all.getChildren().add(PanelParts.of(Part.ANSWERS, null, answers(shown).toArray(Node[]::new)));
         return List.of(all);
+    }
+
+    /**
+     * *How buttons answer the bot* (2026-11-02, mockup C of three, the user's pick): Try on this screen hovers, holds
+     * and Tabs two of its buttons on the game, the hand path of {@code edit_map learn_interactions}; each cause's
+     * answer with Keep when two buttons changed alike ({@code learn_shade}); the shades kept, each with ✕.
+     */
+    private List<Node> answers(String constant) {
+        List<Node> all = new ArrayList<>();
+        Button tryOn = action("Try on this screen", "Hover, half-press and Tab two of " + graph.shown(constant)
+                + "'s buttons on the game, which must show this screen; nothing is written until Keep", () -> {
+            PanelContext context = new PanelContext(services, CaptureValue.current(services));
+            // Acting on the user's own desktop is allowed: they pressed it, as ▶ Try.
+            run("Trying how buttons answer…", constant, () -> {
+                Interactions.Tried tried = Interactions.tryOn(context, constant, true);
+                return tried.answers().isEmpty() ? tried.stopped()
+                        : "Tried: keep what two buttons showed alike, below.";
+            });
+        });
+        tryOn.setDisable(busy);
+        all.add(tryOn);
+        Optional<Interactions.Tried> last = Interactions.last(services.resourcesDir())
+                .filter(t -> t.screen().equals(constant));
+        last.ifPresent(tried -> {
+            for (Interactions.Answer answer : tried.answers()) {
+                Label what = new Label(Interactions.label(answer.cause()) + " · " + answer.said());
+                what.setWrapText(true);
+                if (!answer.keeps()) {
+                    all.add(line(what));
+                    continue;
+                }
+                Button keep = action("Keep", "A button under the bot's " + Interactions.label(answer.cause())
+                        .toLowerCase(Locale.ROOT) + " shown like this is Normal, for the whole bot", () -> run(
+                        "Keeping…", constant, () -> FxCall.call(() -> Versions.learn(services, answer.id(), null))));
+                keep.setDisable(busy);
+                all.add(line(swatches(answer.shade()), what, keep));
+            }
+            if (tried.stopped() != null) all.add(text(tried.stopped()));
+        });
+        for (Shade shade : Interactions.learned(services)) {
+            Button forget = action("✕", "Forget this shade: a run takes it for a version again", () -> run(
+                    "Forgetting…", constant, () -> FxCall.call(() -> Versions.unlearn(services, shade))));
+            forget.setDisable(busy);
+            all.add(line(swatches(shade), new Label(Interactions.label(shade.cause()) + " · "
+                    + shade.kind().displayName() + " · kept, Normal"), forget));
+        }
+        return all;
     }
 
     /**

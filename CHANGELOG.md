@@ -61,6 +61,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   button is seen again is Disabled; one still shown in a later Studio session proposes a lasting `Blocks` state. A part
   a pressed button showed that blocked is cut as its Disabled look, `<picture>_disabled`. `edit_map learn_shade` takes
   `state` (`Blocks.MAXED`, added to the bot's States), needed when the proposal asks for one; the map panel presets it.
+- **Discovery learns how buttons answer the bot**: `edit_map learn_interactions` (🗺 Screens: a screen's *How buttons
+  answer the bot* ▸ Try on this screen) hovers two of the screen's buttons on the game, holds each mid-press and
+  releases off it, and Tabs twice. A change two buttons show alike is proposed as a Hover, Press or Focus shade meaning
+  Normal, kept by `learn_shade fit hover-…` (the panel's Keep), one per cause; nothing is written by trying. An
+  emulator tries the press only. It stops when the game leaves the screen.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that
