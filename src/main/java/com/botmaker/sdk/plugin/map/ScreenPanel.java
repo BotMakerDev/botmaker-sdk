@@ -45,6 +45,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
@@ -56,6 +57,8 @@ import javafx.scene.control.SplitMenuButton;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -260,7 +263,7 @@ final class ScreenPanel {
         cutOpened();
     }
 
-    /** Picks the selected screen's input {@code field} (null: none), as a box clicked on the board does. */
+    /** Picks the selected screen's input {@code field} (null: none), as a box right-clicked on the board does. */
     void pickInput(String field) {
         if (Objects.equals(field, picked)) return;
         picked = selected == null || field == null || graph.input(selected, field).isEmpty() ? null : field;
@@ -302,10 +305,26 @@ final class ScreenPanel {
                 .map(canvas::pictureTime).toList());
     }
 
-    /** A box clicked on a shot: its input picked, here, on the board and in the outline. */
+    /** A box or a panel row right-clicked: its input picked, here, on the board and in the outline. */
     private void picked(String constant, Row row) {
         pickInput(row.field());
         inputPicked.accept(constant, row.field());
+    }
+
+    /**
+     * An input clicked, on the shot or in the panel: the screen it opens picked and shown (the user's call, 2026-11-02:
+     * a click goes, a right-click picks); one it opens none of yet is picked instead.
+     */
+    private void go(String constant, Row row) {
+        graph.opens(constant, row.field()).ifPresentOrElse(this::showScreen, () -> picked(constant, row));
+    }
+
+    /** Whether {@code e} was a click on a button inside {@code line}, which acts on its own. */
+    private static boolean onAControl(MouseEvent e, Node line) {
+        for (Node at = e.getPickResult().getIntersectedNode(); at != null && at != line; at = at.getParent()) {
+            if (at instanceof ButtonBase) return true;
+        }
+        return false;
     }
 
     /**
@@ -374,7 +393,7 @@ final class ScreenPanel {
         List<String> markers = markerIds(constant);
         // The input picked when it is drawn: a pick since restyles the drawing, and a zoom draws it picked.
         board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
-                markers, strips, cuts, audit, picked, row -> picked(constant, row), null));
+                markers, strips, cuts, audit, picked, row -> go(constant, row), row -> picked(constant, row), null));
         board.repick(picked);
     }
 
@@ -517,7 +536,9 @@ final class ScreenPanel {
                     + "inputs, try them, cut more and go there. Solid arrows are how each screen was found; dashed "
                     + "ones are other ways in and ways back. A screen's right-click folds what is below it. ▶▶ Next "
                     + "untried picks the next input to try.")));
-            all.addAll(shades());
+            // Folded until opened (the user's call, 2026-11-02: open, it crowded the map's first look).
+            List<Node> shades = shades();
+            if (!shades.isEmpty()) all.add(PanelParts.of(Part.SHADES, null, shades));
             return all;
         }
         TextField first = new TextField();
@@ -729,7 +750,11 @@ final class ScreenPanel {
             Node one = canvas.thumb(picture, ROW_THUMB, "screen-row-thumb");
             if (picture != null) {
                 Tooltip.install(one, new Tooltip("Show " + picture + " at its own size"));
-                one.setOnMouseClicked(e -> showPicture(constant, row));
+                one.setOnMouseClicked(e -> {
+                    if (e.getButton() != MouseButton.PRIMARY) return;
+                    showPicture(constant, row);
+                    e.consume();
+                });
             }
             return one;
         }, result, row.result());
@@ -737,7 +762,15 @@ final class ScreenPanel {
         HBox line = new HBox(8, thumb, words, result);
         onShot.ifPresent(said -> line.getChildren().add(said));
         line.setAlignment(Pos.CENTER_LEFT);
-        line.getStyleClass().add("screen-row");
+        line.getStyleClass().addAll("screen-row", "screen-row-open");
+        Tooltip.install(words, new Tooltip(graph.opens(constant, row.field()).map(to -> "Click: go to "
+                + graph.shown(to) + ". ").orElse("") + "Right-click: pick it, with its editors."));
+        line.setOnMouseClicked(e -> {
+            if (onAControl(e, line)) return;
+            if (e.getButton() == MouseButton.SECONDARY) picked(constant, row);
+            else if (e.getButton() == MouseButton.PRIMARY) go(constant, row);
+            e.consume();
+        });
         if (untried) {
             Button play = action("▶", "Try " + row.label(), () -> tryRow(constant, row));
             play.setDisable(busy);
@@ -1226,7 +1259,7 @@ final class ScreenPanel {
             });
         }
         if (shades == null || shades.proposed().isEmpty() && shades.learned().isEmpty()) return List.of();
-        List<Node> all = new ArrayList<>(List.of(heading("Shades the game shows")));
+        List<Node> all = new ArrayList<>();
         List<ButtonState> states = shades.proposed().stream().anyMatch(Versions.Proposal::shared)
                 ? BotStates.offered(services.pluginValues()).stream().filter(s -> s != State.NORMAL).toList()
                 : List.of();

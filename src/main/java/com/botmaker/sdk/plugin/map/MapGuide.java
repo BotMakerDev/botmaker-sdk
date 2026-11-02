@@ -56,8 +56,8 @@ final class MapGuide {
     static final String JUMP_BACK = "Back to the screen looked at before";
     static final String JUMP_FORWARD = "Forward again";
     static final String JUMP_ANY = "Open any screen of the map by its name";
-    static final String JUMP_CHIPS = "Open a screen this one's ways lead to, or one looked at lately, in the map; the "
-            + "game is not moved";
+    static final String JUMP_CHIPS = "Open a screen this one's ways lead to, the one it opens from (↩), or one looked "
+            + "at lately, in the map; the game is not moved";
 
     // --- the toolbar's ▶▶ ---
     static final String NEXT_UNTRIED = "Pick the next input to try, on the screen Discovery explores next, and show "
@@ -71,8 +71,8 @@ final class MapGuide {
     enum Part {
         MARKERS("Markers", "What tells this screen apart: pictures that all show on it, pictures it never shows, "
                 + "words it reads."),
-        INPUTS("Inputs", "Everything pressed on it: buttons, hotkeys, strips, trees. ▶ tries one, ⋯ edits it, a "
-                + "click on its box on the board picks it."),
+        INPUTS("Inputs", "Everything pressed on it: buttons, hotkeys, strips, trees. A click on one, or on its box on "
+                + "the board, goes to the screen it opens; a right-click picks it. ▶ tries one, ⋯ edits it."),
         WAYS_IN("Ways in", "Each input of another screen that opens this one; the first is how it was found."),
         SCREEN_LOOKS("Looks", "Other looks of the whole screen, an event's skin: each shows only while its method "
                 + "says so."),
@@ -81,6 +81,8 @@ final class MapGuide {
         NOTES("Notes", "Your notes on it: what it spends and earns, its timers, its quirks."),
         ANSWERS("How buttons answer the bot", "How a button looks while the bot hovers, holds or focuses it, so a "
                 + "run never takes that for a version: tried on two of this screen's buttons, kept by hand."),
+        SHADES("Shades the game shows", "How the game dims, greys or lights a button to mean a state, for the whole "
+                + "bot: a shade seen on two buttons is proposed with Learn, a learned one is forgotten by ✕."),
         PRESSED_BY("Pressed by", "How the run presses it: a click, a double or right click, a hold, a hover."),
         TEXT_FIELD("Text field", "A field the run types into: the words typed, the field cleared first, Enter "
                 + "after."),
@@ -126,7 +128,7 @@ final class MapGuide {
                      TREE_SCROLL, TRY -> true;
                 case TEXT_FIELD -> input instanceof Button button && button.isField();
                 case DRAG -> input instanceof Button button && button.isDrag();
-                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, ANSWERS, COPIES, WHERE, GROUP -> false;
+                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, ANSWERS, SHADES, COPIES, WHERE, GROUP -> false;
             };
         }
 
@@ -245,7 +247,7 @@ final class MapGuide {
                     new Entry("GUILD (italic)", null, SCREEN_TAB + "."),
                     new Entry("◀ ▶", null, JUMP_BACK + "; " + JUMP_FORWARD + "."),
                     new Entry("GUILD ▾", null, JUMP_ANY + "."),
-                    new Entry("ways out · recent", null, JUMP_CHIPS + "."))),
+                    new Entry("ways out · back · recent", null, JUMP_CHIPS + "."))),
             new Section("The outline", List.of(
                     new Entry("Filter screens and inputs…", null, "Keeps the screens and inputs whose words have the "
                             + "text, and the lines down to them. Under each screen are its inputs, and under an "

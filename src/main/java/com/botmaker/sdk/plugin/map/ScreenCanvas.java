@@ -41,6 +41,8 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -71,6 +73,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -743,7 +746,8 @@ final class ScreenCanvas {
     /**
      * {@link #shot} with each of {@code rows} boxed where its picture is on the shot ({@code audit}), else, before the
      * audit is made or for a picture it has not checked, where it was cut ({@code cuts}, by picture); each box hands its
-     * row to {@code onPick} when clicked. A box away from its picture's place is dashed; a picture not on the shot is
+     * row to {@code onGo} when clicked, to {@code onPick} when right-clicked. A box away from its picture's place is
+     * dashed; a picture not on the shot is
      * listed under it. A member of one of {@code strips} is drawn in its strip instead, every member of the list in
      * it, over the place the list sits. {@code onShot} runs on a click elsewhere on the shot (null: none). The input
      * whose field is {@code picked} is drawn picked (null: none). Each of {@code markers} (picture ids) is boxed in
@@ -751,7 +755,11 @@ final class ScreenCanvas {
      */
     Optional<Node> shotWithInputs(String constant, double width, List<Row> rows, List<String> markers,
                                   List<Strip> strips, Map<String, FrameCut> cuts, Audit audit, String picked,
-                                  Consumer<Row> onPick, Runnable onShot) {
+                                  Consumer<Row> onGo, Consumer<Row> onPick, Runnable onShot) {
+        BiConsumer<Row, MouseEvent> clicked = (row, e) -> {
+            (e.getButton() == MouseButton.SECONDARY ? onPick : onGo).accept(row);
+            e.consume();
+        };
         int shotWidth = resources == null ? 0 : ScreenShots.size(shotFile(constant)).width();
         // One read: the shot and its boxes are of the same file, rewritten meanwhile or not.
         return image(constant, width, false).map(image -> {
@@ -786,7 +794,7 @@ final class ScreenCanvas {
                     Tooltip.install(gone, new Tooltip(row.label() + ": its picture is not on this shot"
                             + (spot.get().area() != null ? "; it is scrolled out of its list."
                             : spot.get().sure() ? "." : "; it comes and goes, or is another look.")));
-                    gone.setOnMouseClicked(e -> onPick.accept(row));
+                    gone.setOnMouseClicked(e -> clicked.accept(row, e));
                     missing.getChildren().add(gone);
                     continue;
                 }
@@ -811,15 +819,12 @@ final class ScreenCanvas {
                             + "is elsewhere.";
                 }
                 Tooltip.install(box, new Tooltip(tip));
-                box.setOnMouseClicked(e -> {
-                    onPick.accept(row);
-                    e.consume();
-                });
+                box.setOnMouseClicked(e -> clicked.accept(row, e));
                 boxes.getChildren().add(box);
             }
             for (Strip strip : drawn) {
                 boxes.getChildren().add(strip(strip, boxOn(strip.place(), shotWidth, shotHeight, width, height),
-                        picked, onPick));
+                        picked, clicked));
             }
             StackPane layered = new StackPane(shot, boxes);
             layered.setMaxSize(width, height);
@@ -882,7 +887,7 @@ final class ScreenCanvas {
      * strip (tall, across), the wheel scrolling it; each picture hands its row to {@code onPick} when clicked, the one
      * of field {@code picked} drawn picked.
      */
-    private Node strip(Strip strip, Box at, String picked, Consumer<Row> onPick) {
+    private Node strip(Strip strip, Box at, String picked, BiConsumer<Row, MouseEvent> clicked) {
         double size = Math.max(16, (strip.down() ? at.width() : at.height()) - 4);
         Pane line = strip.down() ? new VBox(2) : new HBox(2);
         for (Row row : strip.members()) {
@@ -892,10 +897,7 @@ final class ScreenCanvas {
             // Not on the screen at every time: drawn faint, as the game shows it only at times.
             if (row.input().isOccasional()) picture.setOpacity(0.45);
             Tooltip.install(picture, new Tooltip(row.label() + ": " + row.result()));
-            picture.setOnMouseClicked(e -> {
-                onPick.accept(row);
-                e.consume();
-            });
+            picture.setOnMouseClicked(e -> clicked.accept(row, e));
             line.getChildren().add(picture);
         }
         ScrollPane scroll = new ScrollPane(line);

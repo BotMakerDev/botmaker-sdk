@@ -98,7 +98,8 @@
     -fx-border-width: 2;
 }
 
-.screen-shot-open {
+.screen-shot-open,
+.screen-row-open {
     -fx-cursor: hand;
 }
 

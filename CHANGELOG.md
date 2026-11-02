@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **🗺 Screens goes where you click**: a click on an input, its box on the Screen tab or its row in the panel, opens
+  the screen it leads to; a right-click picks it with its editors, as a click did. The jump bar has `↩` back to the
+  screen it opens from, beside its ways out. *Shades the game shows* is a folded part of the map's panel, no longer
+  open on its first look.
+
 - **A screen is told by its parts that mark**: `public final Mark title = Mark.of(Pictures.TITLE);` (or a `Caption`,
   or an `Element`), and any button, text button or element readout made `.marking()` — a button by any of its looks,
   so a dimmed one still tells it. `.absent()` on a part says the screen never shows it. `Setup.markers`, `absent`,

@@ -126,9 +126,12 @@ public final class ScreenMap {
     /** What the jump bar shows, as last drawn. */
     private Jumps jumpsDrawn;
 
-    /** What the jump bar shows: its screen, the ▾'s screens, its ways out (each "to\nlabel"), recent, ◀ and ▶. */
-    private record Jumps(String selected, List<String> screens, List<String> out, List<String> recent, boolean back,
-                         boolean forward) {}
+    /**
+     * What the jump bar shows: its screen, the ▾'s screens, its ways out (each "to\nlabel"), the screen above it
+     * (empty: none), recent, ◀ and ▶.
+     */
+    private record Jumps(String selected, List<String> screens, List<String> out, String up, List<String> recent,
+                         boolean back, boolean forward) {}
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
     /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
@@ -396,9 +399,11 @@ public final class ScreenMap {
             if (link.from().equals(selected) && !link.to().equals(selected)) out.putIfAbsent(link.to(), link);
         }
         List<String> recent = selected == null ? List.of() : opened.recent(selected);
+        // The screen it opens from, one click up beside the ways down (the user's call, 2026-11-02).
+        String up = selected == null ? "" : graph.parent(selected).orElse("");
         // Drawn again only when it changed: each read would close the ▾ list under the user's pointer.
         Jumps now = new Jumps(selected, cards == null ? List.of() : cards.stream().map(Card::constant).toList(),
-                out.entrySet().stream().map(e -> e.getKey() + "\n" + e.getValue().label()).toList(), recent,
+                out.entrySet().stream().map(e -> e.getKey() + "\n" + e.getValue().label()).toList(), up, recent,
                 opened.canBack(), opened.canForward());
         if (now.equals(jumpsDrawn)) return;
         jumpsDrawn = now;
@@ -423,6 +428,10 @@ public final class ScreenMap {
         jumps.getChildren().setAll(back, ahead, any);
         if (!out.isEmpty()) jumps.getChildren().add(jumpLabel("ways out:"));
         out.forEach((to, link) -> jumps.getChildren().add(jumpChip("→ " + to, to, link.label())));
+        if (!up.isEmpty()) {
+            jumps.getChildren().addAll(jumpLabel("back:"), jumpChip("↩ " + up, up, "The screen "
+                    + graph.shown(selected) + " opens from"));
+        }
         if (!recent.isEmpty()) jumps.getChildren().add(jumpLabel("recent:"));
         for (String constant : recent) jumps.getChildren().add(jumpChip(constant, constant, graph.shown(constant)));
     }
