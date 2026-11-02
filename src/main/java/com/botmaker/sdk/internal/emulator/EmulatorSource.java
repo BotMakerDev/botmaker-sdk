@@ -138,6 +138,8 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
         QuietRun.grantRequested(emu.device(), packageName);
         // The device asked outside the map's lock: a slow ADB must not hold up another instance's entry.
         if (QUIET.containsKey(instanceName)) return;
+        // A run that joins a game already up never went through the launcher, which shuts the popups off.
+        QuietRun.calm(emu.device());
         QuietRun.Was was = QuietRun.start(emu.device());
         if (QUIET.putIfAbsent(instanceName, was) != null) return;
         Debug.log("Do Not Disturb on " + instanceName + " while the bot runs");

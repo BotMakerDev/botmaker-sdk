@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **No Android popup over the game**: an emulator a game is started on, or a run joins, gets Gemini, the assist
+  gestures and heads-up notifications shut off for good, besides Do Not Disturb for the run.
 - **🗺 Screens goes where you click**: a click on an input, its box on the Screen tab or its row in the panel, opens
   the screen it leads to; a right-click picks it with its editors, as a click did. The jump bar has `↩` back to the
   screen it opens from, beside its ways out. *Shades the game shows* is a folded part of the map's panel, no longer
