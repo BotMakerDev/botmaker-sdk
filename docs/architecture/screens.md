@@ -10,6 +10,13 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   which shows: what tells it from a screen showing the same markers; `internal/screens/Markers` is the one rule every
   reader tells a screen by, 2026-10-16), a `from` way (the tree), `alsoFrom`
   ways, a `back` input (null: a close button, then Escape), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
+- **A screen is told by its parts that mark** (2026-11-02): a field `Mark.of(picture | Caption | Element)`, or an
+  input or element readout made `.marking()`; a part `.absent()` never shows while it does. A marking button is
+  found by any of its looks, so one shown dimmed or Disabled still tells its screen. A part two screens share is no
+  problem: the set tells a screen. `Markers.of` merges the parts with the setup's old lists, which are deprecated and
+  moved to parts on any save (`MarkParts.move`) or all at once by `edit_map` `move_markers`. `MarkerSets` says, in
+  `read_map`, two screens with equal sets and a set inside another with no absent part between them, naming the part
+  to add. A look's (`ScreenVariant`) markers are still lists.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a

@@ -6,11 +6,13 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.MarkParts;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.shared.Diag;
 
@@ -63,6 +65,7 @@ public final class ScreenMapRead {
                 part(values, member).ifPresent(part -> screens.put(member.group(), switch (part) {
                     case Input input -> screens.get(member.group()).withInput(member.name(), input);
                     case Readout readout -> screens.get(member.group()).withReadout(member.name(), readout);
+                    case Mark mark -> screens.get(member.group()).withMark(member.name(), mark);
                 }));
             }
         }
@@ -91,7 +94,7 @@ public final class ScreenMapRead {
     public static Optional<ScreenPart> part(PluginValues values, Member member) {
         return values.open(SdkValues.SCREEN_MAP, member)
                 .flatMap(ctx -> ctx.value(Input.class).<ScreenPart>map(input -> input)
-                        .or(() -> ctx.value(Readout.class)));
+                        .or(() -> ctx.value(Readout.class)).or(() -> ctx.value(Mark.class)));
     }
 
     /**
@@ -102,7 +105,8 @@ public final class ScreenMapRead {
      */
     public static Optional<String> write(PluginValues values, String constant, MapScreen was, MapScreen now) {
         try {
-            return written(values, constant, was, now);
+            // Saved in the new form: what its setup names the old way becomes its parts (2026-11-02).
+            return written(values, constant, was, MarkParts.move(now));
         } finally {
             forget();
         }

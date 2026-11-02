@@ -19,6 +19,7 @@ import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
@@ -67,7 +68,8 @@ public final class ScreenTypes implements TypeHolder {
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
                 PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CAPTION_SHAPE,
-                READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, READOUT_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
+                READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, READOUT_ELEMENT_SHAPE, MARK_PICTURE_SHAPE, MARK_TEXT_SHAPE,
+                MARK_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE);
     }
@@ -253,6 +255,18 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Readout.text(Zone)}, then {@code .subject()} when it names which one its screen shows. */
     public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = ComponentType.part(Readout.class)
             .writtenAs(Readout::text);
+
+    /** {@code Mark.of(ImageTemplate)}: a picture telling its screen, then {@code .absent()} when it never shows there. */
+    public static final DeclaredCall<Mark> MARK_PICTURE_SHAPE = ComponentType.part(Mark.class)
+            .<ImageTemplate, Mark>writtenAs(Mark::of);
+
+    /** {@code Mark.of(Caption)}: words telling their screen, and the same link. */
+    public static final DeclaredCall<Mark> MARK_TEXT_SHAPE = ComponentType.part(Mark.class)
+            .<Caption, Mark>writtenAs(Mark::of);
+
+    /** {@code Mark.of(Element)}: an app's element telling its screen, and the same link. */
+    public static final DeclaredCall<Mark> MARK_ELEMENT_SHAPE = ComponentType.part(Mark.class)
+            .<Element, Mark>writtenAs(Mark::of);
 
     /** {@code Readout.element(Element)}: an app's text read from the screen's tree, and the same link. */
     public static final DeclaredCall<Readout> READOUT_ELEMENT_SHAPE = ComponentType.part(Readout.class)

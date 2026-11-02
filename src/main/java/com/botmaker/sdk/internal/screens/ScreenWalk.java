@@ -13,7 +13,6 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.text.Words;
-import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -176,8 +175,8 @@ public final class ScreenWalk {
      * screen opened from it), or its markers hold all of {@code under}'s and more (a tab of a window).
      */
     private boolean standsAbove(String over, String under) {
-        Set<String> marks = new HashSet<>(graph.markers(under).shown().stream().map(ImageTemplate::id).toList());
-        List<String> its = graph.markers(over).shown().stream().map(ImageTemplate::id).toList();
+        Set<String> marks = graph.markers(under).keys();
+        Set<String> its = graph.markers(over).keys();
         if (its.size() > marks.size() && its.containsAll(marks)) return true;
         if (graph.panelOf(over).filter(under::equals).isPresent()) return true;
         for (String from : graph.opensFrom(over)) {
@@ -205,7 +204,7 @@ public final class ScreenWalk {
         }
         // Ranked by markers only among the screens nothing shown hides; the loop's fallback keeps the nearest first.
         return shown.stream().filter(c -> !under.contains(c))
-                .min(Comparator.comparingInt((String c) -> -graph.screens().get(c).markers().size()))
+                .min(Comparator.comparingInt((String c) -> -graph.markers(c).size()))
                 .or(() -> shown.stream().findFirst());
     }
 

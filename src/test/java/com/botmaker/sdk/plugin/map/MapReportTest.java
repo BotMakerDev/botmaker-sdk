@@ -167,7 +167,7 @@ class MapReportTest {
     @Test
     void aScreenNoWayReachesIsSaid() {
         Map<String, MapScreen> screens = screens();
-        screens.put("LOST", screen(Setup.named("Lost").markers(marks("home")).from(ref("NOWHERE", "tavern"))));
+        screens.put("LOST", screen(Setup.named("Lost").markers(marks("gems")).from(ref("NOWHERE", "tavern"))));
         List<String> problems = MapReport.problems(ScreenGraph.of(screens), NAMED::contains, id -> true, "LOST");
         assertEquals(List.of("Lost: no way from Home reaches it, so a run cannot go there."), problems);
     }

@@ -10,7 +10,9 @@ import com.botmaker.sdk.api.text.DigitSet;
  * Navigate#read} and {@link Navigate#number} while the game shows that screen (2026-10-22).
  *
  * <p>An app's text is read from the screen's tree, exactly as the app states it: {@code
- * Readout.element(Elements.BATTERY_LEVEL)} (2026-10-31).
+ * Readout.element(Elements.BATTERY_LEVEL)} (2026-10-31). Such an element tells its screen when it is there only:
+ * {@link #marking}, or {@link #absent} when it never is (2026-11-02). A zone read tells nothing, since what it reads
+ * changes.
  *
  * <p>A screen that shows one of several — hero N, shop item X — names which by its {@link #subject() subject}: {@code
  * Readout.text(Zones.HERO_NAME).subject()}, read by {@link Navigate#subject}.
@@ -19,29 +21,54 @@ import com.botmaker.sdk.api.text.DigitSet;
  * @param digits    the game font's digits it is read with; null to read it by OCR
  * @param isSubject whether it names which one the screen shows
  * @param element   the node of the screen's tree whose text it reads; null to read a zone
+ * @param isMarking whether its element tells its screen: in the tree while the app shows it; never for a zone
+ * @param isAbsent  whether its element is never in the tree while the app shows its screen; never for a zone
  */
-public record Readout(Zone zone, DigitSet digits, boolean isSubject, Element element) implements ScreenPart {
+public record Readout(Zone zone, DigitSet digits, boolean isSubject, Element element, boolean isMarking,
+                      boolean isAbsent) implements ScreenPart {
+
+    public Readout {
+        if (element == null || isAbsent) isMarking = false;
+        if (element == null) isAbsent = false;
+    }
 
     /** The words {@code zone} shows, read by OCR. */
     public static Readout text(Zone zone) {
-        return new Readout(zone, null, false, null);
+        return new Readout(zone, null, false, null, false, false);
     }
 
     /** The number {@code zone} shows, read with {@code digits}' pictures. */
     public static Readout digits(Zone zone, DigitSet digits) {
-        return new Readout(zone, digits, false, null);
+        return new Readout(zone, digits, false, null, false, false);
     }
 
     /** The text of {@code element} in the screen's tree, else its accessibility label. */
     public static Readout element(Element element) {
         if (element == null) throw new IllegalArgumentException("A readout of an element needs the element");
-        return new Readout(null, null, false, element);
+        return new Readout(null, null, false, element, false, false);
     }
 
     /** This readout, naming which one its screen shows: the hero's name on a hero's page. */
     @Link
     public Readout subject() {
-        return new Readout(zone, digits, true, element);
+        return new Readout(zone, digits, true, element, isMarking, isAbsent);
+    }
+
+    /** This readout of an element, telling its screen: in the tree while the app shows it. A zone's stays as it is. */
+    @Link
+    public Readout marking() {
+        return new Readout(zone, digits, isSubject, element, true, false);
+    }
+
+    /** This readout of an element, telling its screen apart from one alike by never being in the tree there. */
+    @Link
+    public Readout absent() {
+        return new Readout(zone, digits, isSubject, element, false, true);
+    }
+
+    /** This readout, telling nothing of its screen: neither {@link #marking} nor {@link #absent}. */
+    public Readout unmarked() {
+        return new Readout(zone, digits, isSubject, element, false, false);
     }
 
     /** Whether it reads a number by digit pictures, not words by OCR. */

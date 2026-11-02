@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
@@ -26,7 +27,7 @@ public final class Screens {
     public static final class Home extends Screen {
         public final Button collect = Button.of(Pictures.COLLECT).tried().occasional()
                 .looks(List.of(Look.of(Pictures.COLLECT_BADGE, States.Presses.BADGE)));
-        public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE);
+        public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE).marking();
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried();
@@ -36,7 +37,7 @@ public final class Screens {
 
         @Override
         public Setup setup() {
-            return Setup.named("Home").markers(List.of(Pictures.BATTLE));
+            return Setup.named("Home");
         }
     }
 
@@ -45,30 +46,35 @@ public final class Screens {
         public final Button buy = Button.of(Pictures.BUY).place(Place.below(Pictures.ITEM)).repeated()
                 .looks(List.of(Look.of(Pictures.BUY_MAXED, States.Blocks.MAXED)));
         public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried();
+        public final Mark bag = Mark.of(Pictures.BAG);
+        public final Mark title = Mark.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80)));
+        public final Mark noBattle = Mark.of(Pictures.BATTLE).absent();
 
         @Override
         public Setup setup() {
             return Setup.named("Shop")
-                    .markers(List.of(Pictures.BAG))
                     .from(HOME.shop)
                     .takes(Duration.ofSeconds(2));
         }
     }
 
     public static final class Items extends Screen {
+        public final Mark item = Mark.of(Pictures.ITEM);
+
         @Override
         public Setup setup() {
-            return Setup.named("Items").markers(List.of(Pictures.ITEM)).from(SHOP.itemsTab).tab();
+            return Setup.named("Items").from(SHOP.itemsTab).tab();
         }
     }
 
     public static final class Settings extends Screen {
         public final Button sound = Button.of(Elements.SOUND).tried();
         public final Readout volume = Readout.element(Elements.VOLUME);
+        public final Mark list = Mark.of(Elements.SETTINGS_LIST);
 
         @Override
         public Setup setup() {
-            return Setup.named("Settings").elements(List.of(Elements.SETTINGS_LIST)).from(HOME.collect);
+            return Setup.named("Settings").from(HOME.collect);
         }
     }
 

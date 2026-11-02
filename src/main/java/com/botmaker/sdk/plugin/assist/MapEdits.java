@@ -84,7 +84,7 @@ final class MapEdits {
         SCREEN, POPUP, START, PANEL, TAB
     }
 
-    @Describe("screen; popup, the game opens it; start, it opens on it (new if none so called); panel, in the screen "
+    @Describe("screen; popup, the game opens it; start, it opens on it (new if none); panel, in the screen "
             + "it opens from; tab, told by its button's selected look")
     record SetKind(String screen, Kind as) implements Edit {
     }
@@ -133,7 +133,7 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
-    @Describe("its way back an untried input again")
+    @Describe("its way back untried again")
     record RemoveBack(String screen) implements Edit {
     }
 
@@ -196,7 +196,7 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String method) implements Edit {
     }
 
-    @Describe("add a marker (all show), or absent: one it never shows; refused if another shot shows the set")
+    @Describe("add a marker (all show), or absent (never shows); refused if another shot shows the set")
     record AddMarker(String screen, @Describe("a picture the bot has") String picture,
                      @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
@@ -205,18 +205,21 @@ final class MapEdits {
     record RemoveMarker(String screen, String picture) implements Edit {
     }
 
-    @Describe("words read in a zone: a marker, or with field a text button clicked on them")
+    @Describe("setup markers made parts, all screens")
+    record MoveMarkers(@Describe(value = "", optional = true) String screen) implements Edit {
+    }
+
+    @Describe("words in a zone: a marker, or with field a text button on them")
     record AddText(String screen, @Describe("as the screen shows them") String text,
                    @Describe("a Zones constant") String zone,
                    @Describe(value = "", optional = true) String field) implements Edit {
     }
 
-    @Describe("take a text marker off")
+    @Describe("a text marker off")
     record RemoveText(String screen, String text) implements Edit {
     }
 
-    @Describe("a pictureless button: across widths, down heights from anchor picture's centre; rows×columns: a grid "
-            + "step apart")
+    @Describe("a pictureless button: across widths, down heights from anchor's centre; rows×columns a grid step apart")
     record AddSpot(String screen, String field, String anchor, Double across, Double down,
                    @Describe(value = "", optional = true) Integer rows,
                    @Describe(value = "", optional = true) Integer columns,
@@ -244,6 +247,11 @@ final class MapEdits {
         try {
             // Off the FX thread: what tells a screen apart is matched over every other screen's shot first.
             if (edit instanceof AddMarker || edit instanceof RemoveMarker) return marker(edit, context);
+            if (edit instanceof MoveMarkers) {
+                return FxCall.call(() -> said(ScreenBook.moveMarkers(context.services())
+                        .map(why -> ScreenEdits.NOT_WRITTEN + why)
+                        .orElse("Every screen is told by its parts: what a setup named moved to marks and marking inputs.")));
+            }
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());
                 AgentReply reply = edited(edit, context);
@@ -284,6 +292,7 @@ final class MapEdits {
             case NewScreen opened -> newScreen(opened, graph, screen, context);
             case AddMarker ignored -> marker(edit, context);
             case RemoveMarker ignored -> marker(edit, context);
+            case MoveMarkers ignored -> AgentReply.refused("move_markers runs on the whole map.");
             case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
             case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),

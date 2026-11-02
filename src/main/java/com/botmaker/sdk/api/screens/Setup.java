@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.plugin.api.meta.Migrate;
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -87,6 +88,10 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
      */
     public static final Duration LOADS = Duration.ofSeconds(60);
 
+    /** Why the old markers have no rule: a rule cannot add a field to the screen's class (2026-11-02). */
+    private static final String MOVED = "markers are parts: a Mark field, or an input's .marking()/.absent(); "
+            + "Studio moves them when it saves a screen, or all at once with edit_map move_markers";
+
     public Setup {
         markers = markers == null ? List.of() : List.copyOf(markers);
         absent = absent == null ? List.of() : List.copyOf(absent);
@@ -111,22 +116,34 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
-    /** This screen, told by {@code markers}: all of them show while the game shows it. */
+    /**
+     * This screen, told by {@code markers}: all of them show while the game shows it. Was how a screen was told: its
+     * parts that mark tell it now, a {@link Mark} or an input that is {@code .marking()}.
+     */
     @Link
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MOVED)
     public Setup markers(List<ImageTemplate> markers) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
-    /** This screen, told apart by {@code absent}: none of them shows while the game shows it. */
+    /** This screen, told apart by {@code absent}: none of them shows while the game shows it. Parts are {@code .absent()} now. */
     @Link
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MOVED)
     public Setup absent(List<ImageTemplate> absent) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
     }
 
-    /** This screen, told by {@code texts} too: all of them show, each in its zone, while the game shows it. */
+    /**
+     * This screen, told by {@code texts} too: all of them show, each in its zone, while the game shows it. A
+     * {@code Mark.of(Caption)} or a text button that is {@code .marking()} tells it now.
+     */
     @Link
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MOVED)
     public Setup texts(List<Caption> texts) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);
@@ -134,9 +151,12 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
 
     /**
      * This screen, told by {@code elements} too: each found in the screen's tree, once or more, while the app shows
-     * it. A tree is read once per look, so they cost little beside a picture.
+     * it. A tree is read once per look, so they cost little beside a picture. A {@code Mark.of(Element)}, or a button or
+     * readout of an element that is {@code .marking()}, tells it now.
      */
     @Link
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MOVED)
     public Setup elements(List<Element> elements) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
                 loads, panelOf, notes, reached, owes, at, isTab, takes, shot);

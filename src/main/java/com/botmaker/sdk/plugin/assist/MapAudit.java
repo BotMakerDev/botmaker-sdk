@@ -359,6 +359,9 @@ public final class MapAudit {
                                          ScreenGraph graph, String constant, Markers set,
                                          Function<MapScreen, Optional<BufferedImage>> shots) {
         if (resources == null || !set.any()) return Optional.empty();
+        // Told by no picture and no words that all show (a group any look of which tells it, an element): a shot alone
+        // cannot say, and an empty set would be found on every one.
+        if (set.shown().isEmpty() && set.texts().isEmpty()) return Optional.empty();
         List<String> shown = files(resources, set.shown());
         List<String> absent = files(resources, set.absent());
         if (shown.size() < set.shown().size()) return Optional.empty();

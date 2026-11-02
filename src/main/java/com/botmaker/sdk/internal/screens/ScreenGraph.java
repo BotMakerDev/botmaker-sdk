@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
@@ -284,9 +285,24 @@ public final class ScreenGraph {
         MapScreen screen = screens.get(constant);
         if (screen == null) return new Markers(List.of(), List.of());
         if (!screen.isTab()) return Markers.of(screen);
-        Button tab = nameOf(screen.fromInput()).flatMap(n -> input(n.screen(), n.field()))
+        return Markers.of(screen, tab(screen));
+    }
+
+    /** The button a tab is told by picked, found through the reference its way in names it by; null for none. */
+    private Button tab(MapScreen screen) {
+        if (!screen.isTab()) return null;
+        if (screen.fromInput() instanceof Button button && BotConstants.inputName(button) == null) return button;
+        return nameOf(screen.fromInput()).flatMap(n -> input(n.screen(), n.field()))
                 .filter(Button.class::isInstance).map(Button.class::cast).orElse(null);
-        return Markers.of(screen, tab);
+    }
+
+    /**
+     * {@code screen}, the map's {@code constant} as a tool changes it, told by {@code now} as parts ({@link
+     * MarkParts#toldBy}): what its tab button adds to {@link #markers} stays the tab's, never written as its own.
+     */
+    public MapScreen toldBy(String constant, MapScreen screen, Markers now) {
+        MapScreen held = screens.get(constant);
+        return MarkParts.toldBy(screen, now, held == null ? null : tab(held));
     }
 
     /** The screen holding {@code edge}'s input: the one it leaves, else, for a tab's, the screen the tab is in. */
@@ -771,7 +787,7 @@ public final class ScreenGraph {
     }
 
     /**
-     * {@code screen} with the picture {@code id} taken out: one of its markers or absent pictures or a look's, a button
+     * {@code screen} with the picture {@code id} taken out: one of its markers, marks or absent pictures or a look's, a button
      * clicking it (its field gone), a button's look or drop, a strip's member, a lock, its way back. Its ways in are
      * kept: a screen is not cut off by a picture going.
      */
@@ -815,6 +831,9 @@ public final class ScreenGraph {
                 now = now.withoutInput(e.getKey());
             }
             else if (!kept.equals(input)) now = now.withInput(e.getKey(), kept);
+        }
+        for (Map.Entry<String, Mark> e : screen.marks().entrySet()) {
+            if (is(e.getValue().picture(), id)) now = now.withoutMark(e.getKey());
         }
         return now;
     }

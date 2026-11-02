@@ -4,6 +4,12 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Markers as parts, the rest (2026-11-02)**: the next release deletes `Setup.markers/absent/texts/elements` and
+  their `@Migrate.Dropped`; first move the SDK's own callers (`MapTools`, `ScreenEdits`, `ElementSaves`, the tests'
+  fixtures) to parts. A look (`ScreenVariant`) is still told by marker lists: tell it by parts too. 🗺 Screens draws a
+  `Mark` field only through its screen's markers; give it a row in the outline and a marking/absent toggle in the
+  input inspector.
+
 - **A shot's density (2026-11-02)**: read_map flags a shot whose file is another size than `Sdk.screen()`, but an
   emulator at the bot's size with another `wm density` lays the game out otherwise and is not seen. Record the
   density a shot was taken at beside it (a PNG text chunk, from `EmulatorSize`'s `wm density` read), and flag one

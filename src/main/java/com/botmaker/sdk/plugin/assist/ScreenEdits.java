@@ -92,10 +92,11 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.isOccasional(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
+                    b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.isOccasional(), null, h.when());
             case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.isOccasional(), null,
-                    t.when(), t.gesture(), t.hold());
+                    t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.isOccasional(), null,
                     s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), false, false, t.isInfo(), null,
@@ -109,11 +110,12 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
                     b.locked(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
+                    b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.locked(),
                     null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
-                    t.locked(), null, t.gesture(), t.hold());
+                    t.locked(), null, t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
                     false, s.locked(), null);
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), t.isInfo(),
@@ -127,11 +129,12 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.isOccasional(),
                     b.locked(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
+                    b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.isOccasional(),
                     h.locked(), h.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
-                    t.isOccasional(), t.locked(), t.when(), t.gesture(), t.hold());
+                    t.isOccasional(), t.locked(), t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
                     s.isOccasional(), s.locked(), s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), false,
@@ -671,7 +674,7 @@ public final class ScreenEdits {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.isOccasional(), button.locked(), button.looks(), button.when(), button.repeats(), cycles,
                 button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
-                button.grid(), button.element(), button.keeps());
+                button.grid(), button.element(), button.keeps(), button.isMarking(), button.isAbsent());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */
@@ -774,12 +777,13 @@ public final class ScreenEdits {
         if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
         Caption caption = Caption.of(Words.of(words), in.get());
         if (field == null || field.isBlank()) {
-            if (on.texts().contains(caption)) return "It is told by " + caption.said() + " already.";
-            List<Caption> now = new ArrayList<>(on.texts());
+            Markers was = graph.markers(constant);
+            if (was.texts().contains(caption)) return "It is told by " + caption.said() + " already.";
+            List<Caption> now = new ArrayList<>(was.texts());
             now.add(caption);
             return said(ScreenBook.step(services, "Tell " + graph.shown(constant) + " by " + caption.said(),
                     () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
-                            s -> s.setup(x -> x.texts(now))))),
+                            s -> graph.toldBy(constant, s, was.withTexts(now))))),
                     graph.shown(constant) + " is told by " + caption.said() + " in Zones." + zone.strip() + " too.");
         }
         String named = on.fieldFor(field);
@@ -819,12 +823,13 @@ public final class ScreenEdits {
         MapScreen on = graph.screens().get(constant);
         if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
         String words = text == null ? "" : text.strip();
-        List<Caption> now = on.texts().stream()
+        Markers was = graph.markers(constant);
+        List<Caption> now = was.texts().stream()
                 .filter(c -> c.words() == null || !c.words().text().equalsIgnoreCase(words)).toList();
-        if (now.size() == on.texts().size()) {
+        if (now.size() == was.texts().size()) {
             return NOT_WRITTEN + graph.shown(constant) + " is not told by \"" + words + "\".";
         }
-        return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.texts(now))),
+        return said(ScreenBook.update(services, constant, s -> graph.toldBy(constant, s, was.withTexts(now))),
                 graph.shown(constant) + " is told by \"" + words + "\" no more.");
     }
 
@@ -1117,9 +1122,8 @@ public final class ScreenEdits {
                     + ": remove it from there first.";
         }
         if (holds(absent ? was.absent() : was.shown(), id)) return "It is told by " + was.said() + " already.";
-        Markers now = absent
-                ? new Markers(was.shown(), plus(was.absent(), picture), was.texts(), was.elements(), was.picked())
-                : new Markers(plus(was.shown(), picture), was.absent(), was.texts(), was.elements(), was.picked());
+        Markers now = absent ? was.withPictures(was.shown(), plus(was.absent(), picture))
+                : was.withPictures(plus(was.shown(), picture), was.absent());
         return toldBy(services, constant, now);
     }
 
@@ -1135,8 +1139,7 @@ public final class ScreenEdits {
         if (!holds(was.shown(), id) && !holds(was.absent(), id)) {
             return NOT_WRITTEN + "it is told by " + was.said() + ", not " + id + ".";
         }
-        Markers now = new Markers(minus(was.shown(), id), minus(was.absent(), id), was.texts(), was.elements(),
-                was.picked());
+        Markers now = was.withPictures(minus(was.shown(), id), minus(was.absent(), id));
         if (!now.any()) return NOT_WRITTEN + id + " is its last marker: add another first.";
         return toldBy(services, constant, now);
     }
@@ -1147,8 +1150,8 @@ public final class ScreenEdits {
         Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services),
                 MapAudit.cuts(services, graph), graph, constant, now);
         if (clash.isPresent()) return NOT_WRITTEN + MapTools.clashSaid(graph, constant, now, clash.get());
-        return said(FxCall.call(() -> ScreenBook.update(services, constant,
-                s -> s.setup(x -> x.markers(now.shown()).absent(now.absent())))), "Told by " + now.said() + ".");
+        return said(FxCall.call(() -> ScreenBook.update(services, constant, s -> graph.toldBy(constant, s, now))),
+                "Told by " + now.said() + ".");
     }
 
     private static boolean holds(List<ImageTemplate> pictures, String id) {

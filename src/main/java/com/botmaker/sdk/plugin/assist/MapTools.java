@@ -919,10 +919,11 @@ final class MapTools {
     /** {@code set} as {@code mark} changes it by {@code cut}: replaced, added to, or given an absent picture. */
     private static Markers marked(Markers set, Mark mark, ImageTemplate cut) {
         return switch (mark) {
-            case SET -> new Markers(List.of(cut), set.absent(), set.texts(), set.elements(), set.picked());
-            case ADD -> new Markers(with(set.shown(), cut), set.absent(), set.texts(), set.elements(), set.picked());
-            case ABSENT -> new Markers(set.shown(), with(set.absent(), cut), set.texts(), set.elements(),
-                    set.picked());
+            // In place of every picture telling it, a button found by its looks too.
+            case SET -> new Markers(List.of(cut), set.absent(), set.texts(), set.elements(), set.picked(), List.of(),
+                    set.absentTexts(), set.absentElements());
+            case ADD -> set.withPictures(with(set.shown(), cut), set.absent());
+            case ABSENT -> set.withPictures(set.shown(), with(set.absent(), cut));
         };
     }
 
@@ -956,7 +957,7 @@ final class MapTools {
                 MapAudit.cuts(services, graph), graph, constant.get(), now);
         if (clash.isEmpty()) return "";
         Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(),
-                s -> s.setup(x -> x.markers(before.shown()).absent(before.absent()))));
+                s -> graph.toldBy(constant.get(), s, before)));
         String name = graph.shown(constant.get());
         return " But " + clashSaid(graph, constant.get(), now, clash.get()) + (failed.isPresent() ? " Putting " + name
                 + "'s markers back failed: " + failed.get() : " " + name + " keeps " + before.said() + "; the "
@@ -1028,8 +1029,8 @@ final class MapTools {
                 }
                 // An input seen to come and go is marked so in place.
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> marker
-                        ? s.setup(x -> at.popup() ? x.markers(now.shown()).absent(now.absent()).popup()
-                        : x.markers(now.shown()).absent(now.absent()))
+                        ? at.popup() ? graph.toldBy(at.constant(), s, now).setup(Setup::popup)
+                        : graph.toldBy(at.constant(), s, now)
                         : back ? asBack(s, at.constant(), had.orElse(null), cut)
                         : had.isPresent() ? s.withInput(had.get(), brought(s.inputs().get(had.get()).occasional(), look))
                         : s.withInput(s.fieldFor(cut.id()), sometimes ? brought(Button.of(cut).occasional(), look)

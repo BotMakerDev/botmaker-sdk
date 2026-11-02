@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A screen is told by its parts that mark**: `public final Mark title = Mark.of(Pictures.TITLE);` (or a `Caption`,
+  or an `Element`), and any button, text button or element readout made `.marking()` — a button by any of its looks,
+  so a dimmed one still tells it. `.absent()` on a part says the screen never shows it. `Setup.markers`, `absent`,
+  `texts` and `elements` are deprecated: Studio moves them to parts when it saves a screen, and the assistant's
+  `edit_map` `move_markers` moves every screen at once. `read_map` says two screens told by the same parts, and a
+  screen whose parts all show on another, naming the part to add.
+
 - **A bot names its own button states**: a look's state is a `ButtonState`, the SDK's NORMAL, SELECTED or DISABLED,
   or a constant of the bot's `@SdkValue(STATES)` class `States` — `enum Blocks implements ButtonState { MAXED }`
   (never pressed) and `enum Presses implements ButtonState { BADGE }` (pressed as usual). 🗺 Screens' look pickers

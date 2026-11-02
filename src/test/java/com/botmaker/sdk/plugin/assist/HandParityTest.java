@@ -61,6 +61,7 @@ class HandParityTest {
             entry("LookWhen", Hand.now("the panel's Looks ⋯ ▸ Shows only while")),
             entry("AddMarker", Hand.now("✂ Cut marker, ＋ Marker from a picture… (shows it or never does)")),
             entry("RemoveMarker", Hand.now("the panel's markers ✕")),
+            entry("MoveMarkers", Hand.now("any edit of a screen saves it with its markers as parts")),
             entry("AddText", Hand.now("a cut on the board as Words that tell it, or A button known by its words")),
             entry("RemoveText", Hand.now("the panel's markers: words ✕")),
             entry("AddSpot", Hand.now("a cut on the board as A spot beside a picture, or its grid (beside, cells)")),

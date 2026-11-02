@@ -18,6 +18,8 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.MarkerSets;
+import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.FxCall;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -181,9 +183,11 @@ public final class MapReport {
         out.append(indent).append(card.name()).append(" [").append(constant).append("] ")
                 .append(String.join(", ", ScreenCards.pills(card).stream().map(ScreenCards.Pill::text).toList()))
                 .append('\n');
-        out.append(indent).append("  ").append(markers(screen.markers(), screen.absent(), screen.elements()))
-                .append(screen.texts().isEmpty() ? "" : " · reads " + String.join(" + ",
-                        screen.texts().stream().map(Caption::said).toList()))
+        // What tells it: its setup's lists and its parts that mark, merged as a run reads them.
+        Markers told = graph.markers(constant);
+        out.append(indent).append("  ").append(markers(told))
+                .append(told.texts().isEmpty() ? "" : " · reads " + String.join(" + ",
+                        told.texts().stream().map(Caption::said).toList()))
                 .append(" · back ").append(graph.backOf(constant).filter(b -> b.via() != null)
                         .map(ScreenGraph.Edge::label).orElse("the default (a close button, then Escape)"))
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
@@ -193,7 +197,7 @@ public final class MapReport {
         graph.panelOf(constant).filter(p -> !graph.parent(constant).equals(Optional.of(p))).ifPresent(p -> ins.add(
                 "a panel of " + graph.shown(p) + ", though its way in is not an input of it"));
         graph.tabParent(constant).ifPresent(p -> ins.add("a tab of " + graph.shown(p) + ", told by its tab picked"
-                + (graph.markers(constant).shown().size() > screen.markers().size() ? ""
+                + (graph.markers(constant).size() > Markers.of(screen, null).size() ? ""
                 : ": its button has no Selected look yet, so nothing tells it")));
         List<String> next = graph.results(constant);
         if (!next.isEmpty()) {
@@ -283,6 +287,22 @@ public final class MapReport {
         return markers(markers, absent, List.of());
     }
 
+    /**
+     * {@code set} as {@link #markers(List, List, List)} says it, a group any of whose looks marks written {@code a|b}
+     * and words read or elements absent after {@code not}.
+     */
+    static String markers(Markers set) {
+        List<String> told = new ArrayList<>(set.shown().stream().map(ImageTemplate::id).toList());
+        set.either().forEach(group -> told.add(String.join("|", group.stream().map(ImageTemplate::id).toList())));
+        set.elements().forEach(element -> told.add("element " + element.shown()));
+        if (told.isEmpty()) return set.texts().isEmpty() ? "marker none" : "marker words";
+        List<String> not = new ArrayList<>(set.absent().stream().map(ImageTemplate::id).toList());
+        set.absentTexts().forEach(words -> not.add("\"" + words.said() + "\""));
+        set.absentElements().forEach(element -> not.add("element " + element.shown()));
+        return (told.size() == 1 ? "marker " : "markers ") + String.join(" + ", told)
+                + (not.isEmpty() ? "" : ", not " + String.join(", ", not));
+    }
+
     /** {@link #markers(List, List)}, with the app's elements that tell it too: {@code marker element "Battery"}. */
     static String markers(List<ImageTemplate> markers, List<ImageTemplate> absent, List<Element> elements) {
         if (markers.isEmpty() && elements.isEmpty()) return "marker none";
@@ -351,6 +371,7 @@ public final class MapReport {
                 if (!file.test(id)) problems.add(name + ": the picture " + id + " has no file.");
             }
         }
+        problems.addAll(MarkerSets.problems(graph, only));
         return problems;
     }
 

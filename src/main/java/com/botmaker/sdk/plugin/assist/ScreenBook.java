@@ -8,12 +8,14 @@ import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
+import com.botmaker.sdk.internal.screens.MarkParts;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -70,9 +72,24 @@ final class ScreenBook {
     static Optional<String> add(StudioServices services, String constant, MapScreen screen) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        return step(services, "Add " + screen.name(), () -> values.create(SCREENS)
-                .or(() -> values.addClass(SCREENS, constant, screen.setup()))
-                .or(() -> ScreenMapRead.add(values, constant, screen.parts())));
+        // Written in the new form: what tells it is its parts.
+        MapScreen moved = MarkParts.move(screen);
+        return step(services, "Add " + moved.name(), () -> values.create(SCREENS)
+                .or(() -> values.addClass(SCREENS, constant, moved.setup()))
+                .or(() -> ScreenMapRead.add(values, constant, moved.parts())));
+    }
+
+    /**
+     * Every screen of the map whose setup still names what tells it the old way, those written as its parts, one
+     * step. Empty when written or none needed it, else the first why not.
+     */
+    static Optional<String> moveMarkers(StudioServices services) {
+        ScreenGraph graph = read(services);
+        Map<String, UnaryOperator<MapScreen>> changes = new LinkedHashMap<>();
+        graph.screens().forEach((constant, screen) -> {
+            if (MarkParts.old(screen)) changes.put(constant, MarkParts::move);
+        });
+        return changes.isEmpty() ? Optional.empty() : updateAll(services, "Move markers to parts", changes);
     }
 
     /**

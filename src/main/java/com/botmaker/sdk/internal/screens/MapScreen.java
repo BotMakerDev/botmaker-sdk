@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
@@ -35,13 +36,21 @@ import java.util.function.UnaryOperator;
  * @param setup    everything but its fields
  * @param inputs   its inputs, field name to input
  * @param readouts what it shows to be read, field name to readout
+ * @param marks    the signs that tell it and are never pressed, field name to mark
  */
-public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts) {
+public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts,
+                        Map<String, Mark> marks) {
 
     public MapScreen {
         setup = setup == null ? Setup.named("") : setup;
         inputs = inputs == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(inputs));
         readouts = readouts == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(readouts));
+        marks = marks == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(marks));
+    }
+
+    /** A screen of {@code setup}, {@code inputs} and {@code readouts}, with no mark. */
+    public MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts) {
+        this(setup, inputs, readouts, Map.of());
     }
 
     /** A screen of {@code setup} and {@code inputs}, reading nothing. */
@@ -63,6 +72,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
     public static MapScreen of(Screen screen) {
         Map<String, Input> inputs = new LinkedHashMap<>();
         Map<String, Readout> readouts = new LinkedHashMap<>();
+        Map<String, Mark> marks = new LinkedHashMap<>();
         for (Field field : screen.getClass().getDeclaredFields()) {
             int modifiers = field.getModifiers();
             if (Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers)
@@ -73,6 +83,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
                 switch (field.get(screen)) {
                     case Input input -> inputs.put(field.getName(), input);
                     case Readout readout -> readouts.put(field.getName(), readout);
+                    case Mark mark -> marks.put(field.getName(), mark);
                     case null, default -> {}
                 }
             } catch (IllegalAccessException | LinkageError unreadable) {
@@ -85,19 +96,24 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         } catch (RuntimeException failed) {
             throw new IllegalStateException(screen.getClass().getSimpleName() + ".setup() failed: " + failed, failed);
         }
-        return new MapScreen(setup, inputs, readouts);
+        return new MapScreen(setup, inputs, readouts, marks);
     }
 
     public String name() {
         return setup.name();
     }
 
+    /**
+     * The pictures that all show while it shows: its setup's and its parts' that mark ({@link Markers#of}). A marking
+     * button of several looks is a group, any of which tells it, and is not among them.
+     */
     public List<ImageTemplate> markers() {
-        return setup.markers();
+        return Markers.of(this).shown();
     }
 
+    /** The pictures that never show while it shows: its setup's and its parts' that are absent. */
     public List<ImageTemplate> absent() {
-        return setup.absent();
+        return Markers.of(this).absent();
     }
 
     public Way from() {
@@ -154,12 +170,20 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         return setup.at();
     }
 
+    /** Whether anything tells it: a part that marks, or what its setup names. */
     public boolean hasMarker() {
-        return setup.hasMarker();
+        return setup.hasMarker() || Markers.of(this).any();
     }
 
+    /**
+     * The picture that stands for it on a card or a button: its setup's first marker, else its first part that marks
+     * by a picture; null when none does.
+     */
     public ImageTemplate firstMarker() {
-        return setup.firstMarker();
+        if (setup.firstMarker() != null) return setup.firstMarker();
+        Markers own = Markers.of(this);
+        if (!own.shown().isEmpty()) return own.shown().getFirst();
+        return own.either().isEmpty() ? null : own.either().getFirst().getFirst();
     }
 
     /** Its first marker picture's id, what stands for it on a card; null when no picture tells it. */
@@ -167,14 +191,14 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         return firstMarker() == null ? null : firstMarker().id();
     }
 
-    /** The words that tell it, each read in its zone. */
+    /** The words that tell it, each read in its zone: its setup's and its parts'. */
     public List<Caption> texts() {
-        return setup.texts();
+        return Markers.of(this).texts();
     }
 
-    /** The app's elements that tell it, each found in the screen's tree. */
+    /** The app's elements that tell it, each found in the screen's tree: its setup's and its parts'. */
     public List<Element> elements() {
-        return setup.elements();
+        return Markers.of(this).elements();
     }
 
     /** Its ways in: its {@code from}, then each {@code alsoFrom}. */
@@ -184,27 +208,57 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
 
     /** This screen, its setup as {@code change} makes it. */
     public MapScreen setup(UnaryOperator<Setup> change) {
-        return new MapScreen(change.apply(setup), inputs, readouts);
+        return new MapScreen(change.apply(setup), inputs, readouts, marks);
     }
 
     /** This screen with {@code input} as its field {@code field}: in its place, or added last. */
     public MapScreen withInput(String field, Input input) {
+        // One field, one part: a mark of that name gives way. A button of its one picture tells the screen in its stead;
+        // any other mark moves to a free name, so the screen is told as before.
+        Map<String, Mark> kept = new LinkedHashMap<>(marks);
+        Mark was = kept.remove(field);
+        Input placed = input;
+        if (was != null && was.picture() != null && input instanceof Button b && !b.isMarking() && !b.isAbsent()
+                && b.allLooks().size() == 1 && b.picture().id().equals(was.picture().id())) {
+            placed = was.isAbsent() ? b.absent() : b.marking();
+        } else if (was != null) {
+            String free = field + "Mark";
+            for (int n = 2; kept.containsKey(free) || inputs.containsKey(free) || readouts.containsKey(free); n++) {
+                free = field + "Mark" + n;
+            }
+            kept.put(free, was);
+        }
         Map<String, Input> now = new LinkedHashMap<>(inputs);
-        now.put(field, input);
-        return new MapScreen(setup, now, readouts);
+        now.put(field, placed);
+        return new MapScreen(setup, now, readouts, kept);
+    }
+
+    /** This screen with {@code mark} as its field {@code field}: in its place, or added last. */
+    public MapScreen withMark(String field, Mark mark) {
+        Map<String, Mark> now = new LinkedHashMap<>(marks);
+        now.put(field, mark);
+        return new MapScreen(setup, inputs, readouts, now);
+    }
+
+    /** This screen without its mark {@code field}. */
+    public MapScreen withoutMark(String field) {
+        Map<String, Mark> now = new LinkedHashMap<>(marks);
+        now.remove(field);
+        return new MapScreen(setup, inputs, readouts, now);
     }
 
     /** This screen with {@code readout} as its field {@code field}: in its place, or added last. */
     public MapScreen withReadout(String field, Readout readout) {
         Map<String, Readout> now = new LinkedHashMap<>(readouts);
         now.put(field, readout);
-        return new MapScreen(setup, inputs, now);
+        return new MapScreen(setup, inputs, now, marks);
     }
 
-    /** Every field of it: its inputs, then its readouts. */
+    /** Every field of it: its inputs, then its readouts, then its marks. */
     public Map<String, ScreenPart> parts() {
         Map<String, ScreenPart> parts = new LinkedHashMap<>(inputs);
         parts.putAll(readouts);
+        parts.putAll(marks);
         return parts;
     }
 
@@ -240,7 +294,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
                 else now.put(e.getKey(), kept);
             }
         }
-        return new MapScreen(setup, now, readouts);
+        return new MapScreen(setup, now, readouts, marks);
     }
 
     /**
@@ -257,7 +311,9 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         String base = name.isEmpty() ? "input" : Character.isDigit(name.charAt(0)) ? "n" + name : name.toString();
         if (SourceVersion.isKeyword(base)) base = base + "Input";
         String field = base;
-        for (int n = 2; inputs.containsKey(field) || readouts.containsKey(field); n++) field = base + n;
+        for (int n = 2; inputs.containsKey(field) || readouts.containsKey(field) || marks.containsKey(field); n++) {
+            field = base + n;
+        }
         return field;
     }
 
