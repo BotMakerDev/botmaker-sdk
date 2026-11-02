@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -29,6 +30,7 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
@@ -96,7 +98,11 @@ public final class MapReport {
             if (only != null && !only.equals(c)) continue;
             MapAudit.of(resources, confidence, cuts, c, read.graph().screens().get(c)).ifPresent(a -> audits.put(c, a));
         }
-        List<String> clashes = MapAudit.clashes(resources, confidence, cuts, read.graph(), only);
+        List<String> clashes = new ArrayList<>(MapAudit.clashes(resources, confidence, cuts, read.graph(), only));
+        // A shot taken while the game showed another size than the bot's is no frame a run sees.
+        Optional<Size> bot = FxCall.call(() -> ScreenSize.read(services));
+        String one = only;
+        bot.ifPresent(size -> clashes.addAll(ScreenShots.offSize(resources, read.graph(), one, size)));
         // Kept for Studio's next start, which matches only the shots and pictures changed since.
         MapAudit.keep(resources);
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,

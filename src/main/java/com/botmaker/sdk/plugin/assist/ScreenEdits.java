@@ -92,7 +92,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.isOccasional(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.isOccasional(), null, h.when());
             case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.isOccasional(), null,
                     t.when(), t.gesture(), t.hold());
@@ -109,7 +109,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
                     b.locked(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.locked(),
                     null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
@@ -127,7 +127,7 @@ public final class ScreenEdits {
         return switch (input) {
             case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.isOccasional(),
                     b.locked(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
-                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element());
+                    b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.isOccasional(),
                     h.locked(), h.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
@@ -671,7 +671,7 @@ public final class ScreenEdits {
         return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
                 button.isOccasional(), button.locked(), button.looks(), button.when(), button.repeats(), cycles,
                 button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
-                button.grid(), button.element());
+                button.grid(), button.element(), button.keeps());
     }
 
     /** {@code button} pressed by {@code gesture}, a hold held {@code hold} when given, else as long as it was. */

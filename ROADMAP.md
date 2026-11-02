@@ -4,6 +4,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **A shot's density (2026-11-02)**: read_map flags a shot whose file is another size than `Sdk.screen()`, but an
+  emulator at the bot's size with another `wm density` lays the game out otherwise and is not seen. Record the
+  density a shot was taken at beside it (a PNG text chunk, from `EmulatorSize`'s `wm density` read), and flag one
+  that differs from what the run sets.
+
 - **Pictures combined from a shared overlay (2026-11-02, the user's call: a future plan)**: a game draws one
   overlay over many things — Sword x Staff's yellow selection brackets round the monster next to the hero, a
   badge, a glow. Cut the overlay once, with its transparency (its alpha read from two grabs over different

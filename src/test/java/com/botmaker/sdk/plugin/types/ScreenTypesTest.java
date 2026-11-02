@@ -373,6 +373,12 @@ class ScreenTypesTest {
                 .when(ScreenTypes.condition("Firestone::shopOpen"));
         assertEquals(shop, roundTrip(ScreenTypes.BUTTON_SHAPE, shop));
         assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE, shop).when()));
+        Button quality = Button.of(picture("quality_low")).keeps(picture("quality_high"));
+        assertEquals(quality, roundTrip(ScreenTypes.BUTTON_SHAPE, quality), "a setting kept goes back with its look");
+        Button speed = Button.cycling(List.of(picture("x1"), picture("x10"))).keeps(picture("x10"));
+        assertEquals(speed, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, speed));
+        Button beyond = Button.cycling(List.of(picture("x1"), picture("x10"))).keeps(picture("x50"));
+        assertEquals(beyond, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, beyond), "a kept look past the cycle");
 
         Way way = Way.of(BotConstants.input("HOME", "event")).whenLooks(State.BADGE)
                 .when(ScreenTypes.condition("Firestone::eventOn"));

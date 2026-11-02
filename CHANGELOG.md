@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
+  taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that
+  look; one that never does stops the run saying which button and why. A popup's button keeps nothing.
+- **read_map says a shot of another size than the bot's**: each screen's and look's shot whose file is not
+  `Sdk.screen()`'s size is listed under what the map cannot do, to be taken again at the bot's size.
+  (The device's density is not recorded yet.)
 - **try_input comes back and goes on**: of several inputs in one call, one that leads to a screen mapped already
   is recorded, the game walked back to the screen tried by the map's way, as go_to_screen does, and the next tried.
   The call still stops at a new screen, a popup (its screen's markers show under it), a refused input, or a way back

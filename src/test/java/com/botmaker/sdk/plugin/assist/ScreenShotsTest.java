@@ -41,6 +41,28 @@ class ScreenShotsTest {
     }
 
     @Test
+    void aShotOfAnotherSizeThanTheBotsIsSaidByItsFile(@TempDir Path resources) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home").shot("screens/HOME.png")));
+        screens.put("PHOTO", MapScreen.of(Setup.named("Photo").shot("screens/PHOTO.png").variants(List.of(
+                ScreenVariant.named("Night").shot("screens/PHOTO@night.png")))));
+        screens.put("SHOP", MapScreen.of(Setup.named("Shop")));
+        ScreenGraph graph = graph(screens);
+        ScreenShots.write(resources.resolve("screens/HOME.png"), new BufferedImage(108, 192, BufferedImage.TYPE_INT_RGB));
+        ScreenShots.write(resources.resolve("screens/PHOTO.png"), new BufferedImage(120, 192, BufferedImage.TYPE_INT_RGB));
+        ScreenShots.write(resources.resolve("screens/PHOTO@night.png"),
+                new BufferedImage(108, 240, BufferedImage.TYPE_INT_RGB));
+
+        List<String> off = ScreenShots.offSize(resources, graph, null, new Size(108, 192));
+        assertEquals(2, off.size(), off.toString());
+        assertTrue(off.getFirst().startsWith("Photo's shot screens/PHOTO.png is 120×192, not the bot's 108×192"),
+                off.getFirst());
+        assertTrue(off.get(1).contains("screens/PHOTO@night.png is 108×240"), "a look's shot too");
+        assertEquals(List.of(), ScreenShots.offSize(resources, graph, "HOME", new Size(108, 192)), "one screen only");
+        assertEquals(List.of(), ScreenShots.offSize(resources, graph, null, new Size()), "a bot of no size: none");
+    }
+
+    @Test
     void aFileNamedAfterTheConstantIsNoShotWhileTheJavaNamesNone(@TempDir Path resources) {
         ScreenGraph graph = graph(Map.of("HOME", MapScreen.of(Setup.named("Home"))));
         ScreenShots.write(resources.resolve("screens/HOME.png"), new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB));

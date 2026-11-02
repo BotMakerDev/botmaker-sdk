@@ -70,6 +70,33 @@ public final class ScreenShots {
         }
     }
 
+    /**
+     * One line for each shot of {@code graph} ({@code only}: that screen's) whose file is another size than
+     * {@code bot}, the bot's screen size: the game showed other values when it was taken, a phone's size or a window
+     * resized, so what it shows and where may not be what a run sees (2026-11-02). Each shot's size is the size its
+     * file records. None when the bot names no size.
+     */
+    public static List<String> offSize(Path resources, ScreenGraph graph, String only, Size bot) {
+        if (resources == null || bot == null || bot.empty()) return List.of();
+        List<String> off = new ArrayList<>();
+        for (Map.Entry<String, MapScreen> entry : graph.screens().entrySet()) {
+            if (only != null && !only.equals(entry.getKey())) continue;
+            List<String> named = new ArrayList<>();
+            if (entry.getValue().setup().shot() != null) named.add(entry.getValue().setup().shot());
+            for (ScreenVariant variant : entry.getValue().variants()) {
+                if (variant.shot() != null) named.add(variant.shot());
+            }
+            for (String path : named) {
+                Size size = size(resources.resolve(path));
+                if (size.empty() || size.equals(bot)) continue;
+                off.add(graph.shown(entry.getKey()) + "'s shot " + path + " is " + size.width() + "×" + size.height()
+                        + ", not the bot's " + bot.width() + "×" + bot.height() + " (Sdk.screen()): the game showed"
+                        + " another size when it was taken. Set the game to the bot's size and take it again.");
+            }
+        }
+        return List.copyOf(off);
+    }
+
     /** Where {@code constant}'s shot is in {@code resources}, as its Java names it; empty when it names none. */
     public static Optional<Path> file(Path resources, ScreenGraph graph, String constant) {
         return file(resources, graph, constant, null);

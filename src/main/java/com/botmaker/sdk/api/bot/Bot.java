@@ -22,6 +22,8 @@ import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.observe.IpcObserver;
+import com.botmaker.sdk.api.screens.Navigate;
+import com.botmaker.sdk.internal.screens.KeptLooks;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.MissFrames;
@@ -117,7 +119,20 @@ public class Bot {
         };
         PopupGuard.enabled(true);
         lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.home()), goHome,
-                doSetup ? InstalledRun.installed().setup() : null);
+                startUp(doSetup ? InstalledRun.installed().setup() : null));
+    }
+
+    /**
+     * What the game's first start owes: the settings the map keeps ({@code Button.keeps}), each pressed until it shows
+     * its look, then {@code setup}; a setting that never shows stops the run saying which. Null when nothing is owed.
+     */
+    private static Runnable startUp(Runnable setup) {
+        if (KeptLooks.of(ScreenMaps.installed()).isEmpty()) return setup;
+        return () -> {
+            Debug.log("settings the map keeps");
+            KeptLooks.hold(ScreenMaps.installed(), Navigate::press).ifPresent(Bot::stop);
+            if (setup != null) setup.run();
+        };
     }
 
     /**
