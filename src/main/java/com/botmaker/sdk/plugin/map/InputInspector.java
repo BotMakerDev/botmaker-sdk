@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -27,6 +28,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenDesk.Trying;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
@@ -327,11 +329,9 @@ final class InputInspector {
             name.getStyleClass().add("screen-row-label");
             name.setMinWidth(0);
             HBox.setHgrow(name, Priority.ALWAYS);
-            ComboBox<State> state = new ComboBox<>(FXCollections.observableArrayList(State.values()));
-            state.setConverter(named(State::displayName));
-            state.setValue(look.state());
+            ComboBox<ButtonState> state = statePicker(look.state());
             state.setOnAction(e -> {
-                if (state.getValue() != null && state.getValue() != look.state()) {
+                if (state.getValue() != null && !state.getValue().equals(look.state()) && declared(state.getValue())) {
                     set(constant, field, button.looks(restated(looks, at, state.getValue())));
                 }
             });
@@ -357,9 +357,7 @@ final class InputInspector {
     private void askLook(String constant, String field, Button button) {
         ComboBox<String> picture = new ComboBox<>(FXCollections.observableArrayList(ScreenEdits.pictures(services)));
         picture.setEditable(true);
-        ComboBox<State> state = new ComboBox<>(FXCollections.observableArrayList(State.values()));
-        state.setConverter(named(State::displayName));
-        state.setValue(State.DISABLED);
+        ComboBox<ButtonState> state = statePicker(State.DISABLED);
         Modals.form(services, "Another look of " + button.label(), new VBox(8, new Label("The picture of it as it "
                 + "looks then"), picture, new Label("What that look means"), state), () -> {
             String id = picture.getValue() == null ? "" : picture.getValue().strip();
@@ -371,8 +369,52 @@ final class InputInspector {
                 panel.wrote(id + " is its usual look already.");
                 return;
             }
+            if (state.getValue() == null) {
+                panel.wrote("Pick what the look means, or type one of the bot's own: Blocks.MAXED, Presses.BADGE.");
+                return;
+            }
+            if (!declared(state.getValue())) return;
             set(constant, field, button.withLook(Look.of(ScreenEdits.picture(services, id), state.getValue())));
         });
+    }
+
+    /**
+     * A picker of what a look means, {@code now} picked: the SDK's and the bot's own states, and one typed as
+     * {@code Blocks.MAXED} (never pressed) or {@code Presses.BADGE} (pressed), which is added to the bot's States.
+     */
+    private ComboBox<ButtonState> statePicker(ButtonState now) {
+        ComboBox<ButtonState> box = new ComboBox<>(FXCollections.observableArrayList(
+                BotStates.offered(services.pluginValues())));
+        typedStates(box);
+        box.setValue(now);
+        return box;
+    }
+
+    /**
+     * Makes {@code box} take a state typed as well as picked: the SDK's by name, the bot's as {@code Blocks.MAXED},
+     * each shown the way {@link BotStates#label} names it.
+     */
+    static void typedStates(ComboBox<ButtonState> box) {
+        box.setEditable(true);
+        box.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ButtonState state) {
+                return state == null ? "" : BotStates.label(state);
+            }
+
+            @Override
+            public ButtonState fromString(String text) {
+                return BotStates.parse(text).orElse(null);
+            }
+        });
+        box.setTooltip(new Tooltip(MapGuide.STATES));
+    }
+
+    /** Whether {@code state} is held by the bot now, added to its States when new; else said why not. */
+    private boolean declared(ButtonState state) {
+        Optional<String> refused = BotStates.declare(services.pluginValues(), state);
+        refused.ifPresent(why -> panel.wrote(ScreenEdits.NOT_WRITTEN + why));
+        return refused.isEmpty();
     }
 
     // --- a button's copies ---
@@ -1351,7 +1393,7 @@ final class InputInspector {
     }
 
     /** {@code looks} with the one at {@code at} meaning {@code state}. */
-    static List<Look> restated(List<Look> looks, int at, State state) {
+    static List<Look> restated(List<Look> looks, int at, ButtonState state) {
         if (at < 0 || at >= looks.size()) return looks;
         List<Look> now = new ArrayList<>(looks);
         now.set(at, Look.of(looks.get(at).picture(), state));

@@ -1251,7 +1251,7 @@ class SdkAssistTest {
                 box("pick", 120, 80, SIZE, SIZE, "marker", "set"),
                 box("spade", 120, 80, SIZE, SIZE, "ignore", Map.of("x", 120, "y", 80, "width", 2, "height", 2)),
                 box("hoe", 120, 80, SIZE, SIZE, "back", true), box("far", 5000, 5000, 4, 4),
-                box("spade_lit", 120, 80, SIZE, SIZE, "variantOf", "spade", "state", "badge")));
+                box("spade_lit", 120, 80, SIZE, SIZE, "variantOf", "spade", "state", "Presses.BADGE")));
         assertTrue(text(both).contains("Saved spade_lit") && !text(both).contains("Not saved, spade_lit"),
                 "another look is cut after the input it is a look of: " + text(both));
         assertTrue(text(both).contains("Noted in Engineer as its marker, in place of coin (marker add adds to the set "

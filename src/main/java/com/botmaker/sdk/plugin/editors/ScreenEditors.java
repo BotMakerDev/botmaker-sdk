@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -151,6 +152,27 @@ public final class ScreenEditors {
     /** An order as a pad of arrows, the old direction pad (2026-10-17): the side or corner the first copy is at. */
     public static Node order(ValueContext ctx) {
         return pad(ctx.value(Order.class).orElse(null), ctx::set);
+    }
+
+    /**
+     * One of the SDK's meanings of a look — normal, selected, disabled — as a row of toggles. The bot's own states are
+     * constants of its {@code States}, picked where a constant is.
+     */
+    public static Node state(ValueContext ctx) {
+        State current = ctx.value(State.class).orElse(State.NORMAL);
+        HBox row = new HBox(2);
+        ToggleGroup group = new ToggleGroup();
+        for (State state : List.of(State.NORMAL, State.SELECTED, State.DISABLED)) {
+            ToggleButton pick = new ToggleButton(state.displayName());
+            pick.setToggleGroup(group);
+            pick.setSelected(state == current);
+            pick.setOnAction(e -> {
+                pick.setSelected(true);
+                ctx.set(state);
+            });
+            row.getChildren().add(pick);
+        }
+        return row;
     }
 
     /** The nine orders as a pad, {@code current} held down; a press hands {@code onPick} its order. */

@@ -174,6 +174,8 @@ final class MapGuide {
     static final String ADD_STRIP = "A new strip of the screen's buttons in no strip or tree, ticked in order, and how "
             + "it scrolls";
     static final String REPEATED = "The screen shows it more than once: a way and a run pick the copy they press";
+    static final String STATES = "What this look means. Or type one of the bot's own: Blocks.MAXED is never pressed, "
+            + "Presses.BADGE is; a new one is added to States.java";
     static final String CYCLES = "Each press shows its next look, the usual one first again after the last";
     static final String GESTURE = "How a run presses it: a click, a double or right click, a hold of the time beside "
             + "it, or the pointer only moved onto it for what opens on hover";

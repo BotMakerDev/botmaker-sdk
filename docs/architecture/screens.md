@@ -79,8 +79,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`Firestone::eventOn`); `ScreenTypes.isMethod` refuses anything else before it reaches the Java.
 - **`Navigate.to / isOn / where / press / state`** (palette, Interaction) are the bot's calls. `press(Screens.X.field[,
   Pick])` walks to the input's screen, scrolls its strip, clicks the copy, closes popups and waits where the map says
-  it leads (`ScreenWalk.press`); its `Pressed.result()` is DONE, DISABLED, ABSENT, NOT_NOW or LEFT, its `landed()` the
-  screen after. A press that leaves the game on its screen though the map says it leads away is pressed once more
+  it leads (`ScreenWalk.press`); its `Pressed.result()` is DONE, DISABLED, BLOCKED, ABSENT, NOT_NOW or LEFT, its `landed()` the
+  screen after, its `state()` the look the button showed. A press that leaves the game on its screen though the map says it leads away is pressed once more
   (lag); a second stay is LEFT. `Pick.untilNone()` presses until the button is gone or disabled (at most 50). `state(button)` is how
   it looks now, nothing walked or scrolled.
 - **The start screen and ways on their own** (the user's calls of 2026-10-18): `Setup.start()` marks the screen the
@@ -137,7 +137,15 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `beside` offsets. **No screen coordinates**: `Beside(other, across, down)` puts the node's centre at `other`'s
   centre plus `across` × other's width and `down` × other's height. `Tree.path` is the fewest offsets from a node in
   view to another, each read either way; `unplaced()` the nodes no chain joins to the first.
-- **A look's `State`** gains LOCKED, DONE and BUSY (`State.blocks()`); a press on such a look is `Pressed.blockedBy`.
+- **A look's state is a `ButtonState`** (2026-11-02): the SDK's `State` keeps NORMAL, SELECTED and DISABLED (BADGE,
+  LOCKED, DONE and BUSY deprecated, `@Migrate.Dropped`); every other meaning is the bot's, a constant of its
+  `@SdkValue(STATES)` class `States` (`SdkValues.STATES`, an `EnumGroups` open set): `enum Blocks implements
+  ButtonState` holds states never pressed, `enum Presses` states pressed as usual. `blocks()` is decided by the
+  enum's name, so a bot's enum needs no body. Studio holds a constant it read as `BotConstants.StateConstant(group,
+  name)` and writes it back by the open set; `BotStates` (`plugin/assist`) offers, parses (`disabled`,
+  `Blocks.MAXED`) and declares one, adding it to the bot's enum before the look naming it is written. A press on a
+  blocking look is `Pressed.blockedBy`: DISABLED for disabled, BLOCKED for a bot's (`Pressed.Result.LOCKED`,
+  `FINISHED` and `BUSY` migrate to BLOCKED), and `Pressed.state()` says which look stopped or carried it.
 - **The walk** (`TreeWalk`, from `Reach.perform`): anchors are the nodes seen once on the frame; it moves the view
   toward the target's predicted place (drag or wheel), carries the anchors across by how far the view moved
   (`Reach.shift`, `FrameShift`; else the drag asked for), and clicks the target once it shows.

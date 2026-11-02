@@ -10,7 +10,7 @@ import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Scroll;
-import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -71,7 +71,7 @@ public final class BoardCuts {
     }
 
     /** Another look of the button whose picture is {@code input}, meaning {@code state}. */
-    public record LookOf(String input, State state) implements As {
+    public record LookOf(String input, ButtonState state) implements As {
     }
 
     /** Part of the screen's look {@code look}: what tells the look apart when {@code marker}, else an input of it. */
@@ -401,7 +401,8 @@ public final class BoardCuts {
                 polygon ? null : b.height(), cut.shape(), polygon ? corners(cut.points()) : null, skip(cut.ignore()),
                 mark, cut.as() instanceof Back ? Boolean.TRUE : null,
                 press != null && press.sometimes() ? Boolean.TRUE : null, popup ? Boolean.TRUE : null,
-                lookOf == null ? null : lookOf.input(), lookOf == null ? null : lookOf.state(), when,
+                lookOf == null ? null : lookOf.input(),
+                lookOf == null || lookOf.state() == null ? null : lookOf.state().id(), when,
                 screenLook == null ? null : blankless(screenLook.look()), null);
     }
 

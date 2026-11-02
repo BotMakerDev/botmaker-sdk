@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -296,33 +298,36 @@ class ScreenWalkTest {
 
         ScreenWalk.Press again = new ScreenWalk(withClaim(), game, STEP_MS, null)
                 .press("HOME", "claim", Pick.untilNone());
-        assertEquals(new ScreenWalk.Press(Pressed.Result.DISABLED, "HOME", 0, again.why()), again);
+        assertEquals(new ScreenWalk.Press(Pressed.Result.DISABLED, "HOME", 0, again.why(), State.DISABLED), again);
         assertEquals(3, game.done.size(), "a disabled button is never clicked");
     }
 
-    /** A node showing locked, maxed or upgrading is never clicked, and says which; pressing until none stops on it. */
+    /** The bot's own states, as its {@code States} class names them. */
+    enum Blocks implements ButtonState { LOCKED, MAXED, BUSY }
+
+    /** A node showing a state of the bot's {@code Blocks} is never clicked, and says which; pressing until none stops on it. */
     @Test
-    void aButtonThatLooksLockedDoneOrBusyIsNotPressed() {
-        Map<State, Pressed.Result> results = Map.of(State.LOCKED, Pressed.Result.LOCKED,
-                State.DONE, Pressed.Result.FINISHED, State.BUSY, Pressed.Result.BUSY);
-        for (Map.Entry<State, Pressed.Result> look : results.entrySet()) {
+    void aButtonShowingABotStateThatBlocksIsNotPressed() {
+        List<ButtonState> blocking = List.of(Blocks.LOCKED, Blocks.MAXED, BotConstants.state(ButtonState.BLOCKS, "BUSY"));
+        for (ButtonState look : blocking) {
+            String shown = "claim_" + look.displayName().toLowerCase(Locale.ROOT);
             Map<String, MapScreen> screens = screens();
             screens.put("HOME", with(screens.get("HOME"),
-                    click("claim").looks(List.of(Look.of(picture("claim_" + look.getKey().id()), look.getKey())))));
+                    click("claim").looks(List.of(Look.of(picture(shown), look)))));
             ScreenGraph map = ScreenGraph.of(screens);
             Game game = new Game("HOME");
-            game.shows.get("HOME").add("claim_" + look.getKey().id());
+            game.shows.get("HOME").add(shown);
 
             ScreenWalk.Press press = new ScreenWalk(map, game, STEP_MS, null).press("HOME", "claim", null);
 
-            assertEquals(new ScreenWalk.Press(look.getValue(), "HOME", 0, press.why()), press);
-            assertTrue(press.why().contains(look.getKey().id()), press.why());
-            assertTrue(game.done.isEmpty(), look.getKey() + " is never clicked");
+            assertEquals(new ScreenWalk.Press(Pressed.Result.BLOCKED, "HOME", 0, press.why(), look), press);
+            assertTrue(press.why().contains(look.id()), press.why());
+            assertTrue(game.done.isEmpty(), look + " is never clicked");
         }
 
         Map<String, MapScreen> screens = screens();
         screens.put("HOME", with(screens.get("HOME"),
-                click("claim").looks(List.of(Look.of(picture("claim_busy"), State.BUSY)))));
+                click("claim").looks(List.of(Look.of(picture("claim_busy"), Blocks.BUSY)))));
         Game game = claiming(1);
         game.greyed = "claim_busy";
         ScreenWalk.Press press = new ScreenWalk(ScreenGraph.of(screens), game, STEP_MS, null)
@@ -480,7 +485,7 @@ class ScreenWalkTest {
         badged.shows.get("HOME").remove("engineer");
         badged.reveals.put("HOME scroll campaign -1", "engineer");
         screens.put("HOME", with(screens.get("HOME"),
-                click("engineer").looks(List.of(Look.of(picture("engineer_badge"), State.BADGE)))));
+                click("engineer").looks(List.of(Look.of(picture("engineer_badge"), BotConstants.state(ButtonState.PRESSES, "BADGE"))))));
         ScreenWalk.Result badgedWalk = new ScreenWalk(ScreenGraph.of(screens), badged, STEP_MS, s -> {})
                 .go("ENGINEER", null);
         assertEquals(ScreenWalk.Outcome.ARRIVED, badgedWalk.outcome(), badgedWalk.toString());

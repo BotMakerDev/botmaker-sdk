@@ -4,6 +4,7 @@ import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
@@ -42,6 +43,41 @@ public final class BotConstants {
     /** The constant {@code name} of the activity enum {@code activity}. */
     public static Outcome outcome(String activity, String name) {
         return new OutcomeConstant(activity == null ? "" : activity, name == null ? "" : name);
+    }
+
+    /**
+     * The bot's state {@code name} of its {@code States} enum {@code group}, {@code States.Blocks.MAXED}, as an editor
+     * holds it: never pressed when its group is {@link ButtonState#BLOCKS}. A run never meets one: there the bot's
+     * constant is the state.
+     */
+    public record StateConstant(String group, String name) implements ButtonState {
+        @Override
+        public boolean blocks() {
+            return BLOCKS.equals(group);
+        }
+
+        @Override
+        public String id() {
+            return group + "." + name;
+        }
+
+        @Override
+        public String toString() {
+            return id();
+        }
+    }
+
+    /** A whole enum of the bot's {@code States}, {@code States.Blocks.class}, by its name. */
+    public record StateGroup(String name) {}
+
+    /** The constant {@code name} of the bot's {@code States} enum {@code group}. */
+    public static ButtonState state(String group, String name) {
+        return new StateConstant(group == null ? "" : group, name == null ? "" : name);
+    }
+
+    /** The bot's {@code States} enum {@code name}. */
+    public static StateGroup stateGroup(String name) {
+        return new StateGroup(name == null ? "" : name);
     }
 
     /** The activity enum {@code name}: {@link Activity#NONE} for none. */

@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageFinder;
@@ -84,10 +85,14 @@ final class PictureTools {
             Pattern.compile("\\p{javaJavaIdentifierStart}[\\p{javaJavaIdentifierPart}.]*::\\p{javaJavaIdentifierStart}"
                     + "\\p{javaJavaIdentifierPart}*");
 
+    /** What a look of an input is refused without. */
+    private static final String SAY_STATE = "say what the look means, state: selected, disabled, or the bot's own as "
+            + "Blocks.MAXED (never pressed) or Presses.BADGE (pressed).";
+
     /** One picture cut: a box of crop_pictures with the call's tags and screen. */
     private record Crop(String name, Integer x, Integer y, Integer width, Integer height, List<String> tags, Skip ignore,
                         CutShape shape, List<Point> points, String screen, Mark marker, Boolean back, Boolean sometimes,
-                        Boolean popup, String variantOf, State state, String when, String screenLook, Boolean moving) {
+                        Boolean popup, String variantOf, String state, String when, String screenLook, Boolean moving) {
 
         /** {@code box} with the call's tags and screen; a polygon's box is the one around its points. */
         static Crop of(Box box, List<String> tags, String screen) {
@@ -221,9 +226,9 @@ final class PictureTools {
                @Describe(value = "the input this is another look of (badged, greyed, picked), by its picture; with "
                        + "state", optional = true)
                String variantOf,
-               @Describe(value = "with variantOf, what the look means (disabled, locked, done, busy: never pressed)",
-                       optional = true)
-               State state,
+               @Describe(value = "with variantOf, what the look means: selected, disabled, or the bot's own as "
+                       + "Blocks.MAXED (never pressed) or Presses.BADGE, added when new", optional = true)
+               String state,
                @Describe(value = "a method reference saying when an input is there (Firestone::eventOn); with "
                        + "screenLook and marker, when that look shows", optional = true)
                String when,
@@ -598,9 +603,8 @@ final class PictureTools {
                 return Optional.of(c.name() + ": a cut is one of a marker, a way back, an input or another look of "
                         + "one; popup goes with marker set or add.");
             }
-            if (c.variantOf() != null && (c.state() == null || c.state() == State.NORMAL)) {
-                return Optional.of(c.name() + ": say what the look means, state: badge, selected, disabled, locked, "
-                        + "done or busy.");
+            if (c.variantOf() != null && BotStates.parse(c.state()).filter(s -> s != State.NORMAL).isEmpty()) {
+                return Optional.of(c.name() + ": " + SAY_STATE);
             }
         }
         return Optional.empty();
@@ -663,7 +667,7 @@ final class PictureTools {
         }
         // What says when an input is there says it comes and goes; with a screen look's marker, when the look shows.
         sometimes = sometimes || when != null && !(screenLook != null && marker);
-        Optional<State> state = Optional.ofNullable(crop.state());
+        Optional<ButtonState> state = BotStates.parse(crop.state());
         if ((marker || back || sometimes || popup || variantOf != null || screenLook != null) && screen == null) {
             return AgentReply.refused("A marker, a way back, an input that comes and goes, another look of an input "
                     + "and a popup are a screen's: give screen too.");
@@ -674,8 +678,7 @@ final class PictureTools {
                     + "goes with marker set or add.");
         }
         if (variantOf != null && (state.isEmpty() || state.get() == State.NORMAL)) {
-            return AgentReply.refused("Say what the look means, state: badge, selected, disabled, locked, done or "
-                    + "busy. Nothing was saved.");
+            return AgentReply.refused(SAY_STATE + " Nothing was saved.");
         }
         if (when != null && !METHOD_REFERENCE.matcher(when).matches()) {
             return AgentReply.refused("when is a method reference, Firestone::eventOn: put an expression in a "

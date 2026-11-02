@@ -130,7 +130,7 @@ class MarkersTest {
     void aTabIsToldByItsSelectedButton() {
         Button gearTab = click("gear_tab").looks(List.of(Look.of(picture("gear_tab_on"), State.SELECTED)));
         Button skillsTab = click("skills_tab").looks(List.of(Look.of(picture("skills_tab_on"), State.SELECTED),
-                Look.of(picture("skills_tab_new"), State.BADGE)));
+                Look.of(picture("skills_tab_new"), MapFixtures.BADGE)));
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")), gearTab, skillsTab,
                 click("info")));

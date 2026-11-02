@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -49,6 +50,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link FlowTypesTest} asserts for a flow, over a setup with every link and each kind of input.
  */
 class ScreenTypesTest {
+
+    /** A state of the bot's own, as Studio holds {@code States.Presses.BADGE} read from the bot. */
+    private static final ButtonState BADGE = BotConstants.state(ButtonState.PRESSES, "BADGE");
 
     private static ImageTemplate picture(String id) {
         return new ImageTemplate("images/" + id + ".png");
@@ -96,7 +100,7 @@ class ScreenTypesTest {
     /** The tree's way in is its input, then the copy, the look and the method it needs, each written after it. */
     @Test
     void theTreesWayInCarriesItsCopyItsLookAndItsMethod() {
-        Setup copy = campaign().fromPick(Pick.nth(2, Order.NORTH)).fromLooks(State.BADGE)
+        Setup copy = campaign().fromPick(Pick.nth(2, Order.NORTH)).fromLooks(BADGE)
                 .fromWhen(ScreenTypes.condition("Firestone::eventOn"));
         assertEquals(copy, roundTrip(ScreenTypes.SETUP_SHAPE, copy));
         assertEquals(Pick.nth(2, Order.NORTH), copy.from().pick());
@@ -369,9 +373,12 @@ class ScreenTypesTest {
 
     @Test
     void looksAndConditionsGoBackTogetherAsTheMethodsTheyName() {
-        Button shop = Button.of(picture("shop")).looks(List.of(Look.of(picture("shop_badge"), State.BADGE)))
+        Button shop = Button.of(picture("shop")).looks(List.of(Look.of(picture("shop_badge"), BADGE),
+                        Look.of(picture("shop_maxed"), BotConstants.state(ButtonState.BLOCKS, "MAXED"))))
                 .when(ScreenTypes.condition("Firestone::shopOpen"));
-        assertEquals(shop, roundTrip(ScreenTypes.BUTTON_SHAPE, shop));
+        assertEquals(shop, roundTrip(ScreenTypes.BUTTON_SHAPE, shop), "a look keeps the bot's own state");
+        assertEquals(List.of(false, true), roundTrip(ScreenTypes.BUTTON_SHAPE, shop).looks().stream()
+                .map(look -> look.state().blocks()).toList());
         assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE, shop).when()));
         Button quality = Button.of(picture("quality_low")).keeps(picture("quality_high"));
         assertEquals(quality, roundTrip(ScreenTypes.BUTTON_SHAPE, quality), "a setting kept goes back with its look");
@@ -380,7 +387,7 @@ class ScreenTypesTest {
         Button beyond = Button.cycling(List.of(picture("x1"), picture("x10"))).keeps(picture("x50"));
         assertEquals(beyond, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, beyond), "a kept look past the cycle");
 
-        Way way = Way.of(BotConstants.input("HOME", "event")).whenLooks(State.BADGE)
+        Way way = Way.of(BotConstants.input("HOME", "event")).whenLooks(BADGE)
                 .when(ScreenTypes.condition("Firestone::eventOn"));
         assertEquals(way, roundTrip(ScreenTypes.WAY_SHAPE, way));
 

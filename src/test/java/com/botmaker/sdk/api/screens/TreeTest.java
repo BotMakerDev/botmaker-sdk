@@ -3,13 +3,12 @@ package com.botmaker.sdk.api.screens;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TreeTest {
@@ -76,10 +75,27 @@ class TreeTest {
         assertTrue(without.path(Set.of("damage"), "fist").isEmpty());
     }
 
+    /** A bot's own states: those of its {@code Blocks} stop a press, those of its {@code Presses} do not. */
+    enum Blocks implements ButtonState { MAXED }
+
+    enum Presses implements ButtonState { BADGE }
+
     @Test
-    void everyLookThatStopsAPressBlocks() {
-        assertEquals(Set.of(State.DISABLED, State.LOCKED, State.DONE, State.BUSY),
-                Arrays.stream(State.values()).filter(State::blocks).collect(Collectors.toSet()));
-        for (State look : State.values()) assertEquals(look.blocks(), Pressed.blockedBy(look) != null, look.id());
+    void everyLookThatStopsAPressBlocksAndSaysWhich() {
+        assertEquals(Pressed.Result.DISABLED, Pressed.blockedBy(State.DISABLED));
+        assertNull(Pressed.blockedBy(State.NORMAL));
+        assertNull(Pressed.blockedBy(State.SELECTED));
+        assertNull(Pressed.blockedBy(null));
+        assertTrue(Blocks.MAXED.blocks());
+        assertEquals(Pressed.Result.BLOCKED, Pressed.blockedBy(Blocks.MAXED));
+        assertFalse(Presses.BADGE.blocks());
+        assertNull(Pressed.blockedBy(Presses.BADGE));
+        assertEquals("Blocks.MAXED", Blocks.MAXED.id());
+        assertEquals("Maxed", Blocks.MAXED.displayName());
+
+        Pressed blocked = new Pressed(Pressed.Result.BLOCKED, null, 0, Blocks.MAXED);
+        assertFalse(blocked.done());
+        assertEquals(Blocks.MAXED, blocked.state());
+        assertEquals(State.NORMAL, new Pressed(Pressed.Result.DONE, null, 1).state());
     }
 }

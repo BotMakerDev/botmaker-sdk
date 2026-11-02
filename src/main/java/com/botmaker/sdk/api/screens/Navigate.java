@@ -117,7 +117,7 @@ public final class Navigate {
      * How {@code button} looks on the game now, by its looks ({@link State#DISABLED} for a greyed-out Buy); empty when
      * it is not in view. Nothing is walked or scrolled to: it is a look at the screen as it stands.
      */
-    public static Optional<State> state(Button button) {
+    public static Optional<ButtonState> state(Button button) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<Strip> strip = map.nameOf(button).flatMap(name -> map.screen(name.screen()))
                 .flatMap(screen -> screen.stripOf(button));
@@ -151,7 +151,7 @@ public final class Navigate {
         if (press.at() != null) tell(map, press.at());
         if (press.result() != Pressed.Result.DONE) Debug.log(press.why());
         return new Pressed(press.result(), press.at() == null ? null : map.instance(press.at()).orElse(null),
-                press.times());
+                press.times(), press.state());
     }
 
     /** Whether the game shows {@code screen} now: its markers are on the screen, and none of its absent pictures. */

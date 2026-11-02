@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -159,7 +160,7 @@ final class ScreenCards {
      * One look of an input's button as the side panel steps through it: its picture, what it means, and where it
      * leads while it looks so; {@code leads} empty when the ways do not tell the looks apart.
      */
-    record ButtonLook(String picture, com.botmaker.sdk.api.screens.State state, String leads) {}
+    record ButtonLook(String picture, ButtonState state, String leads) {}
 
     /**
      * One strip of a screen as its shot draws it: every member's picture in the strip's order, over the place the
@@ -394,7 +395,7 @@ final class ScreenCards {
         List<ScreenGraph.Lead> leads = graph.leads(constant, field);
         List<ButtonLook> looks = input instanceof Button button ? button.allLooks().stream()
                 .map(v -> new ButtonLook(v.picture().id(), v.state(), String.join(" / ", leads.stream()
-                        .filter(l -> l.state() == null || l.state() == v.state())
+                        .filter(l -> l.state() == null || l.state().equals(v.state()))
                         .map(l -> graph.shown(l.to()) + said(null, l.when())).distinct().toList()))).toList()
                 : List.of();
         String traits = switch (input) {
@@ -449,7 +450,7 @@ final class ScreenCards {
     }
 
     /** What a way needs, in words after the screen it leads to: {@code  (disabled, while Firestone::eventOn)}. */
-    private static String said(com.botmaker.sdk.api.screens.State state, BooleanSupplier when) {
+    private static String said(ButtonState state, BooleanSupplier when) {
         List<String> needs = new ArrayList<>();
         if (state != null) needs.add(state.displayName().toLowerCase(Locale.ROOT));
         String method = ScreenTypes.sourceOf(when);

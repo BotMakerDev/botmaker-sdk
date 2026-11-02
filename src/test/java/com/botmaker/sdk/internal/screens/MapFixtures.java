@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
@@ -25,6 +26,12 @@ import java.util.Map;
 public final class MapFixtures {
 
     private MapFixtures() {}
+
+    /** A bot's own state that a run presses through: {@code States.Presses.BADGE}, as Studio holds it. */
+    public static final ButtonState BADGE = BotConstants.state(ButtonState.PRESSES, "BADGE");
+
+    /** A bot's own state that stops a press: {@code States.Blocks.MAXED}, as Studio holds it. */
+    public static final ButtonState MAXED = BotConstants.state(ButtonState.BLOCKS, "MAXED");
 
     public static ImageTemplate picture(String id) {
         return new ImageTemplate("images/" + id + ".png");

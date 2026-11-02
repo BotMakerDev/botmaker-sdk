@@ -164,7 +164,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /** This screen, its way in taken only while its button looks as {@code state} says. */
-    public Setup fromLooks(State state) {
+    public Setup fromLooks(ButtonState state) {
         return from == null ? this : fromWay(from.whenLooks(state));
     }
 

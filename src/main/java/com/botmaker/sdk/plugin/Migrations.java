@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
@@ -37,6 +38,9 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  * {@code isClearing()}), its {@code text()} is {@code types()} and {@code typedByBody()} is {@code isTyped()}; a
  * zone's {@code anchor()} is {@code anchored()}; {@code OcrOptions}' {@code withX(…)} is {@code x(…)}; a flow
  * step's {@code description()} is {@code described()} and its {@code screen()} is {@code on()}.
+ *
+ * <p>2026-11-02: a button's states other than normal, selected and disabled are the bot's own ({@code ButtonState}),
+ * so a press's {@code LOCKED}, {@code FINISHED} and {@code BUSY} are one {@code BLOCKED} carrying the look.
  */
 final class Migrations {
 
@@ -200,5 +204,20 @@ final class Migrations {
     @Migrate(Flow.Step.class)
     static Screen screen(@Migrate.Self Flow.Step self) {
         return self.on();
+    }
+
+    @Migrate(value = Pressed.Result.class, kind = Migrate.Kind.FIELD)
+    static Pressed.Result LOCKED() {
+        return Pressed.Result.BLOCKED;
+    }
+
+    @Migrate(value = Pressed.Result.class, kind = Migrate.Kind.FIELD)
+    static Pressed.Result FINISHED() {
+        return Pressed.Result.BLOCKED;
+    }
+
+    @Migrate(value = Pressed.Result.class, kind = Migrate.Kind.FIELD)
+    static Pressed.Result BUSY() {
+        return Pressed.Result.BLOCKED;
     }
 }

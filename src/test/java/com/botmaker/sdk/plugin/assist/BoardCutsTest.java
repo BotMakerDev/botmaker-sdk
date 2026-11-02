@@ -62,7 +62,7 @@ class BoardCutsTest {
         assertEquals("Bot::eventOn", press.when());
         Box look = BoardCuts.box(cut(new BoardCuts.LookOf("collect_button", State.DISABLED)));
         assertEquals("collect_button", look.variantOf());
-        assertEquals(State.DISABLED, look.state());
+        assertEquals(State.DISABLED.id(), look.state());
         assertEquals(Boolean.TRUE, BoardCuts.box(cut(new BoardCuts.Back())).back());
         Box screenLook = BoardCuts.box(cut(new BoardCuts.ScreenLook("Halloween", true, "")));
         assertEquals(Mark.SET, screenLook.marker());

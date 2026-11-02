@@ -20,7 +20,9 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.text.OcrOptions;
@@ -87,7 +89,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, ZONE, KEY,
                 MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                ACTIVITY, OUTCOME);
+                ACTIVITY, OUTCOME, STATE);
     }
 
     @Override
@@ -225,6 +227,16 @@ public final class SdkTypes implements TypeHolder {
             .fresh(() -> new Size(0, 0))
             .editor(() -> GeometryEditors::size)
             .writtenAsRecord();
+
+    /**
+     * One of the SDK's meanings of a button's look, {@code State.DISABLED}. A look's slot takes any
+     * {@link ButtonState}, the bot's own {@code States.Blocks.MAXED} too, which its open set writes; this keeps the
+     * SDK's enum read and written as its constant.
+     */
+    public static final PluginType<State> STATE = PluginType.value(State.class)
+            .firstConstant()
+            .editor(() -> ScreenEditors::state)
+            .writtenAsConstant();
 
     /**
      * A named area of the game, in the bot's pixels: {@code new Zone(10, 20, 200, 120)}, and

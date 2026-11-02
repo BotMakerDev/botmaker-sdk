@@ -28,7 +28,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
-import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -84,7 +84,7 @@ public final class ScreenTypes implements TypeHolder {
             .<Input>with(Setup::from, Setup::fromInput)
             .<Screen>with(Setup::after, Setup::fromAfter)
             .<Pick>with(Setup::fromPick, setup -> setup.from() == null ? null : setup.from().pick())
-            .<State>with(Setup::fromLooks, setup -> setup.from() == null ? null : setup.from().state())
+            .<ButtonState>with(Setup::fromLooks, setup -> setup.from() == null ? null : setup.from().state())
             .<BooleanSupplier>with(Setup::fromWhen, Parts.SETUP_FROM_WHEN.part(ScreenTypes::condition));
 
     /**
@@ -100,12 +100,12 @@ public final class ScreenTypes implements TypeHolder {
     }
 
     /**
-     * {@code Way.of(Input)}, {@code .pick(Pick)} through one copy of a repeated button, {@code .whenLooks(State)}
+     * {@code Way.of(Input)}, {@code .pick(Pick)} through one copy of a repeated button, {@code .whenLooks(ButtonState)}
      * when it needs one look of the button, and {@code .when(…)} when a method says whether it leads here now.
      */
     public static final DeclaredCall<Way> WAY_SHAPE = ComponentType.part(Way.class)
             .writtenAs(Way::of)
-            .<State>with(Way::whenLooks, Way::state)
+            .<ButtonState>with(Way::whenLooks, Way::state)
             .<BooleanSupplier>with(Way::when, Parts.WAY_WHEN.part(ScreenTypes::condition));
 
     /** {@code Way.onItsOwn(Screen)}: the screen follows that one by itself, and {@code .when(…)} when it needs it. */
@@ -122,7 +122,7 @@ public final class ScreenTypes implements TypeHolder {
             .<BooleanSupplier>with(ScreenVariant::when, Parts.VARIANT_WHEN.part(ScreenTypes::condition))
             .<String>with(ScreenVariant::shot, ScreenVariant::shot);
 
-    /** {@code Look.of(ImageTemplate, State)}: another look of a button. */
+    /** {@code Look.of(ImageTemplate, ButtonState)}: another look of a button, the SDK's state or the bot's. */
     public static final DeclaredCall<Look> LOOK_SHAPE = ComponentType.part(Look.class).writtenAs(Look::of);
 
     /**

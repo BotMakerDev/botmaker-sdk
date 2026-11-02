@@ -435,7 +435,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     /** What the look {@code pictureId} means: one of its looks' state; empty for a picture that is none of them. */
-    public Optional<State> stateOf(String pictureId) {
+    public Optional<ButtonState> stateOf(String pictureId) {
         return allLooks().stream().filter(v -> v.picture().id().equals(pictureId)).map(Look::state).findFirst();
     }
 

@@ -78,7 +78,7 @@ class ScreenGraphTest {
     @Test
     void aScreensLooksAreItsToo_andAPictureGoingTakesItOffTheScreenButNotOffAWayIn() {
         Map<String, MapScreen> screens = firestone();
-        Button claim = click("claim").looks(List.of(Look.of(picture("claim_badge"), State.BADGE)));
+        Button claim = click("claim").looks(List.of(Look.of(picture("claim_badge"), MapFixtures.BADGE)));
         screens.put("CAMPAIGN", screen(screens.get("CAMPAIGN").setup().variants(List.of(ScreenVariant.named("Halloween")
                 .markers(marks("pumpkin")).inputs(List.of(ref("CAMPAIGN", "candy"))))), claim, click("map"),
                 click("candy").occasional()));

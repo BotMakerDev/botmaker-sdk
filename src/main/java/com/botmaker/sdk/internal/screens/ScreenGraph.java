@@ -8,7 +8,7 @@ import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
-import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
@@ -70,7 +70,7 @@ public final class ScreenGraph {
      * {@code when} the method answering whether it leads there now ({@link Way#when}), null for always. A way in with
      * no input is {@link #onItsOwn}: {@code to} follows {@code from} by itself, after a load ({@link Way#onItsOwn}).
      */
-    public record Edge(String from, String to, String input, Input via, boolean back, Pick pick, State state,
+    public record Edge(String from, String to, String input, Input via, boolean back, Pick pick, ButtonState state,
                        BooleanSupplier when) {
 
         public Edge(String from, String to, String input, Input via, boolean back) {
@@ -94,7 +94,7 @@ public final class ScreenGraph {
      * Where an input leads through {@code pick}'s copy, while its button looks as {@code state} says and {@code when}
      * answers true; each null for any.
      */
-    public record Lead(Pick pick, State state, BooleanSupplier when, String to) {}
+    public record Lead(Pick pick, ButtonState state, BooleanSupplier when, String to) {}
 
     private final Map<String, MapScreen> screens;
     /** The bot's own screens by the constant holding each, at run time; empty for a map read by Studio's tools. */

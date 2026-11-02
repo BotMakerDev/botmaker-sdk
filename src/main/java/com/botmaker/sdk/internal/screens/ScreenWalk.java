@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
@@ -336,8 +337,21 @@ public final class ScreenWalk {
     /** The most presses of one {@link Pick#untilNone}: a button that never runs out is no loop to run for ever. */
     static final int MOST_PRESSES = 50;
 
-    /** A press's end: what came of it, the screen the game showed after (null when none), the presses, and why. */
-    public record Press(Pressed.Result result, String at, int times, String why) {}
+    /**
+     * A press's end: what came of it, the screen the game showed after (null when none), the presses, why, and
+     * {@code state} the look its button showed, the one that kept it from being pressed or the last it was pressed in;
+     * {@link State#NORMAL} when it had no other, or when the press read none (a pick of each copy, a list's member).
+     */
+    public record Press(Pressed.Result result, String at, int times, String why, ButtonState state) {
+
+        public Press {
+            state = state == null ? State.NORMAL : state;
+        }
+
+        public Press(Pressed.Result result, String at, int times, String why) {
+            this(result, at, times, why, State.NORMAL);
+        }
+    }
 
     /**
      * Presses the field {@code field} of {@code constant}, the screen the game is on ({@code Navigate.press} walks
@@ -396,7 +410,8 @@ public final class ScreenWalk {
         boolean retried = false;
         boolean shows = false;
         Pressed.Result missed = Pressed.Result.ABSENT;
-        State blocking = null;
+        ButtonState blocking = null;
+        ButtonState pressedIn = null;
         String walked = null;
         try {
             for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
@@ -410,7 +425,7 @@ public final class ScreenWalk {
                     return new Press(times > 0 ? Pressed.Result.DONE : Pressed.Result.ABSENT, constant, times,
                             "The screen could not be captured.");
                 }
-                State look = null;
+                ButtonState look = null;
                 if (input instanceof Button button && p.mode() != Pick.Mode.EACH) {
                     Optional<Reach.Seen> seen;
                     if (tree != null) {
@@ -438,6 +453,7 @@ public final class ScreenWalk {
                         break;
                     }
                     look = seen.get().state();
+                    pressedIn = look;
                 } else if (!reach.perform(acted, strip, p, frame.get())) {
                     // Every copy greyed out, locked, done or busy is a button showing that look; none at all, an
                     // absent one; one that shows pressable, a drag whose drop is not there.
@@ -461,7 +477,8 @@ public final class ScreenWalk {
                 if (landed.isEmpty() || !landed.get().equals(constant)) {
                     boolean led = landed.isPresent() && leads.contains(landed.get());
                     return new Press(led ? Pressed.Result.DONE : Pressed.Result.LEFT, landed.orElse(null), times,
-                            name + " led to " + landed.map(graph::shown).orElse("no screen of the map") + ".");
+                            name + " led to " + landed.map(graph::shown).orElse("no screen of the map") + ".",
+                            pressedIn);
                 }
                 // Still here though the map says it leads away: a click lost to lag is pressed once more, and a second
                 // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
@@ -488,14 +505,20 @@ public final class ScreenWalk {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, "Stopped.");
         }
         if (p.mode() == Pick.Mode.UNTIL && (shows || times > 0)) {
-            if (shows) return new Press(Pressed.Result.DONE, constant, times, name + " shows " + p.look().id() + ".");
+            if (shows) {
+                return new Press(Pressed.Result.DONE, constant, times, name + " shows " + p.look().id() + ".",
+                        pressedIn);
+            }
             // Greyed out or gone before it showed the look asked: never a success.
             return new Press(missed, constant, times, name + " never showed "
-                    + (p.look() == null ? "the look asked" : p.look().id()) + " after " + times + " presses.");
+                    + (p.look() == null ? "the look asked" : p.look().id()) + " after " + times + " presses.",
+                    blocking);
         }
-        if (times > 0) return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.");
+        if (times > 0) {
+            return new Press(Pressed.Result.DONE, constant, times, name + " pressed " + times + "×.", pressedIn);
+        }
         return new Press(missed, constant, 0, name + (blocking != null ? " looks " + blocking.id() + "."
-                : walked != null ? " " + walked : " is not on " + graph.shown(constant) + "."));
+                : walked != null ? " " + walked : " is not on " + graph.shown(constant) + "."), blocking);
     }
 
     /** Why {@code dragged}, on {@code constant}, was not pressed: its drop is not on the screen. */
@@ -523,11 +546,11 @@ public final class ScreenWalk {
      * The screens the field {@code field} of {@code constant}, {@code input}, leads to in {@code look}: of a repeated
      * button, only the ways through the copy {@code pick} pressed. Its way back leads to every screen it is opened from.
      */
-    private List<String> leads(String constant, String field, Input input, Pick pick, State look) {
+    private List<String> leads(String constant, String field, Input input, Pick pick, ButtonState look) {
         boolean copies = input instanceof Button button && button.repeats();
         List<String> ahead = graph.leads(constant, field).stream()
                 .filter(lead -> !copies || sameCopy(lead.pick(), pick))
-                .filter(lead -> lead.state() == null || lead.state() == look)
+                .filter(lead -> lead.state() == null || lead.state().equals(look))
                 .filter(lead -> Conditions.holds(lead.when()))
                 .map(ScreenGraph.Lead::to).distinct().toList();
         if (!graph.isBack(constant, field)) return ahead;

@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A bot names its own button states**: a look's state is a `ButtonState`, the SDK's NORMAL, SELECTED or DISABLED,
+  or a constant of the bot's `@SdkValue(STATES)` class `States` — `enum Blocks implements ButtonState { MAXED }`
+  (never pressed) and `enum Presses implements ButtonState { BADGE }` (pressed as usual). 🗺 Screens' look pickers
+  and the assistant's `state` offer them and add a constant when a new one is named (`Blocks.MAXED`). A press on a
+  bot's blocking look is `Pressed.Result.BLOCKED`, and `Pressed.state()` says which look stopped or carried it, so
+  a flow can `switch` on it. Deprecated, with rules: `State.BADGE`, `LOCKED`, `DONE`, `BUSY` (`@Migrate.Dropped`:
+  name them in `States`), `Pressed.Result.LOCKED`, `FINISHED`, `BUSY` (migrated to BLOCKED).
 - **A dimmed or greyed button is seen Disabled without a picture of it**: a button's usual look that matches where
   the frame is under 0.7 of its picture's light, or under half its colour (a colourful picture only), is taken as
   Disabled, so a run never presses it — a tutorial dimming every button but one, or a greyed-out one. Matching

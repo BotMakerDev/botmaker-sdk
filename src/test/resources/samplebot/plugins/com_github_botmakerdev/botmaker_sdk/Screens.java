@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
@@ -23,7 +24,8 @@ import java.util.List;
 public final class Screens {
 
     public static final class Home extends Screen {
-        public final Button collect = Button.of(Pictures.COLLECT).tried().occasional();
+        public final Button collect = Button.of(Pictures.COLLECT).tried().occasional()
+                .looks(List.of(Look.of(Pictures.COLLECT_BADGE, States.Presses.BADGE)));
         public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE);
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
@@ -40,7 +42,8 @@ public final class Screens {
 
     public static final class Shop extends Screen {
         public final Button item = Button.of(Pictures.ITEM).dragsOnto(Pictures.BAG).dragTime(Duration.ofMillis(500));
-        public final Button buy = Button.of(Pictures.BUY).place(Place.below(Pictures.ITEM)).repeated();
+        public final Button buy = Button.of(Pictures.BUY).place(Place.below(Pictures.ITEM)).repeated()
+                .looks(List.of(Look.of(Pictures.BUY_MAXED, States.Blocks.MAXED)));
         public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried();
 
         @Override

@@ -17,7 +17,6 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
-import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -599,7 +598,7 @@ class ReachTest {
     @Test
     void aLookCutElsewhereSaysWhereItsButtonIs() {
         ImageTemplate card = new ImageTemplate("images/card.png").at(new Rect(0, 95, 300, 90));
-        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, State.DONE)));
+        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, MapFixtures.MAXED)));
         Column shown = new Column(Map.of(), 0) {
             @Override
             public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
@@ -609,7 +608,7 @@ class ReachTest {
 
         Reach.Seen seen = shown.seen(node, shown.look().orElseThrow()).orElseThrow();
 
-        assertEquals(State.DONE, seen.state());
+        assertEquals(MapFixtures.MAXED, seen.state());
         assertEquals(new Rect(210, 305, 80, 80), seen.place(), "the button's own place, moved as the card was");
     }
 
@@ -617,7 +616,7 @@ class ReachTest {
     @Test
     void aLookTiedWithTheUsualPictureTellsTheState() {
         ImageTemplate card = new ImageTemplate("images/card.png").at(new Rect(10, 100, 300, 90));
-        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, State.DONE)));
+        Button node = Button.of(TAVERN).looks(List.of(Look.of(card, MapFixtures.MAXED)));
         Column both = new Column(Map.of(), 0) {
             @Override
             public Optional<Rect> find(ImageTemplate picture, BufferedImage frame) {
@@ -625,8 +624,8 @@ class ReachTest {
             }
         };
 
-        assertEquals(State.DONE, both.seen(node, both.look().orElseThrow()).orElseThrow().state());
-        assertEquals(State.DONE, both.copies(node, null, Order.NORTH, both.look().orElseThrow()).getFirst().state());
+        assertEquals(MapFixtures.MAXED, both.seen(node, both.look().orElseThrow()).orElseThrow().state());
+        assertEquals(MapFixtures.MAXED, both.copies(node, null, Order.NORTH, both.look().orElseThrow()).getFirst().state());
     }
 
     private static final Button GO = Button.of(new ImageTemplate("images/go.png")).repeated();

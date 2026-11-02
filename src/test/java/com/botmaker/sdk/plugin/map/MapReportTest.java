@@ -9,9 +9,9 @@ import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
-import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
@@ -105,7 +105,7 @@ class MapReportTest {
     void looksAndTheMethodsSayingWhenAreRead() {
         Map<String, MapScreen> screens = screens();
         screens.put("HOME", with(screens.get("HOME"),
-                click("tavern").looks(List.of(Look.of(picture("tavern_badge"), State.BADGE))),
+                click("tavern").looks(List.of(Look.of(picture("tavern_badge"), MapFixtures.BADGE))),
                 click("event").when(ScreenTypes.condition("Firestone::eventOn"))));
         screens.put("TAVERN", with(screens.get("TAVERN").setup(s -> s.fromWhen(
                         ScreenTypes.condition("Firestone::tavernOpen")).variants(List.of(ScreenVariant
@@ -116,7 +116,7 @@ class MapReportTest {
         String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, null);
         assertTrue(text.contains("- event: not seen yet (comes and goes) while Firestone::eventOn\n"), text);
         assertTrue(text.contains("- tavern: → Tavern (while Firestone::tavernOpen); looks normal tavern → "
-                + "Tavern (while Firestone::tavernOpen), badge tavern_badge → Tavern (while Firestone::tavernOpen)\n"),
+                + "Tavern (while Firestone::tavernOpen), Presses.BADGE tavern_badge → Tavern (while Firestone::tavernOpen)\n"),
                 text);
         assertTrue(text.contains("in from Home by tavern (while Firestone::tavernOpen)\n"), text);
         assertTrue(text.contains("look Halloween: marker pumpkin\n"), text);
@@ -180,14 +180,14 @@ class MapReportTest {
                         .beside(List.of(Beside.of(picture("damage"), 1.2, -0.6))),
                 Node.of(picture("speed")).after(List.of(picture("health"))))).dragged();
         screens.put("RESEARCH", screen(Setup.named("Research").markers(marks("research")).from(ref("HOME", "tavern")),
-                click("damage"), click("health").looks(List.of(Look.of(picture("health_max"), State.DONE))),
+                click("damage"), click("health").looks(List.of(Look.of(picture("health_max"), MapFixtures.MAXED))),
                 click("speed"), tree));
         ScreenGraph graph = ScreenGraph.of(screens);
 
         String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, "RESEARCH");
         assertTrue(text.contains("  damage_tree nodes:\n"
                 + "    damage\n"
-                + "      health: from damage (1.2, -0.6); done health_max\n"
+                + "      health: from damage (1.2, -0.6); Blocks.MAXED health_max\n"
                 + "        speed\n"), text);
         assertEquals(List.of("Research: damage_tree's speed has no offsets joining it to damage, so a run cannot "
                 + "bring it into view: link them, then try_input scroll over a node."),

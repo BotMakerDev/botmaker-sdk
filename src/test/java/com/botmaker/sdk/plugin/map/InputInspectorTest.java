@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class InputInspectorTest {
 
     private static final Look OFF = Look.of(MapFixtures.picture("buy_off"), State.DISABLED);
-    private static final Look BADGE = Look.of(MapFixtures.picture("buy_badge"), State.BADGE);
+    private static final Look BADGE = Look.of(MapFixtures.picture("buy_badge"), MapFixtures.BADGE);
     private static final Look PICKED = Look.of(MapFixtures.picture("buy_on"), State.SELECTED);
 
     @Test
@@ -47,8 +47,8 @@ class InputInspectorTest {
         assertEquals(looks, InputInspector.moved(looks, 0, -1), "nothing above the first");
         assertEquals(looks, InputInspector.moved(looks, 2, 3), "nothing below the last");
         assertEquals(List.of(OFF, PICKED), InputInspector.without(looks, 1));
-        assertEquals(List.of(OFF, Look.of(BADGE.picture(), State.BUSY), PICKED),
-                InputInspector.restated(looks, 1, State.BUSY));
+        assertEquals(List.of(OFF, Look.of(BADGE.picture(), MapFixtures.MAXED), PICKED),
+                InputInspector.restated(looks, 1, MapFixtures.MAXED));
     }
 
     @Test

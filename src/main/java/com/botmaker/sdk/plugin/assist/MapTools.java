@@ -15,7 +15,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
-import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -428,7 +428,7 @@ final class MapTools {
         Input base = match > 0 && made instanceof Button once && !once.repeats() ? once.repeated() : made;
         // A button with looks leads where the look clicked says: the way it opens names that look, and its usual
         // look none (a way taken whatever the button looks).
-        State look = what == null || !(base instanceof Button looked) ? null : looked.looks().stream()
+        ButtonState look = what == null || !(base instanceof Button looked) ? null : looked.looks().stream()
                 .filter(v -> v.picture().id().equalsIgnoreCase(what)).map(com.botmaker.sdk.api.screens.Look::state)
                 .findFirst().orElse(null);
         boolean ask = !graph.untried(screen).isEmpty();
@@ -718,7 +718,7 @@ final class MapTools {
      * {@code screen}'s field {@code field} as a way in, through the copy {@code pick} names (null: the first), needing
      * the look {@code look} of its button (null: any).
      */
-    private static Way way(String screen, String field, State look, Pick pick) {
+    private static Way way(String screen, String field, ButtonState look, Pick pick) {
         Way way = Way.of(BotConstants.input(screen, field)).pick(pick);
         return look == null ? way : way.whenLooks(look);
     }
@@ -736,7 +736,7 @@ final class MapTools {
      * within {@code took}, the time it took to settle.
      */
     private static AgentReply opened(AgentContext context, ScreenGraph graph, String screen, String field, Input base,
-                                     State look, Pick pick, String child, BufferedImage frame, Duration took) {
+                                     ButtonState look, Pick pick, String child, BufferedImage frame, Duration took) {
         StudioServices services = context.services();
         String constant = ScreenBook.constantFor(graph, child);
         String shot = ScreenShots.fresh(graph, constant, null);
@@ -770,7 +770,7 @@ final class MapTools {
      * says no time of its own.
      */
     private static AgentReply reached(StudioServices services, ScreenGraph graph, String screen, String field,
-                                      Input base, State look, Pick pick, String known, Duration took) {
+                                      Input base, ButtonState look, Pick pick, String known, Duration took) {
         String to = graph.shown(known);
         MapScreen target = graph.screens().get(known);
         if (target.isPopup()) {
@@ -799,7 +799,7 @@ final class MapTools {
         }
         // A way taken whatever the button looks covers each look; one needing a look covers only that look.
         boolean already = graph.leads(screen, field).stream().anyMatch(lead -> lead.to().equals(known)
-                && (lead.state() == null || lead.state() == look) && Objects.equals(lead.pick(), pick));
+                && (lead.state() == null || lead.state().equals(look)) && Objects.equals(lead.pick(), pick));
         Optional<String> failed = write(() -> ScreenBook.update(services, screen, s -> s.withInput(field,
                         ScreenEdits.untried(base)))
                 .or(() -> already && target.setup().takes() != null ? Optional.empty()
@@ -978,7 +978,7 @@ final class MapTools {
      * for one that comes and goes, the bot's method saying when it is there, {@code Firestone::eventOn}; and the look
      * of the screen it belongs to, {@code Halloween}, as that look's marker or an input only it has.
      */
-    record Look(String variantOf, State state, String when, String screenLook) {
+    record Look(String variantOf, ButtonState state, String when, String screenLook) {
         static final Look NONE = new Look(null, null, null, null);
     }
 
@@ -1087,13 +1087,17 @@ final class MapTools {
                     return " " + at.name() + " has no input " + look.variantOf() + ": cut that button with screen "
                             + at.name() + " first, then this as its look.";
                 }
+                Optional<String> undeclared = BotStates.declare(services.pluginValues(), look.state());
+                if (undeclared.isPresent()) {
+                    return " " + look.state().id() + " could not be added to States: " + undeclared.get();
+                }
                 Button now = ((Button) screen.inputs().get(of.get()))
                         .withLook(com.botmaker.sdk.api.screens.Look.of(cut, look.state()));
                 Optional<String> failed = ScreenBook.update(services, at.constant(), s -> s.withInput(of.get(), now));
                 if (failed.isPresent()) return " It could not be noted in " + at.name() + ": " + failed.get();
                 String label = look.state().id();
                 return " Noted in " + at.name() + " as the " + label + " look of " + of.get() + ": one input, "
-                        + "found by any of its looks" + (look.state() == State.DISABLED ? ", never pressed while it "
+                        + "found by any of its looks" + (look.state().blocks() ? ", never pressed while it "
                         + "looks so." : ". When this look leads elsewhere, try_input it by this picture: the way it "
                         + "opens names the look.");
             });

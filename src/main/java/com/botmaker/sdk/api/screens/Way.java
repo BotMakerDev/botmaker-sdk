@@ -22,7 +22,7 @@ import java.util.function.BooleanSupplier;
  * @param when  the method answering whether this way leads here now; null for always
  * @param after the screen this one follows by itself, with no input; null for a way through {@code via}
  */
-public record Way(Input via, Pick pick, State state, BooleanSupplier when, Screen after) {
+public record Way(Input via, Pick pick, ButtonState state, BooleanSupplier when, Screen after) {
 
     public static Way of(Input via) {
         return new Way(via, null, null, null, null);
@@ -45,7 +45,7 @@ public record Way(Input via, Pick pick, State state, BooleanSupplier when, Scree
     }
 
     /** This way, taken only while {@code via}'s button looks as {@code state} says. */
-    public Way whenLooks(State state) {
+    public Way whenLooks(ButtonState state) {
         return new Way(via, pick, state, when, after);
     }
 

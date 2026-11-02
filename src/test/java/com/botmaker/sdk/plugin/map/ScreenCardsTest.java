@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
@@ -207,8 +208,7 @@ class ScreenCardsTest {
     @Test
     void aLinkSaysTheLookItsButtonMustHave() {
         Map<String, MapScreen> screens = screens();
-        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(s -> s.fromLooks(
-                com.botmaker.sdk.api.screens.State.BADGE)));
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(s -> s.fromLooks(MapFixtures.BADGE)));
         Link campaign = ScreenCards.links(ScreenGraph.of(screens)).stream()
                 .filter(l -> l.to().equals("CAMPAIGN") && !l.back()).findFirst().orElseThrow();
         assertEquals("badge", campaign.look());

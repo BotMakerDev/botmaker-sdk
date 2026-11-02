@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.Text;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -15,6 +16,7 @@ import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.BoardCuts.As;
+import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.flow.FlowNames;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
@@ -406,8 +408,8 @@ final class CutForm {
         private final ComboBox<Gesture> gesture = new ComboBox<>(FXCollections.observableArrayList(
                 Arrays.stream(Gesture.values()).filter(g -> g != Gesture.UNKNOWN).toList()));
         private final ComboBox<String> input = new ComboBox<>();
-        private final ComboBox<State> state = new ComboBox<>(FXCollections.observableArrayList(
-                Arrays.stream(State.values()).filter(s -> s != State.NORMAL).toList()));
+        private final ComboBox<ButtonState> state = new ComboBox<>(FXCollections.observableArrayList(
+                BotStates.offered(services.pluginValues()).stream().filter(s -> s != State.NORMAL).toList()));
         private final TextField look = new TextField();
         private final CheckBox lookMarker = new CheckBox("tells the look apart");
         private final ComboBox<String> group = new ComboBox<>();
@@ -464,6 +466,7 @@ final class CutForm {
             kind.valueProperty().addListener((o, was, is) -> {
                 if (is != null) fill();
             });
+            InputInspector.typedStates(state);
             state.setValue(State.DISABLED);
             look.setPromptText("the look's name: Halloween");
             anchor.setValue(Anchor.CENTER);

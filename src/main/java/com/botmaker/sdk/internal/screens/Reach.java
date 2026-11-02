@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
+import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
@@ -106,7 +107,7 @@ public interface Reach {
      * {@code look}'s state where it matched at {@code found}: its usual look dimmed or greyed out is {@link
      * State#DISABLED}, so a run never presses a button the game shows off without a look cut for it (2026-11-02).
      */
-    private State stateOf(Look look, Rect found, BufferedImage frame) {
+    private ButtonState stateOf(Look look, Rect found, BufferedImage frame) {
         return look.state() == State.NORMAL && dimmed(look.picture(), found, frame) ? State.DISABLED : look.state();
     }
 
@@ -331,7 +332,7 @@ public interface Reach {
     }
 
     /** A button as {@code frame} shows it: which of its looks (what it means, and its picture), and where. */
-    record Seen(State state, Rect place, ImageTemplate picture) {}
+    record Seen(ButtonState state, Rect place, ImageTemplate picture) {}
 
     /**
      * Where {@code picture} is anywhere in {@code area} on {@code frame}, {@code area} in the frame the picture was cut
