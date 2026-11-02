@@ -17,6 +17,9 @@ import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.screens.ShadeFit.Fit;
+import com.botmaker.sdk.internal.vision.FrameChange;
+import com.botmaker.sdk.internal.vision.FrameChange.Clock;
+import com.botmaker.sdk.internal.vision.FrameChange.Motion;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 
 import java.awt.image.BufferedImage;
@@ -43,6 +46,8 @@ public final class Interactions {
     /** How long a press is held, from its button's centre to off it, and when in it the frame is read. */
     static final long HOLD_MS = 900;
     static final long MID_HOLD_MS = 300;
+    /** The longest a press's answer is waited for before the next press: try_input's own settle. */
+    static final int ANSWER_MS = 5_000;
     /** How far past the button's box the press is released, so it presses nothing. */
     static final int PAST = 12;
     /** The Tabs pressed: two buttons focused in turn. */
@@ -157,6 +162,7 @@ public final class Interactions {
                     Rect at = spot.at();
                     int off = at.x() + at.width() + PAST < width ? at.x() + at.width() + PAST
                             : Math.max(0, at.x() - PAST);
+                    Optional<BufferedImage> before = Frames.look(context);
                     RuntimeException[] failed = {null};
                     Thread held = Thread.ofVirtual().name("interaction-press").start(() -> {
                         try {
@@ -173,6 +179,12 @@ public final class Interactions {
                         held.join();
                     }
                     if (failed[0] != null) throw failed[0];
+                    // A game that took it as a press may open the next screen seconds later: its answer is waited
+                    // for, so the next press never lands on that screen.
+                    if (before.isPresent()) {
+                        FrameChange.answered(before.get(), Motion.NONE, () -> Frames.look(context), ANSWER_MS,
+                                FrameChange.ANSWER_SHARE, FrameChange.QUIET_MS, Clock.REAL);
+                    }
                     if (!stays(context, resources, spots)) return null;
                 }
             }
@@ -203,7 +215,11 @@ public final class Interactions {
         List<Spot> spots = new ArrayList<>();
         double needs = Frames.confidence(context.services());
         for (Map.Entry<String, Input> input : screen.inputs().entrySet()) {
-            if (!(input.getValue() instanceof Button button) || button.picture() == null) continue;
+            // A spot's picture is its anchor's, pressed elsewhere; an element's is a shot of the tree's.
+            if (!(input.getValue() instanceof Button button) || button.picture() == null || button.isBeside()
+                    || button.isElement()) {
+                continue;
+            }
             Optional<String> base = Frames.picture(resources, button.picture().id());
             if (base.isEmpty() || spots.stream().anyMatch(s -> s.picture().equals(base.get()))) continue;
             MatchResult match = LookTools.best(context, resources, base.get(), frame);

@@ -83,7 +83,7 @@ public final class MarkParts {
     private static String name(Mark mark) {
         if (mark.picture() != null) return mark.picture().id();
         if (mark.caption() != null && mark.caption().words() != null) return mark.caption().words().text();
-        return mark.element() == null ? "mark" : mark.element().id();
+        return mark.element() == null ? "mark" : mark.element().shown();
     }
 
     private static boolean telling(ScreenPart part) {

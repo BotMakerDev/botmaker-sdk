@@ -414,6 +414,8 @@ class ScreenGraphTest {
         assertEquals("n10x", home.fieldFor("10x"));
         assertEquals("newInput", home.fieldFor("new"), "no keyword");
         assertEquals("input", home.fieldFor("—"));
+        assertEquals("slotWeapon", home.fieldFor("slotWeapon"), "a field name given keeps its words");
+        assertEquals("boltrayGames", home.fieldFor("BOLTRAY GAMES"));
         MapScreen taken = new MapScreen(Setup.named("Home"), Map.of("beerBuy", click("beer_buy")));
         assertEquals("beerBuy2", taken.fieldFor("beer buy"));
     }

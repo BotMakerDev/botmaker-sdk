@@ -129,8 +129,12 @@ final class Protocol {
                   a button's image, not its label: a label's text changes with the game's language and shows
                   through to a moving background; leave out the corner a badge (a red count or bell) comes and
                   goes on. A thing that moves (an idle monster) is cut with moving: true; ignore is for a
-                  changing part of a still thing (a timer). Matching ignores colour: a lit button and its greyed-out twin both match
-                  (crop_pictures says where else a cut is found), so cut the twin too. A round button or an odd
+                  changing part of a still thing (a timer). A dimmed, greyed or lit copy of a cut button is a
+                  version of it, never a cut of its own: which_screen proposes the shade once two buttons show it
+                  alike, and edit_map learn_shade keeps it with the state it means (Disabled, Selected, or a state
+                  of the bot's, asked of the author); learn_interactions learns the looks hover, press and focus
+                  give. A slot whose content changes (gear, an item, a portrait) is no picture: edit_map add_spot
+                  it beside a stable anchor, and try_input it by its field. A round button or an odd
                   icon over a moving background is cut with shape ellipse or polygon: a box's corners would carry
                   the background; the preview checkers what is left out, so check it clips none of the icon.
                 - Done when every input on the screen is tried and has its purpose, and no Appeared word is left
@@ -170,8 +174,10 @@ final class Protocol {
                   going, or ImageWaiter.waitFor / waitUntilGone of a picture only that screen or state shows (a
                   close button is on every screen: not a marker). ScreenWait.waitStable and Wait guess, they prove
                   nothing.
-                - Act on a lit button and its greyed-out twin with the compare forms, the lit one as good and the
-                  twin as bad: ImageFinder.whileFindCompare(good, bad, action), clickCompare.
+                - A button's greyed or dimmed version is its state, from the shades and looks Discovery learned:
+                  a run never presses one shown Disabled. Two different things that look alike are acted on with
+                  the compare forms, the right one as good: ImageFinder.whileFindCompare(good, bad, action),
+                  clickCompare.
                 - Done when its run_activity went through once: write_notes its screen with reached built.
                 """),
         TRIAL("Stage 3, Trial: prove each activity, then the whole flow", """

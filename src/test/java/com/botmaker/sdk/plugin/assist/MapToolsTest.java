@@ -255,4 +255,16 @@ class MapToolsTest {
             }
         };
     }
+
+    /** A spot beside an anchor is tried by its field, never as the anchor's own button. */
+    @Test
+    void aSpotIsTriedByItsField() {
+        ImageTemplate skill = new ImageTemplate("char_skill_icon");
+        MapScreen character = MapScreen.of(Setup.named("Character")).withInput("charSkillIcon", Button.of(skill))
+                .withInput("slotWeapon", Button.beside(skill, -5.6, -9.5));
+        assertEquals(Optional.of("slotWeapon"), MapTools.spotField(character, "slotWeapon"));
+        assertEquals(Optional.of("slotWeapon"), MapTools.spotField(character, "slotweapon"), "as a field is routed");
+        assertEquals(Optional.empty(), MapTools.spotField(character, "charSkillIcon"), "the anchor's button is not one");
+        assertEquals(Optional.empty(), MapTools.spotField(character, "char_skill_icon"), "a picture is not a field");
+    }
 }

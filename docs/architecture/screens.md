@@ -14,7 +14,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   input or element readout made `.marking()`; a part `.absent()` never shows while it does. A marking button is
   found by any of its looks, so one shown dimmed or Disabled still tells its screen. A part two screens share is no
   problem: the set tells a screen. `Markers.of` merges the parts with the setup's old lists, which are deprecated and
-  moved to parts on any save (`MarkParts.move`) or all at once by `edit_map` `move_markers`. `MarkerSets` says, in
+  moved to parts on any save (`MarkParts.move`) or all at once by `edit_map` `move_markers`, each new `Mark` named from
+  its picture, words or element's words (`MapScreen.fieldFor`, which keeps a camelCase name's words). `MarkerSets` says, in
   `read_map`, two screens with equal sets and a set inside another with no absent part between them, naming the part
   to add. A look's (`ScreenVariant`) markers are still lists.
 - **A version computed by colour** (2026-11-02): `Sdk.shades()` (`@SdkValue(SHADES)`, `Shades.of(Shade…)`) holds the
@@ -62,7 +63,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   must be found where they were, else it stops. Two buttons fitted alike make an `Answer` with a shade of that cause
   meaning Normal, its id the cause's (`hover-3fa2`). The last try per project is kept in memory only;
   `Versions.learn` keeps its answer first (any state but Normal refused), replacing the shade of the same cause. The
-  assistant's call never acts on the user's own desktop; the panel's does, as ▶ Try.
+  assistant's call never acts on the user's own desktop; the panel's does, as ▶ Try. After each press it waits for the
+  game's answer (`FrameChange.answered`, `ANSWER_MS`) before checking the buttons are still there, so a press the game
+  took opens its screen before the next press could land on it. Spots and elements are not tried: their picture is
+  an anchor's or a shot. A game that acts on touch-down (Sword x Staff on Waydroid, 2026-11-02) takes even a press
+  released off the button: the try stops there and keeps what came before.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
@@ -99,6 +104,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`internal/screens/Placed`); no copy, or no anchor, presses nothing (ABSENT). `Button.beside(anchor, across, down)`
   is a button with no picture of its own: its `picture` is the anchor, its `Beside` the spot's offset in the anchor's
   size (a spot the anchor's size), pressed only when the anchor is found; there is no fixed spot without an anchor.
+  A slot whose content changes (Sword x Staff's gear slots) is a spot, never its item's art. try_input takes a spot by
+  its field (`MapTools.spotField`), never by its anchor's picture, which names the anchor's own button.
   `.grid(Grid.of(rows, columns, across, down))` makes the spots a grid's cells, repeated, their steps in the anchor's
   size, `Pick.cell(row, column)` one of them. `Reach.copies` maps each copy of the picture to its spots, then filters
   by the place; `Reach.seen` takes the nearest for a place, the cell for a cell. 🗺's board still boxes a spot on its

@@ -65,7 +65,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   answer the bot* ▸ Try on this screen) hovers two of the screen's buttons on the game, holds each mid-press and
   releases off it, and Tabs twice. A change two buttons show alike is proposed as a Hover, Press or Focus shade meaning
   Normal, kept by `learn_shade fit hover-…` (the panel's Keep), one per cause; nothing is written by trying. An
-  emulator tries the press only. It stops when the game leaves the screen.
+  emulator tries the press only. It stops when the game leaves the screen, waiting after each press for the game to
+  answer, so a press the game took never lets the next one land on the screen it opened.
+
+- **Fixed, met mapping Sword x Staff**: `try_input` with a spot's field (`slotWeapon`) pressed the spot's anchor
+  button instead of the spot; it presses the spot beside its anchor now. A field named in camelCase
+  (`add_spot field slotWeapon`) kept its words, not `slotweapon`. `move_markers` names an element's mark from its
+  words (`boltrayGamesPrivacyPolicy`), not `input`. The assistant's guide no longer says to cut a greyed-out twin:
+  a dimmed or greyed look is a learned shade, and a slot whose content changes is a spot.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

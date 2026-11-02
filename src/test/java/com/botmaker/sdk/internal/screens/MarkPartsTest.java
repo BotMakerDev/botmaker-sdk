@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
@@ -129,6 +130,13 @@ class MarkPartsTest {
         assertTrue(moved.setup().markers().isEmpty() && moved.setup().absent().isEmpty());
         assertTrue(((Button) moved.inputs().get("battle")).isMarking(), "the button showing it marks");
         assertTrue(Markers.of(home).same(Markers.of(moved)), "the screen is told as before");
+    }
+
+    /** An element marker found by its words is named by them, not {@code input}. */
+    @Test
+    void anElementMarkIsNamedByItsWords() {
+        MapScreen policy = screen(Setup.named("Policy").elements(List.of(Element.byText(Words.of("Privacy Policy")))));
+        assertEquals(Set.of("privacyPolicy"), MarkParts.move(policy).marks().keySet());
     }
 
     /** Two screens told by the same parts are said; a part they share, on its own, is not. */

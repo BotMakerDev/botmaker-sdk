@@ -279,8 +279,9 @@ final class MapTools {
         Optional<Input> held = ScreenBook.find(graph, input.screen() == null ? "" : input.screen().strip())
                 .flatMap(screen -> graph.input(screen, field));
         return held.map(named -> switch (named) {
-            // An app's element is pressed by its field, found in the tree; its picture is a shot, never matched.
-            case Button button -> button.picture() == null || button.isElement() ? input
+            // An app's element is pressed by its field, found in the tree; its picture is a shot, never matched. A spot
+            // by its field too: its picture is its anchor's, whose own button would be pressed instead.
+            case Button button -> button.picture() == null || button.isElement() || button.isBeside() ? input
                     : input.named(button.picture().id(), input.scroll(), null);
             case Strip strip when strip.scroll() != null && strip.scroll().drag() != null && input.scroll() == null ->
                     null;
@@ -369,10 +370,14 @@ final class MapTools {
         Optional<String> owing = graph.owingMarker();
         if (owing.isPresent()) return Tried.refused(owes(graph.shown(owing.get())));
         MapScreen on = graph.screens().get(screen);
-        String what = byPicture ? input.picture().strip() : null;
+        String typed = byPicture ? input.picture().strip() : null;
+        // A spot is pressed by its field beside its anchor, which is the picture looked for.
+        Optional<String> spot = spotField(on, typed);
+        String what = spot.map(f -> ((Button) on.inputs().get(f)).picture().id()).orElse(typed);
         Optional<String> element = elementField(on, what);
         boolean byElement = element.isPresent();
-        Optional<String> held = element.or(() -> held(on, what, key.orElse(null), notches, graph, screen));
+        Optional<String> held = element.or(() -> spot).or(() -> held(on, what, key.orElse(null), notches, graph,
+                screen));
         boolean untried = held.filter(f -> !graph.tried(screen, f)).isPresent();
         boolean byWords = held.map(on.inputs()::get).filter(TextButton.class::isInstance).isPresent();
         if (byWords && (notches != 0 || match > 0)) {
@@ -399,10 +404,10 @@ final class MapTools {
         }
         // A hotkey names nothing: when it opens a screen, it is tried again with opens.
         String child = opens != null ? opens : byElement ? nameOf((Button) on.inputs().get(element.get()), what)
-                : byPicture ? nameFrom(what, name) : null;
+                : byPicture ? nameFrom(typed, name) : null;
         if (byPicture && !never && !locked && notches == 0 && opens == null
                 && (!isName(child) || ScreenBook.find(graph, child).isPresent())) {
-            return Tried.refused(what + " would name the screen it opens \"" + child + "\"" + (isName(child)
+            return Tried.refused(typed + " would name the screen it opens \"" + child + "\"" + (isName(child)
                     ? ", a screen the map has" : "") + ": give opens, the name that screen shows. Nothing was done.");
         }
         Optional<AgentReply> away = notOn(context, graph, screen);
@@ -455,9 +460,10 @@ final class MapTools {
         ActTools.Entered shown = notches == 0 ? flash(context, slow, onMarkers) : slow;
         boolean flashed = shown != slow;    // its markers hidden a moment, then back: this screen, redrawn
         // A button pressed while it showed a version of its usual look tells what the version means; a part it
-        // showed that blocks is cut as its Disabled look, which the input is written with.
+        // showed that blocks is cut as its Disabled look, which the input is written with. A spot is pressed beside
+        // its anchor: what it opened is no answer of the anchor's look.
         boolean pressedPlain = notches == 0 && shown.after() != null && !shown.reply().isRefused() && byPicture
-                && button != null && pick == null && (look == null || look == State.NORMAL);
+                && button != null && !button.isBeside() && pick == null && (look == null || look == State.NORMAL);
         Versions.Pressing pressing = !pressedPlain ? Versions.Pressing.NONE : foundOn(context, what, shown.before())
                 .map(at -> Versions.pressed(context, new Versions.Pressed(screen, held.orElse(null), button, what, at,
                         shown.before(), shown.after(), shown.motion(), !flashed && shown.share() >= SCREEN_SHARE)))
@@ -1572,6 +1578,18 @@ final class MapTools {
                 .filter(e -> e.getValue().equals(input)).map(Map.Entry::getKey).findFirst().orElse(button.label()))
                 : nameFrom(button.picture().id(), graph.shown(screen));
         return !isName(child) || ScreenBook.find(graph, child).isPresent();
+    }
+
+    /**
+     * The field of {@code on} a spot named {@code typed} is: a button pressed beside its anchor, which a call by the
+     * anchor's picture would take for the anchor's own button. Empty for anything else.
+     */
+    static Optional<String> spotField(MapScreen on, String typed) {
+        if (typed == null || typed.isBlank()) return Optional.empty();
+        return on.inputs().entrySet().stream()
+                .filter(e -> e.getKey().equalsIgnoreCase(typed.strip()) && e.getValue() instanceof Button b
+                        && b.isBeside() && b.picture() != null)
+                .map(Map.Entry::getKey).findFirst();
     }
 
     /**

@@ -299,11 +299,13 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
 
     /**
      * A free field name for an input called {@code words} ({@code beer_buy_tavern}, {@code Beer buy}): its words in
-     * lowerCamelCase, {@code beerBuyTavern}, numbered when taken, {@code input} when no word is left.
+     * lowerCamelCase, {@code beerBuyTavern} (a camelCase name keeps its words), numbered when taken, {@code input} when no word is left.
      */
     public String fieldFor(String words) {
         StringBuilder name = new StringBuilder();
-        for (String word : (words == null ? "" : words).split("[^A-Za-z0-9]+")) {
+        // A camelCase name keeps its words: slotWeapon is slot and Weapon.
+        String spaced = (words == null ? "" : words).replaceAll("(?<=[a-z0-9])(?=[A-Z])", " ");
+        for (String word : spaced.split("[^A-Za-z0-9]+")) {
             if (word.isEmpty()) continue;
             String lower = word.toLowerCase(Locale.ROOT);
             name.append(name.isEmpty() ? lower : Character.toUpperCase(lower.charAt(0)) + lower.substring(1));
