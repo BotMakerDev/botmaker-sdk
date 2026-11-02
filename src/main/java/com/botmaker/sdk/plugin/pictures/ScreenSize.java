@@ -1,12 +1,19 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedHandle;
+import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.session.display.SessionBackends;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -41,6 +48,49 @@ public final class ScreenSize {
         Size frame = cut.frame();
         if (frame == null || frame.empty()) return picture;
         return adopt(services, frame).filter(frame::equals).isPresent() ? picture : picture.in(frame);
+    }
+
+    private static final ManagedSet<ImageTemplate> PICTURES = ManagedSet.of(SdkValues.PICTURES);
+    private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
+
+    /**
+     * What {@link #change} did: the size before, and the constants written by hand, which it could not mark as cut
+     * at that size.
+     */
+    public record Changed(Optional<Size> before, List<String> unmarked) {}
+
+    /**
+     * Sets the bot's screen size to {@code size} (the user's call, 2026-11-02: a size is set, not only taken from the
+     * first cut). Every picture and digit set cut at the old size is written {@code .in(old)} first, so it still
+     * scales from the frame it was cut from. On the FX thread.
+     *
+     * @return what changed, or the host's sentence when {@code screen()} was not written
+     */
+    public static Changed change(StudioServices services, Size size) {
+        if (size == null || size.empty()) throw new IllegalArgumentException("a size is a width and a height above 0");
+        if (handWritten(services)) {
+            throw new IllegalStateException("Sdk.screen() is written by hand, so it is left as you wrote it.");
+        }
+        Optional<Size> before = read(services);
+        List<String> unmarked = new ArrayList<>();
+        if (before.isPresent() && !before.get().equals(size)) {
+            PluginValues values = services.pluginValues();
+            for (Member member : PICTURES.members(values)) {
+                Optional<ValueContext> ctx = PICTURES.open(values, member);
+                Optional<ImageTemplate> held = ctx.flatMap(PICTURES::read);
+                if (held.isEmpty()) unmarked.add("Pictures." + member.name());
+                else if (held.get().frame() == null) ctx.get().set(held.get().in(before.get()));
+            }
+            for (Member member : DIGITS.members(values)) {
+                Optional<ValueContext> ctx = DIGITS.open(values, member);
+                Optional<DigitSet> held = ctx.flatMap(DIGITS::read);
+                if (held.isEmpty()) unmarked.add("Digits." + member.name());
+                else if (held.get().frame() == null) ctx.get().set(held.get().in(before.get()));
+            }
+        }
+        Optional<String> refused = SCREEN.write(services, size);
+        if (refused.isPresent()) throw new IllegalStateException(refused.get());
+        return new Changed(before, unmarked);
     }
 
     /** Whether {@code screen()} is written by hand, so its size cannot be read and it is never written. */

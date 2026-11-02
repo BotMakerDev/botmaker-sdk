@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The assistant sets the bot's screen size**: `setup`'s `set_screen_size` writes `Sdk.screen()`, where until now
+  only the first picture cut set it. Pictures and digits cut at the old size are written `.in(old)`, so they still
+  scale; the answer says zones and spots are read at the new size. Studio's own control is still to come.
 - **A launch after a translator Fix or Undo works**: the private display left behind when Waydroid stopped is closed
   and a new one opened, where `launch_game` said the game was running and ▶ Launch refused.
 - **The assistant checks and fixes the emulator**: `setup`'s `emulator_checks` lists the rows the Game dialog shows and

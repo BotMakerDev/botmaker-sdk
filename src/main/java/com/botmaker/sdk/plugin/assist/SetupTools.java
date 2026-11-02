@@ -13,7 +13,9 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.OpenWindows;
@@ -154,34 +156,34 @@ final class SetupTools {
     record Read() implements Step {
     }
 
-    @Describe("point the bot at an open window, found again by its class (and title when the class is shared)")
-    record SetCaptureSource(@Describe("the window's title, as list_windows gives it") String window) implements Step {
+    @Describe("point the bot at an open window, by its class (and title)")
+    record SetCaptureSource(@Describe("its title in list_windows") String window) implements Step {
     }
 
     @Describe("change one of the bot's settings in Sdk.settings()")
     record SetSetting(@Describe("which setting; read lists them") Setting setting,
-                      @Describe("its new value: a number, true or false, or a place's or backend's id")
+                      @Describe("a number, true or false, or an id")
                       String value) implements Step {
     }
 
-    @Describe("point the bot at an emulator; with app, launch that app on it")
+    @Describe("point the bot at an emulator; launch app on it")
     record UseEmulator(@Describe("the emulator's name, as list_emulators gives it") String name,
-                       @Describe(value = "an app's package on it, com.example.game", optional = true) String app)
+                       @Describe(value = "an app's package on it", optional = true) String app)
             implements Step {
     }
 
-    @Describe("make a target first in Sdk.launchTargets; each computer starts the first it can")
-    record SetLaunchTarget(@Describe("as list_games names it (steam:620, emu-app:<package>@<emulator>…); cli: and exe: "
-            + "are the user's to set")
+    @Describe("make a target first in Sdk.launchTargets")
+    record SetLaunchTarget(@Describe("as list_games names it (steam:620, emu-app:<package>@<emulator>); cli: and exe: "
+            + "are the user's")
                            String target) implements Step {
     }
 
-    @Describe("is the target's game installed, its source, how the last install went")
+    @Describe("is the target's game installed, and from where")
     record Readiness() implements Step {
     }
 
     @Describe("install the target's game in the background")
-    record InstallGame(@Describe(value = "an .apk/.xapk the user named; Android only", optional = true) String file)
+    record InstallGame(@Describe(value = "an .apk/.xapk the user named", optional = true) String file)
             implements Step {
     }
 
@@ -189,18 +191,23 @@ final class SetupTools {
     record UpdateGame() implements Step {
     }
 
+    @Describe("set Sdk.screen(), the size pictures are cut at")
+    record SetScreenSize(@Describe("px") int width, @Describe("px; above width for portrait") int height)
+            implements Step {
+    }
+
     @Describe("the target emulator's checks: ok, and whether fix repairs it")
     record EmulatorChecks() implements Step {
     }
 
-    @Describe("run a failed check's fix in the background; the user may get a password window")
+    @Describe("run a failed check's fix; the user may get a password window")
     record Fix(@Describe("its id in emulator_checks") String check,
                @Describe(value = "true: undo the last fix", optional = true) Boolean undo)
             implements Step {
     }
 
-    record Launch(@Describe(value = "seconds to wait for the bot's window, up to "
-            + MAX_LAUNCH_WAIT + "; left out: answer once launched", optional = true) Integer seconds) {
+    record Launch(@Describe(value = "wait up to this many seconds (max " + MAX_LAUNCH_WAIT + ") for its window",
+            optional = true) Integer seconds) {
     }
 
     /** The longest launch_game waits: below the 60 s an MCP client commonly gives a call. */
@@ -233,6 +240,7 @@ final class SetupTools {
             case Read read -> read(context);
             case SetCaptureSource window -> setCaptureSource(window, context);
             case SetSetting setting -> setSetting(setting, context);
+            case SetScreenSize size -> setScreenSize(size, context);
             case UseEmulator emulator -> useEmulator(emulator, context);
             case SetLaunchTarget target -> setLaunchTarget(target, context);
             case Readiness readiness -> readiness(context);
@@ -486,6 +494,37 @@ final class SetupTools {
             if (refused.isPresent()) return AgentReply.refused(refused.get());
             return AgentReply.text(change.setting().id() + " is now " + change.setting().read(after)
                     + " in Sdk.settings().");
+        });
+    }
+
+    /**
+     * set_screen_size: {@code Sdk.screen()} set, the pictures cut at the old size marked as such
+     * ({@link ScreenSize#change}). Zones and spots carry no frame, so the answer says they are read at the new size.
+     */
+    static AgentReply setScreenSize(SetScreenSize change, AgentContext context) {
+        if (change.width() <= 0 || change.height() <= 0) {
+            return AgentReply.refused("A screen size is a width and a height above 0.");
+        }
+        Size size = new Size(change.width(), change.height());
+        return FxCall.call(() -> {
+            ScreenSize.Changed changed;
+            try {
+                changed = ScreenSize.change(context.services(), size);
+            } catch (IllegalArgumentException | IllegalStateException refused) {
+                return AgentReply.refused(refused.getMessage());
+            }
+            if (changed.before().filter(size::equals).isPresent()) {
+                return AgentReply.text("The bot's screen size is already " + size + ".");
+            }
+            List<String> lines = new ArrayList<>(List.of("The bot's screen size is now " + size
+                    + " in Sdk.screen(); its private display is made at it, and a run brings the game to it."));
+            changed.before().ifPresent(old -> lines.add("Pictures and digits cut at " + old + " are written .in("
+                    + old + ") and scaled; recut them for exact matches. Zones and spots are read at the new size:"
+                    + " recut them."));
+            if (!changed.unmarked().isEmpty()) {
+                lines.add("Written by hand, left as they are: " + String.join(", ", changed.unmarked()));
+            }
+            return AgentReply.text(String.join("\n", lines));
         });
     }
 
