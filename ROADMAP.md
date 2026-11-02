@@ -4,6 +4,20 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **A recogniser trained from a watch, for 3D games (2026-11-02, the user's call: a future plan)**: a 3D monster
+  turns, scales with distance and changes with light, so no picture, coarse or not, keeps matching it. Train a
+  detector per bot instead, with nothing labelled by hand:
+  - positives: every grab ◉ Watch reads is a whole frame whose box holds the thing; several watches as the camera
+    moves give the angles (an angle never watched is never learnt);
+  - negatives: the rest of each grab, and every frame the map holds where none of the thing's frames matches (each
+    screen checked against all of them: slow, once, at training), with the bot's other pictures as the hard ones;
+  - more of both by pasting the thing, cut from its background (the pixels that change between poses are its own),
+    at other places, sizes, brightnesses and blurs onto those negative frames;
+  - first OpenCV's classic trainer (HOG + SVM: seconds, CPU, Java) for sprites; a small neural detector exported as
+    ONNX and run by OpenCV's `dnn` for 3D (minutes on a CPU; YOLOX or NanoDet, Apache-2.0, never the AGPL
+    Ultralytics). Before any 3D path, a flat thing the game draws over it (name plate, health bar) found as a picture.
+  Needs a design session (classic vs neural, the cut-out, where training runs and its UI).
+
 - **Web pages as a target (`botmaker-plugin-web`, after screen elements, 2026-10-31)**: the same `Element` found
   in a page's DOM (ids, ARIA labels, text) through Playwright for Java, in a plugin of its own so its ~200 MB driver
   never reaches a game bot. Review `Element` against the DOM before it is frozen. Spec

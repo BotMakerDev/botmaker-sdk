@@ -810,13 +810,9 @@ final class PictureTools {
         };
     }
 
-    /** Whether {@code pose} matches {@code kept}, both one size, at {@code needs}. */
+    /** Whether {@code pose} matches {@code kept}, both one size, at {@code needs}, as the watch compares poses. */
     private static boolean alike(BufferedImage pose, BufferedImage kept, double needs) {
-        if (pose.getWidth() != kept.getWidth() || pose.getHeight() != kept.getHeight()) return false;
-        try (ImageTemplate template = ImageTemplate.of("shown", kept)) {
-            MatchResult match = ImageFinder.bestMatch(template, new StillSource(pose));
-            return match.isFound() && match.confidence() >= needs;
-        }
+        return FrameWatch.alike(pose, kept, needs);
     }
 
     /** How long a watch waits for a frame the capture has not handed out yet before it reads the same one again. */

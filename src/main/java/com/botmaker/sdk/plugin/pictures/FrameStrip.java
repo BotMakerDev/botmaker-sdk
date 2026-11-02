@@ -12,8 +12,9 @@ import java.util.List;
 public final class FrameStrip {
 
     /**
-     * The most frames one picture holds: 16, for a thing that sways smoothly, as the plant monster's tween showed more
-     * than 8 poses in 1.3 s of its loop at a run's confidence (the user's call, 2026-11-02).
+     * The most frames one picture holds: 16, room for a thing that sways smoothly (Sword x Staff's plant: 7 to 8 poses
+     * matched coarsely, 25 at full size). Each is one more search on every find, but a coarse one: 16 cost about what
+     * one still picture's search does (the user's call, 2026-11-02).
      */
     public static final int MOST = 16;
 

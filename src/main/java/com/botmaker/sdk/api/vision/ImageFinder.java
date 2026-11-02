@@ -13,6 +13,7 @@ import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
 import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.trace.Trace;
+import com.botmaker.sdk.internal.vision.Coarse;
 import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
 import org.opencv.core.Mat;
@@ -190,30 +191,135 @@ public class ImageFinder {
      * for each only {@link #near} its place.
      */
     private static List<RawMatch> bestEach(List<ImageTemplate> templates, Mat background, int margin) {
-        // One search per frame, side by side; each template's frames are folded back into its best below.
-        List<OpencvManager.Search> searches = new ArrayList<>(templates.size());
-        int[] firsts = new int[templates.size() + 1];
-        for (int t = 0; t < templates.size(); t++) {
-            ImageTemplate template = templates.get(t);
-            firsts[t] = searches.size();
-            try {
-                Rectangle area = near(template, margin, background.width(), background.height());
-                for (Mat frame : template.frameMats()) {
-                    searches.add(new OpencvManager.Search(frame, template.authoredSize(), area));
+        // One search per frame, side by side; each template's frames are folded back into its best below. A moving
+        // picture's searches run on the shrunk frame (Coarse), each kind in one batch.
+        List<OpencvManager.Search> fine = new ArrayList<>(templates.size());
+        List<OpencvManager.Search> coarse = new ArrayList<>();
+        List<Sight> sights = new ArrayList<>(templates.size());
+        int[] firsts = new int[templates.size()];
+        int[] ends = new int[templates.size()];
+        try (Shot shot = new Shot(background)) {
+            for (int t = 0; t < templates.size(); t++) {
+                ImageTemplate template = templates.get(t);
+                Sight sight = null;
+                List<OpencvManager.Search> searches = fine;
+                try {
+                    sight = Sight.of(template, shot, template.coarse());
+                    searches = sight.shrunk() ? coarse : fine;
+                    firsts[t] = searches.size();
+                    Rectangle area = sight.area(near(template, margin, background.width(), background.height()));
+                    for (Mat frame : sight.frames()) {
+                        searches.add(new OpencvManager.Search(frame, sight.authored(), area));
+                    }
+                } catch (RuntimeException unreadable) {
+                    firsts[t] = searches.size();
+                    searches.add(null);
                 }
-            } catch (RuntimeException unreadable) {
-                searches.add(null);
+                sights.add(sight);
+                ends[t] = searches.size();
             }
+            List<RawMatch> fineEach = fine.isEmpty() ? List.of() : OpencvManager.findBestEach(background, fine, false);
+            List<RawMatch> coarseEach = coarse.isEmpty() ? List.of()
+                    : OpencvManager.findBestEach(shot.small(), coarse, false);
+            List<RawMatch> bests = new ArrayList<>(templates.size());
+            for (int t = 0; t < templates.size(); t++) {
+                Sight sight = sights.get(t);
+                List<RawMatch> each = sight != null && sight.shrunk() ? coarseEach : fineEach;
+                RawMatch best = null;
+                for (int s = firsts[t]; s < ends[t]; s++) best = better(best, each.get(s));
+                bests.add(sight == null ? best : sight.back(best));
+            }
+            return bests;
         }
-        firsts[templates.size()] = searches.size();
-        List<RawMatch> each = OpencvManager.findBestEach(background, searches, false);
-        List<RawMatch> bests = new ArrayList<>(templates.size());
-        for (int t = 0; t < templates.size(); t++) {
+    }
+
+    /** A frame's pixels and, made the first time a coarse picture asks, its {@link Coarse shrunk} copy. */
+    private static final class Shot implements AutoCloseable {
+
+        private final Mat full;
+        private Mat small;
+
+        Shot(Mat full) {
+            this.full = full;
+        }
+
+        Mat small() {
+            if (small == null) small = Coarse.shrink(full);
+            return small;
+        }
+
+        /** Releases the shrunk copy only: the frame's own pixels are the caller's. */
+        @Override
+        public void close() {
+            if (small != null) small.release();
+        }
+    }
+
+    /**
+     * How a template's frames meet a {@link Shot}: as they are, or {@link #shrunk()}, both frames and shot shrunk
+     * ({@link Coarse}), with what maps between the two: the shot's ratio for a place, the frame's own for a size, so a
+     * match grown back has the picture's size exactly.
+     */
+    private record Sight(boolean shrunk, List<Mat> frames, Mat background, Dimension authored, double across,
+                         double down, double wide, double high) {
+
+        /** {@code template} on {@code shot}, {@code coarse} or as it is. */
+        static Sight of(ImageTemplate template, Shot shot, boolean coarse) {
+            if (!coarse) {
+                return new Sight(false, template.frameMats(), shot.full, template.authoredSize(), 1, 1, 1, 1);
+            }
+            List<Mat> frames = template.coarseMats();
+            Mat one = template.getMat();
+            Mat small = shot.small();
+            return new Sight(true, frames, small, Coarse.shrink(template.authoredSize()),
+                    shot.full.cols() / (double) small.cols(), shot.full.rows() / (double) small.rows(),
+                    one.cols() / (double) frames.getFirst().cols(), one.rows() / (double) frames.getFirst().rows());
+        }
+
+        /** An area of the shot, null for all of it, as this sight's background has it, grown to whole pixels. */
+        Rectangle area(Rectangle full) {
+            if (full == null || !shrunk) return full;
+            int left = (int) Math.floor(full.x / across);
+            int top = (int) Math.floor(full.y / down);
+            int right = (int) Math.ceil((full.x + full.width) / across);
+            int bottom = (int) Math.ceil((full.y + full.height) / down);
+            return new Rectangle(left, top, right - left, bottom - top);
+        }
+
+        int x(int full) {
+            return (int) Math.floor(full / across);
+        }
+
+        int y(int full) {
+            return (int) Math.floor(full / down);
+        }
+
+        /** A match on this sight's background, in the shot's pixels; null stays null. */
+        RawMatch back(RawMatch match) {
+            if (match == null || !shrunk) return match;
+            return new RawMatch((int) Math.round(match.x() * across), (int) Math.round(match.y() * down),
+                    (int) Math.round(match.width() * wide), (int) Math.round(match.height() * high), match.score());
+        }
+    }
+
+    /**
+     * {@code match} over {@code template}'s frames on {@code background}, as {@link Sight} has them meet it, the best
+     * of them in the background's pixels. {@code match} takes a frame, the background and the size the picture was
+     * cut in.
+     */
+    private static RawMatch overFrames(ImageTemplate template, Mat background, FrameMatch match) {
+        try (Shot shot = new Shot(background)) {
+            Sight sight = Sight.of(template, shot, template.coarse());
             RawMatch best = null;
-            for (int s = firsts[t]; s < firsts[t + 1]; s++) best = better(best, each.get(s));
-            bests.add(best);
+            for (Mat frame : sight.frames()) best = better(best, match.on(frame, sight.background(), sight.authored()));
+            return sight.back(best);
         }
-        return bests;
+    }
+
+    /** One frame matched on a background, as one of {@link OpencvManager}'s searches does it. */
+    @FunctionalInterface
+    private interface FrameMatch {
+        RawMatch on(Mat frame, Mat background, Dimension authored);
     }
 
     /** The higher-scored of two matches, either null; the first on a tie, so an earlier frame wins. */
@@ -227,11 +333,8 @@ public class ImageFinder {
      * place a find answers is the best frame's, never the first that would do.
      */
     private static RawMatch best(ImageTemplate template, Mat background) {
-        RawMatch best = null;
-        for (Mat frame : template.frameMats()) {
-            best = better(best, OpencvManager.findBest(frame, background, false, template.authoredSize()));
-        }
-        return best;
+        return overFrames(template, background, (frame, on, authored) -> OpencvManager.findBest(frame, on, false,
+                authored));
     }
 
     /**
@@ -239,29 +342,28 @@ public class ImageFinder {
      * best-scored of the frames that clear {@code confidence}, or null when none does.
      */
     private static RawMatch bestOver(ImageTemplate template, Mat background, double confidence) {
-        RawMatch best = null;
-        for (Mat frame : template.frameMats()) {
-            best = better(best, OpencvManager.findBestMatch(frame, background, false, confidence,
-                    template.authoredSize()));
-        }
-        return best;
+        return overFrames(template, background, (frame, on, authored) -> OpencvManager.findBestMatch(frame, on,
+                false, confidence, authored));
     }
 
     /**
      * Every place any frame of {@code template} shows at or above {@code confidence}, as
      * {@link OpencvManager#findMultipleMatches} gives them: one thing showing is one match, the frame that scores
-     * best there, so a place two frames both match is not counted twice.
+     * best there, so a place two frames both match is not counted twice. A moving picture is matched shrunk on the
+     * shrunk frame ({@link Coarse}).
      */
     private static List<RawMatch> all(ImageTemplate template, Mat background, double confidence) {
-        List<Mat> frames = template.frameMats();
-        if (frames.size() == 1) {
-            return OpencvManager.findMultipleMatches(frames.getFirst(), background, false, confidence,
+        if (!template.coarse()) {
+            return OpencvManager.findMultipleMatches(template.getMat(), background, false, confidence,
                     template.authoredSize());
         }
         List<RawMatch> found = new ArrayList<>();
-        for (Mat frame : frames) {
-            found.addAll(OpencvManager.findMultipleMatches(frame, background, false, confidence,
-                    template.authoredSize()));
+        try (Shot shot = new Shot(background)) {
+            Sight sight = Sight.of(template, shot, true);
+            for (Mat frame : sight.frames()) {
+                OpencvManager.findMultipleMatches(frame, sight.background(), false, confidence, sight.authored())
+                        .forEach(m -> found.add(sight.back(m)));
+            }
         }
         found.sort(Comparator.comparingDouble(RawMatch::score).reversed());
         List<RawMatch> kept = new ArrayList<>();
@@ -400,7 +502,8 @@ public class ImageFinder {
             for (int i = 0; i < goods.size(); i++) {
                 ImageTemplate template = goods.get(i);
                 RawMatch gm = bests.get(i);
-                if (gm != null && gm.score() >= confidence && beatsAllBads(gm, bad.templates(), background, margin)) {
+                if (gm != null && gm.score() >= confidence
+                        && beatsAllBads(gm, template, bad.templates(), background, margin)) {
                     MatchResult result = new MatchResult(new Point(gm.x() + origin.x(), gm.y() + origin.y()),
                             gm.width(), gm.height(), gm.score(), template.id());
                     emitMatch(source, result);
@@ -669,7 +772,8 @@ public class ImageFinder {
                 if (gm == null) {
                     continue;
                 }
-                if (beatsAllBads(gm, bads, background, margin) && (!best.isFound() || gm.score() > best.confidence())) {
+                if (beatsAllBads(gm, good, bads, background, margin)
+                        && (!best.isFound() || gm.score() > best.confidence())) {
                     best = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
                             gm.width(), gm.height(), gm.score(), good.id());
@@ -713,7 +817,7 @@ public class ImageFinder {
                 if (gm == null) {
                     continue;
                 }
-                if (beatsAllBads(gm, bads, background, margin)) {
+                if (beatsAllBads(gm, good, bads, background, margin)) {
                     MatchResult result = new MatchResult(
                             new Point(gm.x() + offsetX, gm.y() + offsetY),
                             gm.width(), gm.height(), gm.score(), good.id());
@@ -758,7 +862,7 @@ public class ImageFinder {
             for (ImageTemplate good : goods) {
                 List<RawMatch> matches = all(good, background, confidence);
                 for (RawMatch gm : matches) {
-                    if (beatsAllBads(gm, bads, background, margin)) {
+                    if (beatsAllBads(gm, good, bads, background, margin)) {
                         results.add(new MatchResult(
                                 new Point(gm.x() + offsetX, gm.y() + offsetY),
                                 gm.width(), gm.height(), gm.score(), good.id()));
@@ -779,19 +883,36 @@ public class ImageFinder {
         }
     }
 
-    /** Whether {@code good}'s match location out-scores every bad template (re-scored there) by {@code margin}. */
-    private static boolean beatsAllBads(RawMatch good, List<ImageTemplate> bads, Mat background, double margin) {
-        for (ImageTemplate bad : bads) {
-            double badScore = Double.NEGATIVE_INFINITY;
-            for (Mat frame : bad.frameMats()) {
-                badScore = Math.max(badScore, OpencvManager.scoreAround(
-                        frame, background, false, good.x(), good.y(), COMPARE_PAD));
-            }
-            if (badScore >= good.score() - margin) {
-                return false;
+    /**
+     * Whether {@code good}'s match location out-scores every bad template (re-scored there) by {@code margin}. Each bad
+     * one is scored at the scale {@code template}, the good picture, was: shrunk when it is {@link ImageTemplate#coarse()
+     * coarse}, whatever the bad one is, so the two scores compare; the shot is shrunk once for all of them.
+     */
+    private static boolean beatsAllBads(RawMatch good, ImageTemplate template, List<ImageTemplate> bads,
+                                        Mat background, double margin) {
+        boolean coarse = template.coarse();
+        try (Shot shot = new Shot(background)) {
+            for (ImageTemplate bad : bads) {
+                if (scoreAround(Sight.of(bad, shot, coarse), good) >= good.score() - margin) {
+                    return false;
+                }
             }
         }
         return true;
+    }
+
+    /**
+     * The bad picture {@code sight} shows: its best score over its frames close around {@code good}'s place; shrunk,
+     * its slack one shrunk pixel.
+     */
+    private static double scoreAround(Sight sight, RawMatch good) {
+        double score = Double.NEGATIVE_INFINITY;
+        int pad = sight.shrunk() ? 1 : COMPARE_PAD;
+        for (Mat frame : sight.frames()) {
+            score = Math.max(score, OpencvManager.scoreAround(frame, sight.background(), false, sight.x(good.x()),
+                    sight.y(good.y()), pad));
+        }
+        return score;
     }
 
     // --- findAll (every location above the threshold) ---
@@ -868,7 +989,7 @@ public class ImageFinder {
             int offsetY = origin.y();
 
             List<MatchResult> results = matches.stream()
-                    .filter(r -> bad.isEmpty() || beatsAllBads(r, bad.templates(), pixels, margin()))
+                    .filter(r -> bad.isEmpty() || beatsAllBads(r, template, bad.templates(), pixels, margin()))
                     .map(r -> {
                         Point location = new Point(r.x() + offsetX, r.y() + offsetY);
                         return new MatchResult(location, r.width(), r.height(), r.score(), template.id());

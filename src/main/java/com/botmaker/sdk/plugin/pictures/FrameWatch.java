@@ -1,10 +1,7 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.vision.ImageFinder;
-import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.internal.capture.StillSource;
+import com.botmaker.sdk.internal.vision.Coarse;
 import com.botmaker.sdk.internal.vision.Images;
 
 import java.awt.image.BufferedImage;
@@ -22,7 +19,8 @@ import java.util.function.Supplier;
  * per pose: what a moving picture ({@link FrameStrip}) is cut from, by the assistant's {@code crop_pictures} and
  * Studio's ◉ Watch alike. Headless: no JavaFX, no project.
  *
- * <p>The rule: each grab is a new pose when no kept frame matches it at the bot's confidence, and is then kept.
+ * <p>The rule: each grab is a new pose when no kept frame matches it at the bot's confidence, both shrunk and blurred
+ * as a moving picture is found ({@link Coarse}: a sway of a few pixels is one pose), and is then kept.
  * Watching stops once, since the last new pose, at least as long has passed as from the start to that pose, and at
  * least {@link #SHORTEST} in all (the loop has come round: {@link Ending#LOOP_CLOSED}); at {@link #LONGEST}; at a
  * pose past {@link #CAP}; or when the feed gives no frame.
@@ -117,9 +115,9 @@ public final class FrameWatch {
     public static Watched poses(Supplier<Optional<BufferedImage>> poses, double confidence, InstantSource clock,
                                 List<BufferedImage> kept, Consumer<Progress> progress) {
         List<BufferedImage> frames = new ArrayList<>(kept);
-        List<ImageTemplate> templates = new ArrayList<>();
-        try {
-            for (int i = 0; i < frames.size(); i++) templates.add(ImageTemplate.of("frame" + (i + 1), frames.get(i)));
+        // Each kept pose held shrunk once, each grab shrunk once against them all.
+        try (Coarse.Poses held = new Coarse.Poses()) {
+            frames.forEach(held::add);
             Instant start = clock.instant();
             Instant lastNew = start;
             Instant now = start;
@@ -139,14 +137,14 @@ public final class FrameWatch {
                 }
                 missed = 0;
                 grabs++;
-                int seen = matching(templates, pose.get(), confidence);
+                int seen = held.best(pose.get(), confidence);
                 if (seen < 0) {
                     if (frames.size() >= CAP) {
                         ending = Ending.TOO_MANY_POSES;
                         break;
                     }
                     frames.add(pose.get());
-                    templates.add(ImageTemplate.of("frame" + frames.size(), pose.get()));
+                    held.add(pose.get());
                     lastNew = now;
                     seen = frames.size() - 1;
                 }
@@ -168,24 +166,19 @@ public final class FrameWatch {
             double seconds = watched.toNanos() / 1e9;
             return new Watched(frames, grabs, seconds <= 0 ? 0 : grabs / seconds, watched, Optional.ofNullable(loop),
                     ending);
-        } finally {
-            templates.forEach(ImageTemplate::close);
         }
     }
 
-    /** The first kept frame {@code pose} matches at {@code confidence}, the best of them; -1 when none does. */
-    private static int matching(List<ImageTemplate> templates, BufferedImage pose, double confidence) {
-        int best = -1;
-        double score = confidence;
-        StillSource source = new StillSource(pose);
-        for (int i = 0; i < templates.size(); i++) {
-            MatchResult match = ImageFinder.bestMatch(templates.get(i), source);
-            if (match.isFound() && match.confidence() >= score) {
-                best = i;
-                score = match.confidence();
-            }
+    /**
+     * Whether {@code pose} is {@code kept}'s pose: both one size and alike at {@code confidence} as a moving picture's
+     * frames are matched, shrunk and blurred ({@link Coarse}).
+     */
+    public static boolean alike(BufferedImage pose, BufferedImage kept, double confidence) {
+        if (!sameSize(pose, kept)) return false;
+        try (Coarse.Poses one = new Coarse.Poses()) {
+            one.add(kept);
+            return one.best(pose, confidence) == 0;
         }
-        return best;
     }
 
     private static boolean inside(BufferedImage frame, Rect box) {

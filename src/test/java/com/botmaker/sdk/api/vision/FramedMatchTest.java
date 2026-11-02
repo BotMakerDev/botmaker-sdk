@@ -18,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A picture of several frames is found where any of its frames shows, as one picture. */
 class FramedMatchTest {
 
-    private static final int SIZE = 24;
+    /** Frames big and their patterns broad enough to survive the quarter-size match moving pictures get (Coarse). */
+    private static final int SIZE = 64;
     private static final double CONFIDENCE = 0.9;
 
     private static BufferedImage pattern(IntBinaryOperator rgb) {
@@ -29,14 +30,14 @@ class FramedMatchTest {
         return img;
     }
 
-    private static final BufferedImage ONE = pattern((x, y) -> (int) (127 + 120 * Math.sin(x / 3.0)) << 16
-            | (int) (127 + 120 * Math.cos(y / 4.0)) << 8);
-    private static final BufferedImage TWO = pattern((x, y) -> ((x / 6 + y / 6) % 2 == 0 ? 0xE0E0E0 : 0x202020));
-    private static final BufferedImage THREE = pattern((x, y) -> (int) (127 + 120 * Math.sin((x + y) / 2.5)) << 8
-            | (x * 10) & 0xFF);
+    private static final BufferedImage ONE = pattern((x, y) -> (int) (127 + 120 * Math.sin(x / 8.0)) << 16
+            | (int) (127 + 120 * Math.cos(y / 10.0)) << 8);
+    private static final BufferedImage TWO = pattern((x, y) -> ((x / 16 + y / 16) % 2 == 0 ? 0xE0E0E0 : 0x202020));
+    private static final BufferedImage THREE = pattern((x, y) -> (int) (127 + 120 * Math.sin((x + y) / 7.0)) << 8
+            | (x * 4) & 0xFF);
 
     /** {@code ONE} with a little of its corner changed: matches wherever {@code ONE} does. */
-    private static final BufferedImage ONE_NUDGED = pattern((x, y) -> x < 3 && y < 3 ? 0x101010 : ONE.getRGB(x, y));
+    private static final BufferedImage ONE_NUDGED = pattern((x, y) -> x < 8 && y < 8 ? 0x101010 : ONE.getRGB(x, y));
 
     private static BufferedImage strip(BufferedImage... frames) {
         BufferedImage strip = new BufferedImage(SIZE * frames.length, SIZE, BufferedImage.TYPE_3BYTE_BGR);
@@ -48,7 +49,7 @@ class FramedMatchTest {
 
     /** Noise of a seed, with each {@code (image, x, y)} drawn on it. */
     private static BufferedImage background(Object... drawn) {
-        BufferedImage frame = new BufferedImage(400, 260, BufferedImage.TYPE_3BYTE_BGR);
+        BufferedImage frame = new BufferedImage(520, 340, BufferedImage.TYPE_3BYTE_BGR);
         Random rnd = new Random(7);
         for (int y = 0; y < frame.getHeight(); y++) {
             for (int x = 0; x < frame.getWidth(); x++) frame.setRGB(x, y, rnd.nextInt(0xFFFFFF));
@@ -98,6 +99,56 @@ class FramedMatchTest {
         }
     }
 
+    /** {@code ONE} moved {@code dx} px inside its square, as a thing sways between two kept poses. */
+    private static BufferedImage oneSwayed(int dx) {
+        return pattern((x, y) -> ONE.getRGB(Math.clamp(x - dx, 0, SIZE - 1), y));
+    }
+
+    @Test
+    void aPoseBetweenFramesIsFound() {
+        // Frames 4 px apart; the screen shows the pose halfway, which no frame holds pixel for pixel.
+        try (ImageTemplate plant = ImageTemplate.of("plant", strip(ONE, oneSwayed(4))).frames(2)) {
+            assertTrue(plant.coarse());
+            MatchResult found = ImageFinder.bestMatch(plant, still(background(oneSwayed(2), 100, 60)));
+            assertTrue(found.isFound() && found.confidence() >= CONFIDENCE, "scored " + found.confidence());
+            assertTrue(Math.abs(found.topLeft().x() - 100) <= 4 && Math.abs(found.topLeft().y() - 60) <= 4,
+                    "at " + found.topLeft());
+            assertEquals(SIZE, found.width());
+        }
+    }
+
+    @Test
+    void aCoarseMatchKeepsThePictureSize() {
+        // 34 px does not divide by 4: the size grown back is the frame's own, not four shrunk pixels' worth.
+        BufferedImage one = ONE.getSubimage(0, 0, 34, 34);
+        BufferedImage three = THREE.getSubimage(0, 0, 34, 34);
+        BufferedImage strip = new BufferedImage(68, 34, BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D g = strip.createGraphics();
+        g.drawImage(one, 0, 0, null);
+        g.drawImage(three, 34, 0, null);
+        g.dispose();
+        try (ImageTemplate plant = ImageTemplate.of("plant", strip).frames(2)) {
+            assertTrue(plant.coarse());
+            MatchResult found = ImageFinder.bestMatch(plant, still(background(three, 100, 60)));
+            assertEquals(34, found.width());
+            assertEquals(34, found.height());
+        }
+    }
+
+    @Test
+    void aSmallMovingPictureIsMatchedAsItIs() {
+        try (ImageTemplate small = ImageTemplate.of("spark", strip(ONE, TWO).getSubimage(0, 0, 48, 24)).frames(2)) {
+            assertFalse(small.coarse(), "24 px frames shrink to 6: matched at full size");
+        }
+    }
+
+    @Test
+    void aStillPictureKeepsEveryPixel() {
+        try (ImageTemplate still = ImageTemplate.of("button", ONE)) {
+            assertFalse(still.coarse());
+        }
+    }
+
     @Test
     void notFoundWhenNoFrameShows() {
         try (ImageTemplate plant = ImageTemplate.of("plant", strip(ONE, TWO)).frames(2)) {
@@ -110,7 +161,7 @@ class FramedMatchTest {
     void findAllMergesFramesAtOnePlace() {
         try (ImageTemplate plant = ImageTemplate.of("plant", strip(ONE, ONE_NUDGED, THREE)).frames(3)) {
             List<MatchResult> all = ImageFinder.allMatches(plant,
-                    still(background(ONE, 40, 30, THREE, 300, 200)), CONFIDENCE);
+                    still(background(ONE, 40, 32, THREE, 300, 200)), CONFIDENCE);
             assertEquals(2, all.size(), all.toString());
         }
     }

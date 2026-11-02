@@ -20,8 +20,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ## [Unreleased]
 
 - **Watching a moving thing keeps up with the game**: `crop_pictures`' `moving` and 🗺's ◉ Watch read a game in a
-  private display as the live board does, about 55 grabs a second where it read 5, and a picture holds up to 16
-  frames. A watch that sees more poses than that says how fast it grabbed.
+  private display as the live board does, about 40 new frames a second where it read 5. A watch that sees more poses
+  than a picture holds says how fast it grabbed.
+- **A moving picture is matched coarsely**: its frames and the screen are both shrunk to a quarter and blurred before
+  they are compared, in every find and in the watch, so a thing that sways smoothly is a few poses instead of
+  dozens (Sword x Staff's plant: 25 poses at full size, 7 shrunk, wrong places at most 0.61) and each search is
+  about 16 times cheaper. A still picture keeps every pixel. A watch lets a pose shift by 12 px, as a find does
+  around its place, and a picture holds up to 16 frames, which cost about one still picture's search.
 - **A picture can hold several frames** of a thing that moves (an idle monster, a pulsing highlight):
   `new ImageTemplate("images/plant.png").at(…).frames(4)` reads its file as four frames side by side, and every
   find, click and screen check finds it wherever any frame shows, each at the bot's confidence. A still picture is

@@ -3,6 +3,8 @@ package com.botmaker.sdk.plugin.pictures;
 import com.botmaker.sdk.api.geometry.Rect;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,6 +56,34 @@ class FrameWatchTest {
         FrameWatch.Watched watched = FrameWatch.watch(feed, BOX, CONFIDENCE, feed);
         assertEquals(FrameWatch.Ending.TOO_MANY_POSES, watched.ending());
         assertFalse(watched.saveable());
+    }
+
+    /** A thing swaying up to 5 px each way, which kept two poses at full size and 0.9: one pose, matched coarsely. */
+    @Test
+    void aSmallSwayIsOnePose() {
+        Rect box = new Rect(16, 16, 96, 96);
+        int[] sway = {0, 1, 2, 3, 4, 5, 4, 3, 2, 1};
+        Feed feed = new Feed(grab -> swayed(box, sway[grab % sway.length]));
+        FrameWatch.Watched watched = FrameWatch.watch(feed, box, CONFIDENCE, feed);
+        assertEquals(1, watched.frames().size());
+        assertEquals(FrameWatch.Ending.LOOP_CLOSED, watched.ending());
+    }
+
+    /** A disc and a block drawn sharp in {@code box}, moved {@code dx} px right. */
+    private static BufferedImage swayed(Rect box, int dx) {
+        BufferedImage frame = new BufferedImage(128, 128, BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D g = frame.createGraphics();
+        try {
+            g.setColor(new Color(200, 200, 200));
+            g.fillRect(box.x(), box.y(), box.width(), box.height());
+            g.setColor(new Color(90, 60, 40));
+            g.fillOval(box.x() + 18 + dx, box.y() + 18, 60, 60);
+            g.setColor(new Color(200, 10, 10));
+            g.fillRect(box.x() + 40 + dx, box.y() + 10, 16, 20);
+        } finally {
+            g.dispose();
+        }
+        return frame;
     }
 
     @Test

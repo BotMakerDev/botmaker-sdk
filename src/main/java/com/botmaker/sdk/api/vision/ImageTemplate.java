@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.vision.BotScreen;
+import com.botmaker.sdk.internal.vision.Coarse;
 import com.botmaker.sdk.internal.vision.TemplateCache;
 import com.botmaker.shared.opencv.OpenCvNative;
 import com.botmaker.shared.opencv.OpencvManager;
@@ -55,6 +56,7 @@ public class ImageTemplate implements AutoCloseable {
     // Lazily-loaded OpenCV image data: the whole file, then one view of it per frame. Null until first asked for.
     private Mat mat;
     private List<Mat> frameMats;
+    private List<Mat> coarseMats;
 
     /**
      * Constructor using file path.
@@ -244,10 +246,30 @@ public class ImageTemplate implements AutoCloseable {
         return frameMats;
     }
 
-    /** Releases the frames' views of the file; the file's own pixels stay. */
+    /**
+     * Whether this picture is matched {@link Coarse coarsely}, shrunk and blurred, frame and screen alike: a moving
+     * one, whose frames are poses a thing sways between, when a frame is big enough to shrink ({@link Coarse#fits}).
+     */
+    boolean coarse() {
+        return frames > 1 && Coarse.fits(width(), height());
+    }
+
+    /**
+     * {@link #frameMats()} shrunk as a {@link #coarse()} picture is matched, kept with them; a still picture's too
+     * when a coarse one is compared against it, so both are scored at one scale.
+     */
+    synchronized List<Mat> coarseMats() {
+        List<Mat> each = frameMats();
+        if (coarseMats == null) coarseMats = each.stream().map(Coarse::shrink).toList();
+        return coarseMats;
+    }
+
+    /** Releases the frames' views of the file and their shrunk copies; the file's own pixels stay. */
     private void releaseFrames() {
         if (frameMats != null && frames > 1) frameMats.forEach(Mat::release);
         frameMats = null;
+        if (coarseMats != null) coarseMats.forEach(Mat::release);
+        coarseMats = null;
     }
 
     /**
