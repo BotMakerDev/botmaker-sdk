@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **try_input comes back and goes on**: of several inputs in one call, one that leads to a screen mapped already
+  is recorded, the game walked back to the screen tried by the map's way, as go_to_screen does, and the next tried.
+  The call still stops at a new screen, a popup (its screen's markers show under it), a refused input, or a way back
+  that failed, saying which.
 - **try_input keeps a screen that changes in place**: an input that changes most of the frame while every marker
   stays where it was, with the same pixels, changes the screen tried in place (a photo mode's zoom), not opening a
   new screen. A panel over part of the screen, or a popup dimming it, still opens one.

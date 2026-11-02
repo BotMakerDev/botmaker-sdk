@@ -1427,6 +1427,45 @@ class SdkAssistTest {
     }
 
     /**
+     * Several inputs in one call: one that leads to a screen mapped already is recorded, the game walked back by the
+     * map's way, and the next tried (Sword x Staff's calls stopped at each, 2026-11-02).
+     */
+    @Test
+    void anInputLeadingToAMappedScreenIsWalkedBackFromAndTheNextTried() {
+        Game game = new Game();
+        NativeControllerFactory.setForTesting(game);
+        BufferedImage home = noise(WATCHED.width(), WATCHED.height(), 41);
+        BufferedImage shop = covered(home, 150, 0, 250, 300, 42);
+        agent.frame = home;
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home", "marker", "set");
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("shop_home", 200, 120, 48, 48)));
+        game.then(shop);
+        tryOne("screen", "Home", "picture", "shop_home", "desktop", true, "settleMs", 0);
+        run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", "set"),
+                box("close_shop", 200, 200, 48, 48, "back", true)));
+        game.then(home);
+        tryOne("screen", "Shop", "picture", "close_shop", "desktop", true, "settleMs", 0);
+        agent.frame = home;
+        run("screenshot");
+        run("crop_pictures", "screen", "Home", "boxes", List.of(box("shop_again", 250, 200, 48, 48),
+                box("ruby", 20, 200, 48, 48), box("pearl", 80, 250, 48, 48)));
+
+        game.then(shop);
+        game.then(home);
+        String all = text(run("try_input", "screen", "Home", "inputs", List.of(Map.of("picture", "shop_again"),
+                Map.of("picture", "ruby"), Map.of("picture", "pearl")), "desktop", true, "settleMs", 0));
+        assertTrue(all.contains("opens Shop, mapped already") && all.contains("tried ruby")
+                && !all.contains("Not tried"), all);
+        assertEquals(home, agent.frame, "walked back by Shop's close");
+        assertEquals(List.of(new BotConstants.InputName("HOME", "shopAgain")), screen("SHOP").alsoFrom().stream()
+                .map(w -> BotConstants.inputName(w.via())).toList(), "the first recorded as a way into Shop");
+        assertTrue(input("HOME", "ruby").isTried() && input("HOME", "pearl").isTried(),
+                "the other two recorded in the same call: " + all);
+        assertEquals(List.of("HOME", "SHOP"), constants());
+    }
+
+    /**
      * Breadth first (the user's call, 2026-10-16): a screen opened, its marker and inputs cut, waits while the
      * screen it was opened from is tried on, and read_guide names the next screen to explore.
      */

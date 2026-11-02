@@ -103,9 +103,9 @@ final class MapTools {
     }
 
     record Try(@Describe("the screen the inputs are on, as the map names it: Home, or its constant HOME") String screen,
-               @Describe("the inputs, tried in this order; the call stops at the first that leaves the screen (opens "
-                       + "one, leads to one mapped already, or shows a popup) or is refused. One input is a list of "
-                       + "one") List<Step> inputs,
+               @Describe("the inputs, tried in this order; one that leads to a mapped screen is walked back from by "
+                       + "the map; the call stops at a new screen, a popup, a refusal or a failed way back. One input "
+                       + "is a list of one") List<Step> inputs,
                @Describe(value = "the longest each is given to answer, in milliseconds; 5000 when left out",
                        optional = true) Integer settleMs,
                @Describe(value = STAY, optional = true) Boolean stay,
@@ -190,10 +190,22 @@ final class MapTools {
 
     private MapTools() {}
 
-    /** What one try did: its reply, and whether the game is still on the screen tried, for the next input. */
-    private record Tried(AgentReply reply, boolean stays) {
+    /**
+     * What one try did: its reply, whether the game is still on the screen tried, for the next input, and, when it is
+     * not, whether it left for a screen the map has, recorded, so the map's way back reaches the screen tried again.
+     */
+    private record Tried(AgentReply reply, boolean stays, boolean mapped) {
+        Tried(AgentReply reply, boolean stays) {
+            this(reply, stays, false);
+        }
+
         static Tried left(AgentReply reply) {
             return new Tried(reply, false);
+        }
+
+        /** Left for {@code reply}'s screen the map has, a popup over it or a screen elsewhere: recorded. */
+        static Tried reached(AgentReply reply) {
+            return new Tried(reply, false, !reply.isRefused());
         }
 
         static Tried refused(String why) {
@@ -203,9 +215,10 @@ final class MapTools {
 
     /**
      * try_input; Studio busy at any read or write of the bot (each on its thread) is said, never thrown. One input is
-     * tried as it is, walking up when it finished the screen; several each stay on the screen, until one is refused
-     * or leaves it (it opened a screen, led to one mapped already or showed a popup), then the walk up, once, when
-     * the screen is finished.
+     * tried as it is, walking up when it finished the screen; several each stay on the screen, until one is refused,
+     * opens a new screen, or leaves for one mapped already (or a popup) and the map's way back to the screen fails,
+     * then the walk up, once, when the screen is finished. A call of eight inputs stopped at the first that led to a
+     * screen mapped already, one call each after it (Sword x Staff, 2026-11-02).
      */
     static AgentReply tryInput(Try call, AgentContext context) {
         List<Step> steps = call.inputs() == null ? List.of() : call.inputs();
@@ -221,7 +234,9 @@ final class MapTools {
                         .getFirst().text() + " Not tried: " + labels(call, steps.subList(i, steps.size())) + "."));
             }
             all = all == null ? tried.reply() : all.and(tried.reply());
-            if (!tried.stays()) {
+            // Recorded, and the game on a screen the map knows: the next input walks back first, as go_to_screen
+            // does, and is refused, stopping the call, when that way fails.
+            if (!tried.stays() && !tried.mapped()) {
                 return i + 1 == steps.size() ? all : all.and(AgentReply.text("Stopped: " + one.label()
                         + " left the screen, or covered it. Not tried: " + labels(call, steps.subList(i + 1,
                         steps.size())) + "."));
@@ -498,7 +513,12 @@ final class MapTools {
                 AgentReply said = entered.reply().and(reached(services, graph, screen, field, base, look, pick,
                         known.get(), entered.took()));
                 // A popup shows over the screen; anything else left it, maybe finished.
-                return Tried.left(graph.screens().get(known.get()).isPopup() ? said : up(context, said, screen, input));
+                // A popup reached shows over the screen, whose markers still show under it, so the next input's look
+                // finds the game on it and clicks under the popup: it ends the call. A popup tried is no screen the
+                // map walks to: what it led to ends the call too.
+                if (graph.screens().get(known.get()).isPopup()) return Tried.left(said);
+                AgentReply reply = up(context, said, screen, input);
+                return on.isPopup() ? Tried.left(reply) : Tried.reached(reply);
             }
             // No screen the map has: one whose markers and buttons stayed put under a change over the rest changed in
             // place (Photo's zoom), and is no new screen.
