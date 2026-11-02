@@ -130,6 +130,50 @@ class MapAuditTest {
         assertTrue(said.getFirst().contains("Save slots's shot too"), said.toString());
     }
 
+    /**
+     * A picture with no place is looked for over the whole frame once: the near look already did it, and looking again
+     * where it was missing doubled read_map's 400 s on Sword x Staff (2026-11-02).
+     */
+    @Test
+    void aPictureWithNoPlaceIsLookedForOnce() throws IOException {
+        Path file = TemplateLibrary.fileForName(resources, "lost");
+        Files.createDirectories(file.getParent());
+        ImageIO.write(noise(SIZE, SIZE, 30), "png", file.toFile());
+        long before = MapAudit.SEARCHED.sum();
+        List<MapAudit.Fit> fits = MapAudit.fits(resources, 0.9, Map.of(), List.of("lost"), noise(WIDTH, HEIGHT, 3));
+        assertEquals(Where.MISSING, fits.getFirst().where());
+        assertEquals(1, MapAudit.SEARCHED.sum() - before);
+    }
+
+    /** Each screen's markers on each other shot are matched once for the same files: a second read_map matches none. */
+    @Test
+    void clashesAreMatchedOnceForTheSameFiles() throws IOException {
+        BufferedImage skull = noise(SIZE, SIZE, 40);
+        BufferedImage choose = noise(SIZE, SIZE, 41);
+        for (Map.Entry<String, BufferedImage> picture : Map.of("skull2", skull, "choose2", choose).entrySet()) {
+            Path file = TemplateLibrary.fileForName(resources, picture.getKey());
+            Files.createDirectories(file.getParent());
+            ImageIO.write(picture.getValue(), "png", file.toFile());
+        }
+        writeShot("screens/A.png", Map.of(skull, new Rect(300, 10, SIZE, SIZE)));
+        writeShot("screens/B.png", Map.of(choose, new Rect(200, 100, SIZE, SIZE)));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", MapFixtures.screen(Setup.named("A").markers(marks("skull2")).shot("screens/A.png")));
+        screens.put("B", MapFixtures.screen(Setup.named("B").markers(marks("choose2")).shot("screens/B.png")));
+        Path third = TemplateLibrary.fileForName(resources, "third2");
+        ImageIO.write(noise(SIZE, SIZE, 42), "png", third.toFile());
+        writeShot("screens/C.png", Map.of());
+        screens.put("C", MapFixtures.screen(Setup.named("C").markers(marks("third2")).shot("screens/C.png")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        long batches = MapAudit.BATCHES.sum();
+        List<String> first = MapAudit.clashes(resources, 0.9, graph, null);
+        assertEquals(3, MapAudit.BATCHES.sum() - batches, "one batch a shot, every screen's markers in it");
+        long before = MapAudit.SEARCHED.sum();
+        assertEquals(first, MapAudit.clashes(resources, 0.9, graph, null));
+        assertEquals(0, MapAudit.SEARCHED.sum() - before);
+    }
+
     private void writeShot(String path, Map<BufferedImage, Rect> pictures) throws IOException {
         BufferedImage shot = noise(WIDTH, HEIGHT, 2);
         Graphics2D g = shot.createGraphics();

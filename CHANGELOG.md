@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **read_map is quicker**: each screen's markers are matched on every other screen's shot once for the same files,
+  all of one shot's in one batch whose pictures match side by side, and a picture with no place is looked for over
+  the whole shot once, not twice. Sword x Staff's 46 screens: 400 s before, 123 s the first time, seconds after.
 - **Watching a moving thing keeps up with the game**: `crop_pictures`' `moving` and 🗺's ◉ Watch read a game in a
   private display as the live board does, about 40 new frames a second where it read 5. A watch that sees more poses
   than a picture holds says how fast it grabbed.

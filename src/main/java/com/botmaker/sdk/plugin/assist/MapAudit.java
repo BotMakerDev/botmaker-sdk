@@ -32,10 +32,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 
 /**
@@ -56,6 +58,27 @@ public final class MapAudit {
             return size() > MOST;
         }
     });
+
+    /** The most pictures-on-a-shot kept: each a screen's marker looked for on another screen's shot. */
+    private static final int MOST_FITTED = 65_536;
+
+    /**
+     * Each screen's marker on another screen's shot, by the shot's and the picture's file times and the confidence:
+     * read_map looks for every screen's markers on every other shot, 43 screens on Sword x Staff, and matched them all
+     * again on each call, one or two a batch, 400 s (2026-11-02).
+     */
+    private static final Map<String, Fit> FITTED = Collections.synchronizedMap(
+            new LinkedHashMap<>(1024, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Fit> eldest) {
+                    return size() > MOST_FITTED;
+                }
+            });
+
+    /** Pictures matched over a shot so far, each look one: what the tests count to see work is not done twice. */
+    static final LongAdder SEARCHED = new LongAdder();
+    /** Batches matched so far, each one shot's: the tests count them to see pictures are matched side by side. */
+    static final LongAdder BATCHES = new LongAdder();
 
     private MapAudit() {}
 
@@ -202,19 +225,47 @@ public final class MapAudit {
         for (Map.Entry<String, MapScreen> other : graph.screens().entrySet()) {
             String c = other.getKey();
             if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
-            Optional<BufferedImage> shot = shots.apply(other.getValue());
-            if (shot.isEmpty()) continue;
-            List<Fit> fits = fits(resources, confidence, Map.of(), names, shot.get());
+            Optional<List<Fit>> fitted = fitted(resources, confidence, names, other.getValue(), shots);
+            if (fitted.isEmpty()) continue;
+            List<Fit> fits = fitted.get();
             boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
             boolean none = fits.subList(shown.size(), fits.size()).stream().allMatch(f -> f.where() == Where.MISSING);
             // Its words are read only where its pictures clash: the shot's title may still tell the two apart.
-            if (all && none && set.texts().stream().allMatch(words -> Reach.findText(words, shot.get(), Reach::ocr)
-                    .isPresent())) {
+            if (all && none && set.texts().stream().allMatch(words -> shots.apply(other.getValue())
+                    .flatMap(shot -> Reach.findText(words, shot, Reach::ocr)).isPresent())) {
                 return Optional.of(new Clash(c, apart(resources, confidence, graph.screens().get(constant),
-                        other.getValue())));
+                        other.getValue(), shots)));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * {@code names} on {@code screen}'s shot, each matched once for the same files ({@link #FITTED}); the shot is read
+     * and the ones not matched yet are matched in one batch. Empty while it has no shot.
+     */
+    private static Optional<List<Fit>> fitted(Path resources, double confidence, List<String> names, MapScreen screen,
+                                              Function<MapScreen, Optional<BufferedImage>> shots) {
+        Optional<Path> file = ScreenShots.file(resources, screen).filter(Files::isRegularFile);
+        if (file.isEmpty()) return Optional.empty();
+        String on = file.get() + "@" + modified(file.get()) + "|" + confidence + "|";
+        Map<String, Fit> found = new LinkedHashMap<>();
+        List<String> missing = new ArrayList<>();
+        for (String name : new LinkedHashSet<>(names)) {
+            Fit made = FITTED.get(on + name + "@" + modified(TemplateLibrary.fileForName(resources, name)));
+            if (made != null) found.put(name, made);
+            else missing.add(name);
+        }
+        if (!missing.isEmpty()) {
+            Optional<BufferedImage> shot = shots.apply(screen);
+            if (shot.isEmpty()) return Optional.empty();
+            for (Fit fit : fits(resources, confidence, Map.of(), missing, shot.get())) {
+                found.put(fit.picture(), fit);
+                FITTED.put(on + fit.picture() + "@" + modified(TemplateLibrary.fileForName(resources, fit.picture())),
+                        fit);
+            }
+        }
+        return Optional.of(names.stream().map(found::get).toList());
     }
 
     /**
@@ -229,6 +280,21 @@ public final class MapAudit {
         Map<MapScreen, Optional<BufferedImage>> read = new IdentityHashMap<>();
         Function<MapScreen, Optional<BufferedImage>> shots = screen -> read.computeIfAbsent(screen,
                 s -> shot(resources, s));
+        if (only == null) {
+            // Every screen's markers on each shot in one batch, whose pictures match side by side: one or two a batch
+            // left the cores idle.
+            Set<String> every = new LinkedHashSet<>();
+            for (MapScreen screen : graph.screens().values()) {
+                if (screen.isPopup()) continue;
+                Markers set = Markers.of(screen);
+                every.addAll(files(resources, set.shown()));
+                every.addAll(files(resources, set.absent()));
+            }
+            List<String> names = List.copyOf(every);
+            for (MapScreen screen : graph.screens().values()) {
+                if (!screen.isPopup()) fitted(resources, confidence, names, screen, shots);
+            }
+        }
         for (Map.Entry<String, MapScreen> each : graph.screens().entrySet()) {
             String c = each.getKey();
             if (only != null && !only.equals(c) || each.getValue().isPopup()) continue;
@@ -240,11 +306,11 @@ public final class MapAudit {
     }
 
     /** {@code other}'s markers not on {@code screen}'s shot; empty while it has none. */
-    private static List<String> apart(Path resources, double confidence, MapScreen screen, MapScreen other) {
-        Optional<BufferedImage> own = shot(resources, screen);
+    private static List<String> apart(Path resources, double confidence, MapScreen screen, MapScreen other,
+                                      Function<MapScreen, Optional<BufferedImage>> shots) {
         List<String> theirs = files(resources, other.markers());
-        if (own.isEmpty() || theirs.isEmpty()) return List.of();
-        return fits(resources, confidence, Map.of(), theirs, own.get()).stream()
+        if (theirs.isEmpty()) return List.of();
+        return fitted(resources, confidence, theirs, screen, shots).orElse(List.of()).stream()
                 .filter(f -> f.where() == Where.MISSING).map(Fit::picture).toList();
     }
 
@@ -266,21 +332,22 @@ public final class MapAudit {
 
     /**
      * Where each of {@code pictures} is on {@code frame}: looked for near its place first ({@link LookTools#NEAR}), as
-     * the assistant's looks do; one not there is then looked for over the whole frame. Two batches, each frame prepared
-     * once.
+     * the assistant's looks do; one not there is then looked for over the whole frame, unless it has no place, which the
+     * first look already searched whole. Two batches, each frame prepared once.
      */
     static List<Fit> fits(Path resources, double confidence, Map<String, FrameCut> cuts, List<String> pictures,
                           BufferedImage frame) {
         List<MatchResult> near = batch(resources, cuts, pictures, frame, true);
         List<String> away = new ArrayList<>();
         for (int i = 0; i < pictures.size(); i++) {
-            if (!clears(near.get(i), confidence)) away.add(pictures.get(i));
+            if (!clears(near.get(i), confidence) && placed(cuts, pictures.get(i))) away.add(pictures.get(i));
         }
         List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(resources, cuts, away, frame, false);
         List<Fit> fits = new ArrayList<>();
         for (int i = 0, next = 0; i < pictures.size(); i++) {
             String picture = pictures.get(i);
             if (clears(near.get(i), confidence)) fits.add(new Fit(picture, Where.AT_PLACE, near.get(i).rect()));
+            else if (!placed(cuts, picture)) fits.add(new Fit(picture, Where.MISSING, null));
             else {
                 MatchResult best = anywhere.get(next++);
                 fits.add(clears(best, confidence) ? new Fit(picture, Where.ELSEWHERE, best.rect())
@@ -288,6 +355,12 @@ public final class MapAudit {
             }
         }
         return fits;
+    }
+
+    /** Whether {@code picture} is looked for near a place first: {@link #batch} looks for one without over the frame. */
+    private static boolean placed(Map<String, FrameCut> cuts, String picture) {
+        FrameCut cut = cuts.get(picture);
+        return cut != null && cut.place() != null;
     }
 
     private static boolean clears(MatchResult match, double confidence) {
@@ -307,6 +380,8 @@ public final class MapAudit {
                 templates.add(cut == null || cut.frame() == null ? file : file.in(cut.frame()));
             }
             StillSource still = new StillSource(frame);
+            SEARCHED.add(templates.size());
+            BATCHES.increment();
             return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
                     ? ImageFinder.bestMatchesNear(templates, LookTools.NEAR, still)
                     : ImageFinder.bestMatches(templates, still));
