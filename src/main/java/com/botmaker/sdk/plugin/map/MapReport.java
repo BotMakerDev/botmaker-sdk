@@ -30,7 +30,6 @@ import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
-import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
@@ -90,8 +89,7 @@ public final class MapReport {
         Predicate<String> file = id -> resources != null && Files.isRegularFile(TemplateLibrary.fileForName(resources,
                 id));
         Predicate<String> shot = c -> ScreenShots.has(resources, read.graph(), c);
-        Map<String, FrameCut> cuts = FxCall.call(() -> services.pluginValues() == null ? Map.<String, FrameCut>of()
-                : TemplateUses.cuts(services.pluginValues()));
+        Map<String, FrameCut> cuts = MapAudit.cuts(services);
         double confidence = FxCall.call(() -> MapAudit.confidence(services));
         Map<String, Audit> audits = new HashMap<>();
         for (String c : read.graph().screens().keySet()) {
@@ -99,7 +97,7 @@ public final class MapReport {
             MapAudit.of(resources, confidence, cuts, c, read.graph().screens().get(c)).ifPresent(a -> audits.put(c, a));
         }
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,
-                audits, MapAudit.clashes(resources, confidence, read.graph(), only), only));
+                audits, MapAudit.clashes(resources, confidence, cuts, read.graph(), only), only));
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));

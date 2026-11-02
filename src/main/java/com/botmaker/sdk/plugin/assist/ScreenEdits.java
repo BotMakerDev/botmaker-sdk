@@ -1144,8 +1144,8 @@ public final class ScreenEdits {
     /** {@code constant} told by {@code now}, unless another screen's shot shows it too. */
     private static String toldBy(StudioServices services, String constant, Markers now) {
         ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
-        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services), graph,
-                constant, now);
+        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services),
+                MapAudit.cuts(services, graph), graph, constant, now);
         if (clash.isPresent()) return NOT_WRITTEN + MapTools.clashSaid(graph, constant, now, clash.get());
         return said(FxCall.call(() -> ScreenBook.update(services, constant,
                 s -> s.setup(x -> x.markers(now.shown()).absent(now.absent())))), "Told by " + now.said() + ".");

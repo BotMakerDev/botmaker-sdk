@@ -123,11 +123,45 @@ class MapAuditTest {
         screens.put("SAVE_SLOTS", MapFixtures.screen(Setup.named("Save slots").markers(marks("choose"))
                 .shot("screens/SAVE_SLOTS.png")));
 
-        List<String> said = MapAudit.clashes(resources, 0.9, ScreenGraph.of(screens), null);
+        List<String> said = MapAudit.clashes(resources, 0.9, Map.of(), ScreenGraph.of(screens), null);
 
         assertEquals(1, said.size(), said.toString());
         assertTrue(said.getFirst().startsWith("Options: "), said.toString());
         assertTrue(said.getFirst().contains("Save slots's shot too"), said.toString());
+    }
+
+    /**
+     * A marker is looked for on another shot where a run looks, near its place: the same picture far from it tells a
+     * run nothing. Looking over each whole shot was 120 of read_map's 123 s on Sword x Staff (2026-11-02).
+     */
+    @Test
+    void aMarkerFarFromItsPlaceOnAnotherShotIsNoClash() throws IOException {
+        BufferedImage badge = noise(SIZE, SIZE, 50);
+        BufferedImage title = noise(SIZE, SIZE, 51);
+        for (Map.Entry<String, BufferedImage> picture : Map.of("badge", badge, "title", title).entrySet()) {
+            Path file = TemplateLibrary.fileForName(resources, picture.getKey());
+            Files.createDirectories(file.getParent());
+            ImageIO.write(picture.getValue(), "png", file.toFile());
+        }
+        Rect place = new Rect(300, 10, SIZE, SIZE);
+        writeShot("screens/MENU.png", Map.of(badge, place));
+        writeShot("screens/FAR.png", Map.of(badge, new Rect(40, 280, SIZE, SIZE),
+                title, new Rect(200, 100, SIZE, SIZE)));
+        writeShot("screens/NEAR.png", Map.of(badge, new Rect(310, 20, SIZE, SIZE),
+                title, new Rect(200, 100, SIZE, SIZE)));
+        Map<String, FrameCut> cuts = Map.of("badge", FrameCut.of(WIDTH, HEIGHT, place));
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("MENU", MapFixtures.screen(Setup.named("Menu").markers(marks("badge"))
+                .shot("screens/MENU.png")));
+        screens.put("FAR", MapFixtures.screen(Setup.named("Far").markers(marks("title")).shot("screens/FAR.png")));
+
+        assertEquals(List.of(), MapAudit.clashes(resources, 0.9, cuts, ScreenGraph.of(screens), null));
+
+        screens.put("FAR", MapFixtures.screen(Setup.named("Near").markers(marks("title"))
+                .shot("screens/NEAR.png")));
+        List<String> said = MapAudit.clashes(resources, 0.9, cuts, ScreenGraph.of(screens), null);
+        assertEquals(1, said.size(), said.toString());
+        assertTrue(said.getFirst().startsWith("Menu: "), said.toString());
     }
 
     /**
@@ -167,10 +201,10 @@ class MapAuditTest {
         ScreenGraph graph = ScreenGraph.of(screens);
 
         long batches = MapAudit.BATCHES.sum();
-        List<String> first = MapAudit.clashes(resources, 0.9, graph, null);
+        List<String> first = MapAudit.clashes(resources, 0.9, Map.of(), graph, null);
         assertEquals(3, MapAudit.BATCHES.sum() - batches, "one batch a shot, every screen's markers in it");
         long before = MapAudit.SEARCHED.sum();
-        assertEquals(first, MapAudit.clashes(resources, 0.9, graph, null));
+        assertEquals(first, MapAudit.clashes(resources, 0.9, Map.of(), graph, null));
         assertEquals(0, MapAudit.SEARCHED.sum() - before);
     }
 

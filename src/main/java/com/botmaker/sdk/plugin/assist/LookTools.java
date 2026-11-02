@@ -420,11 +420,7 @@ final class LookTools {
      * action's answer lost.
      */
     static Map<String, FrameCut> cuts(AgentContext context) {
-        try {
-            return FxCall.call(() -> TemplateUses.cuts(context.services().pluginValues()));
-        } catch (RuntimeException unanswered) {
-            return Map.of();
-        }
+        return MapAudit.cuts(context.services());
     }
 
     /**

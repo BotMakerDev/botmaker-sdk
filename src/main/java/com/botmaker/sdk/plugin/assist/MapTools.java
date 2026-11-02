@@ -923,8 +923,8 @@ final class MapTools {
         if (constant.isEmpty()) return "";
         Markers now = graph.markers(constant.get());
         if (now.same(before)) return "";
-        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services), graph,
-                constant.get(), now);
+        Optional<MapAudit.Clash> clash = MapAudit.clash(services.resourcesDir(), MapAudit.confidence(services),
+                MapAudit.cuts(services, graph), graph, constant.get(), now);
         if (clash.isEmpty()) return "";
         Optional<String> failed = FxCall.call(() -> ScreenBook.update(services, constant.get(),
                 s -> s.setup(x -> x.markers(before.shown()).absent(before.absent()))));

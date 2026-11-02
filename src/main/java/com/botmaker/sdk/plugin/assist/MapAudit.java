@@ -22,6 +22,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 
 /**
  * Whether each screen's shot shows what the screen names: its marker, and each input's and its way back's picture, at
@@ -63,9 +65,9 @@ public final class MapAudit {
     private static final int MOST_FITTED = 65_536;
 
     /**
-     * Each screen's marker on another screen's shot, by the shot's and the picture's file times and the confidence:
-     * read_map looks for every screen's markers on every other shot, 43 screens on Sword x Staff, and matched them all
-     * again on each call, one or two a batch, 400 s (2026-11-02).
+     * Each screen's marker on another screen's shot, by the shot's and the picture's file times, the confidence and how
+     * the picture is looked for ({@link #key}): read_map looks for every screen's markers on every other shot, 43
+     * screens on Sword x Staff, and matched them all again on each call, one or two a batch, 400 s (2026-11-02).
      */
     private static final Map<String, Fit> FITTED = Collections.synchronizedMap(
             new LinkedHashMap<>(1024, 0.75f, true) {
@@ -203,29 +205,70 @@ public final class MapAudit {
 
     /**
      * The first screen of {@code graph} other than {@code constant} whose shot shows {@code set} (every marker found
-     * anywhere on it, no absent picture found, every one of its words read): on that screen a run would take the game for {@code constant}. Rarity's
-     * title scored 0.80 on Upgrade (2026-10-16). Skipped: a popup, whose shot shows the screen under it, and a screen
-     * reached from {@code constant}, which a run finds over it first. Empty with no clash, or while a picture of
-     * {@code set} has no file. Off the FX thread: it reads and matches every other shot.
+     * near its place, as {@code cuts} gives it, no absent picture found anywhere, every one of its words read): on that
+     * screen a run would take the game for {@code constant}. Rarity's title scored 0.80 on Upgrade (2026-10-16).
+     * Skipped: a popup, whose shot shows the screen under it, and a screen reached from {@code constant}, which a run
+     * finds over it first. Empty with no clash, or while a picture of {@code set} has no file. Off the FX thread: it
+     * reads and matches every other shot.
+     *
+     * <p>A marker is looked for where a run looks first ({@link Markers#onEach}): one far from its place on another
+     * shot tells that run nothing. A run looks over the whole frame only when no screen shows near (a window whose
+     * shape changed), and a clash there is not said.
      */
-    public static Optional<Clash> clash(Path resources, double confidence, ScreenGraph graph, String constant,
-                                        Markers set) {
-        return clash(resources, confidence, graph, constant, set, screen -> shot(resources, screen));
+    public static Optional<Clash> clash(Path resources, double confidence, Map<String, FrameCut> cuts,
+                                        ScreenGraph graph, String constant, Markers set) {
+        return clash(resources, confidence, cuts, graph, constant, set, screen -> shot(resources, screen));
     }
 
-    /** {@link #clash(Path, double, ScreenGraph, String, Markers)} reading each screen's shot through {@code shots}. */
-    private static Optional<Clash> clash(Path resources, double confidence, ScreenGraph graph, String constant,
-                                         Markers set, Function<MapScreen, Optional<BufferedImage>> shots) {
+    /**
+     * Every picture's cut, its place among them, as {@link #clash} looks near it, read on the FX thread: none while
+     * Studio has no values or the FX thread does not answer (a dialog holds it).
+     */
+    public static Map<String, FrameCut> cuts(StudioServices services) {
+        try {
+            return FxCall.call(() -> services.pluginValues() == null ? Map.<String, FrameCut>of()
+                    : TemplateUses.cuts(services.pluginValues()));
+        } catch (RuntimeException unanswered) {
+            return Map.of();
+        }
+    }
+
+    /**
+     * {@link #cuts(StudioServices)} of only the pictures {@link #clash} looks for on {@code graph}: each screen's
+     * markers and absent pictures, opening their constants alone, never the bot's hundreds.
+     */
+    public static Map<String, FrameCut> cuts(StudioServices services, ScreenGraph graph) {
+        Path resources = services.resourcesDir();
+        if (resources == null) return Map.of();
+        Set<String> names = new LinkedHashSet<>();
+        for (MapScreen screen : graph.screens().values()) {
+            Markers set = Markers.of(screen);
+            names.addAll(files(resources, set.shown()));
+            names.addAll(files(resources, set.absent()));
+        }
+        try {
+            return FxCall.call(() -> services.pluginValues() == null ? Map.<String, FrameCut>of()
+                    : TemplateUses.cuts(services.pluginValues(), names));
+        } catch (RuntimeException unanswered) {
+            return Map.of();
+        }
+    }
+
+    /** {@link #clash(Path, double, Map, ScreenGraph, String, Markers)} reading each screen's shot through {@code shots}. */
+    private static Optional<Clash> clash(Path resources, double confidence, Map<String, FrameCut> cuts,
+                                         ScreenGraph graph, String constant, Markers set,
+                                         Function<MapScreen, Optional<BufferedImage>> shots) {
         if (resources == null || !set.any()) return Optional.empty();
         List<String> shown = files(resources, set.shown());
         List<String> absent = files(resources, set.absent());
         if (shown.size() < set.shown().size()) return Optional.empty();
-        List<String> names = new ArrayList<>(shown);
-        names.addAll(absent);
+        List<Sought> sought = new ArrayList<>();
+        shown.forEach(p -> sought.add(new Sought(p, true)));
+        absent.forEach(p -> sought.add(new Sought(p, false)));
         for (Map.Entry<String, MapScreen> other : graph.screens().entrySet()) {
             String c = other.getKey();
             if (c.equals(constant) || other.getValue().isPopup() || graph.dependsOn(c).contains(constant)) continue;
-            Optional<List<Fit>> fitted = fitted(resources, confidence, names, other.getValue(), shots);
+            Optional<List<Fit>> fitted = fitted(resources, confidence, cuts, sought, other.getValue(), shots);
             if (fitted.isEmpty()) continue;
             List<Fit> fits = fitted.get();
             boolean all = fits.subList(0, shown.size()).stream().allMatch(f -> f.where() != Where.MISSING);
@@ -233,39 +276,63 @@ public final class MapAudit {
             // Its words are read only where its pictures clash: the shot's title may still tell the two apart.
             if (all && none && set.texts().stream().allMatch(words -> shots.apply(other.getValue())
                     .flatMap(shot -> Reach.findText(words, shot, Reach::ocr)).isPresent())) {
-                return Optional.of(new Clash(c, apart(resources, confidence, graph.screens().get(constant),
+                return Optional.of(new Clash(c, apart(resources, confidence, cuts, graph.screens().get(constant),
                         other.getValue(), shots)));
             }
         }
         return Optional.empty();
     }
 
+    /** A picture as {@link #clash} looks for it: within {@link Reach#MARKER_MARGIN} of its place, or anywhere. */
+    private record Sought(String picture, boolean near) {
+    }
+
     /**
-     * {@code names} on {@code screen}'s shot, each matched once for the same files ({@link #FITTED}); the shot is read
-     * and the ones not matched yet are matched in one batch. Empty while it has no shot.
+     * Each of {@code sought} on {@code screen}'s shot, in its order. Each is matched once for the same files and the
+     * same look ({@link #FITTED}); the shot is read and the ones not matched yet are matched in one batch. Empty while
+     * it has no shot.
      */
-    private static Optional<List<Fit>> fitted(Path resources, double confidence, List<String> names, MapScreen screen,
+    private static Optional<List<Fit>> fitted(Path resources, double confidence, Map<String, FrameCut> cuts,
+                                              List<Sought> sought, MapScreen screen,
                                               Function<MapScreen, Optional<BufferedImage>> shots) {
         Optional<Path> file = ScreenShots.file(resources, screen).filter(Files::isRegularFile);
         if (file.isEmpty()) return Optional.empty();
         String on = file.get() + "@" + modified(file.get()) + "|" + confidence + "|";
-        Map<String, Fit> found = new LinkedHashMap<>();
-        List<String> missing = new ArrayList<>();
-        for (String name : new LinkedHashSet<>(names)) {
-            Fit made = FITTED.get(on + name + "@" + modified(TemplateLibrary.fileForName(resources, name)));
-            if (made != null) found.put(name, made);
-            else missing.add(name);
-        }
+        Map<Sought, String> keys = new LinkedHashMap<>();
+        for (Sought s : sought) keys.computeIfAbsent(s, k -> on + key(resources, cuts, k));
+        Map<Sought, Fit> found = new LinkedHashMap<>();
+        List<Sought> missing = new ArrayList<>();
+        keys.forEach((s, key) -> {
+            Fit made = FITTED.get(key);
+            if (made != null) found.put(s, made);
+            else missing.add(s);
+        });
         if (!missing.isEmpty()) {
             Optional<BufferedImage> shot = shots.apply(screen);
             if (shot.isEmpty()) return Optional.empty();
-            for (Fit fit : fits(resources, confidence, Map.of(), missing, shot.get())) {
-                found.put(fit.picture(), fit);
-                FITTED.put(on + fit.picture() + "@" + modified(TemplateLibrary.fileForName(resources, fit.picture())),
-                        fit);
+            List<MatchResult> matches = batch(resources, cuts, missing.stream().map(Sought::picture).toList(),
+                    shot.get(), i -> missing.get(i).near(), Reach.MARKER_MARGIN);
+            for (int i = 0; i < missing.size(); i++) {
+                Sought s = missing.get(i);
+                Fit fit = clears(matches.get(i), confidence) ? new Fit(s.picture(), Where.AT_PLACE,
+                        matches.get(i).rect()) : new Fit(s.picture(), Where.MISSING, null);
+                found.put(s, fit);
+                FITTED.put(keys.get(s), fit);
             }
         }
-        return Optional.of(names.stream().map(found::get).toList());
+        return Optional.of(sought.stream().map(found::get).toList());
+    }
+
+    /**
+     * {@code sought}'s key, past its shot's: the picture's file time and how its template is built — the frame it was
+     * cut on (which scales it) and its frames, and its place when looked for near it. A retake, a recut or a moved
+     * place looks again; one built alike shares the match.
+     */
+    private static String key(Path resources, Map<String, FrameCut> cuts, Sought sought) {
+        FrameCut cut = cuts.get(sought.picture());
+        String how = cut == null ? "as cut" : "cut on " + cut.frame() + " x" + cut.frames()
+                + (sought.near() && cut.place() != null ? " near " + cut.place() : "");
+        return how + ":" + sought.picture() + "@" + modified(TemplateLibrary.fileForName(resources, sought.picture()));
     }
 
     /**
@@ -274,7 +341,8 @@ public final class MapAudit {
      * so a screen whose shot came later went unseen: Hades II's Options skull crowns its Save slots too, and a walk
      * from Save slots believed it was on Options (2026-10-30).
      */
-    public static List<String> clashes(Path resources, double confidence, ScreenGraph graph, String only) {
+    public static List<String> clashes(Path resources, double confidence, Map<String, FrameCut> cuts,
+                                       ScreenGraph graph, String only) {
         List<String> lines = new ArrayList<>();
         // Each shot is read once: every screen's markers are looked for on every other screen's shot.
         Map<MapScreen, Optional<BufferedImage>> read = new IdentityHashMap<>();
@@ -283,34 +351,38 @@ public final class MapAudit {
         if (only == null) {
             // Every screen's markers on each shot in one batch, whose pictures match side by side: one or two a batch
             // left the cores idle.
-            Set<String> every = new LinkedHashSet<>();
+            Set<Sought> every = new LinkedHashSet<>();
             for (MapScreen screen : graph.screens().values()) {
                 if (screen.isPopup()) continue;
                 Markers set = Markers.of(screen);
-                every.addAll(files(resources, set.shown()));
-                every.addAll(files(resources, set.absent()));
+                files(resources, set.shown()).forEach(p -> every.add(new Sought(p, true)));
+                files(resources, set.absent()).forEach(p -> every.add(new Sought(p, false)));
             }
-            List<String> names = List.copyOf(every);
+            List<Sought> sought = List.copyOf(every);
             for (MapScreen screen : graph.screens().values()) {
-                if (!screen.isPopup()) fitted(resources, confidence, names, screen, shots);
+                if (!screen.isPopup()) fitted(resources, confidence, cuts, sought, screen, shots);
             }
         }
         for (Map.Entry<String, MapScreen> each : graph.screens().entrySet()) {
             String c = each.getKey();
             if (only != null && !only.equals(c) || each.getValue().isPopup()) continue;
             Markers set = Markers.of(each.getValue());
-            clash(resources, confidence, graph, c, set, shots)
+            clash(resources, confidence, cuts, graph, c, set, shots)
                     .ifPresent(clash -> lines.add(graph.shown(c) + ": " + MapTools.clashSaid(graph, c, set, clash)));
         }
         return lines;
     }
 
-    /** {@code other}'s markers not on {@code screen}'s shot; empty while it has none. */
-    private static List<String> apart(Path resources, double confidence, MapScreen screen, MapScreen other,
+    /**
+     * {@code other}'s markers not anywhere on {@code screen}'s shot, as an absent picture is looked for; empty while it
+     * has none.
+     */
+    private static List<String> apart(Path resources, double confidence, Map<String, FrameCut> cuts,
+                                      MapScreen screen, MapScreen other,
                                       Function<MapScreen, Optional<BufferedImage>> shots) {
-        List<String> theirs = files(resources, other.markers());
+        List<Sought> theirs = files(resources, other.markers()).stream().map(p -> new Sought(p, false)).toList();
         if (theirs.isEmpty()) return List.of();
-        return fitted(resources, confidence, theirs, screen, shots).orElse(List.of()).stream()
+        return fitted(resources, confidence, cuts, theirs, screen, shots).orElse(List.of()).stream()
                 .filter(f -> f.where() == Where.MISSING).map(Fit::picture).toList();
     }
 
@@ -337,12 +409,12 @@ public final class MapAudit {
      */
     static List<Fit> fits(Path resources, double confidence, Map<String, FrameCut> cuts, List<String> pictures,
                           BufferedImage frame) {
-        List<MatchResult> near = batch(resources, cuts, pictures, frame, true);
+        List<MatchResult> near = batch(resources, cuts, pictures, frame, i -> true, LookTools.NEAR);
         List<String> away = new ArrayList<>();
         for (int i = 0; i < pictures.size(); i++) {
             if (!clears(near.get(i), confidence) && placed(cuts, pictures.get(i))) away.add(pictures.get(i));
         }
-        List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(resources, cuts, away, frame, false);
+        List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(resources, cuts, away, frame, i -> false, 0);
         List<Fit> fits = new ArrayList<>();
         for (int i = 0, next = 0; i < pictures.size(); i++) {
             String picture = pictures.get(i);
@@ -367,24 +439,27 @@ public final class MapAudit {
         return match.isFound() && match.confidence() >= confidence;
     }
 
-    /** Each picture's best match, near its place ({@code near}) or anywhere; not found when it has no file. */
+    /**
+     * Each picture's best match in one batch: within {@code margin} of its place when {@code near} holds for its index
+     * and it has one, else anywhere; not found when it has no file.
+     */
     private static List<MatchResult> batch(Path resources, Map<String, FrameCut> cuts, List<String> pictures,
-                                           BufferedImage frame, boolean near) {
+                                           BufferedImage frame, IntPredicate near, int margin) {
         List<ImageTemplate> templates = new ArrayList<>();
         try {
-            for (String picture : pictures) {
+            for (int i = 0; i < pictures.size(); i++) {
+                String picture = pictures.get(i);
                 FrameCut cut = cuts.get(picture);
                 ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, picture).toString());
-                if (near && cut != null && cut.place() != null) file = file.at(cut.place());
+                if (near.test(i) && cut != null && cut.place() != null) file = file.at(cut.place());
                 if (cut != null) file = file.frames(cut.frames());
                 templates.add(cut == null || cut.frame() == null ? file : file.in(cut.frame()));
             }
             StillSource still = new StillSource(frame);
             SEARCHED.add(templates.size());
             BATCHES.increment();
-            return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> near
-                    ? ImageFinder.bestMatchesNear(templates, LookTools.NEAR, still)
-                    : ImageFinder.bestMatches(templates, still));
+            // One with no place is looked for everywhere.
+            return ToolTiming.timed(ToolTiming.Phase.MATCH, () -> ImageFinder.bestMatchesNear(templates, margin, still));
         } finally {
             // Released after the match: an unreleased template is native memory.
             templates.forEach(ImageTemplate::close);
