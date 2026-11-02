@@ -310,4 +310,46 @@ class ShadeFitTest {
         assertEquals(Optional.empty(), ShadeFit.shown(cutAt(null, null), new Rect(10, 14, 24, 24), frame,
                 List.of(lifted), GAME), "a picture with no place has no move to tell");
     }
+
+    @Test
+    void aFitOffTheCutIsAChangeAndAlikeFitsAreOneChange() {
+        ShadeFit.Fit same = fit(shown(icon(), each(v -> v)));
+        ShadeFit.Fit dim = fit(shown(icon(), each(v -> (int) Math.round(v * 0.45))));
+        ShadeFit.Fit dimToo = fit(shown(icon(), each(v -> (int) Math.round(v * 0.48))));
+        ShadeFit.Fit bright = fit(shown(icon(), each(v -> v + 40)));
+        assertFalse(same.offIdentity(), "the button as cut");
+        assertTrue(dim.offIdentity());
+        assertTrue(bright.offIdentity());
+        assertTrue(dim.alike(dimToo), "within a tolerance");
+        assertFalse(dim.alike(bright));
+    }
+
+    /** {@code frame} with a white square at {@code (x, y)}, {@code side} wide: a lock drawn over the button. */
+    private static BufferedImage withSquare(BufferedImage frame, int x, int y, int side) {
+        Graphics2D g = frame.createGraphics();
+        g.setColor(Color.WHITE);
+        g.fillRect(x, y, side, side);
+        g.dispose();
+        return frame;
+    }
+
+    @Test
+    void anAdditionIsOnePatchTheCutLacksTheRestFittingOnceItIsSetAside() {
+        BufferedImage frame = withSquare(shown(icon(), each(v -> (int) Math.round(v * 0.45))), 24, 14, 6);
+        ShadeFit.Addition added = ShadeFit.addition(icon(), frame, AT).orElseThrow();
+        assertEquals(new Rect(24, 14, 6, 6), added.area());
+        assertEquals(Shade.Kind.DIM, added.fit().kind(), "the rest still reads as dimmed");
+        assertEquals(0.45, added.fit().gain().red(), 0.02);
+    }
+
+    @Test
+    void aPlainShadeOrNoiseIsNoAddition() {
+        assertEquals(Optional.empty(), ShadeFit.addition(icon(), shown(icon(), each(v -> (int) Math.round(v * 0.45))),
+                AT));
+        Random random = new Random(7);
+        assertEquals(Optional.empty(), ShadeFit.addition(icon(), shown(icon(), each(v -> v + random.nextInt(9) - 4)),
+                AT));
+        assertEquals(Optional.empty(), ShadeFit.addition(icon(), withSquare(shown(icon(), each(v -> v)), 10, 10, 20),
+                AT), "most of the button covered is another picture, not an addition");
+    }
 }

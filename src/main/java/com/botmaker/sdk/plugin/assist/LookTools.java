@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -260,9 +261,11 @@ final class LookTools {
         // Copies are counted all over the frame, one more match each: only when the call asks for everywhere.
         Optional<ToolReach> reach = Boolean.TRUE.equals(shown.everywhere()) ? ToolReach.of(context) : Optional.empty();
         List<Shade> shades = Frames.shades(context.services());
+        Map<String, Rect> matched = new LinkedHashMap<>();
         for (Scored s : scored) {
             boolean on = s.match().confidence() >= needs;
             if (on) {
+                matched.putIfAbsent(s.name(), s.match().rect());
                 found.add(s.match().rect());
                 Frames.mark(context, s.match().rect(), Marks.Kind.FOUND, s.name());
             }
@@ -275,8 +278,10 @@ final class LookTools {
         }
         String head = found.isEmpty() ? "None of the pictures is on screen (a run needs " + Frames.score(needs) + ")."
                 : found.size() + " on screen (✓, a run needs " + Frames.score(needs) + "):";
-        return Frames.found(onMap + head + "\n" + String.join("\n", lines), frame.get(), found, Frames.FOUND,
-                shown.show());
+        // Each button found fitted against its cut: a version is deduced from the frame alone.
+        String versions = Versions.seen(context, resources.get(), matched, frame.get(), shades);
+        return Frames.found(onMap + head + "\n" + String.join("\n", lines) + (versions.isEmpty() ? "" : "\n"
+                + versions), frame.get(), found, Frames.FOUND, shown.show());
     }
 
     /**

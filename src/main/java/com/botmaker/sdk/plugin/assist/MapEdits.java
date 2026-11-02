@@ -209,6 +209,10 @@ final class MapEdits {
     record MoveMarkers(@Describe(value = "", optional = true) String screen) implements Edit {
     }
 
+    @Describe("learn a fit which_screen proposes")
+    record LearnShade(@Describe(value = "", optional = true) String screen, String fit) implements Edit {
+    }
+
     @Describe("words in a zone: a marker, or with field a text button on them")
     record AddText(String screen, @Describe("as the screen shows them") String text,
                    @Describe("a Zones constant") String zone,
@@ -252,6 +256,11 @@ final class MapEdits {
                         .map(why -> ScreenEdits.NOT_WRITTEN + why)
                         .orElse("Every screen is told by its parts: what a setup named moved to marks and marking inputs.")));
             }
+            if (edit instanceof LearnShade learn) {
+                // The sightings' file is read here, not on the FX thread.
+                Versions.warm(context.services().resourcesDir());
+                return FxCall.call(() -> said(Versions.learn(context.services(), learn.fit())));
+            }
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());
                 AgentReply reply = edited(edit, context);
@@ -293,6 +302,7 @@ final class MapEdits {
             case AddMarker ignored -> marker(edit, context);
             case RemoveMarker ignored -> marker(edit, context);
             case MoveMarkers ignored -> AgentReply.refused("move_markers runs on the whole map.");
+            case LearnShade ignored -> AgentReply.refused("learn_shade runs on the whole bot.");
             case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
             case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),

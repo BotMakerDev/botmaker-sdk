@@ -25,7 +25,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `ShadeFit.causes` allows: hover under the last pointer (not on an emulator), focus on the last press, press within
   `PRESS_MS` of it — the pointer is run-wide (`ShadeFit.pointer`, reset when a run takes its shades), set by the map's
   presses, drags and scrolls only. Tint shades also match the cut tinted (`ShadeFit.tinted`; cuts and copies kept by
-  file stamp, 64 at most) where the plain cut finds nothing. No shade: no computed version.
+  file stamp, 512 at most) where the plain cut finds nothing. No shade: no computed version.
 - **A version computed by geometry** (2026-11-02): `Shade.Kind` `GLOW`, `SCALE`, `SHIFT` (`Shade.moves()`) are told
   by the match, not its pixels' colour (`ShadeFit.moved`): a glow by `ShadeFit.ring` (the ring `geometry.ring` wide
   against the band beyond, matched to the shade's offset), a scale by the match's size against the cut's, a shift by
@@ -33,6 +33,19 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   live one. `RunReach.rescaled` matches every picture drawn at each learned size (`ShadeFit.sizes`, `scaled`,
   `scaledAround`) in one `bestMatchesNear` call: near a match when found, which keeps a 40-button poll within 1.3×
   (`ScaledMatchTest`), and the better score wins.
+- **Shades the game shows** (2026-11-02, spec `../docs/superpowers/specs/2026-11-02-shades-panel-design.md`): the
+  map panel with no screen picked lists `Versions.shown` — proposals with a state picker and Learn
+  (`Versions.learn(services, id, meaning)`, the hand path of `learn_shade`), learned GAME shades with ✕
+  (`Versions.unlearn`) — read off the FX thread.
+- **Discovery deduces versions** (2026-11-02, `plugin/assist/Versions`): which_screen fits every button it finds
+  against its cut (`ShadeFit.fit`). A fit off the cut (`Fit.offIdentity`) is a version of that button, unless the
+  largest set of alike fits (`Fit.alike`) covers 3 buttons or more and more than half the frame's: that is a shade over
+  the screen (a tutorial's, a popup's), kept but never a version. Sightings are kept per button and frame in the
+  cache's `map-versions` (512 at most), apart from the build-keyed `map-audit`, so they outlive an SDK rebuild. A fit
+  seen alike on two buttons or more is proposed by id (`dim-3fa2`, from the group's first fit, so it holds) and
+  `edit_map learn_shade` appends it to `Sdk.shades()`, cause `GAME`, `Disabled` for a dim, grey or fade and `Selected`
+  for a brightening or a tint until pressing says otherwise. A part the cut lacks (`ShadeFit.addition`: the largest
+  patch off the fit, 2–50 % of the button, holding 60 % of what the refit leaves) is said with its place.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a

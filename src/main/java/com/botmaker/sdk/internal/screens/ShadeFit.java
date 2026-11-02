@@ -134,6 +134,33 @@ public final class ShadeFit {
             return far;
         }
 
+        /**
+         * Whether this is a change of the cut at all: a colour change (within {@link #MOST_ERROR}), its gain or offset
+         * off the cut's own by more than a shade's {@link Shade#TOLERANCE}, or the colour lost.
+         */
+        public boolean offIdentity() {
+            if (error > MOST_ERROR) return false;
+            if (grey) return true;
+            for (int c = 0; c < 3; c++) {
+                if (Math.abs(gain.get(c) - 1) > Shade.TOLERANCE || Math.abs(offset.get(c)) > Shade.TOLERANCE) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** Whether {@code other} is the same change: both grey or neither, each gain and offset within a tolerance. */
+        public boolean alike(Fit other) {
+            if (grey != other.grey) return false;
+            for (int c = 0; c < 3; c++) {
+                if (Math.abs(gain.get(c) - other.gain.get(c)) > Shade.TOLERANCE
+                        || Math.abs(offset.get(c) - other.offset.get(c)) > Shade.TOLERANCE) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /** What kind of change this is, by its numbers. */
         public Shade.Kind kind() {
             if (grey) return Shade.Kind.GREY;
@@ -231,7 +258,7 @@ public final class ShadeFit {
      * first, so the button under the cursor never reads as the game's dim its hover looks like. Focus is weighed with
      * the game's by distance: it lasts until the next press, and the game may dim the button just pressed.
      */
-    static Optional<Shade> closest(Fit fit, List<Shade> shades, Set<Shade.Cause> causes) {
+    public static Optional<Shade> closest(Fit fit, List<Shade> shades, Set<Shade.Cause> causes) {
         return closest(shades, causes,
                 shade -> fit.fits(shade) ? OptionalDouble.of(fit.distance(shade)) : OptionalDouble.empty());
     }
@@ -360,14 +387,154 @@ public final class ShadeFit {
         // The match does not say which frame it was: the one the shown pixels fit best.
         Fit best = null;
         for (int f = 0; f < Math.max(1, frames); f++) {
-            Fit one = fit(cut, f * width, width, height, frame, found);
+            Fit one = fit(cut, f * width, width, height, frame, found, null);
             if (one != null && (best == null || one.error() < best.error())) best = one;
         }
         return Optional.ofNullable(best);
     }
 
-    /** {@link #fit} of the frame of {@code cut} starting at {@code x0}; null with nothing to fit. */
-    private static Fit fit(BufferedImage cut, int x0, int width, int height, BufferedImage frame, Rect found) {
+    /** {@link #fit(BufferedImage, int, BufferedImage, Rect)} of {@code picture}'s file; empty when it cannot be read. */
+    public static Optional<Fit> fit(ImageTemplate picture, Rect found, BufferedImage frame) {
+        return cut(picture).flatMap(cut -> fit(cut, picture.frames(), frame, found));
+    }
+
+    /** A pixel off its fit by more than this, 0 to 1 averaged over the channels, is not the fit's. */
+    private static final double OFF = 0.2;
+    /** The share of the cut's opaque pixels an addition covers: more than a speck, less than half. */
+    private static final double LEAST_ADDED = 0.02;
+    private static final double MOST_ADDED = 0.5;
+    /** A whole fit off by no more than this, root mean square, leaves nothing to look for an addition in. */
+    private static final double ROUGH = 0.03;
+    /** The share of what the whole fit leaves that the addition must hold. */
+    private static final double MOST_OF = 0.6;
+
+    /**
+     * A part shown on the button that its cut lacks — a lock, a badge, a check — after the best colour fit: one patch of
+     * pixels off that fit holding most of what it leaves, the rest fitting once it is set aside.
+     *
+     * @param area where it shows, in the frame's pixels
+     * @param fit  the colour fit of the rest of the button
+     */
+    public record Addition(Rect area, Fit fit) {}
+
+    /** {@code picture}'s addition where it matched {@code frame} at {@code found}; empty for none, or a moving picture. */
+    public static Optional<Addition> addition(ImageTemplate picture, Rect found, BufferedImage frame) {
+        if (picture.frames() > 1) return Optional.empty();
+        return cut(picture).flatMap(cut -> addition(cut, frame, found));
+    }
+
+    static Optional<Addition> addition(BufferedImage cut, BufferedImage frame, Rect found) {
+        int width = cut.getWidth();
+        int height = cut.getHeight();
+        if (width < 1 || height < 1 || found.width() < 1 || found.height() < 1) return Optional.empty();
+        Fit whole = fit(cut, 0, width, height, frame, found, null);
+        // A button its fit reads well holds no addition: most buttons on a frame, spared the patch search.
+        if (whole == null || whole.error() <= ROUGH) return Optional.empty();
+        boolean[] patch = largestPatch(offBy(cut, width, height, frame, found, whole), width, height);
+        if (patch == null) return Optional.empty();
+        Fit rest = fit(cut, 0, width, height, frame, found, patch);
+        if (rest == null || rest.error() > MOST_ERROR || rest.error() * 2 > whole.error()) return Optional.empty();
+        // Weighed against the rest's own fit, which the patch no longer pulls off.
+        double[] off = offBy(cut, width, height, frame, found, rest);
+        double total = 0;
+        double held = 0;
+        int opaque = 0;
+        int size = 0;
+        int left = width, top = height, right = -1, bottom = -1;
+        for (int i = 0; i < off.length; i++) {
+            if (off[i] < 0) continue;
+            total += off[i];
+            opaque++;
+            if (!patch[i]) continue;
+            size++;
+            held += off[i];
+            left = Math.min(left, i % width);
+            right = Math.max(right, i % width);
+            top = Math.min(top, i / width);
+            bottom = Math.max(bottom, i / width);
+        }
+        if (total <= 0 || size < LEAST_ADDED * opaque || size > MOST_ADDED * opaque || held < MOST_OF * total) {
+            return Optional.empty();
+        }
+        int x = found.x() + left * found.width() / width;
+        int y = found.y() + top * found.height() / height;
+        int x2 = found.x() + (right + 1) * found.width() / width;
+        int y2 = found.y() + (bottom + 1) * found.height() / height;
+        return Optional.of(new Addition(new Rect(x, y, Math.max(1, x2 - x), Math.max(1, y2 - y)), rest));
+    }
+
+    /** How far each cut pixel is off {@code fit}, averaged over the channels; -1 for one see-through or off the frame. */
+    private static double[] offBy(BufferedImage cut, int width, int height, BufferedImage frame, Rect found, Fit fit) {
+        boolean alpha = cut.getColorModel().hasAlpha();
+        double[] off = new double[width * height];
+        for (int y = 0; y < height; y++) {
+            int fy = found.y() + y * found.height() / height;
+            for (int x = 0; x < width; x++) {
+                int fx = found.x() + x * found.width() / width;
+                int argb = cut.getRGB(x, y);
+                if (fy < 0 || fy >= frame.getHeight() || fx < 0 || fx >= frame.getWidth()
+                        || alpha && (argb >>> 24) < 128) {
+                    off[y * width + x] = -1;
+                    continue;
+                }
+                double[] in = channels(argb);
+                double[] out = channels(frame.getRGB(fx, fy));
+                double light = 0.299 * in[0] + 0.587 * in[1] + 0.114 * in[2];
+                double sum = 0;
+                for (int c = 0; c < 3; c++) {
+                    sum += Math.abs(out[c] - (fit.gain().get(c) * (fit.grey() ? light : in[c]) + fit.offset().get(c)));
+                }
+                off[y * width + x] = sum / 3;
+            }
+        }
+        return off;
+    }
+
+    /** The largest 4-connected patch of pixels off by more than {@link #OFF}, by what they hold; null for none. */
+    private static boolean[] largestPatch(double[] off, int width, int height) {
+        int[] label = new int[off.length];
+        int labels = 0;
+        int best = 0;
+        double bestHeld = 0;
+        int[] queue = new int[off.length];
+        for (int start = 0; start < off.length; start++) {
+            if (label[start] != 0 || off[start] <= OFF) continue;
+            labels++;
+            double held = 0;
+            int head = 0, tail = 0;
+            queue[tail++] = start;
+            label[start] = labels;
+            while (head < tail) {
+                int i = queue[head++];
+                held += off[i];
+                int x = i % width;
+                int y = i / width;
+                int[] next = {x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, y > 0 ? i - width : -1,
+                        y < height - 1 ? i + width : -1};
+                for (int n : next) {
+                    if (n >= 0 && label[n] == 0 && off[n] > OFF) {
+                        label[n] = labels;
+                        queue[tail++] = n;
+                    }
+                }
+            }
+            if (held > bestHeld) {
+                bestHeld = held;
+                best = labels;
+            }
+        }
+        if (best == 0) return null;
+        boolean[] patch = new boolean[off.length];
+        for (int i = 0; i < off.length; i++) patch[i] = label[i] == best;
+        return patch;
+    }
+
+    /**
+     * {@link #fit} of the frame of {@code cut} starting at {@code x0}, the pixels {@code skip} marks (by
+     * {@code y × width + x}) set aside; null with nothing to fit.
+     */
+    private static Fit fit(BufferedImage cut, int x0, int width, int height, BufferedImage frame, Rect found,
+                           boolean[] skip) {
         boolean alpha = cut.getColorModel().hasAlpha();
         // Sums for the least squares: per channel over the cut's own channel, and over the cut's light.
         double n = 0;
@@ -379,7 +546,7 @@ public final class ShadeFit {
             if (fy < 0 || fy >= frame.getHeight()) continue;
             for (int x = 0; x < width; x++) {
                 int fx = found.x() + x * found.width() / width;
-                if (fx < 0 || fx >= frame.getWidth()) continue;
+                if (fx < 0 || fx >= frame.getWidth() || skip != null && skip[y * width + x]) continue;
                 int argb = cut.getRGB(x0 + x, y);
                 if (alpha && (argb >>> 24) < 128) continue;
                 int rgb = frame.getRGB(fx, fy);

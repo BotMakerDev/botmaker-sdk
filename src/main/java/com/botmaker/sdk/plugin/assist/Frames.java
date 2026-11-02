@@ -32,8 +32,11 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -52,6 +55,11 @@ final class Frames {
     /** The shades the bot learned, none when it learned none. */
     static List<Shade> shades(StudioServices services) {
         return SHADES.read(services).map(Shades::list).orElse(List.of());
+    }
+
+    /** Writes {@code shades} as the bot's learned ones; empty when written, else why not. On the FX thread. */
+    static Optional<String> writeShades(StudioServices services, List<Shade> shades) {
+        return SHADES.write(services, new Shades(shades));
     }
 
     static final Color FOUND = new Color(0x3f, 0xb9, 0x50);
@@ -256,6 +264,15 @@ final class Frames {
     /** How many frames the picture {@code name}'s file holds, as its constant says; 1 when it says not. */
     static int frames(AgentContext context, String name) {
         return FxCall.call(() -> TemplateUses.frames(context.services().pluginValues(), name));
+    }
+
+    /** {@link #frames(AgentContext, String)} of each of {@code names}, in one call on the FX thread. */
+    static Map<String, Integer> frames(AgentContext context, Collection<String> names) {
+        return FxCall.call(() -> {
+            Map<String, Integer> frames = new HashMap<>();
+            names.forEach(name -> frames.put(name, TemplateUses.frames(context.services().pluginValues(), name)));
+            return frames;
+        });
     }
 
     /** The resources folder, when a project is open. */

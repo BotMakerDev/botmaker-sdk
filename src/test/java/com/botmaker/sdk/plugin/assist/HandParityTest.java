@@ -68,6 +68,7 @@ class HandParityTest {
             // the map tools
             entry("not_a_screen", Hand.now("⋯ Screen ▸ Not a screen")),
             entry("place_pictures", Hand.now("⋯ Screen ▸ Add pictures the bot has…")),
+            entry("LearnShade", Hand.now("the map panel's Shades the game shows ▸ Learn")),
             entry("try_input", Hand.now("▶, ▶ Try next, and the picked input's ▶ Try: which copy, what it opens, "
                     + "how long, and whether the game stays")),
             entry("go_to_screen", Hand.now("🧭 Go here")),

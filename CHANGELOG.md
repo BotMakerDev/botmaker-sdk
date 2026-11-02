@@ -49,6 +49,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   or either end of a pulse; a run also matches the cut drawn at each learned size, near each match or the
   picture's place, so a map's poll stays within 1.3× of none. `SHIFT`: the match off the picture's place by the
   learned move. A colour shade writes `Shade.Geometry.NONE`.
+- **Discovery deduces versions from what it sees**: which_screen fits each button it finds against its cut and says a
+  version (`shop shows dimmed, as play did`). The same change on most of a frame's buttons is a shade over the screen,
+  never a version. A change seen on two buttons is proposed, and `edit_map learn_shade fit <id>` writes it into
+  `Sdk.shades()` (a dim, grey or fade means Disabled). A change on one button is only said. A part a button shows and
+  its cut lacks (a lock, a badge) is said with its place. What was seen is kept between Studio starts. In 🗺 Screens,
+  with no screen picked, *Shades the game shows* lists them: Learn with the state picked, ✕ to forget a learned one.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

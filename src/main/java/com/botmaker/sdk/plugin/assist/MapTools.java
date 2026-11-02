@@ -165,15 +165,14 @@ final class MapTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("not_a_screen")
-                    .describedAs("Takes back a screen try_input added when the input only changed the screen it was "
-                            + "on (a whole redraw: a stage changed, a fight restarted): the screen leaves the map and "
-                            + "each way into it is recorded on the screen it leaves as changing that one in place. "
-                            + "Refused once anything is reached from it")
+                    .describedAs("Takes back a screen try_input added when the input only redrew the screen it was "
+                            + "on (a stage changed): the screen leaves the map and each way into it is recorded as "
+                            + "changing that one in place. Refused once anything is reached from it")
                     .takes(Mistake.class).handledBy(MapTools::notAScreen),
             AssistantTool.named("place_pictures")
                     .describedAs("crop_pictures' map half for pictures the bot has already: notes them on a screen "
-                            + "of the bot's Screens as its marker, its way back, or inputs untried until try_input "
-                            + "tries them, without cutting them again. A marker starts the screen as a cut one does")
+                            + "as its marker, way back, or untried inputs, without cutting them again. A marker "
+                            + "starts the screen as a cut one does")
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
                     .describedAs("Discovery's one way to act on a screen: does inputs cut on it (click, scroll, "
@@ -183,7 +182,7 @@ final class MapTools {
                             + "with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")
-                    .describedAs("Walks the game to a screen of the bot's Screens as a run does: finds where it is "
+                    .describedAs("Walks the game to a screen of the map as a run does: finds where it is "
                             + "by the markers, then does each input on the way and waits for each screen; a popup "
                             + "on the way is closed. Says where it ended and why when it did not arrive")
                     .takes(Goal.class).handledBy(MapTools::goToScreen));

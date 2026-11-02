@@ -171,10 +171,29 @@ public final class MapAudit {
 
     /** Where {@code resources}' project's matches are kept: the cache's {@code map-audit}, by the folder's hash. */
     private static Path store(Path resources) {
+        return store(resources, Kept.AUDIT);
+    }
+
+    /** What a project keeps in the cache, each in a folder of its own. */
+    enum Kept {
+        /** These matches, read back only by the SDK build that made them. */
+        AUDIT("map-audit"),
+        /** The versions Discovery saw ({@link Versions}), read back by any build. */
+        VERSIONS("map-versions");
+
+        private final String folder;
+
+        Kept(String folder) {
+            this.folder = folder;
+        }
+    }
+
+    /** {@code resources}' project's file in the cache's {@code kind} folder, by the project folder's hash. */
+    static Path store(Path resources, Kept kind) {
         String folder = resources.toAbsolutePath().normalize().toString();
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(folder.getBytes(StandardCharsets.UTF_8));
-            return CacheDirs.cacheRoot().resolve("map-audit")
+            return CacheDirs.cacheRoot().resolve(kind.folder)
                     .resolve(HexFormat.of().formatHex(hash, 0, 16) + ".bin");
         } catch (NoSuchAlgorithmException never) {
             throw new IllegalStateException(never);
