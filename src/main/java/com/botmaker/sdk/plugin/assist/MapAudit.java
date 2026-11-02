@@ -24,13 +24,20 @@ import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 
+import com.botmaker.shared.config.CacheDirs;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -38,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
@@ -82,7 +90,96 @@ public final class MapAudit {
     /** Batches matched so far, each one shot's: the tests count them to see pictures are matched side by side. */
     static final LongAdder BATCHES = new LongAdder();
 
+    /** The projects whose kept matches were read back ({@link #remember}), each once a Studio start. */
+    private static final Set<Path> REMEMBERED = ConcurrentHashMap.newKeySet();
+    /** The projects with a match made since {@link #keep} last wrote theirs: one with none is not written again. */
+    private static final Set<Path> CHANGED = ConcurrentHashMap.newKeySet();
+    /**
+     * The SDK build that made the matches, its jar and the jar's time: one built otherwise may match otherwise, and
+     * its file is passed over.
+     */
+    private static final String BUILD = build();
+
     private MapAudit() {}
+
+    /**
+     * Reads back the matches {@link #keep} wrote for {@code resources}' project, once: a Studio started again matches
+     * only the shots and pictures changed since. A broken file, or one of another layout, is passed over.
+     */
+    public static void remember(Path resources) {
+        if (resources != null) remember(resources, store(resources));
+    }
+
+    static void remember(Path resources, Path store) {
+        if (!REMEMBERED.add(resources)) return;
+        AuditFile.read(store, BUILD).ifPresent(kept -> {
+            kept.made().forEach(MADE::putIfAbsent);
+            kept.fitted().forEach(FITTED::putIfAbsent);
+        });
+    }
+
+    /** Writes the matches made for {@code resources}' project, for {@link #remember} after the next start. */
+    public static void keep(Path resources) {
+        if (resources != null) keep(resources, store(resources));
+    }
+
+    static void keep(Path resources, Path store) {
+        if (!CHANGED.remove(resources)) return;
+        Map<String, Audit> made;
+        Map<String, Fit> fitted;
+        synchronized (MADE) {
+            made = ours(resources, MADE);
+        }
+        synchronized (FITTED) {
+            fitted = ours(resources, FITTED);
+        }
+        try {
+            AuditFile.write(store, BUILD, made, fitted);
+        } catch (IOException unwritten) {
+            // Only a cache: the next start matches again.
+        }
+    }
+
+    private static String build() {
+        try {
+            Path jar = Path.of(MapAudit.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            return jar + "@" + Files.getLastModifiedTime(jar).toMillis();
+        } catch (Exception unknown) {
+            // A build not told apart: none of its files is read back.
+            return "unknown@" + System.nanoTime();
+        }
+    }
+
+    /** Forgets every match made or read back, as a Studio started again has none: the tests start from it. */
+    static void forget() {
+        MADE.clear();
+        FITTED.clear();
+        REMEMBERED.clear();
+        CHANGED.clear();
+    }
+
+    /** The entries of {@code cache} made for {@code resources}: keys start with it, or with a shot in it. */
+    private static <T> Map<String, T> ours(Path resources, Map<String, T> cache) {
+        String audit = resources + "|";
+        String shot = resources + File.separator;
+        Map<String, T> ours = new LinkedHashMap<>();
+        cache.forEach((key, value) -> {
+            if (key.startsWith(audit) || key.startsWith(shot)) ours.put(key, value);
+        });
+        return ours;
+    }
+
+    /** Where {@code resources}' project's matches are kept: the cache's {@code map-audit}, by the folder's hash. */
+    private static Path store(Path resources) {
+        String folder = resources.toAbsolutePath().normalize().toString();
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(folder.getBytes(StandardCharsets.UTF_8));
+            return CacheDirs.cacheRoot().resolve("map-audit")
+                    .resolve(HexFormat.of().formatHex(hash, 0, 16) + ".bin");
+        } catch (NoSuchAlgorithmException never) {
+            throw new IllegalStateException(never);
+        }
+    }
 
     /** Where a picture is on a frame: at its place (or anywhere, for one with no place), elsewhere, or nowhere. */
     public enum Where { AT_PLACE, ELSEWHERE, MISSING }
@@ -155,11 +252,12 @@ public final class MapAudit {
     public static Optional<Audit> of(Path resources, double confidence, Map<String, FrameCut> cuts, String constant,
                                      MapScreen screen) {
         if (resources == null || screen == null) return Optional.empty();
+        remember(resources);
         Optional<Path> named = ScreenShots.file(resources, screen);
         if (named.isEmpty()) return Optional.empty();
         Path shotFile = named.get();
-        long shotTime = modified(shotFile);
-        if (shotTime == 0) return Optional.empty();
+        String shotTime = modified(shotFile);
+        if (shotTime.isEmpty()) return Optional.empty();
         Map<String, Check> checks = checks(resources, screen);
         StringBuilder key = new StringBuilder(resources + "|" + constant + "@" + shotTime + "|" + confidence);
         checks.values().forEach(c -> key.append('|').append(c).append('@')
@@ -189,6 +287,7 @@ public final class MapAudit {
         }
         Audit audit = new Audit(List.copyOf(spots));
         MADE.put(key.toString(), audit);
+        CHANGED.add(resources);
         return Optional.of(audit);
     }
 
@@ -217,6 +316,7 @@ public final class MapAudit {
      */
     public static Optional<Clash> clash(Path resources, double confidence, Map<String, FrameCut> cuts,
                                         ScreenGraph graph, String constant, Markers set) {
+        if (resources != null) remember(resources);
         return clash(resources, confidence, cuts, graph, constant, set, screen -> shot(resources, screen));
     }
 
@@ -318,6 +418,7 @@ public final class MapAudit {
                         matches.get(i).rect()) : new Fit(s.picture(), Where.MISSING, null);
                 found.put(s, fit);
                 FITTED.put(keys.get(s), fit);
+                CHANGED.add(resources);
             }
         }
         return Optional.of(sought.stream().map(found::get).toList());
@@ -343,6 +444,7 @@ public final class MapAudit {
      */
     public static List<String> clashes(Path resources, double confidence, Map<String, FrameCut> cuts,
                                        ScreenGraph graph, String only) {
+        if (resources != null) remember(resources);
         List<String> lines = new ArrayList<>();
         // Each shot is read once: every screen's markers are looked for on every other screen's shot.
         Map<MapScreen, Optional<BufferedImage>> read = new IdentityHashMap<>();
@@ -548,11 +650,15 @@ public final class MapAudit {
         return Places.inSource(new Zone(rect.x(), rect.y(), rect.width(), rect.height()), frame, live);
     }
 
-    private static long modified(Path file) {
+    /**
+     * {@code file}'s time and size, empty when it is gone: a file copied with its time kept (an unzip, {@code cp -p})
+     * but other pixels mostly has another size, and the kept matches outlive Studio's start.
+     */
+    private static String modified(Path file) {
         try {
-            return Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() : 0;
+            return Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() + "/" + Files.size(file) : "";
         } catch (IOException gone) {
-            return 0;
+            return "";
         }
     }
 }

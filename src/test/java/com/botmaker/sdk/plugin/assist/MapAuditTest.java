@@ -218,6 +218,47 @@ class MapAuditTest {
         ImageIO.write(shot, "png", file.toFile());
     }
 
+    @Test
+    void theMatchesKeptOnDiskAreNotMatchedAgainAfterAStart() throws IOException {
+        Map<String, FrameCut> cuts = home();
+        ScreenGraph graph = ScreenGraph.of(Map.of("HOME", screen()));
+        Path store = resources.resolve("kept/audit.bin");
+        Audit audit = MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow();
+        List<String> said = MapAudit.clashes(resources, 0.9, cuts, graph, null);
+        MapAudit.keep(resources, store);
+
+        // Studio started again: nothing in memory, the file read back.
+        MapAudit.forget();
+        MapAudit.remember(resources, store);
+        long before = MapAudit.SEARCHED.sum();
+        assertEquals(audit, MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow());
+        assertEquals(said, MapAudit.clashes(resources, 0.9, cuts, graph, null));
+        assertEquals(0, MapAudit.SEARCHED.sum() - before);
+    }
+
+    @Test
+    void aBrokenKeptFileIsPassedOver() throws IOException {
+        Map<String, FrameCut> cuts = home();
+        Path store = resources.resolve("kept/audit.bin");
+        Files.createDirectories(store.getParent());
+        Files.write(store, new byte[]{0, 0, 0, 18, 'b', 'o', 't'});
+        MapAudit.forget();
+        MapAudit.remember(resources, store);
+        long before = MapAudit.SEARCHED.sum();
+        assertEquals(Where.AT_PLACE, MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow()
+                .of("home").orElseThrow().where());
+        assertTrue(MapAudit.SEARCHED.sum() - before > 0, "matched again");
+    }
+
+    @Test
+    void aFileAnotherBuildMatchedIsPassedOver() throws IOException {
+        Path store = resources.resolve("kept/audit.bin");
+        AuditFile.write(store, "sdk@1", Map.of(), Map.of("k", new MapAudit.Fit("home", Where.AT_PLACE,
+                new Rect(1, 2, 3, 4))));
+        assertEquals(1, AuditFile.read(store, "sdk@1").orElseThrow().fitted().size());
+        assertTrue(AuditFile.read(store, "sdk@2").isEmpty());
+    }
+
     /** In a list, anywhere in it is its place, and one scrolled out of the shot is only a note. */
     @Test
     void anInputInItsListIsAtItsPlaceAnywhereInItAndScrolledOutIsANote() throws IOException {

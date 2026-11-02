@@ -96,8 +96,11 @@ public final class MapReport {
             if (only != null && !only.equals(c)) continue;
             MapAudit.of(resources, confidence, cuts, c, read.graph().screens().get(c)).ifPresent(a -> audits.put(c, a));
         }
+        List<String> clashes = MapAudit.clashes(resources, confidence, cuts, read.graph(), only);
+        // Kept for Studio's next start, which matches only the shots and pictures changed since.
+        MapAudit.keep(resources);
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,
-                audits, MapAudit.clashes(resources, confidence, cuts, read.graph(), only), only));
+                audits, clashes, only));
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));

@@ -26,7 +26,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   all of one shot's in one batch whose pictures match side by side, and a picture with no place is looked for over
   the whole shot once, not twice. A screen's marker is looked for on the other shots near its place, as a run looks
   for it, not over each whole shot: one far from its place tells a run nothing, and so is no longer said as a clash.
-  Sword x Staff's 49 screens: 400 s before, 24 s the first time, a few seconds after.
+  Sword x Staff's 49 screens: 400 s before, 24 s the first time, a few seconds after. The matches are kept in the
+  cache folder (`map-audit/`, one file per project) and read back after Studio starts again, so only the shots and
+  pictures changed since are matched; a broken file is passed over.
 - **Watching a moving thing keeps up with the game**: `crop_pictures`' `moving` and 🗺's ◉ Watch read a game in a
   private display as the live board does, about 40 new frames a second where it read 5. A watch that sees more poses
   than a picture holds says how fast it grabbed.
