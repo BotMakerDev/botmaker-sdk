@@ -634,7 +634,7 @@ class ReachTest {
     @Test
     void aLearnedShadeTellsTheStateOfTheUsualLook() {
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         Column dimmed = new Column(Map.of("tavern", 0), 0) {
             @Override
             public Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {

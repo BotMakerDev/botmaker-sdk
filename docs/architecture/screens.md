@@ -26,6 +26,13 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `PRESS_MS` of it — the pointer is run-wide (`ShadeFit.pointer`, reset when a run takes its shades), set by the map's
   presses, drags and scrolls only. Tint shades also match the cut tinted (`ShadeFit.tinted`; cuts and copies kept by
   file stamp, 64 at most) where the plain cut finds nothing. No shade: no computed version.
+- **A version computed by geometry** (2026-11-02): `Shade.Kind` `GLOW`, `SCALE`, `SHIFT` (`Shade.moves()`) are told
+  by the match, not its pixels' colour (`ShadeFit.moved`): a glow by `ShadeFit.ring` (the ring `geometry.ring` wide
+  against the band beyond, matched to the shade's offset), a scale by the match's size against the cut's, a shift by
+  its place against the picture's `at` place, each scaled from the cut's frame (`frame()` or the bot's screen) to the
+  live one. `RunReach.rescaled` matches every picture drawn at each learned size (`ShadeFit.sizes`, `scaled`,
+  `scaledAround`) in one `bestMatchesNear` call: near a match when found, which keeps a 40-button poll within 1.3×
+  (`ScaledMatchTest`), and the better score wins.
   `reached` (SURVEYED → BUILT → TRIED → TUNED, or LOCKED), `owes`, and `at(Point)`, the corner its card was
   moved to on 🗺 Screens (none: the layout places it). A screen names the one it is reached from,
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a

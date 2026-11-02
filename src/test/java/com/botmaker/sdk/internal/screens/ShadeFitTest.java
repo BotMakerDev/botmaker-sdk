@@ -2,11 +2,13 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.screens.State;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Optional;
@@ -133,7 +135,7 @@ class ShadeFitTest {
         Random random = new Random(7);
         ShadeFit.Fit fit = fit(shown(icon(), each(v -> (int) Math.round(v * 0.45) + random.nextInt(9) - 4)));
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         assertEquals(Optional.of(dim), ShadeFit.closest(fit, List.of(dim), GAME));
     }
 
@@ -145,7 +147,7 @@ class ShadeFitTest {
             for (int x = 0; x < 50; x++) frame.setRGB(x, y, random.nextInt(0xFFFFFF));
         }
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         assertEquals(Optional.empty(), ShadeFit.closest(fit(frame), List.of(dim), GAME));
         assertEquals(Optional.empty(), ShadeFit.closest(fit(shown(icon(), each(v -> v))), List.of(dim), GAME),
                 "the button as cut is not dimmed");
@@ -166,10 +168,10 @@ class ShadeFitTest {
     @Test
     void aHoverThatDarkensKeepsTheButtonUnderTheCursorNormal() {
         Shade hover = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.5), Shade.Channels.all(0), 0.1,
-                Shade.Cause.HOVER, State.DISABLED);
+                Shade.Cause.HOVER, State.DISABLED, Shade.Geometry.NONE);
         assertEquals(State.NORMAL, hover.state(), "the bot's input never changes what a button means");
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0.1, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         ShadeFit.Fit darker = fit(shown(icon(), each(v -> (int) Math.round(v * 0.47))));
         Set<Shade.Cause> underCursor = ShadeFit.causes(AT, new ShadeFit.Pointer(new Point(20, 20), 0, false, true),
                 10_000);
@@ -180,9 +182,9 @@ class ShadeFitTest {
     @Test
     void theFocusOfAButtonJustPressedDoesNotHideTheGamesDim() {
         Shade focus = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.5), Shade.Channels.all(0), 0.1,
-                Shade.Cause.FOCUS, State.NORMAL);
+                Shade.Cause.FOCUS, State.NORMAL, Shade.Geometry.NONE);
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0.1, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         ShadeFit.Fit darker = fit(shown(icon(), each(v -> (int) Math.round(v * 0.45))));
         Set<Shade.Cause> pressedHere = ShadeFit.causes(AT, new ShadeFit.Pointer(new Point(20, 20), 0, true, false),
                 10_000);
@@ -206,7 +208,7 @@ class ShadeFitTest {
             }
         }
         Shade grey = new Shade(Shade.Kind.GREY, Shade.Channels.all(0.6), Shade.Channels.all(0), 0, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         assertEquals(Optional.of(grey),
                 ShadeFit.closest(ShadeFit.fit(cut, 1, frame, AT).orElseThrow(), List.of(grey), GAME));
     }
@@ -229,11 +231,83 @@ class ShadeFitTest {
     @Test
     void aShadeAppliedToTheCutIsWhatItFits() {
         Shade tint = new Shade(Shade.Kind.TINT, new Shade.Channels(1, 0.6, 0.5), Shade.Channels.all(0), 0,
-                Shade.Cause.GAME, State.DISABLED);
+                Shade.Cause.GAME, State.DISABLED, Shade.Geometry.NONE);
         BufferedImage tinted = ShadeFit.shaded(icon(), tint);
         assertEquals(0, tinted.getRGB(0, 0) >>> 24, "see-through stays so");
         BufferedImage frame = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
         frame.getGraphics().drawImage(tinted, 10, 10, null);
         assertEquals(Optional.of(tint), ShadeFit.closest(fit(frame), List.of(tint), GAME));
+    }
+
+    private static Shade moving(Shade.Kind kind, Shade.Channels offset, Shade.Geometry geometry) {
+        return new Shade(kind, Shade.Channels.all(1), offset, 0.04, Shade.Cause.GAME, State.SELECTED, geometry);
+    }
+
+    /** The icon, cut at {@code place} in a frame of {@code authored}. */
+    private static ShadeFit.Cut cutAt(Rect place, Size authored) {
+        return new ShadeFit.Cut(icon(), 1, place, authored);
+    }
+
+    @Test
+    void aGlowIsARingLighterThanTheFrameBeyond() {
+        Shade glow = moving(Shade.Kind.GLOW, Shade.Channels.all(0.3), new Shade.Geometry(4, 1, 1, 0, 0));
+        Rect at = new Rect(28, 28, 24, 24);
+        BufferedImage plain = new BufferedImage(80, 80, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = plain.createGraphics();
+        g.setColor(new Color(40, 40, 40));
+        g.fillRect(0, 0, 80, 80);
+        g.drawImage(icon(), 28, 28, null);
+        BufferedImage lit = new BufferedImage(80, 80, BufferedImage.TYPE_INT_RGB);
+        Graphics2D l = lit.createGraphics();
+        l.drawImage(plain, 0, 0, null);
+        l.setColor(new Color(117, 117, 117));
+        l.fillRect(24, 24, 32, 32);
+        l.drawImage(icon(), 28, 28, null);
+        assertEquals(Optional.of(glow), ShadeFit.shown(cutAt(null, null), at, lit, List.of(glow), GAME));
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(null, null), at, plain, List.of(glow), GAME),
+                "no ring, no glow");
+    }
+
+    @Test
+    void aScaleIsAMatchOfAnotherSizeScaledToTheFrame() {
+        Shade grown = moving(Shade.Kind.SCALE, Shade.Channels.all(0), new Shade.Geometry(0, 1.1, 1.1, 0, 0));
+        BufferedImage frame = new BufferedImage(150, 150, BufferedImage.TYPE_INT_RGB);
+        Size cutOn = new Size(100, 100);
+        assertEquals(Optional.of(grown), ShadeFit.shown(cutAt(null, cutOn), new Rect(10, 10, 40, 40), frame,
+                List.of(grown), GAME), "40 shown of 24 cut, the frame half again as big: 1.11");
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(null, cutOn), new Rect(10, 10, 36, 36), frame,
+                List.of(grown), GAME), "the cut's size, scaled with the frame");
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(null, cutOn), new Rect(10, 10, 48, 48), frame,
+                List.of(grown), GAME), "bigger than learned");
+    }
+
+    @Test
+    void aPulseIsEitherEndAndEachEndIsOneMoreMatch() {
+        Shade pulse = moving(Shade.Kind.SCALE, Shade.Channels.all(0), new Shade.Geometry(0, 0.9, 1.15, 0, 0));
+        BufferedImage frame = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
+        assertEquals(Optional.of(pulse), ShadeFit.shown(cutAt(null, null), new Rect(10, 10, 22, 22), frame,
+                List.of(pulse), GAME));
+        assertEquals(Optional.of(pulse), ShadeFit.shown(cutAt(null, null), new Rect(10, 10, 27, 27), frame,
+                List.of(pulse), GAME));
+        Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0, Shade.Cause.GAME,
+                State.DISABLED, Shade.Geometry.NONE);
+        assertEquals(List.of(0.9, 1.15), ShadeFit.sizes(List.of(pulse, dim,
+                moving(Shade.Kind.SCALE, Shade.Channels.all(0), new Shade.Geometry(0, 1, 1.15, 0, 0)))),
+                "the cut's own size is no match of its own; a size learned twice is matched once");
+    }
+
+    @Test
+    void aShiftIsTheMatchOffItsUsualPlaceByTheLearnedMove() {
+        Shade lifted = moving(Shade.Kind.SHIFT, Shade.Channels.all(0), new Shade.Geometry(0, 1, 1, 0, -6));
+        BufferedImage frame = new BufferedImage(60, 60, BufferedImage.TYPE_INT_RGB);
+        Rect place = new Rect(10, 20, 24, 24);
+        assertEquals(Optional.of(lifted), ShadeFit.shown(cutAt(place, null), new Rect(10, 14, 24, 24), frame,
+                List.of(lifted), GAME));
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(place, null), place, frame, List.of(lifted), GAME),
+                "in its place");
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(place, null), new Rect(30, 20, 24, 24), frame,
+                List.of(lifted), GAME), "moved elsewhere");
+        assertEquals(Optional.empty(), ShadeFit.shown(cutAt(null, null), new Rect(10, 14, 24, 24), frame,
+                List.of(lifted), GAME), "a picture with no place has no move to tell");
     }
 }

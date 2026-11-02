@@ -186,9 +186,9 @@ public final class SdkValues implements ValueHolder {
                     + " Name a new state on a look in 🗺 Screens to add one.");
 
     /**
-     * How the game shows a button changed by colour alone — {@code Shades.of(new Shade(Shade.Kind.DIM, …,
-     * State.DISABLED))}: learned on one button seen both ways and applied to all, never chosen (2026-11-02). None
-     * written: no button is seen in a shade.
+     * How the game shows a button changed by colour, a glow, a size or a place — {@code Shades.of(new
+     * Shade(Shade.Kind.DIM, …, State.DISABLED, Shade.Geometry.NONE))}: learned on one button seen both ways and
+     * applied to all, never chosen (2026-11-02). None written: no button is seen in a shade.
      */
     public static final ManagedMethod<Shades> SHADES = ManagedValue.method(SdkValue.Id.SHADES)
             .in(HOLDER)

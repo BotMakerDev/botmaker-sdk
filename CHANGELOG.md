@@ -43,6 +43,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   tinted too, one more match per tint shade. which_screen says the version beside a match (`dimmed → Disabled`). A
   bot with no shade sees none: the built-in dim check (0.7 of the light, half the colour) is gone. Discovery learns
   shades in a later release.
+- **Versions computed by geometry**: three more `Shade` kinds, each with a `Shade.Geometry` (ring, smallest and
+  largest size, dx, dy, in the cut frame's pixels, scaled to the frame as places are). `GLOW`: a ring around the
+  match lighter than the frame beyond it by the shade's offset. `SCALE`: the match bigger or smaller than the cut,
+  or either end of a pulse; a run also matches the cut drawn at each learned size, near each match or the
+  picture's place, so a map's poll stays within 1.3× of none. `SHIFT`: the match off the picture's place by the
+  learned move. A colour shade writes `Shade.Geometry.NONE`.
 
 - **The settings a bot needs are part of its map**: a button `.keeps(Pictures.QUALITY_HIGH)` (one of its looks,
   taken as Selected when it is none; every look it shows on the way must be one too) is pressed at the run's start, its screen walked to, until it shows that

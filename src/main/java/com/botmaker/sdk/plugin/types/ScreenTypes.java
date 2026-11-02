@@ -66,7 +66,7 @@ public final class ScreenTypes implements TypeHolder {
     @Override
     public List<ComponentType<?>> components() {
         return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, SHADES_SHAPE,
-                SHADE_SHAPE, CHANNELS_SHAPE, BUTTON_SHAPE,
+                SHADE_SHAPE, CHANNELS_SHAPE, GEOMETRY_SHAPE, BUTTON_SHAPE,
                 BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
@@ -134,11 +134,15 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<Shades> SHADES_SHAPE = ComponentType.part(Shades.class)
             .writtenAsEach(Shades::of, Shades::list);
 
-    /** {@code new Shade(kind, gain, offset, tolerance, cause, state)}: one learned shade. */
+    /** {@code new Shade(kind, gain, offset, tolerance, cause, state, geometry)}: one learned shade. */
     public static final DeclaredCall<Shade> SHADE_SHAPE = ComponentType.part(Shade.class).writtenAsRecord();
 
     /** {@code new Shade.Channels(red, green, blue)}: a shade's gain or offset. */
     public static final DeclaredCall<Shade.Channels> CHANNELS_SHAPE = ComponentType.part(Shade.Channels.class)
+            .writtenAsRecord();
+
+    /** {@code new Shade.Geometry(ring, smallest, largest, dx, dy)}: how a glow, a scale or a shift moves a button. */
+    public static final DeclaredCall<Shade.Geometry> GEOMETRY_SHAPE = ComponentType.part(Shade.Geometry.class)
             .writtenAsRecord();
 
     /**

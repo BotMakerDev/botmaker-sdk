@@ -9,8 +9,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
   fixtures) to parts. A look (`ScreenVariant`) is still told by marker lists: tell it by parts too. 🗺 Screens draws a
   `Mark` field only through its screen's markers; give it a row in the outline and a marking/absent toggle in the
   input inspector.
-- **Shades, the rest (2026-11-02)**: a tint shade is matched tinted only by `findEachScored`/`findAllScored`; a
-  strip's band (`findWithinScored`) and markers (`findEach*`) still look for the plain cut. A pointer is recorded only
+- **Shades, the rest (2026-11-02)**: a tint or scale shade is matched tinted or scaled only by
+  `findEachScored`/`findAllScored`; a strip's band (`findWithinScored`), markers (`findEach*`) and the assistant's
+  `ToolReach` still look for the plain cut. A scaled copy is looked for near a match or the picture's place, so an
+  unplaced picture shown scaled and nowhere near is missed. A glow's ring is read against the band beyond it, so a
+  button on a busy background may read no glow. A pointer is recorded only
   for the map's presses, not a flow's own `Mouse` calls, nor the assistant's hands (`ToolReach.shade` tries the
   game's shades only). Nothing yet writes `Sdk.shades()` but the author: Discovery
   learns them (plan phase 5), and 🗺 Screens has no view of them.

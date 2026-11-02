@@ -10,14 +10,22 @@ package com.botmaker.sdk.api.screens;
  * that button did when pressed. A shade whose cause is the bot's own input ({@link Cause#HOVER}, {@link Cause#PRESS},
  * {@link Cause#FOCUS}) means {@link State#NORMAL} and is tried only on the button the input is on.
  *
- * @param kind      what the change looks like, for the reader: the fit is what tells it
+ * <p>Three kinds change where and how big the button shows rather than its colour ({@link Kind#GLOW},
+ * {@link Kind#SCALE}, {@link Kind#SHIFT}): their {@link #geometry()} says how, in the pixels of the frame the button
+ * was cut from, scaled to the frame as places are.
+ *
+ * @param kind      what the change looks like; for a colour change, for the reader only: the fit is what tells it
  * @param gain      how much of each channel of the cut shows
- * @param offset    what each channel gains on top, 0 to 1
- * @param tolerance how far a fit may stray from {@code gain} and {@code offset}, in either, and still be this shade
+ * @param offset    what each channel gains on top, 0 to 1; for a {@link Kind#GLOW}, how much lighter its ring is than
+ *                  the frame around it
+ * @param tolerance how far a fit may stray from {@code gain} and {@code offset}, in either, and still be this shade; a
+ *                  scale's share and a shift's share of the button's size too
  * @param cause     what makes the game show it
  * @param state     what the button means shown so; {@code Normal} for a shade the bot's input causes
+ * @param geometry  how a glow, a scale or a shift moves the button; {@link Geometry#NONE} for a colour change
  */
-public record Shade(Kind kind, Channels gain, Channels offset, double tolerance, Cause cause, ButtonState state) {
+public record Shade(Kind kind, Channels gain, Channels offset, double tolerance, Cause cause, ButtonState state,
+                    Geometry geometry) {
 
     /** How far a learned fit may stray when nothing else is said: a frame's noise and a game's soft edges. */
     public static final double TOLERANCE = 0.08;
@@ -30,6 +38,38 @@ public record Shade(Kind kind, Channels gain, Channels offset, double tolerance,
         cause = cause == null ? Cause.GAME : cause;
         // The bot's own input changes how a button looks, never what it means.
         state = cause != Cause.GAME || state == null ? State.NORMAL : state;
+        geometry = geometry == null ? Geometry.NONE : geometry;
+    }
+
+    /** Whether this shade moves the button rather than changing its colour. */
+    public boolean moves() {
+        return kind == Kind.GLOW || kind == Kind.SCALE || kind == Kind.SHIFT;
+    }
+
+    /**
+     * How a shade moves the button, in the pixels of the frame it was cut from.
+     *
+     * @param ring     a {@link Kind#GLOW}'s ring width around the button; 0 for none
+     * @param smallest a {@link Kind#SCALE}'s smallest size, 1 the cut's: a pulse's one end
+     * @param largest  its largest size: a pulse's other end, {@code smallest} again for a button that only grows
+     * @param dx       a {@link Kind#SHIFT}'s move to the right of the button's usual place
+     * @param dy       its move down
+     */
+    public record Geometry(int ring, double smallest, double largest, int dx, int dy) {
+
+        /** No move: a colour change. */
+        public static final Geometry NONE = new Geometry(0, 1, 1, 0, 0);
+
+        public Geometry {
+            ring = Math.max(0, ring);
+            smallest = smallest <= 0 ? 1 : smallest;
+            largest = largest <= 0 ? smallest : largest;
+            if (largest < smallest) {
+                double low = largest;
+                largest = smallest;
+                smallest = low;
+            }
+        }
     }
 
     /** One value per colour channel. */
@@ -61,7 +101,13 @@ public record Shade(Kind kind, Channels gain, Channels offset, double tolerance,
         /** Coloured: the channels scaled apart. */
         TINT("tinted"),
         /** Faded towards a background: scaled down and lifted towards its colour. */
-        FADE("faded");
+        FADE("faded"),
+        /** A light around it: a ring of {@link Geometry#ring()} lighter than the frame beyond by the offset. */
+        GLOW("glowing"),
+        /** Bigger or smaller, or pulsing between two sizes: matched at each learned size. */
+        SCALE("scaled"),
+        /** Moved off its usual place by {@link Geometry#dx()}, {@link Geometry#dy()}. */
+        SHIFT("shifted");
 
         private final String displayName;
 

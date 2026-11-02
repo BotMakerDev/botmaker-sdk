@@ -119,8 +119,8 @@ record ToolReach(AgentContext context, Path resources, double confidence, Hands 
     public Optional<Shade> shade(ImageTemplate picture, Rect found, BufferedImage frame) {
         List<Shade> shades = Frames.shades(context.services());
         if (shades.isEmpty()) return Optional.empty();
-        return Frames.picture(resources, picture.id())
-                .map(name -> new ImageTemplate(TemplateLibrary.fileForName(resources, name).toString()))
+        // Placed as the constant places it: a shift is told against that place.
+        return Frames.picture(resources, picture.id()).map(name -> placed(name, picture))
                 .flatMap(file -> ShadeFit.shown(file, found, frame, shades, Set.of(Shade.Cause.GAME)));
     }
 

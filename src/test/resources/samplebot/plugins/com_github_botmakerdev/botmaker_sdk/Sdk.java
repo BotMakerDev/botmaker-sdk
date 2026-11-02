@@ -72,7 +72,9 @@ public final class Sdk {
     @SdkValue(SdkValue.Id.SHADES)
     public static Shades shades() {
         return Shades.of(new Shade(Shade.Kind.DIM, new Shade.Channels(0.45, 0.45, 0.45), new Shade.Channels(0, 0, 0),
-                0.08, Shade.Cause.GAME, State.DISABLED));
+                0.08, Shade.Cause.GAME, State.DISABLED, new Shade.Geometry(0, 1.0, 1.0, 0, 0)),
+                new Shade(Shade.Kind.SCALE, new Shade.Channels(1, 1, 1), new Shade.Channels(0, 0, 0), 0.04,
+                        Shade.Cause.HOVER, State.NORMAL, new Shade.Geometry(0, 1.1, 1.1, 0, 0)));
     }
 
     private Sdk() {}

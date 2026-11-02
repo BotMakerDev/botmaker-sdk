@@ -422,16 +422,21 @@ class ScreenTypesTest {
     @Test
     void learnedShadesRoundTrip() {
         Shade dim = new Shade(Shade.Kind.DIM, Shade.Channels.all(0.45), Shade.Channels.all(0), 0.08, Shade.Cause.GAME,
-                State.DISABLED);
+                State.DISABLED, Shade.Geometry.NONE);
         Shade hover = new Shade(Shade.Kind.BRIGHT, new Shade.Channels(1.1, 1.1, 1.2), Shade.Channels.all(0.02), 0.05,
-                Shade.Cause.HOVER, State.NORMAL);
+                Shade.Cause.HOVER, State.NORMAL, Shade.Geometry.NONE);
+        Shade pulse = new Shade(Shade.Kind.SCALE, Shade.Channels.all(1), Shade.Channels.all(0), 0.04, Shade.Cause.GAME,
+                State.SELECTED, new Shade.Geometry(0, 1.05, 1.15, 0, 0));
         assertEquals(dim, roundTrip(ScreenTypes.SHADE_SHAPE, dim));
+        assertEquals(pulse, roundTrip(ScreenTypes.SHADE_SHAPE, pulse));
         assertEquals(hover.gain(), roundTrip(ScreenTypes.CHANNELS_SHAPE, hover.gain()));
-        Shades both = Shades.of(dim, hover);
+        assertEquals(new Shade.Geometry(3, 1, 1, -4, 2),
+                roundTrip(ScreenTypes.GEOMETRY_SHAPE, new Shade.Geometry(3, 1, 1, -4, 2)));
+        Shades both = Shades.of(dim, hover, pulse);
         assertEquals(both, roundTrip(ScreenTypes.SHADES_SHAPE, both));
         assertEquals(Shades.none(), roundTrip(ScreenTypes.SHADES_SHAPE, Shades.none()));
         assertTrue(new SdkPlugin().componentTypes().containsAll(List.of(ScreenTypes.SHADES_SHAPE,
-                ScreenTypes.SHADE_SHAPE, ScreenTypes.CHANNELS_SHAPE)));
+                ScreenTypes.SHADE_SHAPE, ScreenTypes.CHANNELS_SHAPE, ScreenTypes.GEOMETRY_SHAPE)));
     }
 
     @Test

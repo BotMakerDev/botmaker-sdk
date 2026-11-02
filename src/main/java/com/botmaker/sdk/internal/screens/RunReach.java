@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * A run's reach: the capture source the run reads ({@link Source#current()}), matched at the bot's confidence and
@@ -99,15 +101,61 @@ public final class RunReach implements Reach {
                 copies.add(copy.get());
             }
         }
-        if (copies.isEmpty()) return found;
-        List<MatchResult> tinted = ImageFinder.bestMatches(copies, new StillSource(frame));
-        for (int k = 0; k < copies.size(); k++) {
-            MatchResult best = tinted.get(k);
-            if (found.get(missing.get(k)).isEmpty() && best.isFound() && best.confidence() >= needs) {
-                found.set(missing.get(k), Optional.of(new Found(best.rect(), best.confidence())));
+        if (!copies.isEmpty()) {
+            List<MatchResult> tinted = ImageFinder.bestMatches(copies, new StillSource(frame));
+            for (int k = 0; k < copies.size(); k++) {
+                MatchResult best = tinted.get(k);
+                if (found.get(missing.get(k)).isEmpty() && best.isFound() && best.confidence() >= needs) {
+                    found.set(missing.get(k), Optional.of(new Found(best.rect(), best.confidence())));
+                }
             }
         }
+        rescaled(pictures, frame, found, needs);
         return found;
+    }
+
+    /**
+     * Each picture drawn at each size the bot's scale shades learned, matched near where it was found, else near its
+     * place (anywhere for a picture with none), all on the frame prepared once: a scaled match that scores better
+     * replaces the cut's, so its place tells the scale. A small area each, so a map's poll stays nearly as fast.
+     */
+    /** By how much a scaled copy must outscore the cut's match to replace it: a flat button scores alike at any size. */
+    static final double SCALED_BETTER = 0.02;
+
+    private static void rescaled(List<ImageTemplate> pictures, BufferedImage frame, List<Optional<Found>> found,
+                                 double needs) {
+        List<Double> sizes = ShadeFit.sizes(ShadeFit.learned());
+        if (sizes.isEmpty()) return;
+        List<Integer> of = new ArrayList<>();
+        List<ImageTemplate> copies = new ArrayList<>();
+        List<ImageTemplate> own = new ArrayList<>();
+        try {
+            for (double size : sizes) {
+                for (int i = 0; i < pictures.size(); i++) {
+                    ImageTemplate picture = pictures.get(i);
+                    Optional<ImageTemplate> copy = found.get(i)
+                            .flatMap(at -> ShadeFit.scaledAround(picture, size, at.place(), frame));
+                    copy.ifPresent(own::add);
+                    if (copy.isEmpty() && found.get(i).isEmpty()) copy = ShadeFit.scaled(picture, size);
+                    if (copy.isEmpty()) continue;
+                    of.add(i);
+                    copies.add(copy.get());
+                }
+            }
+            if (copies.isEmpty()) return;
+            List<MatchResult> bests = ImageFinder.bestMatchesNear(copies, MARKER_MARGIN, new StillSource(frame));
+            for (int k = 0; k < copies.size(); k++) {
+                MatchResult best = bests.get(k);
+                Optional<Found> was = found.get(of.get(k));
+                if (best.isFound() && best.confidence() >= needs
+                        && (was.isEmpty() || best.confidence() > was.get().score() + SCALED_BETTER)) {
+                    found.set(of.get(k), Optional.of(new Found(best.rect(), best.confidence())));
+                }
+            }
+        } finally {
+            // Placed on a match: copies of their own, their pixels native memory.
+            own.forEach(ImageTemplate::close);
+        }
     }
 
     /** The bot's tint shades: a tint drops a match below the confidence, so the cut is matched tinted too. */
@@ -134,20 +182,28 @@ public final class RunReach implements Reach {
                 .map(MatchResult::rect).toList();
     }
 
-    /** Every copy, and when none shows, every copy tinted as the first tint shade that finds one shows it. */
+    /**
+     * Every copy, and when none shows, every copy tinted as the first tint shade that finds one shows it, else drawn
+     * at the first learned size that finds one.
+     */
     @Override
     public List<Found> findAllScored(ImageTemplate picture, BufferedImage frame) {
         double needs = BotSettings.current().confidence();
-        List<Found> all = ImageFinder.allMatches(picture, new StillSource(frame), needs).stream()
+        List<Found> all = allOf(picture, frame, needs);
+        if (!all.isEmpty()) return all;
+        // Each copy made only when the one before found nothing.
+        Stream<Supplier<Optional<ImageTemplate>>> copies = Stream.concat(
+                tints().stream().map(tint -> () -> ShadeFit.tinted(picture, tint)),
+                ShadeFit.sizes(ShadeFit.learned()).stream().map(size -> () -> ShadeFit.scaled(picture, size)));
+        return copies.map(Supplier::get).flatMap(Optional::stream)
+                .map(copy -> allOf(copy, frame, needs))
+                .filter(shown -> !shown.isEmpty())
+                .findFirst().orElse(all);
+    }
+
+    private static List<Found> allOf(ImageTemplate picture, BufferedImage frame, double needs) {
+        return ImageFinder.allMatches(picture, new StillSource(frame), needs).stream()
                 .map(match -> new Found(match.rect(), match.confidence())).toList();
-        for (Shade tint : all.isEmpty() ? tints() : List.<Shade>of()) {
-            Optional<ImageTemplate> copy = ShadeFit.tinted(picture, tint);
-            if (copy.isEmpty()) continue;
-            List<Found> tinted = ImageFinder.allMatches(copy.get(), new StillSource(frame), needs).stream()
-                    .map(match -> new Found(match.rect(), match.confidence())).toList();
-            if (!tinted.isEmpty()) return tinted;
-        }
-        return all;
     }
 
     /**

@@ -2,15 +2,19 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.TemplateCache;
 import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.shared.opencv.OpenCvNative;
 import org.opencv.core.Mat;
 
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,13 +25,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
 
 /**
  * How a button's usual picture shows where it matched, told by colour: the shown pixels fitted against the cut's by
  * least squares over its opaque pixels, {@code shown = gain × cut + offset} in each channel, or each channel from the
  * cut's light for a greyed one. The fit is checked against the bot's learned {@link Shade}s; none fits, the look's own
  * state holds (2026-11-02: no threshold is built in, a bot with no shade sees no computed version).
+ *
+ * <p>A glow, a scale and a shift are told by the match's geometry instead: the ring around it against the frame
+ * beyond, its size against the cut's, its place against the cut's place, each scaled to the frame as places are.
  */
 public final class ShadeFit {
 
@@ -40,8 +50,11 @@ public final class ShadeFit {
     private static final double LIFTED = 0.04;
     /** A light fit this close to the own-channel one fits as well. */
     private static final double CLOSE = 0.01;
-    /** How many cuts and tinted copies are kept, the least used dropped first. */
-    private static final int KEPT = 64;
+    /**
+     * How many cuts and tinted or scaled copies are kept, the least used dropped first: a map's every picture, its copy
+     * at two sizes and a tint, so a poll never redraws one.
+     */
+    private static final int KEPT = 512;
 
     /** The run's learned shades, as {@code Sdk.shades()} says, handed over by the run before the first look. */
     private static volatile List<Shade> learned = List.of();
@@ -100,6 +113,7 @@ public final class ShadeFit {
 
         /** Whether {@code shade} names this change: its model, its gain and offset within its tolerance. */
         boolean fits(Shade shade) {
+            if (shade.moves()) return false;
             if (asGrey(shade)) return greyToo.fits(shade);
             if (error > MOST_ERROR || grey != (shade.kind() == Shade.Kind.GREY)) return false;
             return distance(shade) <= shade.tolerance();
@@ -134,7 +148,7 @@ public final class ShadeFit {
 
         /** This fit as a shade of {@code cause} meaning {@code state}: what Discovery writes from one button seen both ways. */
         public Shade learned(Shade.Cause cause, ButtonState state) {
-            return new Shade(kind(), round(gain), round(offset), Shade.TOLERANCE, cause, state);
+            return new Shade(kind(), round(gain), round(offset), Shade.TOLERANCE, cause, state, Shade.Geometry.NONE);
         }
 
         private static Shade.Channels round(Shade.Channels c) {
@@ -180,8 +194,36 @@ public final class ShadeFit {
     public static Optional<Shade> shown(ImageTemplate picture, Rect found, BufferedImage frame, List<Shade> shades,
                                         Set<Shade.Cause> causes) {
         if (shades.stream().noneMatch(s -> causes.contains(s.cause()))) return Optional.empty();
-        return cut(picture).flatMap(cut -> fit(cut, picture.frames(), frame, found))
-                .flatMap(fit -> closest(fit, shades, causes));
+        return cut(picture).flatMap(cut -> shown(new Cut(cut, picture.frames(), picture.place(), authored(picture)),
+                found, frame, shades, causes));
+    }
+
+    /**
+     * A picture's pixels and where it was cut: what the geometry of a match is told against.
+     *
+     * @param pixels   the file's pixels, its frames side by side
+     * @param frames   how many frames
+     * @param place    where it was cut, in the frame it was cut from; null when it says none
+     * @param authored the size of that frame; null when nothing says it (the match is then not scaled)
+     */
+    record Cut(BufferedImage pixels, int frames, Rect place, Size authored) {
+
+        int width() {
+            return pixels.getWidth() / Math.max(1, frames);
+        }
+
+        int height() {
+            return pixels.getHeight();
+        }
+    }
+
+    /** {@link #shown(ImageTemplate, Rect, BufferedImage, List, Set)} of a cut already read. */
+    static Optional<Shade> shown(Cut cut, Rect found, BufferedImage frame, List<Shade> shades, Set<Shade.Cause> causes) {
+        Fit fit = shades.stream().anyMatch(s -> !s.moves() && causes.contains(s.cause()))
+                ? fit(cut.pixels(), cut.frames(), frame, found).orElse(null) : null;
+        double[] scale = scale(cut.authored(), frame);
+        return closest(shades, causes, shade -> shade.moves() ? moved(shade, cut, scale, found, frame)
+                : fit != null && fit.fits(shade) ? OptionalDouble.of(fit.distance(shade)) : OptionalDouble.empty());
     }
 
     /**
@@ -190,15 +232,116 @@ public final class ShadeFit {
      * the game's by distance: it lasts until the next press, and the game may dim the button just pressed.
      */
     static Optional<Shade> closest(Fit fit, List<Shade> shades, Set<Shade.Cause> causes) {
+        return closest(shades, causes,
+                shade -> fit.fits(shade) ? OptionalDouble.of(fit.distance(shade)) : OptionalDouble.empty());
+    }
+
+    /** {@link #closest(Fit, List, Set)} by {@code distance}, empty for a shade that does not fit. */
+    private static Optional<Shade> closest(List<Shade> shades, Set<Shade.Cause> causes,
+                                           Function<Shade, OptionalDouble> distance) {
         Shade best = null;
+        double nearest = 0;
         for (Shade shade : shades) {
-            if (!causes.contains(shade.cause()) || !fit.fits(shade)) continue;
+            if (!causes.contains(shade.cause())) continue;
+            OptionalDouble far = distance.apply(shade);
+            if (far.isEmpty()) continue;
             if (best == null || rank(shade) < rank(best)
-                    || rank(shade) == rank(best) && fit.distance(shade) < fit.distance(best)) {
+                    || rank(shade) == rank(best) && far.getAsDouble() < nearest) {
                 best = shade;
+                nearest = far.getAsDouble();
             }
         }
         return Optional.ofNullable(best);
+    }
+
+    /**
+     * How far the match at {@code found} is from the move {@code shade} learned, as a share like its tolerance; empty
+     * when it does not show it: a glow's ring no lighter, a match at the cut's size or place.
+     */
+    private static OptionalDouble moved(Shade shade, Cut cut, double[] scale, Rect found, BufferedImage frame) {
+        Shade.Geometry move = shade.geometry();
+        double tolerance = shade.tolerance();
+        return switch (shade.kind()) {
+            case GLOW -> glowed(shade, (int) Math.round(move.ring() * (scale[0] + scale[1]) / 2), found, frame);
+            case SCALE -> {
+                double across = found.width() / (cut.width() * scale[0]);
+                double down = found.height() / (cut.height() * scale[1]);
+                double size = (across + down) / 2;
+                if (Math.abs(across - down) > tolerance || Math.abs(size - 1) <= tolerance) yield OptionalDouble.empty();
+                double off = size < move.smallest() ? move.smallest() - size
+                        : size > move.largest() ? size - move.largest() : 0;
+                yield off <= tolerance ? OptionalDouble.of(off) : OptionalDouble.empty();
+            }
+            case SHIFT -> {
+                if (cut.place() == null) yield OptionalDouble.empty();
+                double across = found.x() - cut.place().x() * scale[0];
+                double down = found.y() - cut.place().y() * scale[1];
+                double side = Math.max(1, Math.min(found.width(), found.height()));
+                double slack = Math.max(SHIFT_SLACK, tolerance * side);
+                if (Math.hypot(across, down) <= slack) yield OptionalDouble.empty();
+                double off = Math.max(Math.abs(across - move.dx() * scale[0]), Math.abs(down - move.dy() * scale[1]));
+                yield off <= slack ? OptionalDouble.of(off / side) : OptionalDouble.empty();
+            }
+            default -> OptionalDouble.empty();
+        };
+    }
+
+    /** A shift of this many frame pixels or fewer is a match's own rounding, never a move. */
+    private static final int SHIFT_SLACK = 2;
+
+    /**
+     * How far the ring {@code width} wide around {@code found} is lighter than the band as wide beyond it, against
+     * {@code shade}'s offset; empty when the ring is not lit by the shade's tolerance or strays from it.
+     */
+    private static OptionalDouble glowed(Shade shade, int width, Rect found, BufferedImage frame) {
+        Optional<Shade.Channels> lift = ring(frame, found, Math.max(1, width));
+        if (lift.isEmpty()) return OptionalDouble.empty();
+        double most = 0;
+        double far = 0;
+        for (int c = 0; c < 3; c++) {
+            most = Math.max(most, lift.get().get(c));
+            far = Math.max(far, Math.abs(lift.get().get(c) - shade.offset().get(c)));
+        }
+        return most >= shade.tolerance() && far <= shade.tolerance() ? OptionalDouble.of(far) : OptionalDouble.empty();
+    }
+
+    /**
+     * How much lighter, per channel 0 to 1, the ring {@code width} wide around {@code found} is than the band as wide
+     * beyond it: what a glow shows, and what Discovery learns one from. Empty when either is off the frame.
+     */
+    public static Optional<Shade.Channels> ring(BufferedImage frame, Rect found, int width) {
+        double[] ring = new double[4];
+        double[] beyond = new double[4];
+        int x0 = found.x() - 2 * width;
+        int y0 = found.y() - 2 * width;
+        int x1 = found.x() + found.width() + 2 * width;
+        int y1 = found.y() + found.height() + 2 * width;
+        for (int y = Math.max(0, y0); y < Math.min(frame.getHeight(), y1); y++) {
+            for (int x = Math.max(0, x0); x < Math.min(frame.getWidth(), x1); x++) {
+                // How many pixels outside the button: 0 inside it.
+                int out = Math.max(Math.max(found.x() - x, x - (found.x() + found.width() - 1)),
+                        Math.max(found.y() - y, y - (found.y() + found.height() - 1)));
+                if (out <= 0) continue;
+                double[] into = out <= width ? ring : beyond;
+                double[] rgb = channels(frame.getRGB(x, y));
+                for (int c = 0; c < 3; c++) into[c] += rgb[c];
+                into[3]++;
+            }
+        }
+        if (ring[3] == 0 || beyond[3] == 0) return Optional.empty();
+        return Optional.of(new Shade.Channels(ring[0] / ring[3] - beyond[0] / beyond[3],
+                ring[1] / ring[3] - beyond[1] / beyond[3], ring[2] / ring[3] - beyond[2] / beyond[3]));
+    }
+
+    /** The size of the frame {@code picture} was cut from: its own, else the bot's screen; null for neither. */
+    private static Size authored(ImageTemplate picture) {
+        return picture.frame() != null ? picture.frame() : BotScreen.size().orElse(null);
+    }
+
+    /** How much bigger {@code frame} shows than {@code authored}, across and down: 1 when nothing says. */
+    private static double[] scale(Size authored, BufferedImage frame) {
+        if (authored == null || authored.empty()) return new double[]{1, 1};
+        return new double[]{frame.getWidth() / (double) authored.width(), frame.getHeight() / (double) authored.height()};
     }
 
     private static int rank(Shade shade) {
@@ -321,6 +464,72 @@ public final class ShadeFit {
         });
         made.ifPresent(copy -> KEPT_PIXELS.put(key, copy));
         return made;
+    }
+
+    /**
+     * The sizes {@code shades}' scales learned, each one more match per picture: a size within its shade's tolerance
+     * of the cut's is left out, as it is never read as the scale.
+     */
+    public static List<Double> sizes(List<Shade> shades) {
+        Set<Double> sizes = new TreeSet<>();
+        for (Shade shade : shades) {
+            if (shade.kind() != Shade.Kind.SCALE) continue;
+            for (double size : new double[]{shade.geometry().smallest(), shade.geometry().largest()}) {
+                if (Math.abs(size - 1) > shade.tolerance()) sizes.add(size);
+            }
+        }
+        return List.copyOf(sizes);
+    }
+
+    /**
+     * {@code picture} drawn {@code size} times as big, each frame alike, its place grown around its centre: a scaled
+     * button no longer matches its cut at the bot's confidence. Made once per picture and size; empty for a picture
+     * whose file cannot be read.
+     */
+    public static Optional<ImageTemplate> scaled(ImageTemplate picture, double size) {
+        String key = stamp(picture) + "|" + picture.place() + "|" + picture.frame() + "|×" + size;
+        if (KEPT_PIXELS.get(key) instanceof ImageTemplate kept) return Optional.of(kept);
+        Optional<ImageTemplate> made = cut(picture).map(cut -> {
+            int frames = Math.max(1, picture.frames());
+            int from = cut.getWidth() / frames;
+            int width = Math.max(1, (int) Math.round(from * size));
+            int height = Math.max(1, (int) Math.round(cut.getHeight() * size));
+            BufferedImage out = new BufferedImage(width * frames, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                for (int f = 0; f < frames; f++) {
+                    g.drawImage(cut, f * width, 0, (f + 1) * width, height, f * from, 0, (f + 1) * from,
+                            cut.getHeight(), null);
+                }
+            } finally {
+                g.dispose();
+            }
+            ImageTemplate copy = ImageTemplate.of(picture.filePath() + "#x" + size, out).frames(picture.frames());
+            Rect place = picture.place();
+            copy = place == null ? copy : copy.at(centred(place.x() + place.width() / 2.0,
+                    place.y() + place.height() / 2.0, width, height));
+            return picture.frame() == null ? copy : copy.in(picture.frame());
+        });
+        made.ifPresent(copy -> KEPT_PIXELS.put(key, copy));
+        return made;
+    }
+
+    /**
+     * {@link #scaled} placed on {@code found}, a match of {@code picture} on {@code frame}: the button grown or shrunk
+     * where it shows, looked for near there only. A copy of its own, which the caller closes.
+     */
+    public static Optional<ImageTemplate> scaledAround(ImageTemplate picture, double size, Rect found,
+                                                       BufferedImage frame) {
+        double[] scale = scale(authored(picture), frame);
+        // Sized as the copy's own pixels are, so the place is the copy's.
+        return scaled(picture, size).map(copy -> copy.at(centred((found.x() + found.width() / 2.0) / scale[0],
+                (found.y() + found.height() / 2.0) / scale[1], copy.width() / Math.max(1, copy.frames()),
+                copy.height())));
+    }
+
+    private static Rect centred(double x, double y, int width, int height) {
+        return new Rect((int) Math.round(x - width / 2.0), (int) Math.round(y - height / 2.0), width, height);
     }
 
     /** {@code picture}'s file as found, with when it was written and its size: a re-cut file is another stamp. */
