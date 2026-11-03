@@ -261,7 +261,8 @@ public final class MapWalk {
                         // The last restart allowed is spent and the game still lost: the walk ends on this screen.
                         if (restarts >= budgets.restarts()) {
                             note.accept(new Finding(Finding.Kind.UNREACHED, screen, null,
-                                    "gave up after " + restarts + " restarts"));
+                                    "gave up after " + restarts + " restarts"
+                                            + (lost != null && screen.equals(start.get()) ? "; " + lost : "")));
                             break walk;
                         }
                         // Its edges are left untried: said, or a start the game never shows ends the walk silently.
@@ -310,6 +311,8 @@ public final class MapWalk {
         for (Map.Entry<String, MapScreen> entry : graph.screens().entrySet()) {
             String screen = entry.getKey();
             if (reached.contains(screen) || unknown.containsKey(screen) || entry.getValue().isPopup()) continue;
+            // A start the game skips (a consent once accepted) is no finding: the walk began where the game was.
+            if (screen.equals(start.get()) && !first.equals(start.get())) continue;
             List<ScreenGraph.Edge> into = in.getOrDefault(screen, List.of());
             if (into.isEmpty()) {
                 note.accept(new Finding(Finding.Kind.UNREACHED, null, screen, "no edge leads to it"));

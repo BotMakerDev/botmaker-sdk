@@ -87,11 +87,14 @@ public final class LiveMoves implements MapWalk.Moves {
         return lost;
     }
 
-    /** At the start, or at once on any screen of the map: a start the game no longer shows is no reason to fail. */
+    /**
+     * On any screen of the map at once, else walked to the start: one look before a walk, so a start the game no
+     * longer shows is not walked to each time.
+     */
     @Override
     public boolean recover() {
-        return graph.start().map(this::goTo).orElse(false)
-                || walk().where(ScreenMaps.lastSeen()).isPresent();
+        return walk().where(ScreenMaps.lastSeen()).isPresent()
+                || graph.start().map(this::goTo).orElse(false);
     }
 
     @Override

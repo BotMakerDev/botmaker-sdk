@@ -39,10 +39,16 @@ public final class Stillness {
         seenAt = now;
     }
 
+    /**
+     * Inputs further apart than this are not one run of input: the wait between them (a timer an idle game counts
+     * down) is a game waiting, so the count starts again at the later one.
+     */
+    static final long MOST_GAP_MS = 30_000;
+
     /** Counts an input sent at {@code now}. */
     public synchronized void acted(long now) {
         if (thumb == null) return;
-        if (actedSince < 0) actedSince = now;
+        if (actedSince < 0 || now - actedLast > MOST_GAP_MS) actedSince = now;
         actedLast = now;
     }
 

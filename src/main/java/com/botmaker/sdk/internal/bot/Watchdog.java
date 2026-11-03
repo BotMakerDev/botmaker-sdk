@@ -33,7 +33,8 @@ import java.util.Optional;
  *
  * <p>The throw happens deterministically at {@link #checkpoint()}, which the flow walker calls between
  * activities. {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
- * calls {@link #reset()} after a restart. All state is per-thread.
+ * calls {@link #reset()} after a restart. The match count is per thread; the game's picture is one for the run,
+ * since a bot looks at one game (a run that captures two surfaces in turn sees each move, and is never told frozen).
  *
  * <p>Internal: a bot never names it, and {@code Bot.runFlow} turns it on.
  */

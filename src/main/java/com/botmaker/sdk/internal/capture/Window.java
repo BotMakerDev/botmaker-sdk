@@ -138,6 +138,7 @@ public class Window implements CaptureSource {
     /** Click at coordinates relative to this window's top-left (converted to absolute internally). */
     public void click(int relativeX, int relativeY) {
         Debug.log("click " + relativeX + "," + relativeY + " in " + title());
+        Watchdog.acted();
         controller().postLeftClick(handle, relativeX, relativeY);
     }
 

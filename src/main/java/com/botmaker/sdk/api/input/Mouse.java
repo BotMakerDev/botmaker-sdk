@@ -68,6 +68,7 @@ public class Mouse {
      */
     public static void click(Point p) {
         if (p == null) return;
+        Watchdog.acted();
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.LEFT.code());
     }
 
@@ -133,11 +134,13 @@ public class Mouse {
 
     public static void rightClick(Point p) {
         if (p == null) return;
+        Watchdog.acted();
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.RIGHT.code());
     }
 
     public static void middleClick(Point p) {
         if (p == null) return;
+        Watchdog.acted();
         PointerPolicy.click(controller(), session(), p.x(), p.y(), MouseButton.MIDDLE.code());
     }
 
@@ -148,6 +151,7 @@ public class Mouse {
      */
     public static void doubleClick(Point p) {
         if (p == null) return;
+        Watchdog.acted();
         NativeController controller = controller();
         java.awt.Point origin = controller.cursorPosition();
         move(p);

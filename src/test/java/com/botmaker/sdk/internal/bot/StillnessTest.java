@@ -28,7 +28,9 @@ class StillnessTest {
         Stillness still = new Stillness();
         still.saw(DARK, 0);
         still.acted(10_000);
-        still.saw(DARK, 40_000);
+        still.saw(DARK, 30_000);
+        still.acted(40_000);
+        still.saw(DARK, 50_000);
         still.acted(70_000);
         still.saw(DARK, 80_000);
 
@@ -46,12 +48,24 @@ class StillnessTest {
     }
 
     @Test
+    void aLongWaitBetweenTwoInputsStartsTheCountAgain() {
+        Stillness still = new Stillness();
+        still.saw(DARK, 0);
+        still.acted(10_000);
+        still.saw(DARK, 130_000);
+        still.acted(130_000);
+        still.saw(DARK, 135_000);
+
+        assertEquals(0, still.stillAfterInput());
+    }
+
+    @Test
     void inputNoFrameFollowedYetCountsOnlyToTheLastFrame() {
         Stillness still = new Stillness();
         still.saw(DARK, 0);
         still.acted(10_000);
         still.saw(DARK, 20_000);
-        still.acted(90_000);
+        still.acted(35_000);
 
         assertEquals(10_000, still.stillAfterInput());
     }
