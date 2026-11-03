@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The assistant types in an emulator's app through the emulator's text input**, as a run does: in a private
+  display a key synthesised over X was mapped by the host's layout (AZERTY typed "Cloudzold" for "Cloudwold").
+  An emulator field's Enter is the emulator's own key.
 - **try_input tells a screen left by its markers, not by how much changed**: a game whose background moves
   changed much and left nothing, a tab whose rows change changed little and left. After a try the screen is read
   on until it holds still a second: its own markers (a tab's shared bar left out) gone means it left, gone and back

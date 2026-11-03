@@ -647,7 +647,7 @@ final class ActTools {
     /** {@link #hands(AgentContext)}, {@code emulator} the capture source read already (null: none). */
     static Hands hands(AgentContext context, CaptureSource emulator) {
         PrivateSession session = Frames.session(context);
-        if (session != null) return new InSession(session);
+        if (session != null) return new InSession(session, emulator);
         if (emulator != null) return new OnEmulator(emulator);
         return new OnDesktop(context.watchedArea().map(at -> new Point(at.x(), at.y())).orElse(new Point(0, 0)));
     }

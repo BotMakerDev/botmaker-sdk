@@ -53,8 +53,14 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
     /** Presses at ({@code fromX}, {@code fromY}), glides to ({@code toX}, {@code toY}) over {@code ms}, and lets go. */
     void drag(int fromX, int fromY, int toX, int toY, long ms);
 
-    /** The private display's own pointer and keyboard, as a run's {@code Mouse} and {@code Keyboard} use them. */
-    record InSession(PrivateSession session) implements Hands {
+    /**
+     * The private display's own pointer and keyboard, as a run's {@code Mouse} and {@code Keyboard} use them. Text
+     * for an emulator's app shown there goes through the emulator's own text input, as a run types it: a key
+     * synthesised on the display is mapped by the host's layout (AZERTY typed "Cloudzold"), the app's by US.
+     *
+     * @param emulator the capture source whose base is the emulator the display shows; null for a window
+     */
+    record InSession(PrivateSession session, CaptureSource emulator) implements Hands {
 
         @Override
         public void click(int x, int y) {
@@ -90,9 +96,24 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
 
         @Override
         public void text(String text) {
+            if (emulator != null && emulator.base() instanceof EmulatorSource device) {
+                device.text(text);
+                return;
+            }
             GenericWindow window = session.attached();
             if (window == null) session.controller().typeText(text);
             else session.controller().typeText(window, text);
+        }
+
+        /** As a run types: on an emulator by its text input and Enter key, which has no select-all. */
+        @Override
+        public void type(String text, boolean clears, boolean submits) {
+            if (emulator != null && emulator.base() instanceof EmulatorSource device) {
+                device.text(text);
+                if (submits) device.key(EmulatorSource.KEYCODE_ENTER);
+                return;
+            }
+            Hands.super.type(text, clears, submits);
         }
 
         @Override
