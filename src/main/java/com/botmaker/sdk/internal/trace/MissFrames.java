@@ -58,9 +58,27 @@ public final class MissFrames {
 
     private MissFrames() {}
 
-    /** Starts saving for this run, in a new folder under the bot's folder, the run's working directory. */
+    /**
+     * Starts saving for this run: in the run's folder when the host keeps one (beside its log), else in a new
+     * folder under the bot's folder, the run's working directory.
+     */
     public static void start() {
+        Optional<Path> host = SdkRun.channel().folder();
+        if (host.isPresent()) {
+            startIn(host.get(), System::currentTimeMillis);
+            return;
+        }
         start(Path.of(System.getProperty("user.dir", ".")).resolve(FOLDER), System::currentTimeMillis);
+    }
+
+    /** Starts saving in {@code folder}, the run's folder the host made, timed by {@code now}. */
+    static synchronized void startIn(Path folder, LongSupplier now) {
+        if (folder.equals(run)) return;
+        clock = now;
+        lastSaved.clear();
+        saved.clear();
+        next = 0;
+        run = folder;
     }
 
     /** {@link #start()} under {@code root}, timed by {@code now}. */
