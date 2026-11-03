@@ -133,6 +133,7 @@ public final class Target {
             SessionBootstrap.relaunchInVm(t.launchSpec());
             return;
         }
+        if (SessionBootstrap.relaunchIsolated(t.launchSpec())) return;
         SessionBootstrap.requireReady(t.launchSpec());
         t.restart();
     }

@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A restart in a private display brings the game back.** When ending the game took Waydroid's session down
+  (a leftover process force-stop could not end), the run closes its display and brings up a fresh one, never
+  Studio's offered display again, which launches nothing; otherwise it starts the game again where it was.
 - **A frozen game is caught in every run.** The watchdog now watches the game's picture: when it stays the same
   for `BotSettings.frozenAfter` (60 s) while the bot keeps clicking, swiping or typing, the run stops with "The game
   looks frozen" and recovers, between activities as for a stuck bot. Before, only a vision loop clicking the same

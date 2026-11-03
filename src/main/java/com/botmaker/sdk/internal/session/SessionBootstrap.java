@@ -9,6 +9,7 @@ import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.Launcher;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.session.SessionBackend;
@@ -263,6 +264,39 @@ public final class SessionBootstrap {
      *                               be started in it
      */
     public static boolean launchIsolated(LaunchSpec spec) {
+        return launchIsolated(spec, true);
+    }
+
+    /**
+     * A recovery's restart of {@code spec} while this run holds a private display: ends the game, and when that
+     * took the emulator down with it ({@link Launcher#stop} — Waydroid's session stopped to end a process
+     * force-stop left behind) closes the display, whose only client went with the session, and brings up a fresh
+     * one, never Studio's offered display again: an adopted display launches nothing. A stop that left the
+     * emulator up starts the game again where it was.
+     *
+     * @return {@code false} when this run holds no private display, so the caller restarts the target itself
+     */
+    public static boolean relaunchIsolated(LaunchSpec spec) {
+        DesktopSession session = BotSession.get();
+        if (spec == null || session == null || !isolationRequested() || where() == BotSettings.Where.VM) {
+            return false;
+        }
+        Optional<String> ended = session.endedBecause();
+        if (ended.isPresent()) throw new IllegalStateException(ended.get() + " Run the bot again to start it.");
+        requireReady(spec);
+        if (!Launcher.stop(spec)) {
+            Launcher.start(spec);
+            return true;
+        }
+        Debug.log("the Waydroid session was stopped to end " + spec.describe()
+            + " — bringing up a fresh private display");
+        BotSession.clear();
+        try { session.close(); } catch (Exception ignored) { /* best-effort teardown */ }
+        if (!launchIsolated(spec, false)) Launcher.start(spec);
+        return true;
+    }
+
+    private static boolean launchIsolated(LaunchSpec spec, boolean adoptOffered) {
         if (!isolationRequested() || spec == null) {
             return false;
         }
@@ -276,8 +310,9 @@ public final class SessionBootstrap {
         // Above every other rung: a live session we were handed is better than any session we could build. Studio
         // passes it when the game is already up in its background session — bringing up a second private display
         // would hand the launch to that first copy (the launcher is single-instance) and the game would end up
-        // somewhere nobody is watching.
-        DesktopSession adopted = Sessions.offered().orElse(null);
+        // somewhere nobody is watching. Not on a relaunch after the emulator was stopped: that display's game went
+        // with it, and an adopted display launches nothing.
+        DesktopSession adopted = adoptOffered ? Sessions.offered().orElse(null) : null;
         if (adopted != null && adopted.attached() == null) {
             // A private display with nothing on it is not the session anyone meant: the target isn't up there, so
             // adopting would give the bot a black frame and no way to fix it (an adopted session never launches).
