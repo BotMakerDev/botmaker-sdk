@@ -189,7 +189,7 @@ public final class MapReport {
                 .append(told.texts().isEmpty() ? "" : " · reads " + String.join(" + ",
                         told.texts().stream().map(Caption::said).toList()))
                 .append(" · back ").append(graph.backOf(constant).filter(b -> b.via() != null)
-                        .map(ScreenGraph.Edge::label).orElse("the default (a close button, then Escape)"))
+                        .map(ScreenGraph.Edge::label).orElse("the default (the usual close button)"))
                 .append(" · shot ").append(shot.test(constant) ? "yes" : "none").append('\n');
         // The tree's way in, then every other: a first screen has no tree's way in and may have others.
         List<String> ins = new ArrayList<>();

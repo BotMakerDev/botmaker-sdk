@@ -1203,8 +1203,12 @@ class SdkAssistTest {
         assertEquals(Scroll.wheel(-3), list.scroll());
         assertTrue(list.isTried());
 
-        // Engineer, opened from Home, covers it: closed first by its way back, Escape with no close button.
-        game.then(homeAlone);
+        // Engineer, opened from Home, covers it and has no way back: a walk presses no key (2026-11-03), so the try
+        // is refused until the game is back on Home.
+        AgentReply covering = tryOne("screen", "Home", "picture", "gold", "info", true, "desktop", true,
+                "settleMs", 0);
+        assertTrue(covering.isRefused() && text(covering).contains("a walk presses no key"), text(covering));
+        agent.frame = homeAlone;
         AgentReply still = tryOne("screen", "Home", "picture", "gold", "info", true, "desktop", true,
                 "settleMs", 0);
         assertTrue(text(still).contains("Noted in Home: tried gold, no visible effect. Every input cut on it is "

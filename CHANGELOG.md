@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A walk presses no key**: Escape asked to quit the game or closed the wrong screen too often. A way back
+  with no input is the game's usual close button; a popup closes by its way out, else that button; a way that
+  is a key is never taken. A walk that needs one ends *missing* and says to map the button that does it, so a
+  map that relied on Escape needs its back buttons cut.
 - **try_input reads what a click opened more surely**: a screen named by `opens` is waited on up to 10 s for
   its marker (a web page still loading); a click that changes little but takes the screen's markers away left
   it (a tab whose title and rows change), instead of being noted as a change in place; a failed walk back says

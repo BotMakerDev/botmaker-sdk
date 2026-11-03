@@ -129,7 +129,7 @@ final class ScreenCards {
         String label() {
             if (field != null) return field;
             if (!back && via == null) return "on its own, once " + from + " is done loading";
-            return via == null ? "the default way back (a close button, then Escape)" : via.label();
+            return via == null ? "the default way back (the usual close button)" : via.label();
         }
     }
 

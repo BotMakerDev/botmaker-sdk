@@ -25,12 +25,12 @@ import java.util.Optional;
  * <p><b>Popups are screens of the map</b> (2026-10-16): each screen of the bot's {@code Screens} whose setup is {@code .popup()}
  * says what tells it (its markers) and how it closes (its {@code back}: a close button, or the choice that closes it,
  * Offline progress' Claim). The check looks for every popup's markers on one frame and closes the one it finds by its
- * {@code back}, then waits for its markers to go; one still shown gets Escape once, and one that stays after that
- * throws {@link BotStuckException}, so the run's recovery takes over. A map with no popup costs nothing: no frame is
+ * {@code back} (else the game's usual close button; never a key), then waits for its markers to go; one that stays,
+ * or shows no way out, throws {@link BotStuckException}, so the run's recovery takes over. A map with no popup costs nothing: no frame is
  * taken. {@code Navigate} closes popups the same way on its walks.
  *
  * <p><b>An overlay the map lacks.</b> When a wait times out on a frame that shows no screen of the map, {@link
- * #uncover()} tries the map's close buttons (a {@code Navigate} walk then Escape too) and warns that an unmapped popup covered the screen, so
+ * #uncover()} tries the map's close buttons and warns that an unmapped popup covered the screen, so
  * the bot's author maps it in Upkeep.
  *
  * <p><b>Reentrancy.</b> The check's own looks go through the vision code that calls it. A thread-local flag makes
@@ -75,7 +75,7 @@ public final class PopupGuard {
      * <b>Reentrancy</b> above), the map has none, or the guard is switched off. The vision facades call this
      * themselves before every step that takes its own capture; a bot only calls it directly to force an extra check.
      *
-     * @throws BotStuckException when a popup is still shown after its way out and Escape
+     * @throws BotStuckException when a popup shows no way out, or is still shown after it
      */
     public static void check() {
         if (!enabled || Boolean.TRUE.equals(running.get()) || Thread.currentThread().isInterrupted()) return;
@@ -95,7 +95,7 @@ public final class PopupGuard {
 
     /**
      * After a wait timed out: when the game shows no screen of the bot's map, clears what covers it (the map's close
-     * buttons; never Escape, which only {@code Navigate}'s walks press) and warns that an unmapped popup covered the screen it was last seen on. Nothing while the
+     * buttons; never a key) and warns that an unmapped popup covered the screen it was last seen on. Nothing while the
      * guard is off or already running on this thread, or while the map tells no screen yet.
      */
     @Hidden("called by the waits when they time out; a bot never calls it")
@@ -111,8 +111,7 @@ public final class PopupGuard {
                 return;    // the wait already failed; a source that will not capture uncovers nothing
             }
             String near = ScreenMaps.lastSeen();
-            // No Escape here: a wait may time out on a screen the map lacks on purpose, where Escape could quit.
-            frame.flatMap(f -> walk.uncover(f, near, false)).ifPresent(cleared -> {
+            frame.flatMap(f -> walk.uncover(f, near)).ifPresent(cleared -> {
                 ScreenMaps.seen(cleared.at());
                 Diag.warn(SOURCE, walk.covered(near, cleared));
             });

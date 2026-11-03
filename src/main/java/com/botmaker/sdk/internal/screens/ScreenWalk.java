@@ -1,8 +1,8 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Pressed;
@@ -36,7 +36,9 @@ import java.util.stream.Collectors;
  * popup of the map that shows is closed first ({@link #closePopups}, which the run's {@code PopupGuard} calls too),
  * and an overlay the map lacks cleared once ({@link #uncover}); a step that lands elsewhere is read again and the way
  * planned anew from there.
- * A way back with no input is the game's usual close button when the walk is given one, else Escape.
+ * A way back with no input is the game's usual close button when the walk is given one. A walk presses no key: a
+ * way that is a key, and a way back with no input and no close button, are never taken (Escape asked to quit the
+ * game or closed the wrong screen too often, 2026-11-03).
  *
  * <p>A way on its own presses nothing: the walk waits for the screen after a loading screen or a transition, up to the
  * time that one {@link ScreenGraph#loadMs loads in}, and ends {@link Outcome#STUCK} "stuck loading" when it is still
@@ -116,7 +118,7 @@ public final class ScreenWalk {
 
     /**
      * This walk, clearing once an overlay the map lacks when {@link #go} finds no screen of the map ({@link #uncover},
-     * Escape included): a run's {@code Navigate}. Without it, such a walk ends {@link Outcome#STUCK}, as the
+     * by close buttons only): a run's {@code Navigate}. Without it, such a walk ends {@link Outcome#STUCK}, as the
      * assistant's do while the screen it explores is not mapped yet.
      */
     public ScreenWalk uncovering() {
@@ -268,7 +270,7 @@ public final class ScreenWalk {
                     reach.pause(POLL_MS);
                     continue;
                 }
-                Optional<Uncovered> cleared = uncover(frame.get(), at, true);
+                Optional<Uncovered> cleared = uncover(frame.get(), at);
                 if (cleared.isPresent()) {
                     uncovered = covered(at, cleared.get());
                     continue;    // planned from a fresh look: this one is the covered frame
@@ -307,7 +309,8 @@ public final class ScreenWalk {
             }
             String from = at;
             BufferedImage seen = frame.get();
-            Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge);
+            Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge)
+                    && keyless(edge);
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
                             known.and(edge -> open(edge, from, seen, false)))
                     .or(() -> graph.pathTo(from, target, known.and(edge -> open(edge, from, seen, true))));
@@ -653,6 +656,12 @@ public final class ScreenWalk {
         return edge.state() == null || edge.state() == seen.get().state();
     }
 
+    /** Whether {@code edge} is taken without a key: no key way, and a way back with no input only by the close button. */
+    private boolean keyless(ScreenGraph.Edge edge) {
+        if (edge.onItsOwn()) return true;
+        return edge.via() == null ? close != null : !(edge.via() instanceof Hotkey);
+    }
+
     /** Whether {@code edge} goes through a text field whose text only a body gives: no walk types it. */
     private static boolean typedByBody(ScreenGraph.Edge edge) {
         return edge.via() instanceof Button button && button.isTyped();
@@ -661,8 +670,13 @@ public final class ScreenWalk {
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */
     private Result blocked(String at, String target, Set<ScreenGraph.Edge> missed, Set<ScreenGraph.Edge> strayed,
                            List<String> walked) {
-        Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge);
+        Predicate<ScreenGraph.Edge> tried = edge -> !missed.contains(edge) && !strayed.contains(edge);
+        Predicate<ScreenGraph.Edge> known = tried.and(this::keyless);
         String to = graph.shown(target);
+        if (graph.pathTo(at, target, known).isEmpty() && graph.pathTo(at, target, tried).isPresent()) {
+            return new Result(Outcome.MISSING, at, walked, "The way to " + to + " takes a key or a way back with no "
+                    + "button, and a walk presses no key: map the button that does it.");
+        }
         Predicate<ScreenGraph.Edge> unlocked = edge -> edge.via() == null || edge.via().locked() == null;
         Optional<List<ScreenGraph.Edge>> typing = graph.pathTo(at, target, known.and(unlocked))
                 .filter(path -> path.stream().anyMatch(ScreenWalk::typedByBody))
@@ -689,16 +703,12 @@ public final class ScreenWalk {
     }
 
     /**
-     * Does {@code edge}'s input; a way back with none is the usual close button while it shows, else Escape: the walk
-     * is on a screen below another then, never on the top one, where Escape may ask to quit the game. False when its
+     * Does {@code edge}'s input; a way back with none is the usual close button while it shows. False when its
      * picture is not on {@code frame}.
      */
     private boolean perform(ScreenGraph.Edge edge, BufferedImage frame) {
         if (edge.onItsOwn()) return true;    // nothing to press: arrives waits for it
-        if (edge.via() == null) {
-            if (close == null || !reach.perform(close, frame)) reach.key(Key.ESCAPE);
-            return true;
-        }
+        if (edge.via() == null) return close != null && reach.perform(close, frame);
         Optional<Tree> tree = treeOf(edge);
         if (edge.via() instanceof Button button && tree.isPresent()) {
             Map<String, Button> buttons = graph.screen(graph.holder(edge)).map(from -> from.nodeButtons(tree.get()))
@@ -836,7 +846,7 @@ public final class ScreenWalk {
         return !popups().isEmpty();
     }
 
-    /** A popup of the map that its way out and Escape both left on the screen. */
+    /** A popup of the map that its way out left on the screen, or that shows no way out. */
     public static final class Stayed extends RuntimeException {
         Stayed(String why) {
             super(why);
@@ -845,10 +855,11 @@ public final class ScreenWalk {
 
     /**
      * {@code frame}, or the look after closing each popup of the map it shows, up to {@link #MOST_POPUPS}. A popup
-     * closes by its {@code back} (Offline progress: its Claim, the choice that closes it), else Escape, and is closed
-     * once its markers are gone; still shown a step later, Escape once more.
+     * closes by its {@code back} (Offline progress: its Claim, the choice that closes it), else the game's usual close
+     * button, and is closed once its markers are gone. No key is pressed: Escape closed the wrong thing too often
+     * (2026-11-03).
      *
-     * @throws Stayed when a popup is still shown after that
+     * @throws Stayed when a popup has no way out on the screen, or is still shown a step after it
      */
     public Optional<BufferedImage> closePopups(Optional<BufferedImage> frame) {
         List<String> popups = popups();
@@ -860,20 +871,20 @@ public final class ScreenWalk {
         return frame;
     }
 
-    /** The look once {@code popup} is closed: its way out, then Escape when it stays. */
+    /** The look once {@code popup} is closed by its way out, else the usual close button. */
     private Optional<BufferedImage> close(String popup, BufferedImage frame) {
         Markers shows = graph.markers(popup);
-        ScreenGraph.Edge back = graph.backOf(popup).orElseThrow();
-        boolean escaped = back.via() == null || !reach.perform(back.via(), frame);
-        if (escaped) reach.key(Key.ESCAPE);
-        Optional<BufferedImage> after = gone(shows);
-        if (after.isEmpty() && !escaped) {
-            reach.key(Key.ESCAPE);
-            after = gone(shows);
+        Input way = graph.backOf(popup).map(ScreenGraph.Edge::via).filter(via -> !(via instanceof Hotkey))
+                .orElse(null);
+        Input pressed = way != null && reach.perform(way, frame) ? way
+                : close != null && reach.perform(close, frame) ? close : null;
+        if (pressed == null) {
+            throw new Stayed(graph.shown(popup) + " shows no way out of the map (" + (way == null ? "none mapped"
+                    : way.label() + " not found") + "): map its close button.");
         }
+        Optional<BufferedImage> after = gone(shows);
         if (after.isPresent()) return after;
-        throw new Stayed(graph.shown(popup) + " stayed after " + (escaped ? "Escape"
-                : back.label() + " and Escape") + ".");
+        throw new Stayed(graph.shown(popup) + " stayed after " + pressed.label() + ".");
     }
 
     /** The first look within a step's time that no longer shows {@code shows}; empty when it stays. */
@@ -893,12 +904,10 @@ public final class ScreenWalk {
     /**
      * Clears what covers the game when {@code frame} shows no screen and no popup of the map: an overlay the map
      * lacks. The map's close buttons (the usual one first, then each way back that is a picture) are looked for on
-     * {@code frame} and the first found clicked; with {@code escape}, Escape when none is, or when the click uncovered
-     * nothing: only a walk, which knows it left a mapped screen, presses it. Empty when
-     * {@code frame} shows a screen of the map already, when the map tells no screen yet, or when nothing brought one
-     * back.
+     * {@code frame} and the first found clicked; no key is pressed. Empty when {@code frame} shows a screen of the map
+     * already, when the map tells no screen yet, or when nothing brought one back.
      */
-    public Optional<Uncovered> uncover(BufferedImage frame, String near, boolean escape) {
+    public Optional<Uncovered> uncover(BufferedImage frame, String near) {
         boolean tells = graph.screens().values().stream().anyMatch(s -> !s.isPopup() && s.hasMarker());
         if (!tells || Thread.currentThread().isInterrupted() || whereOn(frame, near).isPresent()
                 || popupOn(frame).isPresent()) {
@@ -920,9 +929,7 @@ public final class ScreenWalk {
             if (at.isPresent()) return Optional.of(new Uncovered(at.get(), closes.get(i).picture().id()));
             break;
         }
-        if (!escape || Thread.currentThread().isInterrupted()) return Optional.empty();
-        reach.key(Key.ESCAPE);
-        return screenWithin(near).map(at -> new Uncovered(at, "Escape"));
+        return Optional.empty();
     }
 
     /** The note for an overlay the map lacks, over {@code near} (the screen last seen, or null), cleared as said. */

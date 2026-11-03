@@ -1089,7 +1089,7 @@ public final class ScreenEdits {
     }
 
     /**
-     * Takes {@code constant}'s own way back off, a walk then closing it by its close button, else Escape: the input
+     * Takes {@code constant}'s own way back off, a walk then closing it by the usual close button: the input
      * it was stays an input of the screen, untried again.
      */
     public static String removeBack(StudioServices services, String constant) {
@@ -1103,7 +1103,7 @@ public final class ScreenEdits {
                     MapScreen kept = keepBack(s).setup(x -> x.back(null));
                     return field.flatMap(kept::input).map(i -> kept.withInput(field.get(), untried(i))).orElse(kept);
                 }),
-                "No way back of its own: a walk closes it by its close button, else Escape. " + was
+                "No way back of its own: a walk closes it by the usual close button, never a key. " + was
                         + " is untried on it again.");
     }
 

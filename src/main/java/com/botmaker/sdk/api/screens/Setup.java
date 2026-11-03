@@ -58,8 +58,8 @@ import java.util.function.BooleanSupplier;
  *                 then {@code .fromPick}, {@code .fromLooks} or {@code .fromWhen} when it needs them), or on its own
  *                 after another ({@code .after(LOADING)}); null for the first screen and for a popup
  * @param alsoFrom other ways in
- * @param back     the way out to where it was opened from, usually one of its own inputs; null for the default: a
- *                 close button, then Escape
+ * @param back     the way out to where it was opened from, usually one of its own inputs; null for the default: the
+ *                 game's usual close button (a walk presses no key)
  * @param variants its looks, each with its own markers: the event screen dressed for an event
  * @param isPopup  whether it opens on its own rather than from an input
  * @param isStart  whether the game opens on it: its loading screen, with no way in

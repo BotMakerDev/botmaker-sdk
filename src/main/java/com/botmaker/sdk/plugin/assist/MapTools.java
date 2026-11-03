@@ -802,7 +802,7 @@ final class MapTools {
         return took.isZero() ? null : took;
     }
 
-    /** The picture name a way back with no input of its own clicks first, before Escape: Firestone's close_x. */
+    /** The picture name a way back with no input of its own clicks: Firestone's close_x. */
     static final String CLOSE = "close_x";
 
     /**
@@ -1072,7 +1072,7 @@ final class MapTools {
                             MapScreen.of(at.popup() ? setup.popup() : setup));
                     return failed.map(why -> " It could not be added to the map: " + why).orElse(" Added "
                             + at.name() + " to the map as Screens." + at.constant() + ", this its marker" + (at.popup()
-                            ? "; a popup, closed by Escape until its close button is cut with back true."
+                            ? "; a popup: cut its close button with back true, as a walk presses no key."
                             : ": the map's first screen. Cut every input on it with screen " + at.name() + "."));
                 }
                 ScreenGraph graph = ScreenBook.read(services);

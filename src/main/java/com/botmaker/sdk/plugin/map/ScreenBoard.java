@@ -205,7 +205,7 @@ final class ScreenBoard {
         if (resized && Math.abs(width - drawnWidth) < 1) return;
         drawnWidth = width;
         if (cover != null) {
-            holder.getChildren().setAll(cover.apply(width));
+            holder.getChildren().setAll(fitted(cover.apply(width), width, cover));
             return;
         }
         if (shotAt == null) {
@@ -213,8 +213,21 @@ final class ScreenBoard {
                     + "● Live to see the game."));
             return;
         }
-        holder.getChildren().setAll(shotAt.apply(width).orElseGet(() -> said("It has no shot yet: ● Live, then ❄ "
+        holder.getChildren().setAll(shotAt.apply(width).map(node -> fitted(node, width, w ->
+                shotAt.apply(w).orElse(node))).orElseGet(() -> said("It has no shot yet: ● Live, then ❄ "
                 + "Freeze while the game shows it, or ⋯ Screen ▸ Retake its shot.")));
+    }
+
+    /**
+     * {@code node} drawn {@code width} wide, or, at zoom 1 when it comes out taller than the view (a portrait
+     * frame), drawn again narrow enough to show whole: the width alone assumed a landscape one.
+     */
+    private Node fitted(Node node, double width, DoubleFunction<? extends Node> again) {
+        if (zoom != 1 || scroller.getViewportBounds() == null) return node;
+        double room = scroller.getViewportBounds().getHeight() - 2 * PADDING;
+        double height = node instanceof Region region ? region.prefHeight(-1) : 0;
+        if (room <= 0 || height <= room) return node;
+        return again.apply(Math.max(160, Math.floor(width * room / height)));
     }
 
     /** How wide the shot is drawn: the tab's width less its padding, at the zoom. */

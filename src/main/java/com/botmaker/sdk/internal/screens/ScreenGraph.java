@@ -65,7 +65,7 @@ public final class ScreenGraph {
 
     /**
      * One edge a walk can take: {@code via}, the field {@code input} of {@code from}, reaches {@code to}. A {@code
-     * back} edge with no input is the default way out: a close button, then Escape; one whose input is no field of
+     * back} edge with no input is the default way out: the usual close button; one whose input is no field of
      * the screen has no {@code input}. {@code pick} is the copy of a repeated button it goes through, null for the
      * first; {@code state} the look of {@code via}'s button the edge needs ({@link Way#whenLooks}), null for any;
      * {@code when} the method answering whether it leads there now ({@link Way#when}), null for always. A way in with
@@ -460,7 +460,7 @@ public final class ScreenGraph {
 
     /**
      * Whether {@code constant} has nothing cut on it: no input and no way back. A popup is never so: the game opens
-     * it, and its default way back (a close button, then Escape) is its way out. Nor is a start screen: the screen
+     * it, and its default way back (the usual close button) is its way out. Nor is a start screen: the screen
      * after it follows on its own.
      */
     public boolean noneCut(String constant) {

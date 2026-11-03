@@ -9,7 +9,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Screen`**: its inputs are its fields, the rest is its `Setup`: a name, `markers` (pictures that all show while the game shows it) and `absent` (pictures none of
   which shows: what tells it from a screen showing the same markers; `internal/screens/Markers` is the one rule every
   reader tells a screen by, 2026-10-16), a `from` way (the tree), `alsoFrom`
-  ways, a `back` input (null: a close button, then Escape), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
+  ways, a `back` input (null: the usual close button), `inputs`, looks (`ScreenVariant`), `popup`, `notes`,
 - **A screen is told by its parts that mark** (2026-11-02): a field `Mark.of(picture | Caption | Element)`, or an
   input or element readout made `.marking()`; a part `.absent()` never shows while it does. A marking button is
   found by any of its looks, so one shown dimmed or Disabled still tells its screen. A part two screens share is no
@@ -241,10 +241,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   wherever it lands. Ends: ARRIVED, NOT_NOW, LOCKED, MISSING (the map names a picture the game no longer shows:
   Upkeep), STUCK, STOPPED.
 - **Popups are screens of the map** (2026-10-16; no run method). `closePopups` closes each one a frame shows by its
-  `back` (or Escape), waits for its markers to go, presses Escape once more if they stay, and throws `Stayed`
-  after that. `PopupGuard.check` calls it before every vision step; with no popup in the map it takes no frame.
+  `back` (else the usual close button), waits for its markers to go, and throws `Stayed` if they stay or nothing
+  can close it. `PopupGuard.check` calls it before every vision step; with no popup in the map it takes no frame.
   `uncover` clears an overlay the map lacks when a frame shows no screen of it: the map's close buttons (each
-  way back that clicks a picture), then Escape when asked. A `Navigate` walk (`uncovering()`) does that once,
+  way back that clicks a picture). **A walk presses no key** (2026-11-03: Escape asked to quit the game or closed
+  the wrong screen): a way that is a key, or a way back with no input and no close button, is left out of every
+  path, and a walk needing one ends MISSING, "map the button that does it". A `Navigate` walk (`uncovering()`) does that once,
   after a second look, and says so; the assistant's walks never do. A timed-out wait clicks only, through
   `PopupGuard.uncover`, which warns "an unmapped popup covered …: map it in Upkeep".
 - **Activities run on the map** (2026-10-16): a body opens with `Navigate.to(Screens.X)`, which on arrival sets

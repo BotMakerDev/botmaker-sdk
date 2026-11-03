@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
@@ -58,7 +59,7 @@ class ScreenWalkTest {
 
     private static Setup named(String name, String marker, String fromScreen, String fromField) {
         Setup setup = Setup.named(name).markers(marker == null ? List.of() : marks(marker));
-        return fromScreen == null ? setup : setup.from(ref(fromScreen, fromField));
+        return fromScreen == null ? setup : setup.from(ref(fromScreen, fromField)).back(click("back"));
     }
 
     private static Map<String, MapScreen> screens() {
@@ -100,8 +101,8 @@ class ScreenWalkTest {
         final List<String> places = new ArrayList<>();
         String screen;
         String popup;
-        /** What closes the popup: its way out or Escape ("both"), only Escape, or nothing. */
-        String closes = "both";
+        /** Whether the popup closes by a click on its close_x; false: it stays whatever is pressed. */
+        boolean closes = true;
         /** An overlay the map lacks, over the screen: it shows {@link #OVERLAY}'s pictures and closes by them. */
         boolean overlay;
         long now;
@@ -139,10 +140,10 @@ class ScreenWalkTest {
             leads.put("HOME click lobby", "LOBBY");
             leads.put("CAMPAIGN click map", "MAP");
             leads.put("MAIL click mail_campaign", "CAMPAIGN");
-            leads.put("MAP key ESCAPE", "CAMPAIGN");
-            leads.put("CAMPAIGN key ESCAPE", "HOME");
-            leads.put("ENGINEER key ESCAPE", "HOME");
-            leads.put("MAIL key ESCAPE", "HOME");
+            leads.put("MAP click back", "CAMPAIGN");
+            leads.put("CAMPAIGN click back", "HOME");
+            leads.put("ENGINEER click back", "HOME");
+            leads.put("MAIL click back", "HOME");
         }
 
         private String showing() {
@@ -158,15 +159,11 @@ class ScreenWalkTest {
             }
             String key = showing() + " " + what;
             if (overlay) {
-                if (shows.get(OVERLAY).isEmpty() ? what.equals("key ESCAPE") : what.equals("click close_x")) {
-                    overlay = false;
-                }
+                if (what.equals("click close_x")) overlay = false;
                 return;
             }
             if (popup != null) {
-                boolean way = what.equals("click close_x") && closes.equals("both");
-                boolean escape = what.equals("key ESCAPE") && !closes.equals("nothing");
-                if (way || escape) popup = null;
+                if (what.equals("click close_x") && closes) popup = null;
                 return;
             }
             String shown = reveals.get(key);
@@ -243,7 +240,7 @@ class ScreenWalkTest {
         ScreenWalk.Result result = go(game, "ENGINEER", reached);
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
-        assertEquals(List.of("key ESCAPE", "click engineer"), game.done);
+        assertEquals(List.of("click back", "click engineer"), game.done);
     }
 
     /** Home with a Claim the game shows, greyed as claim_off once it runs out. */
@@ -524,39 +521,72 @@ class ScreenWalkTest {
     @Test
     void aWayBackThatLandsOnAnotherScreenGoesOnFromThere() {
         Game game = new Game("CAMPAIGN");
-        game.leads.put("CAMPAIGN key ESCAPE", "MAIL");
+        game.leads.put("CAMPAIGN click back", "MAIL");
         List<String> reached = new ArrayList<>();
 
         ScreenWalk.Result walked = go(game, "ENGINEER", reached);
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
-        assertEquals(List.of("key ESCAPE", "key ESCAPE", "click engineer"), game.done);
+        assertEquals(List.of("click back", "click back", "click engineer"), game.done);
         assertEquals(List.of("CAMPAIGN", "MAIL", "HOME", "ENGINEER"), reached);
         assertTrue(game.now < STEP_MS, "no step waited out its time: " + game.now);
     }
 
     @Test
-    void aWayBackWithNoInputIsEscape() {
+    void aWayBackIsItsButton() {
         Game game = new Game("MAP");
 
         ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
-        assertEquals(List.of("key ESCAPE", "key ESCAPE", "click engineer"), game.done);
+        assertEquals(List.of("click back", "click back", "click engineer"), game.done);
     }
 
-    /** The game's usual close button, given, is clicked where it shows; Escape only where it does not (2026-10-14). */
+    /** Campaign with no way back of its own: its parent is reached only by the game's usual close button. */
+    private static ScreenGraph campaignWithNoBack() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
+                        .from(ref("HOME", "campaign")).alsoFrom(List.of(Way.of(ref("MAIL", "mail_campaign")))),
+                click("map"), click("bonus").occasional()));
+        return ScreenGraph.of(screens);
+    }
+
+    /** The game's usual close button, given, is clicked for a way back with no input (2026-10-14). */
     @Test
-    void aWayBackWithNoInputClicksTheUsualCloseButtonWhileItShows() {
-        Game game = new Game("MAP");
+    void aWayBackWithNoInputClicksTheUsualCloseButton() {
+        Game game = new Game("MAP", campaignWithNoBack());
         game.shows.get("CAMPAIGN").add("close_x");
         game.leads.put("CAMPAIGN click close_x", "HOME");
 
         ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("ENGINEER", null);
 
-        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
-        assertEquals(List.of("key ESCAPE", "click close_x", "click engineer"), game.done,
-                "Map shows no close_x: Escape; Campaign shows it: clicked");
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("click back", "click close_x", "click engineer"), game.done);
+    }
+
+    /** Escape asked to quit the game or closed the wrong screen: a walk presses no key (2026-11-03). */
+    @Test
+    void aWayBackWithNoInputAndNoCloseButtonIsMissingAndNothingIsPressed() {
+        Game game = new Game("CAMPAIGN", campaignWithNoBack());
+
+        ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome(), walked.why());
+        assertTrue(walked.why().contains("a walk presses no key: map the button that does it"), walked.why());
+        assertEquals(List.of(), game.done);
+    }
+
+    @Test
+    void aWayThatIsAKeyIsNeverTaken() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))
+                .back(MapFixtures.key(Key.ESCAPE))));
+        Game game = new Game("MAP", ScreenGraph.of(screens));
+
+        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("HOME", null);
+
+        assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome(), walked.why());
+        assertEquals(List.of(), game.done, "no key pressed, and the close button is no way for a mapped key");
     }
 
     @Test
@@ -601,35 +631,40 @@ class ScreenWalkTest {
     }
 
     @Test
-    void aPopupWithNoWayOutIsClosedByEscape() {
+    void aPopupWithNoWayOutIsClosedByTheUsualCloseButton() {
+        Game game = new Game("HOME");
+        game.popup = "NEWS";
+        game.shows.get("NEWS").add("close_x");
+
+        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("CAMPAIGN", null);
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("click close_x", "click campaign"), game.done);
+    }
+
+    @Test
+    void aPopupWithNoWayOutAndNoCloseButtonIsStuckAndNothingIsPressed() {
         Game game = new Game("HOME");
         game.popup = "NEWS";
 
-        assertEquals(ScreenWalk.Outcome.ARRIVED, go(game, "CAMPAIGN", new ArrayList<>()).outcome());
-        assertEquals(List.of("key ESCAPE", "click campaign"), game.done);
+        ScreenWalk.Result walked = go(game, "CAMPAIGN", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome());
+        assertTrue(walked.why().contains("map its close button"), walked.why());
+        assertEquals(List.of(), game.done);
     }
 
     @Test
-    void aPopupStillShownAfterItsWayOutGetsEscapeOnce() {
+    void aPopupThatStaysAfterItsWayOutIsStuck() {
         Game game = new Game("HOME");
         game.popup = "OFFER";
-        game.closes = "escape";
-
-        assertEquals(ScreenWalk.Outcome.ARRIVED, go(game, "CAMPAIGN", new ArrayList<>()).outcome());
-        assertEquals(List.of("click close_x", "key ESCAPE", "click campaign"), game.done);
-    }
-
-    @Test
-    void aPopupThatStaysAfterItsWayOutAndEscapeIsStuck() {
-        Game game = new Game("HOME");
-        game.popup = "OFFER";
-        game.closes = "nothing";
+        game.closes = false;
 
         ScreenWalk.Result walked = go(game, "CAMPAIGN", new ArrayList<>());
 
         assertEquals(ScreenWalk.Outcome.STUCK, walked.outcome());
         assertTrue(walked.why().startsWith("Offer stayed after"), walked.why());
-        assertEquals(List.of("click close_x", "key ESCAPE"), game.done, "Escape once, then the run's recovery");
+        assertFalse(game.done.stream().anyMatch(d -> d.startsWith("key ")), "no key pressed: " + game.done);
         ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
         assertThrows(ScreenWalk.Stayed.class, () -> walk.closePopups(game.look()), "the guard's own call throws");
     }
@@ -660,28 +695,14 @@ class ScreenWalkTest {
     }
 
     @Test
-    void anOverlayIsNotEscapedUnlessAsked() {
+    void anOverlayWithNoCloseButtonOfTheMapIsLeftAndNothingIsPressed() {
         Game game = new Game("HOME");
         game.overlay = true;
         game.shows.get(OVERLAY).clear();
         ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
 
-        assertEquals(Optional.empty(), walk.uncover(game.look().orElseThrow(), "HOME", false));
-        assertEquals(List.of(), game.done, "a timed-out wait never presses Escape");
-    }
-
-    @Test
-    void anOverlayWithNoCloseButtonOfTheMapGetsEscape() {
-        Game game = new Game("HOME");
-        game.overlay = true;
-        game.shows.get(OVERLAY).clear();
-        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
-
-        Optional<ScreenWalk.Uncovered> cleared = walk.uncover(game.look().orElseThrow(), "HOME", true);
-
-        assertEquals(Optional.of(new ScreenWalk.Uncovered("HOME", "Escape")), cleared);
-        assertEquals(List.of("key ESCAPE"), game.done);
-        assertEquals(Optional.empty(), walk.uncover(game.look().orElseThrow(), "HOME", true), "nothing covers Home now");
+        assertEquals(Optional.empty(), walk.uncover(game.look().orElseThrow(), "HOME"));
+        assertEquals(List.of(), game.done, "no key, no guess");
     }
 
     /** A panel over its parent leaves the parent's marker in view: the panel is where the game is (2026-10-15). */
@@ -695,7 +716,7 @@ class ScreenWalkTest {
 
         ScreenWalk.Result walked = walk.go("MAIL", "HOME");
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome());
-        assertEquals(List.of("key ESCAPE", "click mail"), game.done, "the panel closed before Home's input");
+        assertEquals(List.of("click back", "click mail"), game.done, "the panel closed before Home's input");
     }
 
     /** Where the game was, its neighbours are looked for first: a far screen's marker only when none of them shows. */
@@ -736,7 +757,7 @@ class ScreenWalkTest {
     void aWayBackArrivesOnlyOnceTheScreenLeftIsGone() {
         Game game = new Game("ENGINEER");
         game.shows.get("ENGINEER").add("home");
-        game.leads.remove("ENGINEER key ESCAPE");
+        game.leads.remove("ENGINEER click back");
 
         ScreenWalk.Result walked = go(game, "MAIL", new ArrayList<>());
 
@@ -927,7 +948,7 @@ class ScreenWalkTest {
     }
 
     /**
-     * Sword x Staff's Character: Escape, its way back as the map had it, asks "Quit the game?", whose Cancel shows
+     * Sword x Staff's Character: its way back as the map had it (Escape then) asks "Quit the game?", whose Cancel shows
      * Character again; each step left its screen, so each counted as arrived, and the walk went round 309 s.
      */
     @Test
@@ -936,8 +957,8 @@ class ScreenWalkTest {
         screens.put("MAIL", screen(screens.get("MAIL").setup(), click("mail_campaign"), click("quit")));
         screens.put("QUIT", screen(named("Quit", "quit_title", "MAIL", "quit")));
         Game game = new Game("CAMPAIGN", ScreenGraph.of(screens));
-        game.leads.put("CAMPAIGN key ESCAPE", "QUIT");
-        game.leads.put("QUIT key ESCAPE", "CAMPAIGN");
+        game.leads.put("CAMPAIGN click back", "QUIT");
+        game.leads.put("QUIT click back", "CAMPAIGN");
 
         ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
 
@@ -1234,19 +1255,20 @@ class ScreenWalkTest {
     void aTabIsWalkedByPressingIt() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home_title")), click("hero")));
-        screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")).from(ref("HOME", "hero")),
+        screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")).from(ref("HOME", "hero"))
+                        .back(click("back")),
                 click("gear_tab").looks(List.of(Look.of(picture("gear_tab_on"), State.SELECTED))),
                 click("skills_tab").looks(List.of(Look.of(picture("skills_tab_on"), State.SELECTED)))));
         screens.put("GEAR", screen(Setup.named("Gear").from(ref("HERO", "gear_tab")).tab()));
         screens.put("SKILLS", screen(Setup.named("Skills").from(ref("HERO", "skills_tab")).tab()));
         Game game = new Game("HOME", ScreenGraph.of(screens));
-        game.shows.put("GEAR", new HashSet<>(Set.of("hero_title", "gear_tab_on", "skills_tab")));
-        game.shows.put("SKILLS", new HashSet<>(Set.of("hero_title", "gear_tab", "skills_tab_on")));
+        game.shows.put("GEAR", new HashSet<>(Set.of("hero_title", "gear_tab_on", "skills_tab", "back")));
+        game.shows.put("SKILLS", new HashSet<>(Set.of("hero_title", "gear_tab", "skills_tab_on", "back")));
         game.leads.put("HOME click hero", "GEAR");
         game.leads.put("GEAR click skills_tab", "SKILLS");
         game.leads.put("SKILLS click gear_tab", "GEAR");
-        game.leads.put("GEAR key ESCAPE", "HOME");
-        game.leads.put("SKILLS key ESCAPE", "HOME");
+        game.leads.put("GEAR click back", "HOME");
+        game.leads.put("SKILLS click back", "HOME");
 
         ScreenWalk.Result result = go(game, "SKILLS", new ArrayList<>());
         assertTrue(result.arrived(), result.why());
@@ -1265,7 +1287,7 @@ class ScreenWalkTest {
 
         result = go(game, "HOME", new ArrayList<>());
         assertTrue(result.arrived(), result.why());
-        assertEquals(List.of("key ESCAPE"), game.done, "left as the screen it is in is");
+        assertEquals(List.of("click back"), game.done, "left as the screen it is in is");
     }
 
     @Test

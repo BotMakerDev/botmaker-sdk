@@ -985,7 +985,7 @@ final class ScreenPanel {
 
     /** {@code constant}'s way back, and ✕ taking its own off. */
     private Node backRow(String constant, MapScreen screen) {
-        Label said = text(screen.back() == null ? "The default one: a close button, then Escape."
+        Label said = text(screen.back() == null ? "The default one: the usual close button, never a key."
                 : screen.back().label());
         HBox.setHgrow(said, Priority.ALWAYS);
         HBox line = new HBox(8, said);
@@ -1060,8 +1060,8 @@ final class ScreenPanel {
         row.ifPresentOrElse(r -> showPicture(link.from(), r), () -> say(!link.back() && link.via() == null
                 ? graph.shown(link.to()) + " shows by itself once " + graph.shown(link.from()) + " is done: nothing "
                 + "is pressed, and a walk waits up to " + graph.loadMs(link.from()) / 1000 + " s for it."
-                : link.via() == null ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by its close button, "
-                + "else Escape."
+                : link.via() == null ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by the usual close button, "
+                + "never a key."
                 : link.label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
                 + "picture shows in 🖼 Manage Pictures."));
     }

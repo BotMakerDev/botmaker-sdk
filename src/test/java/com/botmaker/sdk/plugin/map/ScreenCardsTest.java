@@ -178,7 +178,7 @@ class ScreenCardsTest {
         Link back = ScreenCards.links(map()).stream().filter(l -> l.back() && l.from().equals("CAMPAIGN"))
                 .findFirst().orElseThrow();
         assertEquals(null, back.via(), "Campaign has no back of its own");
-        assertEquals("the default way back (a close button, then Escape)", back.label());
+        assertEquals("the default way back (the usual close button)", back.label());
     }
 
     @Test

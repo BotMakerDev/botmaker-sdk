@@ -76,7 +76,7 @@ final class MapGuide {
         WAYS_IN("Ways in", "Each input of another screen that opens this one; the first is how it was found."),
         SCREEN_LOOKS("Looks", "Other looks of the whole screen, an event's skin: each shows only while its method "
                 + "says so."),
-        WAY_BACK("Way back", "What a walk presses to leave it: its own input, else a close button, then Escape."),
+        WAY_BACK("Way back", "What a walk presses to leave it: its own input, else the usual close button, never a key."),
         OWES("Owes", "What is left to cut or try here, as Discovery noted it."),
         NOTES("Notes", "Your notes on it: what it spends and earns, its timers, its quirks."),
         ANSWERS("How buttons answer the bot", "How a button looks while the bot hovers, holds or focuses it, so a "
@@ -149,8 +149,8 @@ final class MapGuide {
     static final String LEADS_TO = "Pick the screen of the map this input opens: one more way into it";
     static final String ON_ITS_OWN = "Pick the screen this one follows by itself, nothing pressed: Home after the "
             + "loading screen, Battle after Entering battle. A walk waits for it, up to the time that screen loads in";
-    static final String REMOVE_BACK ="Take its own way back off: a walk then closes it by its close button, else "
-            + "Escape";
+    static final String REMOVE_BACK ="Take its own way back off: a walk then closes it by the usual close button, "
+            + "never a key";
 
     // --- the board, live ---
     static final String LIVE = "Draw the game here, live: a click, a drag, the wheel or a key on it goes to the game";
