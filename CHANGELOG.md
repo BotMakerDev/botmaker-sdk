@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Recoveries that fail in a row wait longer each time**: 2 s after the second, doubling to 60 s, until a pass of
+  the bot ends well. A game that could not be captured was restarted 456 times in 150 s, a new launch each time.
 - **A Screens report in Studio's Reports tab.** Every line the SDK says while it knows the game's screen carries
   that screen; a `Navigate.to` that does not arrive says where it went from and to, at its level (stuck: a warning;
   missing: an error), and, when the game showed none of the map's screens, `screen=none` with the screen it was

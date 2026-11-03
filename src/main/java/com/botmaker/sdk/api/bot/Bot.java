@@ -23,6 +23,7 @@ import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.api.screens.Navigate;
+import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.screens.KeptLooks;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
@@ -30,6 +31,7 @@ import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -344,9 +346,14 @@ public class Bot {
      */
     static void supervise(Runnable body, Runnable recovery) {
         Watchdog.enable();
+        int failed = 0;
         while (true) {
+            // Recoveries that fail in a row wait longer each time (2026-11-03): a game that cannot be captured was
+            // restarted 456 times in 150 s, each restart a new launch and the run log 1.7 MB.
+            if (failed > 0) Wait.time(backOff(failed));
             try {
                 body.run();
+                failed = 0;
             } catch (BotStoppedException e) {
                 Debug.log("Stopped by request.");
                 return;
@@ -357,12 +364,20 @@ public class Bot {
                 else Say.warn(recovering);
                 Watchdog.reset();
                 if (!recovered(recovery)) return;
+                failed++;
             } catch (RuntimeException e) {
                 Debug.error("Crashed: " + e + " — recovering.");
                 Watchdog.reset();
                 if (!recovered(recovery)) return;
+                failed++;
             }
         }
+    }
+
+    /** The pause before the next pass after {@code failed} failures in a row: none after one, then 2 s doubling to 60 s. */
+    static Duration backOff(int failed) {
+        if (failed <= 1) return Duration.ZERO;
+        return Duration.ofSeconds(Math.min(60, 1L << Math.min(failed - 1, 6)));
     }
 
     /**

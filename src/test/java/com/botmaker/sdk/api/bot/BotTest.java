@@ -6,6 +6,7 @@ import com.botmaker.sdk.internal.bot.Watchdog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +26,16 @@ class BotTest {
     void tearDown() {
         Watchdog.disable();
         Watchdog.reset();
+    }
+
+    @Test
+    void recoveriesFailingInARowWaitLongerUpToAMinute() {
+        assertEquals(Duration.ZERO, Bot.backOff(0));
+        assertEquals(Duration.ZERO, Bot.backOff(1));
+        assertEquals(Duration.ofSeconds(2), Bot.backOff(2));
+        assertEquals(Duration.ofSeconds(4), Bot.backOff(3));
+        assertEquals(Duration.ofSeconds(60), Bot.backOff(7));
+        assertEquals(Duration.ofSeconds(60), Bot.backOff(500));
     }
 
     @Test
