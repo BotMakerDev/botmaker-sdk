@@ -43,6 +43,7 @@ class RunDetailsTest {
         SdkRun.started(channel);
         RunDetails.start();
         assertEquals("none", details.get("launchTarget"));
+        assertEquals("unknown", details.get("gameVersion"));
         assertTrue(details.containsKey("platform"));
     }
 

@@ -24,7 +24,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   telemetry. Studio's run agent hands that channel over and writes the run's `run.jsonl`; a run with no host (a
   plain `java` launch) prints its lines to the console, and `Ask` asks on the console. A wait's miss frames go in
   the channel's run folder (`RunChannel.folder()`), none when it has none.
-- **A run's log says why, at the right level.** A bot's run hands its host the SDK's details: the flow, the launch target's kind, the platform and each plain `@Param` value; each line names
+- **A run's log says why, at the right level.** A bot's run hands its host the SDK's details: the flow, the launch target's kind, the game's version (best effort, `unknown` when it can't be read in 2 s), the platform and each plain `@Param` value; each line names
   the bot's own line that led to it. A level says who handled the result: a walk *stuck* is a warning naming the
   target, the last known screen, the steps walked and the target's markers' scores now; *missing* is an error;
   *not now* and *locked* are information, the bot's code handles them. A fallback that rescued the run warns: the

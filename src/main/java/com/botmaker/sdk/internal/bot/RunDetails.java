@@ -5,6 +5,7 @@ import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.trace.SdkRun;
+import com.botmaker.shared.launch.GameVersion;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -26,7 +27,8 @@ public final class RunDetails {
     }
 
     /**
-     * The SDK's words for the run: {@code flow}, {@code launchTarget} (its kind), {@code platform} (an emulator's
+     * The SDK's words for the run: {@code flow}, {@code launchTarget} (its kind), {@code gameVersion} (best effort,
+     * {@link GameVersion}: at most two seconds, else {@code unknown}), {@code platform} (an emulator's
      * instance, else the OS) and each {@code @Param} of {@code values} whose value is plain text, a number, a switch
      * or a choice, as {@code param.<name>}.
      */
@@ -36,6 +38,7 @@ public final class RunDetails {
         if (flow != null) out.put("flow", flow);
         LaunchTarget target = Target.current();
         out.put("launchTarget", target == null ? "none" : target.getClass().getSimpleName());
+        out.put("gameVersion", target == null ? GameVersion.UNKNOWN : GameVersion.of(target.launchSpec()));
         out.put("platform", target instanceof LaunchTarget.EmulatorApp app && app.instance() != null
                 && !app.instance().isBlank() ? app.instance() : System.getProperty("os.name", ""));
         for (Class<?> holder : values == null ? new Class<?>[0] : values) {
