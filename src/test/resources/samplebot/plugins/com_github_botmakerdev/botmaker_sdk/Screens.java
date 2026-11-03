@@ -1,9 +1,12 @@
 package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 
+import samplebot.SampleBot;
+
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
@@ -30,7 +33,8 @@ public final class Screens {
         public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE).marking();
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
-        public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried();
+        public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried()
+                .when(Condition.of(SampleBot::shopOpen));
         public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),
                 new DigitSet("src/main/resources/digits/gold")).subject();
         public final Readout title = Readout.text(new Zone(0, 40, 300, 40));

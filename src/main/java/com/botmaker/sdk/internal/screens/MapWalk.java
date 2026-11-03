@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.runlog.api.Level;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 
 import java.time.Duration;
@@ -380,15 +381,12 @@ public final class MapWalk {
         }
     }
 
-    /** Whether {@code edge}'s own method ({@code Way.when}) says it leads there now; true without one. */
+    /**
+     * Whether {@code edge}'s own method ({@code Way.when}) says yes, it leads there now; true without one. Unknown is
+     * not tried, so it is never a finding.
+     */
     private static boolean leadsNow(ScreenGraph.Edge edge) {
-        if (edge.when() == null) return true;
-        try {
-            return edge.when().getAsBoolean();
-        } catch (RuntimeException e) {
-            rethrowStop(e);
-            return false;
-        }
+        return Conditions.answer(edge.when()) == Answer.YES;
     }
 
     /** Rethrows {@code e} when it is a stop, or wraps one (a move run on an executor). */

@@ -1,5 +1,9 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.screens.Answer;
+import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.internal.flow.FlowWalker;
+
 import java.util.function.BooleanSupplier;
 
 /**
@@ -12,13 +16,25 @@ public final class Conditions {
 
     private Conditions() {}
 
-    /** Whether {@code condition} holds: true for none and for one that cannot answer (a name, a method that threw). */
-    public static boolean holds(BooleanSupplier condition) {
-        if (condition == null) return true;
+    /**
+     * What {@code condition} says: a {@link Condition}'s own answer; a plain supplier yes or no; none yes; one that
+     * cannot answer (a name, a method that threw) unknown. A stop thrown inside it, or wrapped, goes on: the run
+     * ends.
+     */
+    public static Answer answer(BooleanSupplier condition) {
+        if (condition == null) return Answer.YES;
         try {
-            return condition.getAsBoolean();
+            return condition instanceof Condition c ? c.answer() : Answer.of(condition.getAsBoolean());
         } catch (RuntimeException unknown) {
-            return true;
+            for (Throwable at = unknown; at != null; at = at.getCause() == at ? null : at.getCause()) {
+                if (FlowWalker.isStop(at)) throw (RuntimeException) at;
+            }
+            return Answer.UNKNOWN;
         }
+    }
+
+    /** Whether {@code condition} holds: anything but no. */
+    public static boolean holds(BooleanSupplier condition) {
+        return answer(condition) != Answer.NO;
     }
 }

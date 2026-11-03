@@ -36,6 +36,11 @@ public final class SampleBot {
     public static void setup() {
     }
 
+    /** Whether the shop is open today — the shop button's {@code .when(Condition.of(SampleBot::shopOpen))}. */
+    public static boolean shopOpen() {
+        return true;
+    }
+
     /** Whether an activity that has not got anywhere yet should keep trying, by {@link Parameters#maxAttempts}. */
     static boolean keepTrying(int attempt) {
         return attempt < Parameters.maxAttempts;

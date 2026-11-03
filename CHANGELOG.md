@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Conditions answer yes, no or unknown** (`api.screens.Answer`, `api.screens.Condition`). Any `.when(…)` takes a
+  `Condition`: `Condition.of(GameLogic::eventOn)` (true yes, false no, a throw unknown), `Condition.all`, `any` and
+  `not` with three-valued logic. It holds unless it says no, so an unknown never closes a way; a plain
+  `BooleanSupplier` still answers yes or no. Every `.when(BooleanSupplier)` keeps its signature. A stop inside a
+  condition still ends the run. 🗺 Screens reads such a condition as it is written and keeps it; its menus still
+  set only a method reference. Explore map tries a way only when its condition says yes.
+
 - **A restart in a private display brings the game back.** When ending the game took Waydroid's session down
   (a leftover process force-stop could not end), the run closes its display and brings up a fresh one, never
   Studio's offered display again, which launches nothing; otherwise it starts the game again where it was.

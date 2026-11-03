@@ -10,9 +10,11 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
@@ -385,14 +387,13 @@ public final class ScreenTypes implements TypeHolder {
 
     /**
      * A condition as a name, {@code Firestone::eventOn}: what the editor reads out of {@code Screens.java}, with no
-     * classpath to ask it on. Asking it throws, which the walk reads as unknown.
+     * classpath to ask it on, so it cannot tell: unknown, which never closes a way.
      */
-    record NamedCondition(String source) implements BooleanSupplier {
+    record NamedCondition(String source) implements Condition {
 
         @Override
-        public boolean getAsBoolean() {
-            throw new UnsupportedOperationException(
-                    "\"" + source + "\" was read out of a file by the editor and is a name, not a method");
+        public Answer answer() {
+            return Answer.UNKNOWN;
         }
     }
 }
