@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- A run's miss frames go in the folder shared's run log names (`RunLog.newFolder`), so a run's log and its
+  frames share one folder. Nothing a bot sees changes.
 - **The assistant types in an emulator's app through the emulator's text input**, as a run does: in a private
   display a key synthesised over X was mapped by the host's layout (AZERTY typed "Cloudzold" for "Cloudwold").
   An emulator field's Enter is the emulator's own key.

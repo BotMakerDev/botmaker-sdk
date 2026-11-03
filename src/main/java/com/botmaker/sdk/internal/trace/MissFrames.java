@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.trace;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.shared.Diag;
+import com.botmaker.shared.runlog.RunLog;
 
 import javax.imageio.ImageIO;
 import java.awt.BasicStroke;
@@ -12,8 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
@@ -42,13 +42,12 @@ import java.util.stream.Stream;
 public final class MissFrames {
 
     static final int KEEP = 20;
-    static final int KEEP_RUNS = 5;
+    static final int KEEP_RUNS = RunLog.KEEP_RUNS;
     static final long QUIET_MS = 30_000;
-    /** The folder every run's frames go under, relative to the bot's folder. */
-    public static final Path FOLDER = Path.of("target", "botmaker-runs");
+    /** The folder every run's frames go under, relative to the bot's folder: the run log's. */
+    public static final Path FOLDER = RunLog.FOLDER;
 
     private static final String SOURCE = "Vision";
-    private static final DateTimeFormatter RUN_NAME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final Color BOX = new Color(0xe3, 0xa0, 0x08);
 
     private static LongSupplier clock = System::currentTimeMillis;
@@ -153,25 +152,9 @@ public final class MissFrames {
         return copy;
     }
 
-    /** A new run's folder, after dropping all but the newest {@code KEEP_RUNS - 1} earlier runs. */
+    /** A new run's folder, named and pruned as the run's log names its own ({@link RunLog#newFolder}). */
     private static Path newRun(Path root) throws IOException {
-        Files.createDirectories(root);
-        try (Stream<Path> dirs = Files.list(root)) {
-            List<Path> old = dirs.filter(Files::isDirectory)
-                    .sorted(Comparator.comparing(Path::getFileName).reversed()).toList();
-            for (Path dir : old.subList(Math.min(old.size(), KEEP_RUNS - 1), old.size())) delete(dir);
-        }
-        String name = LocalDateTime.now().format(RUN_NAME);
-        Path dir = root.resolve(name);
-        for (int n = 2; Files.exists(dir); n++) dir = root.resolve(name + "-" + n);
-        return Files.createDirectories(dir);
-    }
-
-    private static void delete(Path dir) throws IOException {
-        try (Stream<Path> files = Files.list(dir)) {
-            for (Path f : files.toList()) Files.deleteIfExists(f);
-        }
-        Files.deleteIfExists(dir);
+        return RunLog.newFolder(root, Clock.systemDefaultZone());
     }
 
     /** {@code what} as a file name: letters, digits and dashes, at most 40. */
