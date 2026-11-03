@@ -14,9 +14,12 @@ import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
+import com.botmaker.sdk.internal.screens.ScreenValues;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.trace.Say;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
@@ -59,25 +62,43 @@ public final class Navigate {
         }
         // Forgotten while walking: a walk that gets stuck is no step to walk back from to where it set out.
         ScreenMaps.reached(null);
+        String from = ScreenMaps.lastSeen();
         ScreenWalk walk = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant));
-        ScreenWalk.Result walked = walk.uncovering().go(target.get(), ScreenMaps.lastSeen());
-        ScreenMaps.seen(walked.at());
+        ScreenWalk.Result walked = walk.uncovering().go(target.get(), from);
+        if (walked.at() == null) ScreenMaps.lost();
+        else ScreenMaps.seen(walked.at());
         if (walked.arrived()) {
             // Where the activity walks back to when one of its steps gets stuck.
             ScreenMaps.reached(target.get());
             return true;
         }
         // Said here, at the bot's line that walked, at its outcome's level; the recovery from a throw says only itself.
+        Map<String, String> move = move(map, from, target.get(), walked.at());
         switch (walked.outcome().level()) {
-            case INFO -> Say.info(walked.why());
-            case WARN -> Say.warn(stuck(map, walk, target.get(), walked));
-            case ERROR -> Debug.error(walked.why());
+            case INFO -> Say.info(walked.why(), move);
+            case WARN -> Say.warn(stuck(map, walk, target.get(), walked), move);
+            case ERROR -> Say.error(walked.why(), move);
             default -> Debug.log(walked.why());
         }
         return switch (walked.outcome()) {
             case MISSING, STUCK -> throw Say.told(new BotStuckException(walked.why()));
             default -> false;
         };
+    }
+
+    /**
+     * A walk that did not arrive, as its line's values say it for the SDK's reports: {@code from} and {@code to}; and,
+     * when it ended on no screen of the map, {@code screen=none} with the {@code target} it was going to.
+     */
+    private static Map<String, String> move(ScreenGraph map, String from, String target, String at) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(ScreenValues.FROM, from == null ? ScreenValues.NONE : map.shown(from));
+        values.put(ScreenValues.TO, map.shown(target));
+        if (at == null) {
+            values.put(ScreenValues.SCREEN, ScreenValues.NONE);
+            values.put(ScreenValues.TARGET, map.shown(target));
+        }
+        return values;
     }
 
     /**

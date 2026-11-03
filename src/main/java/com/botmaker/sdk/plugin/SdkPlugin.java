@@ -14,6 +14,7 @@ import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pictures.MoveOffer;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
+import com.botmaker.sdk.plugin.run.SdkReportViews;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
@@ -79,7 +80,8 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .readiness(GameReady::now)
                 .onProjectOpened(SdkPlugin::opened)
                 .onProjectClosing(SdkPlugin::closing)
-                .onBotRun(SdkRun::started));
+                .onBotRun(SdkRun::started)
+                .reportViews(SdkReportViews.class));
     }
 
     /**

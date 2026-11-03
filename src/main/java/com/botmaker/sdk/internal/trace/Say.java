@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.trace;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -27,6 +28,21 @@ public final class Say {
     /** What the bot's code handled, said even with debugging off. */
     public static void info(String message) {
         SdkRun.info(TraceSources.origin(), message);
+    }
+
+    /** {@link #warn(String)} carrying {@code values} of the SDK's own ({@link SdkRun#warn(SdkRun.Origin, String, Map)}). */
+    public static void warn(String message, Map<String, String> values) {
+        SdkRun.warn(TraceSources.origin(), message, values);
+    }
+
+    /** {@link #info(String)} carrying {@code values}, as {@link #warn(String, Map)}. */
+    public static void info(String message, Map<String, String> values) {
+        SdkRun.info(TraceSources.origin(), message, values);
+    }
+
+    /** Nobody handled it, said whether debugging is on or off, carrying {@code values} as {@link #warn(String, Map)}. */
+    public static void error(String message, Map<String, String> values) {
+        SdkRun.error(TraceSources.origin(), message, null, values);
     }
 
     /** {@code thrown}, after its problem was said where it happened; returns it, to throw. */

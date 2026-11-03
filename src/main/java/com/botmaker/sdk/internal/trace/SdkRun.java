@@ -6,6 +6,8 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.observe.IpcObserver;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Predicate;
@@ -23,7 +25,15 @@ public final class SdkRun {
     /** A leading {@code [Name]} longer than this is text, not a source. */
     private static final int MAX_SOURCE = 32;
 
+    /** The value key of the screen the game was last seen on, which every line said while one is known carries. */
+    public static final String SCREEN = "screen";
+
     private static volatile RunChannel channel = RunChannel.console();
+    /** The screen the game was last seen on, as the map shows it; null while none is known. */
+    private static volatile String screen;
+    /** Said once, as the run's JVM ends: the SDK's lines that sum the run up (the time on each screen). */
+    private static volatile Runnable atEnd;
+    private static volatile boolean hooked;
 
     private SdkRun() {}
 
@@ -32,11 +42,44 @@ public final class SdkRun {
         if (given == null) return;
         channel = given;
         IpcObserver.install();
+        hook();
+    }
+
+    /** The screen the game is on now, as the map shows it ({@code null}: none known); later lines carry it. */
+    public static void screen(String shown) {
+        screen = shown == null || shown.isBlank() ? null : shown;
+    }
+
+    /**
+     * What sums the run up, said once as its JVM ends, through the channel then: a host's run log stays open to the
+     * end, its lines flushed one by one, so the hook that ends the host's run and this one may run in either order.
+     */
+    public static void atEnd(Runnable summary) {
+        atEnd = summary;
+    }
+
+    private static synchronized void hook() {
+        if (hooked) return;
+        hooked = true;
+        Runtime.getRuntime().addShutdownHook(new Thread(SdkRun::end, "botmaker-sdk-run-end"));
+    }
+
+    /** Says {@link #atEnd}'s lines once; a summary that throws costs only itself. */
+    static void end() {
+        Runnable summary = atEnd;
+        atEnd = null;
+        if (summary == null) return;
+        try {
+            summary.run();
+        } catch (RuntimeException ignored) {
+            // the run's own lines are written already
+        }
     }
 
     /** Back to {@link RunChannel#console()}, with no observer encoding frames nobody reads. */
     public static void ended() {
         channel = RunChannel.console();
+        screen = null;
         IpcObserver.uninstall();
     }
 
@@ -58,19 +101,37 @@ public final class SdkRun {
     public static void debug(Origin origin, String message, int count, Rect where) {
         RunChannel to = channel;
         if (!to.recorded()) return;
-        write(to, TraceLine.Level.DEBUG, origin, message, count, where, null);
+        write(to, TraceLine.Level.DEBUG, origin, message, count, where, null, Map.of());
     }
 
     /** A debug line under {@code source}, written by the first class calling in. */
     public static void debug(String source, String message) {
         RunChannel to = channel;
         if (!to.recorded()) return;
-        write(to, TraceLine.Level.DEBUG, named(source), message, 1, null, null);
+        write(to, TraceLine.Level.DEBUG, named(source), message, 1, null, null, Map.of());
     }
 
     /** What the bot's code handled, said even with debugging off. */
     public static void info(Origin origin, String message) {
-        write(channel, TraceLine.Level.INFO, origin, message, 1, null, null);
+        info(origin, message, Map.of());
+    }
+
+    /**
+     * {@link #info(Origin, String)} carrying {@code values} besides the screen: keys of the SDK's own, which its
+     * report views count ({@code plugin/run/SdkReportViews}); one named {@value #SCREEN} wins over the one known.
+     */
+    public static void info(Origin origin, String message, Map<String, String> values) {
+        write(channel, TraceLine.Level.INFO, origin, message, 1, null, null, values);
+    }
+
+    /** {@link #warn(Origin, String)} carrying {@code values}, as {@link #info(Origin, String, Map)}. */
+    public static void warn(Origin origin, String message, Map<String, String> values) {
+        write(channel, TraceLine.Level.WARN, origin, message, 1, null, null, values);
+    }
+
+    /** {@link #error(Origin, String, Throwable)} carrying {@code values}, as {@link #info(Origin, String, Map)}. */
+    public static void error(Origin origin, String message, Throwable cause, Map<String, String> values) {
+        write(channel, TraceLine.Level.ERROR, origin, message, 1, null, cause, values);
     }
 
     /** {@link #info(Origin, String)} under {@code source}. */
@@ -80,7 +141,7 @@ public final class SdkRun {
 
     /** A fallback rescued the run: said whether debugging is on or off. */
     public static void warn(Origin origin, String message) {
-        write(channel, TraceLine.Level.WARN, origin, message, 1, null, null);
+        warn(origin, message, Map.of());
     }
 
     /** {@link #warn(Origin, String)} under {@code source}. */
@@ -90,7 +151,7 @@ public final class SdkRun {
 
     /** Nobody handled it; {@code cause} may be null. */
     public static void error(Origin origin, String message, Throwable cause) {
-        write(channel, TraceLine.Level.ERROR, origin, message, 1, null, cause);
+        error(origin, message, cause, Map.of());
     }
 
     /** The first frame beyond {@code skip}, and beyond this class's own. */
@@ -115,7 +176,16 @@ public final class SdkRun {
     }
 
     private static void write(RunChannel to, TraceLine.Level level, Origin origin, String message, int count,
-                              Rect where, Throwable cause) {
+                              Rect where, Throwable cause, Map<String, String> given) {
+        Map<String, String> values = new LinkedHashMap<>();
+        String known = screen;
+        if (known != null) values.put(SCREEN, known);
+        if (given != null) values.putAll(given);
+        send(to, level, origin, message, count, where, cause, values);
+    }
+
+    private static void send(RunChannel to, TraceLine.Level level, Origin origin, String message, int count,
+                             Rect where, Throwable cause, Map<String, String> values) {
         Origin given = origin == null ? new Origin("", "", "") : origin;
         String text = message == null ? "" : message;
         String source = sourceOf(text);
@@ -127,7 +197,7 @@ public final class SdkRun {
         Optional<TraceLine.Region> region = where == null ? Optional.empty()
                 : Optional.of(new TraceLine.Region(where.x(), where.y(), where.width(), where.height()));
         to.line(new TraceLine(Instant.now(), level, source, text, count, given.className(), given.method(), "",
-                OptionalInt.empty(), region), cause);
+                OptionalInt.empty(), region, values), cause);
     }
 
     /** The name in a leading {@code [Name]}, or empty when {@code message} does not start with one. */

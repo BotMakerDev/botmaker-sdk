@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.internal.trace.SdkRun;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -38,6 +39,22 @@ public final class ScreenMaps {
         installed = found;
         last = null;
         reached = null;
+        lost();
+        // The run's last lines: one per screen it came to, which only a local run's reports read.
+        SdkRun.atEnd(ScreenMaps::sayTime);
+    }
+
+    /** How long the run spent on each screen, and how often it came to it, from {@link #seen}. */
+    private static final ScreenTime TIME = new ScreenTime(System::currentTimeMillis);
+
+    /** One INFO line per screen the run came to, with its {@code visits} and {@code millis}. */
+    private static void sayTime() {
+        SdkRun.Origin origin = new SdkRun.Origin("Screens", ScreenMaps.class.getName(), "sayTime");
+        for (ScreenTime.Spent s : TIME.spent()) {
+            SdkRun.info(origin, "On " + s.screen() + ": " + s.visits() + (s.visits() == 1 ? " visit, " : " visits, ")
+                    + Math.round(s.millis() / 1000.0) + " s in all.", Map.of(ScreenValues.SCREEN, s.screen(),
+                    ScreenValues.VISITS, Integer.toString(s.visits()), ScreenValues.MILLIS, Long.toString(s.millis())));
+        }
     }
 
     /** Walks {@code map} from now on, as {@link #install} would learn it; {@code null} is the empty map. */
@@ -45,6 +62,16 @@ public final class ScreenMaps {
         installed = map == null ? ScreenGraph.of(Map.of()) : map;
         last = null;
         reached = null;
+        lost();
+    }
+
+    /**
+     * The game is on no screen of the map now, as far as the run knows: later lines carry none and no screen's time
+     * runs. The screen last seen is kept, as where a walk looks first.
+     */
+    public static void lost() {
+        SdkRun.screen(null);
+        TIME.off();
     }
 
     /** The screen of the installed map the game was last seen on: a walk looks for its neighbours first. */
@@ -54,9 +81,17 @@ public final class ScreenMaps {
         return last;
     }
 
-    /** Remembers {@code constant} as the screen the game was last seen on; a popup is never one. */
+    /**
+     * Remembers {@code constant} as the screen the game was last seen on; a popup is never one. The run's later lines
+     * carry it ({@link ScreenValues#SCREEN}), and its time is counted from now.
+     */
     public static void seen(String constant) {
-        if (constant != null && installed.screen(constant).filter(s -> !s.isPopup()).isPresent()) last = constant;
+        ScreenGraph map = installed;
+        if (constant == null || map.screen(constant).filter(s -> !s.isPopup()).isEmpty()) return;
+        last = constant;
+        String shown = map.shown(constant);
+        SdkRun.screen(shown);
+        TIME.on(shown);
     }
 
     /**

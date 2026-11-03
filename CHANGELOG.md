@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A Screens report in Studio's Reports tab.** Every line the SDK says while it knows the game's screen carries
+  that screen; a `Navigate.to` that does not arrive says where it went from and to, at its level (stuck: a warning;
+  missing: an error), and, when the game showed none of the map's screens, `screen=none` with the screen it was
+  going to. As a run ends, one line per screen says how often the run came to it and how long it stayed. The SDK
+  declares four views of them: *Problems per screen*, *Failed moves* (from × to), *Unrecognised screens* and *Time on
+  screens* (your own runs only).
 - **What a bot reads off the screen stays on the machine**: `Text.read`, `readDigits`, `lastMatch`,
   `lastMatchList`, `TextMatch.text` and `Navigate.read`/`number` carry `@ReadsScreen`, so a report sent to the
   bot's author shows `…` for what they returned.
