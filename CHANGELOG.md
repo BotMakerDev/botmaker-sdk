@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Explore map says a screen it could not get to**, even after a game restart, so a map whose start the game no
+  longer shows ends with "Never reached: …" instead of in silence.
 - **Explore map, a run beside your bot's.** Studio shows *▶ Explore map* for a bot on the SDK: it starts the game
   and walks the bot's whole screen map without the bot's `main`, every screen and every edge once, and says what did
   not go as the map says: an edge that arrived elsewhere, nowhere or too late (a warning), a screen whose pictures

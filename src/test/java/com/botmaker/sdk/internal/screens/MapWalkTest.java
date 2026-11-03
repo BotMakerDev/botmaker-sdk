@@ -191,9 +191,26 @@ class MapWalkTest {
         Summary summary = walk(ScreenGraph.of(screens), game);
 
         assertEquals(5, game.restarts);
-        assertEquals(List.of(new Finding(Finding.Kind.UNREACHED, "B5", null, "gave up after 5 restarts")),
-                summary.findings());
+        List<Finding> expected = new ArrayList<>();
+        for (int i = 1; i <= 4; i++) {
+            expected.add(new Finding(Finding.Kind.UNREACHED, "B" + i, null, MapWalk.NOT_GOT_TO));
+        }
+        expected.add(new Finding(Finding.Kind.UNREACHED, "B5", null, "gave up after 5 restarts"));
+        assertEquals(expected, summary.findings());
         assertTrue(summary.notTried() > 0);
+    }
+
+    @Test
+    void aStartScreenTheGameNeverShowsIsSaid() {
+        // Sword x Staff, 2026-11-03: the game opened on a screen that was not the start; the walk said nothing.
+        Game game = new Game();
+        game.at = s -> false;
+
+        Summary summary = walk(map(), game);
+
+        assertEquals(1, game.restarts);
+        assertEquals(List.of(new Finding(Finding.Kind.UNREACHED, "A", null, MapWalk.NOT_GOT_TO)), summary.findings());
+        assertEquals(summary.edges(), summary.notTried());
     }
 
     @Test

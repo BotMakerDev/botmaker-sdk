@@ -29,6 +29,9 @@ public final class MapWalk {
 
     private MapWalk() {}
 
+    /** Why a screen's edges were left untried: the walk could not get to it, a game restart included. */
+    public static final String NOT_GOT_TO = "could not get to it, even after a game restart";
+
     /** Something the walk met that the map does not say: {@code why} in words, {@code from}/{@code to} the screens. */
     public record Finding(Kind kind, String from, String to, String why) {
 
@@ -219,6 +222,8 @@ public final class MapWalk {
                                     "gave up after " + restarts + " restarts"));
                             break walk;
                         }
+                        // Its edges are left untried: said, or a start the game never shows ends the walk silently.
+                        note.accept(new Finding(Finding.Kind.UNREACHED, screen, null, NOT_GOT_TO));
                         continue walk;
                     }
                 }

@@ -186,9 +186,9 @@ final class MapTools {
                             + "with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")
-                    .describedAs("Walks the game to a screen of the map as a run does: finds where it is "
-                            + "by the markers, then does each input on the way and waits for each screen; a popup "
-                            + "on the way is closed. Says where it ended and why when it did not arrive")
+                    .describedAs("Walks the game to a map screen as a run does: finds where it is by the "
+                            + "markers, does each input on the way, waits for each screen, closes popups. "
+                            + "Says where it ended and why when it did not arrive")
                     .takes(Goal.class).handledBy(MapTools::goToScreen));
 
     private MapTools() {}
