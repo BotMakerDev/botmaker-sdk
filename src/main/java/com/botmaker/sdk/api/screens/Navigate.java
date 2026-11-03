@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.ReadsScreen;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotStuckException;
@@ -192,6 +193,7 @@ public final class Navigate {
      * nothing is read there.
      */
     @Hidden("no block can pick a readout yet: Studio reads Screens.HOME.gold as an input; written in Java")
+    @ReadsScreen
     public static Optional<String> read(Readout readout) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<BotConstants.InputName> name = map.nameOf(readout);
@@ -208,6 +210,7 @@ public final class Navigate {
      * {@code 350/500} 350500; empty as for {@link #read}, or when it shows no digit.
      */
     @Hidden("as read: no block can pick a readout yet")
+    @ReadsScreen
     public static OptionalLong number(Readout readout) {
         String digits = read(readout).map(text -> text.replaceAll("\\D", "")).orElse("");
         if (digits.isEmpty()) return OptionalLong.empty();

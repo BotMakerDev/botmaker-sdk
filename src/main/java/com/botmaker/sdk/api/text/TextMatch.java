@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.text;
 
+import com.botmaker.plugin.api.palette.ReadsScreen;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 
@@ -50,6 +51,7 @@ public class TextMatch {
     }
 
     /** The recognized text, or {@code null} if not found. */
+    @ReadsScreen
     public String text() {
         return text;
     }

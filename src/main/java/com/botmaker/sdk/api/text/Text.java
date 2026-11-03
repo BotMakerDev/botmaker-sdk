@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.text;
 import com.botmaker.plugin.api.palette.Fills;
 import com.botmaker.plugin.api.palette.Palette;
+import com.botmaker.plugin.api.palette.ReadsScreen;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.PopupGuard;
 import com.botmaker.sdk.api.console.Debug;
@@ -89,6 +90,7 @@ public final class Text {
      * @return the last text match, never null
      */
     @Fills(label = "Text found")
+    @ReadsScreen
     public static TextMatch lastMatch() {
         TextMatch result = lastMatch.get();
         return result != null ? result : TextMatch.notFound();
@@ -100,6 +102,7 @@ public final class Text {
      *
      * @return the last text match list, never null
      */
+    @ReadsScreen
     public static List<TextMatch> lastMatchList() {
         List<TextMatch> result = lastMatchList.get();
         return result != null ? result : new ArrayList<>();
@@ -145,11 +148,13 @@ public final class Text {
     // ---------------------------------------------------------------------
 
     /** All recognized text within {@code source}, as one string. Empty string if nothing is read. */
+    @ReadsScreen
     public static String read(CaptureSource source) {
         return read(source, DEFAULT_OPTIONS);
     }
 
     /** {@link #read(CaptureSource)} against the current source. */
+    @ReadsScreen
     public static String read() {
         return read(Source.current(), DEFAULT_OPTIONS);
     }
@@ -158,6 +163,7 @@ public final class Text {
      * All recognized text within {@code source} using {@code opts}, as one string. {@code null} options are
      * {@link #DEFAULT_OPTIONS}, here and in every {@code OcrOptions} overload.
      */
+    @ReadsScreen
     public static String read(CaptureSource source, OcrOptions opts) {
         BufferedImage img = source.capture();
         if (img == null) return "";
@@ -184,6 +190,7 @@ public final class Text {
      * ({@code ,} {@code .} {@code /}) is passed over, so {@code 350/500} reads {@code 350500}: narrow the area to
      * one number (2026-10-11).
      */
+    @ReadsScreen
     public static OptionalLong readDigits(CaptureSource source, DigitSet digits) {
         try {
             return DigitReader.read(source, digits, BotSettings.current().confidence());
@@ -194,6 +201,7 @@ public final class Text {
     }
 
     /** {@link #readDigits(CaptureSource, DigitSet)} against the current source. */
+    @ReadsScreen
     public static OptionalLong readDigits(DigitSet digits) {
         return readDigits(Source.current(), digits);
     }

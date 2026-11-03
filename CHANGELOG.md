@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **What a bot reads off the screen stays on the machine**: `Text.read`, `readDigits`, `lastMatch`,
+  `lastMatchList`, `TextMatch.text` and `Navigate.read`/`number` carry `@ReadsScreen`, so a report sent to the
+  bot's author shows `…` for what they returned.
 - **A run reaches its host through the contract only.** The SDK writes its lines, its run's details, its overlay
   events and `Ask`'s questions on the run channel its host hands it (`onBotRun`), never through shared's log or
   telemetry. Studio's run agent hands that channel over and writes the run's `run.jsonl`; a run with no host (a
