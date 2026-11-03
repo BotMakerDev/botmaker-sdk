@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Explore map, a run beside your bot's.** Studio shows *▶ Explore map* for a bot on the SDK: it starts the game
+  and walks the bot's whole screen map without the bot's `main`, every screen and every edge once, and says what did
+  not go as the map says: an edge that arrived elsewhere, nowhere or too late (a warning), a screen whose pictures
+  no longer match, and a screen never reached (errors), then one line of counts. They reach the end-of-run dialog and
+  the Reports tab like any run's problems (*Failed moves* shows the edges). It is never stuck for ever: each edge gets
+  30 s, the walk 30 min and 5 game restarts. An edge whose method says no, whose button is locked, greyed out or shows
+  another look than the one it needs, or a way back with no button, is not taken. Stopped midway, it keeps the
+  problems it found so far.
 - **Recoveries that fail in a row wait longer each time**: 2 s after the second, doubling to 60 s, until a pass of
   the bot ends well. A game that could not be captured was restarted 456 times in 150 s, a new launch each time.
 - **A Screens report in Studio's Reports tab.** Every line the SDK says while it knows the game's screen carries

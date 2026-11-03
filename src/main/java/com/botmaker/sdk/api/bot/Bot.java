@@ -300,7 +300,7 @@ public class Bot {
      * first {@code COLD} launch over force-stop-then-relaunch on a {@code RESTART} recovery. Always waits for the
      * game window to appear after launching.
      */
-    private static void launchConfiguredTarget(StartMode mode) {
+    static void launchConfiguredTarget(StartMode mode) {
         switch (mode) {
             case COLD -> {
                 Target.startIfNotRunning();

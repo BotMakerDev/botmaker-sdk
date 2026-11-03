@@ -16,6 +16,7 @@ import com.botmaker.sdk.plugin.pictures.MoveOffer;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkReportViews;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
+import com.botmaker.sdk.plugin.run.SdkRuns;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
@@ -81,7 +82,8 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .onProjectOpened(SdkPlugin::opened)
                 .onProjectClosing(SdkPlugin::closing)
                 .onBotRun(SdkRun::started)
-                .reportViews(SdkReportViews.class));
+                .reportViews(SdkReportViews.class)
+                .runs(SdkRuns.class));
     }
 
     /**

@@ -275,6 +275,31 @@ public final class ScreenWalk {
         }
     }
 
+    /**
+     * Takes {@code edge} itself, the game on its {@code from}, and no other way: closes the popups shown, does its
+     * input (a way back with none, the usual close button; one on its own, nothing) and waits a step for it to arrive.
+     * {@link Outcome#ARRIVED} when it did, at {@code to}; else {@link Outcome#MISSING} for an input not on the screen
+     * and {@link Outcome#STUCK} for one that led nowhere in time, each at the screen the game shows after (null: none).
+     */
+    public Result take(ScreenGraph.Edge edge) {
+        try {
+            Optional<BufferedImage> frame = closePopups(reach.look());
+            if (frame.isEmpty()) return new Result(Outcome.STUCK, null, List.of(), "The game shows no frame.");
+            if (!perform(edge, frame.get())) {
+                return new Result(Outcome.MISSING, edge.from(), List.of(), edge.label() + " is not on "
+                        + graph.shown(edge.from()) + (edge.via() == null && close == null ? ": no close button is "
+                        + "mapped for a way back with none." : "."));
+            }
+            if (arrives(edge)) {
+                reached.accept(edge.to());
+                return new Result(Outcome.ARRIVED, edge.to(), List.of(edge.to()), "On " + graph.shown(edge.to()) + ".");
+            }
+            return new Result(Outcome.STUCK, where(edge.from()).orElse(null), List.of(), null);
+        } catch (Stayed stayed) {
+            return new Result(Outcome.STUCK, edge.from(), List.of(), stayed.getMessage());
+        }
+    }
+
     private Result walk(String target, String near) {
         Optional<MapScreen> goal = graph.screen(target);
         if (goal.isEmpty()) {

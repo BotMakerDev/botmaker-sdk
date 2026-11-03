@@ -38,7 +38,7 @@ class MapWalkTest {
     }
 
     /** A game that does what {@code arrival} says for each edge, AT_TARGET by default; goes where {@code at} allows. */
-    private static final class Game implements MapWalk.Moves {
+    private static class Game implements MapWalk.Moves {
         Function<ScreenGraph.Edge, Took> arrival = e -> new Took(Arrival.AT_TARGET, e.to());
         Predicate<String> at = s -> true;
         final List<ScreenGraph.Edge> taken = new ArrayList<>();
@@ -228,6 +228,62 @@ class MapWalkTest {
         RuntimeException stop = assertThrows(RuntimeException.class, () -> walk(map(), game));
 
         assertEquals("com.botmaker.sdk.api.bot.Bot$BotStoppedException", stop.getClass().getName());
+    }
+
+    @Test
+    void anEdgeWhoseButtonLooksOtherwiseIsNotTaken() {
+        Game game = new Game() {
+            @Override
+            public boolean open(ScreenGraph.Edge edge) {
+                return !edge.to().equals("B");
+            }
+        };
+
+        Summary summary = walk(map(), game);
+
+        assertTrue(game.taken.stream().noneMatch(e -> e.to().equals("B")));
+        assertEquals(List.of(), summary.findings(), "B is behind an edge never tried");
+    }
+
+    @Test
+    void aWayClosedNowIsNoFinding() {
+        Game game = new Game();
+        game.arrival = e -> when(e, "A", "B", Arrival.NOT_NOW, "A");
+
+        Summary summary = walk(map(), game);
+
+        assertEquals(List.of(), summary.findings(), "B, behind a way closed now, is no finding either");
+        assertTrue(summary.notTried() > 0);
+    }
+
+    @Test
+    void theFindingsBeforeAStopAreHandedOnAsFound() {
+        Game game = new Game();
+        game.arrival = e -> {
+            if (e.to().equals("D")) Bot.stop();
+            return when(e, "A", "B", Arrival.ELSEWHERE, "D");
+        };
+        List<Finding> found = new ArrayList<>();
+
+        assertThrows(RuntimeException.class,
+                () -> MapWalk.walk(map(), game, Budgets.DEFAULT, () -> game.nowMs, found::add));
+
+        assertEquals(List.of(new Finding(Finding.Kind.EDGE_MISSED, "A", "B", "arrived at D")), found);
+    }
+
+    @Test
+    void aFindingSaysItsScreensAndCarriesThem() {
+        ScreenGraph graph = map();
+        Finding missed = new Finding(Finding.Kind.EDGE_MISSED, "A", "B", "arrived at D");
+        Finding unreached = new Finding(Finding.Kind.UNREACHED, null, "C", "no edge leads to it");
+
+        assertEquals("Edge missed: A → B, arrived at D", missed.said(graph));
+        assertEquals(Map.of("from", "A", "to", "B", "screen", "A"), missed.values(graph));
+        assertEquals("Never reached: C, no edge leads to it", unreached.said(graph));
+        assertEquals(Map.of("to", "C", "screen", "C"), unreached.values(graph));
+        int edges = graph.edges().size();
+        assertEquals("Map check: 4/4 screens, " + edges + "/" + edges + " edges, 0 not tried",
+                walk(graph, new Game()).said());
     }
 
     @Test
