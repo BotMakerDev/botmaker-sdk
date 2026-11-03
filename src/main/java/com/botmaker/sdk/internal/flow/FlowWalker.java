@@ -285,7 +285,7 @@ public final class FlowWalker {
     }
 
     /** {@code Bot.stop()}'s throw, which ends a run on purpose and is no failure. Its class is private to {@code Bot}. */
-    private static boolean isStop(Throwable e) {
+    public static boolean isStop(Throwable e) {
         return e.getClass().getName().equals(STOP);
     }
 
