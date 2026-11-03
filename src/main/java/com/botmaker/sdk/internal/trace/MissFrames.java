@@ -2,7 +2,6 @@ package com.botmaker.sdk.internal.trace;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.shared.Diag;
 import com.botmaker.runlog.RunLog;
 
 import javax.imageio.ImageIO;
@@ -44,7 +43,7 @@ public final class MissFrames {
     static final int KEEP = 20;
     static final int KEEP_RUNS = RunLog.KEEP_RUNS;
     static final long QUIET_MS = 30_000;
-    /** The folder every run's frames go under, relative to the bot's folder: the run log's. */
+    /** The folder every run's frames go under, relative to the bot's folder: shared's run folder layout. */
     public static final Path FOLDER = RunLog.FOLDER;
 
     private static final String SOURCE = "Vision";
@@ -75,7 +74,7 @@ public final class MissFrames {
             run = newRun(root);
         } catch (IOException e) {
             run = null;
-            Diag.warn(SOURCE, "Failed frames will not be saved: " + e.getMessage());
+            SdkRun.warn(SOURCE, "Failed frames will not be saved: " + e.getMessage());
         }
     }
 
@@ -100,7 +99,7 @@ public final class MissFrames {
             if (frame == null) return;
             ImageIO.write(frame, "png", file.toFile());
         } catch (IOException | RuntimeException e) {
-            Diag.warn(SOURCE, "Failed: " + what + ". Its frame could not be saved: " + e.getMessage());
+            SdkRun.warn(SOURCE, "Failed: " + what + ". Its frame could not be saved: " + e.getMessage());
             return;
         }
         synchronized (MissFrames.class) {
@@ -113,10 +112,10 @@ public final class MissFrames {
                 }
             }
         }
-        Diag.warn(SOURCE, "Failed: " + what + ". Saved what it saw: " + shown(file));
+        SdkRun.warn(SOURCE, "Failed: " + what + ". Saved what it saw: " + shown(file));
     }
 
-    /** This run's folder, which its log shares; empty outside a run or when it could not be made. */
+    /** This run's folder under {@link #FOLDER}; empty outside a run or when it could not be made. */
     public static Optional<Path> folder() {
         return Optional.ofNullable(run);
     }

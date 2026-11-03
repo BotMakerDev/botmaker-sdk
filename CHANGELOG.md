@@ -19,8 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
-- **A run's log says why, at the right level.** A bot's run starts its `run.jsonl` (shared's `RunFiles`) with the
-  SDK's details: the flow, the launch target's kind, the platform and each plain `@Param` value; each line names
+- **A run reaches its host through the contract only.** The SDK writes its lines, its run's details, its overlay
+  events and `Ask`'s questions on the run channel its host hands it (`onBotRun`), never through shared's log or
+  telemetry. Until Studio's run agent hands that channel over, a run's lines go to the console only: no
+  `run.jsonl`, no live trace or overlay, and `Ask` asks on the console.
+- **A run's log says why, at the right level.** A bot's run hands its host the SDK's details: the flow, the launch target's kind, the platform and each plain `@Param` value; each line names
   the bot's own line that led to it. A level says who handled the result: a walk *stuck* is a warning naming the
   target, the last known screen, the steps walked and the target's markers' scores now; *missing* is an error;
   *not now* and *locked* are information, the bot's code handles them. A fallback that rescued the run warns: the

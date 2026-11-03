@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.run;
 
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.screens.ScreenStep;
-import com.botmaker.shared.ipc.TelemetryEvent;
 
 /**
  * What the run bar says the bot is doing: the activity it is in, the screen of its map it last reached, and the last
@@ -20,17 +20,17 @@ record RunStatus(String activity, String screen, String action, int line) {
      * This status after {@code event}; unchanged by an event that says nothing about where the bot is. A screen
      * reached keeps what was done; a new activity keeps the screen, since the game is still on it.
      */
-    RunStatus after(TelemetryEvent event) {
+    RunStatus after(RunEvent event) {
         return switch (event) {
-            case TelemetryEvent.Step s -> ScreenStep.screen(s.action())
+            case RunEvent.Step s -> ScreenStep.screen(s.action())
                     .map(reached -> new RunStatus(s.activity().isEmpty() ? activity : s.activity(), reached.name(),
                             action, line))
                     .orElseGet(() -> new RunStatus(s.activity(), screen, s.action(), s.line()));
-            case TelemetryEvent.Match m -> new RunStatus(activity, screen,
+            case RunEvent.Match m -> new RunStatus(activity, screen,
                     m.found() ? "found (" + percent(m.confidence()) + ")" : "looked, not found", m.line());
-            case TelemetryEvent.Click c -> new RunStatus(activity, screen, "clicked", c.line());
-            case TelemetryEvent.Swipe s -> new RunStatus(activity, screen, "swiped", s.line());
-            case TelemetryEvent.Region _, TelemetryEvent.Log _, TelemetryEvent.Ask _, TelemetryEvent.Answer _ -> this;
+            case RunEvent.Click c -> new RunStatus(activity, screen, "clicked", c.line());
+            case RunEvent.Swipe s -> new RunStatus(activity, screen, "swiped", s.line());
+            case RunEvent.Region _ -> this;
         };
     }
 

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.plugin.api.TraceLine;
-import com.botmaker.shared.ipc.TelemetryEvent;
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -80,16 +80,16 @@ public final class TelemetrySerializer {
     record SwipeEvent(long ts, Target target, String kind, int x1, int y1, int x2, int y2, long duration)
             implements Event {}
 
-    /** {@link TelemetryEvent.Target} with the client's short keys. */
+    /** {@link RunEvent.Target} with the client's short keys. */
     record Target(String title, int x, int y, int w, int h) {
-        static Target of(TelemetryEvent.Target t) {
+        static Target of(RunEvent.Target t) {
             return t == null ? null : new Target(t.title(), t.x(), t.y(), t.width(), t.height());
         }
     }
 
-    /** {@link TelemetryEvent.Rect} with the client's short keys. */
+    /** {@link RunEvent.Rect} with the client's short keys. */
     record Rect(int x, int y, int w, int h) {
-        static Rect of(TelemetryEvent.Rect r) {
+        static Rect of(RunEvent.Rect r) {
             return r == null ? null : new Rect(r.x(), r.y(), r.width(), r.height());
         }
     }
@@ -97,7 +97,7 @@ public final class TelemetrySerializer {
     // --- Writers ---
 
     /** The full {@code telemetry} text message, as it goes out on the socket. */
-    public static String telemetryJson(TelemetryEvent te) {
+    public static String telemetryJson(RunEvent te) {
         return write(new Telemetry("telemetry", event(te)));
     }
 
@@ -159,23 +159,17 @@ public final class TelemetrySerializer {
     }
 
     /** The event body, stamped with the send clock: {@code ts} is when it left, not when the bot saw it. */
-    static Event event(TelemetryEvent te) {
+    static Event event(RunEvent te) {
         long ts = System.currentTimeMillis();
         Target target = Target.of(te.target());
         return switch (te) {
-            case TelemetryEvent.Match m -> new MatchEvent(ts, target, "Match", m.found(),
+            case RunEvent.Match m -> new MatchEvent(ts, target, "Match", m.found(),
                     confidence(m.confidence()), Rect.of(m.region()), Rect.of(m.rect()));
-            case TelemetryEvent.Click c -> new ClickEvent(ts, target, "Click", c.x(), c.y(), c.button());
-            case TelemetryEvent.Region r -> new RegionEvent(ts, target, "Region", Rect.of(r.rect()));
-            case TelemetryEvent.Swipe s -> new SwipeEvent(ts, target, "Swipe",
+            case RunEvent.Click c -> new ClickEvent(ts, target, "Click", c.x(), c.y(), c.button());
+            case RunEvent.Region r -> new RegionEvent(ts, target, "Region", Rect.of(r.rect()));
+            case RunEvent.Swipe s -> new SwipeEvent(ts, target, "Swipe",
                     s.x1(), s.y1(), s.x2(), s.y2(), s.durationMs());
-            case TelemetryEvent.Log l -> throw new IllegalArgumentException(
-                    "a log line is not an event the pilot draws: " + l.text());
-            case TelemetryEvent.Ask a -> throw new IllegalArgumentException(
-                    "a question is not an event the pilot draws: " + a.prompt());
-            case TelemetryEvent.Answer a -> throw new IllegalArgumentException(
-                    "an answer is not an event the pilot draws: " + a.id());
-            case TelemetryEvent.Step s -> throw new IllegalArgumentException(
+            case RunEvent.Step s -> throw new IllegalArgumentException(
                     "a step is not an event the pilot draws: " + s.activity());
         };
     }

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.console;
 
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.internal.trace.TraceSources;
-import com.botmaker.shared.Diag;
 
 /**
  * The single, global debug-output switch for a running bot. One flag governs <em>all</em> of the SDK's
@@ -27,9 +27,9 @@ import com.botmaker.shared.Diag;
  * class and method — beside a line for every call the bot makes into a plugin, which Studio writes without any
  * {@code Debug.log}.
  *
- * <p>The flag itself lives in {@code botmaker-shared}'s {@link Diag}, which this class only delegates to.
- * {@code shared} can't depend on the SDK, yet its window/capture/input code prints diagnostics of its own —
- * keeping the state in the lower module is what makes this <em>one</em> switch rather than two that drift.
+ * <p>The flag itself is the run's, held by the host's run channel ({@code RunChannel.debug}), which this class only
+ * delegates to: the host decides where a line goes and whether it is kept (spec
+ * {@code docs/superpowers/specs/2026-11-03-run-reports-design.md} §7).
  *
  * <p><b>Curated for the palette</b> (see {@code @Palette}): six of the seven are offered. The one hidden is
  * {@link #set(boolean)}, and it is the third instance of a shape this sweep keeps finding — a method whose
@@ -50,42 +50,42 @@ public final class Debug {
 
     /** Whether debug output is currently on. All SDK diagnostic prints consult this. */
     public static boolean isEnabled() {
-        return Diag.isEnabled();
+        return SdkRun.channel().debug();
     }
 
     /** Turns debug output on for the rest of the run. */
     public static void enable() {
-        Diag.set(true);
+        set(true);
     }
 
     /** Turns debug output off for the rest of the run (a quiet production run). */
     public static void disable() {
-        Diag.set(false);
+        set(false);
     }
 
     /** Sets debug output on or off. */
     public static void set(boolean on) {
-        Diag.set(on);
+        SdkRun.channel().debug(on);
     }
 
     /**
-     * Prints {@code message} to stdout under the calling class's name when debugging is on. When off, the run's log
-     * keeps it among the last lines it writes before a warning or an error; nothing is printed.
+     * Prints {@code message} under the calling class's name when debugging is on. When off, the run's log keeps it
+     * among the last lines it writes before a warning or an error; nothing is printed.
      */
     public static void log(String message) {
-        if (Diag.isRecorded()) Diag.log(TraceSources.origin(), message, 1, null);
+        if (SdkRun.channel().recorded()) SdkRun.debug(TraceSources.origin(), message, 1, null);
     }
 
-    /** Prints {@code message} to stderr under the calling class's name, whether debugging is on or off. */
+    /** Prints {@code message} under the calling class's name, whether debugging is on or off. */
     public static void error(String message) {
-        Diag.error(TraceSources.origin(), message, null);
+        SdkRun.error(TraceSources.origin(), message, null);
     }
 
     /**
-     * Prints {@code message} then {@code t}'s stack trace to stderr, whether debugging is on or off. Use this
+     * Prints {@code message} then {@code t}'s stack trace, whether debugging is on or off. Use this
      * instead of {@code t.printStackTrace()}, which never reaches the trace.
      */
     public static void error(String message, Throwable t) {
-        Diag.error(TraceSources.origin(), message, t);
+        SdkRun.error(TraceSources.origin(), message, t);
     }
 }

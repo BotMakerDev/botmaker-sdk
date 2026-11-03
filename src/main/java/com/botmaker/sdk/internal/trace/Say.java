@@ -1,7 +1,5 @@
 package com.botmaker.sdk.internal.trace;
 
-import com.botmaker.shared.Diag;
-
 import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -23,12 +21,12 @@ public final class Say {
 
     /** A fallback rescued the run: printed and kept whether debugging is on or off. */
     public static void warn(String message) {
-        Diag.warn(TraceSources.origin(), message);
+        SdkRun.warn(TraceSources.origin(), message);
     }
 
     /** What the bot's code handled, said even with debugging off. */
     public static void info(String message) {
-        Diag.info(TraceSources.origin(), message);
+        SdkRun.info(TraceSources.origin(), message);
     }
 
     /** {@code thrown}, after its problem was said where it happened; returns it, to throw. */

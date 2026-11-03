@@ -3,12 +3,12 @@ package com.botmaker.sdk.plugin.pilot;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.video.VideoPacket;
 import com.botmaker.shared.Diag;
-import com.botmaker.shared.ipc.TelemetryEvent;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
 import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
-import com.botmaker.shared.ipc.TelemetryFrame;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
@@ -90,8 +90,8 @@ public final class PilotServer implements AutoCloseable {
      * The open project's bot, as the host exposes it: start, stop, and what it reports while it runs.
      *
      * <p>This is the contract's {@link Runs}, not an editor's event bus. Telemetry arrives as the encoded
-     * {@link TelemetryFrame} bytes rather than as a decoded record, which is what keeps the wire's vocabulary
-     * out of the contract — the pilot decodes it here, with the same shared codec the bot encoded it with.
+     * {@link RunFrames} bytes rather than as a decoded record, which is what keeps the SDK's vocabulary out of
+     * the contract — the pilot decodes it here, with the SDK's own codec the bot encoded it with.
      */
     private final Runs runs;
     /** The subscriptions taken on {@link #runs}, closed with the server so a rebound pilot is not fed twice. */
@@ -152,7 +152,7 @@ public final class PilotServer implements AutoCloseable {
 
     private Javalin app;
     private ScheduledExecutorService frameExec;
-    private volatile TelemetryEvent.Target lastTarget;
+    private volatile RunEvent.Target lastTarget;
     /** The surface of the most recently pushed frame — the only region Interact gestures may land in. */
     private volatile PilotInputService.Bounds lastBounds;
     /**
@@ -433,11 +433,9 @@ public final class PilotServer implements AutoCloseable {
 
     // --- Telemetry + state fan-out (text messages) ---
 
-    private void onTelemetry(TelemetryEvent te) {
-        // A log line, a question or a step is drawn nowhere on the screen, and its whole-screen target must not
-        // move the view.
-        if (te == null || te instanceof TelemetryEvent.Log || te instanceof TelemetryEvent.Ask
-                || te instanceof TelemetryEvent.Answer || te instanceof TelemetryEvent.Step) return;
+    private void onTelemetry(RunEvent te) {
+        // A step is drawn nowhere on the screen, and its whole-screen target must not move the view.
+        if (te == null || te instanceof RunEvent.Step) return;
         lastTarget = te.target();
         broadcastText(TelemetrySerializer.telemetryJson(te));
     }
@@ -451,9 +449,9 @@ public final class PilotServer implements AutoCloseable {
      */
     private void onTelemetryFrame(byte[] frame) {
         if (frame == null || frame.length == 0) return;
-        try (var in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(frame))) {
-            onTelemetry(TelemetryFrame.read(in));
-        } catch (Exception unreadable) {
+        try {
+            onTelemetry(RunFrames.decode(frame));
+        } catch (RunFrames.Unreadable unreadable) {
             // dropped, deliberately — see above
         }
     }

@@ -1,7 +1,7 @@
 package com.botmaker.sdk.plugin.run;
 
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.screens.ScreenStep;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -13,41 +13,41 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** What the run bar says and which marks the layer draws, from the run's telemetry. */
 class RunOverlayModelTest {
 
-    private static final TelemetryEvent.Target SCREEN = TelemetryEvent.NO_SURFACE;
+    private static final RunEvent.Target SCREEN = RunEvent.NO_SURFACE;
 
     @Test
     void theBarNamesTheActivityAndTheLastThingDoneThere() {
         RunStatus status = RunStatus.START;
         assertEquals("", status.text());
 
-        status = status.after(new TelemetryEvent.Step("Collect", "", -1));
+        status = status.after(new RunEvent.Step("Collect", "", -1));
         assertEquals("Collect", status.text());
 
-        status = status.after(new TelemetryEvent.Match(SCREEN, null, new TelemetryEvent.Rect(1, 2, 3, 4), 0.934,
+        status = status.after(new RunEvent.Match(SCREEN, null, new RunEvent.Rect(1, 2, 3, 4), 0.934,
                 true, 40));
         assertEquals("Collect · found (93%) · line 40", status.text());
 
-        status = status.after(new TelemetryEvent.Click(SCREEN, 5, 6, 1, 42));
+        status = status.after(new RunEvent.Click(SCREEN, 5, 6, 1, 42));
         assertEquals("Collect · clicked · line 42", status.text());
 
-        status = status.after(new TelemetryEvent.Log("info", "", "hi", 1, 0, null, "", "", "", 3));
-        assertEquals("Collect · clicked · line 42", status.text(), "a log line moves nothing");
+        status = status.after(new RunEvent.Region(SCREEN, new RunEvent.Rect(0, 0, 1, 1), 3));
+        assertEquals("Collect · clicked · line 42", status.text(), "a region shown moves nothing");
 
-        status = status.after(new TelemetryEvent.Step("Home", "", -1));
+        status = status.after(new RunEvent.Step("Home", "", -1));
         assertEquals("Home", status.text(), "a new activity starts with nothing done");
     }
 
     @Test
     void theBarNamesTheScreenAWalkReachedUntilAnother() {
-        RunStatus status = RunStatus.START.after(new TelemetryEvent.Step("Collect", "", -1))
-                .after(new TelemetryEvent.Click(SCREEN, 5, 6, 1, 42))
-                .after(new TelemetryEvent.Step("Collect", ScreenStep.action("CAMPAIGN", "Campaign"), -1));
+        RunStatus status = RunStatus.START.after(new RunEvent.Step("Collect", "", -1))
+                .after(new RunEvent.Click(SCREEN, 5, 6, 1, 42))
+                .after(new RunEvent.Step("Collect", ScreenStep.action("CAMPAIGN", "Campaign"), -1));
         assertEquals("Collect · 🗺 Campaign · clicked · line 42", status.text(), "reaching a screen undoes nothing");
 
-        status = status.after(new TelemetryEvent.Step("Upgrade", "", -1));
+        status = status.after(new RunEvent.Step("Upgrade", "", -1));
         assertEquals("Upgrade · 🗺 Campaign", status.text(), "the game is still on it in the next activity");
 
-        status = status.after(new TelemetryEvent.Step("", ScreenStep.action("HOME", "Home"), -1));
+        status = status.after(new RunEvent.Step("", ScreenStep.action("HOME", "Home"), -1));
         assertEquals("Upgrade · 🗺 Home", status.text(), "a step with no activity keeps the activity");
     }
 
@@ -64,17 +64,17 @@ class RunOverlayModelTest {
 
     @Test
     void aBotWithNoFlowStillSaysWhatItDid() {
-        RunStatus status = RunStatus.START.after(new TelemetryEvent.Match(SCREEN, null, null, 0.4, false, 7));
+        RunStatus status = RunStatus.START.after(new RunEvent.Match(SCREEN, null, null, 0.4, false, 7));
         assertEquals("looked, not found · line 7", status.text());
     }
 
     @Test
     void aFoundBoxAndAClickDotFadeOutAndAMissDrawsNothing() {
         RunMarks marks = new RunMarks();
-        marks.add(new TelemetryEvent.Match(SCREEN, null, new TelemetryEvent.Rect(10, 20, 30, 40), 0.9, true, -1), 0);
-        marks.add(new TelemetryEvent.Match(SCREEN, null, null, 0.2, false, -1), 0);
-        marks.add(new TelemetryEvent.Click(SCREEN, 100, 200, 1, -1), 500);
-        marks.add(new TelemetryEvent.Step("A", "", -1), 500);
+        marks.add(new RunEvent.Match(SCREEN, null, new RunEvent.Rect(10, 20, 30, 40), 0.9, true, -1), 0);
+        marks.add(new RunEvent.Match(SCREEN, null, null, 0.2, false, -1), 0);
+        marks.add(new RunEvent.Click(SCREEN, 100, 200, 1, -1), 500);
+        marks.add(new RunEvent.Step("A", "", -1), 500);
 
         List<RunMarks.Mark> start = marks.at(500);
         assertEquals(2, start.size());
@@ -92,7 +92,7 @@ class RunOverlayModelTest {
     @Test
     void aClickingLoopKeepsABoundedNumberOfMarks() {
         RunMarks marks = new RunMarks();
-        for (int i = 0; i < RunMarks.MAX_MARKS * 3; i++) marks.add(new TelemetryEvent.Click(SCREEN, i, 0, 1, -1), 0);
+        for (int i = 0; i < RunMarks.MAX_MARKS * 3; i++) marks.add(new RunEvent.Click(SCREEN, i, 0, 1, -1), 0);
         List<RunMarks.Mark> live = marks.at(0);
         assertEquals(RunMarks.MAX_MARKS, live.size());
         assertEquals(RunMarks.MAX_MARKS * 3 - 1, live.getLast().x(), "the newest are kept");

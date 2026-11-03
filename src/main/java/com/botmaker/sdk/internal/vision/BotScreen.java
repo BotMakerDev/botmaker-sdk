@@ -4,7 +4,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.sdk.internal.emulator.EmulatorSize;
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
@@ -76,7 +76,7 @@ public final class BotScreen {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (RuntimeException | LinkageError refused) {
-                Diag.warn(SOURCE, "Could not resize the game window: " + refused.getMessage());
+                SdkRun.warn(SOURCE, "Could not resize the game window: " + refused.getMessage());
             }
             live = measure(whole);
             if (live.isEmpty() || live.get().equals(wanted)) return live;
@@ -90,7 +90,7 @@ public final class BotScreen {
             live = measure(whole);
             if (live.isEmpty() || live.get().equals(wanted)) return live;
         }
-        Diag.warn(SOURCE, "The game shows " + live.get() + " but the bot's pictures were cut at " + wanted
+        SdkRun.warn(SOURCE, "The game shows " + live.get() + " but the bot's pictures were cut at " + wanted
                 + " (Sdk.screen()): they are scaled, which can miss. Set the game to " + wanted
                 + (window == null ? "." : ", or let its window be resized.")
                 + (Places.otherShape(wanted, live.get()) ? " Its shape differs too: pictures scale by the smaller"

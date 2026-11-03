@@ -1,12 +1,11 @@
 package com.botmaker.sdk.internal.trace;
 
+import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.shared.Diag;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -52,20 +51,20 @@ class TraceTest {
     /** A collapsed run crosses as one trace line with its count, and a located one with its rectangle. */
     @Test
     void aTracedLineCarriesItsCountAndWhere() {
-        List<TelemetryEvent.Log> lines = new ArrayList<>();
-        Diag.setSink(lines::add);
+        List<TraceLine> lines;
         try {
+            lines = RecordingChannel.start(true).lines;
             Trace.log("[Vision] ore not found", new Trace.Runs.Run(47, 3_400));
             Trace.log("[Vision] find ore → (5,6)", new Rect(1, 2, 8, 8));
         } finally {
-            Diag.setSink(null);
+            RecordingChannel.stop();
         }
 
         assertEquals(2, lines.size());
         assertEquals("Vision", lines.getFirst().source());
-        assertEquals("ore not found over 3.4s", lines.getFirst().text(), "the count is Diag's to show, once");
+        assertEquals("ore not found over 3.4s", lines.getFirst().text(), "the count is the host's to show, once");
         assertEquals(47, lines.getFirst().count());
-        assertEquals(new TelemetryEvent.Rect(1, 2, 8, 8), lines.get(1).rect());
+        assertEquals(Optional.of(new TraceLine.Region(1, 2, 8, 8)), lines.get(1).where());
     }
 
     @Test

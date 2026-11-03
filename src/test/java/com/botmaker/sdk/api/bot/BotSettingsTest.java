@@ -5,7 +5,6 @@ import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.api.console.Debug;
-import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
@@ -135,21 +134,20 @@ class BotSettingsTest {
 
     @Test
     void theRunsDebugPropertyWinsOverTheBotsSetting() {
-        assertEquals(Runs.DEBUG.name(), Diag.RUN_PROPERTY, "the SDK reads the property the host writes");
         try {
-            System.setProperty(Diag.RUN_PROPERTY, "false");
+            System.setProperty(Runs.DEBUG.name(), "false");
             BotSettings.use(BotSettings.DEFAULTS.debug(true));
             assertFalse(Debug.isEnabled(), "Studio's toggle off silences a bot whose setting is on");
 
-            System.setProperty(Diag.RUN_PROPERTY, "true");
+            System.setProperty(Runs.DEBUG.name(), "true");
             BotSettings.use(BotSettings.DEFAULTS.debug(false));
             assertTrue(Debug.isEnabled(), "and turns on one whose setting is off");
 
-            System.clearProperty(Diag.RUN_PROPERTY);
+            System.clearProperty(Runs.DEBUG.name());
             BotSettings.use(BotSettings.DEFAULTS.debug(false));
             assertFalse(Debug.isEnabled(), "with no toggle the bot decides");
         } finally {
-            System.clearProperty(Diag.RUN_PROPERTY);
+            System.clearProperty(Runs.DEBUG.name());
             Debug.enable();
         }
     }

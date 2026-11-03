@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.session.Capability;
 import com.botmaker.session.PreviewFrame;
 import org.junit.jupiter.api.Test;
@@ -214,7 +214,7 @@ class TargetCaptureTest {
         try {
             TargetCapture capture = new TargetCapture(null, () -> 4242L);
 
-            capture.resolve(PilotRoute.DESKTOP, new TelemetryEvent.Target("Firestone", 0, 0, 640, 480));
+            capture.resolve(PilotRoute.DESKTOP, new RunEvent.Target("Firestone", 0, 0, 640, 480));
 
             assertFalse(nc.calls.contains("capture"),
                     "the session's own container must never be grabbed as a :0 window target");
@@ -232,7 +232,7 @@ class TargetCaptureTest {
         NativeControllerFactory.setForTesting(nc);
         try {
             TargetCapture.Resolved resolved = new TargetCapture(null)
-                    .resolve(PilotRoute.DESKTOP, new TelemetryEvent.Target("Firestone", 0, 0, 640, 480));
+                    .resolve(PilotRoute.DESKTOP, new RunEvent.Target("Firestone", 0, 0, 640, 480));
 
             assertNotNull(resolved);
             assertSame(nc.windowFrame, resolved.cap().img());

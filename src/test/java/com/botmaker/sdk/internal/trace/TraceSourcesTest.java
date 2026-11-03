@@ -1,14 +1,12 @@
 package com.botmaker.sdk.internal.trace;
 
+import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
-import com.botmaker.shared.Diag;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -27,12 +25,9 @@ class TraceSourcesTest {
         }
     }
 
-    private final List<TelemetryEvent.Log> lines = new ArrayList<>();
-
     @AfterEach
     void restore() {
-        Diag.setSink(null);
-        Debug.enable();
+        RecordingChannel.stop();
     }
 
     @Test
@@ -50,44 +45,41 @@ class TraceSourcesTest {
 
     @Test
     void aBotsOwnLineIsPrintedUnderItsClassAndAnExplicitPrefixWins() {
-        Debug.enable();
-        Diag.setSink(lines::add);
+        List<TraceLine> lines = RecordingChannel.start(true).lines;
 
         Debug.log("hello");
         Debug.log("[Custom] mine");
         Debug.error("oops");
 
         assertEquals(List.of("TraceSourcesTest", "Custom", "TraceSourcesTest"),
-                lines.stream().map(TelemetryEvent.Log::source).toList());
+                lines.stream().map(TraceLine::source).toList());
         assertEquals("hello", lines.getFirst().text());
-        assertEquals(TelemetryEvent.Log.ERROR, lines.get(2).level());
+        assertEquals(TraceLine.Level.ERROR, lines.get(2).level());
     }
 
     /** An error reaches the trace with debugging off; a debug line does not. */
     @Test
     void anErrorIsTracedOnAQuietRun() {
-        Debug.disable();
-        Diag.setSink(lines::add);
+        List<TraceLine> lines = RecordingChannel.start(false).lines;
 
         Debug.log("chatter");
         Debug.error("crashed");
 
-        assertEquals(List.of("crashed"), lines.stream().map(TelemetryEvent.Log::text).toList());
+        assertEquals(List.of("crashed"), lines.stream().map(TraceLine::text).toList());
     }
 
     /** The host filters by the class and method that wrote a line; a lambda counts as the method it sits in. */
     @Test
     void aLineCarriesTheClassAndMethodThatWroteIt() {
-        Debug.enable();
-        Diag.setSink(lines::add);
+        List<TraceLine> lines = RecordingChannel.start(true).lines;
 
         Debug.log("direct");
         Runnable inLambda = () -> Debug.log("from a lambda");
         inLambda.run();
 
         assertEquals(List.of(TraceSourcesTest.class.getName(), TraceSourcesTest.class.getName()),
-                lines.stream().map(TelemetryEvent.Log::writerClass).toList());
+                lines.stream().map(TraceLine::writerClass).toList());
         assertEquals(List.of("aLineCarriesTheClassAndMethodThatWroteIt", "aLineCarriesTheClassAndMethodThatWroteIt"),
-                lines.stream().map(TelemetryEvent.Log::writerMethod).toList());
+                lines.stream().map(TraceLine::writerMethod).toList());
     }
 }

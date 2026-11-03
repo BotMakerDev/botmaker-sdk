@@ -1,6 +1,6 @@
 package com.botmaker.sdk.api.console;
 
-import com.botmaker.shared.ipc.TelemetryEvent.Ask.Kind;
+import com.botmaker.plugin.api.run.AskKind;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class AskTest {
         }
 
         @Override
-        public String ask(Kind kind, String prompt, List<String> choices) {
+        public String ask(AskKind kind, String prompt, List<String> choices) {
             prompts.add(prompt);
             return answers.isEmpty() ? null : answers.poll();
         }
@@ -45,14 +45,14 @@ class AskTest {
     @Test
     void an_answer_that_does_not_read_is_asked_again_with_a_hint() {
         Scripted channel = new Scripted("twelve", " 12 ");
-        assertEquals(12, Ask.ask(channel, Kind.WHOLE, "Rounds?", List.of(), Ask::readWhole));
+        assertEquals(12, Ask.ask(channel, AskKind.WHOLE, "Rounds?", List.of(), Ask::readWhole));
         assertEquals(List.of("Rounds?", "Rounds? (a whole number, like 12)"), channel.prompts);
     }
 
     @Test
     void a_cancel_throws() {
         assertThrows(CancellationException.class,
-                () -> Ask.ask(new Scripted(), Kind.TEXT, "Name?", List.of(), s -> s));
+                () -> Ask.ask(new Scripted(), AskKind.TEXT, "Name?", List.of(), s -> s));
     }
 
     @Test
@@ -75,12 +75,12 @@ class AskTest {
         ByteArrayOutputStream printed = new ByteArrayOutputStream();
         Ask.Channel console = Ask.console(new PrintStream(printed, true, StandardCharsets.UTF_8),
                 new BufferedReader(new StringReader("2\n")));
-        String mode = Ask.ask(console, Kind.CHOICE, "Mode?", List.of("farm", "fight"),
+        String mode = Ask.ask(console, AskKind.CHOICE, "Mode?", List.of("farm", "fight"),
                 answer -> Ask.readChoice(answer, List.of("farm", "fight")));
         assertEquals("fight", mode);
         String shown = printed.toString(StandardCharsets.UTF_8);
         assertTrue(shown.contains("Mode?") && shown.contains("1) farm") && shown.contains("2) fight"), shown);
         // The end of input is nobody there to answer: a cancel, never a loop.
-        assertThrows(CancellationException.class, () -> Ask.ask(console, Kind.TEXT, "Again?", List.of(), s -> s));
+        assertThrows(CancellationException.class, () -> Ask.ask(console, AskKind.TEXT, "Again?", List.of(), s -> s));
     }
 }

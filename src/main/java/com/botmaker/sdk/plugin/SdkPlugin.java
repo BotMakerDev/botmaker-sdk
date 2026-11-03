@@ -7,6 +7,7 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameReady;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
@@ -77,7 +78,8 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .trial(Bot::trial)
                 .readiness(GameReady::now)
                 .onProjectOpened(SdkPlugin::opened)
-                .onProjectClosing(SdkPlugin::closing));
+                .onProjectClosing(SdkPlugin::closing)
+                .onBotRun(SdkRun::started));
     }
 
     /**

@@ -7,8 +7,8 @@ import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.internal.trace.Trace;
-import com.botmaker.shared.Diag;
 
 import java.awt.image.BufferedImage;
 import java.util.Optional;
@@ -113,7 +113,7 @@ public final class PopupGuard {
             String near = ScreenMaps.lastSeen();
             frame.flatMap(f -> walk.uncover(f, near)).ifPresent(cleared -> {
                 ScreenMaps.seen(cleared.at());
-                Diag.warn(SOURCE, walk.covered(near, cleared));
+                SdkRun.warn(SOURCE, walk.covered(near, cleared));
             });
         } catch (ScreenWalk.Stayed stayed) {
             throw new BotStuckException(stayed.getMessage());

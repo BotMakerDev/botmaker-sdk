@@ -3,8 +3,8 @@ package com.botmaker.sdk.plugin.run;
 import com.botmaker.plugin.api.RunOverlayHolder;
 import com.botmaker.plugin.api.run.RunOverlayContext;
 import com.botmaker.plugin.api.run.RunOverlayPart;
-import com.botmaker.shared.ipc.TelemetryEvent;
-import com.botmaker.shared.ipc.TelemetryFrame;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.scene.Group;
@@ -131,12 +131,12 @@ public final class SdkRunOverlay implements RunOverlayHolder {
      * Hands each event of the run to {@code onEvent} on the JavaFX thread, until the overlay closes. A frame this
      * build cannot read is skipped, as a newer runtime's would be.
      */
-    private static void listen(RunOverlayContext context, Consumer<TelemetryEvent> onEvent) {
+    private static void listen(RunOverlayContext context, Consumer<RunEvent> onEvent) {
         AutoCloseable subscription = context.services().runs().onTelemetry(frame -> {
-            TelemetryEvent event;
+            RunEvent event;
             try {
-                event = TelemetryFrame.decode(frame);
-            } catch (TelemetryFrame.FrameFormatException unreadable) {
+                event = RunFrames.decode(frame);
+            } catch (RunFrames.Unreadable unreadable) {
                 return;
             }
             Platform.runLater(() -> onEvent.accept(event));

@@ -4,10 +4,7 @@ import com.botmaker.plugin.api.params.Param;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
-import com.botmaker.sdk.internal.observe.IpcObserver;
-import com.botmaker.sdk.internal.trace.MissFrames;
-import com.botmaker.shared.ipc.TelemetryEvent;
-import com.botmaker.shared.runlog.RunFiles;
+import com.botmaker.sdk.internal.trace.SdkRun;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -15,22 +12,17 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * What the SDK adds to a run's log, which shared's {@link RunFiles} keeps (spec {@code
- * docs/superpowers/specs/2026-11-03-run-reports-design.md} §2): the run in the SDK's own words, its facts'
- * {@code details}, and each line tied to the bot's own line that led to it, as the host's trace ties it.
+ * What the SDK adds to a run's log (spec {@code docs/superpowers/specs/2026-11-03-run-reports-design.md} §2): the run
+ * in the SDK's own words, its facts' {@code details}, handed to the host through the run channel (§7). The host keeps
+ * the log, the facts it knows itself and which bot line each line belongs to.
  */
 public final class RunDetails {
 
     private RunDetails() {}
 
-    /** Starts this run's log in its miss frames' folder, read off {@code values}, the bot's values classes. */
+    /** Tells the host this run's details, read off {@code values}, the bot's values classes. */
     public static void start(Class<?>... values) {
-        RunFiles.start(MissFrames.folder().orElse(null), of(values), RunDetails::attributed);
-    }
-
-    /** {@code line} tied to the bot's own line that led to it; as is when none. */
-    static TelemetryEvent.Log attributed(TelemetryEvent.Log line) {
-        return IpcObserver.botFrame().map(at -> line.at(at.getClassName(), at.getLineNumber())).orElse(line);
+        SdkRun.channel().details(of(values));
     }
 
     /**

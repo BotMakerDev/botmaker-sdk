@@ -1,8 +1,8 @@
 package com.botmaker.sdk.plugin.pilot;
 
 import com.botmaker.plugin.api.TraceLine;
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,17 +56,17 @@ class TelemetryWireContractTest {
     /** Every case this class asserted, so a case added to the corpus and never wired up fails the build. */
     private static final Set<String> COVERED = new HashSet<>();
 
-    private static final TelemetryEvent.Target TARGET =
-            new TelemetryEvent.Target("Nested Game", 100, 50, 640, 480);
+    private static final RunEvent.Target TARGET =
+            new RunEvent.Target("Nested Game", 100, 50, 640, 480);
 
     // --- The corpus, message by message ---
 
     @Test
     void aSuccessfulMatchCarriesItsSearchRegionAndTheRectItFound() {
-        assertWire("telemetry.match.found", TelemetrySerializer.telemetryJson(new TelemetryEvent.Match(
+        assertWire("telemetry.match.found", TelemetrySerializer.telemetryJson(new RunEvent.Match(
                 TARGET,
-                new TelemetryEvent.Rect(110, 60, 200, 100),
-                new TelemetryEvent.Rect(150, 80, 32, 24),
+                new RunEvent.Rect(110, 60, 200, 100),
+                new RunEvent.Rect(150, 80, 32, 24),
                 0.9123, true)));
     }
 
@@ -75,13 +75,13 @@ class TelemetryWireContractTest {
         // region/rect are null, not absent: the renderer tests `o.region` / `o.rect`, so an omitted key
         // would read the same — but the client's `Rect | null` types say null, and this pins it.
         assertWire("telemetry.match.miss",
-                TelemetrySerializer.telemetryJson(new TelemetryEvent.Match(TARGET, null, null, 0.0, false)));
+                TelemetrySerializer.telemetryJson(new RunEvent.Match(TARGET, null, null, 0.0, false)));
     }
 
     @Test
     void aClickCarriesAbsoluteCoordinatesAndTheButton() {
         assertWire("telemetry.click",
-                TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(TARGET, 300, 220, 3)));
+                TelemetrySerializer.telemetryJson(new RunEvent.Click(TARGET, 300, 220, 3)));
     }
 
     @Test
@@ -89,31 +89,31 @@ class TelemetryWireContractTest {
         // Both ends in one message, not a stream of moves: the client draws an arrow, and a gesture arriving
         // as fifty little segments would be fifty overlays fading out of step with each other.
         assertWire("telemetry.swipe",
-                TelemetrySerializer.telemetryJson(new TelemetryEvent.Swipe(TARGET, 200, 400, 200, 120, 450)));
+                TelemetrySerializer.telemetryJson(new RunEvent.Swipe(TARGET, 200, 400, 200, 120, 450)));
     }
 
     @Test
     void aRegionHighlightCarriesOnlyItsRect() {
         assertWire("telemetry.region", TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Region(TARGET, new TelemetryEvent.Rect(0, 0, 640, 480))));
+                new RunEvent.Region(TARGET, new RunEvent.Rect(0, 0, 640, 480))));
     }
 
     @Test
     void aTitleWithQuotesBackslashesAndNonAsciiSurvivesIntact() {
         // A window title is whatever the game called itself. Quote and backslash are escaped; a non-ASCII
         // character goes out as itself (the frames are UTF-8), and a negative origin is a left-hand monitor.
-        TelemetryEvent.Target odd =
-                new TelemetryEvent.Target("He said \"hi\" \u2014 C:\\Games\\x", -1920, 0, 1280, 720);
+        RunEvent.Target odd =
+                new RunEvent.Target("He said \"hi\" \u2014 C:\\Games\\x", -1920, 0, 1280, 720);
         assertWire("telemetry.target.title.quoted", TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Region(odd, new TelemetryEvent.Rect(-1920, 0, 100, 100))));
+                new RunEvent.Region(odd, new RunEvent.Rect(-1920, 0, 100, 100))));
     }
 
     @Test
     void aNullTargetSerializesAsNullRatherThanCrashing() {
-        // TelemetryEvent's javadoc says target is never null; the serializer tolerates it anyway and the
+        // RunEvent's javadoc says target is never null; the serializer tolerates it anyway and the
         // client types it `Target | null`. Characterising it here means the tolerance is deliberate.
         assertWire("telemetry.target.null",
-                TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(null, 10, 20, 1)));
+                TelemetrySerializer.telemetryJson(new RunEvent.Click(null, 10, 20, 1)));
     }
 
     @Test
@@ -180,7 +180,7 @@ class TelemetryWireContractTest {
         // 'ts' is stamped at serialization, not carried by the event, so the corpus holds a sentinel and
         // assertWire substitutes it. This is the assertion the substitution would otherwise throw away.
         long before = System.currentTimeMillis();
-        JsonNode event = parse(TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(TARGET, 1, 2, 1)))
+        JsonNode event = parse(TelemetrySerializer.telemetryJson(new RunEvent.Click(TARGET, 1, 2, 1)))
                 .get("event");
         long ts = event.get("ts").asLong();
         assertTrue(ts >= before && ts <= System.currentTimeMillis(),
@@ -189,10 +189,10 @@ class TelemetryWireContractTest {
 
     @Test
     void theSourceLineIsNotOnTheWire() {
-        // Every TelemetryEvent carries line(), and no message carries it out. Pinned so that the day the
+        // Every RunEvent carries line(), and no message carries it out. Pinned so that the day the
         // pilot wants to show which block is running, this test is what says the field has to be added.
         JsonNode event = parse(TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Click(TARGET, 1, 2, 1, 42))).get("event");
+                new RunEvent.Click(TARGET, 1, 2, 1, 42))).get("event");
         assertTrue(event.get("line") == null, "line() is dropped at the wire boundary");
     }
 
@@ -201,8 +201,8 @@ class TelemetryWireContractTest {
         // B18, fixed by writing through Jackson: the hand-built writer escaped backslash and quote and
         // stopped there, and JSON forbids raw U+0000..U+001F in a string, so a newline in a title took the
         // whole message out — the client's JSON.parse threw and usePilot's catch dropped it silently.
-        TelemetryEvent.Target titled = new TelemetryEvent.Target("Game\nWindow", 0, 0, 10, 10);
-        JsonNode event = parse(TelemetrySerializer.telemetryJson(new TelemetryEvent.Click(titled, 1, 2, 1)))
+        RunEvent.Target titled = new RunEvent.Target("Game\nWindow", 0, 0, 10, 10);
+        JsonNode event = parse(TelemetrySerializer.telemetryJson(new RunEvent.Click(titled, 1, 2, 1)))
                 .get("event");
         assertEquals("Game\nWindow", event.get("target").get("title").asText());
     }
@@ -212,7 +212,7 @@ class TelemetryWireContractTest {
         // B18's other half: %.4f of NaN was the bare token NaN, which is not JSON. A confidence that never
         // got computed is a miss's 0, which is a number the client can format.
         JsonNode event = parse(TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Match(TARGET, null, null, Double.NaN, false))).get("event");
+                new RunEvent.Match(TARGET, null, null, Double.NaN, false))).get("event");
         assertEquals(0.0, event.get("confidence").asDouble());
         assertTrue(event.get("confidence").isNumber());
     }
@@ -222,7 +222,7 @@ class TelemetryWireContractTest {
         // What the old %.4f did, kept: the client shows four places, and fifteen digits of a float's
         // representation error are bytes on every match.
         JsonNode event = parse(TelemetrySerializer.telemetryJson(
-                new TelemetryEvent.Match(TARGET, null, null, 0.912345678, true))).get("event");
+                new RunEvent.Match(TARGET, null, null, 0.912345678, true))).get("event");
         assertEquals("0.9123", event.get("confidence").asText());
     }
 

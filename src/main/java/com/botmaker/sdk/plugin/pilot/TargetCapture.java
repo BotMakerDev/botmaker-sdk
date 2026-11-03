@@ -1,9 +1,9 @@
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.capture.WindowMatch;
-import com.botmaker.shared.ipc.TelemetryEvent;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.Preview;
 import com.botmaker.session.PreviewFrame;
@@ -116,7 +116,7 @@ public final class TargetCapture {
      * <p>On the {@link PilotRoute.Desktop} route, {@code lastTarget} is the most recent telemetry target (may be
      * {@code null} when idle) and a live window target wins over the project default.
      */
-    public Resolved resolve(PilotRoute route, TelemetryEvent.Target lastTarget) {
+    public Resolved resolve(PilotRoute route, RunEvent.Target lastTarget) {
         PilotRoute r = route == null ? PilotRoute.DESKTOP : route;
         switch (r) {
             case PilotRoute.Session(DesktopSession s) -> {
@@ -135,8 +135,8 @@ public final class TargetCapture {
         return cap == null ? null : new Resolved(route, cap);
     }
 
-    private Capture captureDesktop(TelemetryEvent.Target lastTarget) {
-        TelemetryEvent.Target t = lastTarget;
+    private Capture captureDesktop(RunEvent.Target lastTarget) {
+        RunEvent.Target t = lastTarget;
         if (t != null && t.title() != null && t.width() > 0 && t.height() > 0) {
             Capture c = captureWindowTarget(resolveWindow(t.title()));
             if (c != null) return c;

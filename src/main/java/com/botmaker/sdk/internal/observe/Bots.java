@@ -16,16 +16,6 @@ public final class Bots {
 
     private static final List<BotObserver> OBSERVERS = new CopyOnWriteArrayList<>();
 
-    static {
-        // Optional Studio telemetry bridge: it self-installs (registers an observer) only when the bot was
-        // launched by the Studio (env var BM_IPC_PORT set). Loaded by name so this neutral, public observer
-        // API keeps zero compile-time dependency on the internal socket bridge — a bot never needs the Studio.
-        try {
-            Class.forName("com.botmaker.sdk.internal.observe.IpcObserver");
-        } catch (Throwable ignored) {
-        }
-    }
-
     private Bots() {}
 
     /** Registers an observer to receive vision/interaction events. No-op if {@code observer} is null. */

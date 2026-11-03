@@ -1,8 +1,6 @@
 package com.botmaker.sdk.internal.trace;
 
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.shared.Diag;
-import com.botmaker.shared.ipc.TelemetryEvent;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -29,19 +27,18 @@ public final class Trace {
 
     /**
      * Prints {@code message} with how long the run lasted, and traces it as one line that happened
-     * {@link Run#count()} times. The count is {@code Diag}'s to show ({@code (×47)}, on the console and in the
+     * {@link Run#count()} times. The count is the host's to show ({@code (×47)}, on the console and in the
      * trace alike), so it is not in the text, where the trace would show it twice.
      */
     public static void log(String message, Runs.Run run) {
-        if (!Diag.isEnabled()) return;
-        Diag.log(TraceSources.origin(), message + " over " + elapsed(run.millis()), run.count(), null);
+        if (!SdkRun.channel().recorded()) return;
+        SdkRun.debug(TraceSources.origin(), message + " over " + elapsed(run.millis()), run.count(), null);
     }
 
     /** Prints {@code message} and traces it at {@code where}, the desktop rectangle it is about. */
     public static void log(String message, Rect where) {
-        if (!Diag.isEnabled()) return;
-        Diag.log(TraceSources.origin(), message, 1, where == null ? null
-                : new TelemetryEvent.Rect(where.x(), where.y(), where.width(), where.height()));
+        if (!SdkRun.channel().recorded()) return;
+        SdkRun.debug(TraceSources.origin(), message, 1, where);
     }
 
     /**

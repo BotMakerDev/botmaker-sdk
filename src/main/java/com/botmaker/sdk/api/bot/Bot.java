@@ -22,7 +22,6 @@ import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
-import com.botmaker.sdk.internal.observe.IpcObserver;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.internal.screens.KeptLooks;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -322,13 +321,11 @@ public class Bot {
     }
 
     /**
-     * Connects the run to the host's trace before anything runs, and logs a thread that dies of an exception
-     * nobody caught (2026-09-30). The trace's sink used to be installed by whichever vision call came first, so
-     * a bot that failed before matching anything showed nothing; and a helper thread's death reached stderr
-     * only, never the trace. A handler the bot set itself is kept.
+     * Logs a thread that dies of an exception nobody caught (2026-09-30): a helper thread's death reached stderr
+     * only, never the trace. A handler the bot set itself is kept. The trace itself is the run channel's, handed
+     * before {@code main} ({@code SdkRun.started}).
      */
     private static void observe() {
-        IpcObserver.installIfEnabled();
         if (Thread.getDefaultUncaughtExceptionHandler() == null) {
             Thread.setDefaultUncaughtExceptionHandler((thread, e) ->
                     Debug.error("thread " + thread.getName() + " died: " + e, e));

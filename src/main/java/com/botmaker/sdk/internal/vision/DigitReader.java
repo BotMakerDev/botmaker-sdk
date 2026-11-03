@@ -4,7 +4,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.text.DigitSet;
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.opencv.OpenCvNative;
 import com.botmaker.shared.opencv.OpencvManager;
 import com.botmaker.shared.opencv.RawMatch;
@@ -80,7 +80,7 @@ public final class DigitReader {
         List<Glyph> glyphs = load(digit -> TemplateSource.read(set.folder() + "/" + digit + ".png", new ArrayList<>())
                 .map(TemplateSource.Found::bytes));
         if (glyphs.isEmpty()) {
-            Diag.warn(SOURCE, "No digit pictures in " + set.folder() + ": save_digits cuts them from a number the"
+            SdkRun.warn(SOURCE, "No digit pictures in " + set.folder() + ": save_digits cuts them from a number the"
                     + " game shows.");
             return OptionalLong.empty();
         }
@@ -153,7 +153,7 @@ public final class DigitReader {
             if (i > 0) {
                 Hit before = line.get(i - 1);
                 if (hit.x() - (before.x() + before.width()) > MISSING * widest) {
-                    Diag.warn(SOURCE, "A character after \"" + digits + "\" is not in the " + name + " digits:"
+                    SdkRun.warn(SOURCE, "A character after \"" + digits + "\" is not in the " + name + " digits:"
                             + " save_digits on a number that shows it.");
                     return OptionalLong.empty();
                 }
@@ -176,7 +176,7 @@ public final class DigitReader {
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(png.get()));
                 if (image != null) glyphs.add(new Glyph(digit, image));
             } catch (IOException unreadable) {
-                Diag.warn(SOURCE, digit + ".png is not an image: " + unreadable.getMessage());
+                SdkRun.warn(SOURCE, digit + ".png is not an image: " + unreadable.getMessage());
             }
         }
         return glyphs;

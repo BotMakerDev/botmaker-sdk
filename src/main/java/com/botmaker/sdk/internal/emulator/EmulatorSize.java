@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.emulator;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.emulator.AdbDevice;
 
 import java.awt.image.BufferedImage;
@@ -61,11 +61,11 @@ public final class EmulatorSize {
             }
             device.shell("wm size " + asked.width() + "x" + asked.height());
             device.shell("wm density " + dpi);
-            Diag.log(SOURCE, "The emulator shows " + size + " for this run, at " + dpi + " dpi; it is reset when the"
-                    + " bot ends.", 0, null);
+            SdkRun.debug(SOURCE, "The emulator shows " + size + " for this run, at " + dpi + " dpi; it is reset when"
+                    + " the bot ends.");
             return true;
         } catch (RuntimeException refused) {
-            Diag.warn(SOURCE, "Could not set the emulator's size: " + refused.getMessage());
+            SdkRun.warn(SOURCE, "Could not set the emulator's size: " + refused.getMessage());
             return false;
         }
     }

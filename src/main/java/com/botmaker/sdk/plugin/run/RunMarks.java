@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.run;
 
-import com.botmaker.shared.ipc.TelemetryEvent;
+import com.botmaker.sdk.internal.observe.RunEvent;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -33,12 +33,12 @@ final class RunMarks {
     private long nextId;
 
     /** Adds the mark {@code event} leaves, if it leaves one. */
-    void add(TelemetryEvent event, long now) {
+    void add(RunEvent event, long now) {
         switch (event) {
-            case TelemetryEvent.Match m when m.found() && m.rect() != null -> placed.addLast(new Placed(nextId++,
+            case RunEvent.Match m when m.found() && m.rect() != null -> placed.addLast(new Placed(nextId++,
                     Kind.FOUND, m.rect().x(), m.rect().y(), m.rect().width(), m.rect().height(),
                     Math.round(m.confidence() * 100) + "%", now));
-            case TelemetryEvent.Click c -> placed.addLast(new Placed(nextId++, Kind.CLICK, c.x(), c.y(), 0, 0, "",
+            case RunEvent.Click c -> placed.addLast(new Placed(nextId++, Kind.CLICK, c.x(), c.y(), 0, 0, "",
                     now));
             default -> { }
         }

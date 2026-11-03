@@ -17,8 +17,8 @@ import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.pictures.FrameViews;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
-import com.botmaker.shared.ipc.TelemetryEvent;
-import com.botmaker.shared.ipc.TelemetryFrame;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -825,13 +825,13 @@ public final class ScreenMap {
 
     /** A run's frame, off the FX thread: a screen its walk reached lights that screen. */
     private void telemetry(byte[] frame) {
-        TelemetryEvent event;
+        RunEvent event;
         try {
-            event = TelemetryFrame.decode(frame);
-        } catch (TelemetryFrame.FrameFormatException unreadable) {
+            event = RunFrames.decode(frame);
+        } catch (RunFrames.Unreadable unreadable) {
             return;
         }
-        if (!(event instanceof TelemetryEvent.Step step)) return;
+        if (!(event instanceof RunEvent.Step step)) return;
         ScreenStep.screen(step.action()).ifPresent(shown -> Platform.runLater(() -> {
             if (!graph.screens().containsKey(shown.constant())) return;
             canvas.setHere(shown.constant());

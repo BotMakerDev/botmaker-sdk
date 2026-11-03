@@ -1,9 +1,9 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
-import com.botmaker.shared.Diag;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
 import java.util.Arrays;
@@ -341,7 +341,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
             }
         }
         // The run's -Dbotmaker.debug (a host's Debug output toggle) wins over the bot's own default.
-        Debug.set(Diag.runOverride().orElse(next.debug));
+        Debug.set(Runs.DEBUG.read(System.getProperty(Runs.DEBUG.name())).orElse(next.debug));
     }
 
     /** The system property {@code LinuxController} reads its backend from. */
