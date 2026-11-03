@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **try_input tells a screen left by its markers, not by how much changed**: a game whose background moves
+  changed much and left nothing, a tab whose rows change changed little and left. After a try the screen is read
+  on until it holds still a second: its own markers (a tab's shared bar left out) gone means it left, gone and back
+  means it was redrawn in place, still there means it stayed, within 10 s at most. A marker dimmed under a popup
+  still counts. A screen with no marker of its own is told by the pictures of its buttons that show; with neither,
+  the try is refused until a marker is cut. The share of the screen changed now only tells a popup or a change
+  over it from a change in place.
 - **A walk presses no key**: Escape asked to quit the game or closed the wrong screen too often. A way back
   with no input is the game's usual close button; a popup closes by its way out, else that button; a way that
   is a key is never taken. A walk that needs one ends *missing* and says to map the button that does it, so a

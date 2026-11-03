@@ -64,8 +64,9 @@ public final class SdkAssist {
               to X and runs the body once more, then the run's home.
             - Popups the game opens on its own are screens of the map (crop_pictures its marker with popup
               true, its way out with back true), closed by the run before every look; never a body's business.
-              An overlay the map lacks is cleared by its close buttons, and the trace says to map it. A walk
-              presses no key: map each way out as a button. A body working through a popup-shaped screen wraps that step in PopupGuard.enabled(false).
+              An overlay the map lacks is cleared by its close buttons; the trace says to map it. A walk
+              presses no key: map ways out as buttons. A body working through a popup-shaped screen wraps that
+              step in PopupGuard.enabled(false).
             - Pictures are the bot's constants, one per idea and place, named <idea>_<where> (CLAIM_RESEARCH):
               the same idea on another screen is another picture. Tag each with the activity using it or a
               custom tag (edit_tags, list_tags, edit_pictures).

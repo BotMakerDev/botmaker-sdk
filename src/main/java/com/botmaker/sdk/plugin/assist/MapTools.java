@@ -45,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -65,12 +66,10 @@ final class MapTools {
     static final String NOT_THERE = "Not there";
 
     static final double SCREEN_SHARE = 0.15;
-    /** How much longer a small change is read on while the screen's marker still shows: Garage drew a second late. */
-    static final int SLOW_SCREEN_MS = 2_500;
-    /** How long a change over the whole screen that hid its marker is read on for the marker to come back. */
-    static final int FLASH_MS = 1_500;
-    /** How often the screen is read meanwhile. */
-    private static final int FLASH_POLL_MS = 250;
+    /** How often the screen is read while waiting for a screen's marker. */
+    private static final int POLL_MS = 250;
+    /** How many of its buttons' pictures stand for a screen with no marker of its own. */
+    private static final int MARKS_BY_BUTTONS = 3;
     /** How long each step of a walk is given for the next screen's marker, as {@code Navigate.to} gives it. */
     private static final long STEP_MS = ScreenWalk.STEP_MS;
     /**
@@ -485,14 +484,26 @@ final class MapTools {
         }
         // A hotkey of the map is pressed as it is written, held when it is.
         Combo keys = base instanceof Hotkey hotkey ? hotkey.combo() : key.orElse(null);
+        Optional<Predicate<BufferedImage>> marks = notches == 0 ? marks(context, on) : Optional.empty();
+        if (notches == 0 && marks.isEmpty()) {
+            return Tried.refused(name + " has no marker of its own and none of its buttons shows, so nothing would "
+                    + "tell whether " + field + " leaves it. Cut its marker first (crop_pictures, marker true, with "
+                    + "screen " + name + "). Nothing was done.");
+        }
         ActTools.Entered first = base instanceof TextButton words
                 ? ActTools.enterText(context, screen, words, input.desktop(), settle, FrameChange.ANSWER_SHARE)
                 : ActTools.enter(context, screen, byPicture ? what : null, notches, button, pick, strip.orElse(null),
                 keys, input.desktop(), settle, FrameChange.ANSWER_SHARE);
         Markers onMarkers = graph.markers(screen);
-        ActTools.Entered slow = notches == 0 ? slowScreen(context, first, onMarkers) : first;
-        ActTools.Entered shown = notches == 0 ? flash(context, slow, onMarkers) : slow;
-        boolean flashed = shown != slow;    // its markers hidden a moment, then back: this screen, redrawn
+        // Left or not, told by what marks the screen going and staying gone, never by how much changed.
+        long watchStart = System.nanoTime();
+        Departure departure = notches == 0 && first.after() != null && !first.reply().isRefused()
+                ? departure(context, first, marks.orElseThrow()) : null;
+        ActTools.Entered shown = departure == null || departure.frame() == first.after() ? first
+                : ActTools.again(context, first, departure.frame(), (System.nanoTime() - watchStart) / 1_000_000);
+        // Its markers hidden a moment, then back: this screen, redrawn.
+        boolean flashed = departure != null && departure.way() == Departure.Way.FLASHED;
+        boolean left = departure != null && departure.way() == Departure.Way.LEFT;
         // A button pressed while it showed a version of its usual look tells what the version means; a part it
         // showed that blocks is cut as its Disabled look, which the input is written with. A spot is pressed beside
         // its anchor: what it opened is no answer of the anchor's look.
@@ -500,7 +511,8 @@ final class MapTools {
                 && button != null && !button.isBeside() && pick == null && (look == null || look == State.NORMAL);
         Versions.Pressing pressing = !pressedPlain ? Versions.Pressing.NONE : foundOn(context, what, shown.before())
                 .map(at -> Versions.pressed(context, new Versions.Pressed(screen, held.orElse(null), button, what, at,
-                        shown.before(), shown.after(), shown.motion(), !flashed && shown.share() >= SCREEN_SHARE)))
+                        shown.before(), shown.after(), shown.motion(),
+                        !flashed && (left || shown.share() >= SCREEN_SHARE))))
                 .orElse(Versions.Pressing.NONE);
         ActTools.Entered entered = pressing.said().isEmpty() ? shown : shown.and(pressing.said());
         // A lambda: a method reference on button would read it, null for a hotkey, before any look is there.
@@ -542,11 +554,10 @@ final class MapTools {
             return new Tried(up(context, said.and(AgentReply.text("Nothing moved: that end is reached. Its other end "
                     + "too, when not scrolled to yet.")), screen, input), true);
         }
-        // A change too small to be a screen still left this one when its markers went (a tab whose title and rows
-        // change: World chest's Explore, 2026-11-03).
-        boolean markersGone = !flashed && entered.share() < SCREEN_SHARE && onMarkers.any()
-                && !ActTools.shows(context, onMarkers, entered.after());
-        if (!flashed && (entered.share() >= SCREEN_SHARE || markersGone)) {
+        // Markers gone left the screen, however little changed (a tab whose title and rows change: World chest's
+        // Explore, 2026-11-03); a change over much of it with them still there is a popup over it, or the screen
+        // changed in place, which landed and stayed tell apart.
+        if (!flashed && (left || entered.share() >= SCREEN_SHARE)) {
             // The screen opens names first, when the map has it and its marker shows.
             Optional<String> named = opens == null ? Optional.empty() : ScreenBook.find(graph, opens)
                     .filter(c -> !c.equals(screen));
@@ -633,7 +644,7 @@ final class MapTools {
         long deadline = System.nanoTime() + OPENS_WAIT_MS * 1_000_000;
         while (System.nanoTime() < deadline) {
             try {
-                Thread.sleep(FLASH_POLL_MS * 2L);
+                Thread.sleep(POLL_MS * 2L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;
@@ -1506,43 +1517,45 @@ final class MapTools {
     }
 
     /**
-     * {@code entered}, or a later look when the screen's {@code markers} come back within {@link #FLASH_MS}: a change
-     * over the whole screen that hid them a moment (a rarity raised in Artifacts flashed, 2026-10-15) changed the
-     * screen in place and opened none.
+     * What tells that the game is still on {@code on}: its own markers (a tab's shared bar left out), else the
+     * pictures of its buttons that show now, up to {@link #MARKS_BY_BUTTONS}; empty when neither does.
      */
-    private static ActTools.Entered flash(AgentContext context, ActTools.Entered entered, Markers markers) {
-        if (entered.after() == null || entered.share() < SCREEN_SHARE || !markers.any()
-                || ActTools.shows(context, markers, entered.after())) {
-            return entered;
-        }
-        Optional<ToolReach> reach = ToolReach.of(context);
-        if (reach.isEmpty()) return entered;
-        return ToolTiming.timed(ToolTiming.Phase.SETTLE, () -> {
-            long deadline = reach.get().nowMs() + FLASH_MS;
-            while (reach.get().nowMs() < deadline && !Thread.currentThread().isInterrupted()) {
-                reach.get().pause(FLASH_POLL_MS);
-                Optional<BufferedImage> now = reach.get().look();
-                if (now.isPresent() && ActTools.shows(context, markers, now.get())) {
-                    return ActTools.again(context, entered, now.get());
-                }
-            }
-            return entered;
-        });
+    private static Optional<Predicate<BufferedImage>> marks(AgentContext context, MapScreen on) {
+        Markers own = Markers.of(on);
+        if (own.any()) return Optional.of(frame -> ActTools.shows(context, own, frame));
+        Optional<BufferedImage> now = Frames.look(context);
+        if (now.isEmpty()) return Optional.empty();
+        List<String> shown = on.inputs().values().stream()
+                .map(i -> i instanceof Button b && b.picture() != null ? b.picture().id() : null)
+                .filter(Objects::nonNull).distinct()
+                .filter(id -> foundOn(context, id, now.get()).isPresent())
+                .limit(MARKS_BY_BUTTONS).toList();
+        if (shown.isEmpty()) return Optional.empty();
+        return Optional.of(frame -> shown.stream().anyMatch(id -> foundOn(context, id, frame).isPresent()));
     }
 
-    /**
-     * {@code first} read on while it changed less than a screen and the screen's {@code markers} still show: a
-     * screen slow to draw (Garage, a second late) would be noted as a change in place. A change that grew with the
-     * markers still in view is drift, not a screen.
-     */
-    private static ActTools.Entered slowScreen(AgentContext context, ActTools.Entered first, Markers markers) {
-        if (first.after() == null || first.share() >= SCREEN_SHARE || !markers.any()
-                || !ActTools.shows(context, markers, first.after())) {
-            return first;
+    /** What {@code entered} did to its screen, watched by {@code marks} on fresh reads of the game. */
+    private static Departure departure(AgentContext context, ActTools.Entered entered,
+                                       Predicate<BufferedImage> marks) {
+        Optional<ToolReach> reach = ToolReach.of(context);
+        if (reach.isEmpty()) {
+            return new Departure(marks.test(entered.after()) ? Departure.Way.STAYED : Departure.Way.LEFT,
+                    entered.after());
         }
-        ActTools.Entered later = ActTools.later(context, first, SLOW_SCREEN_MS, SCREEN_SHARE);
-        return later.after() == null || later != first && !ActTools.shows(context, markers, later.after())
-                ? later : first;
+        FrameChange.Clock clock = new FrameChange.Clock() {
+            @Override
+            public long nowMs() {
+                return reach.get().nowMs();
+            }
+
+            @Override
+            public void sleep(long ms) {
+                reach.get().pause(ms);
+            }
+        };
+        return ToolTiming.timed(ToolTiming.Phase.SETTLE, () -> Departure.watch(entered.after(), marks,
+                (a, b) -> FrameChange.changed(a, b, entered.motion()), reach.get()::look, clock,
+                Departure.Timing.TRY));
     }
 
     /**

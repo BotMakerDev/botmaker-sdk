@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.assist;
 
-import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
@@ -16,15 +15,12 @@ import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
-import com.botmaker.sdk.internal.vision.FrameChange.Clock;
 import com.botmaker.sdk.internal.vision.FrameChange.Motion;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,34 +52,6 @@ class MapToolsTest {
         assertEquals("Tavern choice", MapTools.nameFrom("tavern_choice_town", "Town"));
         assertEquals("Upgrades", MapTools.nameFrom("upgrades", "Home"));
         assertEquals("Guild hall", MapTools.nameFrom("guild_hall", "Home"));
-    }
-
-    /** A screen that draws a second after a small first change is still read as the screen it opens. */
-    @Test
-    void aScreenSlowToDrawIsWaitedFor() throws InterruptedException {
-        BufferedImage before = filled(Color.GRAY, 0);
-        BufferedImage pressed = filled(Color.GRAY, 20);     // a button's press: a corner, under SCREEN_SHARE
-        BufferedImage garage = filled(Color.BLUE, 0);
-        ActTools.Entered first = new ActTools.Entered(AgentReply.text("Clicked garage; changed a corner."), before,
-                pressed, Motion.NONE, "click garage", "Clicked garage", 200);
-        assertTrue(first.share() < MapTools.SCREEN_SHARE);
-
-        long[] waited = {0};
-        Deque<BufferedImage> reads = new ArrayDeque<>(List.of(pressed, pressed, pressed, garage, garage));
-        ActTools.Entered later = ActTools.later(first, () -> Optional.of(reads.size() > 1 ? reads.poll()
-                : reads.peek()), MapTools.SLOW_SCREEN_MS, MapTools.SCREEN_SHARE, counting(waited),
-                after -> AgentReply.text("answered"));
-        assertSame(garage, later.after());
-        assertTrue(later.share() >= MapTools.SCREEN_SHARE);
-        assertEquals("answered", later.reply().parts().getFirst().text());
-        assertEquals("click garage", later.how());
-        assertEquals(200 + waited[0], later.tookMs(), "the first change's time, then the wait for the screen");
-
-        waited[0] = 0;
-        ActTools.Entered same = ActTools.later(first, () -> Optional.of(pressed), MapTools.SLOW_SCREEN_MS,
-                MapTools.SCREEN_SHARE, counting(waited), after -> AgentReply.text("answered"));
-        assertSame(first, same, "a change in place stays one");
-        assertEquals(MapTools.SLOW_SCREEN_MS, waited[0], "read on to the cap, never past it");
     }
 
     /** What moved on a screen stands for its next inputs there, for a while, on a frame of its size. */
@@ -256,20 +224,6 @@ class MapToolsTest {
         g.fillRect(0, 0, corner, corner);
         g.dispose();
         return image;
-    }
-
-    private static Clock counting(long[] waited) {
-        return new Clock() {
-            @Override
-            public long nowMs() {
-                return waited[0];
-            }
-
-            @Override
-            public void sleep(long ms) {
-                waited[0] += ms;
-            }
-        };
     }
 
     /** A spot beside an anchor is tried by its field, never as the anchor's own button. */

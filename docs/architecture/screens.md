@@ -284,7 +284,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **Discovery** (`MapTools`): `crop_pictures` cuts a screen's inputs, marker, back, looks (`variantOf`,
   `screenLook`, `when`), `sometimes` and `popup`; `place_pictures` puts pictures the bot already has on a screen;
   `try_input` clicks each input of its list and records what it did — opened a new screen (owing its marker), led to a mapped one
-  (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup; its
+  (a way in or its way back, found with `whereOn`), changed it in place, or nothing — and stops at a popup. Whether
+  it left the screen is its own markers going while the screen holds still a second, never the share changed
+  (`Departure`, 2026-11-03: an animated background changes much, a tab little); back again is a redraw in place; a
+  screen with no marker of its own is told by its buttons' pictures, else the try is refused. Its
   `match` tries one copy of a repeated picture (the picture's one cut split into an untried input per copy first), and
   `which_screen` with `everywhere` numbers the copies;
   `not_a_screen` turns a screen back into a tried input on each of its ways in; `go_to_screen` and

@@ -38,8 +38,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * The assistant's hands: a click, a key or a scroll on the game the look tools see, each answered in text — the
@@ -514,39 +512,16 @@ final class ActTools {
                 after.get(), motion, how, done, Clock.REAL.nowMs() - acted);
     }
 
-    /**
-     * {@code entered} read on for up to {@code capMs}, for a screen slow to draw: a small first change (a button's
-     * press, a background swaying past the motion it was seen with) ends the wait before the screen it opens shows.
-     * The later frame and its answer once {@code share} of the screen changed; else {@code entered} as it was; no
-     * frame when stopped meanwhile.
-     */
-    static Entered later(AgentContext context, Entered entered, int capMs, double share) {
-        try {
-            return ToolTiming.timed(ToolTiming.Phase.SETTLE, () -> later(entered, () -> Frames.look(context), capMs,
-                    share, Clock.REAL, after -> answer(context, entered.done(), entered.before(), after,
-                            entered.motion(), false)));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Entered.no(AgentReply.text(entered.done() + "; stopped before the screen was read again."));
-        }
-    }
-
-    static Entered later(Entered entered, Supplier<Optional<BufferedImage>> look, int capMs, double share, Clock clock,
-                         Function<BufferedImage, AgentReply> answer) throws InterruptedException {
-        long start = clock.nowMs();
-        Optional<BufferedImage> after = FrameChange.answered(entered.before(), entered.motion(), look, capMs, share,
-                clock);
-        if (after.isEmpty() || FrameChange.share(entered.before(), after.get(), entered.motion()) < share) {
-            return entered;
-        }
-        return new Entered(answer.apply(after.get()), entered.before(), after.get(), entered.motion(), entered.how(),
-                entered.done(), entered.tookMs() + clock.nowMs() - start);
-    }
-
     /** {@code entered} read again on {@code after}, a later look: its answer said anew from that frame. */
     static Entered again(AgentContext context, Entered entered, BufferedImage after) {
+        return again(context, entered, after, 0);
+    }
+
+    /** {@code entered} read again on {@code after}, {@code waitedMs} after it settled. */
+    static Entered again(AgentContext context, Entered entered, BufferedImage after, long waitedMs) {
         return new Entered(answer(context, entered.done(), entered.before(), after, entered.motion(), false),
-                entered.before(), after, entered.motion(), entered.how(), entered.done(), entered.tookMs());
+                entered.before(), after, entered.motion(), entered.how(), entered.done(),
+                entered.tookMs() + waitedMs);
     }
 
     /** What changed from {@code before} to {@code after}, in text, with the changed part's image when asked. */
