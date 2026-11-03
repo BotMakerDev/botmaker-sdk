@@ -870,6 +870,24 @@ public final class ScreenWalk {
     }
 
     /**
+     * What {@code constant}'s readouts {@code fields} show, all read off one look, by field; a field read as nothing is
+     * left out. Empty when that look does not show the screen, a screen with no marker included. Nothing is walked to.
+     */
+    public Optional<Map<String, String>> readAll(String constant, List<String> fields) {
+        Markers markers = graph.markers(constant);
+        if (!markers.any()) return Optional.empty();
+        Optional<BufferedImage> frame = reach.look().filter(f -> markers.on(reach, f));
+        if (frame.isEmpty()) return Optional.empty();
+        Map<String, String> read = new LinkedHashMap<>();
+        for (String field : fields) {
+            graph.screen(constant).flatMap(screen -> screen.readout(field))
+                    .flatMap(readout -> reach.readout(readout, frame.get()))
+                    .ifPresent(text -> read.put(field, text));
+        }
+        return Optional.of(read);
+    }
+
+    /**
      * What {@code constant}'s readout {@code field} shows, read off one look; empty when that look does not show the
      * screen, a screen with no marker included, or nothing is read there. Nothing is walked to or closed.
      */

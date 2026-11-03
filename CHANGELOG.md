@@ -19,6 +19,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Game facts, kept between runs** (`api.state.Fact`, `api.state.GameState`). A bot's `Facts` class beside
+  `Screens` declares what the game shows of the account: `Fact.number(Screens.Home.class, home -> home.level)`,
+  `Fact.read(…)` (text, `.as(HeroClass.class)` for an enum's constant), `Fact.shown(…)` (an element in the tree) and
+  `Fact.set()` (a step's yes or no, `GameState.set(Facts.TUTORIAL_DONE, true)`). Each is read whenever a run is on its
+  screen and its reading is older than `.staleAfter(…)` (1 h unless said), never by going there for it;
+  `GameState.refresh` goes there for a flow that needs it fresh. A fact never read, or stale, is unknown, and its
+  conditions (`atLeast`, `atMost`, `is`, `isTrue`) say unknown, so a way it guards stays open; `.assume(value)` answers
+  until the first reading. Values are this machine's: JSON in the SDK's state folder of the bot,
+  `.botmaker/plugins/com_github_botmakerdev/botmaker_sdk/targets/<target>/game.json`, never in git, a publish or a
+  `.bmk`. A fact marked `.account()` keeps the others apart per account (`targets/<target>/<account>/game.json`). A
+  file that does not read leaves every fact unknown, said once; an entry that does not read is read again.
+
 - **Conditions answer yes, no or unknown** (`api.screens.Answer`, `api.screens.Condition`). Any `.when(…)` takes a
   `Condition`: `Condition.of(GameLogic::eventOn)` (true yes, false no, a throw unknown), `Condition.all`, `any` and
   `not` with three-valued logic. It holds unless it says no, so an unknown never closes a way; a plain

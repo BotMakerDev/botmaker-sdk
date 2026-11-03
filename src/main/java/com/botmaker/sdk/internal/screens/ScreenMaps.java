@@ -8,6 +8,7 @@ import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * The bot's screen map at run time: each {@code static final} {@link Screen} of the {@code Screens} class beside a
@@ -92,6 +93,16 @@ public final class ScreenMaps {
         String shown = map.shown(constant);
         SdkRun.screen(shown);
         TIME.on(shown);
+        Consumer<String> listener = onSeen;
+        if (listener != null) listener.accept(constant);
+    }
+
+    /** Told each screen {@link #seen}: the game facts read on it ({@code KeptFacts}). */
+    private static volatile Consumer<String> onSeen;
+
+    /** Tells {@code listener} each screen the game is seen on from now; {@code null} tells nobody. */
+    public static void onSeen(Consumer<String> listener) {
+        onSeen = listener;
     }
 
     /**
