@@ -8,6 +8,7 @@ import com.botmaker.sdk.internal.emulator.SystemDialogs;
 import com.botmaker.sdk.internal.observe.BotObserver;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
+import com.botmaker.sdk.internal.trace.Say;
 
 import java.util.Optional;
 
@@ -88,17 +89,18 @@ public final class Watchdog {
         if (dialog.isPresent()) {
             progress();
             restartNext = true;
-            Debug.error(dialog.get());
-            throw new BotStuckException(dialog.get());
+            // The run's recovery restarts the game: a fallback rescuing the run, a warning.
+            Say.warn(dialog.get());
+            throw Say.told(new BotStuckException(dialog.get()));
         }
         State s = STATE.get();
         if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
             int repeats = s.repeats;
             String sig = s.signature;
             progress();
-            Debug.error("stuck after " + repeats + " checks repeating " + sig);
-            throw new BotStuckException("Bot appears stuck: no progress for " + repeats
-                    + " consecutive checks (repeating " + sig + ")");
+            Say.warn("stuck after " + repeats + " checks repeating " + sig);
+            throw Say.told(new BotStuckException("Bot appears stuck: no progress for " + repeats
+                    + " consecutive checks (repeating " + sig + ")"));
         }
     }
 

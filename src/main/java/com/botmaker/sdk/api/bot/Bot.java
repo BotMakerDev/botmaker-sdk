@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.InstalledGame;
@@ -27,6 +28,7 @@ import com.botmaker.sdk.internal.screens.KeptLooks;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.MissFrames;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.util.HashSet;
@@ -111,6 +113,8 @@ public class Bot {
             InstalledRun.walk(null);
             Debug.log("No @SdkValue(SdkValue.Id.FLOW) field in the classes runFlow was given: no flow runs.");
         }
+        // Once the flow is known: the log's facts name it.
+        RunDetails.start(values);
         InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skipped(values)));
         boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
@@ -157,6 +161,7 @@ public class Bot {
         ManagedValues.install(values);
         InstalledGame.install(values);
         ScreenMaps.install(values);
+        RunDetails.start(values);
         SessionBootstrap.joinOffered();
         // Switched back on each run, so a warm JVM keeps no switch a body of the run before left off.
         PopupGuard.enabled(true);
@@ -349,7 +354,10 @@ public class Bot {
                 Debug.log("Stopped by request.");
                 return;
             } catch (BotStuckException e) {
-                Debug.error("Stuck: " + e.getMessage() + " — recovering.");
+                // The recovery rescues the run: a warning, unless whoever threw said the problem already.
+                String recovering = "Stuck: " + e.getMessage() + " — recovering.";
+                if (Say.wasTold(e)) Say.info(recovering);
+                else Say.warn(recovering);
                 Watchdog.reset();
                 if (!recovered(recovery)) return;
             } catch (RuntimeException e) {

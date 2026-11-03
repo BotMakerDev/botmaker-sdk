@@ -83,6 +83,11 @@ public final class RunReach implements Reach {
     }
 
     @Override
+    public List<Double> bestScores(List<ImageTemplate> pictures, BufferedImage frame) {
+        return ImageFinder.bestMatches(pictures, new StillSource(frame)).stream().map(MatchResult::confidence).toList();
+    }
+
+    @Override
     public List<Optional<Found>> findEachScored(List<ImageTemplate> pictures, BufferedImage frame) {
         double needs = BotSettings.current().confidence();
         List<Optional<Found>> found = new ArrayList<>(ImageFinder.bestMatches(pictures, new StillSource(frame)).stream()

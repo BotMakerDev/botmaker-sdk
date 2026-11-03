@@ -151,7 +151,7 @@ public final class IpcObserver implements BotObserver {
      * prefix would find no line in it at all. {@code com.botmaker.studio.} is the trace agent Studio
      * runs a bot with, whose frames sit between a traced call and the bot line that made it.
      */
-    static Optional<StackWalker.StackFrame> botFrame() {
+    public static Optional<StackWalker.StackFrame> botFrame() {
         return Diag.Callers.first(f -> isLibrary(f.getClassName()) || f.getLineNumber() <= 0);
     }
 

@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run's log says why, at the right level.** A bot's run starts its `run.jsonl` (shared's `RunFiles`) with the
+  SDK's details: the flow, the launch target's kind, the platform and each plain `@Param` value; each line names
+  the bot's own line that led to it. A level says who handled the result: a walk *stuck* is a warning naming the
+  target, the last known screen, the steps walked and the target's markers' scores now; *missing* is an error;
+  *not now* and *locked* are information, the bot's code handles them. A fallback that rescued the run warns: the
+  flow's walk back, the watchdog's dialog and stuck checks, `supervise`'s recovery. A problem is said once, where
+  it is thrown: the recovery that catches it says information.
+- **`Debug.log` lines are kept while debugging is off**: the run's log holds the last 50 and writes them just
+  before the next warning or error, so a quiet run's problem comes with what led to it.
 - A run's miss frames go in the folder shared's run log names (`RunLog.newFolder`), so a run's log and its
   frames share one folder. Nothing a bot sees changes.
 - **The assistant types in an emulator's app through the emulator's text input**, as a run does: in a private

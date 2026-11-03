@@ -13,6 +13,7 @@ import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.trace.Trace;
 
 import java.util.Map;
@@ -244,15 +245,22 @@ public final class FlowWalker {
             String back = backTo(step);
             if (back == null) throw stuck;
             String shown = ScreenMaps.installed().shown(back);
-            Debug.error("[Activity] " + step.label() + " got stuck (" + stuck.getMessage() + "): walking back to "
+            // A fallback rescuing the run: a warning, unless whoever threw said the problem already.
+            say(stuck, "[Activity] " + step.label() + " got stuck (" + stuck.getMessage() + "): walking back to "
                     + shown + " and running it once more.");
             Watchdog.reset();
             if (!walkBack.test(back)) {
-                Debug.error("[Activity] " + step.label() + " could not walk back to " + shown + ".");
+                say(stuck, "[Activity] " + step.label() + " could not walk back to " + shown + ".");
                 throw stuck;
             }
             return body.run();
         }
+    }
+
+    /** {@code message} as a warning, or as an info when {@code stuck}'s problem was said where it was thrown. */
+    private static void say(BotStuckException stuck, String message) {
+        if (Say.wasTold(stuck)) Say.info(message);
+        else Say.warn(message);
     }
 
     /** The screen a stuck {@code step} walks back to: the one it says it works on, else the last one it reached. */

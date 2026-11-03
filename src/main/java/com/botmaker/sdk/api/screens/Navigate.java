@@ -14,9 +14,11 @@ import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.sdk.internal.trace.Say;
 
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.stream.Collectors;
 
 /**
  * Goes from screen to screen by the bot's map, its {@code Screens} class: {@code Navigate.to(Screens.CAMPAIGN)}
@@ -56,21 +58,38 @@ public final class Navigate {
         }
         // Forgotten while walking: a walk that gets stuck is no step to walk back from to where it set out.
         ScreenMaps.reached(null);
-        ScreenWalk.Result walked = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant))
-                .uncovering().go(target.get(), ScreenMaps.lastSeen());
+        ScreenWalk walk = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant));
+        ScreenWalk.Result walked = walk.uncovering().go(target.get(), ScreenMaps.lastSeen());
         ScreenMaps.seen(walked.at());
+        if (walked.arrived()) {
+            // Where the activity walks back to when one of its steps gets stuck.
+            ScreenMaps.reached(target.get());
+            return true;
+        }
+        // Said here, at the bot's line that walked, at its outcome's level; the recovery from a throw says only itself.
+        switch (walked.outcome().level()) {
+            case INFO -> Say.info(walked.why());
+            case WARN -> Say.warn(stuck(map, walk, target.get(), walked));
+            case ERROR -> Debug.error(walked.why());
+            default -> Debug.log(walked.why());
+        }
         return switch (walked.outcome()) {
-            case ARRIVED -> {
-                // Where the activity walks back to when one of its steps gets stuck.
-                ScreenMaps.reached(target.get());
-                yield true;
-            }
-            case NOT_NOW, LOCKED, STOPPED -> {
-                Debug.log(walked.why());
-                yield false;
-            }
-            case MISSING, STUCK -> throw new BotStuckException(walked.why());
+            case MISSING, STUCK -> throw Say.told(new BotStuckException(walked.why()));
+            default -> false;
         };
+    }
+
+    /**
+     * A stuck walk as its warning says it: where to, the last screen known, the steps it took, why it stopped, and how
+     * well the last screen's markers match what the game shows now.
+     */
+    private static String stuck(ScreenGraph map, ScreenWalk walk, String target, ScreenWalk.Result walked) {
+        String seen = walk.markersSeen(walked.at());
+        return "Stuck going to " + map.shown(target) + ": " + walked.why()
+                + " Last known screen: " + (walked.at() == null ? "none" : map.shown(walked.at())) + "."
+                + (walked.walked().isEmpty() ? "" : " Walked: " + walked.walked().stream().map(map::shown)
+                        .collect(Collectors.joining(" → ")) + ".")
+                + (seen.isEmpty() ? "" : " Its markers now: " + seen + ".");
     }
 
     /** {@link #press(Button, Pick)} of its first copy. */

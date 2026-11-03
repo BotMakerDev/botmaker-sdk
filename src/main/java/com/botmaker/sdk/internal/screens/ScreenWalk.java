@@ -13,6 +13,8 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.text.Words;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.runlog.api.Level;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +55,23 @@ import java.util.stream.Collectors;
 public final class ScreenWalk {
 
     /** How a walk ended. */
-    public enum Outcome { ARRIVED, NOT_NOW, LOCKED, MISSING, STUCK, STOPPED }
+    public enum Outcome {
+        ARRIVED, NOT_NOW, LOCKED, MISSING, STUCK, STOPPED;
+
+        /**
+         * The level a run says it at, by who handles it (spec {@code 2026-11-03-run-reports-design.md} §1): the bot's
+         * code acts on a closed way ({@code NOT_NOW}, {@code LOCKED}); the run's recovery rescues a stuck walk; nobody
+         * fixes a map that names a picture the game no longer shows ({@code MISSING}) but its Upkeep.
+         */
+        public Level level() {
+            return switch (this) {
+                case ARRIVED, STOPPED -> Level.DEBUG;
+                case NOT_NOW, LOCKED -> Level.INFO;
+                case STUCK -> Level.WARN;
+                case MISSING -> Level.ERROR;
+            };
+        }
+    }
 
     /** A walk's end: how, the screen it ended on (null when none was known), the screens reached, and why. */
     public record Result(Outcome outcome, String at, List<String> walked, String why) {
@@ -128,6 +147,31 @@ public final class ScreenWalk {
     /** The screen the game shows now, {@code near}'s neighbours looked for first; popups aside. */
     public Optional<String> where(String near) {
         return reach.look().flatMap(frame -> whereOn(frame, near));
+    }
+
+    /**
+     * What the game shows now of {@code constant}'s markers, each with its match's score or "—" when not found:
+     * {@code "title 0.93, gold —"}; what a stuck walk's warning names of the screen it was last on. Empty when the
+     * screen has no picture marker or nothing can be seen.
+     */
+    public String markersSeen(String constant) {
+        if (constant == null) return "";
+        try {
+            List<ImageTemplate> pictures = graph.markers(constant).pictures();
+            if (pictures.isEmpty()) return "";
+            Optional<BufferedImage> frame = reach.look();
+            if (frame.isEmpty()) return "";
+            List<Double> scores = reach.bestScores(pictures, frame.get());
+            List<String> each = new ArrayList<>();
+            for (int i = 0; i < pictures.size(); i++) {
+                each.add(pictures.get(i).id() + " " + (i < scores.size()
+                        ? String.format(Locale.ROOT, "%.2f", scores.get(i)) : "—"));
+            }
+            return String.join(", ", each);
+        } catch (RuntimeException e) {
+            // The window a walk got stuck on may be gone: the warning goes without its markers, never instead of it.
+            return "";
+        }
     }
 
     /**

@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.runlog.api.Level;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
@@ -1298,5 +1299,16 @@ class ScreenWalkTest {
         ScreenWalk.Result result = go(game, "HOME", new ArrayList<>());
         assertTrue(result.arrived(), result.why());
         assertEquals(List.of(), game.done);
+    }
+
+    /** By who handles it: the bot's code a closed way, the recovery a stuck walk, nobody but Upkeep a missing picture. */
+    @Test
+    void eachOutcomeIsSaidAtItsLevel() {
+        assertEquals(Level.DEBUG, ScreenWalk.Outcome.ARRIVED.level());
+        assertEquals(Level.DEBUG, ScreenWalk.Outcome.STOPPED.level());
+        assertEquals(Level.INFO, ScreenWalk.Outcome.NOT_NOW.level());
+        assertEquals(Level.INFO, ScreenWalk.Outcome.LOCKED.level());
+        assertEquals(Level.WARN, ScreenWalk.Outcome.STUCK.level());
+        assertEquals(Level.ERROR, ScreenWalk.Outcome.MISSING.level());
     }
 }

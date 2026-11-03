@@ -19,7 +19,7 @@ import java.util.Set;
 public final class TraceSources {
 
     /** The classes a line passes through on its way to {@code Diag}; the caller is the first class beyond them. */
-    private static final Set<Class<?>> PASS_THROUGH = Set.of(Debug.class, Trace.class, TraceSources.class);
+    private static final Set<Class<?>> PASS_THROUGH = Set.of(Debug.class, Trace.class, TraceSources.class, Say.class);
 
     private TraceSources() {}
 

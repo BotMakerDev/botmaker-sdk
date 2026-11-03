@@ -68,9 +68,12 @@ public final class Debug {
         Diag.set(on);
     }
 
-    /** Prints {@code message} to stdout under the calling class's name when debugging is on; a no-op when off. */
+    /**
+     * Prints {@code message} to stdout under the calling class's name when debugging is on. When off, the run's log
+     * keeps it among the last lines it writes before a warning or an error; nothing is printed.
+     */
     public static void log(String message) {
-        if (Diag.isEnabled()) Diag.log(TraceSources.origin(), message, 1, null);
+        if (Diag.isRecorded()) Diag.log(TraceSources.origin(), message, 1, null);
     }
 
     /** Prints {@code message} to stderr under the calling class's name, whether debugging is on or off. */

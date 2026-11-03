@@ -116,6 +116,11 @@ public final class MissFrames {
         Diag.warn(SOURCE, "Failed: " + what + ". Saved what it saw: " + shown(file));
     }
 
+    /** This run's folder, which its log shares; empty outside a run or when it could not be made. */
+    public static Optional<Path> folder() {
+        return Optional.ofNullable(run);
+    }
+
     /** The latest run's saved frames under {@code botFolder}, oldest first; empty when that run saved none. */
     public static List<Path> latest(Path botFolder) {
         Path runs = botFolder.resolve(FOLDER);

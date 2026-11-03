@@ -127,6 +127,14 @@ public interface Reach {
     }
 
     /**
+     * Each picture's best score on {@code frame}, whether or not it clears the confidence: what a stuck walk's
+     * warning shows, a near miss included. By default 1 for a picture found, 0 for one not.
+     */
+    default List<Double> bestScores(List<ImageTemplate> pictures, BufferedImage frame) {
+        return findEachScored(pictures, frame).stream().map(at -> at.map(Found::score).orElse(0.0)).toList();
+    }
+
+    /**
      * How far from its cut place a marker is looked for, in the pixels of the frame it was cut from, scaled with the
      * frame: a title moves a few pixels at most.
      */
