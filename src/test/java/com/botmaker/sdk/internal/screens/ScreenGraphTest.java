@@ -248,6 +248,28 @@ class ScreenGraphTest {
                 .pathTo("MAP", "ENGINEER", edge -> true).orElseThrow().stream().map(ScreenGraph.Edge::to).toList());
     }
 
+    /**
+     * A way back returns where the game came from: a page opened from Center goes back to Center, so no path enters it
+     * from Center to leave by the way back to its parent (User Agreement, from Menu user center and Consent, went
+     * round, 2026-11-03). Begun on the page, its way back is the parent's.
+     */
+    @Test
+    void aWayBackFollowsOnlyAWayInFromWhereItLeads() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("ROOT", screen("Root", click("to_hub"), click("to_legal")));
+        screens.put("HUB", screen(Setup.named("Hub").from(ref("ROOT", "to_hub")).takes(Duration.ofSeconds(5)),
+                click("to_center")));
+        screens.put("CENTER", screen(Setup.named("Center").from(ref("HUB", "to_center")), click("uc_legal")));
+        screens.put("LEGAL", screen(Setup.named("Legal").from(ref("ROOT", "to_legal"))
+                .alsoFrom(List.of(Way.of(ref("CENTER", "uc_legal"))))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("HUB", "ROOT"), graph.pathTo("CENTER", "ROOT", edge -> true).orElseThrow().stream()
+                .map(ScreenGraph.Edge::to).toList(), "not Legal, whose way back leads to Center again");
+        assertEquals(List.of("ROOT"), graph.pathTo("LEGAL", "ROOT", edge -> true).orElseThrow().stream()
+                .map(ScreenGraph.Edge::to).toList());
+    }
+
     @Test
     void aLoopOfWaysInEndsEveryWalk() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();

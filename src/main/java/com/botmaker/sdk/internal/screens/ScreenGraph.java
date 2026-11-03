@@ -689,7 +689,7 @@ public final class ScreenGraph {
     /**
      * The quickest edges {@code usable} allows from {@code from} to {@code to}, by each edge's {@link #cost}; empty
      * when none leads there. Of paths that cost the same, the one a search by fewest edges finds first, edges in their
-     * map order (2026-10-22).
+     * map order (2026-10-22). A way back follows no way in from a screen other than the one it leads to.
      */
     public Optional<List<Edge>> pathTo(String from, String to, Predicate<Edge> usable) {
         if (!screens.containsKey(from) || !screens.containsKey(to)) return Optional.empty();
@@ -713,8 +713,14 @@ public final class ScreenGraph {
                 }
                 return Optional.of(path);
             }
+            Edge cameBy = reachedBy.get(at);
             for (Edge edge : edges) {
                 if (!edge.from().equals(at) || done.contains(edge.to())) continue;
+                // A way back returns where the game came from: after a way in from elsewhere it leads there again.
+                if (edge.back() && cameBy != null && !cameBy.back() && !cameBy.onItsOwn()
+                        && !cameBy.from().equals(edge.to())) {
+                    continue;
+                }
                 long cost = costs.get(at) + cost(edge);
                 Long now = costs.get(edge.to());
                 if (now != null && now <= cost) continue;
