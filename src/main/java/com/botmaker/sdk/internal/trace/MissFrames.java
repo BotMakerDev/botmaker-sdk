@@ -3,7 +3,7 @@ package com.botmaker.sdk.internal.trace;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.shared.Diag;
-import com.botmaker.shared.runlog.RunLog;
+import com.botmaker.runlog.RunLog;
 
 import javax.imageio.ImageIO;
 import java.awt.BasicStroke;
