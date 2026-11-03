@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.MatchEvent;
 import com.botmaker.sdk.internal.trace.Say;
 
+import java.awt.image.BufferedImage;
 import java.util.Optional;
 
 /**
@@ -25,6 +26,10 @@ import java.util.Optional;
  * picture found at the same place over and over: a click that changes nothing. The
  * observer only <em>counts</em> — it never throws, because the vision layer
  * ({@link com.botmaker.sdk.api.vision.ImageFinder}) swallows {@code Exception} and would eat it.
+ *
+ * <p>It also tells a frozen game ({@link #frozen()}, 2026-11-03): every capture and every input counts into one
+ * {@link Stillness}, and a picture that stays still for {@link BotSettings#frozenAfter()} after input was sent is
+ * a game that no longer answers, whether the bot was clicking, waiting on a picture or walking the screen map.
  *
  * <p>The throw happens deterministically at {@link #checkpoint()}, which the flow walker calls between
  * activities. {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
@@ -59,6 +64,7 @@ public final class Watchdog {
             // A run starts owing no restart: one an earlier run in this JVM left is not this run's.
             SystemDialogs.clear();
             restartNext = false;
+            STILL.clear();
             Bots.addObserver(COUNTER);
             enabled = true;
             Debug.log("enabled");
@@ -92,6 +98,13 @@ public final class Watchdog {
             // The run's recovery restarts the game: a fallback rescuing the run, a warning.
             Say.warn(dialog.get());
             throw Say.told(new BotStuckException(dialog.get()));
+        }
+        Optional<String> frozen = frozen();
+        if (frozen.isPresent()) {
+            progress();
+            STILL.clear();
+            Say.warn(frozen.get());
+            throw Say.told(new BotStuckException(frozen.get()));
         }
         State s = STATE.get();
         if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
@@ -127,6 +140,33 @@ public final class Watchdog {
     /** Clears all watchdog state on the current thread (called by the supervisor after a restart). */
     public static void reset() {
         progress();
+        STILL.clear();
+    }
+
+    /** The game's picture across the run: every capture a source takes and every input sent to the game. */
+    private static final Stillness STILL = new Stillness();
+
+    /** Counts a frame a capture source took of the game, on whichever thread took it, watched or not; returns it. */
+    public static BufferedImage saw(BufferedImage frame) {
+        STILL.saw(frame, System.currentTimeMillis());
+        return frame;
+    }
+
+    /** Counts a click, swipe, key or text sent to the game. */
+    public static void acted() {
+        STILL.acted(System.currentTimeMillis());
+    }
+
+    /**
+     * Why the game looks frozen: its picture has not changed for {@link BotSettings#frozenAfter()} although input
+     * was sent to it meanwhile. Empty while it answers, or while nothing was sent: a still game with no input is
+     * one waiting, not a frozen one.
+     */
+    public static Optional<String> frozen() {
+        long still = STILL.stillAfterInput();
+        if (still < BotSettings.current().frozenAfter()) return Optional.empty();
+        return Optional.of("The game looks frozen: its picture did not change for " + still / 1000
+                + " s after the bot's input (BotSettings.frozenAfter)");
     }
 
     private static void record(String signature) {

@@ -149,6 +149,11 @@ public final class ScreenWalk {
         return reach.look().flatMap(frame -> whereOn(frame, near));
     }
 
+    /** The first screen of the map the game shows within {@code ms}, popups closed: a loader the map lacks waited out. */
+    public Optional<String> whereWithin(long ms) {
+        return shows(ms).flatMap(frame -> whereOn(frame, null));
+    }
+
     /**
      * What the game shows now of {@code constant}'s markers, each with its match's score or "—" when not found:
      * {@code "title 0.93, gold —"}; what a stuck walk's warning names of the screen it was last on. Empty when the
@@ -294,7 +299,7 @@ public final class ScreenWalk {
                 reached.accept(edge.to());
                 return new Result(Outcome.ARRIVED, edge.to(), List.of(edge.to()), "On " + graph.shown(edge.to()) + ".");
             }
-            return new Result(Outcome.STUCK, where(edge.from()).orElse(null), List.of(), null);
+            return new Result(Outcome.STUCK, where(edge.from()).orElse(null), List.of(), reach.frozen().orElse(null));
         } catch (Stayed stayed) {
             return new Result(Outcome.STUCK, edge.from(), List.of(), stayed.getMessage());
         }
@@ -327,6 +332,8 @@ public final class ScreenWalk {
             if (Thread.currentThread().isInterrupted()) return new Result(Outcome.STOPPED, at, walked, "Stopped.");
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isEmpty()) return new Result(Outcome.STUCK, at, walked, "The screen could not be captured.");
+            Optional<String> frozen = reach.frozen();
+            if (frozen.isPresent()) return new Result(Outcome.STUCK, at, walked, frozen.get());
             Optional<String> here = whereOn(frame.get(), at);
             // A screen with no marker, just reached, is where the game is while the one it was opened from shows
             // under it, or none shows.
@@ -356,8 +363,8 @@ public final class ScreenWalk {
                 }
             }
             if (here.isEmpty()) {
-                return new Result(Outcome.STUCK, at, walked, "The game shows no screen of the bot's map"
-                        + (at == null ? "." : "; it was last on " + graph.shown(at) + "."));
+                return new Result(Outcome.STUCK, at, walked, reach.frozen().orElse("The game shows no screen of the "
+                        + "bot's map" + (at == null ? "." : "; it was last on " + graph.shown(at) + ".")));
             }
             at = here.get();
             if (!at.equals(told)) {
@@ -620,7 +627,7 @@ public final class ScreenWalk {
         long deadline = reach.nowMs() + stepMs;
         Optional<BufferedImage> now = frame;
         while (now.isPresent() && !shows.test(now.get()) && reach.nowMs() < deadline
-                && !Thread.currentThread().isInterrupted()) {
+                && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty()) {
             reach.pause(POLL_MS);
             now = closePopups(reach.look());
         }
@@ -683,7 +690,7 @@ public final class ScreenWalk {
                 if (shown.isPresent()) return shown;
                 shown = closePopups(raw).flatMap(frame -> shownLead(leads, frame));
                 if (shown.isPresent()) return shown;
-            } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+            } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty());
         } else {
             reach.pause(Reach.CLICK_SETTLE_MS);
         }
@@ -858,7 +865,7 @@ public final class ScreenWalk {
             reach.pause(POLL_MS);
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isPresent() && whereOn(frame.get(), null).isPresent()) return frame;
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
+        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty());
         return Optional.empty();
     }
 

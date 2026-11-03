@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A frozen game is caught in every run.** The watchdog now watches the game's picture: when it stays the same
+  for `BotSettings.frozenAfter` (60 s) while the bot keeps clicking, swiping or typing, the run stops with "The game
+  looks frozen" and recovers, between activities as for a stuck bot. Before, only a vision loop clicking the same
+  picture over and over noticed; a bot waiting on pictures or walking the screen map did not. A still picture with no
+  input is a game waiting, never a frozen one. Vision loops and screen walks use the same rule, and a screen walk on a
+  frozen game ends at once with that reason instead of timing out step by step.
+- **Explore map starts where the game is.** A game that no longer shows the map's start screen is walked from the
+  screen it shows (waited for up to 60 s while it opens), and every screen the walk did not reach from there is tried
+  on its own; why it found no screen at all (frozen, nothing seen, no screen of the map) is said in the report.
 - **Explore map says a screen it could not get to**, even after a game restart, so a map whose start the game no
   longer shows ends with "Never reached: …" instead of in silence.
 - **Explore map, a run beside your bot's.** Studio shows *▶ Explore map* for a bot on the SDK: it starts the game

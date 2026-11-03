@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.shared.capture.GenericWindow;
@@ -102,7 +103,7 @@ public class Window implements CaptureSource {
     @Hidden("the CaptureSource half of this type; hidden there and hidden here, since an override "
             + "carries none of the interface's annotations")
     public BufferedImage capture() {
-        return controller().captureWindow(handle);
+        return Watchdog.saw(controller().captureWindow(handle));
     }
 
     @Override

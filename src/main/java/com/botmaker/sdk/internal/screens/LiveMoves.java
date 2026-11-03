@@ -65,9 +65,33 @@ public final class LiveMoves implements MapWalk.Moves {
         return arrived(edge, took.at(), took.why());
     }
 
+    /** Long enough for a game's first loader the map lacks ("Initializing…") to end. */
+    static final long FIRST_SCREEN_MS = 60_000;
+
+    /** Why the last {@link #where()} found nothing; null after one that found a screen. */
+    private String lost;
+
+    /** Why the game shows no screen: frozen by the run's own verdict ({@link Reach#frozen()}), else unseen or unmapped. */
+    @Override
+    public Optional<String> where() {
+        Optional<String> at = walk().whereWithin(FIRST_SCREEN_MS);
+        at.ifPresentOrElse(ScreenMaps::seen, ScreenMaps::lost);
+        lost = at.isPresent() ? null : reach.frozen().orElseGet(() -> reach.look().isEmpty()
+                ? "nothing of the game can be seen"
+                : "the game shows no screen of the map for " + FIRST_SCREEN_MS / 1000 + " s");
+        return at;
+    }
+
+    @Override
+    public String lost() {
+        return lost;
+    }
+
+    /** At the start, or at once on any screen of the map: a start the game no longer shows is no reason to fail. */
     @Override
     public boolean recover() {
-        return graph.start().map(this::goTo).orElse(false);
+        return graph.start().map(this::goTo).orElse(false)
+                || walk().where(ScreenMaps.lastSeen()).isPresent();
     }
 
     @Override

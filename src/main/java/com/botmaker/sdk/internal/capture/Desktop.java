@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.session.BotSession;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.shared.capture.ScreenCapture;
@@ -22,7 +23,7 @@ public final class Desktop implements CaptureSource {
     @Override
     public BufferedImage capture() {
         DesktopSession session = session();
-        return session != null ? session.captureScreen() : ScreenCapture.captureDesktop();
+        return Watchdog.saw(session != null ? session.captureScreen() : ScreenCapture.captureDesktop());
     }
 
     @Override

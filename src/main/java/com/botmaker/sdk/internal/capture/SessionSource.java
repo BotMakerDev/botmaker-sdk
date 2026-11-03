@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.capture;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.session.DesktopSession;
 
@@ -33,7 +34,7 @@ public final class SessionSource implements CaptureSource, WindowBacked {
 
     @Override
     public BufferedImage capture() {
-        return session.capture();
+        return Watchdog.saw(session.capture());
     }
 
     @Override

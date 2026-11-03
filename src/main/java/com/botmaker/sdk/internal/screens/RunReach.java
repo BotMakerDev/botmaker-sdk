@@ -18,6 +18,7 @@ import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
@@ -335,6 +336,12 @@ public final class RunReach implements Reach {
         CaptureSource source = Source.current();
         source.drag(onScreen(source, from), onScreen(source, to), time.toMillis());
         ShadeFit.moved(new ShadeFit.Pointer(to, nowMs(), false, !(source.base() instanceof EmulatorSource)));
+    }
+
+    /** The run's own verdict: every capture and input of the run counts, the walk's and the bot's. */
+    @Override
+    public Optional<String> frozen() {
+        return Watchdog.frozen();
     }
 
     @Override

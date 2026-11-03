@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.observe.SwipeEvent;
@@ -57,7 +58,7 @@ public final class Emulator implements CaptureSource {
     @Hidden("the CaptureSource half of this type; hidden there and hidden here, since an override "
             + "carries none of the interface's annotations")
     public java.awt.image.BufferedImage capture() {
-        return device.screencap();
+        return Watchdog.saw(device.screencap());
     }
 
     /** Always {@code (0,0)}: an emulator's captured pixels <em>are</em> its coordinate space. */
@@ -78,6 +79,7 @@ public final class Emulator implements CaptureSource {
             return;
         }
         Debug.log("click " + p + " on " + name());
+        Watchdog.acted();
         device.tap(p.x(), p.y());
     }
 
@@ -86,12 +88,14 @@ public final class Emulator implements CaptureSource {
     /** Taps ({@code x},{@code y}) in emulator pixels. */
     public void tap(int x, int y) {
         Debug.log("tap " + x + "," + y + " on " + name());
+        Watchdog.acted();
         device.tap(x, y);
     }
 
     /** Swipes/drags from ({@code x1},{@code y1}) to ({@code x2},{@code y2}) over {@code durationMs}. */
     public void swipe(int x1, int y1, int x2, int y2, long durationMs) {
         Debug.log("swipe " + x1 + "," + y1 + " -> " + x2 + "," + y2 + " over " + durationMs + "ms");
+        Watchdog.acted();
         device.swipe(x1, y1, x2, y2, durationMs);
         // Emulator pixels are already what the pilot streams for this route (origin (0,0)), so the same
         // coordinates ADB was handed are the ones an overlay draws — no mapping, as with click().
@@ -125,6 +129,7 @@ public final class Emulator implements CaptureSource {
     /** Presses the Back button. */
     public void back() {
         Debug.log("back");
+        Watchdog.acted();
         device.key(KEYCODE_BACK);
     }
 
@@ -137,12 +142,14 @@ public final class Emulator implements CaptureSource {
     /** Types {@code text} into the focused field. */
     public void text(String text) {
         Debug.log("text \"" + text + "\"");
+        Watchdog.acted();
         device.text(text);
     }
 
     /** Sends an Android key event by keycode. */
     public void key(int keyCode) {
         Debug.log("key " + keyCode);
+        Watchdog.acted();
         device.key(keyCode);
     }
 

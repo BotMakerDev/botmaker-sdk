@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -41,6 +42,7 @@ class MapWalkTest {
     private static class Game implements MapWalk.Moves {
         Function<ScreenGraph.Edge, Took> arrival = e -> new Took(Arrival.AT_TARGET, e.to());
         Predicate<String> at = s -> true;
+        Optional<String> where = Optional.empty();
         final List<ScreenGraph.Edge> taken = new ArrayList<>();
         int restarts;
         long nowMs;
@@ -54,6 +56,11 @@ class MapWalkTest {
         public Took take(ScreenGraph.Edge edge) {
             taken.add(edge);
             return arrival.apply(edge);
+        }
+
+        @Override
+        public Optional<String> where() {
+            return where;
         }
 
         @Override
@@ -99,16 +106,47 @@ class MapWalkTest {
 
         Summary summary = walk(map(), game);
 
-        assertEquals(List.of(new Finding(Finding.Kind.EDGE_MISSED, "A", "B", "arrived at D"),
-                new Finding(Finding.Kind.UNREACHED, "A", "B", "behind A")), summary.findings(),
-                "C, only behind B, is no finding");
-        assertTrue(summary.notTried() > 0, "B's and C's edges were never tried");
+        assertEquals(List.of(new Finding(Finding.Kind.EDGE_MISSED, "A", "B", "arrived at D")), summary.findings(),
+                "B, walked to by the map once A and D are done, is reached");
+        assertEquals(0, summary.notTried(), "B's and C's edges were tried from B");
+    }
+
+    @Test
+    void aFrozenGameIsSaidAsTheStartsReason() {
+        // Sword x Staff, 2026-11-03: Waydroid froze; the walk said only that it could not get to the start.
+        Game game = new Game() {
+            @Override
+            public String lost() {
+                return "the game looks frozen";
+            }
+        };
+        game.at = s -> false;
+
+        Summary summary = walk(map(), game);
+
+        assertEquals(List.of(new Finding(Finding.Kind.UNREACHED, "A", null, "the game looks frozen")),
+                summary.findings());
+    }
+
+    @Test
+    void aStartTheGameSkipsBeginsWhereTheGameIs() {
+        // Sword x Staff, 2026-11-03: Consent once accepted is never shown again; the walk stayed on it.
+        Game game = new Game();
+        game.at = s -> !s.equals("A");
+        game.where = Optional.of("B");
+
+        Summary summary = walk(map(), game);
+
+        assertEquals("B", game.taken.getFirst().from());
+        assertTrue(game.taken.stream().anyMatch(e -> e.from().equals("D")), "D, behind A only, walked to");
+        assertEquals(List.of(new Finding(Finding.Kind.UNREACHED, "A", null, MapWalk.NOT_GOT_TO)), summary.findings());
     }
 
     @Test
     void aScreenOnlyShowingNoPicturesIsPicturesChanged() {
         Game game = new Game();
         game.arrival = e -> when(e, "A", "B", Arrival.UNKNOWN, null);
+        game.at = s -> !s.equals("B") && !s.equals("C");    // C is only behind B, whose pictures do not show
 
         Summary summary = walk(map(), game);
 

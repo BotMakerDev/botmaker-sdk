@@ -18,7 +18,8 @@ import java.util.function.LongSupplier;
 
 /**
  * A walk over a whole screen map, independent of the bot's {@code main}: every screen reached breadth first from
- * the start, every edge taken once, and what did not go as the map says written down as findings.
+ * the start (from where the game is, when it no longer shows the start), then from any screen the map still leads to,
+ * every edge taken once, and what did not go as the map says written down as findings.
  *
  * <p>Pure: the game is behind {@link Moves} and the clock is {@code nowMs}, so tests script both. Never stuck
  * forever: an edge that fails is noted and the walk goes on; a screen it cannot get back to is recovered, then the
@@ -123,6 +124,19 @@ public final class MapWalk {
         /** Presses {@code edge}'s input from its {@code from} (or waits, for one {@link ScreenGraph.Edge#onItsOwn}). */
         Took take(ScreenGraph.Edge edge);
 
+        /**
+         * The screen of the map the game shows now, a loader the map lacks waited out a while; empty when none
+         * shows. Where the walk begins when it cannot get to the start.
+         */
+        default Optional<String> where() {
+            return Optional.empty();
+        }
+
+        /** Why the last {@link #where()} found no screen ("the game looks frozen…"); null when it cannot say. */
+        default String lost() {
+            return null;
+        }
+
         /** Walks to any screen of the map; whether it got there. */
         boolean recover();
 
@@ -189,8 +203,17 @@ public final class MapWalk {
         long began = nowMs.getAsLong();
         long whole = budgets.whole().toMillis();
         long perEdge = budgets.edge().toMillis();
-        Set<String> reached = new LinkedHashSet<>(List.of(start.get()));
+        // A start the game no longer shows (a consent once accepted): the walk begins where the game is.
+        String first = start.get();
+        String lost = null;
+        if (!goTo(moves, start.get())) {
+            Optional<String> at = where(moves);
+            if (at.isPresent()) first = at.get();
+            else lost = moves.lost();
+        }
+        Set<String> reached = new LinkedHashSet<>(List.of(first));
         Deque<String> queue = new ArrayDeque<>(reached);
+        Set<String> jumped = new LinkedHashSet<>();
         Set<ScreenGraph.Edge> tried = new LinkedHashSet<>();
         Map<String, String> unknown = new LinkedHashMap<>();
         List<Finding> findings = new ArrayList<>();
@@ -202,7 +225,26 @@ public final class MapWalk {
         int restarts = 0;
 
         walk:
-        while (!queue.isEmpty()) {
+        while (true) {
+            if (queue.isEmpty()) {
+                // Nothing left behind the screens reached: one not reached yet may be, by the map, from where the
+                // game is now (the screens behind a start the game skips). Each is tried once; never one whose
+                // pictures did not show, nor one whose every way in is closed now.
+                String next = null;
+                for (String screen : graph.screens().keySet()) {
+                    if (nowMs.getAsLong() - began > whole) break walk;
+                    if (reached.contains(screen) || unknown.containsKey(screen) || !jumped.add(screen)
+                            || in.getOrDefault(screen, List.of()).stream().noneMatch(MapWalk::leadsNow)
+                            || graph.screen(screen).map(MapScreen::isPopup).orElse(false)) continue;
+                    if (goTo(moves, screen)) {
+                        next = screen;
+                        break;
+                    }
+                }
+                if (next == null) break;
+                reached.add(next);
+                queue.add(next);
+            }
             String screen = queue.poll();
             for (ScreenGraph.Edge edge : out.getOrDefault(screen, List.of())) {
                 if (nowMs.getAsLong() - began > whole) break walk;
@@ -223,7 +265,8 @@ public final class MapWalk {
                             break walk;
                         }
                         // Its edges are left untried: said, or a start the game never shows ends the walk silently.
-                        note.accept(new Finding(Finding.Kind.UNREACHED, screen, null, NOT_GOT_TO));
+                        note.accept(new Finding(Finding.Kind.UNREACHED, screen, null,
+                                lost != null && screen.equals(start.get()) ? lost : NOT_GOT_TO));
                         continue walk;
                     }
                 }
@@ -295,6 +338,15 @@ public final class MapWalk {
         } catch (RuntimeException e) {
             rethrowStop(e);
             return false;
+        }
+    }
+
+    private static Optional<String> where(Moves moves) {
+        try {
+            return moves.where();
+        } catch (RuntimeException e) {
+            rethrowStop(e);
+            return Optional.empty();
         }
     }
 

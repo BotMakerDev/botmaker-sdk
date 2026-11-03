@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.palette.PaletteDefault;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.capture.WindowBacked;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
@@ -137,6 +138,7 @@ public class Keyboard {
     public static void press(CaptureSource source, Key key) {
         GenericWindow w = WindowBacked.of(source);
         Debug.log("press " + key + (w == null ? " (focused window)" : " -> " + w.getTitle()));
+        Watchdog.acted();
         if (w == null) {
             controller().keyDown(key.nativeCode());
             return;
@@ -209,6 +211,7 @@ public class Keyboard {
         GenericWindow w = WindowBacked.of(source);
         Debug.log("type \"" + text + "\""
                 + (w == null ? " (focused window)" : " -> " + w.getTitle()));
+        Watchdog.acted();
         if (w == null) {
             controller().typeText(text);
             return;

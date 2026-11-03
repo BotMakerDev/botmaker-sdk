@@ -330,6 +330,14 @@ public interface Reach {
         return FrameShift.of(before, after);
     }
 
+    /**
+     * Why the game looks frozen: its picture stayed still for a while although input was sent to it. Empty while it
+     * answers, or when this reach cannot tell (by default).
+     */
+    default Optional<String> frozen() {
+        return Optional.empty();
+    }
+
     /** Milliseconds on a clock that only goes forward. */
     long nowMs();
 

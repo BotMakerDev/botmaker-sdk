@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.observe.Surface;
 import com.botmaker.sdk.internal.observe.SwipeEvent;
@@ -102,6 +103,7 @@ public class Mouse {
 
     /** Hold a mouse button down at the current cursor position. */
     public static void down(MouseButton button) {
+        Watchdog.acted();
         controller().mouseButton(button.code(), true);
     }
 
@@ -265,16 +267,17 @@ public class Mouse {
     @Hidden("a signed notches is the ambiguity scrollUp/scrollDown remove; this method's own javadoc "
             + "already prefers them, and the menu offering all three as equals contradicted it")
     public static void scroll(int notches) {
+        Watchdog.acted();
         controller().scroll(notches);
     }
 
     /** Scroll up / away from you by {@code notches} (always a positive amount). */
     public static void scrollUp(int notches) {
-        controller().scroll(Math.abs(notches));
+        scroll(Math.abs(notches));
     }
 
     /** Scroll down / toward you by {@code notches} (always a positive amount). */
     public static void scrollDown(int notches) {
-        controller().scroll(-Math.abs(notches));
+        scroll(-Math.abs(notches));
     }
 }

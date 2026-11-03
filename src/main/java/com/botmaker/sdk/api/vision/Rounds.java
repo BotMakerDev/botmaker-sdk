@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.internal.bot.Stillness;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -31,12 +32,6 @@ import java.util.function.LongSupplier;
  */
 final class Rounds {
 
-    /** The frame a round compares is shrunk to grey this size. */
-    static final int THUMB_W = 64;
-    static final int THUMB_H = 36;
-    /** A mean grey difference per thumbnail pixel above this, out of 255, is a screen that moved. */
-    static final double MOVED = 2.0;
-
     /** The time a still screen is measured in; a test replaces it. */
     static LongSupplier clock = System::currentTimeMillis;
 
@@ -55,9 +50,8 @@ final class Rounds {
     private final int max;
     private final int frozenAfter;
     private int done;
-    /** The last round's frame, shrunk; and when the frame was last seen to move. */
-    private int[] thumb;
-    private long stillSince;
+    /** This loop's own frames and acts: how long its screen stayed still while it acted. */
+    private final Stillness still = new Stillness();
 
     private Rounds(Ref loop, Object... args) {
         this.loop = loop;
@@ -110,13 +104,14 @@ final class Rounds {
         if (Thread.currentThread().isInterrupted()) return false;
         if (seen != null) {
             long now = clock.getAsLong();
-            int[] shrunk = thumb(seen);
-            if (thumb == null || moved(thumb, shrunk)) {
-                thumb = shrunk;
-                stillSince = now;
-            } else if (now - stillSince >= frozenAfter) {
+            // The round about to act counts as acting on this frame: a loop that has acted every round since the
+            // screen last moved is frozen before its next act.
+            still.saw(seen, now);
+            still.acted(now);
+            long stillMs = still.stillAfterInput();
+            if (stillMs >= frozenAfter) {
                 throw new BotStuckException("The game looks frozen: " + named() + " acted on the same screen for "
-                        + (now - stillSince) / 1000 + " s (BotSettings.frozenAfter)");
+                        + stillMs / 1000 + " s (BotSettings.frozenAfter)");
             }
         }
         if (++done > max) {
@@ -124,26 +119,6 @@ final class Rounds {
                     + "change what it looks for (BotSettings.maxRounds)");
         }
         return true;
-    }
-
-    static int[] thumb(BufferedImage frame) {
-        int[] grey = new int[THUMB_W * THUMB_H];
-        int w = frame.getWidth();
-        int h = frame.getHeight();
-        for (int ty = 0; ty < THUMB_H; ty++) {
-            for (int tx = 0; tx < THUMB_W; tx++) {
-                int rgb = frame.getRGB(Math.min(w - 1, (tx * w + w / 2) / THUMB_W),
-                        Math.min(h - 1, (ty * h + h / 2) / THUMB_H));
-                grey[ty * THUMB_W + tx] = (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
-            }
-        }
-        return grey;
-    }
-
-    static boolean moved(int[] before, int[] after) {
-        long sum = 0;
-        for (int i = 0; i < before.length; i++) sum += Math.abs(before[i] - after[i]);
-        return sum / (double) before.length > MOVED;
     }
 
     /** Waits until {@code seen} is true, looking every {@link #POLL_MS}, at most {@code patienceMs}. */

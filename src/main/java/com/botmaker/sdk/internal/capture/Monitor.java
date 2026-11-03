@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.shared.capture.ScreenCapture;
 
 import java.awt.Rectangle;
@@ -36,7 +37,7 @@ public final class Monitor implements CaptureSource {
 
     @Override
     public BufferedImage capture() {
-        return ScreenCapture.captureMonitor(index);
+        return Watchdog.saw(ScreenCapture.captureMonitor(index));
     }
 
     @Override
