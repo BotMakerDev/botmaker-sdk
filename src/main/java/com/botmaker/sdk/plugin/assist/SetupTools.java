@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -41,6 +42,8 @@ import java.awt.Rectangle;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -173,8 +176,7 @@ final class SetupTools {
     }
 
     @Describe("make a target first in Sdk.launchTargets")
-    record SetLaunchTarget(@Describe("as list_games names it (steam:620, emu-app:<package>@<emulator>); cli: and exe: "
-            + "are the user's")
+    record SetLaunchTarget(@Describe("as list_games names it (steam:620); cli: and exe: are the user's")
                            String target) implements Step {
     }
 
@@ -194,6 +196,14 @@ final class SetupTools {
     @Describe("set Sdk.screen(), the size pictures are cut at")
     record SetScreenSize(@Describe("px") int width, @Describe("px; above width for portrait") int height)
             implements Step {
+    }
+
+    @Describe("the values a run keeps and their age")
+    record GameFacts() implements Step {
+    }
+
+    @Describe("set a kept value back to its start")
+    record Forget(@Describe("Progress::gold") String fact) implements Step {
     }
 
     @Describe("the target emulator's checks: ok, and whether fix repairs it")
@@ -248,7 +258,32 @@ final class SetupTools {
             case UpdateGame update -> install(null, true, context);
             case EmulatorChecks checks -> ChecksTools.checks(context);
             case Fix fix -> ChecksTools.fix(fix.check(), Boolean.TRUE.equals(fix.undo()), context);
+            case GameFacts ignored -> FxCall.call(() -> gameFacts(context.services().pluginValues().runParameters()));
+            case Forget forget -> FxCall.call(() -> forget(forget.fact(), context));
         };
+    }
+
+    /** Each value a run keeps, and how long ago a run wrote it. */
+    private static AgentReply gameFacts(List<RunParameter> facts) {
+        if (facts.isEmpty()) return AgentReply.text("No facts yet: edit_map add_fact adds one.");
+        Instant now = Instant.now();
+        StringBuilder out = new StringBuilder();
+        for (RunParameter fact : facts) {
+            out.append(fact.group()).append("::").append(fact.name()).append(' ').append(fact.type()).append(" = ")
+                    .append(fact.value()).append(", ").append(fact.keptAt()
+                            .map(at -> "written " + Duration.between(at, now).toMinutes() + " min ago")
+                            .orElse("no run wrote it")).append('\n');
+        }
+        return AgentReply.text(out.toString().strip());
+    }
+
+    /** {@code fact}, {@code Progress::gold}, set back to its starting value. */
+    private static AgentReply forget(String fact, AgentContext context) {
+        String[] named = fact == null ? new String[0] : fact.strip().split("::", -1);
+        if (named.length != 2) return AgentReply.refused("A fact is named Progress::gold, as game_facts lists it.");
+        Optional<String> refused = context.services().pluginValues().forgetRunParameter(named[0], named[1]);
+        return refused.map(AgentReply::refused).orElseGet(() -> AgentReply.text(
+                fact.strip() + " is back to its starting value; a run reads it again."));
     }
 
     /** The install or update setup started last, until the next one; null before any. */

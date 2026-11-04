@@ -36,6 +36,7 @@ class HandParityTest {
 
     private static final Map<String, Hand> HANDS = Map.ofEntries(
             // edit_map's actions
+            entry("AddFact", Hand.now("the method written by hand in its group's file; 🗺 has no form for one yet")),
             entry("Rename", Hand.now("⋯ Screen ▸ Rename…")),
             entry("Delete", Hand.now("⋯ Screen ▸ Delete…")),
             entry("SetKind", Hand.now("⋯ Screen ▸ Popup, Start screen, A panel of <screen>; a new start screen: New "

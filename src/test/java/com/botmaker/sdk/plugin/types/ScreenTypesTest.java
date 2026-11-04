@@ -382,6 +382,18 @@ class ScreenTypesTest {
         assertEquals(List.of(false, true), roundTrip(ScreenTypes.BUTTON_SHAPE, shop).looks().stream()
                 .map(look -> look.state().blocks()).toList());
         assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE, shop).when()));
+        String test = "Params.when(Progress::gold).atLeast(5)";
+        assertEquals(test, ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE,
+                Button.of(picture("shop")).when(ScreenTypes.condition(test))).when()), "a test reads back as it is written");
+        assertEquals("com.botmaker.sdk.api.params." + test, ScreenTypes.sourceOf(ScreenTypes.typedCondition(test)),
+                "typed, its Params is named in full for the host to import");
+        assertTrue(ScreenTypes.isCondition("Params.when(Progress::rank).is(Progress.Rank.HIGH)"));
+        assertTrue(ScreenTypes.isCondition("Params.when(Progress::name).is(\"a\")"));
+        assertFalse(ScreenTypes.isCondition("Params.when(Progress::gold).atLeast(System.exit(0))"));
+        assertFalse(ScreenTypes.isCondition("Params.when(Progress::name).is(\"a\" + b)"));
+        assertEquals(new ScreenTypes.ParamTest("Progress", "open", "boolean"),
+                ScreenTypes.paramTest("Params.when(Progress::open).isTrue()").orElseThrow());
+        assertEquals("", ScreenTypes.paramTest("Params.when(Progress::rank).is(Rank.TOP1)").orElseThrow().type());
         Button quality = Button.of(picture("quality_low")).keeps(picture("quality_high"));
         assertEquals(quality, roundTrip(ScreenTypes.BUTTON_SHAPE, quality), "a setting kept goes back with its look");
         Button speed = Button.cycling(List.of(picture("x1"), picture("x10"))).keeps(picture("x10"));

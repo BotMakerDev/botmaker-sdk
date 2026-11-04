@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Claude keeps facts about the game** (2026-11-04): `edit_map` `add_fact` adds a value a run keeps to a `@GameState`
+  group, read off a screen's readout (`holds` text, number, shown) or set by a step (`flag`). An input's, a way's or a
+  look's `when` takes `Params.when(Progress::gold).atLeast(5)` as well as a method, checked against the fact's type.
+  `setup` `game_facts` lists during-a-run values with their age, and `forget` removes one. Tool descriptions were
+  shortened to stay within the budget.
 - **A run's text is never written as Java** (2026-11-04): `Params.set` writes a value as data at any depth, so text read
   off a game cannot become code, even inside a list; such a value stays in memory for the run and the file is left alone.
 - **`Params.set` refuses a value of another type** (2026-11-04): generics let `T` widen to `Object`, so a `String` could

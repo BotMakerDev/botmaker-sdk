@@ -76,7 +76,7 @@ final class FlowTools {
                        @Describe(value = "", optional = true) String flow) implements Change {
     }
 
-    @Describe("rename an activity everywhere: its card in every flow, its arrows and its constant")
+    @Describe("rename an activity: its cards, arrows and constant")
     record RenameActivity(@Describe("rename_*: the current name; connect, disconnect: the activity the arrow leaves")
                           String from,
                           @Describe("rename_*: the new name; connect: the card the arrow goes to") String to,
@@ -87,13 +87,13 @@ final class FlowTools {
     record RemoveActivity(String name, @Describe(value = "", optional = true) String flow) implements Change {
     }
 
-    @Describe("draw an arrow from an outcome of from to the card that runs next, replacing the one that outcome had")
+    @Describe("arrow an outcome of from to the card run next, replacing its old one")
     record Connect(String from, @Describe(value = ON, optional = true) String outcome, String to,
                    @Describe(value = FROM_FLOW, optional = true) String fromFlow,
                    @Describe(value = "", optional = true) String flow) implements Change {
     }
 
-    @Describe("remove the arrow an outcome of from leaves on; a run reporting it then stops there")
+    @Describe("remove an outcome's arrow; a run reporting it stops there")
     record Disconnect(String from, @Describe(value = "", optional = true) String outcome,
                       @Describe(value = "", optional = true) String fromFlow,
                       @Describe(value = "", optional = true) String flow) implements Change {
@@ -151,9 +151,8 @@ final class FlowTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_flow")
-                    .describedAs("The bot's flows by name, then one flow: each activity with its body, switches and "
-                            + "outcomes, each sub-flow card with its exits, every arrow, where a run starts, its "
-                            + "limits, and the bot's home and setup")
+                    .describedAs("The bot's flows, then one: each activity with its body, switches and outcomes, "
+                            + "sub-flow cards with their exits, arrows, start, limits, and the bot's home and setup")
                     .takes(Which.class).handledBy(FlowTools::readFlow),
             ToolTiming.actions("edit_flow", "Changes the bot's flows as the 🔀 Activity Flow window does",
                     Change.class, FlowTools::edit));

@@ -62,15 +62,13 @@ final class NotesTools {
                             + "how far it got and what it owes. Read them before exploring")
                     .takes(Section.class).handledBy(NotesTools::readNotes),
             AssistantTool.named("write_notes")
-                    .describedAs("Keep what you learnt: a screen's notes (spends, earns, refills, work "
-                            + "badge, unlock), how far it got (reached) and what it owes; with no screen, what "
-                            + "holds across the game. Short lines. Replaces the notes whole: "
-                            + "read_notes first")
+                    .describedAs("Keep what you learnt: a screen's notes (spends, earns, refills, work badge, "
+                            + "unlock), how far it got (reached) and what it owes; no screen: the whole game. Short "
+                            + "lines, replacing the notes whole: read_notes first")
                     .takes(Note.class).handledBy(NotesTools::writeNotes),
             AssistantTool.named("read_guide")
-                    .describedAs("The steps of the bot's current stage, from its home method and Screens, with where "
-                            + "each screen stands; or one stage's by number or name. Read it before starting and "
-                            + "whenever a stage's check passes")
+                    .describedAs("The steps of the bot's current stage, with where each screen stands; or one "
+                            + "stage's by number or name")
                     .takes(Which.class).handledBy(NotesTools::readGuide));
 
     private NotesTools() {}

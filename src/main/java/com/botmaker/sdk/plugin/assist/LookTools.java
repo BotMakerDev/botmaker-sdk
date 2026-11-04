@@ -134,9 +134,9 @@ final class LookTools {
                     .describedAs("Where a picture is on the screen now and how sure the match is")
                     .takes(PictureName.class).handledBy(LookTools::findPicture),
             AssistantTool.named("which_screen")
-                    .describedAs("Which screen of the bot's Screens the game shows, by their markers, then every "
-                            + "picture scored near where it was cut on that frame, best first, the ones a run would "
-                            + "find ticked; everywhere true scores each all over the frame")
+                    .describedAs("Which of the bot's Screens the game shows, by markers, then every picture scored "
+                            + "near where it was cut, best first, ticked when a run would find it; everywhere true "
+                            + "scores each all over the frame")
                     .takes(Shown.class).handledBy(LookTools::whichScreen),
             AssistantTool.named("wait_for_picture")
                     .describedAs("Waits until a picture is on the screen, as ImageFinder.waitFor would, and says "

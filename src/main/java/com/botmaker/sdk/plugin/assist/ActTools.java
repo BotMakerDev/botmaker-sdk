@@ -112,11 +112,10 @@ final class ActTools {
                             + "what changed: the pictures on screen after, the text that appeared and went")
                     .takes(Click.class).handledBy(ActTools::click),
             AssistantTool.named("key")
-                    .describedAs("Taps a key on the game, waits for it to answer, and says what changed, as click")
+                    .describedAs("Taps a key on the game, as click")
                     .takes(Press.class).handledBy(ActTools::key),
             AssistantTool.named("scroll")
-                    .describedAs("Scrolls the wheel over a point or a picture of the game, waits, and says what "
-                            + "changed, as click")
+                    .describedAs("Scrolls the wheel over a point or a picture, as click")
                     .takes(Wheel.class).handledBy(ActTools::scroll));
 
     /** The motion last read before an input of try_input's, on {@code screen} at {@code atMs}. */

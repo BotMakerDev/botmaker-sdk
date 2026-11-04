@@ -64,11 +64,10 @@ public final class MapReport {
 
     public static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("read_map")
-                    .describedAs("The bot's Screens in text: each under the one it opens from, how far Discovery got, "
-                            + "its marker, way back and shot, what each input does; then what the map cannot do: a "
-                            + "screen no way reaches, an input that comes and goes never seen, a picture inline or "
-                            + "with no file, a shot without its marker, a picture off its place or its screen's "
-                            + "shot. show adds the drawing")
+                    .describedAs("The bot's Screens in text: each under the one it opens from, its stage, marker, way "
+                            + "back and shot, what each input does; then what the map cannot do (a screen no way "
+                            + "reaches, an input never seen, a picture with no file or off its place or shot). show "
+                            + "adds the drawing")
                     .takes(Ask.class).handledBy(MapReport::read));
 
     private MapReport() {}

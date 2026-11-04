@@ -12,7 +12,14 @@ import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.plugin.api.source.ParameterWrite;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.RunParameter;
+import com.botmaker.sdk.api.params.Assumed;
+import com.botmaker.sdk.api.params.GameState;
+import com.botmaker.sdk.api.params.ReadOn;
+import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
@@ -72,6 +79,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -1946,6 +1954,59 @@ class SdkAssistTest {
     }
 
     /** edit_map group: a strip named by the screen's buttons in it, scrolled over a member that shows. */
+    /** A fact is a method of a @GameState group: added by the host, tested in a when, listed with its age, forgotten. */
+    @Test
+    void aFactIsAddedTestedListedAndForgotten() {
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tab")))
+                .withReadout("gold", Readout.digits(new Zone(0, 0, 10, 10), new DigitSet("digits/gold"))));
+
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
+                "Params.when(Progress::gold).atLeast(5)").isRefused(), "no such fact yet");
+        assertTrue(run("edit_map", "screen", "Home", "action", "add_fact", "name", "gold", "holds", "number",
+                "field", "nothing").isRefused(), "no such readout");
+        assertTrue(run("edit_map", "screen", "Nowhere", "action", "add_fact", "name", "gold", "holds", "number",
+                "field", "gold").isRefused(), "no such screen");
+        assertTrue(run("edit_map", "action", "add_fact", "screen", "Home", "name", "rested", "holds", "flag").isRefused(),
+                "a step sets a flag: it shows nowhere");
+
+        AgentReply added = run("edit_map", "screen", "Home", "action", "add_fact", "name", "gold", "holds", "number",
+                "field", "gold", "minutes", 30);
+        assertFalse(added.isRefused(), text(added));
+        assertTrue(text(added).contains("Params.when(Progress::gold).atLeast(5)"), text(added));
+        ParameterWrite gold = host.parameters.getFirst();
+        assertEquals("Progress", gold.group());
+        assertEquals(0, gold.start());
+        assertEquals(GameState.class.getName(), gold.groupMarks().getFirst().annotation());
+        ParameterWrite.Mark read = gold.marks().getFirst();
+        assertEquals(ReadOn.class.getName(), read.annotation());
+        assertEquals("gold", read.members().get("field"));
+        assertEquals(new ParameterWrite.ClassOf(SdkValues.SCREEN_MAP, PluginValues.Member.of("HOME")),
+                read.members().get("screen"));
+        assertEquals(30, gold.marks().get(1).members().get("minutes"));
+
+        assertFalse(run("edit_map", "action", "add_fact", "name", "rested", "holds", "flag").isRefused(), "no screen");
+        assertEquals(Assumed.class.getName(), host.parameters.getLast().marks().getFirst().annotation());
+
+        AgentReply tested = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
+                "Params.when(Progress::gold).atLeast(5)");
+        assertFalse(tested.isRefused(), text(tested));
+        assertEquals("com.botmaker.sdk.api.params.Params.when(Progress::gold).atLeast(5)",
+                ScreenTypes.sourceOf(input("HOME", "tab").when()));
+        AgentReply wrongType = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
+                "Params.when(Progress::gold).isTrue()");
+        assertTrue(wrongType.isRefused() && text(wrongType).contains("is a int"), text(wrongType));
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
+                "Params.when(Progress::gold).is(Rank.TOP)").isRefused(), "a constant on a number does not compile");
+
+        String facts = text(run("setup", "action", "game_facts"));
+        assertTrue(facts.contains("Progress::gold int = 0, written 12 min ago"), facts);
+        assertTrue(facts.contains("Progress::rested boolean = false, no run wrote it"), facts);
+
+        assertTrue(run("setup", "action", "forget", "fact", "gold").isRefused(), "a fact is named as it is listed");
+        assertFalse(run("setup", "action", "forget", "fact", "Progress::gold").isRefused());
+        assertEquals(List.of("Progress::gold"), host.forgotten);
+    }
+
     @Test
     void editMapMakesAStripOfTheScreensButtons() throws IOException {
         for (String name : List.of("tavern", "campaign", "mail")) TemplateLibrary.saveTemplate(resources, patch(), name);
@@ -2041,6 +2102,8 @@ class SdkAssistTest {
         host.set("screen_map").put(constant, TestContexts.row(Object.class, "").withValue(screen.setup()));
         screen.inputs().forEach((field, input) -> host.set("screen_map").put(constant + "." + field,
                 TestContexts.row(Object.class, "").withValue(input)));
+        screen.readouts().forEach((field, readout) -> host.set("screen_map").put(constant + "." + field,
+                TestContexts.row(Object.class, "").withValue(readout)));
     }
 
     @Test
@@ -2226,6 +2289,34 @@ class SdkAssistTest {
         @Override public Theme theme() { return null; }
         @Override public Dialogs dialogs() { return null; }
         @Override public PluginValues pluginValues() { return this; }
+
+        final List<ParameterWrite> parameters = new ArrayList<>();
+        final List<String> forgotten = new ArrayList<>();
+
+        @Override
+        public Optional<String> addRunParameter(ParameterWrite write) {
+            parameters.add(write);
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> forgetRunParameter(String group, String name) {
+            forgotten.add(group + "::" + name);
+            return Optional.empty();
+        }
+
+        /** The first was written 12 minutes ago, the others by no run yet. */
+        @Override
+        public List<RunParameter> runParameters() {
+            List<RunParameter> out = new ArrayList<>();
+            for (ParameterWrite write : parameters) {
+                String type = write.start() instanceof Integer ? "int" : "boolean";
+                Optional<Instant> kept = out.isEmpty() ? Optional.of(Instant.now().minus(Duration.ofMinutes(12)))
+                        : Optional.empty();
+                out.add(new RunParameter(write.group(), write.name(), type, String.valueOf(write.start()), kept));
+            }
+            return out;
+        }
 
         /** Each outermost batch's label, as Studio's undo would name the step. */
         final List<String> steps = new ArrayList<>();

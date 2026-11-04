@@ -44,7 +44,6 @@ import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.assist.MapTools.Mark;
 import com.botmaker.sdk.plugin.assist.BoardCuts.Watch;
 import com.botmaker.sdk.plugin.screen.CutShape;
-import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -268,7 +267,7 @@ final class PictureTools {
                   String pointUsesAt) implements Edit {
     }
 
-    @Describe("give a picture a new image cut from the last screenshot, keeping its name and every use")
+    @Describe("recut a picture from the last screenshot, keeping its name and uses")
     record Replace(String picture,
                    @Describe(value = "left edge, in the last screenshot's pixels", optional = true)
                    Integer x,
@@ -662,9 +661,8 @@ final class PictureTools {
         String variantOf = blankless(crop.variantOf());
         String when = blankless(crop.when());
         String screenLook = blankless(crop.screenLook());
-        if (!ScreenTypes.isMethod(when)) {
-            return AgentReply.refused("when is a method reference, Firestone::eventOn. Nothing was saved.");
-        }
+        Optional<String> notWhen = ScreenEdits.notCondition(context.services(), when);
+        if (notWhen.isPresent()) return AgentReply.refused("when: " + notWhen.get() + " Nothing was saved.");
         if (screenLook != null && (back || popup || variantOf != null || !MapTools.isName(screenLook))) {
             return AgentReply.refused("A screen's look is named in plain words, on one line, and holds a marker or "
                     + "inputs only. Nothing was saved.");

@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Answer;
@@ -45,7 +46,9 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -372,12 +375,50 @@ public final class ScreenTypes implements TypeHolder {
 
     private static final Pattern METHOD = Pattern.compile("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*::[A-Za-z_$][\\w$]*");
 
+    /** {@code Params.when(Progress::gold).atLeast(5)}: one group, one parameter, one literal test. */
+    private static final Pattern PARAM_TEST = Pattern.compile("Params\\.when\\(([A-Za-z_$][\\w$]*)::([A-Za-z_$][\\w$]*)\\)"
+            + "\\.(?:(atLeast|atMost)\\((-?\\d+)\\)|(isTrue)\\(\\)|is\\((-?\\d+|true|false|\"[^\"\\\\\\n]*\""
+            + "|[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*)\\))");
+
     /**
-     * Whether {@code source} is a method reference, {@code Firestone::eventOn}, or blank: what an edit may write as a
-     * condition. The source goes into the bot's Java as written, so anything else is refused before it is.
+     * What a typed condition tests of a during-a-run parameter.
+     *
+     * @param type the parameter's type the test needs, {@code int}, {@code boolean} or {@code String}; blank: a
+     *             constant, of a type of the bot's
      */
-    public static boolean isMethod(String source) {
-        return source == null || source.isBlank() || METHOD.matcher(source.strip()).matches();
+    public record ParamTest(String group, String name, String type) {}
+
+    /** What {@code source} tests when it is {@code Params.when(Progress::gold).atLeast(5)}; else empty. */
+    public static Optional<ParamTest> paramTest(String source) {
+        if (source == null) return Optional.empty();
+        Matcher test = PARAM_TEST.matcher(source.strip());
+        if (!test.matches()) return Optional.empty();
+        String type = "";
+        String literal = test.group(6);
+        if (test.group(3) != null) type = "int";
+        else if (test.group(5) != null) type = "boolean";
+        else if (literal.startsWith("\"")) type = "String";
+        else if (literal.equals("true") || literal.equals("false")) type = "boolean";
+        else if (literal.matches("-?\\d+")) type = "int";
+        return Optional.of(new ParamTest(test.group(1), test.group(2), type));
+    }
+
+    /**
+     * Whether {@code source} is a method reference, {@code Firestone::eventOn}, a test of a parameter,
+     * {@code Params.when(Progress::gold).atLeast(5)}, or blank: what an edit may write as a condition. The source goes
+     * into the bot's Java as written, so anything else is refused before it is.
+     */
+    public static boolean isCondition(String source) {
+        return source == null || source.isBlank() || METHOD.matcher(source.strip()).matches()
+                || paramTest(source).isPresent();
+    }
+
+    /**
+     * The condition a person or Claude typed, to write: as {@link #condition}, with {@code Params} named in full so
+     * the host imports it. What a file already says is read by {@link #condition}, as it says it.
+     */
+    public static BooleanSupplier typedCondition(String source) {
+        return condition(paramTest(source).isPresent() ? Params.class.getName() + source.strip().substring(6) : source);
     }
 
     /** How {@code condition} is written, or {@code ""} for none or a live one. */

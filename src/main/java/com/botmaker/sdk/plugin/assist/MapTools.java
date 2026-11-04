@@ -170,20 +170,19 @@ final class MapTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("not_a_screen")
-                    .describedAs("Takes back a screen try_input added when the input only redrew the screen it was "
-                            + "on (a stage changed): the screen leaves the map and each way into it is recorded as "
-                            + "changing that one in place. Refused once anything is reached from it")
+                    .describedAs("Takes back a screen try_input added when the input only redrew its screen (a stage "
+                            + "changed): it leaves the map and each way into it becomes a change in place. Refused "
+                            + "once anything is reached from it")
                     .takes(Mistake.class).handledBy(MapTools::notAScreen),
             AssistantTool.named("place_pictures")
                     .describedAs("Notes pictures the bot has on a screen as its marker, way back, or untried "
                             + "inputs, without cutting them again; a marker starts the screen as a cut one does")
                     .takes(Places.class).handledBy(MapTools::placePictures),
             AssistantTool.named("try_input")
-                    .describedAs("Discovery's way to act on a screen: does its inputs (click, scroll, "
-                            + "hotkey) and records what each did: opened a new screen (owing its marker), "
-                            + "led to a mapped one, changed this one, or nothing. Breadth first: refused while a "
-                            + "screen owes its marker; with nothing left here, walks to the shallowest screen "
-                            + "with inputs left (stay keeps it)")
+                    .describedAs("Does a screen's inputs (click, scroll, hotkey) and records what each did: opened "
+                            + "a new screen (owing its marker), reached a mapped one, changed this one, or nothing. "
+                            + "Breadth first: refused while a screen owes its marker; done here, walks to the "
+                            + "shallowest screen with inputs left (stay keeps it)")
                     .takes(Try.class).handledBy(MapTools::tryInput),
             AssistantTool.named("go_to_screen")
                     .describedAs("Walks the game to a map screen as a run does: finds where it is by the "
@@ -1154,7 +1153,7 @@ final class MapTools {
 
     /** {@code input} with the method saying when it is there, as {@code look} names it; none keeps what it had. */
     private static Input brought(Input input, Look look) {
-        return look.when() == null ? input : input.when(ScreenTypes.condition(look.when()));
+        return look.when() == null ? input : input.when(ScreenTypes.typedCondition(look.when()));
     }
 
     /** {@code picture}, just cut, noted as another look of the input {@code look} names on the screen {@code at}. */
@@ -1214,7 +1213,7 @@ final class MapTools {
                 String field = buttonOf(screen, cut).orElseGet(() -> screen.fieldFor(cut.id()));
                 Markers set = marker ? marked(Markers.of(was), mark, cut) : Markers.of(was);
                 ScreenVariant told = was.markers(set.shown()).absent(set.absent());
-                ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.condition(look.when()));
+                ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.typedCondition(look.when()));
                 List<Input> named = new ArrayList<>(was.inputs());
                 if (!named.contains(BotConstants.input(at.constant(), field))) {
                     named.add(BotConstants.input(at.constant(), field));

@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -619,8 +620,9 @@ public final class ScreenEdits {
      */
     public static String setWayWhen(StudioServices services, String to, String from, String viaField,
                                     String method) {
-        if (!ScreenTypes.isMethod(method)) return notMethod(method);
-        BooleanSupplier when = ScreenTypes.condition(method);
+        Optional<String> refused = notCondition(services, method);
+        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
+        BooleanSupplier when = ScreenTypes.typedCondition(method);
         ScreenGraph graph = ScreenBook.read(services);
         if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
             return noWay(graph, to, from, viaField);
@@ -1170,8 +1172,9 @@ public final class ScreenEdits {
 
     /** {@code constant}'s look {@code look} shown only while {@code method} answers true; blank: no method says. */
     public static String setLookWhen(StudioServices services, String constant, String look, String method) {
-        if (!ScreenTypes.isMethod(method)) return notMethod(method);
-        BooleanSupplier when = ScreenTypes.condition(method);
+        Optional<String> refused = notCondition(services, method);
+        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
+        BooleanSupplier when = ScreenTypes.typedCondition(method);
         MapScreen screen = ScreenBook.read(services).screens().get(constant);
         Optional<ScreenVariant> had = screen == null || look == null ? Optional.empty() : screen.variants().stream()
                 .filter(v -> v.name().equalsIgnoreCase(look.strip())).findFirst();
@@ -1188,8 +1191,9 @@ public final class ScreenEdits {
 
     /** {@code constant}'s field {@code field} there only while {@code method} answers true; blank: no method says. */
     public static String setInputWhen(StudioServices services, String constant, String field, String method) {
-        if (!ScreenTypes.isMethod(method)) return notMethod(method);
-        BooleanSupplier when = ScreenTypes.condition(method);
+        Optional<String> refused = notCondition(services, method);
+        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
+        BooleanSupplier when = ScreenTypes.typedCondition(method);
         return said(ScreenBook.update(services, constant, s -> s.input(field)
                         .map(input -> s.withInput(field, input.when(when))).orElse(s)),
                 when == null ? "No method says when " + field + " is there."
@@ -1259,8 +1263,29 @@ public final class ScreenEdits {
         return names;
     }
 
-    private static String notMethod(String method) {
-        return NOT_WRITTEN + "\"" + method.strip() + "\" is no method reference (Firestone::eventOn).";
+    /**
+     * Why {@code source} may not be written as a condition: neither a method reference nor a test of a parameter a run
+     * keeps and of the type the test needs. Empty when it may, or is blank.
+     */
+    static Optional<String> notCondition(StudioServices services, String source) {
+        if (!ScreenTypes.isCondition(source)) {
+            return Optional.of("\"" + source.strip() + "\" is no method reference (Firestone::eventOn) or test of a "
+                    + "fact (Params.when(Progress::gold).atLeast(5)).");
+        }
+        Optional<ScreenTypes.ParamTest> test = ScreenTypes.paramTest(source);
+        if (test.isEmpty()) return Optional.empty();
+        String named = test.get().group() + "::" + test.get().name();
+        Optional<RunParameter> parameter = services.pluginValues().runParameters().stream()
+                .filter(p -> p.group().equals(test.get().group()) && p.name().equals(test.get().name())).findFirst();
+        if (parameter.isEmpty()) return Optional.of("No fact " + named + "; add it first (add_fact).");
+        String wanted = test.get().type();
+        String type = parameter.get().type();
+        if (wanted.isEmpty()) {
+            return List.of("int", "boolean", "String").contains(type)
+                    ? Optional.of(named + " is a " + type + "; test it with a literal.") : Optional.empty();
+        }
+        return wanted.equals(type) ? Optional.empty()
+                : Optional.of(named + " is a " + type + "; that test needs a " + wanted + ".");
     }
 
     private static String said(Optional<String> failed, String done) {

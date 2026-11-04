@@ -5,7 +5,13 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.plugin.api.source.ParameterWrite;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.params.Assumed;
+import com.botmaker.sdk.api.params.GameState;
+import com.botmaker.sdk.api.params.ReadOn;
+import com.botmaker.sdk.api.params.StaleAfter;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -22,6 +28,7 @@ import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -47,7 +54,7 @@ final class MapEdits {
     private static final String SCROLL = "with picture: a strip's notches to it";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
-    private static final String METHOD = "a bot method true while it holds (Firestone::eventOn); blank: always";
+    private static final String METHOD = "Firestone::eventOn, or Params.when(Progress::gold).atLeast(5); blank: always";
 
     /**
      * What set_input records an input did, opening nothing: tried, or leaves for a screen reached otherwise; untried
@@ -69,6 +76,21 @@ final class MapEdits {
         Integer scroll();
 
         String key();
+    }
+
+    /** What a fact is and how a run learns it: read off a readout, or set by a step of the bot. */
+    enum FactKind {
+        TEXT, NUMBER, SHOWN, FLAG
+    }
+
+    @Describe("a value a run keeps in params/, read off screen's readout field (flag: a step sets it)")
+    record AddFact(@Describe(value = "", optional = true) String screen,
+                   String name,
+                   FactKind holds,
+                   @Describe(value = "", optional = true) String field,
+                   @Describe(value = "blank: Progress", optional = true) String group,
+                   @Describe(value = "stale after; blank: an hour", optional = true) Integer minutes)
+            implements Edit {
     }
 
     @Describe("rename the screen")
@@ -280,6 +302,7 @@ final class MapEdits {
                 }
                 return FxCall.call(() -> said(Versions.learn(context.services(), learn.fit(), state.orElse(null))));
             }
+            if (edit instanceof AddFact fact) return FxCall.call(() -> addFact(fact, context.services()));
             return FxCall.call(() -> {
                 ScreenGraph before = ScreenBook.read(context.services());
                 AgentReply reply = edited(edit, context);
@@ -292,6 +315,55 @@ final class MapEdits {
             return AgentReply.refused("Studio did not answer while editing the bot's Screens: " + busy.getMessage()
                     + " Read the map (read_map) before trying again.");
         }
+    }
+
+    /** The method of a {@code @GameState} group a run keeps {@code fact} in: the map changes in nothing. */
+    private static AgentReply addFact(AddFact fact, StudioServices services) {
+        String group = has(fact.group()) ? fact.group().strip() : "Progress";
+        String name = has(fact.name()) ? fact.name().strip() : "";
+        if (fact.holds() == null) return AgentReply.refused("A fact holds text, number, shown or flag.");
+        ParameterWrite write = switch (fact.holds()) {
+            case TEXT -> ParameterWrite.of(group, name, "");
+            case NUMBER -> ParameterWrite.of(group, name, 0);
+            case SHOWN, FLAG -> ParameterWrite.of(group, name, false);
+        };
+        write = write.groupMarked(ParameterWrite.Mark.of(GameState.class));
+        String read = "a step sets it";
+        if (fact.holds() == FactKind.FLAG) {
+            if (has(fact.screen()) || has(fact.field()) || fact.minutes() != null) {
+                return AgentReply.refused("A flag is set by a step of the bot: it takes no screen, field or minutes.");
+            }
+            write = write.marked(ParameterWrite.Mark.of(Assumed.class));
+        } else {
+            ScreenGraph graph = ScreenBook.read(services);
+            Optional<String> screen = has(fact.screen()) ? ScreenBook.find(graph, fact.screen()) : Optional.empty();
+            if (screen.isEmpty()) {
+                return AgentReply.refused("A fact read off the game needs a screen of the bot's Screens. Nothing was written.");
+            }
+            MapScreen on = graph.screens().get(screen.get());
+            if (!has(fact.field()) || !on.readouts().containsKey(fact.field().strip())) {
+                return AgentReply.refused(screen.get() + " has no readout " + fact.field() + ": it has "
+                        + on.readouts().keySet() + ". Save one first (save_digits, save_region). Nothing was written.");
+            }
+            String field = fact.field().strip();
+            write = write.marked(ParameterWrite.Mark.of(ReadOn.class)
+                    .withClassOf("screen", SdkValues.SCREEN_MAP, PluginValues.Member.of(screen.get()))
+                    .with("field", field));
+            read = "read off " + screen.get() + "." + field;
+            if (fact.minutes() != null) {
+                if (fact.minutes() <= 0) return AgentReply.refused("minutes is above 0.");
+                write = write.marked(ParameterWrite.Mark.of(StaleAfter.class).with("minutes", fact.minutes()));
+            }
+        }
+        Optional<String> refused = services.pluginValues().addRunParameter(write);
+        if (refused.isPresent()) return AgentReply.refused(refused.get() + " Nothing was written.");
+        String test = switch (fact.holds()) {
+            case TEXT -> ".is(\"…\")";
+            case NUMBER -> ".atLeast(5)";
+            case SHOWN, FLAG -> ".isTrue()";
+        };
+        return AgentReply.text(group + "." + name + " added, " + read + ". Test it in a when: Params.when(" + group + "::"
+                + name + ")" + test + ".");
     }
 
     /** {@code edit} done on the FX thread. */
@@ -309,6 +381,7 @@ final class MapEdits {
         String screen = found.get();
         MapScreen on = graph.screens().get(screen);
         return switch (edit) {
+            case AddFact fact -> addFact(fact, services);
             case Rename rename -> said(ScreenEdits.rename(services, screen, rename.name()));
             case Delete ignored -> said(ScreenEdits.delete(services, screen));
             case SetKind set -> said(kind(services, screen, set.as()));
