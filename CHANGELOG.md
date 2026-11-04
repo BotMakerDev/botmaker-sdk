@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run writes its own parameters** (2026-11-04): `Params.set(Progress::level, 5)` keeps a
+  `@Param.Shown(changes = DURING_RUN)` parameter in `params/` and the run sees it at once through
+  `Params.get(Progress::level)`; `Params.when(Progress::level).atLeast(5)` is a condition for any `.when(…)`. A value
+  that cannot be written stays in memory for the run, with one warning. Every bot now carries `botmaker-plugin-host`
+  and JDT, about 10 MB.
 - **Run parameters live in the SDK's group in `params/`** (2026-11-04): `flow`, `doSetup`, `skip`,
   `launchTarget` and `captureSource` are methods of `params/com_github_botmakerdev/botmaker_sdk/Sdk.java`, this
   computer's, with a committed starting copy under `starting-params/`. `runFlow(Sdk.class)` finds the group from

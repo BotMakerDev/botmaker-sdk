@@ -6,8 +6,9 @@ The **BotMaker SDK** is the runtime library that user bots compile against, **an
 The sibling **botmaker-studio** app (`../botmaker-studio`) loads it as a plugin off an open project's
 classpath and never depends on it. The SDK depends on **botmaker-shared** (`../botmaker-shared`,
 cross-platform native window plumbing), **botmaker-session**, the contract (`botmaker-studio-api`, at
-`compile` so a bot has `@Param` and `@SdkValue`'s `@ManagedMarker`), **botmaker-plugin-basics** and, for its plugin half only,
-**botmaker-plugin-toolkit**.
+`compile` so a bot has `@Param` and `@SdkValue`'s `@ManagedMarker`), **botmaker-plugin-basics**,
+**botmaker-plugin-host** with JDT (2026-11-04: `api.params.Params` writes a during-a-run parameter through the
+value grammar, in the bot's own JVM) and, for its plugin half only, **botmaker-plugin-toolkit**.
 
 This file states what is true now. How it got here — the generated sources, `activities.json`, `Wire`,
 `capture.json`, the seeds, the codecs, and every dated section this file carried until 2026-09-28 — is in
@@ -68,7 +69,7 @@ A bot pins `com.github.BotMakerDev:botmaker-sdk:<version>`, and `~/.m2` is check
 the SDK and what it builds on at their `main` `-SNAPSHOT` from the umbrella root:
 
 ```bash
-mvn -pl botmaker-sdk -am install     # shared, session, contract, toolkit, basics, then the SDK
+mvn -pl botmaker-sdk -am install     # shared, session, contract, toolkit, host, basics, then the SDK
 ```
 
 Re-run it after each SDK edit; a bot pinned to the SDK pom's `-SNAPSHOT` resolves the fresh jar on its next

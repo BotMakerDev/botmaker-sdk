@@ -50,6 +50,10 @@
              flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
              resolvable version, and cutting plugin-basics therefore forces an SDK release. -->
         <botmaker.pluginbasics.version>0.8.2-SNAPSHOT</botmaker.pluginbasics.version>
+        <!-- botmaker-plugin-host version: the value grammar a running bot writes its during-a-run parameters with
+             (Params.set, 2026-11-04). Same contract and flatten reason as the ones above; plugin-host's JDT is
+             `optional`, so it is declared below at plugin-host's version. -->
+        <botmaker.pluginhost.version>0.10.2-SNAPSHOT</botmaker.pluginhost.version>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
         <javafx.version>27</javafx.version>
@@ -106,6 +110,19 @@
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-session</artifactId>
             <version>${botmaker.session.version}</version>
+        </dependency>
+
+        <!-- The value grammar and JDT, in every bot (the user's call, 2026-11-04, about 10 MB): any run keeps what
+             it learned, in Studio, `botmaker plugin run` or plain `java`. -->
+        <dependency>
+            <groupId>com.github.BotMakerDev</groupId>
+            <artifactId>botmaker-plugin-host</artifactId>
+            <version>${botmaker.pluginhost.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jdt</groupId>
+            <artifactId>org.eclipse.jdt.core</artifactId>
+            <version>3.47.0</version>
         </dependency>
 
         <!-- The Studio plugin contract, at `compile`: a bot's own code carries @Param and @Managed, so it

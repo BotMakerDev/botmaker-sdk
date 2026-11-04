@@ -10,14 +10,14 @@ name: CI
 # `jitpack` runs only on a version tag. It was a separate file (publish.yml) purely because its trigger
 # differs, which a job-level `if:` expresses just as well.
 #
-# All FIVE upstreams — botmaker-studio-api, botmaker-plugin-toolkit, botmaker-plugin-basics,
-# botmaker-shared, botmaker-session — are resolved from source, not from JitPack. This repo's pom pins every one at its main -SNAPSHOT — the
+# All SIX upstreams — botmaker-studio-api, botmaker-plugin-toolkit, botmaker-plugin-basics,
+# botmaker-plugin-host, botmaker-shared, botmaker-session — are resolved from source, not from JitPack. This repo's pom pins every one at its main -SNAPSHOT — the
 # version the umbrella reactor and a local `mvn install` produce — so there is no published artifact under
 # those coordinates to download. Building their main branches here means CI compiles the same pairing a
 # maintainer builds locally.
 #
 # THE LIST BELOW MUST MATCH THE POM'S ${botmaker.*.version} PROPERTIES, and nothing about a local build
-# can tell you when it stops matching: in the umbrella reactor each of the five is a sibling module and
+# can tell you when it stops matching: in the umbrella reactor each of the six is a sibling module and
 # resolves for free. That is exactly how the toolkit went missing here for five days. The umbrella's
 # release checks the two against each other (CiDepsGate) before it pushes a tag.
 
@@ -74,6 +74,12 @@ jobs:
           repository: BotMakerDev/botmaker-plugin-basics
           path: .deps/botmaker-plugin-basics
 
+      - name: Check out botmaker-plugin-host
+        uses: actions/checkout@v7
+        with:
+          repository: BotMakerDev/botmaker-plugin-host
+          path: .deps/botmaker-plugin-host
+
       - name: Check out botmaker-runlog
         uses: actions/checkout@v7
         with:
@@ -101,13 +107,14 @@ jobs:
       # RETRIED — Maven Central answers 429 Too Many Requests to GitHub-hosted runners often enough to have
       # failed a release (botmaker-studio, 2026-09-02, on the very first plugin descriptor of the first
       # upstream). See .github/mvn-retry.sh for why the retry cannot be a Maven flag.
-      - name: Install the five upstreams (their main -SNAPSHOT)
+      - name: Install the six upstreams (their main -SNAPSHOT)
         run: |
           source .github/mvn-retry.sh
           mvn_retry mvn -B -f .deps/botmaker-studio-api/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-toolkit/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-plugin-parent/pom.xml install
           mvn_retry mvn -B -f .deps/botmaker-plugin-basics/pom.xml install -DskipTests
+          mvn_retry mvn -B -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-runlog/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-shared/pom.xml install -DskipTests
           mvn_retry mvn -B -f .deps/botmaker-session/pom.xml install -DskipTests
@@ -158,12 +165,6 @@ jobs:
           repository: BotMakerDev/botmaker-cli
           path: .deps/botmaker-cli
 
-      - name: Check out botmaker-plugin-host (botmaker-cli's own upstream)
-        uses: actions/checkout@v7
-        with:
-          repository: BotMakerDev/botmaker-plugin-host
-          path: .deps/botmaker-plugin-host
-
       # The cli bundles the archetype's `template` zip (`plugin new`), resolved at its main -SNAPSHOT, which
       # nothing publishes: red on main until 2026-10-23 with "Could not find artifact
       # …botmaker-plugin-archetype:zip:template:…-SNAPSHOT". The toolkit it needs is installed above.
@@ -176,7 +177,6 @@ jobs:
       - name: Plugin gate (the checks the catalog runs)
         run: |
           source .github/mvn-retry.sh
-          mvn_retry mvn -B -q -f .deps/botmaker-plugin-host/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-plugin-archetype/pom.xml install -DskipTests
           mvn_retry mvn -B -q -f .deps/botmaker-cli/pom.xml package -DskipTests
           java -jar .deps/botmaker-cli/target/botmaker-cli-*-all.jar plugin validate . --no-build
