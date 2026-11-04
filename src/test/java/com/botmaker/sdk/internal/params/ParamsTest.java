@@ -1,6 +1,6 @@
 package com.botmaker.sdk.internal.params;
 
-import com.botmaker.plugin.host.grammar.ParamsFitter;
+import com.botmaker.java.grammar.ParamsFitter;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Progress;

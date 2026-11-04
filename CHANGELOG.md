@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The value grammar comes from `botmaker-java`** (2026-11-04): it left `botmaker-plugin-host`, and JDT arrives with it
+  rather than by its own line in this pom. Nothing changes for a bot.
 - **The SDK's editor writes no Java text** (2026-11-04). A screen's `when` that tests a fact,
   `Params.when(Progress::gold).atLeast(5)`, is a typed value (`ParamCheck`) written and read through declared
   calls, `Params::when` and `When::atLeast`/`atMost`/`is`/`isTrue`; an activity not written yet is

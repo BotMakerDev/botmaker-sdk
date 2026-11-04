@@ -37,8 +37,8 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
-import com.botmaker.plugin.host.grammar.JavaValue;
-import com.botmaker.plugin.host.grammar.ValueGrammar;
+import com.botmaker.java.grammar.JavaValue;
+import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.sdk.api.params.Params;
 import org.junit.jupiter.api.Test;
 

@@ -2,10 +2,10 @@ package com.botmaker.sdk.internal.params;
 
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.plugin.host.ClasspathGrammar;
-import com.botmaker.plugin.host.grammar.JavaValue;
-import com.botmaker.plugin.host.grammar.ParamValues;
-import com.botmaker.plugin.host.grammar.ParamsFitter;
-import com.botmaker.plugin.host.grammar.ValueGrammar;
+import com.botmaker.java.grammar.JavaValue;
+import com.botmaker.java.grammar.ParamValues;
+import com.botmaker.java.grammar.ParamsFitter;
+import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.sdk.api.params.Assumed;
 import com.botmaker.sdk.api.params.GameState;
 import com.botmaker.sdk.api.params.ReadOn;
