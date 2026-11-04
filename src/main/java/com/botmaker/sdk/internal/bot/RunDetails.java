@@ -1,13 +1,13 @@
 package com.botmaker.sdk.internal.bot;
 
-import com.botmaker.plugin.api.params.Param;
+import com.botmaker.sdk.internal.config.ParamGroups;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.launch.GameVersion;
 
-import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,8 +29,8 @@ public final class RunDetails {
     /**
      * The SDK's words for the run: {@code flow}, {@code launchTarget} (its kind), {@code gameVersion} (best effort,
      * {@link GameVersion}: at most two seconds, else {@code unknown}), {@code platform} (an emulator's
-     * instance, else the OS) and each {@code @Param} of {@code values} whose value is plain text, a number, a switch
-     * or a choice, as {@code param.<name>}.
+     * instance, else the OS) and each parameter of the groups beside {@code values} ({@link ParamGroups}) whose value
+     * is plain text, a number, a switch or a choice, as {@code param.<name>}.
      */
     static Map<String, String> of(Class<?>... values) {
         Map<String, String> out = new LinkedHashMap<>();
@@ -41,13 +41,18 @@ public final class RunDetails {
         out.put("gameVersion", target == null ? GameVersion.UNKNOWN : GameVersion.of(target.launchSpec()));
         out.put("platform", target instanceof LaunchTarget.EmulatorApp app && app.instance() != null
                 && !app.instance().isBlank() ? app.instance() : System.getProperty("os.name", ""));
-        for (Class<?> holder : values == null ? new Class<?>[0] : values) {
-            for (Field field : holder.getDeclaredFields()) {
-                if (!Modifier.isStatic(field.getModifiers()) || !field.isAnnotationPresent(Param.class)) continue;
+        for (Object group : ParamGroups.groups(values)) {
+            for (Method method : group.getClass().getDeclaredMethods()) {
+                // A parameter is a public instance method with no argument, as Studio's Parameters window reads one.
+                if (Modifier.isStatic(method.getModifiers()) || !Modifier.isPublic(method.getModifiers())
+                        || method.getParameterCount() != 0 || method.getReturnType() == void.class
+                        || method.isSynthetic()) {
+                    continue;
+                }
                 try {
-                    field.setAccessible(true);
-                    Object value = field.get(null);
-                    if (plain(value)) out.put("param." + field.getName(), String.valueOf(value));
+                    method.setAccessible(true);
+                    Object value = method.invoke(group);
+                    if (plain(value)) out.put("param." + method.getName(), String.valueOf(value));
                 } catch (ReflectiveOperationException | RuntimeException ignored) {
                     // a parameter that cannot be read is left out
                 }

@@ -9,20 +9,19 @@ import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The game half of the bot's {@code Sdk} parameters, read off the classes {@code Bot.runFlow} is handed: the
- * launchers the bot supports, the one its runner picked, the game VM it runs in and the capture source it reads — and
- * the launch target a run starts ({@link #launchTarget}). A {@code -D} given to a bot started by hand wins over the
- * launchers.
+ * The game half of the bot's {@code Sdk} values, read off the classes {@code Bot.runFlow} is handed and the parameter
+ * group beside them ({@link ParamGroups}): the launchers the bot supports and the game VM it runs in (the author's,
+ * in {@code Sdk.java}), the one launcher its runner picked and the capture source it reads (the runner's, in
+ * {@code params/}) — and the launch target a run starts ({@link #launchTarget}). A {@code -D} given to a bot started
+ * by hand wins over the launchers.
  *
- * <p>Read by mark, not by name: the field carrying {@code @SdkValue(SdkValue.Id.LAUNCH_TARGETS)} is the list,
- * whatever the bot calls it. A field of another type, or one that cannot be read, is no value: nothing is launched
- * and the VM is the one there is, which is what a bot with no such field gets too.
+ * <p>Read by mark, not by name: the method carrying {@code @SdkValue(SdkValue.Id.LAUNCH_TARGETS)} is the list,
+ * whatever the bot calls it. A value of another type, or one that cannot be read, is no value: nothing is launched
+ * and the VM is the one there is, which is what a bot with no such method gets too.
  */
 public final class InstalledGame {
 
@@ -41,28 +40,12 @@ public final class InstalledGame {
      * {@code Source.current()} names none: it is what this sets.
      */
     public static void install(Class<?>... values) {
-        List<String> targets = null;
-        String chosen = null;
-        String named = null;
-        CaptureSource capture = null;
-        if (values != null) {
-            for (Class<?> type : values) {
-                if (type == null) continue;
-                if (targets == null) targets = specs(field(type, SdkValue.Id.LAUNCH_TARGETS));
-                if (chosen == null && field(type, SdkValue.Id.LAUNCH_TARGET) instanceof LaunchChoice choice) {
-                    chosen = choice.spec();
-                }
-                if (named == null && field(type, SdkValue.Id.VM) instanceof String text) named = text;
-                if (capture == null && field(type, SdkValue.Id.CAPTURE) instanceof CaptureSource source
-                        && !(source instanceof CurrentSource)) {
-                    capture = source;
-                }
-            }
-        }
+        List<String> targets = specs(marked(SdkValue.Id.LAUNCH_TARGETS, values));
         launchTargets = targets == null ? List.of() : targets;
-        launchChoice = chosen == null ? "" : chosen;
-        vm = named == null ? "" : named.trim();
-        Source.set(capture);
+        launchChoice = marked(SdkValue.Id.LAUNCH_TARGET, values) instanceof LaunchChoice choice ? choice.spec() : "";
+        vm = marked(SdkValue.Id.VM, values) instanceof String named ? named.trim() : "";
+        Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
+                && !(source instanceof CurrentSource) ? source : null);
     }
 
     /** The launch specs the bot lists, preferred first; empty when it lists none. */
@@ -125,40 +108,12 @@ public final class InstalledGame {
     }
 
     /**
-     * The value of the first {@code public static} field marked {@code id} in {@code values}, or null when none
-     * marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup},
+     * The value marked {@code id} in {@code values} or the parameter group beside them ({@link ParamGroups}), or null
+     * when none marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup},
      * {@code skip}).
      */
     public static Object marked(SdkValue.Id id, Class<?>... values) {
-        if (values == null) return null;
-        for (Class<?> type : values) {
-            Object value = type == null ? null : field(type, id);
-            if (value != null) return value;
-        }
-        return null;
-    }
-
-    /** The value of the {@code public static} field of {@code type} marked {@code id}, or null. */
-    private static Object field(Class<?> type, SdkValue.Id id) {
-        Field[] declared;
-        try {
-            declared = type.getDeclaredFields();
-        } catch (RuntimeException | LinkageError unreadable) {
-            return null;
-        }
-        for (Field field : declared) {
-            SdkValue mark = field.getAnnotation(SdkValue.class);
-            int modifiers = field.getModifiers();
-            if (mark == null || mark.value() != id || !Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers)) {
-                continue;
-            }
-            try {
-                return field.get(null);
-            } catch (IllegalAccessException | RuntimeException unreadable) {
-                return null;
-            }
-        }
-        return null;
+        return ParamGroups.marked(id, values);
     }
 
     /**

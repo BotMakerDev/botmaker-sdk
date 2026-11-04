@@ -31,9 +31,9 @@ public final class VmChoice {
     }
 
     /**
-     * Makes {@code name} the bot's VM; {@code null} or blank for the one there is. The parameter is conditional
-     * ({@link SdkValues#VM}): one a bot lacks because it never ran its game in a VM is written now, which the settings
-     * just switched to. Nothing is written when it already names {@code name}. A refusal goes to the status line.
+     * Makes {@code name} the bot's VM; {@code null} or blank for the one there is. A bot whose holder lacks
+     * {@link SdkValues#VM}'s method gets it written now. Nothing is written when it already names {@code name}.
+     * A refusal goes to the status line.
      */
     public static void set(StudioServices services, String name) {
         if (services == null) return;

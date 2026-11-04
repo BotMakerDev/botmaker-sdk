@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Run parameters live in the SDK's group in `params/`** (2026-11-04): `flow`, `doSetup`, `skip`,
+  `launchTarget` and `captureSource` are methods of `params/com_github_botmakerdev/botmaker_sdk/Sdk.java`, this
+  computer's, with a committed starting copy under `starting-params/`. `runFlow(Sdk.class)` finds the group from
+  the holder (`…plugins.<g>.<a>.Sdk` reads `…params.<g>.<a>.Sdk`). `launchTargets()` and `vm()` are the
+  author's bot data now: static `@SdkValue` methods of the holder `Sdk`, no longer `@Param` fields.
 - **Game facts, kept between runs** (`api.state.Fact`, `api.state.GameState`). A bot's `Facts` class beside
   `Screens` declares what the game shows of the account: `Fact.number(Screens.Home.class, home -> home.level)`,
   `Fact.read(…)` (text, `.as(HeroClass.class)` for an enum's constant), `Fact.shown(…)` (an element in the tree) and

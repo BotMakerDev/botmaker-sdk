@@ -18,27 +18,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The game half of a bot's {@code Sdk} parameters, read by their marks, and the launcher a system picks. */
 class InstalledGameTest {
 
-    /** A bot's {@code Sdk}: the fields are found by mark, whatever they are called. */
+    /** A bot's {@code Sdk}: the methods are found by mark, whatever they are called. */
     public static final class Sdk {
         @SdkValue(SdkValue.Id.LAUNCH_TARGETS)
-        public static List<Launcher> launchers = List.of(Launcher.of("faugus:abc"), Launcher.of(" steam:570 "),
-                Launcher.of(""));
+        public static List<Launcher> launchers() {
+            return List.of(Launcher.of("faugus:abc"), Launcher.of(" steam:570 "), Launcher.of(""));
+        }
 
         @SdkValue(SdkValue.Id.VM)
-        public static String gameVm = " win11 ";
+        public static String gameVm() {
+            return " win11 ";
+        }
 
         @SdkValue(SdkValue.Id.CAPTURE)
-        public static CaptureSource game = CaptureSource.window("firestone.exe", "");
+        public static CaptureSource game() {
+            return CaptureSource.window("firestone.exe", "");
+        }
 
         @SdkValue(SdkValue.Id.DO_SETUP)
-        public static boolean setUpFirst = true;
+        public static boolean setUpFirst() {
+            return true;
+        }
     }
 
     @Test
     void theRunsOwnParametersAreReadByTheirMarksFromTheFirstClassMarkingThem() {
         assertEquals(Boolean.TRUE, InstalledGame.marked(SdkValue.Id.DO_SETUP, null, Object.class, Sdk.class));
-        assertNull(InstalledGame.marked(SdkValue.Id.SKIP, Sdk.class), "a bot with no skip field has none");
+        assertNull(InstalledGame.marked(SdkValue.Id.SKIP, Sdk.class), "a bot with no skip method has none");
         assertNull(InstalledGame.marked(SdkValue.Id.FLOW, (Class<?>[]) null));
+    }
+
+    @Test
+    void aHoldersParametersAreReadFromTheGroupBesideIt() {
+        Class<?> holder = com.botmaker.sdk.internal.config.fixture.plugins.g.a.Sdk.class;
+        assertEquals("com.botmaker.sdk.internal.config.fixture.params.g.a.Sdk", ParamGroups.groupName(holder.getName()));
+        assertEquals(Boolean.FALSE, InstalledGame.marked(SdkValue.Id.DO_SETUP, holder),
+                "main hands the holder; the value is the group's method");
+        InstalledGame.install(holder);
+        assertEquals(List.of("faugus:abc", "steam:570"), InstalledGame.launchTargets(), "the author's, in the holder");
+        assertEquals("steam:570", InstalledGame.launchChoice(), "the runner's, in the group");
+        assertEquals(1, ParamGroups.groups(holder).size());
+        assertTrue(ParamGroups.groups(Sdk.class).isEmpty(), "a class outside plugins/ has no group");
     }
 
     @AfterEach
@@ -96,10 +116,14 @@ class InstalledGameTest {
     /** A bot whose runner picked a launcher. */
     public static final class Picked {
         @SdkValue(SdkValue.Id.LAUNCH_TARGETS)
-        public static List<Launcher> launchers = List.of(Launcher.of("faugus:abc"), Launcher.of("steam:570"));
+        public static List<Launcher> launchers() {
+            return List.of(Launcher.of("faugus:abc"), Launcher.of("steam:570"));
+        }
 
         @SdkValue(SdkValue.Id.LAUNCH_TARGET)
-        public static LaunchChoice launcher = LaunchChoice.of(" steam:570 ");
+        public static LaunchChoice launcher() {
+            return LaunchChoice.of(" steam:570 ");
+        }
     }
 
     @Test
