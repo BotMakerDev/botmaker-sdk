@@ -37,6 +37,10 @@
   **The `api` root holds no classes**. Plumbing the plugin half needs and a bot never names is public in
   `internal`: `internal.launch` (`Game`, `Target`, `LaunchTarget`), `internal.emulator`, `internal.bot`
   (`Session`, `Watchdog`, `BotStuckException`), `internal.flow.Flows`, `internal.capture.Window`.
+  **One exception (2026-11-04, the user's call): `api.bot.SdkValue.Holder`.** A bot never names it, but the
+  contract checks at compile time that a value's holder is a constant of the enum its marker's `Id` names
+  (`enum Id implements ManagedId<Holder>`), so it sits beside `Id`. The `ManagedId` it names is a contract type
+  in an `api` signature; it counts as the annotation exception.
 
 - **The package tree is `api` / `internal` / `plugin`, and nothing else** (`../docs/refactor/34-plugin-package-tree.md`,
   enforced by `plugin/PluginLayersTest`). `api` and `internal` are what a bot links: no JavaFX, no toolkit, no

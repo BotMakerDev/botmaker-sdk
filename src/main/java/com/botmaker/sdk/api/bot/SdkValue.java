@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.bot;
 
+import com.botmaker.plugin.api.managed.ManagedId;
 import com.botmaker.plugin.api.managed.ManagedMarker;
 
 import java.lang.annotation.Documented;
@@ -46,7 +47,7 @@ public @interface SdkValue {
     Id value();
 
     /** The SDK's values, one constant each. */
-    enum Id {
+    enum Id implements ManagedId<Holder> {
         /**
          * The bot's activity flows, one per way of playing: what runs, in what order, and what stops it — a class
          * of {@code Flow} constants.
@@ -115,5 +116,24 @@ public @interface SdkValue {
         LAUNCH_TARGET,
         /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
         VM
+    }
+
+    /**
+     * The bot's classes the SDK's values live in, one constant each, named by its parts: {@code SDK} is
+     * {@code Sdk.java}, {@code SCREENS} is {@code Screens.java}. Studio writes the class when a bot lacks it; a bot
+     * never names this enum.
+     */
+    enum Holder {
+        SDK,
+        FLOWS,
+        PICTURES,
+        TAGS,
+        ACTIVITIES,
+        ZONES,
+        DIGITS,
+        TEXTS,
+        ELEMENTS,
+        STATES,
+        SCREENS
     }
 }

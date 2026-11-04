@@ -33,7 +33,6 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
-import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.List;
 import java.util.Set;
@@ -60,9 +59,6 @@ import java.util.Set;
  */
 public final class SdkValues implements ValueHolder {
 
-    /** The class the method-shaped values live in: {@code Sdk.java} under {@code plugins/}, named by the bot's {@code main}. */
-    public static final String HOLDER = "Sdk";
-
     /**
      * The flows — {@code static final Flow MAIN = Flow.of(…)}, one per way of playing. 🔀 Activity Flow draws one,
      * keeping its activities, wires and layout in step.
@@ -70,24 +66,24 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.OfConstants<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
             .of(Flow.class)
             .referredToAs(BotConstants::flow)
-            .in("Flows")
+            .in(SdkValue.Holder.FLOWS)
             .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
                     + " activities, the wires and the layout in step.");
 
     /** The game's home and setup — {@code Run.of().home(…)}. */
     public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(Run.class, Run.NONE)
             .because("This says how the bot gets the game home and sets it up. Change them in 🔀 Activity Flow.");
 
     public static final ManagedMethod<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(FlowLayout.class, FlowLayout.NONE)
             .because("These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps"
                     + " them in step with the activities' names.");
 
     public static final ManagedMethod<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(BotSettings.class, BotSettings.DEFAULTS)
             .because("These are the bot's settings — delays, confidence, input and its private display. Change"
                     + " them in ⚙ Bot Settings.");
@@ -99,7 +95,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedOpenSet.OfConstants<ImageTemplate> PICTURES = ManagedValue.openSet(SdkValue.Id.PICTURES)
             .of(ImageTemplate.class)
-            .in(TemplateNames.CLASS_NAME)
+            .in(SdkValue.Holder.PICTURES)
             .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
                     + " use of it together.");
 
@@ -111,7 +107,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.OfConstants<PictureTag> TAGS = ManagedValue.openSet(SdkValue.Id.TAGS)
             .of(PictureTag.class)
             .referredToAs(BotConstants::tag)
-            .in("Tags")
+            .in(SdkValue.Holder.TAGS)
             .because("Tags.java holds the groups 🖼 Manage Pictures files pictures under. Add, rename or delete one"
                     + " there, which changes every picture it holds together.");
 
@@ -124,7 +120,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
             .ofEnumGroups(Outcome.class, BotConstants::outcome)
             .groupedAs(Activity.class, BotConstants::activity)
-            .in("Activities")
+            .in(SdkValue.Holder.ACTIVITIES)
             .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
                     + " exit and every use of it together.");
 
@@ -135,7 +131,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedOpenSet.OfConstants<Zone> ZONES = ManagedValue.openSet(SdkValue.Id.ZONES)
             .of(Zone.class)
-            .in("Zones")
+            .in(SdkValue.Holder.ZONES)
             .because("Zones.java holds the bot's named areas. Ask Claude to save_region an area again, under its"
                     + " name, to move it.");
 
@@ -146,7 +142,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedOpenSet.OfConstants<DigitSet> DIGITS = ManagedValue.openSet(SdkValue.Id.DIGITS)
             .of(DigitSet.class)
-            .in("Digits")
+            .in(SdkValue.Holder.DIGITS)
             .because("Digits.java holds the game fonts' digit pictures. Ask Claude to save_digits on a number the"
                     + " game shows to add or fix one.");
 
@@ -157,7 +153,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedOpenSet.OfConstants<Words> TEXTS = ManagedValue.openSet(SdkValue.Id.TEXTS)
             .of(Words.class)
-            .in("Texts")
+            .in(SdkValue.Holder.TEXTS)
             .because("Texts.java holds the texts the bot types. Set a text field's text in 🗺 Screens to add one.");
 
     /**
@@ -167,7 +163,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedOpenSet.OfConstants<Element> ELEMENTS = ManagedValue.openSet(SdkValue.Id.ELEMENTS)
             .of(Element.class)
-            .in("Elements")
+            .in(SdkValue.Holder.ELEMENTS)
             .because("Elements.java holds the app inputs the bot finds in the screen's tree. Pick one on a frozen"
                     + " frame in 🗺 Screens to add one.");
 
@@ -180,7 +176,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.EnumGroups<ButtonState> STATES = ManagedValue.openSet(SdkValue.Id.STATES)
             .ofEnumGroups(ButtonState.class, BotConstants::state)
             .groupedAs(BotConstants.StateGroup.class, BotConstants::stateGroup)
-            .in("States")
+            .in(SdkValue.Holder.STATES)
             .because("States.java holds what the bot's buttons' looks mean: Blocks is never pressed, Presses is."
                     + " Name a new state on a look in 🗺 Screens to add one.");
 
@@ -190,7 +186,7 @@ public final class SdkValues implements ValueHolder {
      * applied to all, never chosen (2026-11-02). None written: no button is seen in a shade.
      */
     public static final ManagedMethod<Shades> SHADES = ManagedValue.method(SdkValue.Id.SHADES)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(Shades.class, Shades.none())
             .because("These are how the game shows a button dimmed, greyed or tinted, each learned from one button"
                     + " seen both ways. Discovery and the assistant write them; a run applies them to every button.");
@@ -208,7 +204,7 @@ public final class SdkValues implements ValueHolder {
             .fields(ScreenPart.class, BotConstants::input)
             .setup(Screen::setup)
             .referredToAs(BotConstants::screen)
-            .in("Screens")
+            .in(SdkValue.Holder.SCREENS)
             .because("Screens.java is the game's map, as Discovery found it. Fill it in with ▶ Try in 🗺 Screens, or"
                     + " ask Claude to try_input on the game.");
 
@@ -219,7 +215,7 @@ public final class SdkValues implements ValueHolder {
      * session default.
      */
     public static final ManagedMethod<Size> SCREEN = ManagedValue.method(SdkValue.Id.SCREEN)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(Size.class, new Size(0, 0))
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
@@ -235,14 +231,14 @@ public final class SdkValues implements ValueHolder {
      * its mark. Like each parameter below, the host writes it there and in {@code starting-params/} on bind.
      */
     public static final ManagedParam<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .startsAs(SdkValues::noFlow)
             .shown(RUN_CATEGORY, "Which flow the bot runs", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** Whether a run sets the game up first — {@code public boolean doSetup()}. */
     public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .startsAs(SdkValues::setUpFirst)
             .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
                     + " setting", Param.Visibility.PUBLIC)
@@ -250,7 +246,7 @@ public final class SdkValues implements ValueHolder {
 
     /** The activities a run switches off — {@code public Set<Class<? extends Outcome>> skip()}. */
     public static final ManagedParam<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .startsAs(SdkValues::skipNothing)
             .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
@@ -270,7 +266,7 @@ public final class SdkValues implements ValueHolder {
      */
     @SuppressWarnings("unchecked")
     public static final ManagedMethod<List<Launcher>> LAUNCH_TARGETS = ManagedValue.method(SdkValue.Id.LAUNCH_TARGETS)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds((Class<List<Launcher>>) (Class<?>) List.class, List.of())
             .because("This is the list of games the bot supports. Add or remove a game in 🎮 Game.");
 
@@ -280,7 +276,7 @@ public final class SdkValues implements ValueHolder {
      * and grow). None: the first this computer can launch.
      */
     public static final ManagedParam<LaunchChoice> LAUNCH_TARGET = ManagedValue.param(SdkValue.Id.LAUNCH_TARGET)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .startsAs(SdkValues::firstAvailable)
             .shown(GAME_CATEGORY, "Which of the bot's games this computer launches", Param.Visibility.PUBLIC)
             .because(GAME_PARAM);
@@ -291,7 +287,7 @@ public final class SdkValues implements ValueHolder {
      * it by its mark ({@code InstalledGame}).
      */
     public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .startsAs(SdkValues::wholeDesktop)
             .shown(GAME_CATEGORY, "The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
             .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source, in the Runner or in"
@@ -303,7 +299,7 @@ public final class SdkValues implements ValueHolder {
      * rule); written when ⚙ Bot Settings first names one, and read by its mark.
      */
     public static final ManagedMethod<String> VM = ManagedValue.method(SdkValue.Id.VM)
-            .in(HOLDER)
+            .in(SdkValue.Holder.SDK)
             .holds(String.class, "")
             .because("This is the game VM ⚙ Bot Settings runs the game in. Change it there.");
 

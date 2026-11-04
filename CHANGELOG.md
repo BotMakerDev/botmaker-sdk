@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's holders are `SdkValue.Holder` constants** (2026-11-04), following the contract: every `.in` names
+  one, and `SdkValues.HOLDER` is gone. Each holder keeps the class name bots already have (`Sdk`, `Flows`,
+  `Pictures`, `Screens`, …), so no bot moves; `SdkHoldersTest` pins them.
 - **Claude keeps facts about the game** (2026-11-04): `edit_map` `add_fact` adds a value a run keeps to a `@GameState`
   group, read off a screen's readout (`holds` text, number, shown) or set by a step (`flag`). An input's, a way's or a
   look's `when` takes `Params.when(Progress::gold).atLeast(5)` as well as a method, checked against the fact's type.
