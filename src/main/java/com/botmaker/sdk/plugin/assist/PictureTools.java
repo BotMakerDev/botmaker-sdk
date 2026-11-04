@@ -661,7 +661,7 @@ final class PictureTools {
         String variantOf = blankless(crop.variantOf());
         String when = blankless(crop.when());
         String screenLook = blankless(crop.screenLook());
-        Optional<String> notWhen = ScreenEdits.notCondition(context.services(), when);
+        Optional<String> notWhen = ScreenEdits.notMethod(when);
         if (notWhen.isPresent()) return AgentReply.refused("when: " + notWhen.get() + " Nothing was saved.");
         if (screenLook != null && (back || popup || variantOf != null || !MapTools.isName(screenLook))) {
             return AgentReply.refused("A screen's look is named in plain words, on one line, and holds a marker or "

@@ -2,13 +2,13 @@ package com.botmaker.sdk.api.params;
 
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.internal.params.GameFacts;
+import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.params.RunParams;
 
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * What a run does with a parameter of the bot, named by its method (2026-11-04).
@@ -77,49 +77,55 @@ public final class Params {
 
     /** Starts a condition on the parameter, for a {@code .when(…)}. */
     public static <G, T> When<T> when(Of<G, T> parameter) {
-        Objects.requireNonNull(parameter, "parameter");
-        return new When<>(() -> known(parameter));
+        return new When<>(Objects.requireNonNull(parameter, "parameter"));
     }
 
     /**
-     * A condition on one parameter's value, read each time it is asked. A value that is unknown, stale, {@code null},
-     * cannot be read or cannot be compared answers unknown, which never closes a way.
+     * A condition on one parameter's value, started: each link finishes one, read each time it is asked. A value that
+     * is unknown, stale, {@code null}, cannot be read or cannot be compared answers unknown, which never closes a way.
+     * Equal by the parameter it names.
      */
     public static final class When<T> {
 
-        private final Supplier<Optional<T>> value;
+        private final Of<?, T> parameter;
 
-        private When(Supplier<Optional<T>> value) {
-            this.value = value;
+        private When(Of<?, T> parameter) {
+            this.parameter = parameter;
+        }
+
+        /** The parameter this condition tests. */
+        public Of<?, T> parameter() {
+            return parameter;
         }
 
         /** Holds when the value is {@code limit} or above. */
         public Condition atLeast(T limit) {
-            return Condition.of(() -> compared(limit) >= 0);
+            return new ParamCheck(this, ParamCheck.Test.AT_LEAST, limit);
         }
 
         /** Holds when the value is {@code limit} or below. */
         public Condition atMost(T limit) {
-            return Condition.of(() -> compared(limit) <= 0);
+            return new ParamCheck(this, ParamCheck.Test.AT_MOST, limit);
         }
 
         /** Holds when the value equals {@code wanted}. */
         public Condition is(T wanted) {
-            return Condition.of(() -> known().equals(wanted));
+            return new ParamCheck(this, ParamCheck.Test.IS, wanted);
         }
 
         /** Holds when the value is {@code true}. */
         public Condition isTrue() {
-            return Condition.of(() -> (Boolean) known());
+            return new ParamCheck(this, ParamCheck.Test.IS_TRUE, null);
         }
 
-        @SuppressWarnings("unchecked")
-        private int compared(T limit) {
-            return ((Comparable<T>) known()).compareTo(limit);
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof When<?> when && parameter.equals(when.parameter);
         }
 
-        private T known() {
-            return value.get().orElseThrow(() -> new IllegalStateException("the parameter has no value"));
+        @Override
+        public int hashCode() {
+            return parameter.hashCode();
         }
     }
 }

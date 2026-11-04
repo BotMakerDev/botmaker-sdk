@@ -70,7 +70,8 @@ public final class SdkAssist {
               Tag each with the activity using it or a custom tag (edit_tags, list_tags, edit_pictures).
             - A run's choices (which flow, which activity is on) are @Param fields, never run properties.
             - What the game shows that a way or input depends on (a level) is a fact (edit_map add_fact), tested in
-              its when: Params.when(Progress::gold).atLeast(5). setup game_facts lists them.
+              its when (way_when, input_when or look_when: fact Progress::gold, with its test and value). setup
+              game_facts lists them.
             """;
 
     private SdkAssist() {}

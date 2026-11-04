@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.source.RunParameter;
+import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -615,20 +616,19 @@ public final class ScreenEdits {
     }
 
     /**
-     * Makes {@code to}'s way in through {@code from}'s field {@code viaField} open only while {@code method} answers
-     * true — a method reference, {@code Firestone::eventOn} — or always, {@code method} blank.
+     * Makes {@code to}'s way in through {@code from}'s field {@code viaField} open only while {@code when} answers
+     * true — a method reference, {@code Firestone::eventOn}, or a test of a fact ({@link #condition}) — or always,
+     * {@code when} {@code null}.
      */
     public static String setWayWhen(StudioServices services, String to, String from, String viaField,
-                                    String method) {
-        Optional<String> refused = notCondition(services, method);
-        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
-        BooleanSupplier when = ScreenTypes.typedCondition(method);
+                                    BooleanSupplier when) {
         ScreenGraph graph = ScreenBook.read(services);
         if (ways(graph.screens().get(to)).stream().noneMatch(way -> wayFrom(graph, way, from, viaField))) {
             return noWay(graph, to, from, viaField);
         }
         return said(ScreenBook.update(services, to, s -> withWayWhen(graph, s, from, viaField, when)),
-                when == null ? "That way is always open now." : "That way is open only while " + method.strip() + ".");
+                when == null ? "That way is always open now."
+                        : "That way is open only while " + ScreenTypes.sourceOf(when) + ".");
     }
 
     /** {@code screen} with its way in through {@code from}'s field {@code viaField} taken only while {@code when}. */
@@ -1170,11 +1170,8 @@ public final class ScreenEdits {
         return pictures.stream().filter(p -> !p.id().equalsIgnoreCase(id)).toList();
     }
 
-    /** {@code constant}'s look {@code look} shown only while {@code method} answers true; blank: no method says. */
-    public static String setLookWhen(StudioServices services, String constant, String look, String method) {
-        Optional<String> refused = notCondition(services, method);
-        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
-        BooleanSupplier when = ScreenTypes.typedCondition(method);
+    /** {@code constant}'s look {@code look} shown only while {@code when} answers true; {@code null}: nothing says. */
+    public static String setLookWhen(StudioServices services, String constant, String look, BooleanSupplier when) {
         MapScreen screen = ScreenBook.read(services).screens().get(constant);
         Optional<ScreenVariant> had = screen == null || look == null ? Optional.empty() : screen.variants().stream()
                 .filter(v -> v.name().equalsIgnoreCase(look.strip())).findFirst();
@@ -1186,18 +1183,15 @@ public final class ScreenEdits {
         String name = had.get().name();
         return said(ScreenBook.update(services, constant, s -> s.setup(x -> x.withVariant(had.get().when(when)))),
                 when == null ? "No method says when " + name + " shows." : name + " shows only while "
-                        + method.strip() + ".");
+                        + ScreenTypes.sourceOf(when) + ".");
     }
 
-    /** {@code constant}'s field {@code field} there only while {@code method} answers true; blank: no method says. */
-    public static String setInputWhen(StudioServices services, String constant, String field, String method) {
-        Optional<String> refused = notCondition(services, method);
-        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
-        BooleanSupplier when = ScreenTypes.typedCondition(method);
+    /** {@code constant}'s field {@code field} there only while {@code when} answers true; {@code null}: nothing says. */
+    public static String setInputWhen(StudioServices services, String constant, String field, BooleanSupplier when) {
         return said(ScreenBook.update(services, constant, s -> s.input(field)
                         .map(input -> s.withInput(field, input.when(when))).orElse(s)),
                 when == null ? "No method says when " + field + " is there."
-                        : field + " is there only while " + method.strip() + ".");
+                        : field + " is there only while " + ScreenTypes.sourceOf(when) + ".");
     }
 
     /**
@@ -1263,29 +1257,79 @@ public final class ScreenEdits {
         return names;
     }
 
+    /** Why {@code method} may not be written as a condition: it is no method reference. Empty when it is, or is blank. */
+    static Optional<String> notMethod(String method) {
+        return method == null || method.isBlank() || ScreenTypes.isMethod(method) ? Optional.empty()
+                : Optional.of("\"" + method.strip() + "\" is no method reference (Firestone::eventOn).");
+    }
+
     /**
-     * Why {@code source} may not be written as a condition: neither a method reference nor a test of a parameter a run
-     * keeps and of the type the test needs. Empty when it may, or is blank.
+     * A condition an edit was given, or why it may not be written.
+     *
+     * @param when    the condition; {@code null} for none (always)
+     * @param refused why not; {@code null} when it may
      */
-    static Optional<String> notCondition(StudioServices services, String source) {
-        if (!ScreenTypes.isCondition(source)) {
-            return Optional.of("\"" + source.strip() + "\" is no method reference (Firestone::eventOn) or test of a "
-                    + "fact (Params.when(Progress::gold).atLeast(5)).");
+    record Given(BooleanSupplier when, String refused) {
+
+        static Given refused(String why) {
+            return new Given(null, why);
         }
-        Optional<ScreenTypes.ParamTest> test = ScreenTypes.paramTest(source);
-        if (test.isEmpty()) return Optional.empty();
-        String named = test.get().group() + "::" + test.get().name();
+    }
+
+    /**
+     * The condition {@code method} names, {@code Firestone::eventOn}, or a test of the during-a-run fact {@code fact}
+     * ({@code Progress::gold}) by {@code test} against {@code value}, read as the fact's type: {@code int},
+     * {@code boolean} or {@code String}. Neither: none. A fact of another type, a constant of the bot's own, is tested
+     * in the bot's Java, never here.
+     */
+    static Given condition(StudioServices services, String method, String fact, ParamCheck.Test test, String value) {
+        boolean tested = fact != null && !fact.isBlank();
+        if (tested && method != null && !method.isBlank()) return Given.refused("Give a method or a fact, not both.");
+        if (!tested && (test != null || value != null && !value.isBlank())) {
+            return Given.refused("Give the fact the test is of (fact Progress::gold).");
+        }
+        if (!tested) {
+            Optional<String> notMethod = notMethod(method);
+            return notMethod.map(Given::refused).orElseGet(() -> new Given(ScreenTypes.condition(method), null));
+        }
+        if (!ScreenTypes.isMethod(fact)) return Given.refused("\"" + fact.strip() + "\" is no fact (Progress::gold).");
+        if (test == null) return Given.refused("Give the fact's test: at_least, at_most, is or is_true.");
+        String named = fact.strip();
+        String group = named.substring(0, named.indexOf("::"));
+        String name = named.substring(named.indexOf("::") + 2);
         Optional<RunParameter> parameter = services.pluginValues().runParameters().stream()
-                .filter(p -> p.group().equals(test.get().group()) && p.name().equals(test.get().name())).findFirst();
-        if (parameter.isEmpty()) return Optional.of("No fact " + named + "; add it first (add_fact).");
-        String wanted = test.get().type();
+                .filter(p -> p.group().equals(group) && p.name().equals(name)).findFirst();
+        if (parameter.isEmpty()) return Given.refused("No fact " + named + "; add it first (add_fact).");
         String type = parameter.get().type();
-        if (wanted.isEmpty()) {
-            return List.of("int", "boolean", "String").contains(type)
-                    ? Optional.of(named + " is a " + type + "; test it with a literal.") : Optional.empty();
+        String wanted = switch (test) {
+            case AT_LEAST, AT_MOST -> "int";
+            case IS_TRUE -> "boolean";
+            case IS -> type;
+        };
+        if (!wanted.equals(type)) return Given.refused(named + " is a " + type + "; that test needs a " + wanted + ".");
+        if (test == ParamCheck.Test.IS_TRUE) return new Given(ScreenTypes.test(named, test, null), null);
+        if (value == null) return Given.refused("Give the value " + named + " is tested against.");
+        Object read = switch (type) {
+            case "int" -> integer(value.strip());
+            case "boolean" -> value.strip().equals("true") || value.strip().equals("false")
+                    ? Boolean.valueOf(value.strip()) : null;
+            case "String" -> value;
+            default -> null;
+        };
+        if (read == null) {
+            return Given.refused(List.of("int", "boolean", "String").contains(type)
+                    ? "\"" + value + "\" is no " + type + "."
+                    : named + " is a " + type + ", a type of the bot's: test it in the bot's Java.");
         }
-        return wanted.equals(type) ? Optional.empty()
-                : Optional.of(named + " is a " + type + "; that test needs a " + wanted + ".");
+        return new Given(ScreenTypes.test(named, test, read), null);
+    }
+
+    private static Integer integer(String text) {
+        try {
+            return Integer.valueOf(text);
+        } catch (NumberFormatException notOne) {
+            return null;
+        }
     }
 
     private static String said(Optional<String> failed, String done) {

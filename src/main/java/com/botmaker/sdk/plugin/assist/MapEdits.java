@@ -30,6 +30,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -54,7 +56,10 @@ final class MapEdits {
     private static final String SCROLL = "with picture: a strip's notches to it";
     private static final String KEY = "the input, by its hotkey: Q";
     private static final String FROM = "the screen the way in leaves";
-    private static final String METHOD = "Firestone::eventOn, or Params.when(Progress::gold).atLeast(5); blank: always";
+    private static final String METHOD = "Firestone::eventOn; blank, no fact: always";
+    private static final String FACT = "or a fact: Progress::gold";
+    private static final String TEST = "the fact's: at_least, at_most, is, is_true";
+    private static final String VALUE = "what test compares to: 5";
 
     /**
      * What set_input records an input did, opening nothing: tried, or leaves for a screen reached otherwise; untried
@@ -175,19 +180,25 @@ final class MapEdits {
                   @Describe(value = "", optional = true) Integer seconds) implements Edit, OfInput {
     }
 
-    @Describe("a way in (from, its input) open only while method holds")
+    @Describe("a way in (from, its input) open only while method, or fact's test, holds")
     record WayWhen(String screen, String from,
                    @Describe(value = "", optional = true) String picture,
                    @Describe(value = "", optional = true) Integer scroll,
                    @Describe(value = "", optional = true) String key,
-                   @Describe(value = METHOD, optional = true) String method) implements Edit, OfInput {
+                   @Describe(value = METHOD, optional = true) String method,
+                   @Describe(value = FACT, optional = true) String fact,
+                   @Describe(value = TEST, optional = true) ParamCheck.Test test,
+                   @Describe(value = VALUE, optional = true) String value) implements Edit, OfInput {
     }
 
-    @Describe("an input there only while method holds")
+    @Describe("an input there only while method, or fact's test, holds")
     record InputWhen(String screen, @Describe(value = "", optional = true) String picture,
                      @Describe(value = "", optional = true) Integer scroll,
                      @Describe(value = "", optional = true) String key,
-                     @Describe(value = "", optional = true) String method) implements Edit, OfInput {
+                     @Describe(value = "", optional = true) String method,
+                     @Describe(value = "", optional = true) String fact,
+                     @Describe(value = "", optional = true) ParamCheck.Test test,
+                     @Describe(value = "", optional = true) String value) implements Edit, OfInput {
     }
 
     /** What a group of a screen's buttons is: a strip along one line, or a tree of linked nodes. */
@@ -214,9 +225,12 @@ final class MapEdits {
             implements Edit {
     }
 
-    @Describe("a look shown only while method holds")
+    @Describe("a look shown only while method, or fact's test, holds")
     record LookWhen(String screen, @Describe("the look's name") String look,
-                    @Describe(value = "", optional = true) String method) implements Edit {
+                    @Describe(value = "", optional = true) String method,
+                    @Describe(value = "", optional = true) String fact,
+                    @Describe(value = "", optional = true) ParamCheck.Test test,
+                    @Describe(value = "", optional = true) String value) implements Edit {
     }
 
     @Describe("a marker (all show), or absent (never shows); refused if another shot shows the set")
@@ -358,12 +372,12 @@ final class MapEdits {
         Optional<String> refused = services.pluginValues().addRunParameter(write);
         if (refused.isPresent()) return AgentReply.refused(refused.get() + " Nothing was written.");
         String test = switch (fact.holds()) {
-            case TEXT -> ".is(\"…\")";
-            case NUMBER -> ".atLeast(5)";
-            case SHOWN, FLAG -> ".isTrue()";
+            case TEXT -> "test is, value the text";
+            case NUMBER -> "test at_least or at_most, value 5";
+            case SHOWN, FLAG -> "test is_true";
         };
-        return AgentReply.text(group + "." + name + " added, " + read + ". Test it in a when: Params.when(" + group + "::"
-                + name + ")" + test + ".");
+        return AgentReply.text(group + "." + name + " added, " + read + ". Test it in way_when, input_when or look_when: "
+                + "fact " + group + "::" + name + ", " + test + ".");
     }
 
     /** {@code edit} done on the FX thread. */
@@ -386,10 +400,12 @@ final class MapEdits {
             case Delete ignored -> said(ScreenEdits.delete(services, screen));
             case SetKind set -> said(kind(services, screen, set.as()));
             case RemoveBack ignored -> said(ScreenEdits.removeBack(services, screen));
-            case LookWhen look -> said(ScreenEdits.setLookWhen(services, screen, look.look(), method(look.method())));
+            case LookWhen look -> when(ScreenEdits.condition(services, look.method(), look.fact(), look.test(),
+                    look.value()), when -> ScreenEdits.setLookWhen(services, screen, look.look(), when));
             case AddWay way -> addWay(way, graph, screen, services);
             case RemoveWay way -> way(way, way.from(), null, graph, screen, services);
-            case WayWhen way -> way(way, way.from(), method(way.method()), graph, screen, services);
+            case WayWhen way -> way(way, way.from(), ScreenEdits.condition(services, way.method(), way.fact(),
+                    way.test(), way.value()), graph, screen, services);
             case NewScreen opened -> newScreen(opened, graph, screen, context);
             case AddMarker ignored -> marker(edit, context);
             case RemoveMarker ignored -> marker(edit, context);
@@ -408,7 +424,8 @@ final class MapEdits {
             case UseAsBack back -> onInput(back, graph, screen, on,
                     field -> said(ScreenEdits.useAsBack(services, screen, field)));
             case InputWhen when -> onInput(when, graph, screen, on,
-                    field -> said(ScreenEdits.setInputWhen(services, screen, field, method(when.method()))));
+                    field -> when(ScreenEdits.condition(services, when.method(), when.fact(), when.test(), when.value()),
+                            given -> ScreenEdits.setInputWhen(services, screen, field, given)));
             case Group group -> said(grouped(context, screen, on, group));
             case Link link -> said(ScreenEdits.link(services, screen, on, link.picture(),
                     link.after() == null ? List.of() : link.after()));
@@ -533,8 +550,10 @@ final class MapEdits {
         return has(named.picture()) && !has(named.key()) && named.scroll() == null ? named.picture().strip() : null;
     }
 
-    private static String method(String method) {
-        return method == null ? "" : method;
+    /** {@code edit} given the condition, or the reason it may not be written. */
+    private static AgentReply when(ScreenEdits.Given given, Function<BooleanSupplier, String> edit) {
+        return given.refused() != null ? AgentReply.refused(given.refused() + " Nothing was written.")
+                : said(edit.apply(given.when()));
     }
 
     /**
@@ -688,11 +707,12 @@ final class MapEdits {
     }
 
     /**
-     * remove_way ({@code method} null) and way_when: {@code screen}'s way in from {@code typedFrom} by the input
+     * remove_way ({@code given} null) and way_when: {@code screen}'s way in from {@code typedFrom} by the input
      * named, as the map holds it.
      */
-    private static AgentReply way(OfInput named, String typedFrom, String method, ScreenGraph graph, String screen,
-                                  StudioServices services) {
+    private static AgentReply way(OfInput named, String typedFrom, ScreenEdits.Given given, ScreenGraph graph,
+                                  String screen, StudioServices services) {
+        if (given != null && given.refused() != null) return AgentReply.refused(given.refused() + " Nothing was written.");
         Optional<String> from = ScreenBook.find(graph, typedFrom);
         if (from.isEmpty()) {
             return AgentReply.refused((has(typedFrom) ? "No screen " + typedFrom.strip() + " in the bot's "
@@ -700,7 +720,7 @@ final class MapEdits {
         }
         List<Way> ways = graph.screens().get(screen).ways();
         // A way on its own is named by its screen alone.
-        if (method == null && !has(named.picture()) && !has(named.key()) && ways.stream()
+        if (given == null && !has(named.picture()) && !has(named.key()) && ways.stream()
                 .anyMatch(w -> w.isOnItsOwn() && graph.onScreen(w).filter(from.get()::equals).isPresent())) {
             return said(ScreenEdits.removeWay(services, screen, from.get(), null));
         }
@@ -718,8 +738,8 @@ final class MapEdits {
             return AgentReply.refused(graph.shown(screen) + " has no such way in" + (each.isEmpty() ? ""
                     : "; its ways in: " + String.join(", ", each)) + ". Nothing was written.");
         }
-        return said(method == null ? ScreenEdits.removeWay(services, screen, from.get(), via.get())
-                : ScreenEdits.setWayWhen(services, screen, from.get(), via.get(), method));
+        return said(given == null ? ScreenEdits.removeWay(services, screen, from.get(), via.get())
+                : ScreenEdits.setWayWhen(services, screen, from.get(), via.get(), given.when()));
     }
 
     /** add_way: {@code screen} reached from {@code from} by the input of {@code from} named. */

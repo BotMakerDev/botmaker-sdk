@@ -104,7 +104,8 @@ final class ScreenHands {
         MenuButton menu = new MenuButton("⋯");
         menu.setTooltip(new Tooltip("Set what " + row.label() + " does by hand"));
         Menu when = whileMenu("Only there while", ScreenTypes.sourceOf(input.when()),
-                method -> done.accept(ScreenEdits.setInputWhen(services, constant, field, method)));
+                method -> done.accept(ScreenEdits.setInputWhen(services, constant, field,
+                        ScreenTypes.condition(method))));
         menu.getItems().addAll(result, info, sometimes, when, never, locked, new SeparatorMenuItem(), back, remove);
         return menu;
     }
@@ -151,7 +152,7 @@ final class ScreenHands {
         MenuButton menu = new MenuButton("⋯");
         menu.setTooltip(new Tooltip("Edit this way in"));
         menu.getItems().addAll(whileMenu("Open only while", when, method -> done.accept(
-                        ScreenEdits.setWayWhen(services, to, from, field, method))),
+                        ScreenEdits.setWayWhen(services, to, from, field, ScreenTypes.condition(method)))),
                 item("Remove this way in", () -> done.accept(ScreenEdits.removeWay(services, to, from, field))));
         return menu;
     }
@@ -161,7 +162,7 @@ final class ScreenHands {
         MenuButton menu = new MenuButton("⋯");
         menu.setTooltip(new Tooltip("When " + look + " shows"));
         menu.getItems().add(whileMenu("Shows only while", when, method -> done.accept(
-                ScreenEdits.setLookWhen(services, constant, look, method))));
+                ScreenEdits.setLookWhen(services, constant, look, ScreenTypes.condition(method)))));
         return menu;
     }
 
@@ -193,7 +194,8 @@ final class ScreenHands {
                 + link.label(), show));
         if (!link.back() && link.field() != null) {
             menu.getItems().add(whileMenu("Open only while", link.when(), method -> done.accept(
-                    ScreenEdits.setWayWhen(services, link.to(), link.from(), link.field(), method))));
+                    ScreenEdits.setWayWhen(services, link.to(), link.from(), link.field(),
+                            ScreenTypes.condition(method)))));
         }
         return menu;
     }
@@ -221,8 +223,9 @@ final class ScreenHands {
             menu.getItems().add(one);
         }
         if (!current.isEmpty() && !methods.contains(current)) {
-            // Written by hand, or its method since renamed: shown, so the user sees what the Java says.
-            RadioMenuItem kept = new RadioMenuItem(current + " (not found)");
+            // A fact's test (edit_map writes it), written by hand, or its method since renamed: shown, so the user
+            // sees what the Java says; picking another replaces it.
+            RadioMenuItem kept = new RadioMenuItem(ScreenTypes.isMethod(current) ? current + " (not found)" : current);
             kept.setToggleGroup(group);
             kept.setSelected(true);
             kept.setDisable(true);

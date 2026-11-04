@@ -1153,7 +1153,7 @@ final class MapTools {
 
     /** {@code input} with the method saying when it is there, as {@code look} names it; none keeps what it had. */
     private static Input brought(Input input, Look look) {
-        return look.when() == null ? input : input.when(ScreenTypes.typedCondition(look.when()));
+        return look.when() == null ? input : input.when(ScreenTypes.condition(look.when()));
     }
 
     /** {@code picture}, just cut, noted as another look of the input {@code look} names on the screen {@code at}. */
@@ -1213,7 +1213,7 @@ final class MapTools {
                 String field = buttonOf(screen, cut).orElseGet(() -> screen.fieldFor(cut.id()));
                 Markers set = marker ? marked(Markers.of(was), mark, cut) : Markers.of(was);
                 ScreenVariant told = was.markers(set.shown()).absent(set.absent());
-                ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.typedCondition(look.when()));
+                ScreenVariant marked = look.when() == null ? told : told.when(ScreenTypes.condition(look.when()));
                 List<Input> named = new ArrayList<>(was.inputs());
                 if (!named.contains(BotConstants.input(at.constant(), field))) {
                     named.add(BotConstants.input(at.constant(), field));

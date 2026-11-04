@@ -49,6 +49,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -1960,8 +1961,10 @@ class SdkAssistTest {
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tab")))
                 .withReadout("gold", Readout.digits(new Zone(0, 0, 10, 10), new DigitSet("digits/gold"))));
 
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
+                "Progress::gold", "test", "at_least", "value", "5").isRefused(), "no such fact yet");
         assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
-                "Params.when(Progress::gold).atLeast(5)").isRefused(), "no such fact yet");
+                "Params.when(Progress::gold).atLeast(5)").isRefused(), "a method is a method reference, never Java");
         assertTrue(run("edit_map", "screen", "Home", "action", "add_fact", "name", "gold", "holds", "number",
                 "field", "nothing").isRefused(), "no such readout");
         assertTrue(run("edit_map", "screen", "Nowhere", "action", "add_fact", "name", "gold", "holds", "number",
@@ -1972,7 +1975,7 @@ class SdkAssistTest {
         AgentReply added = run("edit_map", "screen", "Home", "action", "add_fact", "name", "gold", "holds", "number",
                 "field", "gold", "minutes", 30);
         assertFalse(added.isRefused(), text(added));
-        assertTrue(text(added).contains("Params.when(Progress::gold).atLeast(5)"), text(added));
+        assertTrue(text(added).contains("fact Progress::gold, test at_least or at_most, value 5"), text(added));
         ParameterWrite gold = host.parameters.getFirst();
         assertEquals("Progress", gold.group());
         assertEquals(0, gold.start());
@@ -1987,16 +1990,23 @@ class SdkAssistTest {
         assertFalse(run("edit_map", "action", "add_fact", "name", "rested", "holds", "flag").isRefused(), "no screen");
         assertEquals(Assumed.class.getName(), host.parameters.getLast().marks().getFirst().annotation());
 
-        AgentReply tested = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
-                "Params.when(Progress::gold).atLeast(5)");
+        AgentReply tested = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
+                "Progress::gold", "test", "at_least", "value", "5");
         assertFalse(tested.isRefused(), text(tested));
-        assertEquals("com.botmaker.sdk.api.params.Params.when(Progress::gold).atLeast(5)",
-                ScreenTypes.sourceOf(input("HOME", "tab").when()));
-        AgentReply wrongType = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
-                "Params.when(Progress::gold).isTrue()");
+        assertEquals(ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_LEAST, 5), input("HOME", "tab").when(),
+                "written as Params.when(Progress::gold).atLeast(5) and read back as the value it is");
+        AgentReply wrongType = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
+                "Progress::gold", "test", "is_true");
         assertTrue(wrongType.isRefused() && text(wrongType).contains("is a int"), text(wrongType));
-        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "method",
-                "Params.when(Progress::gold).is(Rank.TOP)").isRefused(), "a constant on a number does not compile");
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
+                "Progress::gold", "test", "is", "value", "Rank.TOP").isRefused(), "no int");
+        assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
+                "Progress::gold", "method", "Bot::eventOn", "test", "is", "value", "1").isRefused(), "one or the other");
+        AgentReply noFact = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "test",
+                "at_least", "value", "5");
+        assertTrue(noFact.isRefused() && text(noFact).contains("Give the fact"), text(noFact));
+        assertEquals(ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_LEAST, 5), input("HOME", "tab").when(),
+                "a test without its fact keeps the guard there");
 
         String facts = text(run("setup", "action", "game_facts"));
         assertTrue(facts.contains("Progress::gold int = 0, written 12 min ago"), facts);

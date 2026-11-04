@@ -36,11 +36,17 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.params.ParamCheck;
+import com.botmaker.plugin.host.grammar.JavaValue;
+import com.botmaker.plugin.host.grammar.ValueGrammar;
+import com.botmaker.sdk.api.params.Params;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -373,6 +379,28 @@ class ScreenTypesTest {
         assertEquals(BotConstants.screen("HOME"), BotConstants.screen("HOME"), "a reference equals one to the same");
     }
 
+    /** A test of a parameter is a typed chain: written on the When it holds, read back into the value it was. */
+    @Test
+    void aTestOfAParameterIsWrittenAndReadAsItsChain() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(ScreenTypes.WHEN_SHAPE, ScreenTypes.AT_LEAST_SHAPE,
+                ScreenTypes.AT_MOST_SHAPE, ScreenTypes.IS_SHAPE, ScreenTypes.IS_TRUE_SHAPE));
+        Map<String, ParamCheck> each = Map.of(
+                "Params.when(Progress::gold).atLeast(5)", ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_LEAST, 5),
+                "Params.when(Progress::gold).atMost(-2)", ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_MOST, -2),
+                "Params.when(Progress::name).is(\"a \\\"b\\\"\")",
+                ScreenTypes.test("Progress::name", ParamCheck.Test.IS, "a \"b\""),
+                "Params.when(Progress::open).isTrue()", ScreenTypes.test("Progress::open", ParamCheck.Test.IS_TRUE, null));
+        each.forEach((java, check) -> {
+            JavaValue written = grammar.write(BooleanSupplier.class, check).orElseThrow(() -> new AssertionError(java));
+            assertEquals(java, written.source());
+            assertTrue(written.imports().contains(Params.class.getName()), "the host imports Params");
+            // Read with no file around it, Params is named in full: a file names it by its import. A .when(…) part
+            // reads it as a BooleanSupplier (SdkAssistTest's facts); alone, an interface nothing declares reads nothing.
+            String qualified = Params.class.getPackageName() + "." + java;
+            assertEquals(check, grammar.read(ParamCheck.class, qualified).orElseThrow(() -> new AssertionError(qualified)));
+        });
+    }
+
     @Test
     void looksAndConditionsGoBackTogetherAsTheMethodsTheyName() {
         Button shop = Button.of(picture("shop")).looks(List.of(Look.of(picture("shop_badge"), BADGE),
@@ -382,18 +410,13 @@ class ScreenTypesTest {
         assertEquals(List.of(false, true), roundTrip(ScreenTypes.BUTTON_SHAPE, shop).looks().stream()
                 .map(look -> look.state().blocks()).toList());
         assertEquals("Firestone::shopOpen", ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE, shop).when()));
-        String test = "Params.when(Progress::gold).atLeast(5)";
-        assertEquals(test, ScreenTypes.sourceOf(roundTrip(ScreenTypes.BUTTON_SHAPE,
-                Button.of(picture("shop")).when(ScreenTypes.condition(test))).when()), "a test reads back as it is written");
-        assertEquals("com.botmaker.sdk.api.params." + test, ScreenTypes.sourceOf(ScreenTypes.typedCondition(test)),
-                "typed, its Params is named in full for the host to import");
-        assertTrue(ScreenTypes.isCondition("Params.when(Progress::rank).is(Progress.Rank.HIGH)"));
-        assertTrue(ScreenTypes.isCondition("Params.when(Progress::name).is(\"a\")"));
-        assertFalse(ScreenTypes.isCondition("Params.when(Progress::gold).atLeast(System.exit(0))"));
-        assertFalse(ScreenTypes.isCondition("Params.when(Progress::name).is(\"a\" + b)"));
-        assertEquals(new ScreenTypes.ParamTest("Progress", "open", "boolean"),
-                ScreenTypes.paramTest("Params.when(Progress::open).isTrue()").orElseThrow());
-        assertEquals("", ScreenTypes.paramTest("Params.when(Progress::rank).is(Rank.TOP1)").orElseThrow().type());
+        ParamCheck gold = ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_LEAST, 5);
+        Button guarded = Button.of(picture("shop")).when(gold);
+        assertEquals(guarded, roundTrip(ScreenTypes.BUTTON_SHAPE, guarded), "a test goes back as the value it is");
+        assertEquals("Progress::gold at least 5", ScreenTypes.sourceOf(gold));
+        assertEquals("Progress::gold", ScreenTypes.factOf(gold));
+        assertTrue(ScreenTypes.isMethod("Firestone::eventOn"));
+        assertFalse(ScreenTypes.isMethod("Params.when(Progress::gold).atLeast(5)"), "a test is no method's name");
         Button quality = Button.of(picture("quality_low")).keeps(picture("quality_high"));
         assertEquals(quality, roundTrip(ScreenTypes.BUTTON_SHAPE, quality), "a setting kept goes back with its look");
         Button speed = Button.cycling(List.of(picture("x1"), picture("x10"))).keeps(picture("x10"));

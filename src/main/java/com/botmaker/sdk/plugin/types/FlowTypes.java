@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.flow.NoBody;
 
 import java.util.List;
 import java.util.Map;
@@ -71,7 +72,7 @@ public final class FlowTypes implements TypeHolder {
     public List<ComponentType<?>> components() {
         return List.of(FLOW_SHAPE, FLOW_FROM_SUBFLOW_SHAPE, RUN_SHAPE, STEP_SHAPE, SUBFLOW_STEP_SHAPE, EDGE_SHAPE,
                 EDGE_INTO_SUBFLOW_SHAPE, EDGE_OUT_OF_SUBFLOW_SHAPE, EDGE_BETWEEN_SUBFLOWS_SHAPE, LIMITS_SHAPE,
-                LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE);
+                LAYOUT_SHAPE, CARDS_SHAPE, SPOT_SHAPE, NO_BODY_SHAPE);
     }
 
     /**
@@ -90,8 +91,7 @@ public final class FlowTypes implements TypeHolder {
         static final Held<Run, String> SETUP = Held.as(String.class, run -> sourceOf(run.setup()));
 
         static final Held<Flow.Step, Activity> CARD = Held.as(Activity.class, Flow.Step::activity);
-        static final Held<Flow.Step, String> BODY = Held.as(String.class,
-                step -> bodyLiteral(sourceOf(step.body())));
+        static final Held<Flow.Step, Object> BODY = Held.as(Object.class, step -> held(step.body()));
         static final Held<Flow.Step, Activity> OFF = Held.as(Activity.class, FlowTypes::offActivity);
 
         static final Held<Flow.Edge, Flow> VIA = Held.as(Flow.class, Flow.Edge::via);
@@ -109,22 +109,14 @@ public final class FlowTypes implements TypeHolder {
 
     // ---- the leaves' codecs ----------------------------------------------------------------------------
 
-    /** How "drawn, not written yet" is spelled in a file — fully qualified, as all of these are. */
-    private static final String NO_BODY = ActivityBody.class.getName() + ".none()";
+    /** {@code ActivityBody.none()}: the card nobody has written yet, written as the call that says so. */
+    public static final DeclaredCall<NoBody> NO_BODY_SHAPE = ComponentType.part(NoBody.class)
+            .<ActivityBody<Outcome>>writtenAs(ActivityBody::none);
 
-    /** A blank body is the card nobody has written yet, and it is written as the call that says so. */
-    private static String bodyLiteral(String reference) {
-        return reference == null || reference.isBlank() ? NO_BODY : reference;
-    }
-
-    /**
-     * The body as the editor draws it: blank for the call that says "not written yet", which is what a card
-     * with no method behind it is, and anything else exactly as written.
-     */
-    private static String bodyOf(String written) {
-        String source = written.strip();
-        boolean none = source.equals(NO_BODY) || source.equals(ActivityBody.class.getSimpleName() + ".none()");
-        return none ? "" : written;
+    /** What a card's body part gives to be written: its method reference's text, or {@link ActivityBody#none()}. */
+    private static Object held(ActivityBody<?> body) {
+        String source = sourceOf(body);
+        return source.isBlank() ? ActivityBody.none() : source;
     }
 
     // ---- the containers --------------------------------------------------------------------------------
@@ -219,10 +211,13 @@ public final class FlowTypes implements TypeHolder {
         return step.whenOff() instanceof Activity activity ? activity : Activity.NONE;
     }
 
-    /** The card for {@code activity} running {@code body} as written, or null for no activity or body. */
-    private static Flow.Step card(Activity activity, String body) {
+    /**
+     * The card for {@code activity} running {@code body}: a method reference as written, or blank for
+     * {@link ActivityBody#none()}, the card with no method behind it yet. Null for no activity or body.
+     */
+    private static Flow.Step card(Activity activity, Object body) {
         if (activity == null || activity.isNone() || body == null) return null;
-        return step(activity, new Named(bodyOf(body)));
+        return step(activity, new Named(body instanceof String source ? source : ""));
     }
 
     /** {@code step} going on to {@code to} when switched off: {@code .whenOff(…)} for an activity held by name. */

@@ -18,6 +18,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -219,17 +220,20 @@ class FlowTypesTest {
         assertEquals(List.of(Activity.class.getField("NONE")), SdkTypes.ACTIVITY.constants());
     }
 
-    /** A body the file writes is kept exactly as written, whatever it is; only the "none yet" call reads blank. */
+    /**
+     * A body the file writes is kept exactly as written, whatever it is; the "none yet" call is a value of its
+     * own, read blank and given back as {@link ActivityBody#none()} for its declared call to write.
+     */
     @Test
     void aBodyIsKeptAsWritten() {
         for (String written : List.of("Collect::body", "() -> Activities.Collect.NEXT")) {
             Flow.Step read = FlowTypes.STEP_SHAPE.build(List.of(COLLECT, written));
             assertEquals(written, FlowTypes.sourceOf(read.body()));
         }
-        Flow.Step none = FlowTypes.STEP_SHAPE.build(List.of(COLLECT, "ActivityBody.none()"));
+        Flow.Step none = FlowTypes.STEP_SHAPE.build(List.of(COLLECT, ActivityBody.none()));
         assertEquals("", FlowTypes.sourceOf(none.body()));
-        assertEquals("com.botmaker.sdk.api.flow.ActivityBody.none()",
-                FlowTypes.STEP_SHAPE.components(none).get(1), "and is written back as the call that says so");
+        assertSame(ActivityBody.none(), FlowTypes.STEP_SHAPE.components(none).get(1),
+                "and is written back as the call that says so");
     }
 
     /** An activity whose body the editor read out of a file is a <em>name</em>, and running one says so. */

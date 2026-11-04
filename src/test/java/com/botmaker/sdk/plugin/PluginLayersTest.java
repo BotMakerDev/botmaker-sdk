@@ -33,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *   <li><b>Rule 4</b> (2026-10-01): {@code api} is what a bot writes, in packages named by what a bot does, and
  *       no public {@code api} signature names an {@code internal} type — a bot could not write the type down,
  *       so a call that took or returned one would be a block nobody can fill.</li>
+ *   <li><b>Rule 5</b> (2026-11-04): no class under {@code plugin} splices Java text; it writes a value by the
+ *       call declared for it.</li>
  * </ul>
  *
  * <p>Only code is scanned: a comment line may name anything, so a javadoc explaining why {@code api} does not
@@ -105,6 +107,34 @@ class PluginLayersTest {
         }));
         assertEquals(List.of(), cycles, "a package under plugin/ depends one way or not at all");
     }
+
+    /**
+     * Rule 5 (2026-11-04): no class under {@code plugin} splices Java text. A value is written by the call
+     * that makes it, declared to the host's grammar; a class name joined to {@code ".none()"} or a literal
+     * {@code "Params.when("} joined to a part is Java built by hand, which is what the grammar is for.
+     */
+    @Test
+    void noPluginClassSplicesJava() {
+        List<String> offences = new ArrayList<>();
+        for (Path file : sources(ROOT.resolve("plugin"))) {
+            List<String> lines = read(file);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).strip();
+                if (isComment(line)) continue;
+                if (JAVA_SPLICE.matcher(line).find()) offences.add(ROOT.relativize(file) + ":" + (i + 1) + " " + line);
+            }
+        }
+        assertEquals(List.of(), offences, "plugin/ writes a value by its declared call, never as text");
+    }
+
+    /**
+     * Java joined by hand: a class's name followed by a member ({@code X.class.getName() + ".none()"}), a call's
+     * opening ({@code "Params.when(" + part}), or a statement's ({@code "new Foo(" + …}, {@code "return " + …}).
+     */
+    private static final Pattern JAVA_SPLICE = Pattern.compile(
+            "get(Simple)?Name\\(\\)\\s*\\+\\s*\"[.(:]"
+                    + "|\"[A-Za-z_][A-Za-z0-9_.]*\\.[a-z][A-Za-z0-9_]*\\(\"\\s*\\+"
+                    + "|\"(new [A-Z][A-Za-z0-9_.]*[ (<]?|return )\"\\s*\\+");
 
     /** Rule 4: the packages a bot's Java imports from, each named by what a bot does with it. */
     @Test

@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's editor writes no Java text** (2026-11-04). A screen's `when` that tests a fact,
+  `Params.when(Progress::gold).atLeast(5)`, is a typed value (`ParamCheck`) written and read through declared
+  calls, `Params::when` and `When::atLeast`/`atMost`/`is`/`isTrue`; an activity not written yet is
+  `ActivityBody.none()`, a declared call of its own. `PluginLayersTest` fails a `plugin/` class that splices
+  Java (Rule 5).
+- **edit_map's way_when, input_when and look_when take a fact by fields** (2026-11-04): `fact`
+  (`Progress::gold`), `test` (`at_least`, `at_most`, `is`, `is_true`) and `value`, checked against the fact's
+  type, in place of Java in `method`. `method` takes a method reference only, as do crop_pictures' `when` and
+  the Screens window's menus. A test against a constant of the bot's own type is refused: write it in the bot's
+  Java.
 - **The SDK's holders are `SdkValue.Holder` constants** (2026-11-04), following the contract: every `.in` names
   one, and `SdkValues.HOLDER` is gone. Each holder keeps the class name bots already have (`Sdk`, `Flows`,
   `Pictures`, `Screens`, …), so no bot moves; `SdkHoldersTest` pins them.

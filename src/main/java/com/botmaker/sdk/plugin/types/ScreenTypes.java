@@ -43,12 +43,11 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.params.ParamCheck;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.BooleanSupplier;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -79,7 +78,8 @@ public final class ScreenTypes implements TypeHolder {
                 READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, READOUT_ELEMENT_SHAPE, MARK_PICTURE_SHAPE, MARK_TEXT_SHAPE,
                 MARK_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
-                PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE);
+                PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE, WHEN_SHAPE, AT_LEAST_SHAPE,
+                AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE);
     }
 
     /**
@@ -98,15 +98,18 @@ public final class ScreenTypes implements TypeHolder {
             .<BooleanSupplier>with(Setup::fromWhen, Parts.SETUP_FROM_WHEN.part(ScreenTypes::condition));
 
     /**
-     * The conditions, each a method reference crossing as the text it is written as, {@code Firestone::eventOn}: a
-     * name the editor holds and never asks (the user's call, 2026-10-15). An expression is a bot method of its own.
+     * The conditions: a method reference crossing as the text it is written as, {@code Firestone::eventOn}, a name the
+     * editor holds and never asks (the user's call, 2026-10-15), or a test of a parameter, a typed value
+     * ({@link #WHEN_SHAPE}). An expression is a bot method of its own.
      */
     private static final class Parts {
-        static final Held<Way, String> WAY_WHEN = Held.as(String.class, way -> sourceOf(way.when()));
-        static final Held<Setup, String> SETUP_FROM_WHEN = Held.as(String.class,
-                setup -> setup.from() == null ? "" : sourceOf(setup.from().when()));
-        static final Held<Input, String> INPUT_WHEN = Held.as(String.class, input -> sourceOf(input.when()));
-        static final Held<ScreenVariant, String> VARIANT_WHEN = Held.as(String.class, v -> sourceOf(v.when()));
+        static final Held<Way, Object> WAY_WHEN = Held.as(Object.class, way -> held(way.when()));
+        static final Held<Setup, Object> SETUP_FROM_WHEN = Held.as(Object.class,
+                setup -> setup.from() == null ? "" : held(setup.from().when()));
+        static final Held<Input, Object> INPUT_WHEN = Held.as(Object.class, input -> held(input.when()));
+        static final Held<ScreenVariant, Object> VARIANT_WHEN = Held.as(Object.class, v -> held(v.when()));
+        static final Held<Params.When, String> WHEN_PARAMETER = Held.as(String.class,
+                when -> when.parameter() instanceof NamedParameter(String source) ? source : "");
     }
 
     /**
@@ -368,62 +371,90 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<Pick> PICK_CELL_SHAPE = ComponentType.part(Pick.class)
             .<Integer, Integer, Pick>writtenAs(Pick::cell, Pick::nth, Pick::column);
 
-    /** A condition that only knows what it is written as — {@code Firestone::eventOn} — or {@code null}. */
-    public static BooleanSupplier condition(String source) {
-        return source == null || source.isBlank() ? null : new NamedCondition(source);
+    /*
+     * A test of a during-a-run parameter, Params.when(Progress::gold).atLeast(5), is a typed chain (2026-11-04): the
+     * When is Params::when of the parameter's method reference, and each link of it a ParamCheck of its own shape,
+     * written on the When it holds.
+     */
+
+    /** {@code Params.when(Progress::gold)}: the parameter, as the method reference it is written as. */
+    public static final DeclaredCall<Params.When> WHEN_SHAPE = ComponentType.part(Params.When.class)
+            .<Params.Of, Params.When>writtenAs(Params::when, Parts.WHEN_PARAMETER.part(ScreenTypes::parameter));
+
+    /** {@code <when>.atLeast(5)}. */
+    public static final DeclaredCall<ParamCheck> AT_LEAST_SHAPE = ComponentType.part(ParamCheck.class)
+            .<Params.When, Object, Condition>writtenAs(Params.When::atLeast, ParamCheck::when, ParamCheck::value);
+
+    /** {@code <when>.atMost(5)}. */
+    public static final DeclaredCall<ParamCheck> AT_MOST_SHAPE = ComponentType.part(ParamCheck.class)
+            .<Params.When, Object, Condition>writtenAs(Params.When::atMost, ParamCheck::when, ParamCheck::value);
+
+    /** {@code <when>.is("gold")}. */
+    public static final DeclaredCall<ParamCheck> IS_SHAPE = ComponentType.part(ParamCheck.class)
+            .<Params.When, Object, Condition>writtenAs(Params.When::is, ParamCheck::when, ParamCheck::value);
+
+    /** {@code <when>.isTrue()}. */
+    public static final DeclaredCall<ParamCheck> IS_TRUE_SHAPE = ComponentType.part(ParamCheck.class)
+            .<Params.When, Condition>writtenAs(Params.When::isTrue, ParamCheck::when);
+
+    /**
+     * The condition a {@code .when(…)} part holds: a method reference, {@code Firestone::eventOn}, as the text it is
+     * written as, or {@code null} when blank; a test of a parameter as the value it is.
+     */
+    public static BooleanSupplier condition(Object held) {
+        return switch (held) {
+            case BooleanSupplier typed -> typed;
+            case String source when !source.isBlank() -> new NamedCondition(source.strip());
+            case null, default -> null;
+        };
+    }
+
+    /** What a {@code .when(…)} part gives to be written: a method reference's text, a test as itself, or {@code ""}. */
+    private static Object held(BooleanSupplier condition) {
+        return condition instanceof NamedCondition(String source) ? source
+                : condition instanceof ParamCheck check ? check : "";
     }
 
     private static final Pattern METHOD = Pattern.compile("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*::[A-Za-z_$][\\w$]*");
 
-    /** {@code Params.when(Progress::gold).atLeast(5)}: one group, one parameter, one literal test. */
-    private static final Pattern PARAM_TEST = Pattern.compile("Params\\.when\\(([A-Za-z_$][\\w$]*)::([A-Za-z_$][\\w$]*)\\)"
-            + "\\.(?:(atLeast|atMost)\\((-?\\d+)\\)|(isTrue)\\(\\)|is\\((-?\\d+|true|false|\"[^\"\\\\\\n]*\""
-            + "|[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*)\\))");
-
     /**
-     * What a typed condition tests of a during-a-run parameter.
-     *
-     * @param type the parameter's type the test needs, {@code int}, {@code boolean} or {@code String}; blank: a
-     *             constant, of a type of the bot's
+     * Whether {@code name} is a method reference, {@code Firestone::eventOn}: what a condition or a tested parameter
+     * is named by. A reference crosses as its text, so anything else is refused before it is written.
      */
-    public record ParamTest(String group, String name, String type) {}
+    public static boolean isMethod(String name) {
+        return name != null && METHOD.matcher(name.strip()).matches();
+    }
 
-    /** What {@code source} tests when it is {@code Params.when(Progress::gold).atLeast(5)}; else empty. */
-    public static Optional<ParamTest> paramTest(String source) {
-        if (source == null) return Optional.empty();
-        Matcher test = PARAM_TEST.matcher(source.strip());
-        if (!test.matches()) return Optional.empty();
-        String type = "";
-        String literal = test.group(6);
-        if (test.group(3) != null) type = "int";
-        else if (test.group(5) != null) type = "boolean";
-        else if (literal.startsWith("\"")) type = "String";
-        else if (literal.equals("true") || literal.equals("false")) type = "boolean";
-        else if (literal.matches("-?\\d+")) type = "int";
-        return Optional.of(new ParamTest(test.group(1), test.group(2), type));
+    /** {@code fact}, a parameter's method reference ({@code Progress::gold}), tested by {@code test} against {@code value}. */
+    public static ParamCheck test(String fact, ParamCheck.Test test, Object value) {
+        return new ParamCheck(Params.when(parameter(fact)), test, test == ParamCheck.Test.IS_TRUE ? null : value);
+    }
+
+    /** The parameter a {@code Params.when(…)} names, as its method reference's text. */
+    private static Params.Of<?, ?> parameter(String reference) {
+        return new NamedParameter(reference.strip());
+    }
+
+    /** The method reference of the parameter {@code check} tests, {@code Progress::gold}, or {@code ""}. */
+    public static String factOf(BooleanSupplier check) {
+        return check instanceof ParamCheck(Params.When<?> when, var test, var value)
+                && when.parameter() instanceof NamedParameter(String source) ? source : "";
     }
 
     /**
-     * Whether {@code source} is a method reference, {@code Firestone::eventOn}, a test of a parameter,
-     * {@code Params.when(Progress::gold).atLeast(5)}, or blank: what an edit may write as a condition. The source goes
-     * into the bot's Java as written, so anything else is refused before it is.
+     * How {@code condition} reads to a person: a method reference as written, {@code Firestone::eventOn}, a test as
+     * {@code Progress::gold at least 5}; {@code ""} for none or a live one.
      */
-    public static boolean isCondition(String source) {
-        return source == null || source.isBlank() || METHOD.matcher(source.strip()).matches()
-                || paramTest(source).isPresent();
-    }
-
-    /**
-     * The condition a person or Claude typed, to write: as {@link #condition}, with {@code Params} named in full so
-     * the host imports it. What a file already says is read by {@link #condition}, as it says it.
-     */
-    public static BooleanSupplier typedCondition(String source) {
-        return condition(paramTest(source).isPresent() ? Params.class.getName() + source.strip().substring(6) : source);
-    }
-
-    /** How {@code condition} is written, or {@code ""} for none or a live one. */
     public static String sourceOf(BooleanSupplier condition) {
-        return condition instanceof NamedCondition(String source) ? source : "";
+        if (condition instanceof NamedCondition(String source)) return source;
+        if (!(condition instanceof ParamCheck(var when, ParamCheck.Test test, Object value))) return "";
+        String fact = factOf(condition);
+        return switch (test) {
+            case AT_LEAST -> fact + " at least " + value;
+            case AT_MOST -> fact + " at most " + value;
+            case IS -> fact + " is " + (value instanceof String text ? "\"" + text + "\"" : value);
+            case IS_TRUE -> fact + " is true";
+        };
     }
 
     /**
@@ -435,6 +466,18 @@ public final class ScreenTypes implements TypeHolder {
         @Override
         public Answer answer() {
             return Answer.UNKNOWN;
+        }
+    }
+
+    /**
+     * A parameter as the method reference it is written as, {@code Progress::gold}: what the editor holds of a
+     * {@code Params.when(…)}, with no classpath to call it on.
+     */
+    record NamedParameter(String source) implements Params.Of<Object, Object> {
+
+        @Override
+        public Object apply(Object group) {
+            throw new UnsupportedOperationException(source + " is only its name here");
         }
     }
 }
