@@ -55,6 +55,16 @@ class ParamsTest {
     }
 
     @Test
+    void aValueOfAnotherTypeIsRefusedAndNeverWritten() throws IOException {
+        String before = Files.readString(file);
+
+        assertThrows(IllegalArgumentException.class, () -> Params.set(Progress::level, "System.exit(0)"));
+        assertThrows(IllegalArgumentException.class, () -> Params.set(Progress::level, null));
+
+        assertEquals(before, Files.readString(file));
+    }
+
+    @Test
     void valuesOfEveryKindAreSpelled() throws IOException {
         Params.set(Progress::rank, Progress.Rank.HIGH);
         Params.set(Progress::open, true);

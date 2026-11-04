@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **`Params.set` refuses a value of another type** (2026-11-04): generics let `T` widen to `Object`, so a `String` could
+  reach an `int` parameter and be written as Java source; it now throws `IllegalArgumentException` and writes nothing.
 - **A run writes its own parameters** (2026-11-04): `Params.set(Progress::level, 5)` keeps a
   `@Param.Shown(changes = DURING_RUN)` parameter in `params/` and the run sees it at once through
   `Params.get(Progress::level)`; `Params.when(Progress::level).atLeast(5)` is a condition for any `.when(…)`. A value

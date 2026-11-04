@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.trace.Say;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.invoke.MethodType;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -59,6 +60,13 @@ public final class RunParams {
         if (shown == null || shown.changes() != Param.Changes.DURING_RUN) {
             throw new IllegalArgumentException(name(parameter) + " changes outside a run, so a run cannot set it: mark "
                     + "it @Param.Shown(changes = Param.Changes.DURING_RUN).");
+        }
+        // The generics let a String through to any parameter (T widens to Object); the grammar would write some such
+        // text as Java, and the next read of the value would not be of the parameter's type.
+        Class<?> type = MethodType.methodType(parameter.getReturnType()).wrap().returnType();
+        if (value == null ? parameter.getReturnType().isPrimitive() : !type.isInstance(value)) {
+            throw new IllegalArgumentException(name(parameter) + " holds a " + type.getSimpleName() + ", not "
+                    + (value == null ? "null" : "a " + value.getClass().getSimpleName()) + ".");
         }
         synchronized (RunParams.class) {
             boolean same = SET.containsKey(parameter) && Objects.equals(SET.get(parameter), value);
