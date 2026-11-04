@@ -103,7 +103,7 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   Move the sample bot off the deprecated element in N, so `SampleBotCompileTest` stays green in N+1.
 - **The palette is discovered, never listed**: `@Palette` marks what is offered, value types carry nothing.
 - **No class under `plugin/` reads or writes Java text**; an editor reads the value and hands one back.
-- **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`) and run properties; no reader of
+- **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`, its private `params/`) and run properties; no reader of
   the old files** (`plugin-values.md`). A managed value's shape changes freely: nothing converts it, and
   Studio's upgrade repairs what no longer reads (`../docs/refactor/25-compatibility.md` §12).
 - **A type is declared once, in `plugin/types/SdkTypes`**; the two string factories in `declaration.md` stay.
