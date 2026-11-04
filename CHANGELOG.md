@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run's text is never written as Java** (2026-11-04): `Params.set` writes a value as data at any depth, so text read
+  off a game cannot become code, even inside a list; such a value stays in memory for the run and the file is left alone.
 - **`Params.set` refuses a value of another type** (2026-11-04): generics let `T` widen to `Object`, so a `String` could
   reach an `int` parameter and be written as Java source; it now throws `IllegalArgumentException` and writes nothing.
 - **A run writes its own parameters** (2026-11-04): `Params.set(Progress::level, 5)` keeps a

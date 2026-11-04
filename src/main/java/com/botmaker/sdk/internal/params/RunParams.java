@@ -151,7 +151,7 @@ public final class RunParams {
             ParamsFitter.onDisk(params, project.resolve(ParamsFitter.STARTING), project.resolve(BACKUPS));
         }
         if (!Files.isRegularFile(file)) throw new IOException(file + " does not exist");
-        JavaValue spelled = grammar().spell(parameter.getGenericReturnType(), value)
+        JavaValue spelled = grammar().spellData(parameter.getGenericReturnType(), value)
                 .orElseThrow(() -> new IOException("no plugin can write a " + parameter.getReturnType().getSimpleName()));
         String source = Files.readString(file);
         String written = ParamValues.withReturned(source, group.getSimpleName(), parameter.getName(), spelled)

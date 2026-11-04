@@ -1,8 +1,10 @@
 package com.botmaker.sdk.internal.params.fixture.params.bot;
 
 import com.botmaker.plugin.api.params.Param;
+import com.botmaker.sdk.api.capture.CaptureSource;
 
 import java.time.Duration;
+import java.util.List;
 
 /** A bot's parameter group, for {@code ParamsTest}. */
 @Param
@@ -25,6 +27,9 @@ public class Progress {
 
     @Param.Shown(changes = Param.Changes.DURING_RUN)
     public Object unspellable() { return null; }
+
+    @Param.Shown(changes = Param.Changes.DURING_RUN)
+    public List<CaptureSource> sources() { return List.of(); }
 
     public int tries() { return 10; }
 }

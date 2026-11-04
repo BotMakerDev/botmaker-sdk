@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -84,6 +85,17 @@ class ParamsTest {
         Params.set(Progress::unspellable, value);
 
         assertEquals(value, Params.get(Progress::unspellable));
+        assertEquals(before, Files.readString(file));
+    }
+
+    /** Text a run read off a game is never written as Java, under a type that takes its source elsewhere. */
+    @Test
+    void aRunsTextIsNeverWrittenAsJava() throws IOException {
+        String before = Files.readString(file);
+        Params.Of<Progress, Object> sources = Progress::sources;
+
+        Params.set(sources, List.of("System.exit(0)"));
+
         assertEquals(before, Files.readString(file));
     }
 
