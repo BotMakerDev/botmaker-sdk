@@ -3,12 +3,24 @@ package com.botmaker.sdk.internal.config;
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.sdk.api.bot.SdkValue;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.jar.JarEntry;
+import java.util.stream.Stream;
 
 /**
  * What a run reads its values from: each class {@code Bot.runFlow} is handed — {@code Sdk.class}, the bot's data —
@@ -63,6 +75,68 @@ public final class ParamGroups {
             }
         }
         return out;
+    }
+
+    /**
+     * Every top-level class of the bot's {@code params} package, at any depth: the bot found from the first of
+     * {@code holders} under its {@code plugins} package, in that holder's class loader. A class that cannot be loaded
+     * is left out; loading initialises none.
+     */
+    public static List<Class<?>> allBeside(Class<?>... holders) {
+        for (Class<?> holder : holders == null ? new Class<?>[0] : holders) {
+            int at = holder == null ? -1 : holder.getName().lastIndexOf(PLUGINS);
+            if (at < 0) continue;
+            String root = (holder.getName().substring(0, at) + PARAMS.substring(0, PARAMS.length() - 1)).replace('.', '/');
+            ClassLoader loader = holder.getClassLoader();
+            Set<String> names = new TreeSet<>();
+            try {
+                for (URL folder : Collections.list(loader.getResources(root))) {
+                    names.addAll(classesUnder(folder, root));
+                }
+            } catch (IOException | RuntimeException unlisted) {
+                return List.of();
+            }
+            List<Class<?>> out = new ArrayList<>();
+            for (String name : names) {
+                try {
+                    out.add(Class.forName(name, false, loader));
+                } catch (ClassNotFoundException | LinkageError unloadable) {
+                    // not a class this run can read a value from
+                }
+            }
+            return out;
+        }
+        return List.of();
+    }
+
+    /** The binary names of the top-level classes under {@code root}, a resource path found at {@code folder}. */
+    private static List<String> classesUnder(URL folder, String root) throws IOException {
+        if (folder.openConnection() instanceof JarURLConnection jar) {
+            try (Stream<JarEntry> entries = jar.getJarFile().stream()) {
+                return entries.map(JarEntry::getName).filter(name -> name.startsWith(root + "/"))
+                        .filter(ParamGroups::isTopLevelClass).map(ParamGroups::binaryName).toList();
+            }
+        }
+        if (!"file".equals(folder.getProtocol())) return List.of();
+        Path base;
+        try {
+            base = Path.of(folder.toURI());
+        } catch (URISyntaxException unreadable) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.walk(base)) {
+            return files.filter(Files::isRegularFile)
+                    .map(file -> root + "/" + base.relativize(file).toString().replace(File.separatorChar, '/'))
+                    .filter(ParamGroups::isTopLevelClass).map(ParamGroups::binaryName).toList();
+        }
+    }
+
+    private static boolean isTopLevelClass(String path) {
+        return path.endsWith(".class") && !path.substring(path.lastIndexOf('/') + 1).contains("$");
+    }
+
+    private static String binaryName(String path) {
+        return path.substring(0, path.length() - ".class".length()).replace('/', '.');
     }
 
     /** The {@code @Param} class beside {@code holder} — its {@code plugins} segment read as {@code params} — or null. */

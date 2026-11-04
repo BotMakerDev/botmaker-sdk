@@ -1,9 +1,11 @@
 package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 
 import samplebot.SampleBot;
+import samplebot.params.bot.Progress;
 
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
@@ -48,6 +50,7 @@ public final class Screens {
     public static final class Shop extends Screen {
         public final Button item = Button.of(Pictures.ITEM).dragsOnto(Pictures.BAG).dragTime(Duration.ofMillis(500));
         public final Button buy = Button.of(Pictures.BUY).place(Place.below(Pictures.ITEM)).repeated()
+                .when(Params.when(Progress::gold).atLeast(5))
                 .looks(List.of(Look.of(Pictures.BUY_MAXED, States.Blocks.MAXED)));
         public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried();
         public final Mark bag = Mark.of(Pictures.BAG);

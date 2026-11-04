@@ -33,17 +33,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   computer's, with a committed starting copy under `starting-params/`. `runFlow(Sdk.class)` finds the group from
   the holder (`…plugins.<g>.<a>.Sdk` reads `…params.<g>.<a>.Sdk`). `launchTargets()` and `vm()` are the
   author's bot data now: static `@SdkValue` methods of the holder `Sdk`, no longer `@Param` fields.
-- **Game facts, kept between runs** (`api.state.Fact`, `api.state.GameState`). A bot's `Facts` class beside
-  `Screens` declares what the game shows of the account: `Fact.number(Screens.Home.class, home -> home.level)`,
-  `Fact.read(…)` (text, `.as(HeroClass.class)` for an enum's constant), `Fact.shown(…)` (an element in the tree) and
-  `Fact.set()` (a step's yes or no, `GameState.set(Facts.TUTORIAL_DONE, true)`). Each is read whenever a run is on its
-  screen and its reading is older than `.staleAfter(…)` (1 h unless said), never by going there for it;
-  `GameState.refresh` goes there for a flow that needs it fresh. A fact never read, or stale, is unknown, and its
-  conditions (`atLeast`, `atMost`, `is`, `isTrue`) say unknown, so a way it guards stays open; `.assume(value)` answers
-  until the first reading. Values are this machine's: JSON in the SDK's state folder of the bot,
-  `.botmaker/plugins/com_github_botmakerdev/botmaker_sdk/targets/<target>/game.json`, never in git, a publish or a
-  `.bmk`. A fact marked `.account()` keeps the others apart per account (`targets/<target>/<account>/game.json`). A
-  file that does not read leaves every fact unknown, said once; an entry that does not read is read again.
+- **Game facts, parameters written during a run** (2026-11-04): a `@Param @GameState` class in `params/` declares what
+  the game shows, each method a fact, its body the value and `@Param.Kept(at)` when a run wrote it: private to this
+  computer, never in git, a publish or a `.bmk`. `@ReadOn(screen = Screens.Home.class, field = "level")` says where it
+  is read (`int`, `boolean` as shown or not, `String`, an enum's constant); whenever a run is on that screen and the
+  value is older than `@StaleAfter(minutes = …)` (1 h unless said) it is read, never by going there for it;
+  `Params.refresh` goes there for a flow that needs it fresh. A fact never written, or stale, is unknown
+  (`Params.known`), and its conditions (`Params.when(…).atLeast`, `atMost`, `is`, `isTrue`) say unknown, so a way it
+  guards stays open; `@Assumed` answers the method's value until written; `Params.forget` sets it back. A game account
+  is a plain parameter of the bot: the SDK keeps nothing per account.
 
 - **Conditions answer yes, no or unknown** (`api.screens.Answer`, `api.screens.Condition`). Any `.when(…)` takes a
   `Condition`: `Condition.of(GameLogic::eventOn)` (true yes, false no, a throw unknown), `Condition.all`, `any` and
