@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's open step asks and starts only where there is a screen** (2026-11-05). The core hosts the plugin too,
+  so the offer to move pictures and, on Windows, the VM keeper run only when `hasUi()` is true.
 - **`Params.set` writes at the running bot's Java** (2026-11-05): a during-a-run value is written at the bot JVM's
   `Runtime.version().feature()` (`JavaLevel.running()`), so a long String in a pre-15 bot is a plain literal.
 - **The value grammar comes from `botmaker-java`** (2026-11-04): it left `botmaker-plugin-host`, and JDT arrives with it

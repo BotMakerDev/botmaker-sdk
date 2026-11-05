@@ -91,11 +91,15 @@ public final class SdkPlugin extends DeclaredPlugin {
      * plugin half's warnings go to its log. A project whose pictures are still at its resources' root is asked about
      * moving them into the SDK's folder ({@link MoveOffer}). On Windows, the game VMs' shutdown settings are applied
      * while a project is open.
+     *
+     * <p>This runs once in each process that hosts the plugin (the core and Studio, since the core's phase 10c): the
+     * offer is a dialog and the VMs are the user's machine's, so both happen once, where there is a screen.
      */
     private static void opened(StudioServices services) {
         SdkLog.bind(services);
         GameButton.bind(services);
         GameReady.bind(services);
+        if (!services.hasUi()) return;
         MoveOffer.offer(services);
         if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }
