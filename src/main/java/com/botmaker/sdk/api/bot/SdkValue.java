@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * public class Running {
  *
  *     @SdkValue(SdkValue.Id.DO_SETUP)
- *     @Param.Shown(category = "Run", description = "Set the game up first")
+ *     @Param.Shown(description = "Set the game up first")
  *     public boolean doSetup() {
  *         return true;
  *     }

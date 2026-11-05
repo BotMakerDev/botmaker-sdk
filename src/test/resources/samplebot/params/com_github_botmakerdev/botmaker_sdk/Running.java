@@ -10,14 +10,13 @@ import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Flows;
 public class Running {
 
     @SdkValue(SdkValue.Id.FLOW)
-    @Param.Shown(category = "Run", description = "Which flow the bot runs")
+    @Param.Shown(description = "Which flow the bot runs")
     public Flow flow() {
         return Flows.MAIN;
     }
 
     @SdkValue(SdkValue.Id.DO_SETUP)
-    @Param.Shown(category = "Run",
-            description = "Set the game up first: tick it on a new computer or after changing a game setting")
+    @Param.Shown(description = "Set the game up first: tick it on a new computer or after changing a game setting")
     public boolean doSetup() {
         return true;
     }

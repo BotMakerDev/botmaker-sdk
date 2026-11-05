@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's parameters carry no category** (2026-11-05): the Parameters window lists them under their groups,
+  `Running` and `Game`. The sample bot's `params/` follows.
+
 - **The SDK's parameters sit in two groups, and `skip` is gone** (2026-11-05). `flow` and `doSetup` are methods of
   `params/com_github_botmakerdev/botmaker_sdk/Running.java`, `launchTarget` and `captureSource` of `Game.java`
   beside it; each group is a heading of the Parameters window. On its next open Studio moves each method from the

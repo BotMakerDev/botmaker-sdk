@@ -220,9 +220,6 @@ public final class SdkValues implements ValueHolder {
             .because("This is the size the bot's pictures were cut at. The first picture cut sets it; a private"
                     + " display is made at it and a game window is resized to it when the bot starts.");
 
-    /** The run parameters' heading in the Runner and the Parameters window. */
-    private static final String RUN_CATEGORY = "Run";
-
     private static final String RUN_PARAM = "The SDK reads this parameter in the bot's main. Change its value in the"
             + " Runner or in Project ▸ Parameters.";
 
@@ -233,19 +230,16 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedParam<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
             .in(SdkValue.Holder.RUNNING)
             .startsAs(SdkValues::noFlow)
-            .shown(RUN_CATEGORY, "Which flow the bot runs", Param.Visibility.PUBLIC)
+            .shown("Which flow the bot runs", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** Whether a run sets the game up first — {@code public boolean doSetup()}. */
     public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
             .in(SdkValue.Holder.RUNNING)
             .startsAs(SdkValues::setUpFirst)
-            .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
+            .shown("Set the game up first: tick it on a new computer or after changing a game"
                     + " setting", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
-
-    /** The game parameters' heading in the Runner and the Parameters window. */
-    private static final String GAME_CATEGORY = "Game";
 
     private static final String GAME_PARAM = "The SDK reads this parameter when the bot starts its game. Pick the"
             + " game in 🎮 Game, in the Runner or in Project ▸ Parameters.";
@@ -271,7 +265,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedParam<LaunchChoice> LAUNCH_TARGET = ManagedValue.param(SdkValue.Id.LAUNCH_TARGET)
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::firstAvailable)
-            .shown(GAME_CATEGORY, "Which of the bot's games this computer launches", Param.Visibility.PUBLIC)
+            .shown("Which of the bot's games this computer launches", Param.Visibility.PUBLIC)
             .because(GAME_PARAM);
 
     /**
@@ -282,7 +276,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::wholeDesktop)
-            .shown(GAME_CATEGORY, "The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
+            .shown("The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
             .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source, in the Runner or in"
                     + " Project ▸ Parameters.");
 
