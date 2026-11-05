@@ -35,7 +35,6 @@ import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * The SDK's managed values, each declared once, and what a run does with each one.
@@ -47,10 +46,11 @@ import java.util.Set;
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
  * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
- * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW}, {@code DO_SETUP} and {@code SKIP} are the
- * run's parameters, {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's: methods of
- * the SDK's parameter group, {@code params/com_github_botmakerdev/botmaker_sdk/Sdk.java}, which {@code Bot.runFlow}
- * reads by their marks and nothing claims. {@code LAUNCH_TARGETS} and {@code VM} are the author's game data in
+ * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW} and {@code DO_SETUP} are the
+ * run's parameters, methods of the SDK's group {@code params/com_github_botmakerdev/botmaker_sdk/Running.java}, and
+ * {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's, in {@code Game.java} beside it
+ * (2026-11-05: a group per holder, which is its category); {@code Bot.runFlow} reads them by their marks and nothing
+ * claims them. {@code LAUNCH_TARGETS} and {@code VM} are the author's game data in
  * {@code Sdk.java}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
@@ -231,24 +231,17 @@ public final class SdkValues implements ValueHolder {
      * its mark. Like each parameter below, the host writes it there and in {@code starting-params/} on bind.
      */
     public static final ManagedParam<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
-            .in(SdkValue.Holder.SDK)
+            .in(SdkValue.Holder.RUNNING)
             .startsAs(SdkValues::noFlow)
             .shown(RUN_CATEGORY, "Which flow the bot runs", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** Whether a run sets the game up first — {@code public boolean doSetup()}. */
     public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
-            .in(SdkValue.Holder.SDK)
+            .in(SdkValue.Holder.RUNNING)
             .startsAs(SdkValues::setUpFirst)
             .shown(RUN_CATEGORY, "Set the game up first: tick it on a new computer or after changing a game"
                     + " setting", Param.Visibility.PUBLIC)
-            .because(RUN_PARAM);
-
-    /** The activities a run switches off — {@code public Set<Class<? extends Outcome>> skip()}. */
-    public static final ManagedParam<Set<Class<? extends Outcome>>> SKIP = ManagedValue.param(SdkValue.Id.SKIP)
-            .in(SdkValue.Holder.SDK)
-            .startsAs(SdkValues::skipNothing)
-            .shown(RUN_CATEGORY, "Activities this run skips", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
 
     /** The game parameters' heading in the Runner and the Parameters window. */
@@ -276,7 +269,7 @@ public final class SdkValues implements ValueHolder {
      * and grow). None: the first this computer can launch.
      */
     public static final ManagedParam<LaunchChoice> LAUNCH_TARGET = ManagedValue.param(SdkValue.Id.LAUNCH_TARGET)
-            .in(SdkValue.Holder.SDK)
+            .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::firstAvailable)
             .shown(GAME_CATEGORY, "Which of the bot's games this computer launches", Param.Visibility.PUBLIC)
             .because(GAME_PARAM);
@@ -287,7 +280,7 @@ public final class SdkValues implements ValueHolder {
      * it by its mark ({@code InstalledGame}).
      */
     public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
-            .in(SdkValue.Holder.SDK)
+            .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::wholeDesktop)
             .shown(GAME_CATEGORY, "The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
             .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source, in the Runner or in"
@@ -310,7 +303,7 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, FLOW, DO_SETUP, SKIP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
+                SCREEN, SHADES, FLOW, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
     }
 
     /** {@link #FLOW}'s type and first value: no flow until the runner picks one of {@code Flows}. */
@@ -321,11 +314,6 @@ public final class SdkValues implements ValueHolder {
     /** {@link #DO_SETUP}'s: a new bot sets its game up on its first run. */
     private static boolean setUpFirst() {
         return true;
-    }
-
-    /** {@link #SKIP}'s: every activity runs. */
-    private static Set<Class<? extends Outcome>> skipNothing() {
-        return Set.of();
     }
 
     /** {@link #LAUNCH_TARGET}'s: no pick, so the first launcher this computer can launch. */

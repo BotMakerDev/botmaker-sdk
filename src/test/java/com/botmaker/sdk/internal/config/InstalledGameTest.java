@@ -44,20 +44,21 @@ class InstalledGameTest {
     @Test
     void theRunsOwnParametersAreReadByTheirMarksFromTheFirstClassMarkingThem() {
         assertEquals(Boolean.TRUE, InstalledGame.marked(SdkValue.Id.DO_SETUP, null, Object.class, Sdk.class));
-        assertNull(InstalledGame.marked(SdkValue.Id.SKIP, Sdk.class), "a bot with no skip method has none");
+        assertNull(InstalledGame.marked(SdkValue.Id.FLOW, Sdk.class), "a bot with no flow method has none");
         assertNull(InstalledGame.marked(SdkValue.Id.FLOW, (Class<?>[]) null));
     }
 
     @Test
     void aHoldersParametersAreReadFromTheGroupBesideIt() {
         Class<?> holder = com.botmaker.sdk.internal.config.fixture.plugins.g.a.Sdk.class;
-        assertEquals("com.botmaker.sdk.internal.config.fixture.params.g.a.Sdk", ParamGroups.groupName(holder.getName()));
+        assertEquals("com.botmaker.sdk.internal.config.fixture.params.g.a", ParamGroups.paramsPackage(holder.getName()));
         assertEquals(Boolean.FALSE, InstalledGame.marked(SdkValue.Id.DO_SETUP, holder),
                 "main hands the holder; the value is the group's method");
         InstalledGame.install(holder);
         assertEquals(List.of("faugus:abc", "steam:570"), InstalledGame.launchTargets(), "the author's, in the holder");
         assertEquals("steam:570", InstalledGame.launchChoice(), "the runner's, in the group");
-        assertEquals(1, ParamGroups.groups(holder).size());
+        assertEquals(2, ParamGroups.groups(holder).size(), "every @Param group of the plugin's package, Game and Running");
+        assertEquals(2, ParamGroups.groups(holder, holder).size(), "each group made once");
         assertTrue(ParamGroups.groups(Sdk.class).isEmpty(), "a class outside plugins/ has no group");
     }
 

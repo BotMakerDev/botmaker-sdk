@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's parameters sit in two groups, and `skip` is gone** (2026-11-05). `flow` and `doSetup` are methods of
+  `params/com_github_botmakerdev/botmaker_sdk/Running.java`, `launchTarget` and `captureSource` of `Game.java`
+  beside it; each group is a heading of the Parameters window. On its next open Studio moves each method from the
+  old `Sdk.java` group with its value, in `params/` and `starting-params/`, and deletes the emptied pair. The `skip`
+  parameter is gone: no run reads it, `SdkValue.Id.SKIP` is deprecated for removal with `@Migrate.Dropped`, and
+  `.switchable()` on a flow card no longer lets the person running the bot switch it off.
+
 - **The SDK's open step asks and starts only where there is a screen** (2026-11-05). The core hosts the plugin too,
   so the offer to move pictures and, on Windows, the VM keeper run only when `hasUi()` is true.
 - **`Params.set` writes at the running bot's Java** (2026-11-05): a during-a-run value is written at the bot JVM's

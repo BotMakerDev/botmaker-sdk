@@ -12,11 +12,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * The run a bot does: the flow it walks, its home and setup, the activities its runner switched off, and the names
- * of the bot's flows.
+ * The run a bot does: the flow it walks, its home and setup, and the names of the bot's flows.
  *
  * <p>{@code Bot.runFlow(Sdk.class)} installs the value your {@code @SdkValue(SdkValue.Id.RUN)} method
  * returns ({@link #use}) and the flow its {@code @Param} names ({@link #walk}), then walks that flow: two hand-offs,
@@ -32,8 +30,6 @@ public final class InstalledRun {
     private static volatile Run current = Run.NONE;
 
     private static volatile Flow flow = Flow.NONE;
-
-    private static volatile Set<Activity> skipped = Set.of();
 
     /** Each of the bot's flows by its constant's name, by identity: two flows may be equal and named apart. */
     private static volatile Map<Flow, String> names = Map.of();
@@ -80,16 +76,6 @@ public final class InstalledRun {
         return flow;
     }
 
-    /** Switches {@code activities} off for this run, wherever a step drawn {@code .switchable()} runs them. */
-    public static void skip(Set<Activity> activities) {
-        skipped = activities == null ? Set.of() : Set.copyOf(activities);
-    }
-
-    /** Whether the runner switched {@code step} off: it is switchable, and its activity is listed to skip. */
-    public static boolean skipped(Flow.Step step) {
-        return step.runnerSwitch() && skipped.contains(step.node());
-    }
-
     /**
      * Whether the flow has the activity switched on — its configured default, before any
      * {@code enable}/{@code disable} a running bot has made. The first step running it, in the flow or in one of its
@@ -100,7 +86,7 @@ public final class InstalledRun {
      */
     public static boolean enabled(Activity activity) {
         Flow.Step found = FlowTree.find(flow(), activity);
-        return found == null || (found.enabled() && !skipped(found));
+        return found == null || found.enabled();
     }
 
     /**

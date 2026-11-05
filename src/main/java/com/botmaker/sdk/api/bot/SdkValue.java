@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.managed.ManagedId;
 import com.botmaker.plugin.api.managed.ManagedMarker;
+import com.botmaker.plugin.api.meta.Migrate;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -11,19 +12,25 @@ import java.lang.annotation.Target;
 
 /**
  * Marks one of the SDK's values in your bot: a method whose returned expression BotMaker Studio's windows
- * rewrite, a class of constants they add to, rename in and remove from, or a {@code @Param} field the SDK
- * declared, whose value the person running the bot sets.
+ * rewrite, a class of constants they add to, rename in and remove from, or a method of a {@code @Param} group the
+ * SDK declared, whose value the person running the bot sets.
  *
  * <pre>{@code
  * public final class Sdk {
  *
- *     @SdkValue(SdkValue.Id.DO_SETUP)
- *     @Param(category = "Run", visibility = Param.PUBLIC, description = "Set the game up first")
- *     public static boolean doSetup = true;
- *
  *     @SdkValue(SdkValue.Id.RUN)
  *     public static Run run() {
  *         return Run.of().home(MyBot::goHome);
+ *     }
+ * }
+ *
+ * @Param
+ * public class Running {
+ *
+ *     @SdkValue(SdkValue.Id.DO_SETUP)
+ *     @Param.Shown(category = "Run", description = "Set the game up first")
+ *     public boolean doSetup() {
+ *         return true;
  *     }
  * }
  *
@@ -101,7 +108,9 @@ public @interface SdkValue {
         FLOW,
         /** Whether a run sets the game up first — the {@code boolean} parameter {@code doSetup}. */
         DO_SETUP,
-        /** The activities a run switches off — the parameter {@code skip}, a set of activity classes. */
+        /** The activities a run switched off — the parameter {@code skip}, which no run reads since 2026-11-05. */
+        @Deprecated(forRemoval = true)
+        @Migrate.Dropped("a run switches no activity off; an activity is on or off in its flow")
         SKIP,
         /**
          * The launchers the bot supports, preferred first — the {@code List<Launcher>} parameter {@code launchTargets}
@@ -121,10 +130,13 @@ public @interface SdkValue {
     /**
      * The bot's classes the SDK's values live in, one constant each, named by its parts: {@code SDK} is
      * {@code Sdk.java}, {@code SCREENS} is {@code Screens.java}. Studio writes the class when a bot lacks it; a bot
-     * never names this enum.
+     * never names this enum. {@code RUNNING} and {@code GAME} are the SDK's parameter groups, {@code Running.java} and
+     * {@code Game.java} in the bot's private {@code params/}, each a category of the Parameters window.
      */
     enum Holder {
         SDK,
+        RUNNING,
+        GAME,
         FLOWS,
         PICTURES,
         TAGS,

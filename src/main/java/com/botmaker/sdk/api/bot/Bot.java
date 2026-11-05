@@ -18,7 +18,6 @@ import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.flow.FlowTree;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
-import com.botmaker.sdk.internal.flow.SkippedActivities;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.params.GameFacts;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
@@ -33,8 +32,6 @@ import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -86,10 +83,9 @@ public class Bot {
      * }</pre>
      *
      * <p>What the person running the bot chooses is the bot's own {@code @Param}s, read off {@code values} by their
-     * marks ({@code @SdkValue(SdkValue.Id.FLOW)}, {@code DO_SETUP}, {@code SKIP}): which of the {@code Flows} runs,
-     * whether the game is set up first, and which activities the flow lets them switch off are skipped. A bot with
-     * no {@code flow} runs nothing; with no {@code doSetup} it skips the setup. An activity in {@code skip} that the
-     * flow does not draw {@code .switchable()} runs anyway, and the debug trace says so. What gets the game back to
+     * marks ({@code @SdkValue(SdkValue.Id.FLOW)}, {@code DO_SETUP}): which of the {@code Flows} runs, and whether the
+     * game is set up first. A bot with no {@code flow} runs nothing; with no {@code doSetup} it skips the setup. What
+     * gets the game back to
      * a known screen is {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after
      * anything unexpected and before each step that goes home; a run with none goes nowhere.
      *
@@ -118,7 +114,6 @@ public class Bot {
         }
         // Once the flow is known: the log's facts name it.
         RunDetails.start(values);
-        InstalledRun.skip(SkippedActivities.of(InstalledRun.flow(), skipped(values)));
         boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
             Runnable home = InstalledRun.home();
@@ -200,20 +195,6 @@ public class Bot {
         if (card == null || !card.goHome()) return;
         Debug.log("Going home first, as the " + card.label() + " card does.");
         home.run();
-    }
-
-    /** The activity classes the {@code skip} parameter names; empty when the bot has none. */
-    private static Set<Class<? extends Outcome>> skipped(Class<?>... values) {
-        if (!(InstalledGame.marked(SdkValue.Id.SKIP, values) instanceof Set<?> set)) return Set.of();
-        Set<Class<? extends Outcome>> out = new HashSet<>();
-        for (Object each : set) {
-            if (each instanceof Class<?> type && Outcome.class.isAssignableFrom(type)) {
-                out.add(type.asSubclass(Outcome.class));
-            } else {
-                Debug.log("skip holds " + each + ", which is no activity: it skips nothing.");
-            }
-        }
-        return out;
     }
 
     /** Why the supervisor invokes the start-up step: the first launch, or a recovery after a crash. */

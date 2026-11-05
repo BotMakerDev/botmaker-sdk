@@ -4,6 +4,11 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **`skip` gone, the rest (2026-11-05)**: the next release deletes `SdkValue.Id.SKIP` and its `@Migrate.Dropped`.
+  `Flow.Step.switchable()`, `runnerSwitch`, the flow editor's *Runner may switch this off* tick and `FlowTools`'
+  `switchable` argument are read by no run since `skip` went: deprecate and drop them, or give the runner another
+  way to switch an activity off — the user's call.
+
 - **Markers as parts, the rest (2026-11-02)**: the next release deletes `Setup.markers/absent/texts/elements` and
   their `@Migrate.Dropped`; first move the SDK's own callers (`MapTools`, `ScreenEdits`, `ElementSaves`, the tests'
   fixtures) to parts. A look (`ScreenVariant`) is still told by marker lists: tell it by parts too. 🗺 Screens draws a

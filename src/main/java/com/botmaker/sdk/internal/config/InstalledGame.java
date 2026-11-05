@@ -109,8 +109,7 @@ public final class InstalledGame {
 
     /**
      * The value marked {@code id} in {@code values} or the parameter group beside them ({@link ParamGroups}), or null
-     * when none marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup},
-     * {@code skip}).
+     * when none marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup}).
      */
     public static Object marked(SdkValue.Id id, Class<?>... values) {
         return ParamGroups.marked(id, values);

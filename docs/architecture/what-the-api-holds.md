@@ -9,7 +9,7 @@
   as a width, and because an editor is claimed by **type**, never by a method and an argument index.
 - `api.bot` — `Bot.runFlow(Sdk.class)`, "Run activity flow", offered in
   `main` only (`@EntryPoint`; installs every managed value in the classes it is handed, `@SdkValue` or another
-  plugin's mark, reads the run's `@Param`s `flow`, `doSetup` and `skip` by their marks, and walks the flow
+  plugin's mark, reads the run's `@Param`s `flow` and `doSetup` by their marks (`skip` is gone, 2026-11-05), and walks the flow
   `flow` names, `internal/flow/FlowWalker`; it was `Bot.run(goHome, …)` until 2026-10-10, when what gets home
   moved onto the flow, and `runFlow(Sdk.flow, Sdk.doSetup, Sdk.skip, Sdk.class)` from 2026-10-11 to 2026-10-14,
   when its arguments stopped being wired by hand), `Bot.stop("…")` (ends the run saying why), `Outcome` (the interface each activity's enum implements; `Outcome.NONE` is "no outcome yet",
@@ -21,7 +21,7 @@
 - `api.flow` — `Flow` (`steps`, `edges`, `start`, `limits`), one per way of playing, each a constant of the
   bot's `Flows` (2026-10-11; presets are gone, a preset is a flow), `Flow.activity(Activities.Collect.class,
   Collect::body)` building a `Flow.Step`, each other part a named link written only when not the default
-  (`.described(…)`, `.off()`, `.switchable()` — the runner may skip it through `Sdk.skip` — `.goesHome()`,
+  (`.described(…)`, `.off()`, `.switchable()` — read by no run since `skip` went, 2026-11-05 — `.goesHome()`,
   `.whenOff(…)`; 2026-10-09, as `BotSettings.defaults().foundDelay(…)…` is),
   `Flow.edge(Activities.Collect.NOTHING_LEFT, Activities.Battle.class)` (its source is the outcome's enum),
   `Run` (`Run.of().home(MyBot::goHome).setup(MyBot::setup)` in `Sdk.run()`, once for the bot; an activity's

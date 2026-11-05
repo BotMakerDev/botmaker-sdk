@@ -15,7 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -24,12 +27,13 @@ import java.util.stream.Stream;
 
 /**
  * What a run reads its values from: each class {@code Bot.runFlow} is handed — {@code Sdk.class}, the bot's data —
- * and the parameter group beside it, which {@code main} never names (2026-11-04, the user's call).
+ * and the parameter groups beside it, which {@code main} never names (2026-11-04, the user's call).
  *
- * <p>A plugin's group mirrors its holder's place: the holder {@code com.mybot.plugins.g.a.Sdk} has its parameters in
- * {@code com.mybot.params.g.a.Sdk}, a class marked {@code @Param} whose methods are this computer's values. The group
- * is looked up by that name in the holder's own class loader and made with its no-argument constructor; a bot
- * without one has no parameters, and each reads as nothing.
+ * <p>A plugin's groups mirror its holder's place: the holder {@code com.mybot.plugins.g.a.Sdk} has its parameters in
+ * the package {@code com.mybot.params.g.a}, each class there marked {@code @Param} one group whose methods are this
+ * computer's values ({@code Running}, {@code Game}; 2026-11-05, a plugin declares several). The groups are listed in
+ * the holder's own class loader, by name, and made with their no-argument constructors; a bot without one has no
+ * parameters, and each reads as nothing.
  */
 public final class ParamGroups {
 
@@ -59,13 +63,18 @@ public final class ParamGroups {
         return null;
     }
 
-    /** The parameter groups beside {@code values}, made once each, in their order; none that cannot be made. */
+    /**
+     * The parameter groups beside {@code values}, made once each, in their order and each holder's by name; none that
+     * cannot be made.
+     */
     public static List<Object> groups(Class<?>... values) {
         List<Object> out = new ArrayList<>();
         if (values == null) return out;
+        Set<Class<?>> seen = new LinkedHashSet<>();
         for (Class<?> type : values) {
-            Class<?> group = type == null ? null : groupOf(type);
-            if (group == null) continue;
+            if (type != null) seen.addAll(groupsOf(type));
+        }
+        for (Class<?> group : seen) {
             try {
                 Constructor<?> made = group.getDeclaredConstructor();
                 made.setAccessible(true);
@@ -87,33 +96,41 @@ public final class ParamGroups {
             int at = holder == null ? -1 : holder.getName().lastIndexOf(PLUGINS);
             if (at < 0) continue;
             String root = (holder.getName().substring(0, at) + PARAMS.substring(0, PARAMS.length() - 1)).replace('.', '/');
-            ClassLoader loader = holder.getClassLoader();
-            Set<String> names = new TreeSet<>();
-            try {
-                for (URL folder : Collections.list(loader.getResources(root))) {
-                    names.addAll(classesUnder(folder, root));
-                }
-            } catch (IOException | RuntimeException unlisted) {
-                return List.of();
-            }
-            List<Class<?>> out = new ArrayList<>();
-            for (String name : names) {
-                try {
-                    out.add(Class.forName(name, false, loader));
-                } catch (ClassNotFoundException | LinkageError unloadable) {
-                    // not a class this run can read a value from
-                }
-            }
-            return out;
+            return classesIn(holder.getClassLoader(), root, true);
         }
         return List.of();
     }
 
+    /**
+     * The top-level classes of the package at resource path {@code root} in {@code loader}, by name, and of its
+     * sub-packages when {@code deep}; none that cannot be loaded, and loading initialises none.
+     */
+    private static List<Class<?>> classesIn(ClassLoader loader, String root, boolean deep) {
+        Set<String> names = new TreeSet<>();
+        try {
+            for (URL folder : Collections.list(loader.getResources(root))) {
+                names.addAll(classesUnder(folder, root, deep));
+            }
+        } catch (IOException | RuntimeException unlisted) {
+            return List.of();
+        }
+        List<Class<?>> out = new ArrayList<>();
+        for (String name : names) {
+            try {
+                out.add(Class.forName(name, false, loader));
+            } catch (ClassNotFoundException | LinkageError unloadable) {
+                // not a class this run can read a value from
+            }
+        }
+        return out;
+    }
+
     /** The binary names of the top-level classes under {@code root}, a resource path found at {@code folder}. */
-    private static List<String> classesUnder(URL folder, String root) throws IOException {
+    private static List<String> classesUnder(URL folder, String root, boolean deep) throws IOException {
         if (folder.openConnection() instanceof JarURLConnection jar) {
             try (Stream<JarEntry> entries = jar.getJarFile().stream()) {
                 return entries.map(JarEntry::getName).filter(name -> name.startsWith(root + "/"))
+                        .filter(name -> deep || name.indexOf('/', root.length() + 1) < 0)
                         .filter(ParamGroups::isTopLevelClass).map(ParamGroups::binaryName).toList();
             }
         }
@@ -124,7 +141,7 @@ public final class ParamGroups {
         } catch (URISyntaxException unreadable) {
             return List.of();
         }
-        try (Stream<Path> files = Files.walk(base)) {
+        try (Stream<Path> files = Files.walk(base, deep ? Integer.MAX_VALUE : 1)) {
             return files.filter(Files::isRegularFile)
                     .map(file -> root + "/" + base.relativize(file).toString().replace(File.separatorChar, '/'))
                     .filter(ParamGroups::isTopLevelClass).map(ParamGroups::binaryName).toList();
@@ -139,22 +156,57 @@ public final class ParamGroups {
         return path.substring(0, path.length() - ".class".length()).replace('/', '.');
     }
 
-    /** The {@code @Param} class beside {@code holder} — its {@code plugins} segment read as {@code params} — or null. */
-    static Class<?> groupOf(Class<?> holder) {
-        String name = groupName(holder.getName());
-        if (name == null) return null;
-        try {
-            Class<?> group = Class.forName(name, false, holder.getClassLoader());
-            return group.isAnnotationPresent(Param.class) ? group : null;
-        } catch (ClassNotFoundException | LinkageError absent) {
-            return null;
+    /** Each holder's groups, found once: a class's package does not change while it is loaded. */
+    private static final ClassValue<List<Class<?>>> GROUPS = new ClassValue<>() {
+        @Override
+        protected List<Class<?>> computeValue(Class<?> holder) {
+            return find(holder);
         }
+    };
+
+    /**
+     * The {@code @Param} classes of {@code holder}'s plugin — the package {@link #paramsPackage} names — by name;
+     * none outside {@code plugins}.
+     */
+    static List<Class<?>> groupsOf(Class<?> holder) {
+        return GROUPS.get(holder);
     }
 
-    /** {@code holder}'s group's binary name: {@code a.plugins.b.Sdk} as {@code a.params.b.Sdk}; null outside plugins. */
-    static String groupName(String holder) {
+    /**
+     * What {@link #groupsOf} lists: the package's classes, and, should its loader list no folder, the SDK's own groups
+     * by their {@link SdkValue.Holder} names, which load by name from any loader.
+     */
+    private static List<Class<?>> find(Class<?> holder) {
+        String pkg = paramsPackage(holder.getName());
+        if (pkg == null) return List.of();
+        ClassLoader loader = holder.getClassLoader();
+        Set<Class<?>> found = new TreeSet<>(Comparator.comparing(Class::getName));
+        found.addAll(classesIn(loader, pkg.replace('.', '/'), false));
+        for (SdkValue.Holder each : SdkValue.Holder.values()) {
+            try {
+                found.add(Class.forName(pkg + "." + className(each), false, loader));
+            } catch (ClassNotFoundException | LinkageError absent) {
+                // not a group this bot has
+            }
+        }
+        return found.stream().filter(group -> group.isAnnotationPresent(Param.class)).toList();
+    }
+
+    /** A holder constant's class name, {@code FLOW_LAYOUT} as {@code FlowLayout}. */
+    private static String className(SdkValue.Holder holder) {
+        StringBuilder out = new StringBuilder();
+        for (String part : holder.name().split("_")) {
+            out.append(part.charAt(0)).append(part.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return out.toString();
+    }
+
+    /** The package of {@code holder}'s groups: {@code a.plugins.b.Sdk} as {@code a.params.b}; null outside plugins. */
+    static String paramsPackage(String holder) {
         int at = holder.lastIndexOf(PLUGINS);
-        return at < 0 ? null : holder.substring(0, at) + PARAMS + holder.substring(at + PLUGINS.length());
+        int dot = holder.lastIndexOf('.');
+        return at < 0 || dot < at + PLUGINS.length() ? null
+                : holder.substring(0, at) + PARAMS + holder.substring(at + PLUGINS.length(), dot);
     }
 
     private static Optional<Object> staticMarked(Class<?> type, SdkValue.Id id) {

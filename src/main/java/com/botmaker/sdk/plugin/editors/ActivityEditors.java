@@ -75,40 +75,11 @@ public final class ActivityEditors {
     }
 
     /**
-     * An activity the person running the bot may switch off — one some flow draws {@code .switchable()}: an entry
-     * of the bot's {@code skip} parameter, {@code Activities.Rest.class}.
-     */
-    public static Node switchable(ValueContext ctx) {
-        return labelBox(ctx, () -> switchableLabels(ctx.services().pluginValues()), () -> false, "Activity",
-                ctx.value(Activity.class).map(Activity::label).orElse(""), FlowNames::activity, null);
-    }
-
-    /**
-     * Whether {@code ctx} is an entry of a parameter listing activities: a {@code Class} with no call site, new or
-     * holding an activity's enum. A class literal of anything else is left to the host.
-     */
-    public static boolean isSkippedActivity(ValueContext ctx) {
-        return ctx.slot().isEmpty() && ctx.type().is(Class.class)
-                && (ctx.source().isBlank() || ctx.value(Activity.class).filter(a -> !a.isNone()).isPresent());
-    }
-
-    /**
      * Whether {@code ctx} is a flow parameter: a {@code Flow} with no call site, as a row of the Parameters window or
      * the Runner is. A flow in code, a {@code Flows} constant's {@code Flow.of(…)} included, is left to its own editor.
      */
     public static boolean isFlowChoice(ValueContext ctx) {
         return ctx.slot().isEmpty() && ctx.type().is(Flow.class);
-    }
-
-    /** The labels of the activities any of the bot's flows lets the runner switch off, in flow order. */
-    static List<String> switchableLabels(PluginValues values) {
-        return FlowValue.FLOWS.members(values).stream()
-                .flatMap(member -> FlowValue.FLOWS.read(values, member).stream())
-                .flatMap(flow -> flow.steps().stream())
-                .filter(Flow.Step::runnerSwitch)
-                .map(Flow.Step::label)
-                .distinct()
-                .toList();
     }
 
     /** The flow list's entry for {@link Flow#NONE}: the bot runs nothing until a flow is picked. */

@@ -50,6 +50,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -178,7 +179,11 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE,
                 assertInstanceOf(ManagedMethod.class, layout).initial());
         var capture = byId.get(SdkValue.Id.CAPTURE);
-        assertEquals("Sdk", capture.holder());
+        assertEquals("Game", capture.holder());
+        assertEquals("Running", byId.get(SdkValue.Id.FLOW).holder());
+        assertEquals("Running", byId.get(SdkValue.Id.DO_SETUP).holder());
+        assertEquals("Game", byId.get(SdkValue.Id.LAUNCH_TARGET).holder());
+        assertFalse(byId.containsKey(SdkValue.Id.SKIP), "skip is no value of the SDK's any more");
         assertEquals(CaptureSource.class, capture.type());
         assertEquals(CaptureSource.desktop().getClass(),
                 assertInstanceOf(ManagedParam.class, capture).initial().getClass());
@@ -202,9 +207,18 @@ class SdkPluginSurfaceTest {
         assertEquals(com.botmaker.sdk.api.text.Words.class, byId.get(SdkValue.Id.TEXTS).type());
         assertEquals("Elements", byId.get(SdkValue.Id.ELEMENTS).holder());
         assertEquals(Element.class, byId.get(SdkValue.Id.ELEMENTS).type());
-        // One declaration per constant, and nothing else.
-        assertEquals(SdkValue.Id.values().length, byId.size());
-        assertEquals(SdkValue.Id.values().length, plugin.managedValues().size());
+        // One declaration per constant but the deprecated ones, and nothing else.
+        long live = Arrays.stream(SdkValue.Id.values()).filter(id -> !deprecated(id)).count();
+        assertEquals(live, byId.size());
+        assertEquals(live, plugin.managedValues().size());
+    }
+
+    private static boolean deprecated(SdkValue.Id id) {
+        try {
+            return SdkValue.Id.class.getField(id.name()).isAnnotationPresent(Deprecated.class);
+        } catch (NoSuchFieldException e) {
+            throw new AssertionError(e);
+        }
     }
 
     /**

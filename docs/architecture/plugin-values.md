@@ -26,10 +26,11 @@ a body that is not exactly `return <expr>;` is read-only with a reason, and Stud
 canvas while this plugin is loaded (its values change in this plugin's windows). A project without them gets
 them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 
-**A parameter is the user's, and private (2026-11-04).** `FLOW`, `DO_SETUP`, `SKIP`, `LAUNCH_TARGET` and `CAPTURE`
-are methods of `params/com_github_botmakerdev/botmaker_sdk/Sdk.java`, this computer's and never committed, with the
-author's starting values in `starting-params/` at the same path; `ParamGroups` finds the group from the holder
-(`…plugins.<g>.<a>.Sdk` reads `…params.<g>.<a>.Sdk`). What the author alone sets (`LAUNCH_TARGETS`, `VM`) is a marked
+**A parameter is the user's, and private (2026-11-04).** `FLOW` and `DO_SETUP` are methods of
+`params/com_github_botmakerdev/botmaker_sdk/Running.java`, `LAUNCH_TARGET` and `CAPTURE` of `Game.java` beside it
+(`Holder.RUNNING`, `Holder.GAME`, 2026-11-05; each group is a category), this computer's and never committed, with the
+author's starting values in `starting-params/` at the same paths; `ParamGroups` finds the groups from the holder
+(`…plugins.<g>.<a>.Sdk` reads every `@Param` class of `…params.<g>.<a>`). What the author alone sets (`LAUNCH_TARGETS`, `VM`) is a marked
 method above, in the committed holder. A game fact is a method of the bot's own `@GameState` group in `params/bot/`,
 `@Param.Shown(changes = DURING_RUN)` with `@ReadOn` or `@Assumed`: a run writes it (`Params.set`) and keeps its time
 in `@Param.Kept`, `Params.when(Progress::gold).atLeast(5)` tests it, and the assistant adds, lists and forgets it

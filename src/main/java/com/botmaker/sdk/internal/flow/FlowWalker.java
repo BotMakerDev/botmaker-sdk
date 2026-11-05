@@ -124,10 +124,10 @@ public final class FlowWalker {
         return override != null ? override : InstalledRun.enabled(activity);
     }
 
-    /** Whether {@code step} runs this pass: a runtime override of its activity, else its own flag and the runner's. */
+    /** Whether {@code step} runs this pass: a runtime override of its activity, else its own flag. */
     static boolean active(Flow.Step step) {
         Boolean override = step.node() instanceof Activity activity ? OVERRIDES.get(activity) : null;
-        return override != null ? override : step.enabled() && !InstalledRun.skipped(step);
+        return override != null ? override : step.enabled();
     }
 
     /**
