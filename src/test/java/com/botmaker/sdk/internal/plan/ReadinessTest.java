@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,26 @@ class ReadinessTest {
         Do hourly = twice.every(Duration.ofHours(1));
         assertFalse(ready(hourly, failed(Duration.ofMinutes(1), 3)));
         assertTrue(ready(hourly, failed(Duration.ofHours(1), 3)), "its cadence brings it back");
+    }
+
+    @Test
+    void dueAtSaysWhen() {
+        assertEquals(Optional.of(NOON), Readiness.dueAt(CLAIM.once(), Optional.empty(), CLOCK), "never done: now");
+        assertEquals(Optional.of(NOON.plus(Duration.ofMinutes(50))),
+                Readiness.dueAt(CLAIM.every(Duration.ofHours(1)), held(Duration.ofMinutes(10)), CLOCK));
+        assertEquals(Optional.of(Instant.parse("2026-11-07T05:00:00Z")),
+                Readiness.dueAt(CLAIM.daily(LocalTime.of(5, 0)), held(Duration.ofHours(6)), CLOCK), "done at 06:00");
+        assertEquals(Optional.of(Instant.parse("2026-11-06T05:00:00Z")),
+                Readiness.dueAt(CLAIM.daily(LocalTime.of(5, 0)), held(Duration.ofHours(8)), CLOCK), "done at 04:00");
+        assertEquals(Optional.of(Instant.parse("2026-11-07T05:00:00Z")),
+                Readiness.dueAt(CLAIM.daily(LocalTime.of(5, 0)), held(Duration.ofHours(7)), CLOCK), "done at 05:00 sharp");
+        assertEquals(Optional.of(NOON.plus(Duration.ofMinutes(20))),
+                Readiness.dueAt(CLAIM, failed(Duration.ofMinutes(10), 1), CLOCK), "half an hour after it failed");
+        assertEquals(Optional.of(NOON), Readiness.dueAt(CLAIM, held(Duration.ofDays(-1)), CLOCK),
+                "no cadence: now, even for a record from a clock ahead");
+        assertTrue(ready(CLAIM.onFail(Retry.again(2)), failed(Duration.ofDays(-1), 1)), "tries left, the same");
+        assertEquals(Optional.empty(), Readiness.dueAt(CLAIM.once(), held(Duration.ofDays(1)), CLOCK));
+        assertEquals(Optional.empty(), Readiness.dueAt(CLAIM.onFail(Retry.never()), failed(Duration.ofDays(1), 1), CLOCK));
     }
 
     @Test

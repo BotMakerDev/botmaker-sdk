@@ -117,6 +117,19 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `Params.when`, refusing a lambda or a method of no `@Param` class at once; `above` and `below` are the `not` of
   `atMost` and `atLeast`. A `Plan` is tiers of goals. `Routine` is what a run will run, `Flow` or `Plan`; it cannot be
   sealed, since the SDK has no module and they are in two packages. Nothing runs a plan yet.
+- **`Planner.round(PlanModel)`** chooses, walking and pressing nothing (`internal.plan`, 2026-11-06). The model is the
+  plan, the map with every action on it, the done-records with their clock, and the screen the game shows; a done-goal
+  reads that map and those records, not the run's, and building a model refuses an `.over` cycle with a sentence. The
+  `Round` says the tier, the route, what is on the way, each action's `Why`, and when the soonest waiting goal is due.
+  A tier is taken when one of its goals is neither met nor waiting; a goal is waiting when nothing can be done for it
+  and something only has to wait, so a goal with no way forward holds its tier. Goals on the very same check are one
+  goal. Per goal: bucket, `.over` even through an action that is no choice, no sub-goal before a sub-goal, known before
+  unknown, least to walk. An unmet `Goal` need recurses at most 4 deep; an unknown one is no sub-goal. On the way: each
+  goal the route does not serve gives at most one ready action, not a last resort nor on-sight, on a crossed screen or
+  one step off and back. Only `.within` makes a done-goal lapse, whatever the action's cadence. A ready `.last()` action
+  is no choice while a better one only has to wait. It reads an action's input as a press takes it, and a way by
+  `ScreenWalk.walkable`, what a walk could ever take; a way back with no button counts, though a run with no close
+  button cannot take it, so a walk may still refuse what it chose. A popup or a screen off the map counts from home.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are

@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A planner can choose what a plan does next** (2026-11-06). It is inside the SDK and nothing calls it yet, so a bot
+  sees no change: an `.over` cycle is refused only once a plan runs.
 - **Goals and plans can be written down** (2026-11-06). `Goal.of(Need.atLeast(Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)`
   or `Goal.done(() -> Screens.MARKET.claim).within(Duration.ofDays(1))` says what is wanted, and `Plan.of(Plan.tier(…),
   Plan.tier(…))` what matters most. `Need` also has `atMost`, `above`, `below`, `is`, `not` and `equalTo`; a fact unknown

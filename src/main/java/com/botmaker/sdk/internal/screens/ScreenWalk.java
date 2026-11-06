@@ -779,9 +779,7 @@ public final class ScreenWalk {
     private boolean open(ScreenGraph.Edge edge, String at, BufferedImage frame, boolean search) {
         Input via = edge.via();
         if (via == null) return Conditions.holds(edge.when());    // a way on its own may be open only while
-        if (via.locked() != null || typedByBody(edge)) return false;
-        // Studio holds only the name of the bot's own code, which it cannot run: no way for its walk.
-        if (via instanceof Custom custom && custom.method() instanceof NamedMethod) return false;
+        if (!walkable(via)) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
         // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
@@ -799,6 +797,16 @@ public final class ScreenWalk {
         if (seen.isEmpty()) return searched || strip.isEmpty() && !via.isOccasional() && edge.state() == null;
         if (seen.get().state().blocks()) return false;
         return edge.state() == null || edge.state() == seen.get().state();
+    }
+
+    /**
+     * Whether a walk could ever go through {@code via}, whatever the game shows: never a lock, a key, a text field whose
+     * text only a body gives, or the name of the bot's own code, as Studio holds it, which it cannot run.
+     */
+    public static boolean walkable(Input via) {
+        if (via.locked() != null || via instanceof Hotkey) return false;
+        if (via instanceof Button button && button.isTyped()) return false;
+        return !(via instanceof Custom custom && custom.method() instanceof NamedMethod);
     }
 
     /** Whether {@code edge} is taken without a key: no key way, and a way back with no input only by the close button. */

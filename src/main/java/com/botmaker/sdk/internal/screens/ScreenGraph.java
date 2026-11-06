@@ -698,7 +698,7 @@ public final class ScreenGraph {
      * {@link #TAKES_MS}) and {@link #STEP_COST_MS}; a way on its own, the time the screen it leaves {@link #loadMs loads
      * in}.
      */
-    long cost(Edge edge) {
+    public long cost(Edge edge) {
         if (edge.onItsOwn()) return loadMs(edge.from());
         return takes(edge.to()).map(Duration::toMillis).orElse(TAKES_MS) + STEP_COST_MS;
     }

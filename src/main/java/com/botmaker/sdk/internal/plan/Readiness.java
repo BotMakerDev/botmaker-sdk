@@ -26,7 +26,7 @@ public final class Readiness {
      * press takes it, with what its strip or tree says of it.
      */
     public static boolean ready(Do action, Input input, Optional<Done> last, Clock clock) {
-        if (input.locked() != null || input.never() != null || !Conditions.holds(input.when())) return false;
+        if (canPress(input) == Answer.NO) return false;
         for (Goal goal : action.goalNeeds()) {
             if (goal.answer() == Answer.NO) return false;
         }
@@ -34,6 +34,12 @@ public final class Readiness {
             if (!Conditions.holds(condition)) return false;
         }
         return due(action, last, clock);
+    }
+
+    /** Whether {@code input} can be pressed: no when locked or marked never, else what its {@code .when} says. */
+    public static Answer canPress(Input input) {
+        if (input.locked() != null || input.never() != null) return Answer.NO;
+        return Conditions.answer(input.when());
     }
 
     /**
@@ -51,28 +57,33 @@ public final class Readiness {
     /** Its {@link Do#until} has not come, and its cadence, or its retry when its check last said no, lets it. */
     public static boolean due(Do action, Optional<Done> last, Clock clock) {
         if (action.until() != null && Conditions.answer(action.until()) == Answer.YES) return false;
-        if (last.isEmpty()) return true;
+        return dueAt(action, last, clock).filter(at -> !at.isAfter(clock.instant())).isPresent();
+    }
+
+    /**
+     * When its cadence, or its retry when its check last said no, next lets it: a time passed when it may be done now;
+     * empty when it is done for good or given up.
+     */
+    public static Optional<Instant> dueAt(Do action, Optional<Done> last, Clock clock) {
+        if (last.isEmpty()) return Optional.of(clock.instant());
         Done done = last.get();
-        Instant now = clock.instant();
         if (done.held()) return cadence(action, done, clock);
         return switch (action.onFail()) {
-            case Retry.Never ignored -> false;
-            case Retry.Later later -> !now.isBefore(done.at().plus(later.after()));
+            case Retry.Never ignored -> Optional.empty();
+            case Retry.Later later -> Optional.of(done.at().plus(later.after()));
             // Its tries spent, only its cadence brings it back; one with no cadence is given up.
-            case Retry.Again again -> done.fails() <= again.times()
-                    || (action.every() != null || action.daily() != null) && cadence(action, done, clock);
+            case Retry.Again again -> done.fails() <= again.times() ? Optional.of(clock.instant())
+                    : action.every() != null || action.daily() != null ? cadence(action, done, clock) : Optional.empty();
         };
     }
 
-    private static boolean cadence(Do action, Done done, Clock clock) {
-        Instant now = clock.instant();
-        if (action.isOnce()) return false;
-        if (action.every() != null) return !now.isBefore(done.at().plus(action.every()));
+    private static Optional<Instant> cadence(Do action, Done done, Clock clock) {
+        if (action.isOnce()) return Optional.empty();
+        if (action.every() != null) return Optional.of(done.at().plus(action.every()));
         if (action.daily() != null) {
-            ZonedDateTime today = now.atZone(clock.getZone()).with(action.daily());
-            Instant since = (today.toInstant().isAfter(now) ? today.minusDays(1) : today).toInstant();
-            return done.at().isBefore(since);
+            ZonedDateTime sameDay = done.at().atZone(clock.getZone()).with(action.daily());
+            return Optional.of((sameDay.toInstant().isAfter(done.at()) ? sameDay : sameDay.plusDays(1)).toInstant());
         }
-        return true;
+        return Optional.of(clock.instant());
     }
 }

@@ -1,0 +1,98 @@
+package com.botmaker.sdk.internal.plan;
+
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.screens.Do;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+
+/**
+ * What {@link Planner#round} chose, and why.
+ *
+ * @param tier       the tier taken, counted from 0; empty when every goal is met or waiting
+ * @param route      the actions to do, in the order to do them, each after what it needs
+ * @param onTheWay   ready actions of any tier that the route passes by, in the order it does
+ * @param considered every action looked at, for each goal in the order it would be taken
+ * @param due        when the soonest goal waiting at or above the tier comes due; empty when none is waiting
+ */
+public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, List<Considered> considered,
+                    Optional<Instant> due) {
+
+    public Round {
+        route = List.copyOf(route);
+        onTheWay = List.copyOf(onTheWay);
+        considered = List.copyOf(considered);
+    }
+
+    /** An action and the field of a screen holding it. */
+    public record Step(Do action, String screen, String field) {
+
+        /** Its key in the {@link DoneRecords}. */
+        public String key() {
+            return DoneRecords.key(screen, field);
+        }
+    }
+
+    /** One action looked at for {@code goal}, and what was found. */
+    public record Considered(Goal goal, Step step, Why why) {}
+
+    /** Why an action was, or was not, a choice. */
+    public sealed interface Why {
+
+        /** Nothing holds it back, and everything it asks is known. */
+        record Ready() implements Why {}
+
+        /** Nothing known holds it back, and a {@code .last()} action: taken when nothing else can be. */
+        record LastResort() implements Why {}
+
+        /** Possible: something it asks answers unknown, which never holds an action back. */
+        record Unknown() implements Why {}
+
+        /** Possible after {@code goal}, first of what it needs, by {@code actions} actions before it. */
+        record Needs(Goal goal, int actions) implements Why {}
+
+        /** Its cadence, or its retry, or a goal it needs lets it at {@code until}. */
+        record Waiting(Instant until) implements Why {}
+
+        /** Not possible now, for {@code block}. */
+        record Blocked(Block block) implements Why {}
+
+        /** Not possible: it needs {@code goal}, and no action can meet that now. */
+        record CannotMeet(Goal goal) implements Why {}
+
+        /** Not possible: it needs {@code goal}, a sub-goal deeper than {@link Planner#DEEPEST}. */
+        record TooDeep(Goal goal) implements Why {}
+    }
+
+    /** What rules an action out. */
+    public enum Block {
+        /** Its input is locked, marked never, or its {@code .when} says no. */
+        INPUT,
+        /** A condition it needs says no. */
+        CONDITION,
+        /** Its {@code .until} says yes. */
+        ENDED,
+        /** A {@code .once()} action, done. */
+        DONE_FOR_GOOD,
+        /** Its check said no, and its retry lets it no more. */
+        GIVEN_UP,
+        /** No way on the map leads to its screen from where the game is. */
+        NO_WAY_THERE
+    }
+
+    /** Whether {@code why} leaves the action a choice. */
+    static boolean possible(Why why) {
+        return switch (why) {
+            case Why.Ready ignored -> true;
+            case Why.LastResort ignored -> true;
+            case Why.Unknown ignored -> true;
+            case Why.Needs ignored -> true;
+            case Why.Waiting ignored -> false;
+            case Why.Blocked ignored -> false;
+            case Why.CannotMeet ignored -> false;
+            case Why.TooDeep ignored -> false;
+        };
+    }
+}
