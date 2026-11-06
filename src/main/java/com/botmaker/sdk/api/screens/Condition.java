@@ -17,7 +17,8 @@ import java.util.function.BooleanSupplier;
  * }</pre>
  *
  * <p>All, any and not follow three-valued logic: all says no when one says no, else unknown when one is unknown;
- * any says yes when one says yes, else unknown when one is unknown; not of unknown is unknown.
+ * any says yes when one says yes, else unknown when one is unknown; not of unknown is unknown. Nor and nand are not of
+ * any and of all; xor and xnor answer only once every one has, since one unknown could change the count.
  */
 @FunctionalInterface
 public interface Condition extends BooleanSupplier {
@@ -44,6 +45,26 @@ public interface Condition extends BooleanSupplier {
     /** Yes when one says yes; no when every one says no; else unknown. */
     static Condition any(Condition... conditions) {
         return new Any(List.of(conditions));
+    }
+
+    /** Yes when every one says no: {@code not(any(…))}. */
+    static Condition nor(Condition... conditions) {
+        return new Not(new Any(List.of(conditions)));
+    }
+
+    /** No when every one says yes: {@code not(all(…))}. */
+    static Condition nand(Condition... conditions) {
+        return new Not(new All(List.of(conditions)));
+    }
+
+    /** Yes when an odd number say yes, two given: one or the other, not both; unknown when one is unknown. */
+    static Condition xor(Condition... conditions) {
+        return new Xor(List.of(conditions));
+    }
+
+    /** Yes when an even number say yes, two given: both or neither: {@code not(xor(…))}. */
+    static Condition xnor(Condition... conditions) {
+        return new Not(new Xor(List.of(conditions)));
     }
 
     /** The other answer; unknown stays unknown. */
@@ -92,6 +113,24 @@ public interface Condition extends BooleanSupplier {
                 if (a == Answer.UNKNOWN) said = Answer.UNKNOWN;
             }
             return said;
+        }
+    }
+
+    /** {@link #xor}: only every answer known tells how many say yes. */
+    record Xor(List<Condition> conditions) implements Condition {
+        public Xor {
+            conditions = List.copyOf(conditions);
+        }
+
+        @Override
+        public Answer answer() {
+            boolean odd = false;
+            for (Condition c : conditions) {
+                Answer a = Conditions.answer(c);
+                if (a == Answer.UNKNOWN) return Answer.UNKNOWN;
+                if (a == Answer.YES) odd = !odd;
+            }
+            return Answer.of(odd);
         }
     }
 

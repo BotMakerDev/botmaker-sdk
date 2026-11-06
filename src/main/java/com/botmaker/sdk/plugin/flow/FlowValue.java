@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.types.FlowTypes;
 
@@ -43,6 +44,9 @@ public final class FlowValue {
 
     /** The flows, {@code Flows.MAIN} and its siblings. */
     public static final ManagedSet<Flow> FLOWS = ManagedSet.of(SdkValues.FLOWS);
+
+    /** The bot's plans, which the Runner offers beside its flows. */
+    public static final ManagedSet<Plan> PLANS = ManagedSet.of(SdkValues.PLANS);
 
     /** The game's home and setup, {@code Sdk.run()}. */
     public static final ManagedHandle<Run> RUN = ManagedHandle.of(SdkValues.RUN);
@@ -99,6 +103,11 @@ public final class FlowValue {
     /** The names of the bot's {@code Flows} constants, in file order. */
     public static List<String> flowNames(PluginValues values) {
         return FLOWS.members(values).stream().map(Member::name).toList();
+    }
+
+    /** The names of the bot's {@code Plans} constants, in file order; none for a bot with no {@code Plans.java}. */
+    public static List<String> planNames(PluginValues values) {
+        return PLANS.members(values).stream().map(Member::name).toList();
     }
 
     /** The flow edited when none is named: {@link #FIRST} when there is one or none at all, else the first. */

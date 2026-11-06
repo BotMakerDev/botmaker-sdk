@@ -2,16 +2,16 @@ package samplebot.params.com_github_botmakerdev.botmaker_sdk;
 
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.sdk.api.bot.SdkValue;
-import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.plan.Routine;
 import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Flows;
 
 /** The BotMaker SDK's run parameters on this computer: each method is one, its body the value. */
 @Param
 public class Running {
 
-    @SdkValue(SdkValue.Id.FLOW)
-    @Param.Shown(description = "Which flow the bot runs")
-    public Flow flow() {
+    @SdkValue(SdkValue.Id.ROUTINE)
+    @Param.Shown(description = "What the bot runs: a flow or a plan")
+    public Routine routine() {
         return Flows.MAIN;
     }
 

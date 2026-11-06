@@ -36,6 +36,26 @@ class ConditionTest {
     }
 
     @Test
+    void norNandXorXnorFollowThreeValuedLogic() {
+        assertEquals(YES, Condition.nor(N, N).answer());
+        assertEquals(NO, Condition.nor(N, U, Y).answer());
+        assertEquals(UNKNOWN, Condition.nor(N, U).answer());
+        assertEquals(NO, Condition.nand(Y, Y).answer());
+        assertEquals(YES, Condition.nand(Y, U, N).answer());
+        assertEquals(UNKNOWN, Condition.nand(Y, U).answer());
+        assertEquals(YES, Condition.xor(Y, N).answer());
+        assertEquals(NO, Condition.xor(Y, Y).answer());
+        assertEquals(NO, Condition.xor(N, N).answer());
+        assertEquals(YES, Condition.xor(Y, Y, Y).answer(), "an odd number say yes");
+        assertEquals(UNKNOWN, Condition.xor(Y, U).answer(), "one unknown could change the count");
+        assertEquals(NO, Condition.xor().answer());
+        assertEquals(YES, Condition.xnor(Y, Y).answer());
+        assertEquals(YES, Condition.xnor(N, N).answer());
+        assertEquals(NO, Condition.xnor(Y, N).answer());
+        assertEquals(UNKNOWN, Condition.xnor(N, U).answer());
+    }
+
+    @Test
     void aThrowingMethodIsUnknown() {
         Condition c = Condition.of(() -> { throw new IllegalStateException("not read yet"); });
         assertEquals(UNKNOWN, c.answer());

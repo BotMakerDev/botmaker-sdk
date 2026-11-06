@@ -3,7 +3,11 @@ package com.botmaker.sdk.internal.flow;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
@@ -100,6 +104,26 @@ public final class BotConstants {
     public static Flow flow(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("A flow reference needs a name");
         return new Flow(List.of(), List.of(), new Activity(REFERENCE + name), Flow.Limits.DEFAULT);
+    }
+
+    /**
+     * The bot's plan {@code name}, {@code Plans.DAILY}, as an editor holds a reference to it: one tier of one goal whose
+     * check is the name alone, equal to another only when it names the same constant. A run never meets one: there
+     * the bot's constant is the plan.
+     *
+     * @throws IllegalArgumentException for a blank name, which names no constant
+     */
+    public static Plan plan(String name) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A plan reference needs a name");
+        return Plan.of(Plan.tier(Goal.of(new PlanReference(name))));
+    }
+
+    /** The check of {@link #plan}'s one goal: a name, which nothing can answer. */
+    private record PlanReference(String name) implements Condition {
+        @Override
+        public Answer answer() {
+            return Answer.UNKNOWN;
+        }
     }
 
     /**

@@ -61,6 +61,11 @@ public @interface SdkValue {
          */
         FLOWS,
         /**
+         * The bot's plans, what matters most as tiers of goals — a class of {@code Plan} constants, {@code Plans.java}
+         * beside {@code Goals.java}.
+         */
+        PLANS,
+        /**
          * The game's home and setup, which no flow owns — a {@code Run} method.
          */
         RUN,
@@ -104,7 +109,17 @@ public @interface SdkValue {
          * game window is sized to — a {@code Size} method.
          */
         SCREEN,
-        /** Which flow a run walks — the {@code Flow} parameter {@code flow}, set in the Runner. */
+        /**
+         * What a run runs, one of the {@code Flows} or of the {@code Plans} — the {@code Routine} parameter
+         * {@code routine}, set in the Runner. While it is {@code Flow.NONE} a run takes {@link #FLOW}'s value.
+         */
+        ROUTINE,
+        /**
+         * Which flow a run walks — the {@code Flow} parameter {@code flow}, which {@link #ROUTINE} replaces; a run reads
+         * it only while {@code routine} is {@code Flow.NONE}.
+         */
+        @Deprecated(forRemoval = true)
+        @Migrate.Dropped("a run runs routine(), a flow or a plan; pick the flow there in the Runner")
         FLOW,
         /** Whether a run sets the game up first — the {@code boolean} parameter {@code doSetup}. */
         DO_SETUP,
@@ -138,6 +153,7 @@ public @interface SdkValue {
         RUNNING,
         GAME,
         FLOWS,
+        PLANS,
         PICTURES,
         TAGS,
         ACTIVITIES,

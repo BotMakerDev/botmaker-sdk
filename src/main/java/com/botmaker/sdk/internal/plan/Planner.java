@@ -60,6 +60,11 @@ public final class Planner {
         return new Planner(model).round();
     }
 
+    /** Whether {@code screen} is one of {@code crossed} or one step off one of them and back, as on-the-way is. */
+    static boolean near(PlanModel model, List<String> crossed, String screen) {
+        return new Planner(model).nearCrossed(crossed, screen).isPresent();
+    }
+
     /**
      * An action as looked at.
      *
@@ -128,7 +133,27 @@ public final class Planner {
             looked.get(goal).resolved().options()
                     .forEach(option -> considered.add(new Considered(goal, option.step(), option.why())));
         }
-        return new Round(taken, route, onTheWay(route, goals), considered, Optional.ofNullable(due));
+        List<String> crossed = route.isEmpty() ? List.of() : crossed(route);
+        List<Near> near = onTheWay(route, goals, crossed);
+        return new Round(taken, route, near.stream().map(Near::step).toList(), doing(route, near, crossed), crossed,
+                considered, Optional.ofNullable(due));
+    }
+
+    /** An on-the-way action, and which of the crossed screens it is done from. */
+    private record Near(int at, Step step) {}
+
+    /** {@code route} with each of {@code near} before the first of its steps that is as far along {@code crossed}. */
+    private static List<Step> doing(List<Step> route, List<Near> near, List<String> crossed) {
+        List<Step> doing = new ArrayList<>();
+        int next = 0;
+        int along = 0;
+        for (Step step : route) {
+            along = Math.max(along, crossed.indexOf(step.screen()));
+            while (next < near.size() && near.get(next).at() <= along) doing.add(near.get(next++).step());
+            doing.add(step);
+        }
+        while (next < near.size()) doing.add(near.get(next++).step());
+        return doing;
     }
 
     private Resolved resolve(Goal goal, int depth) {
@@ -179,6 +204,8 @@ public final class Planner {
             return Option.none(step, new Why.Blocked(held ? Block.DONE_FOR_GOOD : Block.GIVEN_UP));
         }
         if (due.get().isAfter(model.clock().instant())) return Option.none(step, new Why.Waiting(due.get()));
+        Optional<Instant> heldOff = model.heldOff(step);
+        if (heldOff.isPresent()) return Option.none(step, new Why.Waiting(heldOff.get()));
 
         List<Step> chain = new ArrayList<>();
         long cost = 0;
@@ -264,10 +291,8 @@ public final class Planner {
      * For each goal of the plan neither met nor served by the route, its first ready action on a screen the route
      * crosses or one screen off it. A last resort waits for its turn, and an on-sight action is the walk's.
      */
-    private List<Step> onTheWay(List<Step> route, Map<Goal, Resolved> goals) {
+    private List<Near> onTheWay(List<Step> route, Map<Goal, Resolved> goals, List<String> crossed) {
         if (route.isEmpty()) return List.of();
-        List<String> crossed = crossed(route);
-        record Near(int at, Step step) {}
         List<Near> near = new ArrayList<>();
         goals.forEach((goal, resolved) -> {
             if (resolved.met() || route.stream().anyMatch(s -> s.action().serves().contains(goal))) return;
@@ -281,7 +306,7 @@ public final class Planner {
             }
         });
         near.sort(Comparator.comparingInt(Near::at));
-        return near.stream().map(Near::step).toList();
+        return near;
     }
 
     /** The screens {@code route} shows, from where the game is, in order. */
@@ -326,7 +351,8 @@ public final class Planner {
                 key -> model.map().pathTo(key.get(0), key.get(1), edge -> open.computeIfAbsent(edge, Planner::isOpen)));
     }
 
-    private static boolean isOpen(Edge edge) {
+    /** Whether a walk could take {@code edge} now: its conditions do not say no, and its input can be walked. */
+    static boolean isOpen(Edge edge) {
         if (!Conditions.holds(edge.when())) return false;
         return edge.via() == null || ScreenWalk.walkable(edge.via()) && Readiness.canPress(edge.via()) != Answer.NO;
     }

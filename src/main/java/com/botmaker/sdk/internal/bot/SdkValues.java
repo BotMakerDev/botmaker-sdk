@@ -19,6 +19,8 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
@@ -46,7 +48,7 @@ import java.util.List;
  * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
  * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
  * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
- * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code FLOW} and {@code DO_SETUP} are the
+ * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code ROUTINE} and {@code DO_SETUP} are the
  * run's parameters, methods of the SDK's group {@code params/com_github_botmakerdev/botmaker_sdk/Running.java}, and
  * {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's, in {@code Game.java} beside it
  * (2026-11-05: a group per holder, which is its category); {@code Bot.runFlow} reads them by their marks and nothing
@@ -69,6 +71,17 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.FLOWS)
             .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
                     + " activities, the wires and the layout in step.");
+
+    /**
+     * The plans — {@code static final Plan DAILY = Plan.of(…)}, each tiers of the goals of {@code Goals.java}. A
+     * reference to one, as the {@code routine} parameter holds, reads as its name.
+     */
+    public static final ManagedOpenSet.OfConstants<Plan> PLANS = ManagedValue.openSet(SdkValue.Id.PLANS)
+            .of(Plan.class)
+            .referredToAs(BotConstants::plan)
+            .in(SdkValue.Holder.PLANS)
+            .because("These are the bot's plans: what matters most, as tiers of the goals in Goals.java. Pick one"
+                    + " in the Runner to run it.");
 
     /** The game's home and setup — {@code Run.of().home(…)}. */
     public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
@@ -224,14 +237,18 @@ public final class SdkValues implements ValueHolder {
             + " Runner or in Project ▸ Parameters.";
 
     /**
-     * Which flow a run walks — {@code public Flow flow()} in the SDK's parameter group, read by {@code Bot.runFlow} by
-     * its mark. Like each parameter below, the host writes it there and in {@code starting-params/} on bind.
+     * What a run runs — {@code public Routine routine()} in the SDK's parameter group, one of the {@code Flows} or of
+     * the {@code Plans}, read by {@code Bot.runFlow} by its mark. Like each parameter below, the host writes it there
+     * and in {@code starting-params/} on bind.
      */
-    public static final ManagedParam<Flow> FLOW = ManagedValue.param(SdkValue.Id.FLOW)
+    public static final ManagedParam<Routine> ROUTINE = ManagedValue.param(SdkValue.Id.ROUTINE)
             .in(SdkValue.Holder.RUNNING)
-            .startsAs(SdkValues::noFlow)
-            .shown("Which flow the bot runs", Param.Visibility.PUBLIC)
+            .startsAs(SdkValues::noRoutine)
+            .shown("What the bot runs: a flow or a plan", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
+
+    // The flow parameter ROUTINE replaces is no value of the SDK's any more, so bind writes it in no bot: a bot that
+    // has one keeps it marked, and a run reads it by that mark while routine is Flow.NONE, until it goes next release.
 
     /** Whether a run sets the game up first — {@code public boolean doSetup()}. */
     public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
@@ -296,12 +313,12 @@ public final class SdkValues implements ValueHolder {
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(FLOWS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, FLOW, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
+        return List.of(FLOWS, PLANS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS,
+                STATES, SCREEN_MAP, SCREEN, SHADES, ROUTINE, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
     }
 
-    /** {@link #FLOW}'s type and first value: no flow until the runner picks one of {@code Flows}. */
-    private static Flow noFlow() {
+    /** {@link #ROUTINE}'s type and first value: nothing until the runner picks a flow or a plan. */
+    private static Routine noRoutine() {
         return Flow.NONE;
     }
 

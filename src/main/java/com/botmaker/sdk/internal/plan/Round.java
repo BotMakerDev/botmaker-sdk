@@ -14,15 +14,19 @@ import java.util.OptionalInt;
  * @param tier       the tier taken, counted from 0; empty when every goal is met or waiting
  * @param route      the actions to do, in the order to do them, each after what it needs
  * @param onTheWay   ready actions of any tier that the route passes by, in the order it does
+ * @param doing      the route with each on-the-way action where the route passes it: what a run does, in order
+ * @param crossed    the screens the route shows, from where the game is, in order; empty with no route
  * @param considered every action looked at, for each goal in the order it would be taken
  * @param due        when the soonest goal waiting at or above the tier comes due; empty when none is waiting
  */
-public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, List<Considered> considered,
-                    Optional<Instant> due) {
+public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, List<Step> doing, List<String> crossed,
+                    List<Considered> considered, Optional<Instant> due) {
 
     public Round {
         route = List.copyOf(route);
         onTheWay = List.copyOf(onTheWay);
+        doing = List.copyOf(doing);
+        crossed = List.copyOf(crossed);
         considered = List.copyOf(considered);
     }
 
@@ -53,7 +57,7 @@ public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, Lis
         /** Possible after {@code goal}, first of what it needs, by {@code actions} actions before it. */
         record Needs(Goal goal, int actions) implements Why {}
 
-        /** Its cadence, or its retry, or a goal it needs lets it at {@code until}. */
+        /** Its cadence, or its retry, or a goal it needs, or the run having found it could not, lets it at {@code until}. */
         record Waiting(Instant until) implements Why {}
 
         /** Not possible now, for {@code block}. */

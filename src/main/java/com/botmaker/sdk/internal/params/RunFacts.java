@@ -218,7 +218,31 @@ public final class RunFacts {
         return Optional.empty();
     }
 
-    private static boolean fresh(Method parameter) {
+    /** The screens of the installed map whose readouts feed {@code parameter}, in the map's order; empty when none does. */
+    public static List<String> screensOf(Method parameter) {
+        ScreenGraph map = ScreenMaps.installed();
+        List<Fact> feeds = facts.stream().filter(each -> each.parameter().equals(parameter)).toList();
+        return map.screens().keySet().stream()
+                .filter(constant -> map.instance(constant)
+                        .filter(screen -> feeds.stream().anyMatch(fact -> fact.screen().isInstance(screen)))
+                        .isPresent())
+                .toList();
+    }
+
+    /**
+     * Reads again each of {@code parameters} that the screen {@code constant} feeds, fresh or not, off one look of it:
+     * after a press, what it changed.
+     */
+    public static void readAgain(String constant, Set<Method> parameters) {
+        Optional<Screen> screen = ScreenMaps.installed().instance(constant);
+        if (screen.isEmpty()) return;
+        List<Fact> due = facts.stream()
+                .filter(fact -> parameters.contains(fact.parameter()) && fact.screen().isInstance(screen.get())).toList();
+        if (!due.isEmpty()) readOn(constant, due);
+    }
+
+    /** Whether {@code parameter} holds a reading that is not stale. */
+    public static boolean fresh(Method parameter) {
         var at = RunParams.keptAt(parameter);
         return at.isPresent() && !RunParams.stale(parameter, at.getAsLong());
     }

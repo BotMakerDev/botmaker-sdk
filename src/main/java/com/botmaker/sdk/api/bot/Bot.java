@@ -11,6 +11,9 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.plan.Routine;
+import com.botmaker.sdk.internal.plan.RunGame;
 import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
@@ -83,8 +86,9 @@ public class Bot {
      * }</pre>
      *
      * <p>What the person running the bot chooses is the bot's own {@code @Param}s, read off {@code values} by their
-     * marks ({@code @SdkValue(SdkValue.Id.FLOW)}, {@code DO_SETUP}): which of the {@code Flows} runs, and whether the
-     * game is set up first. A bot with no {@code flow} runs nothing; with no {@code doSetup} it skips the setup. What
+     * marks ({@code @SdkValue(SdkValue.Id.ROUTINE)}, {@code DO_SETUP}): which of the {@code Flows} or {@code Plans}
+     * runs, and whether the game is set up first. A plan runs round after round until no goal of it comes due again
+     * ({@code PlanRun}). A bot with no {@code routine} runs nothing; with no {@code doSetup} it skips the setup. What
      * gets the game back to
      * a known screen is {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after
      * anything unexpected and before each step that goes home; a run with none goes nowhere.
@@ -107,10 +111,11 @@ public class Bot {
         InstalledRun.nameFlows(values);
         ScreenMaps.install(values);
         RunFacts.install(values);
-        if (InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow) InstalledRun.walk(flow);
+        Routine routine = routine(values);
+        if (routine instanceof Flow flow) InstalledRun.walk(flow);
         else {
             InstalledRun.walk(null);
-            Debug.log("No @SdkValue(SdkValue.Id.FLOW) field in the classes runFlow was given: no flow runs.");
+            if (routine == null) Debug.log("No routine or flow parameter in the classes runFlow was given: nothing runs.");
         }
         // Once the flow is known: the log's facts name it.
         RunDetails.start(values);
@@ -120,8 +125,23 @@ public class Bot {
             if (home != null) home.run();
         };
         PopupGuard.enabled(true);
-        lifecycle(() -> FlowWalker.run(InstalledRun.flow(), InstalledRun.home()), goHome,
-                startUp(doSetup ? InstalledRun.installed().setup() : null));
+        Runnable body = routine instanceof Plan plan ? RunGame.body(plan, values)
+                : () -> FlowWalker.run(InstalledRun.flow(), InstalledRun.home());
+        lifecycle(body, goHome, startUp(doSetup ? InstalledRun.installed().setup() : null));
+    }
+
+    /**
+     * What a run runs: the {@code routine} parameter, a flow or a plan; while it is {@link Flow#NONE}, the
+     * {@code flow} parameter it replaces, so a bot that picked a flow before keeps running it. Null when the bot has
+     * neither.
+     */
+    @SuppressWarnings("removal")
+    static Routine routine(Class<?>... values) {
+        Object routine = InstalledGame.marked(SdkValue.Id.ROUTINE, values);
+        if (routine instanceof Plan plan) return plan;
+        if (routine instanceof Flow flow && !flow.equals(Flow.NONE)) return flow;
+        Object flow = InstalledGame.marked(SdkValue.Id.FLOW, values);
+        return flow instanceof Flow old ? old : routine instanceof Flow none ? none : null;
     }
 
     /**
@@ -182,7 +202,7 @@ public class Bot {
         System.clearProperty(TrialEntry.TARGET);
         int hash = target.indexOf('#');
         Runnable home = InstalledRun.home();
-        if (hash < 0 || home == null || !(InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow)) return;
+        if (hash < 0 || home == null || !(routine(values) instanceof Flow flow)) return;
         Class<?> returned;
         try {
             returned = Class.forName(target.substring(0, hash), false, body.getClass().getClassLoader())

@@ -8,6 +8,8 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.plan.Routine;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import org.junit.jupiter.api.Test;
 
@@ -175,6 +177,19 @@ class FlowTypesTest {
         assertEquals("DAILY", new Flow.Sub(DAILY).name());
         assertNull(BotConstants.flowName(Flow.NONE), "an empty flow is no reference");
         assertNull(BotConstants.flowName(collectBattleRest()));
+    }
+
+    /**
+     * The Runner lists the bot's plans beside its flows: the {@code routine} row is a flow choice, and a plan it holds
+     * is read by its constant's name, so two plans with the same tiers stay two picks.
+     */
+    @Test
+    void runnerListsPlans() {
+        assertTrue(SdkValues.PLANS.isReferredByName());
+        assertEquals(BotConstants.plan("DAILY"), SdkValues.PLANS.byReference("DAILY"));
+        assertFalse(BotConstants.plan("DAILY").equals(BotConstants.plan("WEEKLY")));
+        assertEquals(Routine.class, SdkValues.ROUTINE.type());
+        assertEquals("Plans", SdkValues.PLANS.holder());
     }
 
     /** An activity is no part's {@code Class} the editor could hold: each shape refuses one that is not a name. */

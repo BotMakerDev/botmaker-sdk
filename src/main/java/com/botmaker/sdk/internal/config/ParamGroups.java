@@ -102,6 +102,19 @@ public final class ParamGroups {
     }
 
     /**
+     * The top-level classes of each of {@code holders}' own packages, in its class loader: where a plugin's values sit
+     * beside the classes the bot keeps with them ({@code Goals} beside {@code Sdk}). Loading initialises none.
+     */
+    public static List<Class<?>> besideHolders(Class<?>... holders) {
+        Set<Class<?>> out = new LinkedHashSet<>();
+        for (Class<?> holder : holders == null ? new Class<?>[0] : holders) {
+            if (holder == null) continue;
+            out.addAll(classesIn(holder.getClassLoader(), holder.getPackageName().replace('.', '/'), false));
+        }
+        return List.copyOf(out);
+    }
+
+    /**
      * The top-level classes of the package at resource path {@code root} in {@code loader}, by name, and of its
      * sub-packages when {@code deep}; none that cannot be loaded, and loading initialises none.
      */

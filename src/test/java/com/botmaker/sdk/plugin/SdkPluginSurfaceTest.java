@@ -180,7 +180,9 @@ class SdkPluginSurfaceTest {
                 assertInstanceOf(ManagedMethod.class, layout).initial());
         var capture = byId.get(SdkValue.Id.CAPTURE);
         assertEquals("Game", capture.holder());
-        assertEquals("Running", byId.get(SdkValue.Id.FLOW).holder());
+        assertFalse(byId.containsKey(SdkValue.Id.FLOW), "bind writes no flow(): routine replaces it");
+        assertEquals("Running", byId.get(SdkValue.Id.ROUTINE).holder());
+        assertEquals("Plans", byId.get(SdkValue.Id.PLANS).holder());
         assertEquals("Running", byId.get(SdkValue.Id.DO_SETUP).holder());
         assertEquals("Game", byId.get(SdkValue.Id.LAUNCH_TARGET).holder());
         assertFalse(byId.containsKey(SdkValue.Id.SKIP), "skip is no value of the SDK's any more");

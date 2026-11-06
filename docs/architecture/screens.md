@@ -116,7 +116,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`Readiness.met`) and answers unknown for an action no screen holds. `Need` builds a `Condition` on a fact through
   `Params.when`, refusing a lambda or a method of no `@Param` class at once; `above` and `below` are the `not` of
   `atMost` and `atLeast`. A `Plan` is tiers of goals. `Routine` is what a run will run, `Flow` or `Plan`; it cannot be
-  sealed, since the SDK has no module and they are in two packages. Nothing runs a plan yet.
+  sealed, since the SDK has no module and they are in two packages. A bot's plans are the `Plans` open set
+  (`SdkValue.Id.PLANS`, `Plans.java` beside `Goals.java`, which holds goals only), read by name through
+  `BotConstants.plan`. `Condition` also has `nor`, `nand`, `xor` and `xnor`; xor answers only once every part has.
 - **`Planner.round(PlanModel)`** chooses, walking and pressing nothing (`internal.plan`, 2026-11-06). The model is the
   plan, the map with every action on it, the done-records with their clock, and the screen the game shows; a done-goal
   reads that map and those records, not the run's, and building a model refuses an `.over` cycle with a sentence. The
@@ -130,6 +132,18 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   is no choice while a better one only has to wait. It reads an action's input as a press takes it, and a way by
   `ScreenWalk.walkable`, what a walk could ever take; a way back with no button counts, though a run with no close
   button cannot take it, so a walk may still refuse what it chose. A popup or a screen off the map counts from home.
+  `Round.doing` is the route with its on-the-way actions placed at the screen they are done from.
+- **`PlanRun`** runs a plan (2026-11-06) through a `PlanRun.Game`, `RunGame` on the real game and a fake in tests. Each
+  round: a goal too deep stops the run; nothing to do idles until `Round.due`, or ends (every goal met, or a tier stuck,
+  said with each of its actions' `Why`). Before acting it walks to read an unknown, stale fact the next action, its
+  goal needs or its tier's unknown goals read (`FactsRead` over the `Condition` tree), when a readout's screen is on the
+  route or one step off and back, at most once per fact per 5 minutes. It walks to the action, rounds again on arrival
+  (another choice now replans), presses, reads the action's and its goals' facts again, and writes the done-record:
+  held when the press was DONE and `.checks` holds. An input absent, disabled or not now, or a screen not reached, holds
+  the action off for 5 minutes (`PlanModel.heldOff`, which the planner answers `Waiting`). Each decision is one trace
+  line carrying `plan.goal` and `plan.action` (`PlanValues`). `Bot.runFlow` runs the `routine` parameter
+  (`SdkValue.Id.ROUTINE`): a flow by `FlowWalker`, a plan by `RunGame`; while it is `Flow.NONE`, the deprecated
+  `flow` parameter's value, gone next release. The Runner's flow row lists the bot's plans below its flows.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are

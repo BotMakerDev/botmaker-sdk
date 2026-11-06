@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.screens.Conditions;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -38,15 +39,23 @@ public final class PlanModel {
     private final Map<Do, Step> steps = new IdentityHashMap<>();
     /** What each action is tried before, directly or through another. */
     private final Map<Do, Set<Do>> over = new IdentityHashMap<>();
+    /** What a run found it could not do on arrival, by identity, and until when it leaves it be. */
+    private final Map<Do, Instant> heldOff;
 
     /**
      * {@code at} is the screen the game shows; one the map does not hold is taken as the map's home, and so is a popup,
      * which has no way on the map out of it: a walk closes it first, whatever lies under it.
      */
     public PlanModel(Plan plan, ScreenGraph map, DoneRecords records, String at) {
+        this(plan, map, records, at, Map.of());
+    }
+
+    /** As {@link #PlanModel(Plan, ScreenGraph, DoneRecords, String)}, each of {@code heldOff} waiting until its time. */
+    public PlanModel(Plan plan, ScreenGraph map, DoneRecords records, String at, Map<Do, Instant> heldOff) {
         this.plan = Objects.requireNonNull(plan, "plan");
         this.map = Objects.requireNonNull(map, "map");
         this.records = Objects.requireNonNull(records, "records");
+        this.heldOff = new IdentityHashMap<>(heldOff);
         boolean aPlace = at != null && map.screen(at).filter(screen -> !screen.isPopup()).isPresent();
         this.at = aPlace ? at : map.home().orElse(at);
         List<Step> all = new ArrayList<>();
@@ -82,6 +91,11 @@ public final class PlanModel {
     /** The clock of the records: the time this model is read at. */
     public Clock clock() {
         return records.clock();
+    }
+
+    /** Until when the run leaves {@code step} be, having found it could not do it; empty when it does not, or no more. */
+    public Optional<Instant> heldOff(Step step) {
+        return Optional.ofNullable(heldOff.get(step.action())).filter(until -> until.isAfter(clock().instant()));
     }
 
     /** {@code step}'s last time. */

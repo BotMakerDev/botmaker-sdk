@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.flow.Flow;
+import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.Labels;
 import com.botmaker.sdk.plugin.flow.FlowConstants;
@@ -25,6 +26,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -75,11 +77,12 @@ public final class ActivityEditors {
     }
 
     /**
-     * Whether {@code ctx} is a flow parameter: a {@code Flow} with no call site, as a row of the Parameters window or
-     * the Runner is. A flow in code, a {@code Flows} constant's {@code Flow.of(…)} included, is left to its own editor.
+     * Whether {@code ctx} is a flow or routine parameter: a {@code Flow} or {@code Routine} with no call site, as a row
+     * of the Parameters window or the Runner is. A flow in code, a {@code Flows} constant's {@code Flow.of(…)}
+     * included, is left to its own editor.
      */
     public static boolean isFlowChoice(ValueContext ctx) {
-        return ctx.slot().isEmpty() && ctx.type().is(Flow.class);
+        return ctx.slot().isEmpty() && (ctx.type().is(Flow.class) || ctx.type().is(Routine.class));
     }
 
     /** The flow list's entry for {@link Flow#NONE}: the bot runs nothing until a flow is picked. */
@@ -92,15 +95,19 @@ public final class ActivityEditors {
      * runs, and a click on a flow picks it. The picked name is written ({@code Flows.DAILY}), never the first flow
      * equal to it: a fresh flow equals {@link Flow#NONE} and a duplicate its source. {@value #NO_FLOW} writes
      * {@code Flow.NONE}; while it is the value, a bot with one flow is prompted to pick it. The prompt is decided as
-     * the row is drawn.
+     * the row is drawn. A {@code Routine} row, {@code routine}, lists the bot's {@code Plans} below its flows
+     * ({@link #planRows}): a plan picked is written as its constant, {@code Plans.DAILY}.
      */
     public static Node flow(ValueContext ctx) {
         PluginValues values = ctx.services().pluginValues();
         List<String> flows = FlowValue.flowNames(values);
-        String current = FlowValue.FLOWS.picked(ctx).map(PluginValues.Member::name)
+        List<String> plans = ctx.type().is(Routine.class) ? FlowValue.planNames(values) : List.of();
+        String current = FlowValue.FLOWS.picked(ctx).or(() -> FlowValue.PLANS.picked(ctx))
+                .map(PluginValues.Member::name)
                 .orElseGet(() -> shown(ctx, values, flows));
-        String prompt = flows.size() == 1 ? "Run " + flows.getFirst() : "Pick a flow";
-        if (NO_FLOW.equals(current) && flows.size() == 1) current = "";
+        boolean onlyOne = flows.size() == 1 && plans.isEmpty();
+        String prompt = onlyOne ? "Run " + flows.getFirst() : plans.isEmpty() ? "Pick a flow" : "Pick a flow or a plan";
+        if (NO_FLOW.equals(current) && onlyOne) current = "";
         Button button = Styles.on(new Button(), Styles.INSET_FIELD_FLAT);
         String[] picked = {current};
         // What the button says: the flow picked, or the prompt; a pick the host refused leaves it as it was.
@@ -132,6 +139,12 @@ public final class ActivityEditors {
                 if (refused.isEmpty()) show.accept(flow);
             });
             VBox box = new VBox(4, none, tree);
+            box.getChildren().addAll(planRows(plans, plan -> {
+                popup.hide();
+                Optional<String> refused = FlowValue.PLANS.pick(ctx, PluginValues.Member.of(plan));
+                refused.ifPresent(ctx.services()::status);
+                if (refused.isEmpty()) show.accept(plan);
+            }));
             box.setPadding(new Insets(6));
             // A popup is a scene of its own: the theme's sheets, and the root's colours, follow the row it opens from.
             box.setStyle("-fx-background-color: -fx-background; -fx-border-color: -fx-box-border;");
@@ -141,6 +154,19 @@ public final class ActivityEditors {
             popup.show(button, at.getMinX(), at.getMaxY());
         });
         return button;
+    }
+
+    /** The rows of {@link #flow}'s list below its flows: a heading, then one link per plan, each {@code picked}. */
+    private static List<Node> planRows(List<String> plans, Consumer<String> picked) {
+        if (plans.isEmpty()) return List.of();
+        List<Node> rows = new ArrayList<>();
+        rows.add(new Label("Plans"));
+        for (String plan : plans) {
+            Hyperlink link = new Hyperlink(plan);
+            link.setOnAction(a -> picked.accept(plan));
+            rows.add(link);
+        }
+        return rows;
     }
 
     /**

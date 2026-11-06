@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run can run a plan** (2026-11-06). The new `routine()` parameter, picked in the Runner, is a flow or one of the
+  bot's `Plans` (`Plans.java`, beside `Goals.java`). A plan runs round after round: it walks to what matters most, reads
+  an unknown fact on the way first, presses, checks, and idles until the next goal is due. Each decision is a line of
+  the run's trace. `flow()` is deprecated: while `routine()` is none, a run still takes it; it goes next release, so
+  pick the flow again under `routine` in the Runner.
+- **`Condition.nor`, `nand`, `xor` and `xnor`** (2026-11-06), three-valued like `all` and `any`: `xor` and `xnor`
+  answer unknown while any part is unknown.
 - **A planner can choose what a plan does next** (2026-11-06). It is inside the SDK and nothing calls it yet, so a bot
   sees no change: an `.over` cycle is refused only once a plan runs.
 - **Goals and plans can be written down** (2026-11-06). `Goal.of(Need.atLeast(Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)`
