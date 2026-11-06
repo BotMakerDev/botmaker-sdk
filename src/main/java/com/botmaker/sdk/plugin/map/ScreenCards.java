@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -378,7 +379,7 @@ final class ScreenCards {
             result = opens.isPresent() ? "→ " + String.join(" / ", graph.leads(constant, field).stream()
                     .map(lead -> graph.shown(lead.to()) + said(lead.state(), lead.when())).distinct().toList())
                     : graph.isBack(constant, field) ? "way back"
-                    : input.isLeaving() ? "leaves" : "tried";
+                    : input.isLeaving() ? "leaves" : input instanceof Custom ? "code" : "tried";
         } else if (input.isOccasional()) {
             state = RowState.UNSEEN;
             result = "not seen yet";
@@ -406,6 +407,7 @@ final class ScreenCards {
                     : "") + tree.nodes().size() + " nodes" + (tree.unplaced().isEmpty() ? ""
                     : ", " + tree.unplaced().size() + " not placed");
             case Hotkey ignored -> "";
+            case Custom custom -> ScreenTypes.methodOf(custom);
             case TextButton words -> textTrait(words);
         };
         return new Row(field, input, field, picture(input), state, result, kind, look,
@@ -445,6 +447,7 @@ final class ScreenCards {
                     : strip.members().getFirst().id();
             case Tree tree -> tree.members().isEmpty() ? null : tree.members().getFirst().id();
             case Hotkey ignored -> null;
+            case Custom ignored -> null;
             case TextButton ignored -> null;
         };
     }

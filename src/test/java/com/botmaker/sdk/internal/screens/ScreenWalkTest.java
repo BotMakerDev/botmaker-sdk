@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -38,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.marks;
@@ -47,6 +49,7 @@ import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
 import static com.botmaker.sdk.internal.screens.MapFixtures.with;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -398,6 +401,32 @@ class ScreenWalkTest {
         assertEquals(Pressed.Result.DONE, press.result(), press.toString());
         assertEquals("CAMPAIGN", press.at());
         assertEquals(List.of("click campaign", "click campaign"), game.done);
+    }
+
+    /** The bot's own code, though the game stays where the map says it leads away from, is run once: pressed or walked. */
+    @Test
+    void theBotsOwnCodeIsNeverRunTwice() {
+        AtomicInteger runs = new AtomicInteger();
+        Map<String, MapScreen> screens = new HashMap<>();
+        screens.put("HOME", screen(named("Home", "home_title", null, null), Custom.of(runs::incrementAndGet)));
+        screens.put("PUZZLE", screen(named("Puzzle", "puzzle_title", "HOME", "custom")));
+        ScreenGraph map = ScreenGraph.of(screens);
+
+        Game pressed = new Game("HOME", map);
+        ScreenWalk.Press press = new ScreenWalk(map, pressed, STEP_MS, null).press("HOME", "custom", null);
+        assertEquals(Pressed.Result.LEFT, press.result(), press.toString());
+        assertEquals(1, runs.get(), "a press is not done again");
+
+        runs.set(0);
+        ScreenWalk.Result walked = go(new Game("HOME", map), "PUZZLE", new ArrayList<>());
+        assertNotEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(1, runs.get(), "nor a step of a walk");
+
+        // Studio holds its name: no way for a walk there, and nothing is thrown.
+        Map<String, MapScreen> named = new HashMap<>(screens);
+        named.put("HOME", screen(named("Home", "home_title", null, null), Custom.of(new NamedMethod("Puzzles::solve"))));
+        ScreenGraph studio = ScreenGraph.of(named);
+        assertNotEquals(ScreenWalk.Outcome.ARRIVED, go(new Game("HOME", studio), "PUZZLE", new ArrayList<>()).outcome());
     }
 
     /** Still on its screen after the second press, though the map says it leads away: not what the map says. */

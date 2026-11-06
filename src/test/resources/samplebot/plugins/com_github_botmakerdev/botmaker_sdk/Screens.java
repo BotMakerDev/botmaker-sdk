@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
@@ -35,6 +36,7 @@ public final class Screens {
         public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE).marking();
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
+        public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried()
                 .when(Condition.of(SampleBot::shopOpen));
         public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),

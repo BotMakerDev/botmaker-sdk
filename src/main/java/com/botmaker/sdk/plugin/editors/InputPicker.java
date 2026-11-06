@@ -10,6 +10,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Screen;
@@ -74,14 +75,15 @@ public final class InputPicker {
 
     private InputPicker() {}
 
-    /** Whether {@code ctx} is an input in a block: a {@code Button}, {@code Hotkey}, {@code Strip} or any input. */
+    /** Whether {@code ctx} is an input in a block: a {@code Button}, {@code Hotkey}, {@code Custom}, {@code Strip} or any input. */
     public static boolean isInput(ValueContext ctx) {
         return kind(ctx) != null && ctx.slot().flatMap(SlotContext::enclosingExecutable).isPresent();
     }
 
     /** The kind of input {@code ctx} takes; null for none. */
     private static Class<? extends Input> kind(ValueContext ctx) {
-        for (Class<? extends Input> kind : List.of(Button.class, Hotkey.class, Strip.class, Input.class)) {
+        for (Class<? extends Input> kind : List.of(Button.class, Hotkey.class, Custom.class, Strip.class,
+                Input.class)) {
             if (ctx.type().is(kind)) return kind;
         }
         return null;
@@ -228,6 +230,7 @@ public final class InputPicker {
             case Button b -> (b.isDrag() ? "drag" : b.isField() ? "text field" : "button")
                     + (b.repeats() ? ", repeated" : "");
             case Hotkey h -> h.label();
+            case Custom c -> c.label();
             case TextButton t -> t.label();
             case Strip s -> pickable ? "strip of " + s.members().size() : "strip:";
             case Tree t -> pickable ? "tree of " + t.nodes().size() : "tree:";
@@ -284,6 +287,7 @@ public final class InputPicker {
             case Strip s -> s.members();
             case Tree t -> t.members();
             case Hotkey h -> List.of();
+            case Custom c -> List.of();
             case TextButton t -> List.of();
         };
         Rect band = null;

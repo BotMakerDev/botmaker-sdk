@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.basics.BasicsPlugin;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Screen;
@@ -57,7 +58,7 @@ class PaletteFillabilityTest {
      * picked ({@code Navigate.to(null)} is false, {@code press(null)} ABSENT), and a null pick as the first copy.
      */
     private static final Set<Class<?>> PICKED_BY_AN_EDITOR = Set.of(Screen.class, Button.class, Hotkey.class,
-            Pick.class);
+            Custom.class, Pick.class);
 
     @Test
     void every_offered_parameter_can_be_filled() {

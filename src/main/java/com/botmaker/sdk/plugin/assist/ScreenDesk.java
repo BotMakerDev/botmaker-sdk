@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Strip;
@@ -71,6 +72,7 @@ public final class ScreenDesk {
     /** Tries {@code input} on {@code constant} as try_input does, {@code how} it says. Off the FX thread. */
     public static String tryInput(AgentContext context, String constant, Input input, Trying how) {
         String opens = how.opens();
+        if (input instanceof Custom) return "A custom input is the bot's own code: only a run of the bot runs it.";
         if (input instanceof Strip strip && strip.scroll() != null && strip.scroll().drag() != null) {
             return "try_input scrolls a strip by the wheel only: a dragged one is scrolled by a run.";
         }
@@ -82,6 +84,7 @@ public final class ScreenDesk {
             case Strip strip -> strip.members().isEmpty() ? null : MapTools.shownMember(strip, context);
             case Tree ignored -> null;
             case Hotkey ignored -> null;
+            case Custom ignored -> null;
             // Words have no picture: try_input presses them by their field.
             case TextButton words -> FxCall.call(() -> ScreenBook.read(context.services())).screen(constant)
                     .flatMap(on -> on.inputs().entrySet().stream().filter(e -> e.getValue().equals(words))

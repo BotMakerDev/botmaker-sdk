@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.testing.TestContexts;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Navigate;
@@ -79,12 +80,12 @@ class ScreenEditorsTest {
             if (!Modifier.isPublic(method.getModifiers())) continue;
             for (int i = 0; i < method.getParameterCount(); i++) {
                 Class<?> type = method.getParameterTypes()[i];
-                if (type != Button.class && type != Hotkey.class && type != Pick.class) continue;
+                if (type != Button.class && type != Hotkey.class && type != Custom.class && type != Pick.class) continue;
                 assertTrue(claimed(TestContexts.slot(method, i, "null")), method.getName() + "'s " + type.getSimpleName());
                 seen++;
             }
         }
-        assertEquals(6, seen, "press(Button), press(Button, Pick), press(Hotkey), state(Button), type(Button, …)");
+        assertEquals(7, seen, "press(Button), press(Button, Pick), press(Hotkey), press(Custom), state(Button), type(Button, …)");
     }
 
     /**

@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
@@ -44,6 +45,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
+import com.botmaker.sdk.internal.screens.NamedMethod;
 
 import java.time.Duration;
 import java.util.List;
@@ -74,7 +76,7 @@ public final class ScreenTypes implements TypeHolder {
                 BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
-                PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CAPTION_SHAPE,
+                PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CUSTOM_SHAPE, CAPTION_SHAPE,
                 READOUT_TEXT_SHAPE, READOUT_DIGITS_SHAPE, READOUT_ELEMENT_SHAPE, MARK_PICTURE_SHAPE, MARK_TEXT_SHAPE,
                 MARK_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
@@ -112,6 +114,7 @@ public final class ScreenTypes implements TypeHolder {
                 when -> when.parameter() instanceof NamedParameter(String source) ? source : "");
         static final Held<Readout, String> READOUT_FACT = Held.as(String.class,
                 readout -> factOf(readout).isEmpty() ? null : factOf(readout));
+        static final Held<Custom, String> CUSTOM_METHOD = Held.as(String.class, ScreenTypes::methodOf);
     }
 
     /**
@@ -276,6 +279,11 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<Hotkey> HOTKEY_COMBO_SHAPE = ComponentType.part(Hotkey.class)
             .<Combo, Hotkey>writtenAs(Hotkey::of)
             .<BooleanSupplier>with(Hotkey::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+
+    /** {@code Custom.of(Puzzles::solve)} and its links: the bot's own method, crossing as the text it is written as. */
+    public static final DeclaredCall<Custom> CUSTOM_SHAPE = ComponentType.part(Custom.class)
+            .<Runnable, Custom>writtenAs(Custom::of, Parts.CUSTOM_METHOD.part(ScreenTypes::method))
+            .<BooleanSupplier>with(Custom::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
 
     /** {@code Caption.of(Words, Zone)}: words a screen shows, one of the bot's {@code Texts}, read in a {@code Zones}. */
     public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class).writtenAs(Caption::of);
@@ -461,6 +469,16 @@ public final class ScreenTypes implements TypeHolder {
     /** The method reference of the fact {@code readout} is read into, {@code Progress::gold}, or {@code ""}. */
     public static String factOf(Readout readout) {
         return readout.fact() instanceof NamedParameter(String source) ? source : "";
+    }
+
+    /** {@code reference}, a method reference ({@code Puzzles::solve}), as Studio holds it in a {@code Custom.of(…)}. */
+    public static Runnable method(String reference) {
+        return reference == null || reference.isBlank() ? null : new NamedMethod(reference.strip());
+    }
+
+    /** The method reference {@code custom} runs, {@code Puzzles::solve}, or {@code ""} for a live method. */
+    public static String methodOf(Custom custom) {
+        return custom.method() instanceof NamedMethod(String source) ? source : "";
     }
 
     /** The method reference of the parameter {@code check} tests, {@code Progress::gold}, or {@code ""}. */

@@ -7,8 +7,8 @@ import java.util.function.BooleanSupplier;
 
 /**
  * One way to act on a {@link Screen}, a field of it: a {@link Button} clicked, a {@link TextButton} clicked on its
- * words, a {@link Hotkey} pressed, a {@link Strip} of buttons that scrolls or shifts, or a {@link Tree} of linked
- * buttons that scrolls in two dimensions. The traits here are each kind's.
+ * words, a {@link Hotkey} pressed, a {@link Strip} of buttons that scrolls or shifts, a {@link Tree} of linked
+ * buttons that scrolls in two dimensions, or the bot's own {@link Custom} Java. The traits here are each kind's.
  *
  * <p>Until it is {@link #tried}, {@link #leaving left by}, {@link #never} done or {@link #locked locked} it is
  * untried: Discovery tries every input of a screen before the screen counts as finished. An input that opened a
@@ -26,7 +26,7 @@ import java.util.function.BooleanSupplier;
  * <p>Each trait is a {@link Link} written after the input's factory, named as its reader is: {@code .leaving()} is
  * read by {@link #isLeaving()}, {@code .locked(…)} by {@link #locked()} (2026-11-01).
  */
-public sealed interface Input extends ScreenPart permits Button, TextButton, Hotkey, Strip, Tree {
+public sealed interface Input extends ScreenPart permits Button, TextButton, Hotkey, Strip, Tree, Custom {
 
     /** Whether Discovery tried it and it opened no screen: it changed this one, or nothing visible. */
     boolean isTried();

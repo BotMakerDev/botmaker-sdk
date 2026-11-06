@@ -141,6 +141,14 @@ public final class Navigate {
     }
 
     /**
+     * Runs {@code custom}'s method on its screen, walking there first, as {@link #press(Button, Pick)} does; it is never
+     * run a second time, though the map says it leads away and the game stayed.
+     */
+    public static Pressed press(Custom custom) {
+        return pressed(custom, null);
+    }
+
+    /**
      * Types {@code text} in {@code field}, a text field of the map ({@code Screens.GUILD.search}), in place of its
      * own text: walks to its screen, clicks it, clears it when it {@link Button#clears clears}, types, presses Enter
      * when it {@link Button#submits submits}, and waits for where the map says it leads, as {@link #press(Button,

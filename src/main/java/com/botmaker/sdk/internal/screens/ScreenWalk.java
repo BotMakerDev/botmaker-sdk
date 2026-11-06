@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pick;
@@ -416,7 +417,8 @@ public final class ScreenWalk {
             }
             // Planned once more from a fresh look before it counts as landing elsewhere: a click lost to lag, or one
             // the game took to pan its view (Firestone's Town, its first Tavern click after a start, 2026-10-17).
-            if (retried.add(next)) continue;
+            // Never the bot's own code: no one knows what a second run of it spends.
+            if (!(next.via() instanceof Custom) && retried.add(next)) continue;
             strayed.add(next);
             if (strayed.size() > MOST_REPLANS) {
                 return new Result(Outcome.STUCK, at, walked, graph.shown(next.to()) + " did not show after "
@@ -576,10 +578,11 @@ public final class ScreenWalk {
                 // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
                 if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
                     // A field that keeps what it holds is never typed twice: its text would be there twice. Nor is a
-                    // drag done twice: what it moved is gone from where it was, and another may sit there now.
+                    // drag done twice: what it moved is gone from where it was, and another may sit there now. Nor the
+                    // bot's own code: no one knows what a second run of it spends.
                     boolean retypes = acted instanceof Button typing && typing.types() != null && !typing.isClearing();
                     boolean redrags = acted instanceof Button dragging && dragging.isDrag();
-                    if (retried || retypes || redrags) {
+                    if (retried || retypes || redrags || acted instanceof Custom) {
                         return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "
                                 + graph.shown(constant) + (retried ? " twice" : "")
                                 + ", though the map says it leads to "
@@ -713,6 +716,8 @@ public final class ScreenWalk {
         Input via = edge.via();
         if (via == null) return Conditions.holds(edge.when());    // a way on its own may be open only while
         if (via.locked() != null || typedByBody(edge)) return false;
+        // Studio holds only the name of the bot's own code, which it cannot run: no way for its walk.
+        if (via instanceof Custom custom && custom.method() instanceof NamedMethod) return false;
         if (!Conditions.holds(edge.when()) || !Conditions.holds(via.when())) return false;
         // Further on, what comes and goes is planned with only when nothing else is open: planned first, Home's
         // Tavern icon pulled a walk on Town back to Home, which found it gone and went to Town again.
@@ -968,8 +973,9 @@ public final class ScreenWalk {
     /** The look once {@code popup} is closed by its way out, else the usual close button. */
     private Optional<BufferedImage> close(String popup, BufferedImage frame) {
         Markers shows = graph.markers(popup);
-        Input way = graph.backOf(popup).map(ScreenGraph.Edge::via).filter(via -> !(via instanceof Hotkey))
-                .orElse(null);
+        // Never the bot's own code either: closing a popup may happen inside any wait, in another input's press.
+        Input way = graph.backOf(popup).map(ScreenGraph.Edge::via)
+                .filter(via -> !(via instanceof Hotkey || via instanceof Custom)).orElse(null);
         Input pressed = way != null && reach.perform(way, frame) ? way
                 : close != null && reach.perform(close, frame) ? close : null;
         if (pressed == null) {

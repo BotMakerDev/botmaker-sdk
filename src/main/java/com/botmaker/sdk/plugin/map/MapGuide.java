@@ -94,6 +94,7 @@ final class MapGuide {
         GROUP("Strip or tree", "Whether it is one button of a strip that scrolls, or a node of a tree."),
         KEYS("Keys", "The key or combination pressed, and how long it is held."),
         WORDS("Words", "The words it is known by, read in its zone."),
+        CODE("Code", "The bot's own method a run runs as its press. Discovery never tries it."),
         MEMBERS("Members", "The strip's buttons, in their order along it."),
         STRIP_SCROLL("Scroll", "How the strip turns to bring a member into view: wheel notches or a drag, measured "
                 + "once."),
@@ -119,12 +120,12 @@ final class MapGuide {
 
         /**
          * Whether it opens at first for {@code input} (null: a part of the screen's panel): a screen's markers and
-         * inputs; a button's press and looks, its field or drag when it is one; every part of a hotkey, words, a strip
-         * or a tree, which shows only for its own kind; and Try.
+         * inputs; a button's press and looks, its field or drag when it is one; every part of a hotkey, words, a strip,
+         * a tree or custom code, which shows only for its own kind; and Try.
          */
         boolean opensFor(Input input) {
             return switch (this) {
-                case MARKERS, INPUTS, PRESSED_BY, BUTTON_LOOKS, KEYS, WORDS, MEMBERS, STRIP_SCROLL, NODES,
+                case MARKERS, INPUTS, PRESSED_BY, BUTTON_LOOKS, KEYS, WORDS, CODE, MEMBERS, STRIP_SCROLL, NODES,
                      TREE_SCROLL, TRY -> true;
                 case TEXT_FIELD -> input instanceof Button button && button.isField();
                 case DRAG -> input instanceof Button button && button.isDrag();

@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Order;
@@ -252,8 +253,27 @@ final class MapTools {
         return String.join(", ", steps.stream().map(s -> One.of(call, s, true).label()).toList());
     }
 
+    /** Whether {@code input} names no picture the bot has, nor a key: it may be a field of its screen. */
+    private static boolean namedByField(One input, AgentContext context) {
+        return input.picture() != null && !input.picture().isBlank() && (input.key() == null || input.key().isBlank())
+                && context.services().projectDir() != null && !ActTools.exists(context, input.picture().strip());
+    }
+
+    /** Whether {@code input} names a {@link Custom} of its screen by its field. */
+    private static boolean namesCustom(One input, AgentContext context) {
+        if (!namedByField(input, context)) return false;
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
+        return ScreenBook.find(graph, input.screen() == null ? "" : input.screen().strip())
+                .flatMap(screen -> graph.input(screen, input.picture().strip())).filter(Custom.class::isInstance)
+                .isPresent();
+    }
+
     private static Tried attempt(One input, AgentContext context) {
         try {
+            if (namesCustom(input, context)) {
+                return Tried.refused(input.picture().strip() + " is the bot's own code: only a run of the bot runs it, "
+                        + "and Discovery leaves it alone. Nothing was done.");
+            }
             One named = byField(input, context);
             if (named == null) {
                 return Tried.refused(input.picture().strip() + " is a strip that scrolls by a drag, which try_input "
@@ -273,10 +293,7 @@ final class MapTools {
      * strip that scrolls by a drag, which try_input cannot do.
      */
     private static One byField(One input, AgentContext context) {
-        if (input.picture() == null || input.picture().isBlank() || input.key() != null && !input.key().isBlank()
-                || context.services().projectDir() == null || ActTools.exists(context, input.picture().strip())) {
-            return input;
-        }
+        if (!namedByField(input, context)) return input;
         ScreenGraph graph = FxCall.call(() -> ScreenBook.read(context.services()));
         String field = input.picture().strip();
         Optional<Input> held = ScreenBook.find(graph, input.screen() == null ? "" : input.screen().strip())
@@ -293,6 +310,8 @@ final class MapTools {
             case Hotkey hotkey -> hotkey.combo() == null ? input : input.named(null, null, hotkey.combo().caps());
             // Words are pressed by their field, where a fresh look reads them.
             case TextButton ignored -> input;
+            // Refused before this, by namesCustom.
+            case Custom ignored -> input;
             // A tree scrolled over by its field is scrolled over a node that shows.
             case Tree tree -> tree.members().isEmpty() || input.scroll() == null ? input
                     : input.named(shownNode(tree, context), input.scroll(), null);

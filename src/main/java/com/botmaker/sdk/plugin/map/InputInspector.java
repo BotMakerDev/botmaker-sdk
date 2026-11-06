@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -34,6 +35,7 @@ import com.botmaker.sdk.plugin.assist.ScreenDesk.Trying;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.MapGuide.Part;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -205,6 +207,7 @@ final class InputInspector {
             }
             case Hotkey hotkey -> all.add(PanelParts.of(Part.KEYS, input, key(constant, field, hotkey)));
             case TextButton words -> all.add(PanelParts.of(Part.WORDS, input, words(words)));
+            case Custom custom -> all.add(PanelParts.of(Part.CODE, input, new Label(ScreenTypes.methodOf(custom))));
             case Strip strip -> {
                 all.add(PanelParts.of(Part.MEMBERS, input, members(constant, field, strip)));
                 all.add(PanelParts.of(Part.STRIP_SCROLL, input, scroll(constant, field, strip)));
@@ -214,7 +217,8 @@ final class InputInspector {
                 all.add(PanelParts.of(Part.TREE_SCROLL, input, treeScroll(constant, field, tree)));
             }
         }
-        all.add(PanelParts.of(Part.TRY, input, trying(constant, row, input)));
+        // The bot's own code runs only in a run: nothing to try here.
+        if (!(input instanceof Custom)) all.add(PanelParts.of(Part.TRY, input, trying(constant, row, input)));
         all.forEach(node -> node.setDisable(busy));
         return all;
     }

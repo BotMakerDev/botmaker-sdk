@@ -41,6 +41,10 @@ public final class SampleBot {
         return true;
     }
 
+    /** The bot's own Java as an input — Home's {@code solve}, {@code Custom.of(SampleBot::solvePuzzle)}. */
+    public static void solvePuzzle() {
+    }
+
     /** Whether an activity that has not got anywhere yet should keep trying, by {@link Parameters#maxAttempts}. */
     static boolean keepTrying(int attempt) {
         return attempt < Parameters.maxAttempts;

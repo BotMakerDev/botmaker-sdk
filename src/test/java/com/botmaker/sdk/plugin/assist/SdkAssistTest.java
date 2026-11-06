@@ -32,6 +32,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.input.Key;
@@ -95,6 +96,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1715,6 +1717,22 @@ class SdkAssistTest {
         private void answer() {
             if (!next.isEmpty()) agent.frame = next.poll();
         }
+    }
+
+    /** The bot's own code is written to and read from the map by its method, and the tools say what it cannot do. */
+    @Test
+    void aCustomInputIsTheBotsAndNoToolTriesIt() {
+        ImageTemplate title = new ImageTemplate(TemplateLibrary.pathForName("title"));
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(List.of(title)),
+                Custom.of(ScreenTypes.method("Puzzles::solve"))));
+
+        Custom held = assertInstanceOf(Custom.class, input("HOME", "custom"));
+        assertEquals("Puzzles::solve", ScreenTypes.methodOf(held));
+
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "custom", "did", "untried")
+                .isRefused(), "never Discovery's to try");
+        String tried = text(run("try_input", "screen", "Home", "inputs", List.of(Map.of("picture", "custom"))));
+        assertTrue(tried.contains("only a run of the bot runs it"), tried);
     }
 
     /** 🗺 Screens' hand tools set what try_input records, and add and remove screens (2026-10-15). */

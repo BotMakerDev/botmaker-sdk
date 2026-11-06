@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.source.ParameterWrite;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.params.Facts;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
@@ -637,6 +638,9 @@ final class MapEdits {
         Optional<AgentReply> dragRefused = drags ? dragRefused(context, field, in, edit, gestured || typed)
                 : Optional.empty();
         if (dragRefused.isPresent()) return dragRefused.get();
+        if (in instanceof Custom && edit.did() == Result.UNTRIED) {
+            return AgentReply.refused(field + " is the bot's own code, never Discovery's to try. Nothing was written.");
+        }
         Input now = in;
         if (edit.did() != null) {
             now = switch (edit.did()) {
@@ -831,6 +835,7 @@ final class MapEdits {
             // A tree is named by its field, never by a picture and a scroll.
             case Tree ignored -> false;
             case Hotkey ignored -> false;
+            case Custom ignored -> false;
             case TextButton ignored -> false;
         };
     }

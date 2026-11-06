@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -377,6 +378,31 @@ class ScreenTypesTest {
         assertNull(BotConstants.inputName(reference.occasional()), "a reference with traits is a button of its own");
         assertEquals("HOME", BotConstants.screenName(BotConstants.screen("HOME")));
         assertEquals(BotConstants.screen("HOME"), BotConstants.screen("HOME"), "a reference equals one to the same");
+    }
+
+    /** The bot's own code crosses as the method reference it is written as, in and out of Java, with its links. */
+    @Test
+    void aCustomInputIsWrittenAndReadAsItsMethodReference() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(ScreenTypes.CUSTOM_SHAPE));
+        Custom solve = Custom.of(ScreenTypes.method("Puzzles::solve"));
+        Custom gone = solve.leaving().never("spends gems");
+
+        assertEquals(solve, roundTrip(ScreenTypes.CUSTOM_SHAPE, solve));
+        assertEquals("Puzzles::solve", ScreenTypes.methodOf(solve));
+        assertEquals("", ScreenTypes.methodOf(Custom.of(() -> { })), "a live method has no name");
+
+        String java = grammar.write(Custom.class, solve).orElseThrow().source();
+        assertTrue(java.endsWith("Custom.of(Puzzles::solve)"), java);
+        assertEquals(solve, grammar.read(Custom.class, qualified(java)).orElseThrow());
+
+        String links = grammar.write(Custom.class, gone).orElseThrow().source();
+        assertTrue(links.endsWith("Custom.of(Puzzles::solve).leaving().never(\"spends gems\")"), links);
+        assertEquals(gone, grammar.read(Custom.class, qualified(links)).orElseThrow());
+    }
+
+    /** {@code java} with {@code Custom} named in full, as a file names it by its import. */
+    private static String qualified(String java) {
+        return java.startsWith("Custom.") ? Custom.class.getPackageName() + "." + java : java;
     }
 
     /** A test of a parameter is a typed chain: written on the When it holds, read back into the value it was. */

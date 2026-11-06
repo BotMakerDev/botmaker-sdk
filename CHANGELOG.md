@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A screen can hold your own Java as an input** (2026-11-06). `Custom.of(Puzzles::solve)` is a field of its screen
+  like a button, for what is no press: a puzzle solved, a swipe computed. `Navigate.press(Screens.PUZZLE.solve)`, or a
+  walk through it, runs the method once. Discovery and ExploreMap never run it, and the map shows it with a `</>` sign
+  and its method reference.
 - **Facts are `@Facts`, and a screen's readout says where each is read** (2026-11-06). A group of facts is marked
   `@Facts` (a bot need not be a game); `@GameState` is deprecated: Studio's upgrade renames it below `src`, but the copy in `starting-params/` is the
   author's to rename by hand, since the fitter restores it. A readout feeds a

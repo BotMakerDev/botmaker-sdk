@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
@@ -39,11 +40,13 @@ public final class LiveMoves implements MapWalk.Moves {
     /**
      * Whether {@code edge} is one a run takes now. A way back with no input is not: a run's walk has no close button
      * to press for it. One whose lead needs a look of its button is taken while the button shows that look, or is not
-     * in view (its press then says it is absent), or is pressed until it shows it.
+     * in view (its press then says it is absent), or is pressed until it shows it. The bot's own code is not: exploring
+     * never runs it, since no one knows what it spends.
      */
     @Override
     public boolean open(ScreenGraph.Edge edge) {
         if (edge.via() == null) return edge.onItsOwn();
+        if (edge.via() instanceof Custom) return false;
         if (edge.state() == null || !(edge.via() instanceof Button button)) return true;
         if (edge.pick() != null && edge.pick().mode() == Pick.Mode.UNTIL) return true;
         Optional<Strip> strip = graph.screen(edge.from()).flatMap(screen -> screen.stripOf(button));

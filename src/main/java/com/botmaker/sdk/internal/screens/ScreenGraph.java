@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
@@ -539,12 +540,16 @@ public final class ScreenGraph {
         return OptionalInt.empty();
     }
 
-    /** A finished screen's shape: a menu when every input tried, never-done, strips and its way back aside, opened one. */
+    /**
+     * A finished screen's shape: a menu when every input tried, never-done, strips, the bot's own code (no one tried it)
+     * and its way back aside, opened one.
+     */
     public Optional<Shape> shape(String constant) {
         boolean opened = false;
         for (String field : fields(constant)) {
             Input input = input(constant, field).orElseThrow();
             if (input.never() != null || input.locked() != null || input instanceof Strip || input instanceof Tree
+                    || input instanceof Custom && opens(constant, field).isEmpty()
                     || isBack(constant, field)
                     || input.isLeaving() || !tried(constant, field)) {
                 continue;

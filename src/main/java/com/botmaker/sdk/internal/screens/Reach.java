@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Drag;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -694,9 +695,17 @@ public interface Reach {
      * shows but a disabled one, the game let settle {@link #CLICK_SETTLE_MS} between them, last to first along its
      * order: a card claimed and gone shifts the ones after it, never one still to press. False for that one when no
      * copy was pressed.
+     *
+     * <p>A {@link Custom} runs its method here, on this thread. Studio holds only its name, which nothing can run: false,
+     * and nothing done.
      */
     default boolean perform(Input input, Strip strip, Pick pick, BufferedImage frame) {
         return switch (input) {
+            case Custom custom -> {
+                if (custom.method() == null || custom.method() instanceof NamedMethod) yield false;
+                custom.method().run();
+                yield true;
+            }
             case Hotkey hotkey -> {
                 keys(hotkey.combo());
                 yield true;

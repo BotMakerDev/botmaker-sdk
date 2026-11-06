@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -97,6 +98,7 @@ public final class ScreenEdits {
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
                     b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.isOccasional(), null, h.when());
+            case Custom c -> new Custom(c.method(), false, c.isInfo(), null, c.isOccasional(), null, c.when());
             case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.isOccasional(), null,
                     t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.isOccasional(), null,
@@ -116,6 +118,7 @@ public final class ScreenEdits {
                     b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.locked(),
                     null);
+            case Custom c -> new Custom(c.method(), c.isLeaving(), c.isInfo(), c.never(), false, c.locked(), null);
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
                     t.locked(), null, t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
@@ -135,6 +138,8 @@ public final class ScreenEdits {
                     b.isMarking(), b.isAbsent());
             case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.isOccasional(),
                     h.locked(), h.when());
+            case Custom c -> new Custom(c.method(), c.isLeaving(), false, c.never(), c.isOccasional(), c.locked(),
+                    c.when());
             case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
                     t.isOccasional(), t.locked(), t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
             case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),

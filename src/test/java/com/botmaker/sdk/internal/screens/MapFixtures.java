@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
@@ -68,6 +69,7 @@ public final class MapFixtures {
         return switch (input) {
             case Button button -> button.picture().id();
             case Hotkey hotkey -> "key_" + hotkey.key().name().toLowerCase(Locale.ROOT);
+            case Custom ignored -> "custom";
             case Strip strip -> strip.members().getFirst().id() + "_strip";
             case Tree tree -> tree.members().getFirst().id() + "_tree";
             case TextButton words -> "text_" + words.caption().words().text().toLowerCase(Locale.ROOT);

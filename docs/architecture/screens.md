@@ -97,6 +97,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   when it is the whole words (`LineMatch.same`): case-blind, spaces and marks at its ends dropped, edits forgiven by
   length (none up to 4 letters, one up to 8, two past), so `Claim` never matches `Claimed` nor `OK` `O` (the user's
   call, 2026-10-22; `Text.findFuzzy`'s two edits anywhere in a line match almost any line for a short label).
+- **`Custom.of(Puzzles::solve)`** is the bot's own Java as an `Input`, for what is no press: a puzzle solved, a swipe
+  computed (2026-11-06). `Navigate.press(custom)` or a walk over a way through it runs the method on the run's thread
+  (`Reach.perform`), never twice, though the game stays where the map says it leads away. It is tried once written, so
+  Discovery never does it, ExploreMap skips its ways (`LiveMoves.open`), a popup is never closed by one, and it says
+  nothing of its screen's shape unless it opens a screen. Studio holds only its name (`NamedMethod`), which nothing can
+  run: its walks plan no way through one, ▶ Try is not offered, and try_input says why.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are
