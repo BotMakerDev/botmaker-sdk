@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
@@ -230,6 +231,17 @@ public final class ScreenGraph {
         for (Map.Entry<String, MapScreen> e : screens.entrySet()) {
             for (Map.Entry<String, Readout> field : e.getValue().readouts().entrySet()) {
                 if (field.getValue() == readout) return Optional.of(new InputName(e.getKey(), field.getKey()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The screen and the field holding {@code action}, this very value; empty when no screen of the map holds it. */
+    public Optional<InputName> nameOf(Do action) {
+        if (action == null) return Optional.empty();
+        for (Map.Entry<String, MapScreen> e : screens.entrySet()) {
+            for (Map.Entry<String, Do> field : e.getValue().actions().entrySet()) {
+                if (field.getValue() == action) return Optional.of(new InputName(e.getKey(), field.getKey()));
             }
         }
         return Optional.empty();

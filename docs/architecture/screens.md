@@ -103,6 +103,14 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   Discovery never does it, ExploreMap skips its ways (`LiveMoves.open`), a popup is never closed by one, and it says
   nothing of its screen's shape unless it opens a screen. Studio holds only its name (`NamedMethod`), which nothing can
   run: its walks plan no way through one, ▶ Try is not offered, and try_input says why.
+- **`Do.press(input)`** is what achieves something on a screen, a `public final` field beside the input it presses
+  (2026-11-06, spec `2026-11-06-goals-planner-design.md`). It is no `ScreenPart`: `MapScreen.actions` holds it, read only
+  off a run's classes, so Studio's map reads none yet and leaves the field as written. `DoneRecords` keeps when each was
+  last done and whether its check held, in the SDK's state folder (`done.json`, keyed `<constant>.<field>`), and
+  `Readiness` says from that and its traits whether it may be done; an unknown never holds one back. A run's
+  `Navigate.to` walks `.doing(DoneRecords.run())`: on each screen it comes to, what is `.onSight()` and ready is pressed
+  if it shows now, nothing waited for, and the walk looks again. The assistant's walks and ExploreMap do none.
+  `Navigate.press(Do)` presses whatever is due or not, and records it: a flow says when.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are

@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A screen says what is done on it** (2026-11-06). `Do.press(chest)` is a field of its screen beside the input it
+  presses, and says what it serves, needs and how often: `.serves`, `.needs`, `.first`, `.last`, `.over`, `.every`,
+  `.daily`, `.once`, `.until`, `.checks`, `.onFail`. One marked `.onSight()` is done whenever a run's walk comes to its
+  screen, it shows and it is ready: an ad closed, a free reward taken. `Navigate.press(Screens.MARKET.claim)` presses one
+  from a flow. Either way the bot's `.botmaker` folder keeps when it was last done and whether its check held. The
+  planner that chooses among the rest comes next, and the map does not show actions yet.
 - **A screen can hold your own Java as an input** (2026-11-06). `Custom.of(Puzzles::solve)` is a field of its screen
   like a button, for what is no press: a puzzle solved, a swipe computed. `Navigate.press(Screens.PUZZLE.solve)`, or a
   walk through it, runs the method once. Discovery and ExploreMap never run it, and the map shows it with a `</>` sign

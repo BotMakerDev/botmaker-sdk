@@ -104,7 +104,8 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
 - **The palette is discovered, never listed**: `@Palette` marks what is offered, value types carry nothing.
 - **No class under `plugin/` reads or writes Java text**; an editor reads the value and hands one back.
 - **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`, its private `params/`) and run properties; no reader of
-  the old files** (`plugin-values.md`). A managed value's shape changes freely: nothing converts it, and
+  the old files** (`plugin-values.md`); what a run learned of the game stays in the SDK's state folder (`DoneRecords`,
+  2026-11-06), never versioned. A managed value's shape changes freely: nothing converts it, and
   Studio's upgrade repairs what no longer reads (`../docs/refactor/25-compatibility.md` §12).
 - **A type is declared once, in `plugin/types/SdkTypes`**; the two string factories in `declaration.md` stay.
 - **All OpenCV loading goes through shared's `OpenCvNative.ensureLoaded()`** (`opencv.md`).

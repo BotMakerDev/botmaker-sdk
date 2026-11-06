@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Mark;
@@ -37,15 +38,22 @@ import java.util.function.UnaryOperator;
  * @param inputs   its inputs, field name to input
  * @param readouts what it shows to be read, field name to readout
  * @param marks    the signs that tell it and are never pressed, field name to mark
+ * @param actions  what is done on it, field name to action: only a run's map holds any, Studio's tools read none yet
  */
 public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts,
-                        Map<String, Mark> marks) {
+                        Map<String, Mark> marks, Map<String, Do> actions) {
 
     public MapScreen {
         setup = setup == null ? Setup.named("") : setup;
         inputs = inputs == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(inputs));
         readouts = readouts == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(readouts));
         marks = marks == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(marks));
+        actions = actions == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(actions));
+    }
+
+    /** A screen of {@code setup}, {@code inputs}, {@code readouts} and {@code marks}, on which nothing is done. */
+    public MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts, Map<String, Mark> marks) {
+        this(setup, inputs, readouts, marks, Map.of());
     }
 
     /** A screen of {@code setup}, {@code inputs} and {@code readouts}, with no mark. */
@@ -64,8 +72,8 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
     }
 
     /**
-     * {@code screen} as the bot's class holds it: its {@code public final} input and readout fields, in the order
-     * declared, and its setup, read now that every constant is set.
+     * {@code screen} as the bot's class holds it: its {@code public final} input, readout, mark and action fields, in
+     * the order declared, and its setup, read now that every constant is set.
      *
      * @throws IllegalStateException when its setup throws, so the bot's author sees why rather than a screen missing
      */
@@ -73,10 +81,11 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         Map<String, Input> inputs = new LinkedHashMap<>();
         Map<String, Readout> readouts = new LinkedHashMap<>();
         Map<String, Mark> marks = new LinkedHashMap<>();
+        Map<String, Do> actions = new LinkedHashMap<>();
         for (Field field : screen.getClass().getDeclaredFields()) {
             int modifiers = field.getModifiers();
             if (Modifier.isStatic(modifiers) || !Modifier.isPublic(modifiers)
-                    || !ScreenPart.class.isAssignableFrom(field.getType())) {
+                    || !ScreenPart.class.isAssignableFrom(field.getType()) && field.getType() != Do.class) {
                 continue;
             }
             try {
@@ -84,6 +93,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
                     case Input input -> inputs.put(field.getName(), input);
                     case Readout readout -> readouts.put(field.getName(), readout);
                     case Mark mark -> marks.put(field.getName(), mark);
+                    case Do action -> actions.put(field.getName(), action);
                     case null, default -> {}
                 }
             } catch (IllegalAccessException | LinkageError unreadable) {
@@ -96,7 +106,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         } catch (RuntimeException failed) {
             throw new IllegalStateException(screen.getClass().getSimpleName() + ".setup() failed: " + failed, failed);
         }
-        return new MapScreen(setup, inputs, readouts, marks);
+        return new MapScreen(setup, inputs, readouts, marks, actions);
     }
 
     public String name() {
@@ -208,7 +218,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
 
     /** This screen, its setup as {@code change} makes it. */
     public MapScreen setup(UnaryOperator<Setup> change) {
-        return new MapScreen(change.apply(setup), inputs, readouts, marks);
+        return new MapScreen(change.apply(setup), inputs, readouts, marks, actions);
     }
 
     /** This screen with {@code input} as its field {@code field}: in its place, or added last. */
@@ -230,28 +240,28 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         }
         Map<String, Input> now = new LinkedHashMap<>(inputs);
         now.put(field, placed);
-        return new MapScreen(setup, now, readouts, kept);
+        return new MapScreen(setup, now, readouts, kept, actions);
     }
 
     /** This screen with {@code mark} as its field {@code field}: in its place, or added last. */
     public MapScreen withMark(String field, Mark mark) {
         Map<String, Mark> now = new LinkedHashMap<>(marks);
         now.put(field, mark);
-        return new MapScreen(setup, inputs, readouts, now);
+        return new MapScreen(setup, inputs, readouts, now, actions);
     }
 
     /** This screen without its mark {@code field}. */
     public MapScreen withoutMark(String field) {
         Map<String, Mark> now = new LinkedHashMap<>(marks);
         now.remove(field);
-        return new MapScreen(setup, inputs, readouts, now);
+        return new MapScreen(setup, inputs, readouts, now, actions);
     }
 
     /** This screen with {@code readout} as its field {@code field}: in its place, or added last. */
     public MapScreen withReadout(String field, Readout readout) {
         Map<String, Readout> now = new LinkedHashMap<>(readouts);
         now.put(field, readout);
-        return new MapScreen(setup, inputs, now, marks);
+        return new MapScreen(setup, inputs, now, marks, actions);
     }
 
     /** Every field of it: its inputs, then its readouts, then its marks. */
@@ -294,7 +304,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
                 else now.put(e.getKey(), kept);
             }
         }
-        return new MapScreen(setup, now, readouts, marks);
+        return new MapScreen(setup, now, readouts, marks, actions);
     }
 
     /**

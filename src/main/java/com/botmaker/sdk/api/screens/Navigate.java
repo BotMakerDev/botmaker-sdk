@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.observe.Bots;
+import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.Reach;
@@ -64,7 +65,7 @@ public final class Navigate {
         ScreenMaps.reached(null);
         String from = ScreenMaps.lastSeen();
         ScreenWalk walk = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant));
-        ScreenWalk.Result walked = walk.uncovering().go(target.get(), from);
+        ScreenWalk.Result walked = walk.uncovering().doing(DoneRecords.run()).go(target.get(), from);
         if (walked.at() == null) ScreenMaps.lost();
         else ScreenMaps.seen(walked.at());
         if (walked.arrived()) {
@@ -146,6 +147,36 @@ public final class Navigate {
      */
     public static Pressed press(Custom custom) {
         return pressed(custom, null);
+    }
+
+    /**
+     * Presses {@code action}'s input, as its own {@code press} does, and keeps the action's done-record. A flow says
+     * when: nothing here asks whether the action is due or what it needs. {@link Pressed.Result#ABSENT} for one no
+     * screen of the map holds; a press that pressed nothing keeps no record.
+     *
+     * @throws BotStuckException as {@link #to} does, when the walk to its screen gets stuck
+     */
+    @Hidden("no block can pick an action yet: written in Java")
+    public static Pressed press(Do action) {
+        ScreenGraph map = ScreenMaps.installed();
+        Optional<BotConstants.InputName> name = map.nameOf(action);
+        if (name.isEmpty()) {
+            Debug.log((action == null ? "No action" : action.input().label()) + " is no action of the bot's screen map.");
+            return new Pressed(Pressed.Result.ABSENT, null, 0);
+        }
+        DoneRecords records = DoneRecords.run();
+        // The walk there leaves it alone though it is done on sight: one press, this one.
+        boolean mine = records.start(action);
+        try {
+            Pressed pressed = pressed(action.input(), null);
+            if (pressed.result() == Pressed.Result.DONE || pressed.result() == Pressed.Result.LEFT) {
+                records.pressed(DoneRecords.key(name.get().screen(), name.get().field()), action,
+                        pressed.result() == Pressed.Result.DONE);
+            }
+            return pressed;
+        } finally {
+            if (mine) records.finish(action);
+        }
     }
 
     /**

@@ -6,21 +6,25 @@ import samplebot.params.bot.Progress;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Params;
+import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Place;
 import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.text.DigitSet;
 
 import java.time.Duration;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -37,6 +41,12 @@ public final class Screens {
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
+        public final Do claim = Do.press(collect).serves(Goal.of(Condition.of(SampleBot::shopOpen))).first()
+                .daily(LocalTime.of(5, 0)).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2));
+        public final Do solved = Do.press(solve).needs(Goal.of(Condition.of(SampleBot::shopOpen)))
+                .needs(Condition.of(SampleBot::shopOpen)).last().over(() -> Screens.HOME.claim).once()
+                .until(Condition.of(SampleBot::shopOpen));
+        public final Do glance = Do.press(avatar).onSight().every(Duration.ofMinutes(10));
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried()
                 .when(Condition.of(SampleBot::shopOpen));
         public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),

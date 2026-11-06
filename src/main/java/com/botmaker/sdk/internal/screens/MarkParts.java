@@ -66,7 +66,7 @@ public final class MarkParts {
             if (left.keeps(part)) settled.put(field, part);
         });
         MapScreen next = new MapScreen(screen.setup().markers(List.of()).absent(List.of()).texts(List.of())
-                .elements(List.of()), Map.of(), Map.of(), Map.of());
+                .elements(List.of()), Map.of(), Map.of(), Map.of(), screen.actions());
         for (Map.Entry<String, ScreenPart> e : parts.entrySet()) {
             ScreenPart part = settled.containsKey(e.getKey()) ? e.getValue() : left.claim(e.getValue());
             next = switch (part) {

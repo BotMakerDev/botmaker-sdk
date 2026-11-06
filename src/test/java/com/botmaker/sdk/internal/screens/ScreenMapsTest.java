@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,10 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The map a run reads off the bot's {@code Screens} class. */
 class ScreenMapsTest {
@@ -27,6 +31,7 @@ class ScreenMapsTest {
 
         public static final class Puzzle extends Screen {
             public final Custom solve = Custom.of(ScreenMapsTest::solve);
+            public final Do solved = Do.press(solve).once();
 
             @Override
             public Setup setup() {
@@ -43,5 +48,19 @@ class ScreenMapsTest {
         int before = SOLVED.get();
         solve.method().run();
         assertEquals(before + 1, SOLVED.get(), "a run holds the bot's own method, not its name");
+    }
+
+    @Test
+    void readsDoFields() {
+        ScreenGraph map = ScreenMaps.read(Bot.class);
+
+        MapScreen puzzle = map.screen("PUZZLE").orElseThrow();
+        assertSame(Bot.PUZZLE.solved, puzzle.actions().get("solved"));
+        assertSame(Bot.PUZZLE.solve, Bot.PUZZLE.solved.input());
+        assertFalse(puzzle.parts().containsKey("solved"), "an action tells nothing of its screen");
+        assertEquals("solved", map.nameOf(Bot.PUZZLE.solved).orElseThrow().field());
+        assertEquals("PUZZLE", map.nameOf(Bot.PUZZLE.solved).orElseThrow().screen());
+        assertTrue(map.nameOf(Do.press(Bot.PUZZLE.solve).once()).isEmpty(), "this very value, not one equal to it");
+        assertEquals(puzzle.actions(), puzzle.setup(setup -> setup.popup()).actions(), "a change to its setup keeps them");
     }
 }

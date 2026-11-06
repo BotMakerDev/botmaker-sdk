@@ -1,8 +1,10 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pick;
@@ -15,6 +17,8 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.Readiness;
 import com.botmaker.runlog.api.Level;
 
 import java.awt.image.BufferedImage;
@@ -109,6 +113,8 @@ public final class ScreenWalk {
     private final Button close;
     /** Whether {@link #go} clears an overlay the map lacks: a run's walks do, the assistant's leave it to the user. */
     private final boolean uncovers;
+    /** Where what {@link #go} does on sight is kept; null when it does none. */
+    private final DoneRecords records;
 
     /** How long a screen of the map is given to show once an overlay's close was pressed: short, a wait timed out. */
     static final long UNCOVER_MS = 2_000;
@@ -123,17 +129,26 @@ public final class ScreenWalk {
 
     /** As above; a way back with no input clicks {@code close}, the game's usual close button, while it shows. */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close) {
-        this(graph, reach, stepMs, reached, close, false);
+        this(graph, reach, stepMs, reached, close, false, null);
     }
 
     private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close,
-                       boolean uncovers) {
+                       boolean uncovers, DoneRecords records) {
         this.graph = graph;
         this.reach = reach;
         this.stepMs = stepMs;
         this.reached = reached == null ? name -> {} : reached;
         this.close = close;
         this.uncovers = uncovers;
+        this.records = records;
+    }
+
+    /**
+     * This walk, doing on each screen it comes to what is done {@link Do#onSight on sight} and ready, kept in
+     * {@code records}: a run's {@code Navigate}. The assistant's walks and ExploreMap do none.
+     */
+    public ScreenWalk doing(DoneRecords records) {
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records);
     }
 
     /**
@@ -142,7 +157,7 @@ public final class ScreenWalk {
      * assistant's do while the screen it explores is not mapped yet.
      */
     public ScreenWalk uncovering() {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, true);
+        return new ScreenWalk(graph, reach, stepMs, reached, close, true, records);
     }
 
     /** The screen the game shows now, {@code near}'s neighbours looked for first; popups aside. */
@@ -378,6 +393,11 @@ public final class ScreenWalk {
                 if (told != null) walked.add(at);
                 reached.accept(at);
                 told = at;
+                if (onSight(at)) {
+                    // Read again from a fresh look, as it may have left the screen; one with no marker stays known.
+                    if (!graph.markers(at).any()) unmarked = at;
+                    continue;
+                }
             }
             // A tab of the target is the target too: the game shows it, one of its tabs picked.
             if (at.equals(target) || graph.tabOf(at, target)) {
@@ -426,6 +446,50 @@ public final class ScreenWalk {
             }
         }
         return new Result(Outcome.STUCK, at, walked, "No way to " + graph.shown(target) + " in " + most + " steps.");
+    }
+
+    /**
+     * Does what {@code at} does on sight and is ready, in the order declared, each on a fresh look with popups closed:
+     * only what shows now is pressed, its strip not scrolled and nothing waited for, and once one has left the screen
+     * the rest are not looked for. An input another screen holds, or one only a body can type in, is not done. True
+     * when any was done, so the walk looks again.
+     */
+    private boolean onSight(String at) {
+        MapScreen screen = graph.screens().get(at);
+        if (records == null || screen == null) return false;
+        boolean marked = graph.markers(at).any();
+        boolean any = false;
+        for (Map.Entry<String, Do> field : screen.actions().entrySet()) {
+            Do action = field.getValue();
+            if (!action.isOnSight()) continue;
+            // As a press takes it: what its strip or tree says of it counts.
+            Optional<Input> held = graph.nameOf(action.input()).filter(name -> name.screen().equals(at))
+                    .flatMap(name -> screen.effective(name.field()));
+            if (held.isEmpty() || held.get() instanceof Button typed && typed.isTyped()) continue;
+            Input input = held.get();
+            String key = DoneRecords.key(at, field.getKey());
+            if (!Readiness.ready(action, input, records.last(key), records.clock())) continue;
+            if (Thread.currentThread().isInterrupted()) break;
+            Optional<BufferedImage> frame = closePopups(reach.look());
+            // A screen with no marker cannot be told again: what was done is taken to have left it there.
+            if (frame.isEmpty() || any && marked && whereOn(frame.get(), at).filter(at::equals).isEmpty()) break;
+            Strip strip = screen.stripOf(input).orElse(null);
+            if (input instanceof Button button && reach.seen(button, strip, null, frame.get()).isEmpty()) continue;
+            // Its own method may walk here again, and a flow pressing it walked here to: it is not done twice.
+            if (!records.start(action)) continue;
+            try {
+                if (!reach.perform(input, strip, null, frame.get())) continue;
+                any = true;
+                // Kept before the wait where nothing is to be asked after it: a stop then loses no press.
+                if (action.checks() == null) records.done(key, true);
+                reach.pause(Reach.CLICK_SETTLE_MS);
+                if (action.checks() != null) records.pressed(key, action, true);
+                Debug.log("Done on sight: " + graph.shown(at) + "'s " + field.getKey() + ".");
+            } finally {
+                records.finish(action);
+            }
+        }
+        return any;
     }
 
     /** The most presses of one {@link Pick#untilNone}: a button that never runs out is no loop to run for ever. */
