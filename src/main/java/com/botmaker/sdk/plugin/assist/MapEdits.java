@@ -6,12 +6,8 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.source.ParameterWrite;
-import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.api.input.Combo;
-import com.botmaker.sdk.api.params.Assumed;
-import com.botmaker.sdk.api.params.GameState;
-import com.botmaker.sdk.api.params.ReadOn;
-import com.botmaker.sdk.api.params.StaleAfter;
+import com.botmaker.sdk.api.params.Facts;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -20,6 +16,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.Place;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
@@ -28,11 +25,11 @@ import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -331,7 +328,10 @@ final class MapEdits {
         }
     }
 
-    /** The method of a {@code @GameState} group a run keeps {@code fact} in: the map changes in nothing. */
+    /**
+     * The method of a {@code @Facts} group a run keeps {@code fact} in, and, for a fact read off the app, the screen's
+     * readout made to feed it: {@code .into(Group::name)}, then {@code .staleAfter(…)} (2026-11-06).
+     */
     private static AgentReply addFact(AddFact fact, StudioServices services) {
         String group = has(fact.group()) ? fact.group().strip() : "Progress";
         String name = has(fact.name()) ? fact.name().strip() : "";
@@ -341,13 +341,15 @@ final class MapEdits {
             case NUMBER -> ParameterWrite.of(group, name, 0);
             case SHOWN, FLAG -> ParameterWrite.of(group, name, false);
         };
-        write = write.groupMarked(ParameterWrite.Mark.of(GameState.class));
-        String read = "a step sets it";
+        write = write.groupMarked(ParameterWrite.Mark.of(Facts.class));
+        String read = "a step sets it; until one does it is unknown, and a way or input under it stays open";
+        String readScreen = null;
+        String readField = null;
+        Readout feeding = null;
         if (fact.holds() == FactKind.FLAG) {
             if (has(fact.screen()) || has(fact.field()) || fact.minutes() != null) {
                 return AgentReply.refused("A flag is set by a step of the bot: it takes no screen, field or minutes.");
             }
-            write = write.marked(ParameterWrite.Mark.of(Assumed.class));
         } else {
             ScreenGraph graph = ScreenBook.read(services);
             Optional<String> screen = has(fact.screen()) ? ScreenBook.find(graph, fact.screen()) : Optional.empty();
@@ -360,17 +362,34 @@ final class MapEdits {
                         + on.readouts().keySet() + ". Save one first (save_digits, save_region). Nothing was written.");
             }
             String field = fact.field().strip();
-            write = write.marked(ParameterWrite.Mark.of(ReadOn.class)
-                    .withClassOf("screen", SdkValues.SCREEN_MAP, PluginValues.Member.of(screen.get()))
-                    .with("field", field));
-            read = "read off " + screen.get() + "." + field;
-            if (fact.minutes() != null) {
-                if (fact.minutes() <= 0) return AgentReply.refused("minutes is above 0.");
-                write = write.marked(ParameterWrite.Mark.of(StaleAfter.class).with("minutes", fact.minutes()));
+            if (fact.minutes() != null && fact.minutes() <= 0) return AgentReply.refused("minutes is above 0.");
+            String feeds = ScreenTypes.factOf(on.readouts().get(field));
+            if (!feeds.isEmpty() && !feeds.equals(group + "::" + name)) {
+                return AgentReply.refused(screen.get() + "." + field + " already reads into " + feeds
+                        + ": a readout feeds one fact. Save another readout first. Nothing was written.");
+            }
+            Readout into = on.readouts().get(field).into(ScreenTypes.fact(group + "::" + name));
+            feeding = fact.minutes() == null ? into : into.staleAfter(Duration.ofMinutes(fact.minutes()));
+            readScreen = screen.get();
+            readField = field;
+            read = "read off " + readScreen + "." + readField;
+        }
+        // A fact that is already there only needs its readout: an earlier add that stopped halfway, or an old @ReadOn.
+        boolean there = feeding != null && services.pluginValues().runParameters().stream()
+                .anyMatch(parameter -> parameter.group().equals(group) && parameter.name().equals(name));
+        if (!there) {
+            Optional<String> refused = services.pluginValues().addRunParameter(write);
+            if (refused.isPresent()) return AgentReply.refused(refused.get() + " Nothing was written.");
+        }
+        if (feeding != null) {
+            Readout readout = feeding;
+            String field = readField;
+            Optional<String> unfed = ScreenBook.update(services, readScreen, s -> s.withReadout(field, readout));
+            if (unfed.isPresent()) {
+                return AgentReply.refused(group + "." + name + " is there, but " + readScreen + "." + readField
+                        + " was not made to read into it: " + unfed.get() + " Give add_fact again to finish it.");
             }
         }
-        Optional<String> refused = services.pluginValues().addRunParameter(write);
-        if (refused.isPresent()) return AgentReply.refused(refused.get() + " Nothing was written.");
         String test = switch (fact.holds()) {
             case TEXT -> "test is, value the text";
             case NUMBER -> "test at_least or at_most, value 5";

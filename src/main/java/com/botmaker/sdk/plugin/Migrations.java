@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.meta.Migrate;
 import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.params.Facts;
+import com.botmaker.sdk.api.params.GameState;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
@@ -219,5 +221,12 @@ final class Migrations {
     @Migrate(value = Pressed.Result.class, kind = Migrate.Kind.FIELD)
     static Pressed.Result BUSY() {
         return Pressed.Result.BLOCKED;
+    }
+
+    /** 2026-11-06: a group of facts is {@code @Facts}, since a bot need not be a game; only the name changes. */
+    @SuppressWarnings("removal")
+    @Migrate(value = GameState.class, kind = Migrate.Kind.TYPE)
+    static Facts gameState() {
+        return null;
     }
 }

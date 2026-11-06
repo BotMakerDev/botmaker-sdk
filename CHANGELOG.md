@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Facts are `@Facts`, and a screen's readout says where each is read** (2026-11-06). A group of facts is marked
+  `@Facts` (a bot need not be a game); `@GameState` is deprecated: Studio's upgrade renames it below `src`, but the copy in `starting-params/` is the
+  author's to rename by hand, since the fitter restores it. A readout feeds a
+  fact itself: `Readout.digits(Zones.GOLD, Digits.GOLD).into(Progress::gold).staleAfter(Duration.ofMinutes(30))`,
+  read whenever its screen shows while the fact is unknown or stale, an hour unless it says. `@ReadOn`, `@StaleAfter`
+  and `@Assumed` are deprecated: they still work, but a readout naming the fact wins over `@ReadOn`, and the
+  assistant's `add_fact` writes the readout's `.into(…)`, and, given a fact already there, only that. Move each
+  `@ReadOn` onto its screen's readout, by `add_fact` or by hand, before the next release deletes them. A flag
+  `add_fact` adds is unknown until a step sets it, no longer assumed false. The runner's fact reader is `RunFacts`.
+
 - **The SDK's parameters carry no category** (2026-11-05): the Parameters window lists them under their groups,
   `Running` and `Game`. The sample bot's `params/` follows.
 

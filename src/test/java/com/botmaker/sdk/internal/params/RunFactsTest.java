@@ -8,6 +8,7 @@ import com.botmaker.sdk.internal.params.fixture.Screens;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Hero;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Progress;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Veteran;
+import com.botmaker.sdk.internal.params.fixture.params.bot.Wallet;
 import com.botmaker.sdk.internal.params.fixture.plugins.Holder;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -30,8 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Game facts are unknown until written, read on their screen when stale, and kept with their time (2026-11-04). */
-class GameFactsTest {
+/**
+ * Facts are unknown until written, read on their screen when stale, and kept with their time (2026-11-04); a readout
+ * that names a fact says where and how long, and wins over a deprecated {@code @ReadOn} (2026-11-06).
+ */
+class RunFactsTest {
 
     private static final String PACKAGE = "com/botmaker/sdk/internal/params/fixture/params";
     private static final Instant NOW = Instant.parse("2026-11-04T10:00:00Z");
@@ -46,7 +50,7 @@ class GameFactsTest {
 
     @BeforeEach
     void aBotWithItsFacts() throws IOException {
-        for (String group : List.of("bot/Hero.java", "bot/Veteran.java")) {
+        for (String group : List.of("bot/Hero.java", "bot/Veteran.java", "bot/Wallet.java")) {
             String source = Files.readString(Path.of("src/test/java", PACKAGE, group));
             Path file = bot.resolve("src/main/java").resolve(PACKAGE).resolve(group);
             Files.createDirectories(file.getParent());
@@ -64,12 +68,12 @@ class GameFactsTest {
 
     @AfterEach
     void noMapLeft() {
-        GameFacts.use(List.of(), (constant, fields) -> Optional.empty());
+        RunFacts.use(List.of(), (constant, fields) -> Optional.empty());
         ScreenMaps.use(null);
     }
 
     private void showing(Optional<Map<String, String>> look) {
-        GameFacts.use(List.of(Hero.class), (constant, fields) -> {
+        RunFacts.use(List.of(Hero.class), (constant, fields) -> {
             reads.add(fields);
             return look;
         });
@@ -100,24 +104,24 @@ class GameFactsTest {
 
     @Test
     void aStaleFactIsReadOnItsScreenOnly() {
-        GameFacts.seen("SHOP");
+        RunFacts.seen("SHOP");
         assertTrue(reads.isEmpty(), "not its screen");
 
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
         assertEquals(1, reads.size(), "all off one look");
         assertEquals(Optional.of(12), Params.known(Hero::level));
         assertEquals(Optional.of(Hero.Kind.FIRE_MAGE), Params.known(Hero::kind), "read loosely");
 
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
         assertEquals(1, reads.size(), "fresh: not read again");
 
         now.addAndGet(61 * 60_000L);
         assertEquals(Optional.empty(), Params.known(Hero::level), "stale");
-        GameFacts.seen("SHOP");
+        RunFacts.seen("SHOP");
         assertEquals(1, reads.size());
         assertEquals(Optional.empty(), Params.known(Hero::level), "still stale: its screen was not seen");
 
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
         assertEquals(2, reads.size());
         assertEquals(Optional.of(12), Params.known(Hero::level), "the same value, a new time");
     }
@@ -151,7 +155,7 @@ class GameFactsTest {
     void aLookThatMissesTheScreenKeepsNothing() {
         showing(Optional.empty());
 
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
 
         assertEquals(1, reads.size());
         assertEquals(Optional.empty(), Params.known(Hero::level));
@@ -162,7 +166,7 @@ class GameFactsTest {
     void aMisnamedReadoutNeverReadsAsFalse() {
         showing(Optional.of(Map.of()));
 
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
 
         assertEquals(Optional.of(false), Params.known(Hero::badge), "its readout exists and shows nothing");
         assertEquals(Optional.empty(), Params.known(Hero::gone), "it has no readout");
@@ -177,12 +181,69 @@ class GameFactsTest {
 
     @Test
     void aReadValueIsWrittenWithItsTime() throws IOException {
-        GameFacts.seen("HOME");
+        RunFacts.seen("HOME");
 
         String written = Files.readString(heroFile);
         assertTrue(written.contains("return 12;"), written);
         assertTrue(written.contains("@Param.Kept(at = \"2026-11-04T10:00:00Z\")"), written);
         assertTrue(written.contains("Kind.FIRE_MAGE"), written);
+    }
+
+    /** Wallet's coins is fed by the shop's readout and marked @ReadOn the home screen: the readout wins. */
+    @Test
+    void readoutWinsOverReadOn() {
+        RunFacts.use(List.of(Hero.class, Wallet.class), (constant, fields) -> {
+            reads.add(fields);
+            return Optional.of(Map.of("level", "Lv 12", "coins", "40"));
+        });
+
+        RunFacts.seen("HOME");
+        assertEquals(Optional.empty(), Params.known(Wallet::coins), "not read where @ReadOn says");
+        assertFalse(reads.getFirst().contains("coins"), reads.toString());
+
+        RunFacts.seen("SHOP");
+        assertEquals(Optional.of(40), Params.known(Wallet::coins), "read where its readout is");
+    }
+
+    /** A reading holds what its readout's staleAfter says, here ten minutes, not the hour a readout holds alone. */
+    @Test
+    void staleAfterMakesItUnknown() {
+        RunFacts.use(List.of(Wallet.class), (constant, fields) -> Optional.of(Map.of("coins", "40", "owner", "Ann")));
+        RunFacts.seen("SHOP");
+        assertEquals(Optional.of(40), Params.known(Wallet::coins));
+        assertEquals(Optional.of("Ann"), Params.known(Wallet::owner));
+
+        now.addAndGet(11 * 60_000L);
+
+        assertEquals(Optional.empty(), Params.known(Wallet::coins), "past its ten minutes");
+        assertEquals(Optional.of("Ann"), Params.known(Wallet::owner), "an hour by default");
+        now.addAndGet(50 * 60_000L);
+        assertEquals(Optional.empty(), Params.known(Wallet::owner), "past the hour");
+    }
+
+    /** A readout that says no time leaves the fact's deprecated {@code @StaleAfter} in force, not the hour. */
+    @Test
+    void aReadoutWithNoTimeKeepsTheOldStaleAfter() {
+        RunFacts.use(List.of(Wallet.class), (constant, fields) -> Optional.of(Map.of("tips", "7")));
+        RunFacts.seen("SHOP");
+        assertEquals(Optional.of(7), Params.known(Wallet::tips));
+
+        now.addAndGet(6 * 60_000L);
+
+        assertEquals(Optional.empty(), Params.known(Wallet::tips), "past its five minutes");
+    }
+
+    /** One screen feeds a fact once: a second readout's absence must not overwrite the first's reading. */
+    @Test
+    void twoReadoutsOfOneScreenFeedAFactOnce() {
+        RunFacts.use(List.of(Wallet.class), (constant, fields) -> {
+            reads.add(fields);
+            return Optional.of(Map.of());
+        });
+
+        RunFacts.seen("SHOP");
+
+        assertEquals(1, reads.getFirst().stream().filter(field -> field.startsWith("sale")).count(), reads.toString());
     }
 
     @Test

@@ -38,8 +38,9 @@ public final class Screens {
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried()
                 .when(Condition.of(SampleBot::shopOpen));
         public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),
-                new DigitSet("src/main/resources/digits/gold")).subject();
-        public final Readout title = Readout.text(new Zone(0, 40, 300, 40));
+                new DigitSet("src/main/resources/digits/gold")).subject().into(Progress::gold)
+                .staleAfter(Duration.ofMinutes(30));
+        public final Readout title = Readout.text(new Zone(0, 40, 300, 40)).into(Progress::player);
 
         @Override
         public Setup setup() {
@@ -76,7 +77,7 @@ public final class Screens {
 
     public static final class Settings extends Screen {
         public final Button sound = Button.of(Elements.SOUND).tried();
-        public final Readout volume = Readout.element(Elements.VOLUME);
+        public final Readout volume = Readout.element(Elements.VOLUME).into(Progress::soundShown);
         public final Mark list = Mark.of(Elements.SETTINGS_LIST);
 
         @Override

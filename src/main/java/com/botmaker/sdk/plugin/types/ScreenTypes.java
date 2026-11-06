@@ -110,6 +110,8 @@ public final class ScreenTypes implements TypeHolder {
         static final Held<ScreenVariant, Object> VARIANT_WHEN = Held.as(Object.class, v -> held(v.when()));
         static final Held<Params.When, String> WHEN_PARAMETER = Held.as(String.class,
                 when -> when.parameter() instanceof NamedParameter(String source) ? source : "");
+        static final Held<Readout, String> READOUT_FACT = Held.as(String.class,
+                readout -> factOf(readout).isEmpty() ? null : factOf(readout));
     }
 
     /**
@@ -278,9 +280,12 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Caption.of(Words, Zone)}: words a screen shows, one of the bot's {@code Texts}, read in a {@code Zones}. */
     public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class).writtenAs(Caption::of);
 
-    /** {@code Readout.text(Zone)}, then {@code .subject()} when it names which one its screen shows. */
-    public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = ComponentType.part(Readout.class)
-            .writtenAs(Readout::text);
+    /**
+     * {@code Readout.text(Zone)}, then {@code .subject()} when it names which one its screen shows, and {@code
+     * .into(Progress::gold).staleAfter(…)} when it feeds a fact.
+     */
+    public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = feeding(ComponentType.part(Readout.class)
+            .writtenAs(Readout::text));
 
     /** {@code Mark.of(ImageTemplate)}: a picture telling its screen, then {@code .absent()} when it never shows there. */
     public static final DeclaredCall<Mark> MARK_PICTURE_SHAPE = ComponentType.part(Mark.class)
@@ -295,12 +300,22 @@ public final class ScreenTypes implements TypeHolder {
             .<Element, Mark>writtenAs(Mark::of);
 
     /** {@code Readout.element(Element)}: an app's text read from the screen's tree, and the same link. */
-    public static final DeclaredCall<Readout> READOUT_ELEMENT_SHAPE = ComponentType.part(Readout.class)
-            .<Element, Readout>writtenAs(Readout::element);
+    public static final DeclaredCall<Readout> READOUT_ELEMENT_SHAPE = feeding(ComponentType.part(Readout.class)
+            .<Element, Readout>writtenAs(Readout::element));
 
     /** {@code Readout.digits(Zone, DigitSet)}: a number read with one of the bot's {@code Digits}, and the same link. */
-    public static final DeclaredCall<Readout> READOUT_DIGITS_SHAPE = ComponentType.part(Readout.class)
-            .<Zone, DigitSet, Readout>writtenAs(Readout::digits);
+    public static final DeclaredCall<Readout> READOUT_DIGITS_SHAPE = feeding(ComponentType.part(Readout.class)
+            .<Zone, DigitSet, Readout>writtenAs(Readout::digits));
+
+    /**
+     * A readout's links to the fact it feeds (2026-11-06): {@code .into(Progress::gold)}, the method reference crossing
+     * as its text, then {@code .staleAfter(Duration)} when its reading holds other than an hour.
+     */
+    private static DeclaredCall<Readout> feeding(DeclaredCall<Readout> readout) {
+        return readout
+                .<Params.Of>with(Readout::into, Parts.READOUT_FACT.part(ScreenTypes::fact))
+                .<Duration>with(Readout::staleAfter, Readout::staleAfter);
+    }
 
     /** {@code TextButton.of(Caption)} and its links: words clicked, pressed by a gesture as a button is. */
     public static final DeclaredCall<TextButton> TEXT_BUTTON_SHAPE = ComponentType.part(TextButton.class)
@@ -433,6 +448,19 @@ public final class ScreenTypes implements TypeHolder {
     /** The parameter a {@code Params.when(…)} names, as its method reference's text. */
     private static Params.Of<?, ?> parameter(String reference) {
         return new NamedParameter(reference.strip());
+    }
+
+    /**
+     * {@code reference}, a fact's method reference ({@code Progress::gold}), as the editor holds it in a readout's
+     * {@code .into(…)}; null when blank, a readout feeding no fact.
+     */
+    public static Params.Of<?, ?> fact(String reference) {
+        return reference == null || reference.isBlank() ? null : parameter(reference);
+    }
+
+    /** The method reference of the fact {@code readout} is read into, {@code Progress::gold}, or {@code ""}. */
+    public static String factOf(Readout readout) {
+        return readout.fact() instanceof NamedParameter(String source) ? source : "";
     }
 
     /** The method reference of the parameter {@code check} tests, {@code Progress::gold}, or {@code ""}. */

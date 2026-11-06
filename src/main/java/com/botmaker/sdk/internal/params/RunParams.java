@@ -8,9 +8,9 @@ import com.botmaker.java.grammar.ParamsFitter;
 import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.java.parse.JavaLevel;
 import com.botmaker.sdk.api.params.Assumed;
-import com.botmaker.sdk.api.params.GameState;
 import com.botmaker.sdk.api.params.ReadOn;
 import com.botmaker.sdk.api.params.StaleAfter;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.internal.trace.Say;
 
 import java.io.File;
@@ -45,6 +45,7 @@ import java.util.function.LongSupplier;
  * <p>The folder is found from the run's working directory, which is the bot's. A write that cannot happen leaves the
  * value in memory, with one warning per parameter.
  */
+@SuppressWarnings("removal")
 public final class RunParams {
 
     private static final String SOURCES = "src/main/java";
@@ -53,8 +54,6 @@ public final class RunParams {
     private static final String BACKUPS = ".botmaker/values-removed";
     /** The same value written again within this long is not written: only its time would change. */
     private static final long REWRITE_AFTER_MS = 60_000;
-    /** How long a value read off a screen holds when its fact says nothing. */
-    private static final long READ_HOLDS_MS = 3_600_000;
 
     private static final Map<Class<?>, Method> REFERENCES = new ConcurrentHashMap<>();
     private static final Map<Method, Held> SET = new HashMap<>();
@@ -144,7 +143,7 @@ public final class RunParams {
     /** The value of the parameter {@code reference} names, if it is known; see {@code Params.known}. */
     public static <G, T> Optional<T> known(Serializable reference, Function<G, T> method) {
         Method parameter = parameterOf(reference);
-        if (!parameter.getDeclaringClass().isAnnotationPresent(GameState.class)) {
+        if (!RunFacts.isFactsGroup(parameter.getDeclaringClass())) {
             return Optional.ofNullable(get(reference, method));
         }
         OptionalLong at = keptAt(parameter);
@@ -174,11 +173,20 @@ public final class RunParams {
         }
     }
 
-    /** Whether a value written at {@code at} is past what {@code parameter} says it holds. */
+    /**
+     * Whether a value written at {@code at} is past what holds for {@code parameter}: what the readouts feeding it say
+     * ({@code Readout.staleAfter}), else its deprecated {@code @StaleAfter}, else an hour when it is read on a screen.
+     * A fact nothing reads never goes stale.
+     */
     static synchronized boolean stale(Method parameter, long at) {
+        OptionalLong fed = RunFacts.holdsMs(parameter);
         StaleAfter after = parameter.getAnnotation(StaleAfter.class);
-        if (after == null && !parameter.isAnnotationPresent(ReadOn.class)) return false;
-        return clock.getAsLong() - at > (after != null ? after.minutes() * 60_000L : READ_HOLDS_MS);
+        long holds;
+        if (fed.isPresent()) holds = fed.getAsLong();
+        else if (after != null) holds = after.minutes() * 60_000L;
+        else if (parameter.isAnnotationPresent(ReadOn.class)) holds = Readout.READING_HOLDS.toMillis();
+        else return false;
+        return clock.getAsLong() - at > holds;
     }
 
     /**

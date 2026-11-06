@@ -401,6 +401,20 @@ class ScreenTypesTest {
         });
     }
 
+    /** A readout feeding a fact is written as its chain, the fact as its method reference, and read back the same. */
+    @Test
+    void aReadoutIntoAFactIsWrittenAsItsChain() {
+        Zone gold = new Zone(10, 10, 80, 20);
+        Readout fed = Readout.text(gold).into(ScreenTypes.fact("Progress::gold")).staleAfter(Duration.ofMinutes(30));
+        assertEquals(fed, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, fed));
+        assertEquals("Progress::gold", ScreenTypes.factOf(roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, fed)));
+        Readout plain = Readout.text(gold).into(ScreenTypes.fact("Progress::name"));
+        assertEquals(plain, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, plain));
+        assertNull(roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, Readout.text(gold)).fact(), "a readout feeding nothing");
+        assertEquals(fed, Readout.text(gold).staleAfter(Duration.ofMinutes(30)).into(ScreenTypes.fact("Progress::gold")),
+                "either order says the same");
+    }
+
     @Test
     void looksAndConditionsGoBackTogetherAsTheMethodsTheyName() {
         Button shop = Button.of(picture("shop")).looks(List.of(Look.of(picture("shop_badge"), BADGE),

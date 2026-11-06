@@ -97,7 +97,7 @@ public final class ScreenMaps {
         if (listener != null) listener.accept(constant);
     }
 
-    /** Told each screen {@link #seen}: the game facts read on it ({@code GameFacts}). */
+    /** Told each screen {@link #seen}: the facts read on it ({@code RunFacts}). */
     private static volatile Consumer<String> onSeen;
 
     /** Tells {@code listener} each screen the game is seen on from now; {@code null} tells nobody. */

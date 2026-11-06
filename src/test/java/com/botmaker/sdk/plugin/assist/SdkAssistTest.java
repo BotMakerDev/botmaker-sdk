@@ -15,11 +15,8 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.ParameterWrite;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.RunParameter;
-import com.botmaker.sdk.api.params.Assumed;
-import com.botmaker.sdk.api.params.GameState;
-import com.botmaker.sdk.api.params.ReadOn;
+import com.botmaker.sdk.api.params.Facts;
 import com.botmaker.sdk.api.screens.Readout;
-import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
@@ -1955,7 +1952,10 @@ class SdkAssistTest {
     }
 
     /** edit_map group: a strip named by the screen's buttons in it, scrolled over a member that shows. */
-    /** A fact is a method of a @GameState group: added by the host, tested in a when, listed with its age, forgotten. */
+    /**
+     * A fact is a method of a @Facts group, added by the host, its screen's readout made to read into it; tested in a
+     * when, listed with its age, forgotten.
+     */
     @Test
     void aFactIsAddedTestedListedAndForgotten() {
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tab")))
@@ -1979,16 +1979,25 @@ class SdkAssistTest {
         ParameterWrite gold = host.parameters.getFirst();
         assertEquals("Progress", gold.group());
         assertEquals(0, gold.start());
-        assertEquals(GameState.class.getName(), gold.groupMarks().getFirst().annotation());
-        ParameterWrite.Mark read = gold.marks().getFirst();
-        assertEquals(ReadOn.class.getName(), read.annotation());
-        assertEquals("gold", read.members().get("field"));
-        assertEquals(new ParameterWrite.ClassOf(SdkValues.SCREEN_MAP, PluginValues.Member.of("HOME")),
-                read.members().get("screen"));
-        assertEquals(30, gold.marks().get(1).members().get("minutes"));
+        assertEquals(Facts.class.getName(), gold.groupMarks().getFirst().annotation());
+        assertEquals(List.of(), gold.marks(), "where it is read is the readout's, not the fact's");
+        Readout fed = screen("HOME").readouts().get("gold");
+        assertEquals("Progress::gold", ScreenTypes.factOf(fed));
+        assertEquals(Duration.ofMinutes(30), fed.staleAfter());
+
+        int kept = host.parameters.size();
+        AgentReply taken = run("edit_map", "screen", "Home", "action", "add_fact", "name", "coins", "holds", "number",
+                "field", "gold");
+        assertTrue(taken.isRefused() && text(taken).contains("already reads into Progress::gold"), text(taken));
+        assertEquals(kept, host.parameters.size(), "refused before anything was written");
+        assertFalse(run("edit_map", "screen", "Home", "action", "add_fact", "name", "gold", "holds", "number",
+                "field", "gold", "minutes", 45).isRefused(), "a fact already there only gets its readout");
+        assertEquals(kept, host.parameters.size(), "not added twice");
+        assertEquals(Duration.ofMinutes(45), screen("HOME").readouts().get("gold").staleAfter());
+        put("HOME", screen("HOME").withReadout("gold", fed));
 
         assertFalse(run("edit_map", "action", "add_fact", "name", "rested", "holds", "flag").isRefused(), "no screen");
-        assertEquals(Assumed.class.getName(), host.parameters.getLast().marks().getFirst().annotation());
+        assertEquals(List.of(), host.parameters.getLast().marks(), "unknown until a step sets it");
 
         AgentReply tested = run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
                 "Progress::gold", "test", "at_least", "value", "5");

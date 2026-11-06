@@ -19,7 +19,7 @@ import com.botmaker.sdk.internal.flow.FlowTree;
 import com.botmaker.sdk.internal.flow.FlowWalker;
 import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
-import com.botmaker.sdk.internal.params.GameFacts;
+import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.api.screens.Navigate;
@@ -106,7 +106,7 @@ public class Bot {
         InstalledGame.install(values);
         InstalledRun.nameFlows(values);
         ScreenMaps.install(values);
-        GameFacts.install(values);
+        RunFacts.install(values);
         if (InstalledGame.marked(SdkValue.Id.FLOW, values) instanceof Flow flow) InstalledRun.walk(flow);
         else {
             InstalledRun.walk(null);
@@ -159,7 +159,7 @@ public class Bot {
         ManagedValues.install(values);
         InstalledGame.install(values);
         ScreenMaps.install(values);
-        GameFacts.install(values);
+        RunFacts.install(values);
         RunDetails.start(values);
         SessionBootstrap.joinOffered();
         // Switched back on each run, so a warm JVM keeps no switch a body of the run before left off.

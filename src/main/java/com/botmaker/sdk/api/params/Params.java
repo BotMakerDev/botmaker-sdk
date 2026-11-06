@@ -1,8 +1,8 @@
 package com.botmaker.sdk.api.params;
 
 import com.botmaker.sdk.api.screens.Condition;
-import com.botmaker.sdk.internal.params.GameFacts;
 import com.botmaker.sdk.internal.params.ParamCheck;
+import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.params.RunParams;
 
 import java.io.Serializable;
@@ -49,15 +49,16 @@ public final class Params {
     }
 
     /**
-     * The parameter's value if it is known. A fact of a {@link GameState} group is unknown until a run writes it, unless
-     * {@link Assumed}, and again once its time is past ({@link StaleAfter}); any other parameter answers its value.
+     * The parameter's value if it is known. A fact of a {@link Facts} group is unknown until a run writes it, and again
+     * once its reading is past what the readout feeding it holds ({@code Readout.staleAfter}); any other parameter
+     * answers its value.
      */
     public static <G, T> Optional<T> known(Of<G, T> parameter) {
         return RunParams.known(parameter, parameter);
     }
 
     /**
-     * Sets the parameter back to its starting value, without a time. A {@link GameState} fact is unknown again for the
+     * Sets the parameter back to its starting value, without a time. A {@link Facts} fact is unknown again for the
      * rest of this run; {@link #get} answers the value the run was compiled with until the next run.
      *
      * @throws IllegalArgumentException for a parameter that changes outside a run, or a lambda
@@ -67,12 +68,12 @@ public final class Params {
     }
 
     /**
-     * Goes to the screen a {@link ReadOn} fact is read on and answers it there, read unless it was known and young
-     * enough; empty when the way or the read fails. Coming back is the caller's. A parameter with no {@link ReadOn}
-     * goes nowhere and answers {@link #known}.
+     * Goes to the screen whose readout feeds the fact ({@code Readout.into}) and answers it there, read unless it was
+     * known and young enough; empty when the way or the read fails. Coming back is the caller's. A parameter no readout
+     * feeds goes nowhere and answers {@link #known}.
      */
     public static <G, T> Optional<T> refresh(Of<G, T> parameter) {
-        return GameFacts.refresh(parameter, parameter);
+        return RunFacts.refresh(parameter, parameter);
     }
 
     /** Starts a condition on the parameter, for a {@code .when(…)}. */
