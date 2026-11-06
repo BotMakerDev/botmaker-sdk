@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Goals and plans can be written down** (2026-11-06). `Goal.of(Need.atLeast(Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)`
+  or `Goal.done(() -> Screens.MARKET.claim).within(Duration.ofDays(1))` says what is wanted, and `Plan.of(Plan.tier(…),
+  Plan.tier(…))` what matters most. `Need` also has `atMost`, `above`, `below`, `is`, `not` and `equalTo`; a fact unknown
+  or stale answers unknown. Nothing runs a plan yet.
 - **A screen says what is done on it** (2026-11-06). `Do.press(chest)` is a field of its screen beside the input it
   presses, and says what it serves, needs and how often: `.serves`, `.needs`, `.first`, `.last`, `.over`, `.every`,
   `.daily`, `.once`, `.until`, `.checks`, `.onFail`. One marked `.onSight()` is done whenever a run's walk comes to its

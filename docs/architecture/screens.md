@@ -111,6 +111,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `Navigate.to` walks `.doing(DoneRecords.run())`: on each screen it comes to, what is `.onSight()` and ready is pressed
   if it shows now, nothing waited for, and the walk looks again. The assistant's walks and ExploreMap do none.
   `Navigate.press(Do)` presses whatever is due or not, and records it: a flow says when.
+- **`api.plan`** holds what is wanted (2026-11-06): a `Goal` is a constant holding a check, `Goal.of(BooleanSupplier)`, which
+  a `Condition` is, or `Goal.done(Supplier<Do>)`, optionally `.within(Duration)`, which reads the done-record
+  (`Readiness.met`) and answers unknown for an action no screen holds. `Need` builds a `Condition` on a fact through
+  `Params.when`, refusing a lambda or a method of no `@Param` class at once; `above` and `below` are the `not` of
+  `atMost` and `atLeast`. A `Plan` is tiers of goals. `Routine` is what a run will run, `Flow` or `Plan`; it cannot be
+  sealed, since the SDK has no module and they are in two packages. Nothing runs a plan yet.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are

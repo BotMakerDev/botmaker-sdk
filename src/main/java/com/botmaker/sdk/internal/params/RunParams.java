@@ -222,7 +222,7 @@ public final class RunParams {
     }
 
     /** The method {@code reference} names, which must be a parameter of a {@code @Param} class. */
-    static Method parameterOf(Serializable reference) {
+    public static Method parameterOf(Serializable reference) {
         Objects.requireNonNull(reference, "parameter");
         return REFERENCES.computeIfAbsent(reference.getClass(), type -> resolve(reference));
     }

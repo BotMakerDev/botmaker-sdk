@@ -6,7 +6,6 @@ import samplebot.params.bot.Progress;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Params;
-import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
@@ -41,9 +40,9 @@ public final class Screens {
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
-        public final Do claim = Do.press(collect).serves(Goal.of(Condition.of(SampleBot::shopOpen))).first()
+        public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY).first()
                 .daily(LocalTime.of(5, 0)).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2));
-        public final Do solved = Do.press(solve).needs(Goal.of(Condition.of(SampleBot::shopOpen)))
+        public final Do solved = Do.press(solve).needs(Goals.SHOP_OPEN)
                 .needs(Condition.of(SampleBot::shopOpen)).last().over(() -> Screens.HOME.claim).once()
                 .until(Condition.of(SampleBot::shopOpen));
         public final Do glance = Do.press(avatar).onSight().every(Duration.ofMinutes(10));

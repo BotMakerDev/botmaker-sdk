@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.flow;
 
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.InstalledRun;
@@ -84,7 +85,7 @@ import java.util.List;
  * @param start  the card a run begins at; {@link Activity#NONE} for a flow that runs nothing
  * @param limits what stops a run that never finishes
  */
-public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits) {
+public record Flow(List<Step> steps, List<Edge> edges, Node start, Limits limits) implements Routine {
 
     /** The empty flow: nothing to run, which is what a project with nothing drawn should do. */
     public static final Flow NONE = new Flow(List.of(), List.of(), Activity.NONE, Limits.DEFAULT);

@@ -6,8 +6,10 @@ import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Retry;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords.Done;
 import com.botmaker.sdk.internal.screens.Conditions;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +34,18 @@ public final class Readiness {
             if (!Conditions.holds(condition)) return false;
         }
         return due(action, last, clock);
+    }
+
+    /**
+     * What {@link Goal#done} says of {@code map}'s action from {@code records}: yes when its last time held, and is
+     * younger than the goal's time if it has one; unknown for an action no screen of {@code map} holds.
+     */
+    public static Answer met(Goal.Done goal, ScreenGraph map, DoneRecords records) {
+        Optional<BotConstants.InputName> name = map.nameOf(goal.action().get());
+        if (name.isEmpty()) return Answer.UNKNOWN;
+        Optional<Done> last = records.last(DoneRecords.key(name.get().screen(), name.get().field()));
+        if (last.isEmpty() || !last.get().held()) return Answer.NO;
+        return Answer.of(goal.within() == null || records.clock().instant().isBefore(last.get().at().plus(goal.within())));
     }
 
     /** Its {@link Do#until} has not come, and its cadence, or its retry when its check last said no, lets it. */

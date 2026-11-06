@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DoTest {
 
-    private static final Goal RICH = Goal.of(() -> Answer.YES);
-    private static final Goal STRONG = Goal.of(() -> Answer.NO);
+    private static final Goal RICH = Goal.of((Condition) () -> Answer.YES);
+    private static final Goal STRONG = Goal.of((Condition) () -> Answer.NO);
 
     @Test
     void traitsChain() {
