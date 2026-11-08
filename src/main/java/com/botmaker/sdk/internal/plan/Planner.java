@@ -38,7 +38,7 @@ import java.util.Set;
 public final class Planner {
 
     /** How deep sub-goals nest: a goal's action may need a goal, up to this many in a row. */
-    static final int DEEPEST = 4;
+    public static final int DEEPEST = 4;
 
     /** Among actions of one bucket and in no {@code .over}: no sub-goal first, known first, then the least to walk. */
     private static final Comparator<Option> CHEAPEST = Comparator.comparing((Option o) -> o.before() > 0)

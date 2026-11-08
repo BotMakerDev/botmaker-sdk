@@ -33,6 +33,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - *+ Goal* adds a goal to `Goals.java` from a fact and a `Need` shortcut (`Goal.of(Need.atLeast(Progress::gold,
     100))`, named `GOLD_AT_LEAST_100`). A whole-number fact takes at least, at most, above, below or equal to; a flag
     takes is true or is false; a text takes equal to. *+ Plan* adds a plan of one tier, one goal, to `Plans.java`.
+  - Warnings, in 🎯 Goals (⚠ above the tiers) and in read_map (2026-11-08): a goal no action serves, a goal no plan
+    names and no action needs, actions whose `.over`s go round in a circle, sub-goals nested deeper than 4, and an
+    action on an input marked never.
+  - Discovery proposes `.serves` (2026-11-08). When try_input presses an input, the facts its screen's readouts show
+    are read on the frames before and after. A goal whose check turned from no to yes is proposed: try_input says so,
+    read_map lists it, and 🗺 Screens shows a 🎯 badge on the input. Nothing is written: the author adds `.serves`.
   - Studio now reads `Plans.java`, `Goals.java` (the new `@SdkValue(GOALS)` open set) and every `Do` field of
     `Screens.java`.
   - `Do.needs`, `until` and `checks` are no longer `@Link`s: Studio reads them by `PlanTypes`' own declaration. A goal

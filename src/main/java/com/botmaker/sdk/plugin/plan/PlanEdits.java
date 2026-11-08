@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.flow.BotConstants.InputName;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.params.ParamCheck.Test;
 import com.botmaker.sdk.internal.plan.PlanModel;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Mark;

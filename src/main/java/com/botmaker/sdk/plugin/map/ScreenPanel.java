@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Shade;
@@ -28,6 +29,7 @@ import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
 import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.assist.ServesProposal;
 import com.botmaker.sdk.plugin.assist.Versions;
 import com.botmaker.sdk.plugin.map.MapGuide.Part;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
@@ -761,6 +763,18 @@ final class ScreenPanel {
         boolean untried = row.state() == ScreenCards.RowState.UNTRIED || row.state() == ScreenCards.RowState.UNSEEN;
         HBox line = new HBox(8, thumb, words, result);
         onShot.ifPresent(said -> line.getChildren().add(said));
+        // Discovery saw a goal turn yes when this was pressed: proposed, written only by the author.
+        MapScreen on = graph.screens().get(constant);
+        Do action = on == null ? null : on.actions().values().stream()
+                .filter(a -> ServesProposal.presses(a, constant, on, row.field())).findFirst().orElse(null);
+        List<String> proposed = ServesProposal.proposed(services.projectDir(), constant, row.field(), action);
+        if (!proposed.isEmpty()) {
+            Label serves = pill("🎯 " + String.join(", ", proposed) + "?", "screen-pill-untried");
+            Tooltip.install(serves, new Tooltip("Pressing it turned " + String.join(", ", proposed.stream()
+                    .map(g -> "Goals." + g).toList()) + " from no to yes: it may serve " + (proposed.size() == 1
+                    ? "it" : "them") + ". Nothing was written: add .serves(…) to its action if it does."));
+            line.getChildren().add(serves);
+        }
         line.setAlignment(Pos.CENTER_LEFT);
         line.getStyleClass().addAll("screen-row", "screen-row-open");
         Tooltip.install(words, new Tooltip(graph.opens(constant, row.field()).map(to -> "Click: go to "

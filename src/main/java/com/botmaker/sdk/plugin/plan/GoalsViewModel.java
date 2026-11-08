@@ -9,6 +9,7 @@ import com.botmaker.sdk.internal.plan.Round;
 import com.botmaker.sdk.internal.plan.Round.Considered;
 import com.botmaker.sdk.internal.plan.Round.Step;
 import com.botmaker.sdk.internal.plan.Round.Why;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.sdk.plugin.types.ScreenTypes;

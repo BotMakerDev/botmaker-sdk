@@ -16,8 +16,10 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.PlanValues;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
@@ -103,6 +105,7 @@ public final class GoalsView {
     private final TextField planName = new TextField();
     private final ChoiceBox<String> planGoal = new ChoiceBox<>();
     private final Label said = new Label();
+    private final Label warnings = new Label();
     private final GraphCanvas<Stop, Edge> route = new GraphCanvas<>(Stop::screen, this::stopView, GoalsView::arrow,
             (laid, links) -> LayeredLayout.arrange(laid, links, List.of()));
     private final Map<String, List<HBox>> rows = new HashMap<>();
@@ -127,6 +130,9 @@ public final class GoalsView {
         said.getStyleClass().add("goals-refused");
         said.setManaged(false);
         said.setVisible(false);
+        warnings.getStyleClass().add("goals-warnings");
+        warnings.setManaged(false);
+        warnings.setVisible(false);
         Button again = new Button("⟳ Read again");
         again.setOnAction(e -> read());
         plans.setOnAction(e -> {
@@ -137,7 +143,7 @@ public final class GoalsView {
         tiers.getStyleClass().add("plan-tiers");
         Node adding = adding();
         adding.getStyleClass().add("plan-adding");
-        ScrollPane left = new ScrollPane(new VBox(said, tiers, adding, cards));
+        ScrollPane left = new ScrollPane(new VBox(said, warnings, tiers, adding, cards));
         left.setFitToWidth(true);
         SplitPane split = new SplitPane(left, route);
         split.setOrientation(Orientation.HORIZONTAL);
@@ -208,13 +214,13 @@ public final class GoalsView {
     /**
      * What one read found: every plan's name that reads, the one shown and its view, or why there is none; the name of
      * every constant of the bot's {@code Plans} and {@code Goals}, read or not, and its facts, for {@code + Plan} and
-     * {@code + Goal}.
+     * {@code + Goal}; and what the goals and plans ask that a run cannot do ({@link MapAudit#planWarnings}).
      */
     private record Read(List<String> plans, String shown, GoalsViewModel view, String refused, List<String> goals,
-                        List<String> planNames, List<RunParameter> facts) {
+                        List<String> planNames, List<RunParameter> facts, List<String> warnings) {
 
         static Read none(String why) {
-            return new Read(List.of(), null, null, why, List.of(), List.of(), List.of());
+            return new Read(List.of(), null, null, why, List.of(), List.of(), List.of(), List.of());
         }
 
         static Read of(StudioServices services, String wanted) {
@@ -236,13 +242,14 @@ public final class GoalsView {
             }
             List<RunParameter> facts = values.runParameters().stream()
                     .filter(fact -> !PlanEdits.shortcuts(fact.type()).isEmpty()).toList();
+            ScreenGraph map = ScreenMapRead.read(services);
+            List<String> warnings = MapAudit.planWarnings(plans, goals, map);
             if (plans.isEmpty()) {
                 return new Read(List.of(), null, null, "The bot has no plan yet: a plan is tiers of the goals in "
                         + "Goals.java, written in Plans.java. + Plan starts one.", List.copyOf(goalNames),
-                        List.copyOf(planNames), facts);
+                        List.copyOf(planNames), facts, warnings);
             }
             String shown = plans.containsKey(wanted) ? wanted : plans.keySet().iterator().next();
-            ScreenGraph map = ScreenMapRead.read(services);
             StudioPlan plan = StudioPlan.of(plans.get(shown), goals, map);
             DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, Clock.systemDefaultZone()))
                     .orElseGet(DoneRecords::none);
@@ -250,10 +257,13 @@ public final class GoalsView {
             try {
                 PlanModel model = new PlanModel(plan.plan(), plan.map(), records, null);
                 return new Read(names, shown, GoalsViewModel.of(model, plan), null, List.copyOf(goalNames),
-                        List.copyOf(planNames), facts);
+                        List.copyOf(planNames), facts, warnings);
             } catch (IllegalArgumentException cycle) {
+                // The cycle is the refusal: said once, not again among the warnings, which found it on their own read.
+                Optional<String> found = PlanModel.overCycle(StudioPlan.of(PlanModel.NO_PLAN, goals, map).map());
                 return new Read(names, shown, null, cycle.getMessage(), List.copyOf(goalNames),
-                        List.copyOf(planNames), facts);
+                        List.copyOf(planNames), facts, warnings.stream()
+                        .filter(w -> found.map(f -> !f.equals(w)).orElse(true)).toList());
             }
         }
     }
@@ -267,6 +277,9 @@ public final class GoalsView {
         rows.clear();
         offer(factPick, read.facts().stream().map(GoalsView::factName).toList(), false);
         offer(planGoal, read.goals(), true);
+        warnings.setText(String.join("\n", read.warnings().stream().map(w -> "⚠ " + w).toList()));
+        warnings.setManaged(!read.warnings().isEmpty());
+        warnings.setVisible(!read.warnings().isEmpty());
         if (view == null) {
             tiers.getChildren().clear();
             refuse(read.refused());

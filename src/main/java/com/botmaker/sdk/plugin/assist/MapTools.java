@@ -532,7 +532,12 @@ final class MapTools {
                         shown.before(), shown.after(), shown.motion(),
                         !flashed && (left || shown.share() >= SCREEN_SHARE))))
                 .orElse(Versions.Pressing.NONE);
-        ActTools.Entered entered = pressing.said().isEmpty() ? shown : shown.and(pressing.said());
+        ActTools.Entered told = pressing.said().isEmpty() ? shown : shown.and(pressing.said());
+        // Discovery's guess at a goal the press served, from the facts the screen shows: proposed, never written.
+        ActTools.Entered entered = told.reply().isRefused() || notches != 0 ? told
+                : ServesProposal.after(context, screen, on, field, departure != null && !left, told.before(),
+                told.after()).map(told::and)
+                .orElse(told);
         // A lambda: a method reference on button would read it, null for a hotkey, before any look is there.
         Input written = pressing.look().<Input>map(l -> button.withLook(l)).orElse(base);
         if (entered.after() == null && notches != 0 && !entered.reply().isRefused() && onMarkers.any()

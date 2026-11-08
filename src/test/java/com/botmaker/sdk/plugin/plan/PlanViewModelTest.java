@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.plan.PlanModel;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.plan.PlanViewModel.State;

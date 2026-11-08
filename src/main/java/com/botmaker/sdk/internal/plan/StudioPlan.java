@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.plan;
+package com.botmaker.sdk.internal.plan;
 
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
@@ -8,10 +8,8 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -111,20 +109,5 @@ public record StudioPlan(Plan plan, ScreenGraph map, Map<Goal, String> names) {
         public int hashCode() {
             return named.hashCode();
         }
-    }
-
-    /** The field each action of {@code map} is, {@code ARENA.fight}, by identity. */
-    static Map<Do, String> fields(ScreenGraph map) {
-        Map<Do, String> out = new IdentityHashMap<>();
-        map.screens().forEach((screen, held) -> held.actions().forEach((field, action) -> out.put(action,
-                screen + "." + field)));
-        return out;
-    }
-
-    /** The goals of {@code plan}'s tiers, each once, in order. */
-    static List<Goal> goals(Plan plan) {
-        Map<Goal, Boolean> seen = new HashMap<>();
-        return plan.tiers().stream().flatMap(tier -> tier.goals().stream())
-                .filter(goal -> seen.putIfAbsent(goal, true) == null).toList();
     }
 }

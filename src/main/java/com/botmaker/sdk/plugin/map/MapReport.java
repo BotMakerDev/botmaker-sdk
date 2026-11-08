@@ -29,6 +29,7 @@ import com.botmaker.sdk.plugin.assist.MapAudit.Where;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
+import com.botmaker.sdk.plugin.assist.ServesProposal;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
@@ -74,10 +75,11 @@ public final class MapReport {
 
     static AgentReply read(Ask ask, AgentContext context) {
         StudioServices services = context.services();
-        record Read(ScreenGraph graph, Map<String, String> stages, Set<String> pictures) {}
+        record Read(ScreenGraph graph, Map<String, String> stages, Set<String> pictures, List<String> plan) {}
         Read read = FxCall.call(() -> {
             ScreenGraph graph = ScreenDesk.read(services);
-            return new Read(graph, ScreenDesk.stages(graph), Set.copyOf(ScreenEdits.pictures(services)));
+            return new Read(graph, ScreenDesk.stages(graph), Set.copyOf(ScreenEdits.pictures(services)),
+                    MapAudit.planWarnings(services, graph));
         });
         if (read.graph().screens().isEmpty()) return AgentReply.text("The bot has no Screens yet.");
         String only = null;
@@ -104,6 +106,11 @@ public final class MapReport {
         Optional<Size> bot = FxCall.call(() -> ScreenSize.read(services));
         String one = only;
         bot.ifPresent(size -> clashes.addAll(ScreenShots.offSize(resources, read.graph(), one, size)));
+        // The goals and plans are the whole bot's: said with the whole map, never with one screen.
+        if (only == null) {
+            clashes.addAll(read.plan());
+            clashes.addAll(ServesProposal.open(services.projectDir(), read.graph()));
+        }
         // Kept for Studio's next start, which matches only the shots and pictures changed since.
         MapAudit.keep(resources);
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,

@@ -162,6 +162,15 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   - **New goals and plans.** *+ Goal* writes `Goal.of(Need.…(fact, limit))` into `Goals`. The fact is a run parameter
     whose type a shortcut takes: a whole number, a flag or a text, since `Need`'s limits read back only as an `Integer`
     or a `String`. *+ Plan* writes a plan of one tier. A name is never one a constant of the set already has.
+  - **Warnings.** `MapAudit.planWarnings` audits the goals and plans against the map: a goal no action serves, a goal
+    no plan names and no action needs, an `.over` cycle (`PlanModel.overCycle`), sub-goals deeper than
+    `Planner.DEEPEST`, an action on a `never` input. 🎯 Goals shows them above the tiers; read_map lists them for the
+    whole map. `StudioPlan` lives in `internal/plan` so that `plugin/assist` can tie the references together too.
+  - **Discovery's proposals.** After try_input presses an input, `ServesProposal.after` reads the facts the screen's
+    readouts feed on the frames before and after (`Reach.readout`), over the values a run kept, and answers each
+    `Need` goal three-valued on both. A goal that turned from no to yes, and that the input's action does not serve
+    yet, is said in the reply, listed by read_map and badged 🎯 on the input's row in 🗺 Screens. The proposals live
+    for the Studio session only and nothing writes the bot: the author adds `.serves`, and the badge goes.
   - **During a run.** It marks the action from each trace line's `plan.action` (`Runs.onTrace`). The plan values
     ride on trace lines, not telemetry frames.
   - **Records.** It reads the bot's done-records from `StudioServices.stateDir()`. It never writes them.

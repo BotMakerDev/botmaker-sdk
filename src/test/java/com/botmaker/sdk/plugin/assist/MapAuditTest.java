@@ -1,11 +1,16 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Do;
+import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -28,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -313,5 +319,87 @@ class MapAuditTest {
             for (int x = 0; x < width; x++) image.setRGB(x, y, rnd.nextInt(0xFFFFFF));
         }
         return image;
+    }
+
+    // ---- the plan's audit (2026-11-08): goals and plans as Studio reads them, by reference ----------------------
+
+    /** One screen, HOME, holding {@code actions} by field, each on an input of the same name. */
+    private static ScreenGraph home(Map<String, Do> actions) {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        actions.keySet().forEach(field -> inputs.put(field, MapFixtures.click(field)));
+        return ScreenGraph.of(Map.of("HOME", new MapScreen(Setup.named("HOME").start(), inputs, Map.of(), Map.of(),
+                actions)));
+    }
+
+    private static Do press(String field) {
+        return Do.press(MapFixtures.ref("HOME", field));
+    }
+
+    /** {@code () -> Screens.HOME.<field>}, as the grammar reads an {@code .over}: the field's reference. */
+    @SuppressWarnings("unchecked")
+    private static Supplier<Do> over(String field) {
+        Supplier<?> named = () -> MapFixtures.ref("HOME", field);
+        return (Supplier<Do>) named;
+    }
+
+    private static Map<String, Goal> goals(String... names) {
+        Map<String, Goal> goals = new LinkedHashMap<>();
+        // Each its own check: one lambda with nothing captured is one value, and goals are told apart by their check.
+        for (String name : names) goals.put(name, Goal.of(() -> name.isEmpty()));
+        return goals;
+    }
+
+    private static Plan plan(String... goals) {
+        return Plan.of(Plan.tier(Arrays.stream(goals).map(BotConstants::goal).toArray(Goal[]::new)));
+    }
+
+    @Test
+    void goalNothingServes() {
+        Map<String, Do> actions = new LinkedHashMap<>();
+        actions.put("chest", press("chest").serves(BotConstants.goal("GOLD")));
+        actions.put("gems", Do.press(MapFixtures.click("gems").never("spends gems")));
+
+        List<String> warnings = MapAudit.planWarnings(Map.of("MAIN", plan("GOLD", "GEMS")),
+                goals("GOLD", "GEMS", "LONELY"), home(actions));
+
+        assertTrue(warnings.contains("Goals.GEMS: no action serves it, so a run cannot meet it: give the action "
+                + "that does it .serves(Goals.GEMS)."), warnings.toString());
+        assertTrue(warnings.stream().noneMatch(w -> w.startsWith("Goals.GOLD")), "GOLD is served and planned");
+        assertTrue(warnings.contains("Goals.LONELY: no plan names it and no action needs it, so no run looks at it."),
+                warnings.toString());
+        assertTrue(warnings.stream().noneMatch(w -> w.startsWith("Goals.GEMS: no plan")), warnings.toString());
+        assertTrue(warnings.contains("HOME.gems presses an input marked never (spends gems): a run never does it."),
+                warnings.toString());
+    }
+
+    @Test
+    void overCycle() {
+        Map<String, Do> actions = new LinkedHashMap<>();
+        actions.put("selling", press("selling").serves(BotConstants.goal("GOLD")).over(over("opening")));
+        actions.put("opening", press("opening").serves(BotConstants.goal("GOLD")).over(over("selling")));
+
+        List<String> warnings = MapAudit.planWarnings(Map.of("MAIN", plan("GOLD")), goals("GOLD"), home(actions));
+
+        assertEquals(1, warnings.size(), warnings.toString());
+        assertTrue(warnings.getFirst().startsWith("These actions each say to be tried before the next, in a circle: "),
+                warnings.getFirst());
+    }
+
+    @Test
+    void subGoalTooDeep() {
+        Map<String, Do> actions = new LinkedHashMap<>();
+        for (int i = 0; i < 5; i++) {
+            actions.put("a" + i, press("a" + i).serves(BotConstants.goal("G" + i)).needs(BotConstants.goal("G" + (i + 1))));
+        }
+        actions.put("a5", press("a5").serves(BotConstants.goal("G5")));
+        Map<String, Goal> goals = goals("G0", "G1", "G2", "G3", "G4", "G5");
+
+        List<String> warnings = MapAudit.planWarnings(Map.of("MAIN", plan("G0")), goals, home(actions));
+
+        assertEquals(List.of("Goals.G0 → Goals.G1 → Goals.G2 → Goals.G3 → Goals.G4 → Goals.G5: sub-goals nest deeper "
+                + "than 4, so a run stops there."), warnings);
+        assertEquals(List.of("Goals.G0: no plan names it and no action needs it, so no run looks at it."),
+                MapAudit.planWarnings(Map.of("MAIN", plan("G1")), goals, home(actions)),
+                "from G1 the chain is 4 deep, as deep as a run follows");
     }
 }

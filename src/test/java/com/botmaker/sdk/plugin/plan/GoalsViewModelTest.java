@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.Round;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import org.junit.jupiter.api.Test;

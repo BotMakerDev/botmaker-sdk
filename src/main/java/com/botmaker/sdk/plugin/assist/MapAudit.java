@@ -1,10 +1,15 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.ScreenVariant;
@@ -13,8 +18,12 @@ import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.plan.PlanModel;
+import com.botmaker.sdk.internal.plan.Planner;
+import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.Reach;
@@ -682,5 +691,96 @@ public final class MapAudit {
         } catch (IOException gone) {
             return "";
         }
+    }
+
+    /** {@link #planWarnings(Map, Map, ScreenGraph)} over the bot's {@code Plans} and {@code Goals}; none without them. */
+    public static List<String> planWarnings(StudioServices services, ScreenGraph map) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return List.of();
+        Map<String, Plan> plans = new LinkedHashMap<>();
+        for (Member member : values.members(SdkValues.PLANS)) {
+            values.open(SdkValues.PLANS, member).flatMap(ctx -> ctx.value(Plan.class))
+                    .ifPresent(plan -> plans.put(member.name(), plan));
+        }
+        Map<String, Goal> goals = new LinkedHashMap<>();
+        for (Member member : values.members(SdkValues.GOALS)) {
+            values.open(SdkValues.GOALS, member).flatMap(ctx -> ctx.value(Goal.class))
+                    .ifPresent(goal -> goals.put(member.name(), goal));
+        }
+        return plans.isEmpty() && goals.isEmpty() ? List.of() : planWarnings(plans, goals, map);
+    }
+
+    /**
+     * What the bot's goals and plans ask that a run cannot do, one line each (2026-11-08): a goal no action serves, a
+     * goal no plan names and no action needs, actions whose {@code .over} go round in a circle, sub-goals nested
+     * deeper than {@link Planner#DEEPEST}, an action on an input marked never. {@code plans} and {@code goals} are the
+     * bot's constants as Studio reads them, by reference; {@link StudioPlan} ties them to {@code map} as a run does.
+     */
+    public static List<String> planWarnings(Map<String, Plan> plans, Map<String, Goal> goals, ScreenGraph map) {
+        StudioPlan whole = StudioPlan.of(PlanModel.NO_PLAN, goals, map);
+        Set<String> out = new LinkedHashSet<>();
+        Set<String> served = new LinkedHashSet<>();
+        Set<String> needed = new LinkedHashSet<>();
+        whole.map().screens().forEach((screen, held) -> held.actions().forEach((field, action) -> {
+            action.serves().forEach(goal -> whole.name(goal).ifPresent(served::add));
+            action.goalNeeds().forEach(goal -> whole.name(goal).ifPresent(needed::add));
+            if (action.input() != null && action.input().never() != null) {
+                out.add(screen + "." + field + " presses an input marked never (" + action.input().never()
+                        + "): a run never does it.");
+            }
+        }));
+        Set<String> planned = new LinkedHashSet<>();
+        plans.values().forEach(plan -> plan.tiers().forEach(tier -> tier.goals()
+                .forEach(goal -> BotConstants.goalName(goal).ifPresent(planned::add))));
+        for (String goal : goals.keySet()) {
+            if (!served.contains(goal)) {
+                out.add("Goals." + goal + ": no action serves it, so a run cannot meet it: give the action that "
+                        + "does it .serves(Goals." + goal + ").");
+            }
+            if (!planned.contains(goal) && !needed.contains(goal)) {
+                out.add("Goals." + goal + ": no plan names it and no action needs it, so no run looks at it.");
+            }
+        }
+        PlanModel.overCycle(whole.map()).ifPresent(out::add);
+        for (Plan plan : plans.values()) {
+            // Each read resolves its own done-goals: its actions are the ones its goals are served by.
+            StudioPlan read = StudioPlan.of(plan, goals, map);
+            List<Do> actions = read.map().screens().values().stream().flatMap(s -> s.actions().values().stream())
+                    .toList();
+            for (Plan.Tier tier : read.plan().tiers()) {
+                Map<Goal, Integer> shallow = new IdentityHashMap<>();
+                for (Goal goal : tier.goals()) {
+                    tooDeep(goal, List.of(goal), actions, shallow).ifPresent(chain -> out.add(String.join(" → ",
+                            chain.stream().map(each -> read.name(each).map(n -> "Goals." + n).orElse("a goal"))
+                                    .toList()) + ": sub-goals nest deeper than " + Planner.DEEPEST
+                            + ", so a run stops there."));
+                }
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    /**
+     * The first chain of goals from {@code path}'s last, each needed by an action that serves the one before, longer
+     * than a run follows; {@code actions} resolved as the goals are. {@code shallow} keeps, for each goal searched in
+     * vain, the deepest place it was searched from: from there or nearer the top it finds nothing either, so the search
+     * goes through each goal at each depth once.
+     */
+    private static Optional<List<Goal>> tooDeep(Goal goal, List<Goal> path, List<Do> actions,
+                                                Map<Goal, Integer> shallow) {
+        Integer searched = shallow.get(goal);
+        if (searched != null && searched >= path.size()) return Optional.empty();
+        for (Do action : actions) {
+            if (!action.serves().contains(goal)) continue;
+            for (Goal need : action.goalNeeds()) {
+                List<Goal> longer = new ArrayList<>(path);
+                longer.add(need);
+                if (path.size() > Planner.DEEPEST) return Optional.of(longer);
+                Optional<List<Goal>> deeper = tooDeep(need, longer, actions, shallow);
+                if (deeper.isPresent()) return deeper;
+            }
+        }
+        shallow.merge(goal, path.size(), Math::max);
+        return Optional.empty();
     }
 }
