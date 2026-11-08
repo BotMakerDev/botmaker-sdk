@@ -325,20 +325,20 @@ class SdkPluginSurfaceTest {
      * rather than on the main bar, and their subject is the window the HUD is drawn over.
      */
     @Test
-    void the_toolbar_contributes_eleven_items_in_their_places_and_orders() {
+    void the_toolbar_contributes_twelve_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
         assertEquals(List.of("game", "project-setup", "capture-source", "bot-settings", "activity-flow",
-                        "screen-map", "manage-templates", "capture-templates", "pilot",
+                        "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
         ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 40, 50, 60, 70, 80, 90, 10, 20),
+        assertEquals(List.of(10, 20, 30, 40, 50, 60, 65, 70, 80, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {
