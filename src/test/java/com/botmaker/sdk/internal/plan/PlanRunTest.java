@@ -88,17 +88,25 @@ class PlanRunTest {
         final Map<String, Pressed.Result> results = new HashMap<>();
         final Map<String, Runnable> effects = new HashMap<>();
         final Map<Method, List<String>> feeds = new HashMap<>();
+        /** Each wait, the slices of one idle (each followed by a look, nothing done between) summed as one. */
         final List<Duration> idled = new ArrayList<>();
+        /** When each fact was last read; one read on a screen is read when that screen is read again. */
+        final Map<Method, Instant> readAt = new HashMap<>();
+        /** The screens each fact is read on when that screen is read; empty: by {@link #feeds}. */
+        final Map<Method, List<String>> readOn = new HashMap<>();
+        int looks;
+        private boolean looked;
 
         @Override
         public Optional<String> where() {
-            return Optional.of(at);
+            return Optional.ofNullable(at);
         }
 
         @Override
         public boolean walk(String screen) {
             did.add("walk " + screen);
             at = screen;
+            looked = false;
             tick();
             return true;
         }
@@ -106,6 +114,7 @@ class PlanRunTest {
         @Override
         public Pressed.Result press(Step step) {
             did.add("press " + step.key());
+            looked = false;
             tick();
             Pressed.Result result = results.getOrDefault(step.key(), Pressed.Result.DONE);
             if (result == Pressed.Result.DONE || result == Pressed.Result.LEFT) {
@@ -117,6 +126,24 @@ class PlanRunTest {
         @Override
         public void readAgain(String screen, Set<Method> facts) {
             did.add("read " + screen);
+            looked = false;
+            for (Method fact : facts) {
+                if (readOn.getOrDefault(fact, feeds.getOrDefault(fact, List.of())).contains(screen)) {
+                    readAt.put(fact, clock.now);
+                }
+            }
+        }
+
+        @Override
+        public Optional<Instant> readAt(Method fact) {
+            return Optional.ofNullable(readAt.get(fact));
+        }
+
+        @Override
+        public boolean look() {
+            looks++;
+            looked = true;
+            return false;
         }
 
         @Override
@@ -131,7 +158,9 @@ class PlanRunTest {
 
         @Override
         public void idle(Duration time) {
-            idled.add(time);
+            if (looked) idled.set(idled.size() - 1, idled.getLast().plus(time));
+            else idled.add(time);
+            looked = false;
             clock.now = clock.now.plus(time);
         }
 
@@ -236,10 +265,45 @@ class PlanRunTest {
 
         assertEquals(Optional.empty(), run.round());
 
-        assertEquals(List.of(Duration.ofHours(2)), game.idled, "one wait, until the chest comes due");
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "a slice of the wait, then a look at the game");
+        assertEquals(1, game.looks);
         assertTrue(game.did.isEmpty(), "nothing walked or pressed while waiting");
         assertEquals(End.MET, run.run());
         assertEquals(List.of("press HOME.chest"), game.did);
+        assertEquals(List.of(Duration.ofHours(2)), game.idled, "one wait in all, until the chest comes due");
+        assertEquals(Duration.ofHours(2).dividedBy(PlanRun.IDLE_LOOK), game.looks, "looked again every slice");
+        assertEquals(1, game.said.stream().filter(line -> line.startsWith("Every goal is met or waiting")).count(),
+                "the idle said once, not each slice: " + game.said);
+    }
+
+    @Test
+    void anIdleLookSeesAGoalFallBackUnmet() {
+        AtomicBoolean full = new AtomicBoolean(true);
+        Goal energy = metWhen(full);
+        AtomicBoolean claimed = new AtomicBoolean();
+        Goal chest = metWhen(claimed);
+        on("HOME", "chest", Do.press(click("chest")).serves(chest).every(Duration.ofHours(2)));
+        on("HOME", "refill", Do.press(click("refill")).serves(energy));
+        FakeGame game = new FakeGame() {
+            @Override
+            public boolean look() {
+                super.look();
+                // What the look reads: the energy spent meanwhile.
+                if (looks == 2) full.set(false);
+                return false;
+            }
+        };
+        game.effects.put("HOME.refill", () -> full.set(true));
+        DoneRecords records = records();
+        records.done("HOME.chest", true);
+        PlanRun run = run(Plan.of(Plan.tier(energy), Plan.tier(chest)), game, records);
+
+        run.round();
+        run.round();
+        run.round();
+
+        assertEquals(List.of("press HOME.refill"), game.did, "seen by the second look, long before the chest is due");
+        assertEquals(List.of(PlanRun.IDLE_LOOK.multipliedBy(2)), game.idled);
     }
 
     @Test
@@ -259,9 +323,11 @@ class PlanRunTest {
 
         game.effects.put("HOME.sell", () -> rich.set(true));
         run.round();
-        assertEquals(List.of(Duration.ofMinutes(10)), game.idled, "waits for its retry, nothing pressed meanwhile");
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "waits for its retry, nothing pressed meanwhile");
         assertEquals(End.MET, run.run());
         assertEquals(List.of("press HOME.sell", "press HOME.sell"), game.did, "a bot method's check reads no fact");
+        assertEquals(List.of(Duration.ofMinutes(10).minusSeconds(1)), game.idled,
+                "one wait in all, until its retry, timed from the press's start, a second before it ended");
     }
 
     @Test
@@ -346,7 +412,7 @@ class PlanRunTest {
         run.round();
 
         assertEquals(List.of("walk SHOP"), game.did, "not walked into again at once");
-        assertEquals(List.of(PlanRun.HELD_OFF), game.idled);
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "it waits out the hold, looking again meanwhile");
     }
 
     @Test
@@ -397,7 +463,7 @@ class PlanRunTest {
         run.round();
 
         assertEquals(List.of("walk SHOP"), game.did, "not walked to again at once");
-        assertEquals(List.of(PlanRun.HELD_OFF), game.idled, "it waits out the hold instead");
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "it waits out the hold instead, looking again meanwhile");
     }
 
     @Test
@@ -416,7 +482,7 @@ class PlanRunTest {
 
         run.round();
         assertEquals(3, game.did.size(), "left be: nothing pressed");
-        assertEquals(PlanRun.HELD_OFF, game.idled.getLast());
+        assertEquals(PlanRun.IDLE_LOOK, game.idled.getLast());
     }
 
     @Test
@@ -431,7 +497,7 @@ class PlanRunTest {
         PlanRun run = run(Plan.of(Plan.tier(energy)), game, records());
 
         assertEquals(Optional.empty(), run.round(), "too few gems for now: no end");
-        assertEquals(List.of(Planner.RECHECK), game.idled, "waits, then looks again");
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "waits, then looks again");
         assertTrue(game.did.isEmpty());
 
         gems.set(60);
@@ -455,5 +521,91 @@ class PlanRunTest {
         assertEquals(Optional.empty(), run.round(), "the tier above acts");
         assertEquals(List.of("press HOME.sell"), game.did);
         assertEquals(Optional.of(End.TOO_DEEP), run.round(), "then the tier that is too deep stops the plan");
+    }
+
+    @Test
+    void aPressThatLeavesTheMapIsUnprovenUntilItsCheckIsRead() {
+        Goal strong = Goal.of(Need.atLeast(Hero::level, 5));
+        on("ARENA", "train", Do.press(click("train")).serves(strong).checks(Need.atLeast(Hero::level, 5)).once());
+        FakeGame game = new FakeGame();
+        game.feeds.put(levelMethod(), List.of("HOME"));
+        // The press leaves the game on no screen of the map.
+        game.effects.put("ARENA.train", () -> game.at = null);
+        DoneRecords records = records();
+        PlanRun run = run(Plan.of(Plan.tier(strong)), game, records);
+
+        run.round();
+        assertEquals(List.of("walk ARENA", "press ARENA.train"), game.did, "nothing read off no screen");
+        assertTrue(records.last("ARENA.train").isEmpty(), "no success kept on a reading older than the press");
+        assertTrue(game.said.getLast().startsWith("ARENA.train pressed, unproven: its check reads level"),
+                game.said.getLast());
+
+        run.round();
+        assertEquals(List.of("walk ARENA", "press ARENA.train", "walk HOME", "read HOME"), game.did,
+                "the next round reads the check's fact where it is fed before it plans");
+        assertTrue(records.last("ARENA.train").orElseThrow().held(), "kept once read after the press");
+        assertEquals(NOON.plusSeconds(1), records.last("ARENA.train").orElseThrow().at(),
+                "timed by the press, not by the proof");
+    }
+
+    @Test
+    void anUnprovenPressNothingCanReadKeepsNoRecordAndStopsAtTheCap() {
+        Goal strong = Goal.of(Need.atLeast(Hero::level, 5));
+        on("HOME", "train", Do.press(click("train")).serves(strong).checks(Need.atLeast(Hero::level, 5)));
+        FakeGame game = new FakeGame();
+        DoneRecords records = records();
+        PlanRun run = run(Plan.of(Plan.tier(strong)), game, records);
+
+        for (int i = 0; i < PlanRun.REPEATS + 1; i++) run.round();
+
+        assertEquals(PlanRun.REPEATS, game.did.stream().filter("press HOME.train"::equals).count(), game.did.toString());
+        assertTrue(records.last("HOME.train").isEmpty(), "never proven, never kept");
+        assertTrue(game.said.stream().anyMatch(line -> line.startsWith("HOME.train's check reads level, which could"
+                + " not be read again since its press: no record kept")), String.join("\n", game.said));
+        assertTrue(game.said.stream().anyMatch(line -> line.startsWith("HOME.train was pressed 3 times in a row and"
+                + " its check could not be read after any")), String.join("\n", game.said));
+    }
+
+    @Test
+    void aPressWhoseCheckIsReadWhereItLeftIsKeptAtOnce() {
+        Goal strong = Goal.of(Need.atLeast(Hero::level, 5));
+        on("ARENA", "train", Do.press(click("train")).serves(strong).checks(Need.atLeast(Hero::level, 5)).once());
+        FakeGame game = new FakeGame();
+        game.feeds.put(levelMethod(), List.of("ARENA"));
+        DoneRecords records = records();
+
+        run(Plan.of(Plan.tier(strong)), game, records).round();
+
+        assertTrue(records.last("ARENA.train").orElseThrow().held(), "read again on ARENA after the press: proven");
+    }
+
+    @Test
+    void anActionOnTheWayFirstOnArrivalLeavesTheActionAChoice() {
+        AtomicBoolean rich = new AtomicBoolean();
+        Goal gold = metWhen(rich);
+        AtomicBoolean open = new AtomicBoolean();
+        AtomicBoolean got = new AtomicBoolean();
+        Goal bonus = metWhen(got);
+        on("SHOP", "sell", Do.press(click("sell")).serves(gold));
+        // Only arriving shows the bonus can be taken.
+        on("SHOP", "bonus", Do.press(click("bonus")).serves(bonus).needs(Condition.of(open::get)).first());
+        FakeGame game = new FakeGame() {
+            @Override
+            public boolean walk(String screen) {
+                open.set(true);
+                return super.walk(screen);
+            }
+        };
+        game.effects.put("SHOP.sell", () -> rich.set(true));
+        game.effects.put("SHOP.bonus", () -> got.set(true));
+
+        End end = run(Plan.of(Plan.tier(gold), Plan.tier(bonus)), game, records()).run();
+
+        assertEquals(End.MET, end);
+        assertEquals(List.of("walk SHOP", "press SHOP.bonus", "press SHOP.sell"), game.did,
+                "the bonus first, then the action the walk came for, never left be");
+        assertTrue(game.said.stream().noneMatch(line -> line.contains("left be")), String.join("\n", game.said));
+        assertTrue(game.said.contains("SHOP.bonus goes first once there; SHOP.sell after it."),
+                String.join("\n", game.said));
     }
 }

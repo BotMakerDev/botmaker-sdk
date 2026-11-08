@@ -91,9 +91,14 @@ public final class DoneRecords {
     }
 
     /** Records {@code key} done now, its check having {@code held} or not, and keeps it in the file. */
-    public synchronized void done(String key, boolean held) {
+    public void done(String key, boolean held) {
+        done(key, held, clock.instant());
+    }
+
+    /** Records {@code key} done {@code at}, its check having {@code held} or not, and keeps it in the file. */
+    public synchronized void done(String key, boolean held, Instant at) {
         int fails = held ? 0 : last(key).map(Done::fails).orElse(0) + 1;
-        done.put(key, new Done(clock.instant(), held, fails));
+        done.put(key, new Done(at, held, fails));
         write();
     }
 
@@ -102,7 +107,12 @@ public final class DoneRecords {
      * check, when the game went {@code asTheMapSays}.
      */
     public void pressed(String key, Do action, boolean asTheMapSays) {
-        done(key, action.checks() == null ? asTheMapSays : Conditions.holds(action.checks()));
+        pressed(key, action, asTheMapSays, clock.instant());
+    }
+
+    /** {@link #pressed(String, Do, boolean)}, the press made {@code at}: one proven after it is timed by the press. */
+    public void pressed(String key, Do action, boolean asTheMapSays, Instant at) {
+        done(key, action.checks() == null ? asTheMapSays : Conditions.holds(action.checks()), at);
     }
 
     /** Takes {@code action} as being done now, this very value; false when it is already. */

@@ -449,6 +449,14 @@ public final class ScreenWalk {
     }
 
     /**
+     * Does what {@code at}, the screen the game shows, does on sight and is ready, as {@link #go} does on each screen it
+     * comes to: a plan's idle looking at the game. Nothing without {@link #doing} records. True when any was done.
+     */
+    public boolean doOnSight(String at) {
+        return onSight(at);
+    }
+
+    /**
      * Does what {@code at} does on sight and is ready, in the order declared, each on a fresh look with popups closed:
      * only what shows now is pressed, its strip not scrolled and nothing waited for, and once one has left the screen
      * the rest are not looked for. An input another screen holds, or one only a body can type in, is not done. True

@@ -21,6 +21,7 @@ import com.botmaker.sdk.internal.trace.Say;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -239,6 +240,24 @@ public final class RunFacts {
         List<Fact> due = facts.stream()
                 .filter(fact -> parameters.contains(fact.parameter()) && fact.screen().isInstance(screen.get())).toList();
         if (!due.isEmpty()) readOn(constant, due);
+    }
+
+    /**
+     * Reads again every fact the screen {@code constant} feeds that was not read at or after {@code since}, fresh or
+     * not, off one look of it: a plan's idle looking at the game.
+     */
+    public static void readEvery(String constant, Instant since) {
+        Optional<Screen> screen = ScreenMaps.installed().instance(constant);
+        if (screen.isEmpty()) return;
+        List<Fact> due = facts.stream().filter(fact -> fact.screen().isInstance(screen.get())
+                && readAt(fact.parameter()).filter(at -> !at.isBefore(since)).isEmpty()).toList();
+        if (!due.isEmpty()) readOn(constant, due);
+    }
+
+    /** When {@code parameter}'s reading was taken; empty when it holds none. */
+    public static Optional<Instant> readAt(Method parameter) {
+        OptionalLong at = RunParams.keptAt(parameter);
+        return at.isPresent() ? Optional.of(Instant.ofEpochMilli(at.getAsLong())) : Optional.empty();
     }
 
     /** Whether {@code parameter} holds a reading that is not stale. */

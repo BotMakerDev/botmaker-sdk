@@ -67,8 +67,8 @@ public final class RunParams {
     private static boolean fitted;
     private static LongSupplier clock = System::currentTimeMillis;
 
-    /** A value this run set, and when. */
-    private record Held(Object value, long at) {}
+    /** A value this run set, when it was last read or set, and when it was last written to the bot. */
+    private record Held(Object value, long at, long written) {}
 
     /** A group's file: {@code relative} under the bot's {@code params} folder. */
     private record GroupFile(Path params, Path relative) {
@@ -98,8 +98,12 @@ public final class RunParams {
         synchronized (RunParams.class) {
             long now = clock.getAsLong();
             Held held = SET.get(parameter);
-            if (held != null && Objects.equals(held.value(), value) && now - held.at() < REWRITE_AFTER_MS) return;
-            SET.put(parameter, new Held(value, now));
+            if (held != null && Objects.equals(held.value(), value) && now - held.written() < REWRITE_AFTER_MS) {
+                // Read again: the run knows it is this fresh, though the file keeps the time it was written.
+                SET.put(parameter, new Held(value, now, held.written()));
+                return;
+            }
+            SET.put(parameter, new Held(value, now, now));
             FORGOTTEN.remove(parameter);
         }
         // Apart from the values' lock: a read on another thread never waits for the disk. Whichever write comes

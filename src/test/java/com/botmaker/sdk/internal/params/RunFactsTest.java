@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,6 +125,31 @@ class RunFactsTest {
         RunFacts.seen("HOME");
         assertEquals(2, reads.size());
         assertEquals(Optional.of(12), Params.known(Hero::level), "the same value, a new time");
+    }
+
+    @Test
+    void theSameValueReadAgainSoonIsFreshThoughNotWritten() throws IOException, NoSuchMethodException {
+        RunFacts.seen("HOME");
+        now.addAndGet(10_000);
+        RunFacts.readAgain("HOME", Set.of(Hero.class.getMethod("level")));
+
+        assertEquals(Optional.of(NOW.plusSeconds(10)), RunFacts.readAt(Hero.class.getMethod("level")),
+                "the run knows the second reading's time");
+        assertTrue(Files.readString(heroFile).contains("@Param.Kept(at = \"2026-11-04T10:00:00Z\")"),
+                "the file keeps the first: only a time would change");
+    }
+
+    @Test
+    void readEveryReadsOnlyWhatWasNotReadSince() {
+        RunFacts.seen("HOME");
+        assertEquals(1, reads.size());
+
+        RunFacts.readEvery("HOME", NOW);
+        assertEquals(1, reads.size(), "read at the look's start: not read twice");
+
+        now.addAndGet(1_000);
+        RunFacts.readEvery("HOME", NOW.plusSeconds(1));
+        assertEquals(2, reads.size(), "fresh but read before the look: read again");
     }
 
     @Test

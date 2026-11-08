@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A plan run proves a press before it counts it, and keeps looking while it idles** (2026-11-09).
+  - A press whose check reads facts is kept as done only once those facts were read after the press. A press that
+    leaves the game on no screen of the map first clears what covers it with the map's close buttons; when the check's
+    facts still cannot be read there, the next round walks to a screen that feeds them and reads them before it plans.
+    A press never proven keeps no record, and three in a row leave the action be for five minutes.
+  - An idle no longer sleeps until the next goal is due: every 30 seconds it reads again the facts of the screen the
+    game shows and does what that screen does on sight, so a goal that falls back unmet is acted on at once.
+  - An action the walk came for is no longer left be for five minutes when, once there, something on the way goes
+    first: that one is done, then this one.
 - **A plan run waits instead of stopping, and never presses in a loop** (2026-11-09).
   - An action blocked only for now is looked at again a minute later: a need or a `when` saying no, or no way to its
     screen now. Its goal waits, and a tier below acts meanwhile. Before, `buyEnergy.needs(gems ≥ 50)` with 10 gems

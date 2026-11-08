@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,15 +90,28 @@ public final class RunGame implements PlanRun.Game {
         return map.instance(screen).map(Navigate::to).orElse(false);
     }
 
+    /**
+     * Presses {@code step}; when the game then shows no screen of the map, what covers it is cleared by the map's close
+     * buttons, so the facts the run reads next are read off a screen it knows.
+     */
     @Override
     public Pressed.Result press(Step step) {
+        RunReach reach = new RunReach();
         // Its own record is the run's to write, once the facts it changed are read again.
-        ScreenWalk.Press press = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null)
-                .press(step.screen(), step.field(), null);
+        ScreenWalk walk = new ScreenWalk(map, reach, ScreenWalk.STEP_MS, null).uncovering();
+        ScreenWalk.Press press = walk.press(step.screen(), step.field(), null);
         if (press.result() != Pressed.Result.DONE) Debug.log(press.why());
-        if (press.at() != null) {
-            if (!press.at().equals(ScreenMaps.lastSeen())) Bots.fireScreen(press.at(), map.shown(press.at()));
-            ScreenMaps.seen(press.at());
+        String at = press.at();
+        if (at == null) {
+            Optional<ScreenWalk.Uncovered> cleared = reach.look().flatMap(frame -> walk.uncover(frame, step.screen()));
+            if (cleared.isPresent()) {
+                at = cleared.get().at();
+                Debug.log(walk.covered(step.screen(), cleared.get()));
+            }
+        }
+        if (at != null) {
+            if (!at.equals(ScreenMaps.lastSeen())) Bots.fireScreen(at, map.shown(at));
+            ScreenMaps.seen(at);
         }
         return press.result();
     }
@@ -115,6 +129,22 @@ public final class RunGame implements PlanRun.Game {
     @Override
     public boolean fresh(Method fact) {
         return RunFacts.fresh(fact);
+    }
+
+    @Override
+    public Optional<Instant> readAt(Method fact) {
+        return RunFacts.readAt(fact);
+    }
+
+    @Override
+    public boolean look() {
+        Instant since = Instant.now();
+        // Telling where the game is reads what is stale there; the rest is read once more after it.
+        Optional<String> at = where();
+        if (at.isEmpty()) return false;
+        RunFacts.readEvery(at.get(), since);
+        return new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).doing(DoneRecords.run())
+                .doOnSight(at.get());
     }
 
     @Override

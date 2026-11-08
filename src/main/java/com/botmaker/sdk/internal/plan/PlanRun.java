@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 
 /**
  * Runs a {@link Plan}: a {@link Planner} round, its first action walked to, looked at again on arrival, pressed and
- * checked, its done-record written; then the next round. Every goal met or waiting, it idles until the soonest is due;
- * none ever due again, it ends. What it does to the game goes through a {@link Game}, a fake in tests.
+ * checked once what its check reads was read again, its done-record written; then the next round. Every goal met or
+ * waiting, it idles toward the soonest due time, looking at the game again on the way; none ever due again, it ends. What it does to the game goes through a {@link Game}, a fake in tests.
  */
 public final class PlanRun {
 
@@ -44,6 +44,12 @@ public final class PlanRun {
      * press is doing nothing the plan can see, and the action is left be for {@link #HELD_OFF}.
      */
     static final int REPEATS = 3;
+
+    /**
+     * The longest an idle waits before it looks at the game again: the facts its screen feeds read afresh and what it
+     * does on sight done, so a goal that falls back unmet is seen before the next one comes due.
+     */
+    static final Duration IDLE_LOOK = Duration.ofSeconds(30);
 
     /** Why a run of a plan ended. */
     public enum End {
@@ -76,8 +82,17 @@ public final class PlanRun {
         /** Whether {@code fact} holds a reading that is not stale. */
         boolean fresh(Method fact);
 
+        /** When {@code fact}'s reading was taken; empty when it holds none. */
+        Optional<Instant> readAt(Method fact);
+
         /** Waits {@code time}; a stop ends the wait by its throw. */
         void idle(Duration time);
+
+        /**
+         * Looks at the game again: every fact the screen it shows feeds read afresh, what it does on sight done. True
+         * when it pressed anything.
+         */
+        boolean look();
 
         /** Says one decision of the run, carrying {@code values} for its report. */
         void say(String line, Map<String, String> values);
@@ -98,6 +113,15 @@ public final class PlanRun {
     private int fruitlessTimes;
     /** When the last press that was made ended; null before the first. */
     private Instant lastPress;
+    /** The last press, when its check reads facts not read again since it: proven or let go by the next round. */
+    private Unproven unproven;
+    /** The due time the run last said it idles until; null when it is not idling. */
+    private Instant idling;
+    /** The action last put after another on arrival, with nothing pressed since; null otherwise. */
+    private Do deferred;
+
+    /** A press of {@code step} for {@code goal} at {@code pressed}, which came to {@code result}, its check not read since. */
+    private record Unproven(Step step, Goal goal, Instant pressed, Pressed.Result result) {}
 
     /** A run of {@code plan} over {@code map}, keeping {@code records}, acting through {@code game}; goals by {@code names}. */
     public PlanRun(Plan plan, ScreenGraph map, DoneRecords records, Game game, Function<Goal, String> names) {
@@ -118,9 +142,11 @@ public final class PlanRun {
 
     /** One round: something done, gone to, waited for, or the end. */
     Optional<End> round() {
+        prove();
         PlanModel model = model(game.where().orElse(null));
         Round round = Planner.round(model);
         if (round.doing().isEmpty()) return idleOrEnd(model, round);
+        idling = null;
         Step next = round.doing().getFirst();
         if (goneToRead(model, round, next)) return Optional.empty();
         doStep(model, round, next);
@@ -132,14 +158,22 @@ public final class PlanRun {
         return new PlanModel(plan, map, records, at, heldOff);
     }
 
-    /** Nothing to do now: idles until the soonest goal is due, else ends, met or stuck. */
+    /**
+     * Nothing to do now: idles toward the soonest goal's due time, {@link #IDLE_LOOK} at most, and looks at the game
+     * again, so the next round plans from what it shows; with nothing ever due, ends, met or stuck.
+     */
     private Optional<End> idleOrEnd(PlanModel model, Round round) {
         Instant now = records.clock().instant();
         if (round.due().isPresent()) {
-            say("Every goal is met or waiting: idle until " + time(round.due().get()) + ".", null, null);
-            game.idle(Duration.between(now, round.due().get()));
+            Instant due = round.due().get();
+            if (!due.equals(idling)) say("Every goal is met or waiting: idle until " + time(due) + ".", null, null);
+            idling = due;
+            Duration left = Duration.between(now, due);
+            game.idle(left.compareTo(IDLE_LOOK) < 0 ? left : IDLE_LOOK);
+            if (game.look()) lastPress = records.clock().instant();
             return Optional.empty();
         }
+        idling = null;
         if (round.tier().isEmpty()) {
             say("Every goal of the plan is met, and none comes due again: the plan is done.", null, null);
             return Optional.of(End.MET);
@@ -233,13 +267,22 @@ public final class PlanRun {
             keepGap();
             // Arriving read what its screen shows: the round may choose otherwise now.
             Round again = Planner.round(model(next.screen()));
-            if (again.doing().isEmpty() || again.doing().getFirst().action() != next.action()) {
-                // Left be, so what came first there is done before the run could come back for this one.
+            boolean still = again.doing().stream().anyMatch(step -> step.action() == next.action());
+            if (still && again.doing().getFirst().action() != next.action() && deferred != next.action()) {
+                // Something on the way goes first; this one stays a choice, so the next rounds come back for it. Once
+                // only before something is pressed: a second time, the way there and back goes round, and it is left be.
+                deferred = next.action();
+                say(again.doing().getFirst().key() + " goes first once there; " + next.key() + " after it.", goal, next);
+                return;
+            }
+            deferred = null;
+            if (!still) {
                 holdOff(next);
-                say(next.key() + " is no more the first thing to do once there: left be for " + HELD_OFF.toMinutes()
+                say(next.key() + " is no more a thing to do once there: left be for " + HELD_OFF.toMinutes()
                         + " min, choosing again.", goal, next);
                 return;
             }
+            Instant pressed = records.clock().instant();
             Pressed.Result result = game.press(next);
             if (result == Pressed.Result.DONE || result == Pressed.Result.LEFT) lastPress = records.clock().instant();
             Set<Method> facts = new LinkedHashSet<>(FactsRead.of(next.action()));
@@ -247,7 +290,7 @@ public final class PlanRun {
             String here = game.where().orElse(null);
             if (here != null && !facts.isEmpty()) game.readAgain(here, facts);
             switch (result) {
-                case DONE, LEFT -> checked(next, goal, result);
+                case DONE, LEFT -> checked(next, goal, result, pressed);
                 default -> {
                     fruitless = null;
                     holdOff(next);
@@ -273,10 +316,86 @@ public final class PlanRun {
         }
     }
 
-    /** {@code next} pressed: whether it worked, kept in its record as a flow's press is, and said when it did not. */
-    private void checked(Step next, Goal goal, Pressed.Result result) {
+    /**
+     * {@code next} pressed at {@code pressed}: kept as {@link #recorded} once every fact its check reads was read since,
+     * else left unproven for the next round to read, and counted as a press that showed nothing.
+     */
+    private void checked(Step next, Goal goal, Pressed.Result result, Instant pressed) {
+        Set<Method> unread = unread(next.action(), pressed);
+        if (unread.isEmpty()) {
+            recorded(next, goal, result, pressed);
+            return;
+        }
+        unproven = new Unproven(next, goal, pressed, result);
+        say(next.key() + " pressed, unproven: its check reads " + names(unread) + ", not read since; read again"
+                + " next round.", goal, next);
+    }
+
+    /** The facts {@code action}'s check reads whose reading was not taken at or after {@code since}. */
+    private Set<Method> unread(Do action, Instant since) {
+        Set<Method> unread = new LinkedHashSet<>();
+        for (Method fact : FactsRead.of(action.checks())) {
+            if (game.readAt(fact).filter(at -> !at.isBefore(since)).isEmpty()) unread.add(fact);
+        }
+        return unread;
+    }
+
+    /**
+     * The last press left unproven: each fact its check reads and nothing read since is read on a screen that feeds
+     * it, walked to when the game is elsewhere. Every one read, the press is {@link #recorded} at the time it was
+     * made; else no record is kept, its goal is planned from what is known, and the press counts toward
+     * {@link #REPEATS} as one that showed nothing. A walk that gets stuck holds the action off before its throw goes
+     * on, so the next press of it does not send the run on the same walk.
+     */
+    private void prove() {
+        Unproven pending = unproven;
+        unproven = null;
+        if (pending == null) return;
+        Step step = pending.step();
+        Set<Method> unread = unread(step.action(), pending.pressed());
+        String at = game.where().orElse(null);
+        for (Method fact : List.copyOf(unread)) {
+            if (!unread.contains(fact)) continue;
+            for (String screen : game.screensOf(fact)) {
+                if (!screen.equals(at)) {
+                    try {
+                        if (!game.walk(screen)) continue;
+                    } catch (RuntimeException stuck) {
+                        holdOff(step);
+                        throw stuck;
+                    }
+                    at = screen;
+                }
+                game.readAgain(screen, unread);
+                unread = unread(step.action(), pending.pressed());
+                break;
+            }
+        }
+        if (unread.isEmpty()) {
+            boolean mine = records.start(step.action());
+            try {
+                recorded(step, pending.goal(), pending.result(), pending.pressed());
+            } finally {
+                if (mine) records.finish(step.action());
+            }
+            return;
+        }
+        say(step.key() + "'s check reads " + names(unread) + ", which could not be read again since its press: no"
+                + " record kept.", pending.goal(), step);
+        strike(step, pending.goal(), " and its check could not be read after any");
+    }
+
+    private static String names(Set<Method> facts) {
+        return facts.stream().map(Method::getName).collect(Collectors.joining(", "));
+    }
+
+    /**
+     * {@code next} pressed at {@code pressed} and its check read: whether it worked, kept in its record at that time,
+     * and said when it did not.
+     */
+    private void recorded(Step next, Goal goal, Pressed.Result result, Instant pressed) {
         Do action = next.action();
-        records.pressed(next.key(), action, result == Pressed.Result.DONE);
+        records.pressed(next.key(), action, result == Pressed.Result.DONE, pressed);
         if (records.last(next.key()).map(DoneRecords.Done::held).orElse(false)) {
             countFruitless(next);
             return;
@@ -306,14 +425,23 @@ public final class PlanRun {
             fruitless = null;
             return;
         }
+        strike(next, blind.get(), " and " + name(blind.get()) + " is still not met");
+    }
+
+    /**
+     * One more press of {@code next} in a row that showed nothing; at {@link #REPEATS} it is left be for
+     * {@link #HELD_OFF}, said with {@code what} the presses did not show.
+     */
+    private void strike(Step next, Goal goal, String what) {
+        Do action = next.action();
         fruitlessTimes = fruitless == action ? fruitlessTimes + 1 : 1;
         fruitless = action;
         if (fruitlessTimes < REPEATS) return;
         int times = fruitlessTimes;
         fruitless = null;
         holdOff(next);
-        say(next.key() + " was pressed " + times + " times in a row and " + name(blind.get()) + " is still not met:"
-                + " left be for " + HELD_OFF.toMinutes() + " min.", blind.get(), next);
+        say(next.key() + " was pressed " + times + " times in a row" + what + ": left be for " + HELD_OFF.toMinutes()
+                + " min.", goal, next);
     }
 
     /** Waits what is left of {@link #PRESS_GAP} since the last press. */
