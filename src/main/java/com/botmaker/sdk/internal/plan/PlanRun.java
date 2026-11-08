@@ -36,6 +36,15 @@ public final class PlanRun {
     /** How long a run leaves an action be once it found it could not be done on arrival, or its screen not reached. */
     static final Duration HELD_OFF = Duration.ofMinutes(5);
 
+    /** The least time between two presses: a plan that finds the same action again each round presses it no faster. */
+    static final Duration PRESS_GAP = Duration.ofSeconds(1);
+
+    /**
+     * How many times in a row an action may be pressed, and hold, while no goal it serves comes to be met: past it the
+     * press is doing nothing the plan can see, and the action is left be for {@link #HELD_OFF}.
+     */
+    static final int REPEATS = 3;
+
     /** Why a run of a plan ended. */
     public enum End {
         /** Every goal is met and none comes due again. */
@@ -83,6 +92,12 @@ public final class PlanRun {
     private final Map<Do, Instant> heldOff = new IdentityHashMap<>();
     /** Each fact gone to read, and when: not gone to again before {@link #HELD_OFF} has passed. */
     private final Map<Method, Instant> wentToRead = new HashMap<>();
+    /** The action of the last press, when it held and met none of its goals; null otherwise. */
+    private Do fruitless;
+    /** How many presses in a row, with nothing else pressed between, {@link #fruitless} has had. */
+    private int fruitlessTimes;
+    /** When the last press that was made ended; null before the first. */
+    private Instant lastPress;
 
     /** A run of {@code plan} over {@code map}, keeping {@code records}, acting through {@code game}; goals by {@code names}. */
     public PlanRun(Plan plan, ScreenGraph map, DoneRecords records, Game game, Function<Goal, String> names) {
@@ -105,13 +120,6 @@ public final class PlanRun {
     Optional<End> round() {
         PlanModel model = model(game.where().orElse(null));
         Round round = Planner.round(model);
-        Optional<Considered> deep = round.considered().stream().filter(c -> c.why() instanceof Why.TooDeep).findFirst();
-        if (deep.isPresent()) {
-            Why.TooDeep why = (Why.TooDeep) deep.get().why();
-            say(deep.get().step().key() + " needs " + name(why.goal()) + ", a goal more than " + Planner.DEEPEST
-                    + " deep: the plan stops. Have it need a goal nearer the plan.", deep.get().goal(), deep.get().step());
-            return Optional.of(End.TOO_DEEP);
-        }
         if (round.doing().isEmpty()) return idleOrEnd(model, round);
         Step next = round.doing().getFirst();
         if (goneToRead(model, round, next)) return Optional.empty();
@@ -138,11 +146,36 @@ public final class PlanRun {
         }
         List<Goal> stuck = plan.tiers().get(round.tier().getAsInt()).goals().stream()
                 .filter(goal -> model.answer(goal) != Answer.YES).toList();
+        Optional<Considered> deep = tooDeep(round, stuck);
+        if (deep.isPresent()) {
+            Why.TooDeep why = (Why.TooDeep) deep.get().why();
+            say(deep.get().step().key() + " needs " + name(why.goal()) + ", a goal more than " + Planner.DEEPEST
+                    + " deep: the plan stops. Have it need a goal nearer the plan.", deep.get().goal(), deep.get().step());
+            return Optional.of(End.TOO_DEEP);
+        }
         String why = stuck.stream().map(goal -> name(goal) + " (" + whyNot(round, goal) + ")")
                 .collect(Collectors.joining(", "));
         say("Nothing can be done for " + why + ", now or later: the plan stops, as the tiers below it wait for it.",
                 stuck.isEmpty() ? null : stuck.getFirst(), null);
         return Optional.of(End.STUCK);
+    }
+
+    /**
+     * The option too deep that leaves {@code stuck} with nothing to do: one of theirs, or of a sub-goal they cannot
+     * meet, followed down. Only what stops the tier taken stops the plan; an option too deep elsewhere was passed over.
+     */
+    private static Optional<Considered> tooDeep(Round round, List<Goal> stuck) {
+        Set<Goal> under = new LinkedHashSet<>(stuck);
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (Considered c : round.considered()) {
+                if (!under.contains(c.goal())) continue;
+                if (c.why() instanceof Why.TooDeep) return Optional.of(c);
+                if (c.why() instanceof Why.CannotMeet cannot) grew |= under.add(cannot.goal());
+            }
+        }
+        return Optional.empty();
     }
 
     /** What the actions serving {@code goal} were found to be, in a few words. */
@@ -196,6 +229,8 @@ public final class PlanRun {
                         + HELD_OFF.toMinutes() + " min.", goal, next);
                 return;
             }
+            // Before looking again, so what the gap lets change is seen.
+            keepGap();
             // Arriving read what its screen shows: the round may choose otherwise now.
             Round again = Planner.round(model(next.screen()));
             if (again.doing().isEmpty() || again.doing().getFirst().action() != next.action()) {
@@ -206,6 +241,7 @@ public final class PlanRun {
                 return;
             }
             Pressed.Result result = game.press(next);
+            if (result == Pressed.Result.DONE || result == Pressed.Result.LEFT) lastPress = records.clock().instant();
             Set<Method> facts = new LinkedHashSet<>(FactsRead.of(next.action()));
             next.action().serves().forEach(served -> facts.addAll(FactsRead.of(served)));
             String here = game.where().orElse(null);
@@ -213,6 +249,7 @@ public final class PlanRun {
             switch (result) {
                 case DONE, LEFT -> checked(next, goal, result);
                 default -> {
+                    fruitless = null;
                     holdOff(next);
                     say(next.key() + " " + notPressed(result) + " on arrival: left be for " + HELD_OFF.toMinutes()
                             + " min, choosing again.", goal, next);
@@ -240,12 +277,50 @@ public final class PlanRun {
     private void checked(Step next, Goal goal, Pressed.Result result) {
         Do action = next.action();
         records.pressed(next.key(), action, result == Pressed.Result.DONE);
-        if (records.last(next.key()).map(DoneRecords.Done::held).orElse(false)) return;
+        if (records.last(next.key()).map(DoneRecords.Done::held).orElse(false)) {
+            countFruitless(next);
+            return;
+        }
+        fruitless = null;
         String failed = action.checks() == null ? "the game showed another screen than the map says"
                 : "its check said no";
         String again = Readiness.dueAt(action, records.last(next.key()), records.clock())
                 .map(at -> "tried again at " + time(at)).orElse("not tried again");
         say(next.key() + " did not work: " + failed + "; " + again + ".", goal, next);
+    }
+
+    /**
+     * A press that held. When the goals its action serves read no fact (a bot's own method, which the run cannot see
+     * move) and none is met after it, one more in a row, with nothing else pressed between; at {@link #REPEATS} the
+     * action is left be, so a check that never answers yes cannot press it forever. A goal of facts is not counted:
+     * its readings show each press's effect, as a threshold reached a step at a time does.
+     */
+    private void countFruitless(Step next) {
+        Do action = next.action();
+        PlanModel after = model(game.where().orElse(null));
+        Optional<Goal> blind = action.serves().stream()
+                .filter(g -> g instanceof Goal.Of && FactsRead.of(g).isEmpty() && after.answer(g) != Answer.YES)
+                .findFirst();
+        boolean anyMet = action.serves().stream().anyMatch(g -> after.answer(g) == Answer.YES);
+        if (blind.isEmpty() || anyMet) {
+            fruitless = null;
+            return;
+        }
+        fruitlessTimes = fruitless == action ? fruitlessTimes + 1 : 1;
+        fruitless = action;
+        if (fruitlessTimes < REPEATS) return;
+        int times = fruitlessTimes;
+        fruitless = null;
+        holdOff(next);
+        say(next.key() + " was pressed " + times + " times in a row and " + name(blind.get()) + " is still not met:"
+                + " left be for " + HELD_OFF.toMinutes() + " min.", blind.get(), next);
+    }
+
+    /** Waits what is left of {@link #PRESS_GAP} since the last press. */
+    private void keepGap() {
+        if (lastPress == null) return;
+        Duration since = Duration.between(lastPress, records.clock().instant());
+        if (since.compareTo(PRESS_GAP) < 0) game.idle(PRESS_GAP.minus(since));
     }
 
     private void holdOff(Step step) {
@@ -284,6 +359,7 @@ public final class PlanRun {
             case Why.Blocked blocked -> "blocked: " + blocked.block().name().toLowerCase().replace('_', ' ');
             case Why.CannotMeet cannot -> "needs " + name(cannot.goal()) + ", which nothing can meet";
             case Why.TooDeep deep -> "needs " + name(deep.goal()) + ", too deep";
+            case Why.Loop loop -> "needs " + name(loop.goal()) + ", which needs it";
         };
     }
 

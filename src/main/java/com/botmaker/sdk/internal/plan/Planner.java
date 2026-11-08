@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -40,6 +41,12 @@ public final class Planner {
     /** How deep sub-goals nest: a goal's action may need a goal, up to this many in a row. */
     public static final int DEEPEST = 4;
 
+    /**
+     * When a goal blocked only for now is looked at again: a need or a {@code when} saying no, no way there now. It
+     * waits this long, as one waiting for its cadence does, instead of ending the run.
+     */
+    public static final Duration RECHECK = Duration.ofMinutes(1);
+
     /** Among actions of one bucket and in no {@code .over}: no sub-goal first, known first, then the least to walk. */
     private static final Comparator<Option> CHEAPEST = Comparator.comparing((Option o) -> o.before() > 0)
             .thenComparing(o -> !o.known()).thenComparingLong(Option::cost);
@@ -50,9 +57,16 @@ public final class Planner {
     private final Map<Edge, Boolean> open = new HashMap<>();
     /** Each goal looked at, at the shallowest depth it was. */
     private final Map<Goal, Looked> looked = new LinkedHashMap<>();
+    /** The goals being resolved, outermost first: one needed again inside its own is a loop. */
+    private final Set<Goal> resolving = new LinkedHashSet<>();
+    /** How many loops were met so far: a goal resolved while one was met answers only for the path it was on. */
+    private int loops;
+    /** When a goal blocked only for now is looked at again: one instant for the whole round. */
+    private final Instant recheck;
 
     private Planner(PlanModel model) {
         this.model = model;
+        this.recheck = model.clock().instant().plus(RECHECK);
     }
 
     /** What to do next under {@code model}'s plan, and why. */
@@ -99,15 +113,22 @@ public final class Planner {
                     .filter(o -> !o.step().action().isLast() || !betterWaits);
         }
 
-        /** When it comes due, while nothing can be done for it and something is only waiting; else empty. */
-        Optional<Instant> waitingUntil() {
+        /**
+         * When it comes due, while nothing can be done for it and something is only waiting; else empty. An action
+         * blocked only for now waits until {@code recheck}, so the goal is looked at again rather than given up.
+         */
+        Optional<Instant> waitingUntil(Instant recheck) {
             if (met || best().isPresent()) return Optional.empty();
-            return options.stream().map(Option::why).filter(Why.Waiting.class::isInstance).map(Why.Waiting.class::cast)
-                    .map(Why.Waiting::until).min(Comparator.naturalOrder());
+            return options.stream().map(Option::why).map(why -> switch (why) {
+                case Why.Waiting waiting -> waiting.until();
+                case Why.Blocked blocked when blocked.block().forNow() -> recheck;
+                default -> null;
+            }).filter(Objects::nonNull).min(Comparator.naturalOrder());
         }
     }
 
-    private record Looked(int depth, Resolved resolved) {}
+    /** A goal as resolved; {@code onItsPath} when a loop was met inside it, so it holds only for the path it was on. */
+    private record Looked(int depth, Resolved resolved, boolean onItsPath) {}
 
     private Round round() {
         Plan plan = model.plan();
@@ -123,7 +144,7 @@ public final class Planner {
             for (Goal goal : plan.tiers().get(i).goals()) {
                 Resolved resolved = goals.get(goal);
                 if (resolved.met()) continue;
-                Optional<Instant> until = resolved.waitingUntil();
+                Optional<Instant> until = resolved.waitingUntil(recheck);
                 if (until.isPresent()) {
                     due = earlier(due, until.get());
                     continue;
@@ -166,19 +187,27 @@ public final class Planner {
 
     private Resolved resolve(Goal goal, int depth) {
         Looked prior = looked.get(goal);
-        if (prior != null && prior.depth() == depth) return prior.resolved();
+        if (prior != null && prior.depth() == depth && !prior.onItsPath()) return prior.resolved();
+        int loopsBefore = loops;
         Resolved resolved;
         if (answer(goal) == Answer.YES) {
             resolved = new Resolved(true, List.of());
         } else {
+            resolving.add(goal);
             List<Option> options = new ArrayList<>();
-            for (Step step : model.actions()) {
-                if (step.action().serves().contains(goal)) options.add(consider(step, depth));
+            try {
+                for (Step step : model.actions()) {
+                    if (step.action().serves().contains(goal)) options.add(consider(step, depth));
+                }
+            } finally {
+                resolving.remove(goal);
             }
             resolved = new Resolved(false, rank(options));
         }
         Looked now = looked.get(goal);
-        if (now == null || depth < now.depth()) looked.put(goal, new Looked(depth, resolved));
+        if (now == null || depth < now.depth() || depth == now.depth() && now.onItsPath()) {
+            looked.put(goal, new Looked(depth, resolved, loops != loopsBefore));
+        }
         return resolved;
     }
 
@@ -190,8 +219,9 @@ public final class Planner {
         Optional<Input> input = map.nameOf(action.input()).filter(name -> name.screen().equals(step.screen()))
                 .flatMap(name -> map.input(name.screen(), name.field()));
         if (input.isEmpty() || input.get() instanceof Button typed && typed.isTyped()) {
-            return Option.none(step, new Why.Blocked(Block.INPUT));
+            return Option.none(step, new Why.Blocked(Block.NO_INPUT));
         }
+        if (input.get().never() != null) return Option.none(step, new Why.Blocked(Block.NEVER));
         Answer press = Readiness.canPress(input.get());
         if (press == Answer.NO) return Option.none(step, new Why.Blocked(Block.INPUT));
         boolean known = press == Answer.YES;
@@ -226,10 +256,14 @@ public final class Planner {
                 known = false;
                 continue;
             }
+            if (resolving.contains(need)) {
+                loops++;
+                return Option.none(step, new Why.Loop(need));
+            }
             if (depth == DEEPEST) return Option.none(step, new Why.TooDeep(need));
             Resolved sub = resolve(need, depth + 1);
             Optional<Option> best = sub.best();
-            Optional<Instant> until = sub.waitingUntil();
+            Optional<Instant> until = sub.waitingUntil(recheck);
             if (best.isPresent()) {
                 best.get().chain().forEach(s -> addOnce(chain, s));
                 cost += best.get().cost();

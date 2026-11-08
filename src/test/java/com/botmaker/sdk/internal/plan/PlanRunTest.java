@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
@@ -397,5 +398,62 @@ class PlanRunTest {
 
         assertEquals(List.of("walk SHOP"), game.did, "not walked to again at once");
         assertEquals(List.of(PlanRun.HELD_OFF), game.idled, "it waits out the hold instead");
+    }
+
+    @Test
+    void aPressThatMeetsNothingIsLeftBeAfterThreeInARow() {
+        Goal never = metWhen(new AtomicBoolean());
+        on("HOME", "tap", Do.press(click("tap")).serves(never));
+        FakeGame game = new FakeGame();
+        PlanRun run = run(Plan.of(Plan.tier(never)), game, records());
+
+        for (int i = 0; i < PlanRun.REPEATS; i++) run.round();
+        assertEquals(List.of("press HOME.tap", "press HOME.tap", "press HOME.tap"), game.did);
+        assertTrue(game.said.getLast().startsWith("HOME.tap was pressed 3 times in a row and GOAL is still not met"),
+                game.said.getLast());
+        assertTrue(game.idled.stream().allMatch(PlanRun.PRESS_GAP::equals) && game.idled.size() == 2,
+                "a second between presses, none before the first: " + game.idled);
+
+        run.round();
+        assertEquals(3, game.did.size(), "left be: nothing pressed");
+        assertEquals(PlanRun.HELD_OFF, game.idled.getLast());
+    }
+
+    @Test
+    void aNeedSayingNoWaitsInsteadOfStopping() {
+        AtomicInteger gems = new AtomicInteger(10);
+        AtomicBoolean full = new AtomicBoolean();
+        Goal energy = metWhen(full);
+        on("HOME", "buyEnergy", Do.press(click("buyEnergy")).serves(energy)
+                .needs(Condition.of(() -> gems.get() >= 50)));
+        FakeGame game = new FakeGame();
+        game.effects.put("HOME.buyEnergy", () -> full.set(true));
+        PlanRun run = run(Plan.of(Plan.tier(energy)), game, records());
+
+        assertEquals(Optional.empty(), run.round(), "too few gems for now: no end");
+        assertEquals(List.of(Planner.RECHECK), game.idled, "waits, then looks again");
+        assertTrue(game.did.isEmpty());
+
+        gems.set(60);
+        assertEquals(End.MET, run.run());
+        assertEquals(List.of("press HOME.buyEnergy"), game.did);
+    }
+
+    @Test
+    void aTooDeepGoalBelowDoesNotStopTheTierAbove() {
+        AtomicBoolean rich = new AtomicBoolean();
+        Goal gold = metWhen(rich);
+        on("HOME", "sell", Do.press(click("sell")).serves(gold));
+        Goal[] deep = new Goal[6];
+        for (int i = 0; i < deep.length; i++) deep[i] = metWhen(new AtomicBoolean());
+        on("HOME", "last", Do.press(click("last")).serves(deep[5]));
+        for (int i = 0; i < 5; i++) on("HOME", "a" + i, Do.press(click("a" + i)).serves(deep[i]).needs(deep[i + 1]));
+        FakeGame game = new FakeGame();
+        game.effects.put("HOME.sell", () -> rich.set(true));
+        PlanRun run = run(Plan.of(Plan.tier(gold), Plan.tier(deep[0])), game, records());
+
+        assertEquals(Optional.empty(), run.round(), "the tier above acts");
+        assertEquals(List.of("press HOME.sell"), game.did);
+        assertEquals(Optional.of(End.TOO_DEEP), run.round(), "then the tier that is too deep stops the plan");
     }
 }

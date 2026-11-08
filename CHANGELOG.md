@@ -19,6 +19,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A plan run waits instead of stopping, and never presses in a loop** (2026-11-09).
+  - An action blocked only for now is looked at again a minute later: a need or a `when` saying no, or no way to its
+    screen now. Its goal waits, and a tier below acts meanwhile. Before, `buyEnergy.needs(gems ≥ 50)` with 10 gems
+    ended the run as stuck. A run ends stuck only when nothing can ever change: a `.once()` done, a retry given up,
+    an `.until` met, an input the screen does not hold.
+  - Presses are at least a second apart. An action pressed three times in a row, each holding, while none of its
+    goals comes to be met, is left be for five minutes.
+  - An option too deep stops the plan only when it is what stops the tier taken, not when it belongs to a goal the
+    planner passed over. Goals that need each other are said as a loop ("needs X, which needs it") in the run and in
+    🎯 Goals.
+
 - **🎯 Goals** (2026-11-06), on the SDK's toolbar tab beside 🗺 Screens. It shows one card per goal of a plan, with
   what the goal asks and whether it is met. Each card lists the actions serving the goal, in the order a run would try
   them. A row shows ★/⤓, the action, its screen, why it is or is not a choice, and the screens and time a walk to it

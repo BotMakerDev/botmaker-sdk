@@ -68,22 +68,34 @@ public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, Lis
 
         /** Not possible: it needs {@code goal}, a sub-goal deeper than {@link Planner#DEEPEST}. */
         record TooDeep(Goal goal) implements Why {}
+
+        /** Not possible: it needs {@code goal}, which is already being looked at above it, so needs itself. */
+        record Loop(Goal goal) implements Why {}
     }
 
-    /** What rules an action out. */
+    /** What rules an action out: for now, which a later round looks at again, or for good. */
     public enum Block {
-        /** Its input is locked, marked never, or its {@code .when} says no. */
+        /** Its input is locked, or its {@code .when} says no: for now. */
         INPUT,
-        /** A condition it needs says no. */
+        /** Its input is marked never: for good. */
+        NEVER,
+        /** Its screen holds no such input, or one a walk cannot press (a text only a body types): for good. */
+        NO_INPUT,
+        /** A condition it needs says no: for now. */
         CONDITION,
-        /** Its {@code .until} says yes. */
+        /** Its {@code .until} says yes: for good. */
         ENDED,
-        /** A {@code .once()} action, done. */
+        /** A {@code .once()} action, done: for good. */
         DONE_FOR_GOOD,
-        /** Its check said no, and its retry lets it no more. */
+        /** Its check said no, and its retry lets it no more: for good. */
         GIVEN_UP,
-        /** No way on the map leads to its screen from where the game is. */
-        NO_WAY_THERE
+        /** No way on the map leads to its screen from where the game is now: for now. */
+        NO_WAY_THERE;
+
+        /** Whether what blocks it may change while the run goes on, so a later round looks again. */
+        public boolean forNow() {
+            return this == INPUT || this == CONDITION || this == NO_WAY_THERE;
+        }
     }
 
     /** Whether {@code why} leaves the action a choice. */
@@ -97,6 +109,7 @@ public record Round(OptionalInt tier, List<Step> route, List<Step> onTheWay, Lis
             case Why.Blocked ignored -> false;
             case Why.CannotMeet ignored -> false;
             case Why.TooDeep ignored -> false;
+            case Why.Loop ignored -> false;
         };
     }
 }

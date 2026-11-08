@@ -305,7 +305,10 @@ class PlannerTest {
         Round round = round(Plan.of(Plan.tier(goal)));
 
         assertEquals(OptionalInt.empty(), round.tier());
-        assertEquals(Optional.of(NOON.plus(Duration.ofMinutes(20))), round.due(), "thirty minutes by default");
+        assertEquals(new Why.Waiting(NOON.plus(Duration.ofMinutes(20))), why(round, "SHOP.claim"),
+                "thirty minutes by default");
+        assertEquals(Optional.of(NOON.plus(Planner.RECHECK)), round.due(),
+                "the need saying no is looked at again sooner, as it may change first");
     }
 
     @Test
@@ -363,7 +366,7 @@ class PlannerTest {
 
         Round round = round(Plan.of(Plan.tier(goal)));
 
-        assertEquals(new Why.Blocked(Block.INPUT), why(round, "HOME.locked"));
+        assertEquals(new Why.Blocked(Block.NEVER), why(round, "HOME.locked"), "marked never: for good");
         assertEquals(new Why.Blocked(Block.ENDED), why(round, "HOME.ended"));
     }
 
@@ -476,7 +479,7 @@ class PlannerTest {
 
         Round round = Planner.round(new PlanModel(Plan.of(Plan.tier(goal)), ScreenGraph.of(screens), records(), "HOME"));
 
-        assertEquals(new Why.Blocked(Block.INPUT), why(round, "HOME.take"));
+        assertEquals(new Why.Blocked(Block.NEVER), why(round, "HOME.take"), "its strip's never is its own");
     }
 
     @Test
@@ -484,7 +487,67 @@ class PlannerTest {
         Goal goal = unmet();
         on("HOME", "name", Do.press(click("name").typed()).serves(goal));
 
-        assertEquals(new Why.Blocked(Block.INPUT), why(round(Plan.of(Plan.tier(goal))), "HOME.name"));
+        assertEquals(new Why.Blocked(Block.NO_INPUT), why(round(Plan.of(Plan.tier(goal))), "HOME.name"));
+    }
+
+    @Test
+    void aGoalBlockedForNowWaitsAndTheTierBelowActs() {
+        Goal energy = unmet();
+        Goal gold = unmet();
+        on("SHOP", "buyEnergy", press("buyEnergy").serves(energy).needs((Condition) () -> Answer.NO));
+        on("HOME", "sell", press("sell").serves(gold));
+
+        Round round = round(Plan.of(Plan.tier(energy), Plan.tier(gold)));
+
+        assertEquals(new Why.Blocked(Block.CONDITION), why(round, "SHOP.buyEnergy"));
+        assertEquals(OptionalInt.of(1), round.tier(), "a need saying no for now holds its tier as waiting, not stuck");
+        assertEquals(List.of("HOME.sell"), keys(round.route()));
+        assertEquals(Optional.of(NOON.plus(Planner.RECHECK)), round.due(), "looked at again in a minute");
+    }
+
+    @Test
+    void aGoalBlockedForGoodHoldsItsTier() {
+        Goal goal = unmet();
+        Goal below = unmet();
+        on("HOME", "name", Do.press(click("name").typed()).serves(goal));
+        on("HOME", "sell", press("sell").serves(below));
+
+        Round round = round(Plan.of(Plan.tier(goal), Plan.tier(below)));
+
+        assertEquals(OptionalInt.of(0), round.tier(), "nothing will ever change for it: its tier is taken, and stuck");
+        assertEquals(List.of(), round.route());
+        assertEquals(Optional.empty(), round.due());
+    }
+
+    @Test
+    void goalsThatNeedEachOtherAreALoop() {
+        Goal a = unmet();
+        Goal b = unmet();
+        on("HOME", "x", press("x").serves(a).needs(b));
+        on("HOME", "y", press("y").serves(b).needs(a));
+
+        Round round = round(Plan.of(Plan.tier(a)));
+
+        assertEquals(new Why.Loop(a), why(round, "HOME.y"), "said as a loop, not as too deep");
+        assertEquals(new Why.CannotMeet(b), why(round, "HOME.x"));
+    }
+
+    @Test
+    void aLoopOnOnePathIsNoVerdictOnAnother() {
+        Goal a = unmet();
+        Goal b = unmet();
+        Goal c = unmet();
+        on("HOME", "x", press("x").serves(a).needs(b));
+        on("HOME", "z", press("z").serves(a));
+        on("HOME", "y", press("y").serves(b).needs(a));
+        on("HOME", "w", press("w").serves(c).needs(b));
+
+        Round round = round(Plan.of(Plan.tier(a), Plan.tier(c)));
+
+        Round below = round(Plan.of(Plan.tier(c)));
+        assertEquals(new Why.Needs(b, 2), why(below, "HOME.w"), "b through y, after a through z");
+        assertEquals(new Why.Needs(b, 2), why(round, "HOME.w"),
+                "the same with a resolved first: b's loop under a holds only there");
     }
 
     @Test

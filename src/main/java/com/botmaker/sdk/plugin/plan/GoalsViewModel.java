@@ -67,7 +67,7 @@ public final class GoalsViewModel {
         /** Whether the planner could take it now. */
         public boolean possible() {
             return !(why instanceof Why.Waiting || why instanceof Why.Blocked || why instanceof Why.CannotMeet
-                    || why instanceof Why.TooDeep);
+                    || why instanceof Why.TooDeep || why instanceof Why.Loop);
         }
     }
 
@@ -168,6 +168,8 @@ public final class GoalsViewModel {
             case Why.Waiting waiting -> "waits until " + time(waiting.until());
             case Why.Blocked blocked -> switch (blocked.block()) {
                 case INPUT -> "input not pressable";
+                case NO_INPUT -> "no such input";
+                case NEVER -> "input marked never";
                 case CONDITION -> "a need says no";
                 case ENDED -> "its until holds";
                 case DONE_FOR_GOOD -> "done, once";
@@ -176,6 +178,7 @@ public final class GoalsViewModel {
             };
             case Why.CannotMeet cannot -> "needs " + plan.name(cannot.goal()).orElse("a goal") + ", unmet";
             case Why.TooDeep deep -> "needs " + plan.name(deep.goal()).orElse("a goal") + ", too deep";
+            case Why.Loop loop -> "needs " + plan.name(loop.goal()).orElse("a goal") + ", which needs it";
         };
     }
 
