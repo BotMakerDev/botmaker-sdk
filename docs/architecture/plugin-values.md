@@ -13,7 +13,12 @@ activities by its own chain (`.tags(List.of(Tags.UI)).activities(List.of(Activit
 **`Tags.java`** (`TAGS`: one `PictureTag.named("UI")` per custom tag 🖼 Manage Pictures groups pictures under,
 which a picture refers to by its constant), and
 **`Activities.java`** (`ACTIVITIES`: one nested `enum Collect implements Outcome { NEXT, NOTHING_LEFT }` per
-activity, each name's label its words). Beside them the host writes **`Zones.java`** (`ZONES`, 2026-10-11):
+activity, each name's label its words),
+**`Goals.java`** (`GOALS`, an open set, 2026-11-06: one `Goal` constant per thing the bot wants, `Goal.of(Need.atLeast(
+Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)` or `Goal.done(() -> Screens.HOME.claim).within(…)`) and
+**`Plans.java`** (`PLANS`: one `Plan` constant per plan, its tiers of goals, `Plan.of(Plan.tier(Goals.A), …)`). What
+is done on a screen is a `Do` field of that screen in `Screens.java`, beside the input it presses, never a value of its
+own (`screens.md` § Actions). Beside them the host writes **`Zones.java`** (`ZONES`, 2026-10-11):
 named `Zone`s in the bot's pixels from the game's corner, which the assistant's `save_region` adds and a run
 places on the live game (`internal/vision/Places`). `Spots.java` (`SPOTS`) went on 2026-10-15: a bot clicks
 pictures, never places. They replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
@@ -26,7 +31,8 @@ a body that is not exactly `return <expr>;` is read-only with a reason, and Stud
 canvas while this plugin is loaded (its values change in this plugin's windows). A project without them gets
 them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 
-**A parameter is the user's, and private (2026-11-04).** `FLOW` and `DO_SETUP` are methods of
+**A parameter is the user's, and private (2026-11-04).** `ROUTINE` (what a run runs, a `Flow` or a `Plan`, picked in
+the Runner, 2026-11-06; it replaces `FLOW`, deprecated and read while `ROUTINE` is `Flow.NONE`) and `DO_SETUP` are methods of
 `params/com_github_botmakerdev/botmaker_sdk/Running.java`, `LAUNCH_TARGET` and `CAPTURE` of `Game.java` beside it
 (`Holder.RUNNING`, `Holder.GAME`, 2026-11-05; each group is a category), this computer's and never committed, with the
 author's starting values in `starting-params/` at the same paths; `ParamGroups` finds the groups from the holder

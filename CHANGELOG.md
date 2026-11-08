@@ -50,18 +50,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   pick the flow again under `routine` in the Runner.
 - **`Condition.nor`, `nand`, `xor` and `xnor`** (2026-11-06), three-valued like `all` and `any`: `xor` and `xnor`
   answer unknown while any part is unknown.
-- **A planner can choose what a plan does next** (2026-11-06). It is inside the SDK and nothing calls it yet, so a bot
-  sees no change: an `.over` cycle is refused only once a plan runs.
+- **A planner chooses what a plan does next** (2026-11-06): the tier, the goal, the action and the route to it, and
+  why each other action is no choice. An `.over` cycle is refused when a plan runs.
 - **Goals and plans can be written down** (2026-11-06). `Goal.of(Need.atLeast(Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)`
   or `Goal.done(() -> Screens.MARKET.claim).within(Duration.ofDays(1))` says what is wanted, and `Plan.of(Plan.tier(…),
   Plan.tier(…))` what matters most. `Need` also has `atMost`, `above`, `below`, `is`, `not` and `equalTo`; a fact unknown
-  or stale answers unknown. Nothing runs a plan yet.
+  or stale answers unknown.
 - **A screen says what is done on it** (2026-11-06). `Do.press(chest)` is a field of its screen beside the input it
   presses, and says what it serves, needs and how often: `.serves`, `.needs`, `.first`, `.last`, `.over`, `.every`,
   `.daily`, `.once`, `.until`, `.checks`, `.onFail`. One marked `.onSight()` is done whenever a run's walk comes to its
   screen, it shows and it is ready: an ad closed, a free reward taken. `Navigate.press(Screens.MARKET.claim)` presses one
-  from a flow. Either way the bot's `.botmaker` folder keeps when it was last done and whether its check held. The
-  planner that chooses among the rest comes next, and the map does not show actions yet.
+  from a flow. Either way the bot's `.botmaker` folder keeps when it was last done and whether its check held. A plan
+  run chooses among the rest, and 🎯 Goals shows them.
 - **A screen can hold your own Java as an input** (2026-11-06). `Custom.of(Puzzles::solve)` is a field of its screen
   like a button, for what is no press: a puzzle solved, a swipe computed. `Navigate.press(Screens.PUZZLE.solve)`, or a
   walk through it, runs the method once. Discovery and ExploreMap never run it, and the map shows it with a `</>` sign
