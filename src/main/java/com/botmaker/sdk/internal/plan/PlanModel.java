@@ -30,6 +30,9 @@ import java.util.stream.Collectors;
  */
 public final class PlanModel {
 
+    /** A plan of one goal nothing answers, for what reads only the map's actions: a plan holds a tier. */
+    public static final Plan NO_PLAN = Plan.of(Plan.tier(Goal.of((Condition) () -> Answer.UNKNOWN)));
+
     private final Plan plan;
     private final ScreenGraph map;
     private final DoneRecords records;
@@ -66,6 +69,16 @@ public final class PlanModel {
         }));
         this.actions = List.copyOf(all);
         for (Step step : actions) readOver(step.action(), new ArrayList<>());
+    }
+
+    /** The sentence a model over {@code map} would refuse its {@code .over}s with; empty when they make no circle. */
+    public static Optional<String> overCycle(ScreenGraph map) {
+        try {
+            new PlanModel(NO_PLAN, map, DoneRecords.none(), null);
+            return Optional.empty();
+        } catch (IllegalArgumentException cycle) {
+            return Optional.of(cycle.getMessage());
+        }
     }
 
     /** The plan. */

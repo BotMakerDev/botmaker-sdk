@@ -19,6 +19,7 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.flow.FlowLayout;
 import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.api.geometry.Zone;
@@ -82,6 +83,18 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.PLANS)
             .because("These are the bot's plans: what matters most, as tiers of the goals in Goals.java. Pick one"
                     + " in the Runner to run it.");
+
+    /**
+     * The goals — {@code static final Goal ENOUGH_GOLD = Goal.of(…)}, each what is wanted, named by the actions that
+     * serve it and the plans that order it. A reference to one, inside an action's {@code .serves(…)} or a tier, reads
+     * as its name.
+     */
+    public static final ManagedOpenSet.OfConstants<Goal> GOALS = ManagedValue.openSet(SdkValue.Id.GOALS)
+            .of(Goal.class)
+            .referredToAs(BotConstants::goal)
+            .in(SdkValue.Holder.GOALS)
+            .because("These are the bot's goals: what is wanted, served by the actions of Screens.java and ordered"
+                    + " by the plans of Plans.java. See them in 🎯 Goals.");
 
     /** The game's home and setup — {@code Run.of().home(…)}. */
     public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
@@ -313,7 +326,7 @@ public final class SdkValues implements ValueHolder {
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(FLOWS, PLANS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS,
+        return List.of(FLOWS, PLANS, GOALS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS,
                 STATES, SCREEN_MAP, SCREEN, SHADES, ROUTINE, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
     }
 

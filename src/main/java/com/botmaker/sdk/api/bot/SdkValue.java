@@ -66,6 +66,11 @@ public @interface SdkValue {
          */
         PLANS,
         /**
+         * The bot's goals, each what is wanted as a check or as an action done — a class of {@code Goal} constants,
+         * {@code Goals.java}, named by the actions that serve them and the plans that order them.
+         */
+        GOALS,
+        /**
          * The game's home and setup, which no flow owns — a {@code Run} method.
          */
         RUN,
@@ -154,6 +159,7 @@ public @interface SdkValue {
         GAME,
         FLOWS,
         PLANS,
+        GOALS,
         PICTURES,
         TAGS,
         ACTIVITIES,

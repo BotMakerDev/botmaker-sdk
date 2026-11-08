@@ -38,7 +38,8 @@ import java.util.function.UnaryOperator;
  * @param inputs   its inputs, field name to input
  * @param readouts what it shows to be read, field name to readout
  * @param marks    the signs that tell it and are never pressed, field name to mark
- * @param actions  what is done on it, field name to action: only a run's map holds any, Studio's tools read none yet
+ * @param actions  what is done on it, field name to action: a run's map holds the live ones, Studio's the ones read
+ *                 from {@code Screens.java}, whose {@code .over(() -> …)} names another by reference
  */
 public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Readout> readouts,
                         Map<String, Mark> marks, Map<String, Do> actions) {
@@ -248,6 +249,13 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         Map<String, Mark> now = new LinkedHashMap<>(marks);
         now.put(field, mark);
         return new MapScreen(setup, inputs, readouts, now, actions);
+    }
+
+    /** This screen with {@code action} as its field {@code field}: in its place, or added last. */
+    public MapScreen withAction(String field, Do action) {
+        Map<String, Do> now = new LinkedHashMap<>(actions);
+        now.put(field, action);
+        return new MapScreen(setup, inputs, readouts, marks, now);
     }
 
     /** This screen without its mark {@code field}. */

@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Readout;
@@ -62,11 +63,17 @@ public final class ScreenMapRead {
                 MapScreen screen = member.grouped() ? screens.get(member.group()) : null;
                 if (screen == null) continue;
                 inputs++;
-                part(values, member).ifPresent(part -> screens.put(member.group(), switch (part) {
+                Optional<ScreenPart> read = part(values, member);
+                read.ifPresent(part -> screens.put(member.group(), switch (part) {
                     case Input input -> screens.get(member.group()).withInput(member.name(), input);
                     case Readout readout -> screens.get(member.group()).withReadout(member.name(), readout);
                     case Mark mark -> screens.get(member.group()).withMark(member.name(), mark);
                 }));
+                // What is done there is no part of what it shows, but a field of it all the same (2026-11-06).
+                if (read.isEmpty()) {
+                    action(values, member).ifPresent(action -> screens.put(member.group(),
+                            screens.get(member.group()).withAction(member.name(), action)));
+                }
             }
         }
         Diag.log("map read: " + screens.size() + " screens, " + inputs + " inputs in "
@@ -95,6 +102,26 @@ public final class ScreenMapRead {
         return values.open(SdkValues.SCREEN_MAP, member)
                 .flatMap(ctx -> ctx.value(Input.class).<ScreenPart>map(input -> input)
                         .or(() -> ctx.value(Readout.class)).or(() -> ctx.value(Mark.class)));
+    }
+
+    /** The action {@code member} holds, {@code Do.press(…)} and its links; empty when there is none the grammar reads. */
+    public static Optional<Do> action(PluginValues values, Member member) {
+        return values.open(SdkValues.SCREEN_MAP, member).flatMap(ctx -> ctx.value(Do.class));
+    }
+
+    /**
+     * Writes {@code action} as {@code constant}'s field {@code field}, which holds one already. Empty when written,
+     * else why not. On the FX thread.
+     */
+    public static Optional<String> writeAction(PluginValues values, String constant, String field, Do action) {
+        try {
+            return values.open(SdkValues.SCREEN_MAP, Member.of(constant, field))
+                    .map(ctx -> ctx.write(action))
+                    .orElse(Optional.of(HOLDER + "." + constant + "." + field + " is written by hand, so it is left as"
+                            + " it is."));
+        } finally {
+            forget();
+        }
     }
 
     /**

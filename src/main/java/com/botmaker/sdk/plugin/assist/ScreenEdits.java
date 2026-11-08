@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -36,10 +37,14 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
+import com.botmaker.sdk.plugin.plan.GoalsViewModel.Mark;
+import com.botmaker.sdk.plugin.plan.StudioPlan;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
 import java.awt.image.BufferedImage;
@@ -56,6 +61,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
@@ -1335,6 +1341,89 @@ public final class ScreenEdits {
         } catch (NumberFormatException notOne) {
             return null;
         }
+    }
+
+    // --- what is done on a screen: the Goals view's drags (2026-11-06) -------------------------------------------
+
+    /**
+     * Has the action {@code constant}.{@code field} tried before the action {@code aboveScreen}.{@code aboveField}: one
+     * {@code .over(() -> Screens.<aboveScreen>.<aboveField>)} more, written as one step of Studio's history. Refused
+     * with the planner's sentence when the two would then each come before the other, through any chain of
+     * {@code .over}s.
+     */
+    public static String setOver(StudioServices services, String constant, String field, String aboveScreen,
+                                 String aboveField) {
+        return writeAction(services, constant, field, action -> over(action, aboveScreen, aboveField),
+                field + " is tried before " + aboveScreen + "." + aboveField + ".");
+    }
+
+    /** Puts the action {@code constant}.{@code field} first among those serving its goals, or last, or neither. */
+    public static String setMark(StudioServices services, String constant, String field, Mark mark) {
+        return writeAction(services, constant, field, action -> marked(action, mark), switch (mark) {
+            case FIRST -> field + " is tried first.";
+            case LAST -> field + " is tried last, when nothing else can be.";
+            case NONE -> field + " is tried in its turn.";
+        });
+    }
+
+    private static String writeAction(StudioServices services, String constant, String field, UnaryOperator<Do> change,
+                                      String done) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return NOT_WRITTEN + "Studio has no source tree open.";
+        ScreenGraph map = ScreenMapRead.read(services);
+        Optional<Do> now = map.screen(constant).map(screen -> screen.actions().get(field));
+        if (now.isEmpty()) return NOT_WRITTEN + constant + "." + field + " is no action of the map.";
+        Do next = change.apply(now.get());
+        Optional<String> refused = refusedOver(map, constant, field, next);
+        if (refused.isPresent()) return NOT_WRITTEN + refused.get();
+        return said(ScreenBook.step(services, "Edit " + constant + "." + field,
+                () -> ScreenMapRead.writeAction(values, constant, field, next)), done);
+    }
+
+    /**
+     * {@code action} with one {@code .over} more, naming {@code screen}.{@code field} as Studio's Java does, by
+     * reference; itself when it names that one already.
+     */
+    static Do over(Do action, String screen, String field) {
+        InputName named = new InputName(screen, field);
+        // Read, a supplier gives the field's reference though typed as a Do.
+        boolean already = action.over().stream().<Object>map(Supplier::get)
+                .anyMatch(each -> each instanceof Input input && named.equals(BotConstants.inputName(input)));
+        return already ? action : action.over(reference(screen, field));
+    }
+
+    /** {@code () -> Screens.<screen>.<field>}, as the grammar reads it: the field's reference wherever a Do is asked. */
+    @SuppressWarnings("unchecked")
+    static Supplier<Do> reference(String screen, String field) {
+        Supplier<?> named = new Reference(screen, field);
+        return (Supplier<Do>) named;
+    }
+
+    /** {@link #reference}: equal by the field it names, so two drags onto one row make equal actions. */
+    private record Reference(String screen, String field) implements Supplier<Input> {
+        @Override
+        public Input get() {
+            return BotConstants.input(screen, field);
+        }
+    }
+
+    /** {@code action} put first, last, or neither. */
+    static Do marked(Do action, Mark mark) {
+        return new Do(action.input(), action.serves(), action.goalNeeds(), action.conditionNeeds(), mark == Mark.FIRST,
+                mark == Mark.LAST, action.over(), action.isOnSight(), action.every(), action.daily(), action.isOnce(),
+                action.until(), action.checks(), action.onFail());
+    }
+
+    /**
+     * The planner's sentence when {@code map}, its action {@code constant}.{@code field} being {@code next}, has
+     * actions each tried before the next in a circle; empty when it has none.
+     */
+    static Optional<String> refusedOver(ScreenGraph map, String constant, String field, Do next) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map.screens());
+        MapScreen screen = screens.get(constant);
+        if (screen == null) return Optional.empty();
+        screens.put(constant, screen.withAction(field, next));
+        return PlanModel.overCycle(StudioPlan.of(PlanModel.NO_PLAN, Map.of(), ScreenGraph.of(screens)).map());
     }
 
     private static String said(Optional<String> failed, String done) {

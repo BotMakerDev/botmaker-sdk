@@ -25,6 +25,10 @@ import java.util.function.Supplier;
  * {@link ScreenPart}: what a screen shows is what the map tells it by, what is done there says nothing of that.
  * {@link Navigate#press(Do)} presses one from a flow and keeps its done-record.
  *
+ * <p>Studio reads and writes it as {@code Do.press(…)} and its links ({@code PlanTypes.DO_SHAPE}): the two
+ * {@code needs} and the conditions {@code until} and {@code checks} are declared there, since a condition crosses as
+ * its method reference's text.
+ *
  * @param input          what it presses
  * @param serves         the goals it is meant to meet
  * @param goalNeeds      the goals that must be met first
@@ -67,14 +71,12 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     }
 
     /** These goals must be met first: an unmet one becomes a sub-goal. */
-    @Link
     public Do needs(Goal... goals) {
         return new Do(input, serves, plus(goalNeeds, goals), conditionNeeds, isFirst, isLast, over, isOnSight, every,
                 daily, isOnce, until, checks, onFail);
     }
 
     /** These must hold first: one that says no only blocks. */
-    @Link
     public Do needs(Condition... conditions) {
         return new Do(input, serves, goalNeeds, plus(conditionNeeds, conditions), isFirst, isLast, over, isOnSight,
                 every, daily, isOnce, until, checks, onFail);
@@ -138,14 +140,12 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     }
 
     /** Not done once {@code condition} says yes: "fight until the enemy falls". */
-    @Link
     public Do until(Condition condition) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
                 condition, checks, onFail);
     }
 
     /** How a run knows it worked: it held unless {@code condition} says no. */
-    @Link
     public Do checks(Condition condition) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
                 until, condition, onFail);

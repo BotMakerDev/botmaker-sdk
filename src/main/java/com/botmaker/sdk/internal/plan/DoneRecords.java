@@ -70,6 +70,16 @@ public final class DoneRecords {
         return Run.RECORDS;
     }
 
+    /** The records kept in the SDK's state folder {@code folder}, as Studio reads a bot's; timed by {@code clock}. */
+    public static DoneRecords in(Path folder, Clock clock) {
+        return new DoneRecords(folder.resolve(FILE), clock);
+    }
+
+    /** No records, kept nowhere: what a check that only reads the map plans with. */
+    public static DoneRecords none() {
+        return new DoneRecords(null, Clock.systemDefaultZone());
+    }
+
     /** The key of the action {@code field} of the screen {@code constant}. */
     public static String key(String constant, String field) {
         return constant + "." + field;
@@ -112,7 +122,7 @@ public final class DoneRecords {
 
     private static Map<String, Done> read(Path file) {
         Map<String, Done> read = new LinkedHashMap<>();
-        if (!Files.isRegularFile(file)) return read;
+        if (file == null || !Files.isRegularFile(file)) return read;
         try {
             JSON.readTree(file.toFile()).properties().forEach(e -> done(e.getValue()).ifPresent(d -> read.put(e.getKey(), d)));
         } catch (IOException unreadable) {
@@ -132,6 +142,7 @@ public final class DoneRecords {
     }
 
     private void write() {
+        if (file == null) return;
         ObjectNode all = JSON.createObjectNode();
         done.forEach((key, d) -> all.putObject(key).put("at", d.at().toString()).put("held", d.held())
                 .put("fails", d.fails()));

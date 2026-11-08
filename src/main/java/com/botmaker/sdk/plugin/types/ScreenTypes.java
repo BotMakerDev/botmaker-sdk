@@ -483,7 +483,7 @@ public final class ScreenTypes implements TypeHolder {
 
     /** The method reference of the parameter {@code check} tests, {@code Progress::gold}, or {@code ""}. */
     public static String factOf(BooleanSupplier check) {
-        return check instanceof ParamCheck(Params.When<?> when, var test, var value)
+        return check instanceof ParamCheck(Params.When<?> when, var test, var value, var byNeed)
                 && when.parameter() instanceof NamedParameter(String source) ? source : "";
     }
 
@@ -493,7 +493,7 @@ public final class ScreenTypes implements TypeHolder {
      */
     public static String sourceOf(BooleanSupplier condition) {
         if (condition instanceof NamedCondition(String source)) return source;
-        if (!(condition instanceof ParamCheck(var when, ParamCheck.Test test, Object value))) return "";
+        if (!(condition instanceof ParamCheck(var when, ParamCheck.Test test, Object value, var byNeed))) return "";
         String fact = factOf(condition);
         return switch (test) {
             case AT_LEAST -> fact + " at least " + value;

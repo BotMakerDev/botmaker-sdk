@@ -7,6 +7,7 @@ import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
+import com.botmaker.sdk.plugin.plan.GoalsView;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
@@ -41,6 +42,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
     public static final String BOT_SETTINGS_ID = "bot-settings";
     public static final String ACTIVITY_FLOW_ID = "activity-flow";
     public static final String SCREEN_MAP_ID = "screen-map";
+    public static final String GOALS_ID = "goals";
     public static final String MANAGE_PICTURES_ID = "manage-templates";
     public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
     public static final String PILOT_ID = "pilot";
@@ -90,6 +92,13 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onBar(60)
             .onPress(() -> ScreenMap::open);
 
+    /** Beside the map: the goals of a plan and what the bot would do for each, in its order (2026-11-06). */
+    public static final ToolbarItem GOALS = ToolbarItem.id(GOALS_ID).label("🎯 Goals")
+            .tooltip("The goals of a plan and the actions serving each, in the order a run would try them, with the "
+                    + "screens crossed to reach one; drag a row to reorder")
+            .onBar(65)
+            .onPress(() -> GoalsView::open);
+
     public static final ToolbarItem MANAGE_PICTURES = ToolbarItem.id(MANAGE_PICTURES_ID).label("🖼 Manage Pictures")
             .tooltip("Rename, retag, replace, delete, import and export the pictures the bot looks for — "
                     + "a rename carries every block that uses it")
@@ -125,7 +134,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
     public static final List<ToolbarItem> ALL = List.of(GAME, PROJECT_SETUP, CAPTURE_SOURCE, BOT_SETTINGS,
-            ACTIVITY_FLOW, SCREEN_MAP, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
+            ACTIVITY_FLOW, SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 

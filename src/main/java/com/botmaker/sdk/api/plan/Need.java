@@ -2,6 +2,8 @@ package com.botmaker.sdk.api.plan;
 
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.internal.params.ParamCheck;
+import com.botmaker.sdk.internal.params.ParamCheck.Test;
 import com.botmaker.sdk.internal.params.RunParams;
 
 import java.util.Objects;
@@ -19,12 +21,12 @@ public final class Need {
 
     /** Yes when the fact is {@code limit} or more. */
     public static <G, T extends Number & Comparable<T>> Condition atLeast(Params.Of<G, T> fact, T limit) {
-        return when(fact).atLeast(Objects.requireNonNull(limit, "limit"));
+        return test(fact, Test.AT_LEAST, Objects.requireNonNull(limit, "limit"));
     }
 
     /** Yes when the fact is {@code limit} or less. */
     public static <G, T extends Number & Comparable<T>> Condition atMost(Params.Of<G, T> fact, T limit) {
-        return when(fact).atMost(Objects.requireNonNull(limit, "limit"));
+        return test(fact, Test.AT_MOST, Objects.requireNonNull(limit, "limit"));
     }
 
     /** Yes when the fact is more than {@code limit}. */
@@ -39,7 +41,7 @@ public final class Need {
 
     /** Yes when the fact is true. */
     public static <G> Condition is(Params.Of<G, Boolean> fact) {
-        return when(fact).isTrue();
+        return test(fact, Test.IS_TRUE, null);
     }
 
     /** Yes when the fact is false. */
@@ -49,11 +51,12 @@ public final class Need {
 
     /** Yes when the fact equals {@code wanted}: a number, a text, an enum constant or a time. */
     public static <G, T extends Comparable<? super T>> Condition equalTo(Params.Of<G, T> fact, T wanted) {
-        return when(fact).is(Objects.requireNonNull(wanted, "wanted"));
+        return test(fact, Test.IS, Objects.requireNonNull(wanted, "wanted"));
     }
 
-    private static <G, T> Params.When<T> when(Params.Of<G, T> fact) {
+    /** The test, marked as written by {@code Need} so Studio writes it back so; a fact no parameter names is refused. */
+    private static <G, T> Condition test(Params.Of<G, T> fact, Test test, Object value) {
         RunParams.parameterOf(fact);
-        return Params.when(fact);
+        return new ParamCheck(Params.when(fact), test, value, true);
     }
 }

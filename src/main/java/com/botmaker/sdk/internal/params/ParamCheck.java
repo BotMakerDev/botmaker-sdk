@@ -15,11 +15,13 @@ import java.util.Optional;
  * <p>A value, equal by what it tests, so the editor reads the chain into one and writes it back by the link that
  * rebuilds it equal ({@code ScreenTypes}).
  *
- * @param when  the parameter tested
- * @param test  how its value is tested
- * @param value the limit, or the value wanted; {@code null} for {@link Test#IS_TRUE}
+ * @param when   the parameter tested
+ * @param test   how its value is tested
+ * @param value  the limit, or the value wanted; {@code null} for {@link Test#IS_TRUE}
+ * @param byNeed whether it was written {@code Need.atLeast(Progress::gold, 5)} rather than through {@code Params.when}:
+ *               the same test, kept apart only so each is written back as it was (2026-11-06)
  */
-public record ParamCheck(Params.When<?> when, Test test, Object value) implements Condition {
+public record ParamCheck(Params.When<?> when, Test test, Object value, boolean byNeed) implements Condition {
 
     /** How a parameter's value is tested: one per link of {@code Params.When}. */
     public enum Test { AT_LEAST, AT_MOST, IS, IS_TRUE }
@@ -27,6 +29,11 @@ public record ParamCheck(Params.When<?> when, Test test, Object value) implement
     public ParamCheck {
         Objects.requireNonNull(when, "when");
         Objects.requireNonNull(test, "test");
+    }
+
+    /** A test written through {@code Params.when}. */
+    public ParamCheck(Params.When<?> when, Test test, Object value) {
+        this(when, test, value, false);
     }
 
     @Override

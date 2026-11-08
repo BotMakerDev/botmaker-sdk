@@ -144,6 +144,18 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   line carrying `plan.goal` and `plan.action` (`PlanValues`). `Bot.runFlow` runs the `routine` parameter
   (`SdkValue.Id.ROUTINE`): a flow by `FlowWalker`, a plan by `RunGame`; while it is `Flow.NONE`, the deprecated
   `flow` parameter's value, gone next release. The Runner's flow row lists the bot's plans below its flows.
+- **🎯 Goals** (`plugin/plan`, 2026-11-06, layout A) shows a plan in Studio, read from the bot's Java.
+  - **How Studio reads it.** `PlanTypes` declares how `Plan`, `Goal`, `Need`, `Do` and `Retry` are written.
+    `ScreenMapRead.of` keeps each `Do` field of a screen as `MapScreen.actions`. Read, a value names another only
+    by reference: `Goals.X` reads as `BotConstants.goal`, `() -> Screens.S.f` as a supplier of the field's
+    reference. `StudioPlan.of` swaps each reference for what it names, so the planner reads it as a run does.
+  - **What it shows.** `GoalsViewModel` is pure: one card per goal, in tier order, its rows in `Planner.round`'s
+    `considered` order. A row's route is `Planner.way` from where the game is, so only the screens it crosses.
+  - **Edits.** `GoalsView` writes through `ScreenEdits.setOver` and `setMark`. A drag that makes the `.over`s
+    loop is refused with `PlanModel.overCycle`'s sentence.
+  - **During a run.** It marks the action from each trace line's `plan.action` (`Runs.onTrace`). The plan values
+    ride on trace lines, not telemetry frames.
+  - **Records.** It reads the bot's done-records from `StudioServices.stateDir()`. It never writes them.
 - **Places** (the user's calls, 2026-10-22): `Place.above/below/leftOf/rightOf/nearest(anchor)` and
   `between(a, b)`, the anchor a picture or a `Caption`, found on the same frame. `Button.place(place)` keeps a button
   only where its place says (the Claim on Daily's row); `Pick.at(place)` picks a copy from a body. Column and row are

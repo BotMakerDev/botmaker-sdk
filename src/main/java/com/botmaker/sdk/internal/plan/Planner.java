@@ -60,6 +60,14 @@ public final class Planner {
         return new Planner(model).round();
     }
 
+    /**
+     * The way a walk under {@code model} takes from {@code from} to {@code to}, as a round would: what the Goals view
+     * draws for one action. Empty when none leads there now.
+     */
+    public static Optional<List<Edge>> way(PlanModel model, String from, String to) {
+        return new Planner(model).way(from, to);
+    }
+
     /** Whether {@code screen} is one of {@code crossed} or one step off one of them and back, as on-the-way is. */
     static boolean near(PlanModel model, List<String> crossed, String screen) {
         return new Planner(model).nearCrossed(crossed, screen).isPresent();

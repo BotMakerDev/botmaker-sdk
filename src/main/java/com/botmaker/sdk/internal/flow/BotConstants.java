@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The bot's own activities and outcomes by name — what an editor that cannot load the bot's classes holds
@@ -120,6 +121,31 @@ public final class BotConstants {
 
     /** The check of {@link #plan}'s one goal: a name, which nothing can answer. */
     private record PlanReference(String name) implements Condition {
+        @Override
+        public Answer answer() {
+            return Answer.UNKNOWN;
+        }
+    }
+
+    /**
+     * The bot's goal {@code name}, {@code Goals.ENOUGH_GOLD}, as an editor holds a reference to it — inside an action's
+     * {@code .serves(…)} or a plan's tier: a goal whose check is the name alone, equal to another only when it names
+     * the same constant. A run never meets one: there the bot's constant is the goal.
+     *
+     * @throws IllegalArgumentException for a blank name, which names no constant
+     */
+    public static Goal goal(String name) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A goal reference needs a name");
+        return Goal.of(new GoalReference(name));
+    }
+
+    /** The constant {@code goal} names when it is a {@link #goal} reference; empty otherwise. */
+    public static Optional<String> goalName(Goal goal) {
+        return goal instanceof Goal.Of(GoalReference(String name)) ? Optional.of(name) : Optional.empty();
+    }
+
+    /** The check of a {@link #goal} reference: a name, which nothing can answer. */
+    private record GoalReference(String name) implements Condition {
         @Override
         public Answer answer() {
             return Answer.UNKNOWN;

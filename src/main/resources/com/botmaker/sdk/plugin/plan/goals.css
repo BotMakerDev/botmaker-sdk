@@ -1,0 +1,114 @@
+/*
+ * 🎯 Goals' look (GoalsView). Every colour resolves a -bm-* token the host's theme publishes on the scene root, so the
+ * view follows the editor into a dark theme without this file knowing what the themes are. A state is said by a word
+ * as well as a colour: a row says why in words, a card whether it is met.
+ */
+
+.goals-view {
+    -bm-goals-card: -fx-control-inner-background;
+    -bm-goals-line: -bm-divider;
+    -bm-goals-chosen: -bm-accent;
+    -bm-goals-off: -bm-muted;
+    -bm-goals-met: -bm-severity-ok-text;
+    -bm-goals-unmet: -bm-severity-warning;
+}
+
+.goals-bar {
+    -fx-padding: 6 8;
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+}
+
+.goals-cards {
+    -fx-padding: 8;
+    -fx-spacing: 10;
+}
+
+.goals-card {
+    -fx-background-color: -bm-goals-card;
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-goals-line;
+    -fx-border-radius: 8;
+    -fx-padding: 8;
+    -fx-spacing: 4;
+}
+
+.goals-card-name {
+    -fx-font-weight: bold;
+}
+
+.goals-fill {
+    -fx-text-fill: -bm-goals-off;
+}
+
+.goals-met {
+    -fx-text-fill: -bm-goals-met;
+}
+
+.goals-unmet {
+    -fx-text-fill: -bm-goals-unmet;
+}
+
+.goals-drop {
+    -fx-padding: 1 6;
+    -fx-background-radius: 6;
+    -fx-border-color: -bm-goals-line;
+    -fx-border-radius: 6;
+}
+
+.goals-drop:target,
+.goals-row:target {
+    -fx-border-color: -bm-goals-chosen;
+    -fx-border-width: 0 0 2 0;
+}
+
+.goals-row {
+    -fx-padding: 3 6;
+    -fx-spacing: 8;
+    -fx-background-radius: 6;
+    -fx-alignment: center-left;
+    -fx-cursor: hand;
+}
+
+.goals-row:hover {
+    /* A see-through grey lightens a dark card and darkens a light one alike, in either theme. */
+    -fx-background-color: rgba(128, 128, 128, 0.18);
+}
+
+.goals-row:selected {
+    -fx-background-color: derive(-bm-goals-chosen, 60%);
+}
+
+.goals-row:running {
+    -fx-border-color: -bm-goals-chosen;
+    -fx-border-width: 0 0 0 3;
+}
+
+.goals-row:off .label {
+    -fx-text-fill: -bm-goals-off;
+}
+
+.goals-row-why,
+.goals-row-screen,
+.goals-row-walk {
+    -fx-text-fill: -bm-goals-off;
+}
+
+.goals-stop {
+    -fx-background-color: -bm-goals-card;
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-goals-line;
+    -fx-border-radius: 8;
+    -fx-padding: 6 10;
+}
+
+.goals-stop:action {
+    -fx-border-color: -bm-goals-chosen;
+    -fx-border-width: 2;
+}
+
+.goals-refused {
+    -fx-text-fill: -bm-severity-error;
+    -fx-padding: 8;
+    -fx-wrap-text: true;
+}

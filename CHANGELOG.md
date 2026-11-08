@@ -19,6 +19,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **🎯 Goals** (2026-11-06), on the SDK's toolbar tab beside 🗺 Screens. It shows one card per goal of a plan, with
+  what the goal asks and whether it is met. Each card lists the actions serving the goal, in the order a run would try
+  them. A row shows ★/⤓, the action, its screen, why it is or is not a choice, and the screens and time a walk to it
+  takes. Beside the cards is the route to the picked row: only the screens crossed, numbered, the action marked.
+  - A double click opens the action's screen in 🗺 Screens.
+  - Drag a row onto another to try it first: `.over(() -> Screens.X.y)` is written. Drag it onto ★ or ⤓ to write
+    `.first()` or `.last()`. A drag that would make `.over`s loop is refused, with the planner's sentence.
+  - During a run, the action the run is on is marked.
+  - Studio now reads `Plans.java`, `Goals.java` (the new `@SdkValue(GOALS)` open set) and every `Do` field of
+    `Screens.java`.
+  - `Do.needs`, `until` and `checks` are no longer `@Link`s: Studio reads them by `PlanTypes`' own declaration. A goal
+    written with `Need` writes back with `Need`.
 - **A run can run a plan** (2026-11-06). The new `routine()` parameter, picked in the Runner, is a flow or one of the
   bot's `Plans` (`Plans.java`, beside `Goals.java`). A plan runs round after round: it walks to what matters most, reads
   an unknown fact on the way first, presses, checks, and idles until the next goal is due. Each decision is a line of

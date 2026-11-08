@@ -4,6 +4,15 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **Left from 🎯 Goals (2026-11-06)**:
+  - **Times basics cannot read.** `Do.every(Duration.ofMinutes(30))` and `.daily(LocalTime.of(5, 0))` do not
+    read in Studio. botmaker-plugin-basics declares `Duration` only as `Duration.ofMillis`, and `LocalTime` only as
+    `LocalTime.of(h, m, s)`. Such an action does not read, so 🎯 Goals neither shows it nor can rewrite it.
+    Fix: declare `ofSeconds`, `ofMinutes`, `ofHours` and `LocalTime.of(h, m)` there.
+  - **A goal's fact is a run's.** In Studio a card says *known in a run* for every fact, and a row *known in a
+    run* when its needs read a fact. The cards could show a run's last read value.
+  - **Not tried by hand yet.** The window has passed no light-and-dark click-check.
+
 - **`skip` gone, the rest (2026-11-05)**: the next release deletes `SdkValue.Id.SKIP` and its `@Migrate.Dropped`.
   `Flow.Step.switchable()`, `runnerSwitch`, the flow editor's *Runner may switch this off* tick and `FlowTools`'
   `switchable` argument are read by no run since `skip` went: deprecate and drop them, or give the runner another
