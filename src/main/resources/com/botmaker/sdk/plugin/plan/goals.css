@@ -112,3 +112,50 @@
     -fx-padding: 8;
     -fx-wrap-text: true;
 }
+
+/* The plan's tiers: a row of goal chips each; a met chip struck through, a waiting one says ⏳ and when. */
+
+.plan-tiers {
+    -fx-padding: 8 8 0 8;
+    -fx-spacing: 4;
+}
+
+.plan-adding {
+    -fx-padding: 4 8;
+    -fx-spacing: 4;
+}
+
+.plan-tier {
+    -fx-background-color: -bm-goals-card;
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-goals-line;
+    -fx-border-radius: 8;
+    -fx-padding: 4 8;
+}
+
+.plan-tier:target {
+    -fx-border-color: -bm-goals-chosen;
+    -fx-border-width: 2;
+}
+
+.plan-chip {
+    -fx-padding: 2 8;
+    -fx-background-radius: 10;
+    -fx-border-color: -bm-goals-line;
+    -fx-border-radius: 10;
+    -fx-alignment: center-left;
+    -fx-cursor: hand;
+}
+
+.plan-chip-name {
+    -fx-font-weight: bold;
+}
+
+.plan-chip:met .plan-chip-name {
+    -fx-strikethrough: true;
+    -fx-text-fill: -bm-goals-off;
+}
+
+.plan-chip:waiting {
+    -fx-border-color: -bm-goals-unmet;
+}

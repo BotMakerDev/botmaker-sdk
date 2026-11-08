@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.graph.GraphCanvas;
@@ -34,6 +35,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextField;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseButton;
@@ -44,9 +46,13 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
+
+import javax.lang.model.SourceVersion;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -55,6 +61,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -64,6 +71,9 @@ import java.util.function.Function;
  * {@link com.botmaker.sdk.internal.plan.Planner#round} would try them; beside them the route of the picked row, only
  * the screens a walk crosses, numbered. A double click opens the action's screen in 🗺 Screens; a row dragged onto
  * another is tried before it ({@code .over}), onto ★ or ⤓ first or last. During a run the action it is on is marked.
+ * Above the cards, the plan's tiers as rows of goal chips (met struck, waiting ⏳ with its due time): a chip dragged onto
+ * a tier moves there, onto ＋ into a tier of its own; {@code + Goal} adds a goal from a {@code Need} over a fact,
+ * {@code + Plan} a plan of one tier (2026-11-06).
  * What it shows is read from the bot's Java and its done-records, so nothing here runs the game.
  */
 public final class GoalsView {
@@ -75,6 +85,10 @@ public final class GoalsView {
     private static final PseudoClass OFF = PseudoClass.getPseudoClass("off");
     private static final PseudoClass TARGET = PseudoClass.getPseudoClass("target");
     private static final PseudoClass ACTION = PseudoClass.getPseudoClass("action");
+    private static final PseudoClass MET = PseudoClass.getPseudoClass("met");
+    private static final PseudoClass WAITING = PseudoClass.getPseudoClass("waiting");
+    /** What a dragged goal chip carries before its name; a dragged row carries {@code SCREEN.field}. */
+    private static final String GOAL_DRAG = "goal:";
     /** One window a project, as 🗺 Screens has. */
     private static final Map<Path, GoalsView> OPEN = new HashMap<>();
 
@@ -82,12 +96,22 @@ public final class GoalsView {
     private final BorderPane root = new BorderPane();
     private final ChoiceBox<String> plans = new ChoiceBox<>();
     private final VBox cards = new VBox();
+    private final VBox tiers = new VBox();
+    private final ChoiceBox<String> factPick = new ChoiceBox<>();
+    private final ChoiceBox<PlanEdits.Shortcut> needPick = new ChoiceBox<>();
+    private final TextField limitText = new TextField();
+    private final TextField planName = new TextField();
+    private final ChoiceBox<String> planGoal = new ChoiceBox<>();
     private final Label said = new Label();
     private final GraphCanvas<Stop, Edge> route = new GraphCanvas<>(Stop::screen, this::stopView, GoalsView::arrow,
             (laid, links) -> LayeredLayout.arrange(laid, links, List.of()));
     private final Map<String, List<HBox>> rows = new HashMap<>();
     private final List<AutoCloseable> subscriptions = new ArrayList<>();
     private GoalsViewModel view;
+    /** What the last read found: the names {@code + Goal} and {@code + Plan} must not take. */
+    private Read last = Read.none("");
+    /** While the plan pick is set from here, so it reads nothing itself. */
+    private boolean choosing;
     private String picked;
     private String running;
     private Stage window;
@@ -105,10 +129,15 @@ public final class GoalsView {
         said.setVisible(false);
         Button again = new Button("⟳ Read again");
         again.setOnAction(e -> read());
-        plans.setOnAction(e -> read());
+        plans.setOnAction(e -> {
+            if (!choosing) read();
+        });
         HBox bar = new HBox(new Label("Plan"), plans, again);
         bar.getStyleClass().add("goals-bar");
-        ScrollPane left = new ScrollPane(new VBox(said, cards));
+        tiers.getStyleClass().add("plan-tiers");
+        Node adding = adding();
+        adding.getStyleClass().add("plan-adding");
+        ScrollPane left = new ScrollPane(new VBox(said, tiers, adding, cards));
         left.setFitToWidth(true);
         SplitPane split = new SplitPane(left, route);
         split.setOrientation(Orientation.HORIZONTAL);
@@ -159,6 +188,11 @@ public final class GoalsView {
 
     /** Reads the plans, the goals and the map off the FX thread, then draws the plan picked. */
     private void read() {
+        read(null);
+    }
+
+    /** {@link #read()}, then {@code after}, a write's refusal, shown over what the read says; null for none. */
+    private void read(String after) {
         String wanted = plans.getValue();
         CompletableFuture.supplyAsync(() -> Read.of(services, wanted)).whenComplete((read, failed) ->
                 Platform.runLater(() -> {
@@ -167,30 +201,47 @@ public final class GoalsView {
                         return;
                     }
                     draw(read);
+                    if (after != null) refuse(after);
                 }));
     }
 
-    /** What one read found: every plan's name, the one shown and its view, or why there is none. */
-    private record Read(List<String> plans, String shown, GoalsViewModel view, String refused) {
+    /**
+     * What one read found: every plan's name that reads, the one shown and its view, or why there is none; the name of
+     * every constant of the bot's {@code Plans} and {@code Goals}, read or not, and its facts, for {@code + Plan} and
+     * {@code + Goal}.
+     */
+    private record Read(List<String> plans, String shown, GoalsViewModel view, String refused, List<String> goals,
+                        List<String> planNames, List<RunParameter> facts) {
+
+        static Read none(String why) {
+            return new Read(List.of(), null, null, why, List.of(), List.of(), List.of());
+        }
 
         static Read of(StudioServices services, String wanted) {
             PluginValues values = services.pluginValues();
-            if (values == null) return new Read(List.of(), null, null, "Studio has no source tree open.");
+            if (values == null) return none("Studio has no source tree open.");
             Map<String, Plan> plans = new LinkedHashMap<>();
+            List<String> planNames = new ArrayList<>();
             for (Member member : values.members(SdkValues.PLANS)) {
+                planNames.add(member.name());
                 values.open(SdkValues.PLANS, member).flatMap(ctx -> ctx.value(Plan.class))
                         .ifPresent(plan -> plans.put(member.name(), plan));
             }
-            if (plans.isEmpty()) {
-                return new Read(List.of(), null, null, "The bot has no plan yet: a plan is tiers of the goals in "
-                        + "Goals.java, written in Plans.java.");
-            }
-            String shown = plans.containsKey(wanted) ? wanted : plans.keySet().iterator().next();
             Map<String, Goal> goals = new LinkedHashMap<>();
+            List<String> goalNames = new ArrayList<>();
             for (Member member : values.members(SdkValues.GOALS)) {
+                goalNames.add(member.name());
                 values.open(SdkValues.GOALS, member).flatMap(ctx -> ctx.value(Goal.class))
                         .ifPresent(goal -> goals.put(member.name(), goal));
             }
+            List<RunParameter> facts = values.runParameters().stream()
+                    .filter(fact -> !PlanEdits.shortcuts(fact.type()).isEmpty()).toList();
+            if (plans.isEmpty()) {
+                return new Read(List.of(), null, null, "The bot has no plan yet: a plan is tiers of the goals in "
+                        + "Goals.java, written in Plans.java. + Plan starts one.", List.copyOf(goalNames),
+                        List.copyOf(planNames), facts);
+            }
+            String shown = plans.containsKey(wanted) ? wanted : plans.keySet().iterator().next();
             ScreenGraph map = ScreenMapRead.read(services);
             StudioPlan plan = StudioPlan.of(plans.get(shown), goals, map);
             DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, Clock.systemDefaultZone()))
@@ -198,25 +249,32 @@ public final class GoalsView {
             List<String> names = List.copyOf(plans.keySet());
             try {
                 PlanModel model = new PlanModel(plan.plan(), plan.map(), records, null);
-                return new Read(names, shown, GoalsViewModel.of(model, plan), null);
+                return new Read(names, shown, GoalsViewModel.of(model, plan), null, List.copyOf(goalNames),
+                        List.copyOf(planNames), facts);
             } catch (IllegalArgumentException cycle) {
-                return new Read(names, shown, null, cycle.getMessage());
+                return new Read(names, shown, null, cycle.getMessage(), List.copyOf(goalNames),
+                        List.copyOf(planNames), facts);
             }
         }
     }
 
     private void draw(Read read) {
         if (!plans.getItems().equals(read.plans())) plans.getItems().setAll(read.plans());
-        if (read.shown() != null && !read.shown().equals(plans.getValue())) plans.setValue(read.shown());
+        if (read.shown() != null && !read.shown().equals(plans.getValue())) choosePlan(read.shown());
+        last = read;
         view = read.view();
         cards.getChildren().clear();
         rows.clear();
+        offer(factPick, read.facts().stream().map(GoalsView::factName).toList(), false);
+        offer(planGoal, read.goals(), true);
         if (view == null) {
+            tiers.getChildren().clear();
             refuse(read.refused());
             route.show(List.of(), List.of());
             return;
         }
         refuse(null);
+        drawTiers(PlanViewModel.of(view, ZoneId.systemDefault()));
         for (Card card : view.cards()) cards.getChildren().add(card(card));
         Optional<Row> keep = picked == null ? Optional.empty() : view.row(picked);
         Optional<Row> first = keep.or(() -> view.cards().stream().flatMap(c -> c.rows().stream()).findFirst());
@@ -228,6 +286,199 @@ public final class GoalsView {
         said.setText(why == null ? "" : why);
         said.setManaged(why != null);
         said.setVisible(why != null);
+    }
+
+    // ---- the plan's tiers (2026-11-06): goal chips, dragged between tiers or into a tier of their own ----------
+
+    private void drawTiers(PlanViewModel plan) {
+        tiers.getChildren().setAll(newTier("＋ new tier first", 0));
+        for (PlanViewModel.Tier tier : plan.tiers()) {
+            Label name = new Label("tier " + (tier.index() + 1));
+            name.getStyleClass().add("goals-fill");
+            HBox line = new HBox(6, name);
+            line.getStyleClass().add("plan-tier");
+            line.setAlignment(Pos.CENTER_LEFT);
+            for (PlanViewModel.Chip chip : tier.chips()) line.getChildren().add(chip(chip));
+            Region space = new Region();
+            HBox.setHgrow(space, Priority.ALWAYS);
+            line.getChildren().addAll(space, newTier("＋ new tier below", tier.index() + 1));
+            acceptGoal(line, goal -> tierEdit(goal, tier.index(), false));
+            tiers.getChildren().add(line);
+        }
+    }
+
+    private Node chip(PlanViewModel.Chip chip) {
+        Label name = new Label(chip.name());
+        name.getStyleClass().add("plan-chip-name");
+        Label said = new Label(chip.said());
+        said.getStyleClass().add("goals-fill");
+        HBox box = new HBox(4, name, said);
+        box.getStyleClass().add("plan-chip");
+        box.pseudoClassStateChanged(MET, chip.state() == PlanViewModel.State.MET);
+        box.pseudoClassStateChanged(WAITING, chip.state() == PlanViewModel.State.WAITING);
+        // A goal written inline in the tier names no constant of Goals: there is nothing to move it by.
+        if (!SourceVersion.isName(chip.name())) return box;
+        box.setOnDragDetected(e -> {
+            Dragboard board = box.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putString(GOAL_DRAG + chip.name());
+            board.setContent(content);
+            e.consume();
+        });
+        return box;
+    }
+
+    /** A pill a goal chip is dropped on to give it a tier of its own at {@code at}. */
+    private Node newTier(String text, int at) {
+        Label pill = new Label(text);
+        pill.getStyleClass().add("goals-drop");
+        acceptGoal(pill, goal -> tierEdit(goal, at, true));
+        return pill;
+    }
+
+    /** Lets {@code target} take a dragged goal chip, and only that, and hands its goal's name to {@code dropped}. */
+    private static void acceptGoal(Node target, Consumer<String> dropped) {
+        target.setOnDragOver(e -> {
+            if (isGoal(e.getDragboard())) e.acceptTransferModes(TransferMode.MOVE);
+            e.consume();
+        });
+        target.setOnDragEntered(e -> target.pseudoClassStateChanged(TARGET, isGoal(e.getDragboard())));
+        target.setOnDragExited(e -> target.pseudoClassStateChanged(TARGET, false));
+        target.setOnDragDropped(e -> {
+            boolean taken = isGoal(e.getDragboard());
+            if (taken) dropped.accept(e.getDragboard().getString().substring(GOAL_DRAG.length()));
+            e.setDropCompleted(taken);
+            e.consume();
+        });
+    }
+
+    private static boolean isGoal(Dragboard board) {
+        return board.hasString() && board.getString().startsWith(GOAL_DRAG);
+    }
+
+    /** A dragged action row, {@code SCREEN.field}: any string but a goal chip's. */
+    private static boolean isRow(Dragboard board) {
+        return board.hasString() && !isGoal(board);
+    }
+
+    private void tierEdit(String goal, int to, boolean newTier) {
+        String plan = plans.getValue();
+        if (plan == null) return;
+        shown(PlanWrites.setTier(services, plan, goal, to, newTier));
+    }
+
+    /** Reads the bot again after a write, then shows the write's refusal, if it was one, over what the read says. */
+    private void shown(String answer) {
+        read(answer.startsWith(ScreenEdits.NOT_WRITTEN) ? answer : null);
+    }
+
+    /** {@code + Goal} and {@code + Plan}, built once: a read refreshes what they offer, never what was typed. */
+    private Node adding() {
+        needPick.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(PlanEdits.Shortcut s) {
+                return s == null ? "" : s.label();
+            }
+
+            @Override
+            public PlanEdits.Shortcut fromString(String text) {
+                return null;
+            }
+        });
+        limitText.setPromptText("limit");
+        limitText.setPrefColumnCount(6);
+        factPick.setOnAction(e -> {
+            RunParameter picked = pickedFact().orElse(null);
+            needPick.getItems().setAll(picked == null ? List.of() : PlanEdits.shortcuts(picked.type()));
+            if (!needPick.getItems().isEmpty()) needPick.setValue(needPick.getItems().getFirst());
+        });
+        needPick.setOnAction(e -> limitText.setDisable(needPick.getValue() == null
+                || !needPick.getValue().takesLimit()));
+        Button addGoal = new Button("+ Goal");
+        addGoal.setOnAction(e -> addGoal());
+        HBox goal = new HBox(6, new Label("Goal:"), factPick, needPick, limitText, addGoal);
+        goal.setAlignment(Pos.CENTER_LEFT);
+        planName.setPromptText("PLAN_NAME");
+        planName.setPrefColumnCount(10);
+        Button addPlan = new Button("+ Plan");
+        addPlan.setOnAction(e -> addPlan());
+        HBox plan = new HBox(6, new Label("Plan:"), planName, planGoal, addPlan);
+        plan.setAlignment(Pos.CENTER_LEFT);
+        return new VBox(4, goal, plan);
+    }
+
+    /**
+     * {@code choice} offering {@code items}, its pick kept while still offered; else the first when
+     * {@code pickFirst}, or none.
+     */
+    private static <T> void offer(ChoiceBox<T> choice, List<T> items, boolean pickFirst) {
+        T was = choice.getValue();
+        if (!choice.getItems().equals(items)) choice.getItems().setAll(items);
+        if (was != null && items.contains(was)) {
+            if (!was.equals(choice.getValue())) choice.setValue(was);
+        } else if (pickFirst && !items.isEmpty()) {
+            choice.setValue(items.getFirst());
+        }
+    }
+
+    /** {@code + Goal}: the fact, the {@code Need} shortcut its type takes and a limit, named after them. */
+    private void addGoal() {
+        RunParameter picked = pickedFact().orElse(null);
+        PlanEdits.Shortcut need = needPick.getValue();
+        if (picked == null || need == null) {
+            refuse(ScreenEdits.NOT_WRITTEN + "pick a fact and what it needs.");
+            return;
+        }
+        Optional<Object> bound = need.takesLimit() ? PlanEdits.limit(picked.type(), limitText.getText())
+                : Optional.empty();
+        if (need.takesLimit() && bound.isEmpty()) {
+            refuse(ScreenEdits.NOT_WRITTEN + "\"" + limitText.getText() + "\" is no " + picked.type() + ".");
+            return;
+        }
+        String reference = picked.group() + "::" + picked.name();
+        Object value = bound.orElse(null);
+        String name = PlanEdits.goalName(reference, need, value, Set.copyOf(last.goals()));
+        shown(PlanWrites.addGoal(services, name, PlanEdits.fromNeed(reference, need, value)));
+    }
+
+    /** The fact picked, {@code Progress::gold}, as the last read found it. */
+    private Optional<RunParameter> pickedFact() {
+        String picked = factPick.getValue();
+        return last.facts().stream().filter(fact -> factName(fact).equals(picked)).findFirst();
+    }
+
+    private static String factName(RunParameter fact) {
+        return fact.group() + "::" + fact.name();
+    }
+
+    /** {@code + Plan}: a name and the goal of its one tier; the new plan is the one shown next. */
+    private void addPlan() {
+        String constant = planName.getText().strip().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]+", "_");
+        if (!SourceVersion.isName(constant) || planGoal.getValue() == null) {
+            refuse(ScreenEdits.NOT_WRITTEN + "a plan needs a name and a goal for its first tier.");
+            return;
+        }
+        if (last.planNames().contains(constant)) {
+            refuse(ScreenEdits.NOT_WRITTEN + "Plans." + constant + " is there already.");
+            return;
+        }
+        String answer = PlanWrites.addPlan(services, constant, planGoal.getValue());
+        if (!answer.startsWith(ScreenEdits.NOT_WRITTEN)) {
+            plans.getItems().add(constant);
+            choosePlan(constant);
+            planName.clear();
+        }
+        shown(answer);
+    }
+
+    /** Shows {@code plan} in the plan pick without its own read: the caller reads. */
+    private void choosePlan(String plan) {
+        choosing = true;
+        try {
+            plans.setValue(plan);
+        } finally {
+            choosing = false;
+        }
     }
 
     private Node card(Card card) {
@@ -263,7 +514,7 @@ public final class GoalsView {
     private Node drop(String text, Mark mark) {
         Label pill = new Label(text);
         pill.getStyleClass().add("goals-drop");
-        acceptDrop(pill, dragged -> write(dragged, action -> ScreenEdits.setMark(services, action[0], action[1], mark)));
+        acceptDrop(pill, dragged -> write(dragged, action -> PlanWrites.setMark(services, action[0], action[1], mark)));
         return pill;
     }
 
@@ -299,7 +550,7 @@ public final class GoalsView {
         });
         acceptDrop(line, dragged -> {
             if (dragged.equals(row.name())) return;
-            write(dragged, action -> ScreenEdits.setOver(services, action[0], action[1], row.step().screen(),
+            write(dragged, action -> PlanWrites.setOver(services, action[0], action[1], row.step().screen(),
                     row.step().field()));
         });
         rows.computeIfAbsent(row.name(), n -> new ArrayList<>()).add(line);
@@ -309,13 +560,13 @@ public final class GoalsView {
     /** Lets {@code target} take a dragged row, the action's {@code SCREEN.field}, and hands it to {@code dropped}. */
     private static void acceptDrop(Node target, Consumer<String> dropped) {
         target.setOnDragOver(e -> {
-            if (e.getDragboard().hasString()) e.acceptTransferModes(TransferMode.MOVE);
+            if (isRow(e.getDragboard())) e.acceptTransferModes(TransferMode.MOVE);
             e.consume();
         });
         target.setOnDragEntered(e -> target.pseudoClassStateChanged(TARGET, true));
         target.setOnDragExited(e -> target.pseudoClassStateChanged(TARGET, false));
         target.setOnDragDropped(e -> {
-            boolean taken = e.getDragboard().hasString();
+            boolean taken = isRow(e.getDragboard());
             if (taken) dropped.accept(e.getDragboard().getString());
             e.setDropCompleted(taken);
             e.consume();
@@ -327,10 +578,8 @@ public final class GoalsView {
         String[] action = dragged.split("\\.", 2);
         if (action.length != 2) return;
         String answer = edit.apply(action);
-        boolean refused = answer.startsWith(ScreenEdits.NOT_WRITTEN);
         picked = dragged;
-        read();
-        if (refused) Platform.runLater(() -> refuse(answer));
+        shown(answer);
     }
 
     private void pick(Row row) {

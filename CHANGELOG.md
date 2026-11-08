@@ -27,6 +27,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - Drag a row onto another to try it first: `.over(() -> Screens.X.y)` is written. Drag it onto ★ or ⤓ to write
     `.first()` or `.last()`. A drag that would make `.over`s loop is refused, with the planner's sentence.
   - During a run, the action the run is on is marked.
+  - Above the cards, the plan's tiers are shown as rows of goal chips. A met goal is struck through. A waiting goal
+    shows ⏳ and the time it comes due. Drag a chip onto another tier to move it there, or onto *＋ new tier* to give
+    it a tier of its own; `Plan.of(Plan.tier(…), …)` is rewritten, and a tier left empty goes.
+  - *+ Goal* adds a goal to `Goals.java` from a fact and a `Need` shortcut (`Goal.of(Need.atLeast(Progress::gold,
+    100))`, named `GOLD_AT_LEAST_100`). A whole-number fact takes at least, at most, above, below or equal to; a flag
+    takes is true or is false; a text takes equal to. *+ Plan* adds a plan of one tier, one goal, to `Plans.java`.
   - Studio now reads `Plans.java`, `Goals.java` (the new `@SdkValue(GOALS)` open set) and every `Do` field of
     `Screens.java`.
   - `Do.needs`, `until` and `checks` are no longer `@Link`s: Studio reads them by `PlanTypes`' own declaration. A goal

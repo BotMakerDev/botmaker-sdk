@@ -151,8 +151,17 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
     reference. `StudioPlan.of` swaps each reference for what it names, so the planner reads it as a run does.
   - **What it shows.** `GoalsViewModel` is pure: one card per goal, in tier order, its rows in `Planner.round`'s
     `considered` order. A row's route is `Planner.way` from where the game is, so only the screens it crosses.
-  - **Edits.** `GoalsView` writes through `ScreenEdits.setOver` and `setMark`. A drag that makes the `.over`s
-    loop is refused with `PlanModel.overCycle`'s sentence.
+  - **Edits.** `PlanEdits` works out each new value with no window, and `PlanWrites` writes it as one history step
+    (`ScreenEdits.historyStep`). `plugin/plan` names `plugin/assist`, never the other way (`PluginLayersTest`). The
+    cards write `.over`, `.first()` and `.last()`. A drag that makes the `.over`s loop is refused with
+    `PlanModel.overCycle`'s sentence.
+  - **Tiers.** `PlanViewModel` turns the cards into the plan's tiers of goal chips: met, waiting with its due time
+    (as `Planner` passes a goal over), open, or unknown until a run. A chip dropped on a tier, or on *＋ new tier*,
+    rewrites `Plan.of(Plan.tier(…), …)` (`PlanEdits.moved`); a tier left empty goes, a drop on its own tier changes
+    nothing. A goal written inline in a tier names no constant and is not dragged.
+  - **New goals and plans.** *+ Goal* writes `Goal.of(Need.…(fact, limit))` into `Goals`. The fact is a run parameter
+    whose type a shortcut takes: a whole number, a flag or a text, since `Need`'s limits read back only as an `Integer`
+    or a `String`. *+ Plan* writes a plan of one tier. A name is never one a constant of the set already has.
   - **During a run.** It marks the action from each trace line's `plan.action` (`Runs.onTrace`). The plan values
     ride on trace lines, not telemetry frames.
   - **Records.** It reads the bot's done-records from `StudioServices.stateDir()`. It never writes them.
