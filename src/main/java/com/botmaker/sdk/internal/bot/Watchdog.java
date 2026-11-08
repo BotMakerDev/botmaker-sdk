@@ -32,7 +32,7 @@ import java.util.Optional;
  * a game that no longer answers, whether the bot was clicking, waiting on a picture or walking the screen map.
  *
  * <p>The throw happens deterministically at {@link #checkpoint()}, which the flow walker calls between
- * activities. {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
+ * activities, or at {@link #checkpointGame()}, which a plan run calls once a round (2026-11-09). {@link #progress()} lets logic the vision layer can't see reset the counter, and the supervisor
  * calls {@link #reset()} after a restart. The match count is per thread; the game's picture is one for the run,
  * since a bot looks at one game (a run that captures two surfaces in turn sees each move, and is never told frozen).
  *
@@ -92,6 +92,25 @@ public final class Watchdog {
      * counter when it throws so recovery starts from a clean slate. Safe to call when disabled (never throws).
      */
     public static void checkpoint() {
+        checkpointGame();
+        State s = STATE.get();
+        if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
+            int repeats = s.repeats;
+            String sig = s.signature;
+            progress();
+            Say.warn("stuck after " + repeats + " checks repeating " + sig);
+            throw Say.told(new BotStuckException("Bot appears stuck: no progress for " + repeats
+                    + " consecutive checks (repeating " + sig + ")"));
+        }
+    }
+
+    /**
+     * The game's half of {@link #checkpoint()}: throws {@link BotStuckException} when Android owes a restart of the
+     * game or its picture is frozen, without the match-repeat count. A plan run calls it once a round: its walk
+     * finds the same markers at the same place on every look, which the count would read as stuck; the run counts
+     * its own progress instead.
+     */
+    public static void checkpointGame() {
         Optional<String> dialog = SystemDialogs.takeRestart();
         if (dialog.isPresent()) {
             progress();
@@ -106,15 +125,6 @@ public final class Watchdog {
             STILL.clear();
             Say.warn(frozen.get());
             throw Say.told(new BotStuckException(frozen.get()));
-        }
-        State s = STATE.get();
-        if (s.repeats >= BotSettings.current().maxRetryAttempts()) {
-            int repeats = s.repeats;
-            String sig = s.signature;
-            progress();
-            Say.warn("stuck after " + repeats + " checks repeating " + sig);
-            throw Say.told(new BotStuckException("Bot appears stuck: no progress for " + repeats
-                    + " consecutive checks (repeating " + sig + ")"));
         }
     }
 

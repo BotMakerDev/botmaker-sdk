@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.internal.plan.RunGame;
+import com.botmaker.sdk.internal.bot.RestartCap;
 import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
@@ -35,6 +36,7 @@ import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -422,10 +424,13 @@ public class Bot {
      */
     static void supervise(Runnable body, Runnable goHome, Consumer<StartMode> startGame) {
         observe();
+        BotSettings settings = BotSettings.current();
+        RestartCap cap = new RestartCap(settings.restartCap(), settings.restartsWithin());
         Runnable restart = () -> {
             // Whichever path restarts it (a cold start that failed, a recovery whose goHome threw), the restart a
             // system dialog owed is paid: left set, the next ordinary recovery would restart instead of going home.
             Watchdog.takeRestartNext();
+            cap.restart(Instant.now()).ifPresent(Bot::stop);
             Debug.log("restarting the game");
             startGame.accept(StartMode.RESTART);
         };

@@ -1,12 +1,14 @@
 package com.botmaker.sdk.internal.plan;
 
 import com.botmaker.sdk.api.bot.Bot;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.time.Wait;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.ParamGroups;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.params.RunFacts;
@@ -49,7 +51,8 @@ public final class RunGame implements PlanRun.Game {
     public static Runnable body(Plan plan, Class<?>... holders) {
         ScreenGraph map = ScreenMaps.installed();
         Map<Goal, String> names = names(holders);
-        PlanRun run = new PlanRun(plan, map, DoneRecords.run(), new RunGame(map), names::get);
+        PlanRun run = new PlanRun(plan, map, DoneRecords.run(), new RunGame(map), names::get,
+                BotSettings.current().stuckAfter());
         return () -> {
             switch (run.run()) {
                 case MET -> Bot.stop();
@@ -161,5 +164,12 @@ public final class RunGame implements PlanRun.Game {
     @Override
     public void say(String line, Map<String, String> values) {
         Say.info(line, values);
+    }
+
+    @Override
+    public void checkpoint() {
+        // The match-repeat count is a flow's: the map's markers, found in place at every look, would grow it here.
+        Watchdog.progress();
+        Watchdog.checkpointGame();
     }
 }

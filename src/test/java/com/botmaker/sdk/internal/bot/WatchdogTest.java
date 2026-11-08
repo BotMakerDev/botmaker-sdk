@@ -55,6 +55,13 @@ class WatchdogTest {
     }
 
     @Test
+    void aPlanRunsCheckpointCountsNoMatchRepeats() {
+        // A plan's walk finds the same markers at the same place on every look.
+        fireSame(5);
+        assertDoesNotThrow(Watchdog::checkpointGame);
+    }
+
+    @Test
     void checkpointDoesNotThrowBelowThreshold() {
         fireSame(2); // repeats == 1 < MAX(3)
         assertDoesNotThrow(Watchdog::checkpoint);

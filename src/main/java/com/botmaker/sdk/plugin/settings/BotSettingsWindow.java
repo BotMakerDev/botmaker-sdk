@@ -98,6 +98,8 @@ public final class BotSettingsWindow {
      */
     @SuppressWarnings("deprecation")
     private boolean debug = BotSettings.DEFAULTS.debug();
+    /** The bot's stuck time and restart cap, kept as they were: this window shows no control for them yet. */
+    private BotSettings.Recovery recovery = BotSettings.DEFAULTS.recovery();
     private final Spinner<Integer> foundDelay = new Spinner<>(0, 600_000, 500, 50);
     private final Spinner<Integer> notFoundDelay = new Spinner<>(0, 600_000, 200, 50);
     private final Spinner<Double> confidence = new Spinner<>(0.0, 1.0, 0.8, 0.05);
@@ -436,6 +438,7 @@ public final class BotSettingsWindow {
         maxRetryAttempts.getValueFactory().setValue(s.maxRetryAttempts());
         randomizeClicks.setSelected(s.randomizeClicks());
         debug = s.debug();
+        recovery = s.recovery();
     }
 
     /**
@@ -456,7 +459,7 @@ public final class BotSettingsWindow {
                 new BotSettings.Loops(maxRounds.getValue(), patience.getValue(), frozenAfter.getValue() * 1000),
                 new BotSettings.RunIn(chosenWhere(), takeOver.isSelected(), displayBackend.getValue(),
                         inputBackend.getValue()),
-                maxRetryAttempts.getValue(), debug);
+                maxRetryAttempts.getValue(), debug, recovery);
     }
 
     private BotSettings.Where chosenWhere() {

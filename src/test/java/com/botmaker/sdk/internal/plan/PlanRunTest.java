@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Hero;
 import com.botmaker.sdk.internal.plan.PlanRun.End;
 import com.botmaker.sdk.internal.plan.Round.Step;
@@ -38,7 +39,9 @@ import java.util.function.Function;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +99,17 @@ class PlanRunTest {
         final Map<Method, List<String>> readOn = new HashMap<>();
         int looks;
         private boolean looked;
+        /** What the next watchdog checkpoint throws, once: a restart Android's dialogs owe. */
+        RuntimeException owed;
+        int checkpoints;
+
+        @Override
+        public void checkpoint() {
+            checkpoints++;
+            RuntimeException thrown = owed;
+            owed = null;
+            if (thrown != null) throw thrown;
+        }
 
         @Override
         public Optional<String> where() {
@@ -564,6 +578,80 @@ class PlanRunTest {
                 + " not be read again since its press: no record kept")), String.join("\n", game.said));
         assertTrue(game.said.stream().anyMatch(line -> line.startsWith("HOME.train was pressed 3 times in a row and"
                 + " its check could not be read after any")), String.join("\n", game.said));
+    }
+
+    /** HOME.train, whose check reads a fact no screen feeds: pressed, never proven, never progress. */
+    private PlanRun trainingNothingProves(FakeGame game, Duration stuckAfter) {
+        Goal strong = Goal.of(Need.atLeast(Hero::level, 5));
+        on("HOME", "train", Do.press(click("train")).serves(strong).checks(Need.atLeast(Hero::level, 5)));
+        return new PlanRun(Plan.of(Plan.tier(strong)), map(), records(), game, goal -> "GOAL", stuckAfter);
+    }
+
+    @Test
+    void actingWithNoProgressIsStuckAtStuckAfterAndHoldsTheActionOff() {
+        FakeGame game = new FakeGame();
+        PlanRun run = trainingNothingProves(game, Duration.ofSeconds(3));
+
+        assertEquals(Optional.empty(), run.round(), "one second of pressing: not yet");
+        BotStuckException stuck = assertThrows(BotStuckException.class, run::round);
+
+        assertTrue(stuck.getMessage().startsWith("No progress for 0 min"), stuck.getMessage());
+        assertEquals(2, game.did.stream().filter("press HOME.train"::equals).count(), game.did.toString());
+        assertEquals(2, game.checkpoints, "the watchdog looked once a round that acted");
+        run.round();
+        assertEquals(2, game.did.stream().filter("press HOME.train"::equals).count(),
+                "held off: the recovered run does not go straight back to it");
+    }
+
+    @Test
+    void aScreenChangeIsProgress() {
+        FakeGame game = new FakeGame();
+        PlanRun run = trainingNothingProves(game, Duration.ofSeconds(3));
+
+        run.round();
+        game.at = "SHOP";
+
+        assertDoesNotThrow(run::round, "another screen than last round's: the clock starts over");
+        assertTrue(game.did.contains("walk HOME"), game.did.toString());
+    }
+
+    @Test
+    void goingBackAndForthBetweenTwoScreensIsNoProgress() {
+        FakeGame game = new FakeGame();
+        PlanRun run = trainingNothingProves(game, Duration.ofSeconds(3));
+
+        run.round();
+        game.at = "SHOP";
+        run.round();
+        game.at = "SHOP";
+
+        assertThrows(BotStuckException.class, run::round, "SHOP again: a screen seen since the last progress");
+    }
+
+    @Test
+    void aRestartOwedWhileIdlingIsTakenAtOnce() {
+        AtomicBoolean claimed = new AtomicBoolean();
+        Goal chest = metWhen(claimed);
+        on("HOME", "chest", Do.press(click("chest")).serves(chest).every(Duration.ofHours(2)));
+        FakeGame game = new FakeGame();
+        DoneRecords records = records();
+        records.done("HOME.chest", true);
+        PlanRun run = run(Plan.of(Plan.tier(chest)), game, records);
+        game.owed = new BotStuckException("The game crashed");
+
+        assertThrows(BotStuckException.class, run::round, "not two hours later, at the next press");
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled);
+    }
+
+    @Test
+    void aRestartTheGameOwesIsTakenInAPlanRun() {
+        FakeGame game = new FakeGame();
+        PlanRun run = trainingNothingProves(game, Duration.ofMinutes(10));
+        BotStuckException owed = new BotStuckException("The game stopped answering");
+        game.owed = owed;
+
+        assertSame(owed, assertThrows(BotStuckException.class, run::round), "to the run's recovery, which restarts");
+        assertEquals(List.of("press HOME.train", "read HOME"), game.did, "after the round's press and its reading");
     }
 
     @Test

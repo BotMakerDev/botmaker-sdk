@@ -1,14 +1,17 @@
 package com.botmaker.sdk.internal.plan;
 
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.plan.Round.Considered;
 import com.botmaker.sdk.internal.plan.Round.Step;
 import com.botmaker.sdk.internal.plan.Round.Why;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.trace.Say;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -96,6 +99,9 @@ public final class PlanRun {
 
         /** Says one decision of the run, carrying {@code values} for its report. */
         void say(String line, Map<String, String> values);
+
+        /** Throws the run's stuck exception when Android owes a restart of the game or the game is frozen. */
+        void checkpoint();
     }
 
     private final Plan plan;
@@ -119,38 +125,116 @@ public final class PlanRun {
     private Instant idling;
     /** The action last put after another on arrival, with nothing pressed since; null otherwise. */
     private Do deferred;
+    /** How long the run may act with no progress before it is stuck. */
+    private final Duration stuckAfter;
+    /**
+     * When the run last made progress — a new screen reached, a goal came to be met, a press proven done — moved on
+     * by every idle since; null before this call of {@link #run}'s first round.
+     */
+    private Instant progressed;
+    /** The screens rounds started on since the last progress. */
+    private final Set<String> screensSince = new LinkedHashSet<>();
+    /** The plan's goals met at a round's start since the last progress. */
+    private final Set<Goal> metSince = new LinkedHashSet<>();
 
     /** A press of {@code step} for {@code goal} at {@code pressed}, which came to {@code result}, its check not read since. */
     private record Unproven(Step step, Goal goal, Instant pressed, Pressed.Result result) {}
 
-    /** A run of {@code plan} over {@code map}, keeping {@code records}, acting through {@code game}; goals by {@code names}. */
-    public PlanRun(Plan plan, ScreenGraph map, DoneRecords records, Game game, Function<Goal, String> names) {
+    /**
+     * A run of {@code plan} over {@code map}, keeping {@code records}, acting through {@code game}; goals by
+     * {@code names}; stuck after acting {@code stuckAfter} with no progress.
+     */
+    public PlanRun(Plan plan, ScreenGraph map, DoneRecords records, Game game, Function<Goal, String> names,
+                   Duration stuckAfter) {
         this.plan = plan;
         this.map = map;
         this.records = records;
         this.game = game;
         this.names = names;
+        this.stuckAfter = stuckAfter;
     }
 
-    /** Runs rounds until the plan ends, and says why it did. A stop ends it by its throw. */
+    /** A run stuck after {@link BotSettings#DEFAULT_STUCK_AFTER}. */
+    PlanRun(Plan plan, ScreenGraph map, DoneRecords records, Game game, Function<Goal, String> names) {
+        this(plan, map, records, game, names, BotSettings.DEFAULT_STUCK_AFTER);
+    }
+
+    /**
+     * Runs rounds until the plan ends, and says why it did. A stop ends it by its throw, and so does a stuck run,
+     * which the run's recovery catches before it calls this again: the progress clock starts over then.
+     */
     public End run() {
+        progressed = null;
         while (true) {
             Optional<End> end = round();
             if (end.isPresent()) return end.get();
         }
     }
 
-    /** One round: something done, gone to, waited for, or the end. */
+    /**
+     * One round: something done, gone to, waited for, or the end. A round that acted ends at the watchdog's
+     * {@link #checkpoint}.
+     */
     Optional<End> round() {
+        if (progressed == null) progressed();
         prove();
-        PlanModel model = model(game.where().orElse(null));
+        String at = game.where().orElse(null);
+        PlanModel model = model(at);
+        progressSeen(model, at);
         Round round = Planner.round(model);
-        if (round.doing().isEmpty()) return idleOrEnd(model, round);
+        if (round.doing().isEmpty()) {
+            Instant from = records.clock().instant();
+            Optional<End> end = idleOrEnd(model, round);
+            // Waiting toward a due time is not acting: the clock leaves it out, and goes on where it was.
+            progressed = progressed.plus(Duration.between(from, records.clock().instant()));
+            if (end.isEmpty()) game.checkpoint();
+            return end;
+        }
         idling = null;
         Step next = round.doing().getFirst();
-        if (goneToRead(model, round, next)) return Optional.empty();
-        doStep(model, round, next);
+        if (!goneToRead(model, round, next)) doStep(model, round, next);
+        checkpoint(round, next);
         return Optional.empty();
+    }
+
+    /**
+     * Counts reaching a screen, or meeting a goal of the plan, as progress when it was not so at any round since the
+     * last progress: a run that goes back and forth between two screens, or a goal that falls unmet and comes back,
+     * makes none.
+     */
+    private void progressSeen(PlanModel model, String at) {
+        Set<Goal> nowMet = new LinkedHashSet<>();
+        plan.tiers().forEach(tier -> tier.goals().stream().filter(goal -> model.answer(goal) == Answer.YES)
+                .forEach(nowMet::add));
+        boolean moved = at != null && !screensSince.contains(at);
+        boolean cameMet = !metSince.containsAll(nowMet);
+        if (moved || cameMet) progressed();
+        if (at != null) screensSince.add(at);
+        metSince.addAll(nowMet);
+    }
+
+    /** The run made progress now: the clock starts over, and so does what counts as new. */
+    private void progressed() {
+        progressed = records.clock().instant();
+        screensSince.clear();
+        metSince.clear();
+    }
+
+    /**
+     * The watchdog's look once a round that acted: a restart Android's dialogs owe or a frozen game throws to the
+     * run's recovery; so does acting {@link #stuckAfter} with no progress, after {@code next} is held off so the
+     * recovered run does not go straight back to it.
+     */
+    private void checkpoint(Round round, Step next) {
+        game.checkpoint();
+        Instant now = records.clock().instant();
+        if (Duration.between(progressed, now).compareTo(stuckAfter) < 0) return;
+        holdOff(next);
+        String why = "No progress for " + stuckAfter.toMinutes() + " min: no screen changed, no goal came to be met"
+                + " and no press was proven done. " + next.key() + " is left be for " + HELD_OFF.toMinutes()
+                + " min; the run recovers: home on the map, else a restart of the game.";
+        say(why, goalOf(round, next), next);
+        throw Say.told(new BotStuckException(why));
     }
 
     private PlanModel model(String at) {
@@ -397,6 +481,7 @@ public final class PlanRun {
         Do action = next.action();
         records.pressed(next.key(), action, result == Pressed.Result.DONE, pressed);
         if (records.last(next.key()).map(DoneRecords.Done::held).orElse(false)) {
+            if (result == Pressed.Result.DONE) progressed();
             countFruitless(next);
             return;
         }

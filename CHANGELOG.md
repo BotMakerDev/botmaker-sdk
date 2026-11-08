@@ -19,6 +19,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A plan run recovers when it is stuck, and stops after too many restarts** (2026-11-09).
+  - The watchdog looks once a round of a plan run: a game Android says crashed or stopped answering is restarted, a
+    frozen game recovers, as in a flow.
+  - A plan run that acts for `BotSettings.stuckAfter` (10 min by default) with no screen change, no goal coming to be
+    met and no press proven done is stuck: the action it was on is left be for 5 min, and the run recovers (home on
+    the map, else a restart). Idling toward a due time is never stuck.
+  - Past `BotSettings.restartCap` restarts of the game within `restartsWithin` (5 in 30 min by default), any run
+    stops and says why, instead of restarting forever. A recovery that only got home is not counted.
+  - `BotSettings` gains the `recovery` part; a bot that builds `new BotSettings(…)` itself passes it (or `null` for
+    the defaults).
+
 - **A plan run proves a press before it counts it, and keeps looking while it idles** (2026-11-09).
   - A press whose check reads facts is kept as done only once those facts were read after the press. A press that
     leaves the game on no screen of the map first clears what covers it with the map's close buttons; when the check's

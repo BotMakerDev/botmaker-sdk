@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -60,9 +61,10 @@ import java.util.Optional;
  *                         least 1
  * @param debug            whether the SDK's debug output starts on, for a run that does not say: a
  *                         {@code -Dbotmaker.debug=true|false} on the run (Studio's Debug output toggle) wins
+ * @param recovery         when a plan run is stuck, and how many restarts a run makes before it stops
  */
 public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn, int maxRetryAttempts,
-                          boolean debug) {
+                          boolean debug, Recovery recovery) {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
     public static final int DEFAULT_FOUND_DELAY = 500;
@@ -113,6 +115,23 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     /** How long to wait for a launched game's window to appear, in milliseconds. */
     public static final long DEFAULT_LAUNCH_WAIT_TIMEOUT = 60000;
 
+    /**
+     * How long a plan run may go on acting with no progress — no screen change, no goal coming to be met, no press
+     * proven done — before it is stuck and the run recovers: home on the map, else a restart of the game. Idling
+     * toward a due time is waiting, never stuck.
+     */
+    public static final Duration DEFAULT_STUCK_AFTER = Duration.ofMinutes(10);
+
+    /**
+     * How many restarts of the game a run makes within {@link #DEFAULT_RESTARTS_WITHIN} before it stops with the
+     * reason instead: a game that keeps needing one will not be fixed by one more. A recovery that only got home
+     * does not count.
+     */
+    public static final int DEFAULT_RESTART_CAP = 5;
+
+    /** The time {@link #DEFAULT_RESTART_CAP} counts restarts over. */
+    public static final Duration DEFAULT_RESTARTS_WITHIN = Duration.ofMinutes(30);
+
     /** The pauses around a match, and whether a click lands on a random point of it rather than its centre. */
     public record Clicks(int foundDelay, int notFoundDelay, boolean randomize) {
         /** A negative pause is none. */
@@ -143,6 +162,27 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
             maxRounds = Math.max(1, maxRounds);
             patience = Math.max(0, patience);
             frozenAfter = Math.max(1000, frozenAfter);
+        }
+    }
+
+    /**
+     * When a run is stuck, and how often it may restart the game. See {@link #DEFAULT_STUCK_AFTER},
+     * {@link #DEFAULT_RESTART_CAP} and {@link #DEFAULT_RESTARTS_WITHIN}.
+     *
+     * @param stuckAfter     how long a plan run may act with no progress; at least a minute
+     * @param restartCap     the restarts allowed within {@code restartsWithin}; at least 1
+     * @param restartsWithin the time the restarts are counted over; at least a minute
+     */
+    public record Recovery(Duration stuckAfter, int restartCap, Duration restartsWithin) {
+        public Recovery {
+            stuckAfter = atLeastAMinute(stuckAfter, DEFAULT_STUCK_AFTER);
+            restartCap = Math.max(1, restartCap);
+            restartsWithin = atLeastAMinute(restartsWithin, DEFAULT_RESTARTS_WITHIN);
+        }
+
+        private static Duration atLeastAMinute(Duration time, Duration fallback) {
+            if (time == null) return fallback;
+            return time.compareTo(Duration.ofMinutes(1)) < 0 ? Duration.ofMinutes(1) : time;
         }
     }
 
@@ -264,10 +304,13 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
             new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
             new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE, DEFAULT_FROZEN_AFTER),
             new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
-            DEFAULT_MAX_RETRY_ATTEMPTS, true);
+            DEFAULT_MAX_RETRY_ATTEMPTS, true,
+            new Recovery(DEFAULT_STUCK_AFTER, DEFAULT_RESTART_CAP, DEFAULT_RESTARTS_WITHIN));
 
     /** A missing part is its default, and fewer than one retry is one. */
     public BotSettings {
+        recovery = recovery == null ? new Recovery(DEFAULT_STUCK_AFTER, DEFAULT_RESTART_CAP, DEFAULT_RESTARTS_WITHIN)
+                : recovery;
         clicks = clicks == null ? new Clicks(DEFAULT_FOUND_DELAY, DEFAULT_NOT_FOUND_DELAY, DEFAULT_RANDOMIZE_CLICKS)
                 : clicks;
         vision = vision == null ? new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN) : vision;
@@ -410,6 +453,21 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
         return loops.frozenAfter;
     }
 
+    /** How long a plan run may act with no progress before it is stuck. */
+    public Duration stuckAfter() {
+        return recovery.stuckAfter;
+    }
+
+    /** How many restarts of the game a run makes within {@link #restartsWithin()} before it stops instead. */
+    public int restartCap() {
+        return recovery.restartCap;
+    }
+
+    /** The time {@link #restartCap()} counts restarts over. */
+    public Duration restartsWithin() {
+        return recovery.restartsWithin;
+    }
+
     /** Where the game runs. */
     public Where where() {
         return runIn.where;
@@ -439,12 +497,13 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     @Link
     public BotSettings confidence(double confidence) {
         return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), loops, runIn, maxRetryAttempts,
-                debug);
+                debug, recovery);
     }
 
     @Link
     public BotSettings compareMargin(double margin) {
-        return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, maxRetryAttempts, debug);
+        return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, maxRetryAttempts, debug,
+                recovery);
     }
 
     @Link
@@ -464,7 +523,25 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     @Link
     public BotSettings maxRetryAttempts(int attempts) {
-        return new BotSettings(clicks, vision, loops, runIn, attempts, debug);
+        return new BotSettings(clicks, vision, loops, runIn, attempts, debug, recovery);
+    }
+
+    /** See {@link #DEFAULT_STUCK_AFTER}. */
+    @Link
+    public BotSettings stuckAfter(Duration time) {
+        return withRecovery(new Recovery(time, recovery.restartCap, recovery.restartsWithin));
+    }
+
+    /** See {@link #DEFAULT_RESTART_CAP}. */
+    @Link
+    public BotSettings restartCap(int restarts) {
+        return withRecovery(new Recovery(recovery.stuckAfter, restarts, recovery.restartsWithin));
+    }
+
+    /** See {@link #DEFAULT_RESTARTS_WITHIN}. */
+    @Link
+    public BotSettings restartsWithin(Duration time) {
+        return withRecovery(new Recovery(recovery.stuckAfter, recovery.restartCap, time));
     }
 
     public BotSettings takeOver(boolean takeOver) {
@@ -472,7 +549,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     public BotSettings debug(boolean on) {
-        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, on);
+        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, on, recovery);
     }
 
     /** Clicks land on the match's centre rather than a random point of it. */
@@ -513,15 +590,19 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     private BotSettings withClicks(Clicks next) {
-        return new BotSettings(next, vision, loops, runIn, maxRetryAttempts, debug);
+        return new BotSettings(next, vision, loops, runIn, maxRetryAttempts, debug, recovery);
     }
 
     private BotSettings withLoops(Loops next) {
-        return new BotSettings(clicks, vision, next, runIn, maxRetryAttempts, debug);
+        return new BotSettings(clicks, vision, next, runIn, maxRetryAttempts, debug, recovery);
     }
 
     private BotSettings withRunIn(RunIn next) {
-        return new BotSettings(clicks, vision, loops, next, maxRetryAttempts, debug);
+        return new BotSettings(clicks, vision, loops, next, maxRetryAttempts, debug, recovery);
+    }
+
+    private BotSettings withRecovery(Recovery next) {
+        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, debug, next);
     }
 
     private static double unit(double value, double fallback) {
