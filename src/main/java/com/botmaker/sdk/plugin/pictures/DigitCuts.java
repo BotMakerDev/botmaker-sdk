@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,31 +74,66 @@ public final class DigitCuts {
     }
 
     /**
-     * Saves the digits of {@code shown} out of {@code image}, character {@code i} being {@code boxes.get(i)}, into
-     * the set {@code name}, replacing a digit it held; a separator is not saved. The first of a repeated digit is.
-     *
-     * @return the digits saved
+     * {@link #characters(BufferedImage)}, with characters that touch split until there are {@code count}: while
+     * fewer, the widest box is cut at its column of least ink, between a quarter and three quarters of its width
+     * (an outlined font joins {@code 3} and {@code 0}). More than {@code count} are left as found.
      */
-    public static List<Integer> save(Path resources, String name, BufferedImage image, List<Rect> boxes,
-                                     String shown) throws IOException {
+    public static List<Rect> characters(BufferedImage image, int count) {
+        List<Rect> boxes = new ArrayList<>(characters(image));
+        if (boxes.isEmpty()) return boxes;
+        int background = background(image);
+        while (boxes.size() < count) {
+            Rect wide = boxes.stream().max(Comparator.comparingInt(Rect::width)).orElseThrow();
+            int from = wide.x() + wide.width() / 4;
+            int to = wide.x() + wide.width() * 3 / 4;
+            if (to <= from) break;
+            int cut = from;
+            int least = Integer.MAX_VALUE;
+            for (int x = from; x <= to; x++) {
+                int inked = 0;
+                for (int y = wide.y(); y < wide.y() + wide.height(); y++) {
+                    if (ink(image.getRGB(x, y), background)) inked++;
+                }
+                if (inked < least) {
+                    least = inked;
+                    cut = x;
+                }
+            }
+            int at = boxes.indexOf(wide);
+            boxes.set(at, new Rect(wide.x(), wide.y(), cut - wide.x() + 1, wide.height()));
+            boxes.add(at + 1, new Rect(cut, wide.y(), wide.x() + wide.width() - cut, wide.height()));
+        }
+        return boxes;
+    }
+
+    /**
+     * Saves the characters of {@code shown} out of {@code image}, character {@code i} being {@code boxes.get(i)},
+     * into the set {@code name}, replacing one it held: each digit, and each mark a number is written with
+     * ({@link DigitReader#SYMBOLS}); a space or any other character is not saved. The first of a repeated one is.
+     *
+     * @return the characters saved, a multiplier as its capital
+     */
+    public static List<Character> save(Path resources, String name, BufferedImage image, List<Rect> boxes,
+                                       String shown) throws IOException {
         Path folder = folder(resources, name);
         Files.createDirectories(folder);
-        List<Integer> saved = new ArrayList<>();
+        List<Character> saved = new ArrayList<>();
         for (int i = 0; i < shown.length(); i++) {
-            int digit = Character.digit(shown.charAt(i), 10);
-            if (digit < 0 || saved.contains(digit)) continue;
-            ImageIO.write(Images.cut(image, boxes.get(i)), "png", folder.resolve(digit + ".png").toFile());
-            saved.add(digit);
+            char symbol = Character.toUpperCase(shown.charAt(i));
+            Optional<String> file = DigitReader.fileOf(symbol);
+            if (file.isEmpty() || saved.contains(symbol)) continue;
+            ImageIO.write(Images.cut(image, boxes.get(i)), "png", folder.resolve(file.get() + ".png").toFile());
+            saved.add(symbol);
         }
         return saved;
     }
 
-    /** The digit pictures the set {@code name} holds on disk. */
+    /** The pictures the set {@code name} holds on disk. */
     public static List<DigitReader.Glyph> held(Path resources, String name) {
         Path folder = folder(resources, name);
-        return DigitReader.load(digit -> {
+        return DigitReader.load(stem -> {
             try {
-                Path file = folder.resolve(digit + ".png");
+                Path file = folder.resolve(stem + ".png");
                 return Files.isRegularFile(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty();
             } catch (IOException unreadable) {
                 return Optional.empty();

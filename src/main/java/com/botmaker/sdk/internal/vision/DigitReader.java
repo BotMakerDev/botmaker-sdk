@@ -14,21 +14,30 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.function.IntFunction;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * {@code Text.readDigits}: a number in a game's own font, read with the font's digit pictures (2026-10-11).
  *
- * <p>Every digit is looked for in the one frame; where two overlap, the surer one stays, or the wider when they are
- * nearly as sure (a {@code 1} is a stroke of a {@code 4}); the line of the surest is read left to right. A gap
+ * <p>Every character is looked for in the one frame; where two overlap, the surer one stays, or the wider when they
+ * are nearly as sure (a {@code 1} is a stroke of a {@code 4}); the line of the surest is read left to right. A gap
  * wider than a digit is a character the set does not hold, so the number is not read rather than read wrong; a
- * narrower one ({@code ,}, {@code .}, {@code /}) is passed over. The digits scale as pictures do, by the whole
- * surface against the bot's screen, not by the area searched.
+ * narrower one is passed over. The characters scale as pictures do, by the whole surface against the bot's screen,
+ * not by the area searched.
+ *
+ * <p>Beside the digits a set may hold the marks a game writes a number with (2026-11-09): {@code ,} is passed over,
+ * {@code .} is a decimal point, {@code K}, {@code M} and {@code B} multiply, and {@code /} ends the number, so
+ * {@code 37.1K} reads 37100 and {@code 300/300} reads 300 ({@link #number}).
  */
 public final class DigitReader {
 
@@ -41,15 +50,27 @@ public final class DigitReader {
     private static final int LONGEST = 18;
     /** Digits shown shorter than this many pixels are enlarged before matching. */
     private static final double SMALL = 12;
+    /** Each mark a set may hold, by the file its picture is saved in: {@code dot.png}. */
+    private static final Map<Character, String> MARKS = Map.of('.', "dot", ',', "comma", '/', "slash", 'K', "k",
+            'M', "m", 'B', "b");
+    /** Every character a set may hold, digits first. */
+    public static final String SYMBOLS = "0123456789.,/KMB";
+    /** A number as {@link #number} reads it: digits, a decimal part, a multiplier. */
+    private static final Pattern NUMBER = Pattern.compile("(\\d+)(\\.\\d+)?([KMB])?");
 
     private DigitReader() {}
 
-    /** A digit's picture. */
-    public record Glyph(int digit, BufferedImage image) {
+    /** A character's picture: a digit or a mark of {@link #SYMBOLS}. */
+    public record Glyph(char symbol, BufferedImage image) {
+
+        /** Whether it is a digit, not a mark. */
+        public boolean digit() {
+            return Character.isDigit(symbol);
+        }
     }
 
-    /** Where a digit was found, in the pixels searched. */
-    record Hit(int digit, int x, int y, int width, int height, double score) {
+    /** Where a character was found, in the pixels searched. */
+    record Hit(char symbol, int x, int y, int width, int height, double score) {
 
         /** Whether {@code other} stands on most of this one's place: one of the two is a misreading. */
         boolean covers(Hit other) {
@@ -68,6 +89,53 @@ public final class DigitReader {
         }
     }
 
+    /**
+     * The name of the file, with no extension, that {@code symbol}'s picture is saved in: the digit itself, or a mark's
+     * word; empty for a character a set does not hold. A lowercase multiplier is its capital.
+     */
+    public static Optional<String> fileOf(char symbol) {
+        if (Character.isDigit(symbol)) return Optional.of(String.valueOf(symbol));
+        return Optional.ofNullable(MARKS.get(Character.toUpperCase(symbol)));
+    }
+
+    /**
+     * The number {@code text} writes, as the game shows it: commas and spaces passed over, read up to a {@code /},
+     * a decimal part kept until a multiplier ({@code K} a thousand, {@code M} a million, {@code B} a billion) and
+     * dropped after it. {@code 37.1K} is 37100, {@code 300/300} is 300, {@code 12.5} is 12. Empty for anything else.
+     */
+    public static OptionalLong number(String text) {
+        if (text == null) return OptionalLong.empty();
+        String plain = text.replace(",", "").replace(" ", "").toUpperCase();
+        int slash = plain.indexOf('/');
+        if (slash >= 0) plain = plain.substring(0, slash);
+        Matcher m = NUMBER.matcher(plain);
+        if (!m.matches() || m.group(1).length() > LONGEST) return OptionalLong.empty();
+        BigDecimal value = new BigDecimal(m.group(1) + (m.group(2) == null ? "" : m.group(2)));
+        if (m.group(3) != null) {
+            value = value.movePointRight(switch (m.group(3)) {
+                case "K" -> 3;
+                case "M" -> 6;
+                default -> 9;
+            });
+        }
+        BigDecimal whole = value.setScale(0, RoundingMode.DOWN);
+        return whole.precision() > LONGEST ? OptionalLong.empty() : OptionalLong.of(whole.longValueExact());
+    }
+
+    /**
+     * The number a readout's text shows, read leniently: {@link #number} over its digits and marks with any other
+     * character dropped ({@code - 130} is 130, {@code 300/300} 300, {@code 37.1K} 37100), else every digit in it
+     * ({@code Lv.12} is 12); empty when it holds no digit or more than a {@code long} holds (2026-11-09).
+     */
+    public static OptionalLong shown(String text) {
+        if (text == null) return OptionalLong.empty();
+        OptionalLong marked = number(text.replaceAll("[^0-9.,/KMBkmb]", ""));
+        if (marked.isPresent()) return marked;
+        String digits = text.replaceAll("\\D", "");
+        return digits.isEmpty() || digits.length() > LONGEST ? OptionalLong.empty()
+                : OptionalLong.of(Long.parseLong(digits));
+    }
+
     /** The number {@code set} reads in {@code source}, or empty when no digit is there or one is missing. */
     public static OptionalLong read(CaptureSource source, DigitSet set, double confidence) {
         BufferedImage frame = source.base().capture();
@@ -77,7 +145,7 @@ public final class DigitReader {
 
     /** The number {@code set} reads in {@code area} of {@code frame}, a whole capture; empty as for the source's. */
     public static OptionalLong read(BufferedImage frame, Rect area, DigitSet set, double confidence) {
-        List<Glyph> glyphs = load(digit -> TemplateSource.read(set.folder() + "/" + digit + ".png", new ArrayList<>())
+        List<Glyph> glyphs = load(file -> TemplateSource.read(set.folder() + "/" + file + ".png", new ArrayList<>())
                 .map(TemplateSource.Found::bytes));
         if (glyphs.isEmpty()) {
             SdkRun.warn(SOURCE, "No digit pictures in " + set.folder() + ": save_digits cuts them from a number the"
@@ -96,11 +164,17 @@ public final class DigitReader {
     }
 
     /**
-     * The number {@code glyphs} read in {@code image}, each digit resized by {@code scale} first. {@code name} names
-     * the set in a warning.
+     * The number {@code glyphs} read in {@code image}, each character resized by {@code scale} first. {@code name}
+     * names the set in a warning.
      */
     public static OptionalLong read(BufferedImage image, double scale, List<Glyph> glyphs, double confidence,
                                     String name) {
+        return text(image, scale, glyphs, confidence, name).map(DigitReader::number).orElse(OptionalLong.empty());
+    }
+
+    /** The characters {@code glyphs} read in {@code image}, as {@link #read} finds them, before they are a number. */
+    public static Optional<String> text(BufferedImage image, double scale, List<Glyph> glyphs, double confidence,
+                                        String name) {
         OpenCvNative.ensureLoaded();
         // A digit a few pixels tall is a handful of pixels to compare: both sides are enlarged first, so a
         // pixel of antialiasing weighs less than a stroke.
@@ -116,7 +190,7 @@ public final class DigitReader {
                 try {
                     for (RawMatch found : OpencvManager.findMultipleMatches(template, background, false,
                             confidence)) {
-                        hits.add(new Hit(glyph.digit(), found.x(), found.y(), found.width(), found.height(),
+                        hits.add(new Hit(glyph.symbol(), found.x(), found.y(), found.width(), found.height(),
                                 found.score()));
                     }
                 } finally {
@@ -126,11 +200,16 @@ public final class DigitReader {
         } finally {
             background.release();
         }
-        return assemble(hits, name);
+        return spelled(hits, name);
     }
 
-    /** The number the hits spell: the better of each overlapping pair, on the surest one's line, left to right. */
+    /** The number the hits spell, as {@link #number} reads {@link #spelled their characters}. */
     static OptionalLong assemble(List<Hit> hits, String name) {
+        return spelled(hits, name).map(DigitReader::number).orElse(OptionalLong.empty());
+    }
+
+    /** The characters the hits spell: the better of each overlapping pair, on the surest one's line, left to right. */
+    static Optional<String> spelled(List<Hit> hits, String name) {
         List<Hit> ranked = new ArrayList<>(hits);
         ranked.sort(Comparator.comparingDouble(Hit::score).reversed());
         List<Hit> kept = new ArrayList<>();
@@ -143,40 +222,42 @@ public final class DigitReader {
                 kept.add(hit);
             }
         }
-        if (kept.isEmpty()) return OptionalLong.empty();
+        if (kept.isEmpty()) return Optional.empty();
         Hit surest = kept.stream().max(Comparator.comparingDouble(Hit::score)).orElseThrow();
         List<Hit> line = kept.stream().filter(surest::sameLine).sorted(Comparator.comparingInt(Hit::x)).toList();
-        int widest = line.stream().mapToInt(Hit::width).max().orElse(0);
-        StringBuilder digits = new StringBuilder();
+        int widest = line.stream().filter(h -> Character.isDigit(h.symbol())).mapToInt(Hit::width).max()
+                .orElse(line.stream().mapToInt(Hit::width).max().orElse(0));
+        StringBuilder text = new StringBuilder();
         for (int i = 0; i < line.size(); i++) {
             Hit hit = line.get(i);
             if (i > 0) {
                 Hit before = line.get(i - 1);
                 if (hit.x() - (before.x() + before.width()) > MISSING * widest) {
-                    SdkRun.warn(SOURCE, "A character after \"" + digits + "\" is not in the " + name + " digits:"
+                    SdkRun.warn(SOURCE, "A character after \"" + text + "\" is not in the " + name + " digits:"
                             + " save_digits on a number that shows it.");
-                    return OptionalLong.empty();
+                    return Optional.empty();
                 }
             }
-            digits.append(hit.digit());
+            text.append(hit.symbol());
         }
-        return digits.length() > LONGEST ? OptionalLong.empty() : OptionalLong.of(Long.parseLong(digits.toString()));
+        return Optional.of(text.toString());
     }
 
     /**
-     * The digit pictures {@code bytes} gives, {@code 0.png} to {@code 9.png} by digit; a missing or unreadable one
-     * is left out.
+     * The pictures {@code bytes} gives, by file name with no extension ({@code 0} to {@code 9}, then each mark's
+     * word, as {@link #fileOf} names them); a missing or unreadable one is left out.
      */
-    public static List<Glyph> load(IntFunction<Optional<byte[]>> bytes) {
+    public static List<Glyph> load(Function<String, Optional<byte[]>> bytes) {
         List<Glyph> glyphs = new ArrayList<>();
-        for (int digit = 0; digit <= 9; digit++) {
-            Optional<byte[]> png = bytes.apply(digit);
+        for (char symbol : SYMBOLS.toCharArray()) {
+            String file = fileOf(symbol).orElseThrow();
+            Optional<byte[]> png = bytes.apply(file);
             if (png.isEmpty()) continue;
             try {
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(png.get()));
-                if (image != null) glyphs.add(new Glyph(digit, image));
+                if (image != null) glyphs.add(new Glyph(symbol, image));
             } catch (IOException unreadable) {
-                SdkRun.warn(SOURCE, digit + ".png is not an image: " + unreadable.getMessage());
+                SdkRun.warn(SOURCE, file + ".png is not an image: " + unreadable.getMessage());
             }
         }
         return glyphs;

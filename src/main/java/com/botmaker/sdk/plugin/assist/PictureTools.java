@@ -1081,7 +1081,7 @@ final class PictureTools {
         Optional<Rect> area = Frames.within(frame.get(), digits.x(), digits.y(), digits.width(), digits.height());
         if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
         BufferedImage number = Images.cut(frame.get(), area.get());
-        List<Rect> boxes = DigitCuts.characters(number);
+        List<Rect> boxes = DigitCuts.characters(number, shows.length());
         AgentReply seen = AgentReply.image(enlarged(number, boxes));
         if (boxes.size() != shows.length()) {
             return AgentReply.refused("That box holds " + boxes.size() + " characters apart, but \"" + shows + "\" has "
@@ -1106,7 +1106,7 @@ final class PictureTools {
         Placed<DigitSet> placed = FxCall.call(() -> place(context.services(), DIGITS, constant, live,
                 at -> at.equals(live) ? set : set.in(live)));
         if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done()).and(seen);
-        List<Integer> saved;
+        List<Character> saved;
         try {
             saved = DigitCuts.save(resources.get(), name, number, boxes, shows);
         } catch (IOException e) {
@@ -1114,12 +1114,14 @@ final class PictureTools {
         }
         List<DigitReader.Glyph> held = DigitCuts.held(resources.get(), name);
         Frames.mark(context, area.get(), Marks.Kind.NOTE, constant);
-        List<Integer> has = held.stream().map(DigitReader.Glyph::digit).toList();
-        List<Integer> lacks = IntStream.rangeClosed(0, 9).boxed().filter(d -> !has.contains(d)).toList();
-        String expected = shows.replaceAll("\\D", "").replaceFirst("^0+(?=.)", "");
+        List<Character> has = held.stream().map(DigitReader.Glyph::symbol).toList();
+        List<Character> lacks = IntStream.rangeClosed('0', '9').mapToObj(d -> (char) d)
+                .filter(d -> !has.contains(d)).toList();
+        OptionalLong wants = DigitReader.number(shows);
+        String expected = wants.isPresent() ? String.valueOf(wants.getAsLong()) : shows;
         OptionalLong read = DigitReader.read(number, 1, held, Frames.confidence(context.services()), name);
         String check = read.isEmpty() ? "It cannot read this box back: box it again, with more plain background."
-                : String.valueOf(read.getAsLong()).equals(expected) ? "It reads this box as " + expected + "."
+                : wants.equals(read) ? "It reads this box as " + expected + "."
                 : "It reads this box as " + read.getAsLong() + ", not " + expected + ": box it again, with more plain"
                 + " background.";
         return AgentReply.text("Saved digits " + digitList(saved) + " into Digits." + constant + " ("
@@ -1207,9 +1209,10 @@ final class PictureTools {
         }
     }
 
-    /** {@code 0 1 5}. */
-    private static String digitList(List<Integer> digits) {
-        return digits.stream().sorted().map(String::valueOf).collect(Collectors.joining(" "));
+    /** {@code 0 1 5 . K}: digits first, then marks, each in {@link DigitReader#SYMBOLS}' order. */
+    private static String digitList(List<Character> symbols) {
+        return symbols.stream().sorted(Comparator.comparingInt(c -> DigitReader.SYMBOLS.indexOf(c)))
+                .map(String::valueOf).collect(Collectors.joining(" "));
     }
 
     /** A number cut from the screen at a size the assistant can see it, each character it was cut into boxed. */

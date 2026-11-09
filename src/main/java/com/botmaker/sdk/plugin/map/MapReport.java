@@ -8,7 +8,9 @@ import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
@@ -349,6 +351,13 @@ public final class MapReport {
                     && graph.pathTo(root.get(), c, e -> true).isEmpty()) {
                 problems.add(name + ": no way from " + graph.shown(root.get()) + " reaches it, so a run cannot go "
                         + "there.");
+            }
+            // A walk closes a popup by its way out, else the usual close button, and stops where neither shows
+            // (Logging in, a loading popup, 2026-11-09). A key or the bot's own code is never pressed to close one.
+            if (screen.isPopup() && graph.backOf(c).map(ScreenGraph.Edge::via)
+                    .filter(via -> !(via instanceof Hotkey || via instanceof Custom)).isEmpty()) {
+                problems.add(name + ": a popup with no way out mapped, so a walk that meets it stops unless the usual "
+                        + "close button shows: map its close button, or set_kind screen when it goes by itself.");
             }
             for (String field : graph.unseen(c)) {
                 // Its method says when to look.

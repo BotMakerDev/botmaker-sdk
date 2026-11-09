@@ -11,7 +11,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DigitReaderTest {
 
     private static DigitReader.Hit hit(int digit, int x, double score) {
-        return new DigitReader.Hit(digit, x, 10, 12, 20, score);
+        return hit((char) ('0' + digit), x, score);
+    }
+
+    private static DigitReader.Hit hit(char symbol, int x, double score) {
+        return new DigitReader.Hit(symbol, x, 10, 12, 20, score);
+    }
+
+    @Test
+    void marksSpellADecimalAMultiplierAndAFraction() {
+        // 37.1K: the dot and the K are characters of the set, read in their places.
+        assertEquals(OptionalLong.of(37100), DigitReader.assemble(List.of(hit(3, 2, 0.97), hit(7, 14, 0.97),
+                hit('.', 26, 0.95), hit(1, 38, 0.96), hit('K', 50, 0.95)), "top_bar"));
+        assertEquals(OptionalLong.of(300), DigitReader.number("300/300"), "a count of a most reads the count");
+        assertEquals(OptionalLong.of(12500), DigitReader.number("12,500"));
+        assertEquals(OptionalLong.of(2_000_000), DigitReader.number("2M"));
+        assertEquals(OptionalLong.of(1_250_000_000), DigitReader.number("1.25b"));
+        assertEquals(OptionalLong.of(12), DigitReader.number("12.5"), "a decimal with no multiplier is cut");
+        assertEquals(OptionalLong.empty(), DigitReader.number("K"));
+        assertEquals(OptionalLong.empty(), DigitReader.number("1.2.3"));
     }
 
     @Test
@@ -26,7 +44,7 @@ class DigitReaderTest {
         assertEquals(OptionalLong.of(42), DigitReader.assemble(List.of(hit(4, 2, 0.97), hit(1, 5, 0.86),
                 hit(2, 14, 0.95)), "gold"));
         // Nearly as sure, the narrow 1 still loses to the whole 4 it is a stroke of.
-        DigitReader.Hit stroke = new DigitReader.Hit(1, 7, 10, 5, 20, 0.97);
+        DigitReader.Hit stroke = new DigitReader.Hit('1', 7, 10, 5, 20, 0.97);
         assertEquals(OptionalLong.of(4), DigitReader.assemble(List.of(stroke, hit(4, 2, 0.95)), "gold"));
     }
 
@@ -57,7 +75,7 @@ class DigitReaderTest {
 
     @Test
     void onlyTheSurestDigitsLineIsRead() {
-        DigitReader.Hit below = new DigitReader.Hit(9, 2, 60, 12, 20, 0.9);
+        DigitReader.Hit below = new DigitReader.Hit('9', 2, 60, 12, 20, 0.9);
         assertEquals(OptionalLong.of(3), DigitReader.assemble(List.of(hit(3, 2, 0.97), below), "gold"));
     }
 

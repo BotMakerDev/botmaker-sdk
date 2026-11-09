@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.screens.ShadeFit.Fit;
 import com.botmaker.sdk.internal.vision.FrameChange;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -155,7 +157,7 @@ public final class Versions {
         if (resources == null) return new Shown(List.of(), List.of());
         List<Shade> learned = FxCall.call(() -> Frames.shades(services));
         Path store = MapAudit.store(resources, MapAudit.Kept.VERSIONS);
-        return new Shown(proposals(kept(resources, store), presses(resources, store), learned),
+        return new Shown(proposals(kept(resources, store), presses(resources, store), learned, screensOf(services)),
                 learned.stream().filter(s -> s.cause() == Shade.Cause.GAME).toList());
     }
 
@@ -180,6 +182,12 @@ public final class Versions {
      * proposed. The shade is the group's first fit's, so its id holds while more sightings come.
      */
     static List<Proposal> proposals(List<Sighting> kept, List<Press> presses, List<Shade> learned) {
+        return proposals(kept, presses, learned, Map.of());
+    }
+
+    /** {@link #proposals}, a toast telling only of the buttons on its own screen ({@link #screensOf}). */
+    static List<Proposal> proposals(List<Sighting> kept, List<Press> presses, List<Shade> learned,
+                                    Map<String, Set<String>> screens) {
         List<List<Sighting>> groups = new ArrayList<>();
         for (Sighting s : kept) {
             if (s.screen() || s.plain() || ShadeFit.closest(s.fit(), learned, Set.of(Shade.Cause.GAME)).isPresent()) {
@@ -191,7 +199,7 @@ public final class Versions {
         return groups.stream().map(g -> {
             Fit first = g.getFirst().fit();
             List<String> pictures = g.stream().map(Sighting::picture).distinct().toList();
-            Meant meant = meant(first, pictures, kept, presses);
+            Meant meant = meant(first, pictures, kept, presses, screens);
             Shade shade = first.learned(Shade.Cause.GAME, meant.state());
             Set<String> ids = new LinkedHashSet<>();
             g.forEach(s -> ids.add(id(learned(s.fit()))));
@@ -216,16 +224,21 @@ public final class Versions {
 
     /**
      * What {@code fit}, seen on {@code pictures}, means: the latest press of one of them that did nothing makes it
-     * {@code Disabled}, then one that showed a toast asks the author for a {@code Blocks} state named from its words,
+     * {@code Disabled}, then, for one picture alone, a press that showed a toast asks the author for a {@code Blocks}
+     * state named from its words,
      * then one that answered asks for a {@code Presses} state; with no press, a version its button showed no more when
      * seen again is {@code Disabled}, and one still shown in a later session asks for a {@code Blocks} state; else its
      * kind says ({@link #meaning}).
      */
-    static Meant meant(Fit fit, List<String> pictures, List<Sighting> kept, List<Press> presses) {
+    static Meant meant(Fit fit, List<String> pictures, List<Sighting> kept, List<Press> presses,
+                       Map<String, Set<String>> screens) {
         State kind = meaning(fit.kind());
         for (Answer answer : Answer.values()) {
             for (Press p : presses.reversed()) {
                 if (p.answer() != answer || !pictures.contains(p.picture()) || !p.fit().alike(fit)) continue;
+                // A toast's words tell of the buttons shown with the pressed one, never of an alike shade on another
+                // screen (skills_loadout_prev's "Loadout 1" named Home's stage_package, 2026-11-09).
+                if (answer == Answer.TOAST && !sameScreen(p.picture(), pictures, screens)) continue;
                 String why = "pressing " + p.picture() + " " + answer.said(p.said());
                 return switch (answer) {
                     case NOTHING -> new Meant(State.DISABLED, why, null);
@@ -247,6 +260,31 @@ public final class Versions {
             }
         }
         return new Meant(kind, null, null);
+    }
+
+    /** Whether each of {@code pictures} is on a screen {@code pressed} is on; a picture the map places nowhere is. */
+    private static boolean sameScreen(String pressed, List<String> pictures, Map<String, Set<String>> screens) {
+        Set<String> on = screens.getOrDefault(pressed, Set.of());
+        if (on.isEmpty()) return true;
+        return pictures.stream().map(picture -> screens.getOrDefault(picture, Set.of()))
+                .allMatch(its -> its.isEmpty() || its.stream().anyMatch(on::contains));
+    }
+
+    /** The screens each picture is on in {@code graph}, by picture id. */
+    static Map<String, Set<String>> screensOf(ScreenGraph graph) {
+        Map<String, Set<String>> screens = new HashMap<>();
+        graph.screens().keySet().forEach(constant -> graph.pictures(constant)
+                .forEach(id -> screens.computeIfAbsent(id, k -> new HashSet<>()).add(constant)));
+        return screens;
+    }
+
+    /** {@link #screensOf} the project's map, read on the FX thread; none when it does not read. */
+    private static Map<String, Set<String>> screensOf(StudioServices services) {
+        try {
+            return screensOf(FxCall.call(() -> ScreenDesk.read(services)));
+        } catch (RuntimeException unread) {
+            return Map.of();
+        }
     }
 
     /** Whether {@code picture} was seen as cut after it showed {@code fit}, the screen not shaded over it. */
@@ -320,8 +358,8 @@ public final class Versions {
         Sight sight = read(seen);
         Path store = MapAudit.store(resources, MapAudit.Kept.VERSIONS);
         record(resources, store, frame, sight);
-        return said(sight, seen.size(), proposals(kept(resources, store), presses(resources, store), learned),
-                learned, added);
+        return said(sight, seen.size(), proposals(kept(resources, store), presses(resources, store), learned,
+                screensOf(context.services())), learned, added);
     }
 
     /** {@code sight} of a frame of {@code buttons} buttons as sentences, {@code added} after; blank for nothing. */
@@ -412,7 +450,7 @@ public final class Versions {
                     shown)), List.of(), List.of()));
             keep(resources.get(), store, new Press(press.picture(), shown, answer, read));
             Optional<Proposal> of = proposal(proposals(kept(resources.get(), store), presses(resources.get(), store),
-                    learned), press.picture(), shown);
+                    learned, screensOf(context.services())), press.picture(), shown);
             return new Pressing("Pressing " + press.picture() + ", shown " + shown.kind().displayName() + ", "
                     + answer.said(read) + (of.filter(Proposal::shared).isPresent() ? ": " + learning(of.get())
                     : ". A shade is learned once two buttons show it."), Optional.empty());
@@ -523,7 +561,8 @@ public final class Versions {
         String typed = id == null ? "" : id.strip();
         Path store = MapAudit.store(resources, MapAudit.Kept.VERSIONS);
         // A shared group first: two groups' ids may share their four digits.
-        Optional<Proposal> proposal = proposals(kept(resources, store), presses(resources, store), learned).stream()
+        Optional<Proposal> proposal = proposals(kept(resources, store), presses(resources, store), learned,
+                screensOf(services)).stream()
                 .filter(p -> p.ids().contains(typed)).min(Comparator.comparing(p -> !p.shared()));
         if (proposal.isEmpty()) {
             return ScreenEdits.NOT_WRITTEN + "no fit " + id + " is proposed; which_screen names the fits it saw.";

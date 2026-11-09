@@ -294,4 +294,15 @@ class RunFactsTest {
         assertFalse(found.contains(Hero.Kind.class), "only top-level classes");
         assertEquals(List.of(), ParamGroups.allBeside(String.class), "not a bot's holder");
     }
+
+    /** A number as a game writes it (Sword x Staff's top bar, 2026-11-09): energy 300/300, Rolla 37.1K. */
+    @Test
+    void aNumberFactReadsTheGamesWayOfWritingOne() {
+        assertEquals(Optional.of(300), RunFacts.parse(int.class, Optional.of("300/300")));
+        assertEquals(Optional.of(37100), RunFacts.parse(int.class, Optional.of("37.1K")));
+        assertEquals(Optional.of(130), RunFacts.parse(int.class, Optional.of("- 130")));
+        assertEquals(Optional.of(12), RunFacts.parse(int.class, Optional.of("Lv.12")));
+        assertEquals(Optional.empty(), RunFacts.parse(int.class, Optional.of("99999999999")), "past an int");
+        assertEquals(Optional.empty(), RunFacts.parse(int.class, Optional.of("none")));
+    }
 }

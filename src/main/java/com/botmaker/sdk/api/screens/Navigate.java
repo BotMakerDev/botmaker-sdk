@@ -18,6 +18,7 @@ import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenValues;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.trace.Say;
+import com.botmaker.sdk.internal.vision.DigitReader;
 
 import java.awt.image.BufferedImage;
 import java.util.LinkedHashMap;
@@ -265,19 +266,14 @@ public final class Navigate {
     }
 
     /**
-     * {@link #read} as a number: the digits it shows, every other mark passed over, so {@code 1,250} is 1250 and
-     * {@code 350/500} 350500; empty as for {@link #read}, or when it shows no digit.
+     * {@link #read} as a number, as the game writes one: {@code 1,250} is 1250, {@code 37.1K} 37100 and
+     * {@code 350/500} 350, the count before the most (2026-11-09); empty as for {@link #read}, or when it shows no
+     * digit.
      */
     @Hidden("as read: no block can pick a readout yet")
     @ReadsScreen
     public static OptionalLong number(Readout readout) {
-        String digits = read(readout).map(text -> text.replaceAll("\\D", "")).orElse("");
-        if (digits.isEmpty()) return OptionalLong.empty();
-        try {
-            return OptionalLong.of(Long.parseLong(digits));
-        } catch (NumberFormatException tooLong) {
-            return OptionalLong.empty();
-        }
+        return read(readout).map(DigitReader::shown).orElse(OptionalLong.empty());
     }
 
     /**

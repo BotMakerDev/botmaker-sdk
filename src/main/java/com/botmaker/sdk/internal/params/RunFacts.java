@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.trace.Say;
+import com.botmaker.sdk.internal.vision.DigitReader;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
@@ -309,20 +310,14 @@ public final class RunFacts {
     static Optional<Object> parse(Class<?> type, Optional<String> text) {
         if (type == boolean.class || type == Boolean.class) return Optional.of(text.isPresent());
         if (type == int.class || type == Integer.class) {
-            return text.map(shown -> shown.replaceAll("\\D", "")).filter(digits -> !digits.isEmpty())
-                    .flatMap(RunFacts::integer);
+            // As the game writes a number: 300/300 is 300, 37.1K is 37100 (2026-11-09).
+            return text.map(DigitReader::shown).filter(OptionalLong::isPresent).map(OptionalLong::getAsLong)
+                    .filter(n -> n >= Integer.MIN_VALUE && n <= Integer.MAX_VALUE).map(n -> (Object) n.intValue());
         }
         if (type == String.class) return text.map(String::strip).filter(shown -> !shown.isEmpty()).map(Object.class::cast);
         return text.flatMap(shown -> constant(type, shown));
     }
 
-    private static Optional<Object> integer(String digits) {
-        try {
-            return Optional.of(Integer.parseInt(digits));
-        } catch (NumberFormatException tooLong) {
-            return Optional.empty();
-        }
-    }
 
     /** {@code type}'s constant {@code text} names, read loosely: {@code "Fire mage"} is {@code FIRE_MAGE}. */
     private static Optional<Object> constant(Class<?> type, String text) {

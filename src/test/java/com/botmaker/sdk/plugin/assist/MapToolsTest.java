@@ -6,6 +6,8 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -236,5 +238,26 @@ class MapToolsTest {
         assertEquals(Optional.of("slotWeapon"), MapTools.spotField(character, "slotweapon"), "as a field is routed");
         assertEquals(Optional.empty(), MapTools.spotField(character, "charSkillIcon"), "the anchor's button is not one");
         assertEquals(Optional.empty(), MapTools.spotField(character, "char_skill_icon"), "a picture is not a field");
+    }
+
+    /** which_screen says what each readout of the screen shown reads, as a run would (2026-11-09). */
+    @Test
+    void theScreenShownSaysWhatItsReadoutsRead() {
+        Readout gems = Readout.text(new Zone(780, 65, 64, 33));
+        Readout energy = Readout.text(new Zone(400, 65, 90, 33));
+        Readout rolla = Readout.text(new Zone(612, 65, 84, 33));
+        Map<String, Readout> readouts = new LinkedHashMap<>();
+        readouts.put("gems", gems);
+        readouts.put("energy", energy);
+        readouts.put("rolla", rolla);
+        ScreenGraph graph = ScreenGraph.of(Map.of("HOME", new MapScreen(Setup.named("Home"), Map.of(), readouts)));
+        Map<Readout, Optional<String>> shown = Map.of(gems, Optional.of("130"), energy, Optional.empty());
+        assertEquals(" Its readouts read: gems \"130\", energy nothing, rolla unreadable.",
+                MapTools.readings(graph, "HOME", r -> {
+                    if (r == rolla) throw new IllegalStateException("words not read");
+                    return shown.get(r);
+                }));
+        assertEquals("", MapTools.readings(ScreenGraph.of(Map.of("HOME", new MapScreen(Setup.named("Home"),
+                Map.of(), Map.of()))), "HOME", r -> Optional.empty()), "a screen with no readout says nothing");
     }
 }

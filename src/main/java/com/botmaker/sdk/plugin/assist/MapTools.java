@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -28,6 +29,7 @@ import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.vision.FrameChange;
@@ -1447,7 +1449,9 @@ final class MapTools {
             String popup = seen.over().map(c -> "The popup " + graph.shown(c) + " (Screens." + c + ") shows over "
                     + "it: go_to_screen closes it on the way.").orElse("");
             return seen.here().map(c -> "On " + graph.shown(c) + " (Screens." + c + "): its marker shows."
-                            + looks(graph, c, seen.walk(), frame) + (popup.isEmpty() ? "" : " " + popup))
+                            + looks(graph, c, seen.walk(), frame)
+                            + (popup.isEmpty() ? readings(graph, c, r -> seen.reach().readout(r, frame))
+                            : " " + popup))
                     .orElse(popup.isEmpty() ? "No screen of the bot's Screens shows: none of their markers is found."
                             : popup.replace(" over it", ""));
         });
@@ -1460,7 +1464,29 @@ final class MapTools {
     }
 
     /** A frame read against the map: the screen whose markers it shows, and the popup over it. */
-    private record Seen(ScreenGraph graph, ScreenWalk walk, Optional<String> here, Optional<String> over) {}
+    private record Seen(ScreenGraph graph, ScreenWalk walk, Reach reach, Optional<String> here,
+                        Optional<String> over) {}
+
+    /**
+     * What each of {@code constant}'s readouts shows, {@code read} as a run reads it: {@code " Its readouts read:
+     * gems \"130\", energy \"300/300\"."}, so a wrong zone or digit set shows before a fact is fed from it (2026-11-09).
+     * Blank for a screen with none.
+     */
+    static String readings(ScreenGraph graph, String constant, Function<Readout, Optional<String>> read) {
+        Map<String, Readout> readouts = graph.screens().get(constant).readouts();
+        if (readouts.isEmpty()) return "";
+        List<String> each = new ArrayList<>();
+        readouts.forEach((name, readout) -> {
+            String shows;
+            try {
+                shows = read.apply(readout).map(text -> "\"" + text + "\"").orElse("nothing");
+            } catch (RuntimeException unread) {
+                shows = "unreadable";
+            }
+            each.add(name + " " + shows);
+        });
+        return " Its readouts read: " + String.join(", ", each) + ".";
+    }
 
     private static Optional<Seen> read(AgentContext context, BufferedImage frame) {
         ScreenGraph graph;
@@ -1477,7 +1503,7 @@ final class MapTools {
         Optional<String> over = walk.popupOn(frame);
         // A screen mapped before shots were kept gets one the first time it is seen with nothing over it.
         if (over.isEmpty()) here.ifPresent(c -> ScreenShots.saveIfMissing(context.services(), graph, c, frame));
-        return Optional.of(new Seen(graph, walk, here, over));
+        return Optional.of(new Seen(graph, walk, reach.get(), here, over));
     }
 
     /**

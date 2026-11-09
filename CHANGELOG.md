@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- A Digits set reads the marks a game writes a number with (2026-11-09): `save_digits` saves `.`, `,`, `/` and the
+  `K`, `M`, `B` multipliers beside the digits, so `37.1K` reads 37100 and `300/300` reads 300, and it splits glyphs
+  that touch to the count of characters shown. `Navigate.number` and a number fact read from a text readout parse the
+  same way: `350/500` is 350, no longer 350500.
+- `read_map` names a popup with no way out mapped, where a walk that meets it stops (2026-11-09).
+- `which_screen` says what each readout of the screen shown reads (2026-11-09).
+- A toast's words propose a `Blocks` state only for buttons on the pressed one's screen, never an alike shade on
+  another screen (2026-11-09).
 - `edit_map add_readout(screen, name, zone[, digits])` makes a screen read a Zones area as a readout, by OCR or by a
   Digits set (2026-11-09). Until now only a cut on the overlay board made one, so an assistant could not give
   `add_fact` the readout it asks for; its refusal now names `add_readout`.

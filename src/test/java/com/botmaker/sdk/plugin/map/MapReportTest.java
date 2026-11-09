@@ -102,6 +102,17 @@ class MapReportTest {
     }
 
     @Test
+    void aPopupWithNoWayOutIsSaid() {
+        // Logging in: a loading popup with no input, where a walk stopped and read_map said nothing (2026-11-09).
+        Map<String, MapScreen> screens = screens();
+        screens.put("LOADING", screen(Setup.named("Logging in").markers(marks("reward")).popup()));
+        List<String> problems = MapReport.problems(ScreenGraph.of(screens), id -> true, id -> true, "LOADING");
+        assertEquals(List.of("Logging in: a popup with no way out mapped, so a walk that meets it stops unless the "
+                + "usual close button shows: map its close button, or set_kind screen when it goes by itself."),
+                problems);
+    }
+
+    @Test
     void looksAndTheMethodsSayingWhenAreRead() {
         Map<String, MapScreen> screens = screens();
         screens.put("HOME", with(screens.get("HOME"),

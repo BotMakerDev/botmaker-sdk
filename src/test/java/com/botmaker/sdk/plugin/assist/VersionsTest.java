@@ -11,6 +11,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -166,6 +168,21 @@ class VersionsTest {
                 3, List.of(proposal), List.of(), List.of());
         assertTrue(said.contains("learn_shade fit " + proposal.id() + " state Blocks.NOT_ENOUGH_GOLD"), said);
         assertTrue(said.contains("Ask the author"), said);
+    }
+
+    /** skills_loadout_prev's toast "Loadout 1" named Home's stage_package, brightened alike (2026-11-09). */
+    @Test
+    void aToastTellsNothingOfAnAlikeButtonOnAnotherScreen() {
+        dimmedOnTwo();
+        press("play", Versions.Answer.TOAST, "Not enough gold!");
+        Map<String, Set<String>> screens = Map.of("play", Set.of("HOME"), "shop", Set.of("SKILLS"));
+        Versions.Proposal proposal = Versions.proposals(kept(), Versions.presses(folder, store()), List.of(), screens)
+                .getFirst();
+        assertNull(proposal.asks(), "no Blocks state for shop, which play's toast never spoke of");
+        assertNull(proposal.why());
+        assertEquals("Blocks.NOT_ENOUGH_GOLD", Versions.proposals(kept(), Versions.presses(folder, store()),
+                List.of(), Map.of("play", Set.of("HOME"), "shop", Set.of("HOME"))).getFirst().asks().id(),
+                "one screen's buttons share a toast's words");
     }
 
     @Test
