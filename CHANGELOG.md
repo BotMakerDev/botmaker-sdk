@@ -26,7 +26,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Zones.java`, `CaptureSource.region(Zone)` and the `save_region` tool are gone, with no deprecated release. The
   assistant's `edit_map add_text`, `add_readout` and `set_input`'s `dragInto` take an `anchor` picture and a `box` of the
   last screenshot and measure the area themselves; the cut form's readout, words and digits pick the picture beside them.
-  A bot that named a `Zones` constant no longer compiles: recut each area beside its icon.
+  A bot that named a `Zones` constant no longer compiles: recut each area beside its icon. On a block an area is a
+  read-only pill, the anchor's thumbnail and `1.2, 0 from gold_icon, 3 x 1`, warning when the picture's file is gone.
+  `which_screen` says why a readout reads nothing: `coins nothing (coin_icon is not shown)`, or its box placed off the
+  screen.
 - A Digits set reads the marks a game writes a number with (2026-11-09): `save_digits` saves `.`, `,`, `/` and the
   `K`, `M`, `B` multipliers beside the digits, so `37.1K` reads 37100 and `300/300` reads 300, and it splits glyphs
   that touch to the count of characters shown. `Navigate.number` and a number fact read from a text readout parse the

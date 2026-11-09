@@ -10,7 +10,13 @@ import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.api.screens.Area;
 import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
+import javafx.scene.image.ImageView;
+
+import java.util.Optional;
 
 /**
  * The three editors for the SDK's geometry types, which are one editor three times
@@ -25,6 +31,10 @@ import javafx.scene.Node;
  * they know where its ends are. So {@code Rect} drags a rectangle, {@code Point} uses the magnifier, and
  * {@code Size} drags a rectangle and throws the origin away — which is exactly how a person measures
  * something on a screen.
+ *
+ * <p>An {@code Area}, a box measured from a picture (2026-11-09), is the fourth: where a {@code Rect} is a box on the
+ * screen, an area is a box beside a picture, so it sits with them. Its pill is read-only, the anchor's thumbnail and
+ * the box in the anchor's units, since its numbers come from two cuts and are never typed.
  */
 public final class GeometryEditors {
 
@@ -60,6 +70,34 @@ public final class GeometryEditors {
     public static Node size(ValueContext ctx) {
         // SIZE, never spec(SIZE, …): a size is the same inside a window and on the desktop.
         return tuple(ctx, Size.class, SIZE);
+    }
+
+    /**
+     * An {@code Area}: its anchor's thumbnail and the box, {@code 1.25, 0 from ore, 2 x 0.5} (2026-11-09). Read-only:
+     * the four numbers are computed from two cuts, the anchor's and the box's, never typed, and a new anchor without
+     * a new box would leave them measuring from the wrong picture. The assistant cuts one (add_readout, add_text,
+     * set_input's dragInto).
+     */
+    public static Node area(ValueContext ctx) {
+        Optional<Area> value = ctx.value(Area.class);
+        if (value.isEmpty()) return Pills.bare(Slots.sourceOr(ctx, "An area beside a picture"));
+        Area area = value.get();
+        Label pill = Pills.value(area.said(), "");
+        ImageView anchor = TemplateEditors.thumbnail(ctx.services(), area.anchor(), TemplateEditors.CHIP);
+        pill.setGraphic(anchor);
+        pill.setTooltip(new Tooltip(anchor == null
+                ? "No picture file called " + area.anchor().id() + " — it was deleted, or never captured. The bot "
+                        + "never finds this area: recut it beside a picture that exists."
+                : "Measured from the picture " + area.anchor().id() + " (" + area.said() + "): from its top-left "
+                        + "corner to the box's, in its widths and heights (negative: left, above), then the box's "
+                        + "size, so it follows the picture wherever and however big the game draws it. Recut it "
+                        + "from two cuts, the picture's and the box's."));
+        return pill;
+    }
+
+    /** An {@code Area} beside a declared choice: the same words as its pill; {@code null} for the plain label. */
+    public static Node areaPreview(ValueContext ctx) {
+        return ctx.value(Area.class).map(area -> (Node) new Label(area.said())).orElse(null);
     }
 
     /** The tuple pill over the host's declaration of {@code type}; read-only on a host that has none to give. */

@@ -54,7 +54,7 @@ import java.util.function.Consumer;
 public final class TemplateEditors {
 
     /** The frame a picture is shown in on a block, and twice that is what is decoded for it. */
-    private static final double CHIP = 34;
+    static final double CHIP = 34;
     /** The tile beside a declared choice — smaller, because it sits in a list of them. */
     private static final double TILE = 48;
 
@@ -103,15 +103,28 @@ public final class TemplateEditors {
      * of "this picture was deleted", and the same answer the pill above gives.
      */
     public static Node preview(ValueContext ctx) {
-        String name = nameOf(ctx);
-        int frames = FrameViews.frames(ctx.services(), name);
-        Image picture = picture(ctx.services(), name, TILE, frames);
+        ImageView view = thumbnail(ctx.services(), nameOf(ctx), TILE);
+        return view == null ? null : Styles.on(new HBox(view), Styles.TILE);
+    }
+
+    /**
+     * {@code template}'s thumbnail fitted in {@code size}, or {@code null} when its file is gone: what another editor
+     * shows beside its own words, as the area pill shows its anchor.
+     */
+    static ImageView thumbnail(StudioServices services, ImageTemplate template, double size) {
+        return thumbnail(services, baseNameOf(template.filePath()), size);
+    }
+
+    /** The picture called {@code name} fitted in {@code size}, its first frame for a moving one; {@code null} for none. */
+    private static ImageView thumbnail(StudioServices services, String name, double size) {
+        int frames = FrameViews.frames(services, name);
+        Image picture = picture(services, name, size, frames);
         if (picture == null) return null;
         ImageView view = FrameViews.firstFrame(new ImageView(picture), frames);
-        view.setFitWidth(TILE);
-        view.setFitHeight(TILE);
+        view.setFitWidth(size);
+        view.setFitHeight(size);
         view.setPreserveRatio(true);
-        return Styles.on(new HBox(view), Styles.TILE);
+        return view;
     }
 
     // ── several pictures ────────────────────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.State;
@@ -81,8 +82,8 @@ public final class SdkTypes implements TypeHolder {
 
     @Override
     public List<PluginType<?>> types() {
-        return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, KEY,
-                MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
+        return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
+                KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
                 STATE);
     }
 
@@ -204,6 +205,18 @@ public final class SdkTypes implements TypeHolder {
             .fresh(() -> new Rect(0, 0, 0, 0))
             .editor(() -> GeometryEditors::rect)
             .writtenAsRecord();
+
+    /**
+     * {@code Area.of(ImageTemplate, double, double, double, double)}: a box measured from a picture, in its widths and
+     * heights (2026-11-09), where a readout reads, a caption's words are read and a drag lets go. Drawn as a pill
+     * showing the anchor and the box ({@link GeometryEditors#area}), never four numbers to type: they are computed
+     * from two cuts. A fresh one is a box the placeholder picture's size, right beside it.
+     */
+    public static final DeclaredCallType<Area> AREA = PluginType.value(Area.class)
+            .fresh(() -> Area.of(placeholder(), 1, 0, 1, 1))
+            .editor(() -> GeometryEditors::area)
+            .preview(() -> GeometryEditors::areaPreview)
+            .writtenAs(Area::of);
 
     /** A width and a height, with no position. */
     public static final DeclaredCallType<Size> SIZE = PluginType.value(Size.class)

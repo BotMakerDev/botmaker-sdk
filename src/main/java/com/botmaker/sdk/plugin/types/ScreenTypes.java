@@ -72,7 +72,7 @@ public final class ScreenTypes implements TypeHolder {
     public List<ComponentType<?>> components() {
         return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, SHADES_SHAPE,
                 SHADE_SHAPE, CHANNELS_SHAPE, GEOMETRY_SHAPE, BUTTON_SHAPE,
-                BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, AREA_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
+                BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
                 PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CUSTOM_SHAPE, CAPTION_SHAPE,
@@ -209,12 +209,6 @@ public final class ScreenTypes implements TypeHolder {
 
     /** {@code Grid.of(int, int, double, double)}: a grid button's rows and columns, its steps in the anchor's size. */
     public static final DeclaredCall<Grid> GRID_SHAPE = ComponentType.part(Grid.class).writtenAs(Grid::of);
-
-    /**
-     * {@code Area.of(ImageTemplate, double, double, double, double)}: a box measured from a picture, in its widths and
-     * heights (2026-11-09), where a readout reads, a caption's words are read and a drag lets go.
-     */
-    public static final DeclaredCall<Area> AREA_SHAPE = ComponentType.part(Area.class).writtenAs(Area::of);
 
     /*
      * A place's side and whether it is a picture or words are told apart by which factory rebuilds it equal, so

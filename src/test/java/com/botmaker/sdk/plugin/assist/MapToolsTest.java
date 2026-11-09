@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Order;
@@ -239,24 +240,52 @@ class MapToolsTest {
         assertEquals(Optional.empty(), MapTools.spotField(character, "char_skill_icon"), "a picture is not a field");
     }
 
-    /** which_screen says what each readout of the screen shown reads, as a run would (2026-11-09). */
+    /**
+     * which_screen says what each readout of the screen shown reads, as a run would (2026-11-09), and reads through
+     * its area: one that reads nothing because its anchor is not shown says so, since that is a missing picture, not
+     * an empty number.
+     */
     @Test
     void theScreenShownSaysWhatItsReadoutsRead() {
-        Readout gems = Readout.text(MapFixtures.area(780, 65, 64, 33));
-        Readout energy = Readout.text(MapFixtures.area(400, 65, 90, 33));
-        Readout rolla = Readout.text(MapFixtures.area(612, 65, 84, 33));
+        Readout gems = Readout.text(MapFixtures.area("gems_icon", 1.2, 0, 2, 1));
+        Readout energy = Readout.text(MapFixtures.area("energy_icon", 1.2, 0, 3, 1));
+        Readout rolla = Readout.text(MapFixtures.area("rolla_icon", 1.2, 0, 3, 1));
+        Readout coins = Readout.text(MapFixtures.area("coin_icon", 1.2, 0, 3, 1));
         Map<String, Readout> readouts = new LinkedHashMap<>();
         readouts.put("gems", gems);
         readouts.put("energy", energy);
         readouts.put("rolla", rolla);
+        readouts.put("coins", coins);
         ScreenGraph graph = ScreenGraph.of(Map.of("HOME", new MapScreen(Setup.named("Home"), Map.of(), readouts)));
-        Map<Readout, Optional<String>> shown = Map.of(gems, Optional.of("130"), energy, Optional.empty());
-        assertEquals(" Its readouts read: gems \"130\", energy nothing, rolla unreadable.",
+        Map<Readout, Optional<String>> shown = Map.of(gems, Optional.of("130"), energy, Optional.empty(),
+                coins, Optional.empty());
+        assertEquals(" Its readouts read: gems \"130\", energy nothing, rolla unreadable, coins nothing (coin_icon "
+                        + "is not shown).",
                 MapTools.readings(graph, "HOME", r -> {
                     if (r == rolla) throw new IllegalStateException("words not read");
                     return shown.get(r);
-                }));
+                }, area -> area.anchor().id().equals("coin_icon") ? " (coin_icon is not shown)" : ""));
         assertEquals("", MapTools.readings(ScreenGraph.of(Map.of("HOME", new MapScreen(Setup.named("Home"),
-                Map.of(), Map.of()))), "HOME", r -> Optional.empty()), "a screen with no readout says nothing");
+                Map.of(), Map.of()))), "HOME", r -> Optional.empty(), area -> ""),
+                "a screen with no readout says nothing");
+    }
+
+    /**
+     * Why an area read nothing: its anchor not shown, or shown with the box off the screen, which are told apart since
+     * one is a missing picture and the other a wrong offset; a box on the screen that shows nothing says no more.
+     */
+    @Test
+    void anAreaThatReadsNothingSaysWhetherItsAnchorOrItsBoxIsMissing() {
+        BufferedImage frame = new BufferedImage(400, 200, BufferedImage.TYPE_INT_RGB);
+        Rect icon = new Rect(300, 50, 40, 20);
+        Area beside = MapFixtures.area("coin_icon", 1.2, 0, 1, 1);
+        Area far = MapFixtures.area("coin_icon", 12, 0, 3, 1);
+        assertEquals(" (coin_icon is not shown)", MapTools.whyNothing(beside, frame, (p, f) -> Optional.empty()));
+        assertEquals(" (its box, placed from coin_icon, is off the screen)",
+                MapTools.whyNothing(far, frame, (p, f) -> Optional.of(icon)));
+        assertEquals("", MapTools.whyNothing(beside, frame, (p, f) -> Optional.of(icon)), "on the screen, blank");
+        assertEquals("", MapTools.whyNothing(beside, frame, (p, f) -> {
+            throw new IllegalStateException("no matcher");
+        }), "an anchor that could not be looked for says nothing more");
     }
 }

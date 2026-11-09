@@ -278,13 +278,13 @@ class ScreenTypesTest {
     @Test
     void anAreaIsWrittenByItsAnchorAndItsNumbers() {
         Area left = Area.of(picture("gold_icon"), -2.5, -0.25, 1.75, 1);
-        assertEquals(left, roundTrip(ScreenTypes.AREA_SHAPE, left));
+        assertEquals(left, roundTrip(SdkTypes.AREA, left));
         Area right = Area.of(picture("gold_icon"), 1.2, 0, 3, 1);
-        assertEquals(right, roundTrip(ScreenTypes.AREA_SHAPE, right));
+        assertEquals(right, roundTrip(SdkTypes.AREA, right));
     }
 
     @Test
-    void wordsAreWrittenAsTheirTextAndTheirZone() {
+    void wordsAreWrittenAsTheirTextAndTheirArea() {
         Caption settings = Caption.of(Words.of("Settings"), MapFixtures.area(100, 20, 300, 40));
         assertEquals(settings, roundTrip(ScreenTypes.CAPTION_SHAPE, settings));
         Setup told = Setup.named("Settings").markers(marks("menu_frame")).texts(List.of(settings));

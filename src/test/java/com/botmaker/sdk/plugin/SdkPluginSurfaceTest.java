@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.TextMatch;
@@ -115,7 +116,7 @@ class SdkPluginSurfaceTest {
     private static final List<Class<?>> DECLARED_TYPES = List.of(
             ImageTemplate.class, Precision.class, OcrOptions.class, com.botmaker.sdk.api.text.DigitSet.class,
             com.botmaker.sdk.api.text.Words.class, Element.class,
-            Point.class, Rect.class, Size.class,
+            Point.class, Rect.class, Size.class, Area.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
             com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.screens.State.class);
@@ -376,11 +377,12 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(18, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
                 + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22;"
                 + " Element 2026-10-31; State 2026-11-02, once a look's state became a ButtonState; Activity and"
-                + " Outcome went 2026-11-09 with flows, and Zone for areas beside a picture");
+                + " Outcome went 2026-11-09 with flows, and Zone for areas beside a picture; Area came the same"
+                + " day, a pill showing its anchor and box");
     }
 
     /**

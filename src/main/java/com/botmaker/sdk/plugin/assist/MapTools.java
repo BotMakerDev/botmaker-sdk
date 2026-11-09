@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -47,6 +48,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -1450,7 +1452,8 @@ final class MapTools {
                     + "it: go_to_screen closes it on the way.").orElse("");
             return seen.here().map(c -> "On " + graph.shown(c) + " (Screens." + c + "): its marker shows."
                             + looks(graph, c, seen.walk(), frame)
-                            + (popup.isEmpty() ? readings(graph, c, r -> seen.reach().readout(r, frame))
+                            + (popup.isEmpty() ? readings(graph, c, r -> seen.reach().readout(r, frame),
+                                    area -> whyNothing(area, frame, seen.reach()::find))
                             : " " + popup))
                     .orElse(popup.isEmpty() ? "No screen of the bot's Screens shows: none of their markers is found."
                             : popup.replace(" over it", ""));
@@ -1469,23 +1472,46 @@ final class MapTools {
 
     /**
      * What each of {@code constant}'s readouts shows, {@code read} as a run reads it: {@code " Its readouts read:
-     * gems \"130\", energy \"300/300\"."}, so a wrong zone or digit set shows before a fact is fed from it (2026-11-09).
-     * Blank for a screen with none.
+     * gems \"130\", energy \"300/300\"."}, so a wrong area or digit set shows before a fact is fed from it (2026-11-09).
+     * A readout of an area that reads nothing adds what {@code whyNothing} says of the area ({@link #whyNothing}):
+     * {@code "coins nothing (coin_icon is not shown)"}. It is asked only then, so a readout that reads costs no
+     * second match. Blank for a screen with none.
      */
-    static String readings(ScreenGraph graph, String constant, Function<Readout, Optional<String>> read) {
+    static String readings(ScreenGraph graph, String constant, Function<Readout, Optional<String>> read,
+                           Function<Area, String> whyNothing) {
         Map<String, Readout> readouts = graph.screens().get(constant).readouts();
         if (readouts.isEmpty()) return "";
         List<String> each = new ArrayList<>();
         readouts.forEach((name, readout) -> {
             String shows;
             try {
-                shows = read.apply(readout).map(text -> "\"" + text + "\"").orElse("nothing");
+                shows = read.apply(readout).map(text -> "\"" + text + "\"").orElse(null);
             } catch (RuntimeException unread) {
                 shows = "unreadable";
             }
+            if (shows == null) shows = "nothing" + (readout.area() == null ? "" : whyNothing.apply(readout.area()));
             each.add(name + " " + shows);
         });
         return " Its readouts read: " + String.join(", ", each) + ".";
+    }
+
+    /**
+     * Why {@code area} read nothing on {@code frame}, its anchor looked for with {@code find}: {@code " (coin_icon is
+     * not shown)"}, {@code " (its box, placed from coin_icon, is off the screen)"}, or blank when the box is on the
+     * screen and simply shows nothing, or when the anchor could not be looked for.
+     */
+    static String whyNothing(Area area, BufferedImage frame,
+                             BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> find) {
+        try {
+            Optional<Rect> found = find.apply(area.anchor(), frame);
+            if (found.isEmpty()) return " (" + area.anchor().id() + " is not shown)";
+            Rect box = area.place(found.get());
+            boolean off = box.x() >= frame.getWidth() || box.y() >= frame.getHeight()
+                    || box.x() + box.width() <= 0 || box.y() + box.height() <= 0;
+            return off ? " (its box, placed from " + area.anchor().id() + ", is off the screen)" : "";
+        } catch (RuntimeException unlooked) {
+            return "";
+        }
     }
 
     private static Optional<Seen> read(AgentContext context, BufferedImage frame) {
