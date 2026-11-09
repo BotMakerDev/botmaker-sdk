@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * The editor for a {@code CaptureSource} — what a bot reads pixels from — in a slot and a Parameters row: a
- * pill naming the source that opens the same tile picker as the toolbar's Capture Source, its Project default
+ * pill naming the source that opens the source tile picker ({@code SourcePicker}), its Project default
  * tile included, since {@code Source.current()} is a value like any other.
  *
  * <p>Values in, values out: the host writes {@code window("G").region(r)} through {@code CaptureTypes}. A value

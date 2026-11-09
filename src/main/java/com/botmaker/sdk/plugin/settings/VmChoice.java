@@ -3,8 +3,11 @@ package com.botmaker.sdk.plugin.settings;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.shared.vm.VmRecord;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -34,31 +37,47 @@ public final class VmChoice {
      * Makes {@code name} the bot's VM; {@code null} or blank for the one there is. A bot whose holder lacks
      * {@link SdkValues#VM}'s method gets it written now. Nothing is written when it already names {@code name}.
      * A refusal goes to the status line.
+     *
+     * @return whether the bot's Java now names {@code name}
      */
-    public static void set(StudioServices services, String name) {
-        if (services == null) return;
+    public static boolean set(StudioServices services, String name) {
+        if (services == null) return false;
         services.runs().set(OLD_RUN_PROPERTY, null);
         String wanted = name == null ? "" : name.trim();
-        if (Objects.equals(written(services), wanted.isEmpty() ? null : wanted)) return;
+        if (Objects.equals(written(services), wanted.isEmpty() ? null : wanted)) return true;
         Optional<ValueContext> ctx = open(services);
         if (ctx.isEmpty()) {
             Optional<String> refused = services.pluginValues().create(SdkValues.VM);
             if (refused.isPresent()) {
                 services.status(refused.get());
-                return;
+                return false;
             }
             ctx = open(services);
         }
         if (ctx.isEmpty()) {
             services.status("Sdk.vm is written by hand, so BotMaker leaves it alone.");
-            return;
+            return false;
         }
-        ctx.get().write(wanted).ifPresent(services::status);
+        Optional<String> refused = ctx.get().write(GameVm.of(wanted));
+        refused.ifPresent(services::status);
+        return refused.isEmpty();
+    }
+
+    /**
+     * Runs the bot's game in {@code vm}: it becomes the bot's VM, and {@code gameRunsIn()} says a VM unless it does
+     * already. What a VM set up from the {@code vm()} editor does once it is ready.
+     */
+    static void use(StudioServices services, VmRecord vm) {
+        if (!set(services, vm.name())) return; // its refusal is the status line
+        BotSettings was = SettingsValue.current(services);
+        Optional<String> refused = SettingsValue.write(services, was, was.where(BotSettings.Where.VM));
+        services.status(refused.map(why -> "The bot's VM is " + vm.name() + ", but gameRunsIn was not set: " + why)
+                .orElse("The bot's game runs in the game VM " + vm.name() + "."));
     }
 
     /** What the bot's {@code vm} parameter names, or {@code null}. */
     private static String written(StudioServices services) {
-        return open(services).flatMap(ctx -> ctx.value(String.class)).map(String::trim)
+        return open(services).flatMap(ctx -> ctx.value(GameVm.class)).map(GameVm::name)
                 .filter(text -> !text.isEmpty()).orElse(null);
     }
 

@@ -18,7 +18,7 @@ import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.ReadinessPrompt;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
-import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -129,7 +129,7 @@ public final class LauncherEditors {
 
     /** Where Studio's launches put the game for the bot's settings: what a run here asks of each game. */
     private static BotSettings.Where place(StudioServices services) {
-        BotSettings settings = BotSettingsWindow.current(services);
+        BotSettings settings = SettingsValue.current(services);
         return SessionBootstrap.wantsVm(settings) ? BotSettings.Where.VM
                 : SessionBootstrap.wantsPrivateDisplay(settings) ? BotSettings.Where.PRIVATE_DISPLAY
                 : BotSettings.Where.MY_DESKTOP;

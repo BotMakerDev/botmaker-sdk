@@ -1,5 +1,6 @@
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
@@ -27,8 +28,8 @@ class InstalledGameTest {
         }
 
         @SdkValue(SdkValue.Id.VM)
-        public static String gameVm() {
-            return " win11 ";
+        public static GameVm gameVm() {
+            return GameVm.of(" win11 ");
         }
 
         @SdkValue(SdkValue.Id.CAPTURE)

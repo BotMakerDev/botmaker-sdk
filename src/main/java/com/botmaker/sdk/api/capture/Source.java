@@ -16,7 +16,7 @@ import com.botmaker.session.DesktopSession;
  * <p>On first use the current source initialises to the whole {@link Desktop}. <b>A bot's own project
  * default is {@link #set(CaptureSource)}</b>, called with its {@code Sdk.captureSource} parameter before the bot
  * starts — {@code Bot.run} does it, and it is the {@code @SdkValue(SdkValue.Id.CAPTURE)} value the user picks in
- * 🎯 Capture Source or the Runner. Set it yourself at runtime for anything else — to
+ * the Parameters window or the Runner. Set it yourself at runtime for anything else — to
  * point the whole bot at a game {@link Window} once, up front — and every subsequent no-source call
  * follows until it is changed again.
  *

@@ -131,7 +131,7 @@ public interface CaptureSource {
      * The window of class {@code windowClass} — X11's {@code WM_CLASS}, a Windows program's file name, a Mac app's
      * name — and, when {@code title} is not blank, of exactly that title (case-insensitive). The class is the same
      * on every computer whatever the game shows; the title is written only when the class is one many programs
-     * share ({@code steam_app_0}, every Proton game without a Steam id). Pick the window in 🎯 Capture Source, which
+     * share ({@code steam_app_0}, every Proton game without a Steam id). Pick the window in the captureSource parameter, which
      * writes both.
      *
      * <p>Never a window by its title alone (2026-10-13): Studio's own "BotMaker Blocks - Firestone" was taken for

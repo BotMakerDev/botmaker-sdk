@@ -94,7 +94,7 @@ class SdkProbesTest {
         };
     }
 
-    /** A project with no {@code Sdk.settings()}: the probe holds a match to the SDK's default confidence. */
+    /** A project with no confidence parameter: the probe holds a match to the SDK's default confidence. */
     private static final StudioServices SERVICES = new StudioServices() {
         @Override public Path projectDir() { return null; }
         @Override public Path resourcesDir() { return null; }

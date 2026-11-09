@@ -19,6 +19,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The bot's settings are parameters, one each** (2026-11-09): confidence, the click delays, random clicks,
+  the compare margin, max rounds, patience, when a run is stuck, restarts, where the game runs and the
+  display and input backends are methods of the SDK's `Settings` group in `params/`, edited in the Parameters
+  window. `Sdk.settings()` is no longer read: a bot that changed a setting there sets it again in the
+  Parameters window (the value resets to its default, as nothing converts a managed value).
+  `BotSettings.current()` and `BotSettings.use(…)` are unchanged.
+- **`vm()` is a `GameVm`** (2026-11-09): `Sdk.vm()` returns `GameVm.of("win11")`, not a `String`, and its slot
+  editor picks the game VM, sets one up, opens its screen and shuts it down. An old `String` body reads as
+  no VM: pick it again.
+- **⚙ Bot Settings, 📋 Project Setup and 🎯 Capture Source left the toolbar** (2026-11-09): the settings and
+  the capture source are parameters, the VM is `vm()`'s editor, and the game button picks what to launch.
+
 - **The game zone is a `ZoneId`** (2026-11-09): `gameZone()` in the `Game` parameters returns
   `ZoneId.of("Asia/Tokyo")`, not a zone id `String`, and starts as the zone of the computer that binds it. The
   `String` form is another type: an upgrade removes it and bind writes the `ZoneId` one, so a zone typed before must

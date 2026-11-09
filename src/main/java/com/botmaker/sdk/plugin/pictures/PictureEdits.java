@@ -1,12 +1,10 @@
 package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.toolkit.ManagedHandle;
-import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
@@ -25,8 +23,6 @@ import java.util.Optional;
  * written there.
  */
 public final class PictureEdits {
-
-    private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     private PictureEdits() {}
 
@@ -157,7 +153,7 @@ public final class PictureEdits {
             return Done.refused("A frame of " + name + " is " + kept.getWidth() + "×" + kept.getHeight() + ", not "
                     + frame.getWidth() + "×" + frame.getHeight() + ": cut it in the picture's own box.");
         }
-        double confidence = SETTINGS.read(services).orElse(BotSettings.DEFAULTS).confidence();
+        double confidence = SettingsValue.confidence(services);
         for (int i = 0; i < frames.size(); i++) {
             if (shows(frames.get(i), frame, confidence)) {
                 return Done.refused("It shows nothing new: frame " + (i + 1) + " of " + name + " already matches it.");

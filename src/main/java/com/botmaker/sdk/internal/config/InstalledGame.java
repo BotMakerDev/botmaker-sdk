@@ -1,10 +1,13 @@
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -12,6 +15,7 @@ import com.botmaker.shared.platform.Os;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The game half of the bot's {@code Sdk} values, read off the classes {@code Bot.run} is handed and the parameter
@@ -49,14 +53,17 @@ public final class InstalledGame {
 
     /**
      * Takes the game parameters as {@link #install} does, leaving the capture source as it is: a reloaded bot keeps
-     * the game and the connection it has.
+     * the game and the connection it has. The Settings group's parameters become the settings in force
+     * ({@link BotSettings#use}), before anything clicks.
      */
     public static void settings(Class<?>... values) {
         List<String> targets = specs(marked(SdkValue.Id.LAUNCH_TARGETS, values));
         launchTargets = targets == null ? List.of() : targets;
         launchChoice = marked(SdkValue.Id.LAUNCH_TARGET, values) instanceof LaunchChoice choice ? choice.spec() : "";
-        vm = marked(SdkValue.Id.VM, values) instanceof String named ? named.trim() : "";
+        vm = marked(SdkValue.Id.VM, values) instanceof GameVm named ? named.name() : "";
         gameZone = zone(marked(SdkValue.Id.GAME_ZONE, values));
+        List<Object> groups = values == null ? List.of() : ParamGroups.groups(values);
+        BotSettings.use(SettingParams.from(field -> Optional.ofNullable(ParamGroups.marked(field.id(), groups, values))));
     }
 
     /** The launch specs the bot lists, preferred first; empty when it lists none. */

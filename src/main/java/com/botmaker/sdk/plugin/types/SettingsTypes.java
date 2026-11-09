@@ -17,8 +17,8 @@ import java.util.List;
  * from the default and reads them back in any order, so the method says what this bot changed and nothing else;
  * it used to be {@code BotSettings.of(BotSettings.clicks(500, 200, true), …, 20, true)}, every number
  * positional. A setting on by default is turned off by a link with a negative name ({@code centredClicks()},
- * {@code debugOff()}): a flag only turns a thing on. The ⚙ Bot Settings window changes the value, never the
- * Java.
+ * {@code debugOff()}): a flag only turns a thing on. Since 2026-11-09 a bot's settings are parameters, one
+ * each; this declaration stays for bot code that builds a value for {@code BotSettings.use}.
  *
  * <p>A link nothing here declares is not this shape and builds nothing: the host shows it read-only, exactly as
  * written.

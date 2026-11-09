@@ -29,7 +29,7 @@ import java.util.Optional;
  *
  * <ul>
  *   <li><b>Targets:</b> none since 2026-11-09, when activity bodies went with flows.</li>
- *   <li><b>Watched:</b> the screen {@code Sdk.captureSource} names. ⇄ Change opens the 🎯 Capture Source
+ *   <li><b>Watched:</b> the screen {@code Sdk.captureSource} names. ⇄ Change opens the source
  *       picker.</li>
  *   <li><b>Frames:</b> that source's own capture, at its origin — what the bot's matchers read.</li>
  *   <li><b>Tools:</b> {@link SdkTools}.</li>

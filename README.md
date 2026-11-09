@@ -92,9 +92,6 @@ method is a compile error, never a button that silently does nothing.
 | 🎯 **Goals** | the plans' tiers, each goal and the actions that serve it — `Goals.java` and `Plans.java` |
 | 🖼 **Manage Pictures** | rename, retag, replace, delete, import and export pictures; a rename moves every use |
 | the game button | which game this bot plays on this computer — from Steam, Heroic, Faugus, Lutris, Waydroid or the app menu — and start it without running the bot |
-| 📋 **Project Setup** | what the project still needs before it can run: something to launch, something to capture, the pictures |
-| 🎯 **Capture Source** | what the bot looks at — a monitor, a window, an emulator instance |
-| ⚙ **Bot Settings** | how the bot clicks and looks, and where it runs — this desktop, a private display, or a game VM |
 | 🎮 **Pilot** | stream the run to a phone or browser, start and stop it, take over the input |
 | ⌖ **Point bot here**, ✂ **Picture of this** | on the overlay editor's row: make the window under the overlay the capture source, or cut a picture out of it |
 

@@ -59,8 +59,8 @@ import java.util.function.Consumer;
  * </ol>
  * On a Mac the system is macOS or Linux, both on Tart, and there is no hypervisor or disc to choose
  * ({@link #macPane}).
- * Closing the window or Cancel stops following the setup, and the VM stays as far as it got: Bot Settings
- * lists it, and this window resumes it ({@link #resume}).
+ * Closing the window or Cancel stops following the setup, and the VM stays as far as it got: the
+ * {@code vm()} editor lists it, and this window resumes it ({@link #resume}).
  */
 final class VmSetupWindow {
 
@@ -290,7 +290,7 @@ final class VmSetupWindow {
         stop.setOnAction(e -> {
             stopSetup();
             progress.setText(progress.getText() + "\nStopped. The VM stays as far as it got: set it up again from "
-                    + "Bot Settings to go on.");
+                    + "Sdk.java's vm() to go on.");
         });
         openScreen.setOnAction(e -> VmScreen.open(services, stage, vm));
         use.setOnAction(e -> {

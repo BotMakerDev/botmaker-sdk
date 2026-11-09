@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.source.ManagedOpenSet;
 import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Run;
@@ -29,6 +30,7 @@ import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -39,15 +41,16 @@ import java.util.List;
  * plugin names this class ({@code .values(SdkValues.class)}), so each value {@link #values()} lists is one of
  * its {@code managedValues()}, in list order; its windows open each one through a toolkit
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code PLANS} and {@code GOALS} are
- * what the bot wants, {@code RUN} the game's home and setup, {@code SETTINGS} how it clicks and looks,
- * {@code SCREEN} the size its pictures were cut at, and {@code PICTURES}, {@code TAGS},
+ * what the bot wants, {@code RUN} the game's home and setup, {@code SCREEN} the size its pictures were cut at, and {@code PICTURES}, {@code TAGS},
  * {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of
  * constants the bot grows. {@code PLAN} and {@code DO_SETUP} are the
  * run's parameters, methods of the SDK's group {@code params/com_github_botmakerdev/botmaker_sdk/Running.java}, and
  * {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's, in {@code Game.java} beside it
  * (2026-11-05: a group per holder, which is its category); {@code Bot.run} reads them by their marks and nothing
  * claims them. {@code LAUNCH_TARGETS} and {@code VM} are the author's game data in
- * {@code Sdk.java}.
+ * {@code Sdk.java}. How the bot clicks, looks and recovers, and where its game runs, are one parameter each in
+ * {@code Settings.java} ({@code FOUND_DELAY} to {@code INPUT_BACKEND}, 2026-11-09: they were one {@code BotSettings}
+ * method), which {@link SettingParams} reads into {@code BotSettings.current()}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
  * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
@@ -83,12 +86,6 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.SDK)
             .holds(Run.class, Run.NONE)
             .because("This says how the bot gets the game home and sets it up. Change it in Sdk.java's run().");
-
-    public static final ManagedMethod<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
-            .in(SdkValue.Holder.SDK)
-            .holds(BotSettings.class, BotSettings.DEFAULTS)
-            .because("These are the bot's settings — delays, confidence, input and its private display. Change"
-                    + " them in ⚙ Bot Settings.");
 
     /**
      * The picture constants — {@code static final ImageTemplate COLLECT = new ImageTemplate(…)}. 🖼 Manage
@@ -256,18 +253,17 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::wholeDesktop)
             .shown("The game's window: where the bot reads pixels from", Param.Visibility.PUBLIC)
-            .because("This is where the bot reads pixels from. Choose it in 🎯 Capture Source, in the Runner or in"
-                    + " Project ▸ Parameters.");
+            .because("This is where the bot reads pixels from. Choose it in the Runner or in Project ▸ Parameters.");
 
     /**
-     * The game VM the game runs in when ⚙ Bot Settings runs it in one — {@code public static String vm()} in
-     * {@code Sdk.java}, by name; blank for the one VM there is. The author's, so bot data (2026-11-04, the user's
-     * rule); written when ⚙ Bot Settings first names one, and read by its mark.
+     * The game VM the game runs in when {@code gameRunsIn()} says a VM — {@code public static GameVm vm()} in
+     * {@code Sdk.java}, by name; {@code GameVm.of("")} for the one VM there is. The author's, so bot data (2026-11-04,
+     * the user's rule); a {@code GameVm} since 2026-11-09, drawn as this computer's VMs with their setup and screen.
      */
-    public static final ManagedMethod<String> VM = ManagedValue.method(SdkValue.Id.VM)
+    public static final ManagedMethod<GameVm> VM = ManagedValue.method(SdkValue.Id.VM)
             .in(SdkValue.Holder.SDK)
-            .holds(String.class, "")
-            .because("This is the game VM ⚙ Bot Settings runs the game in. Change it there.");
+            .holds(GameVm.class, GameVm.of(""))
+            .because("This is the game VM the game runs in. Pick it, or set one up, in Sdk.java's vm().");
 
     /**
      * The game server's time zone — {@code public ZoneId gameZone()}, {@code ZoneId.of("Europe/Paris")}, which a
@@ -295,14 +291,194 @@ public final class SdkValues implements ValueHolder {
             .because("These are words a run exploring on its own never presses beside unless the input spends, such"
                     + " as Buy or Delete in the app's language. Currency signs are refused without being listed.");
 
+    private static final String SETTING = "The SDK reads this parameter when the bot starts. Change its value in the"
+            + " Runner or in Project ▸ Parameters ▸ Settings.";
+
+    /** The pause after a match is found — {@code public int foundDelay()}, in ms. */
+    public static final ManagedParam<Integer> FOUND_DELAY = ManagedValue.param(SdkValue.Id.FOUND_DELAY)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::foundDelay)
+            .shown("Pause after a picture is found, in ms: long enough for the game's animation to settle",
+                    Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** The pause after a match is not found — {@code public int notFoundDelay()}, in ms. */
+    public static final ManagedParam<Integer> NOT_FOUND_DELAY = ManagedValue.param(SdkValue.Id.NOT_FOUND_DELAY)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::notFoundDelay)
+            .shown("Pause after a picture is not found, in ms: how fast the bot looks again", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** Whether a click lands on a random point of the match — {@code public boolean randomClicks()}. */
+    public static final ManagedParam<Boolean> RANDOM_CLICKS = ManagedValue.param(SdkValue.Id.RANDOM_CLICKS)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::randomClicks)
+            .shown("Click a random point of what was found rather than its centre", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** How sure a match has to be — {@code public double confidence()}, 0..1. */
+    public static final ManagedParam<Double> CONFIDENCE = ManagedValue.param(SdkValue.Id.CONFIDENCE)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::confidence)
+            .shown("How sure a match has to be, from 0 to 1: lower finds more, and finds wrong things more",
+                    Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** How far a good picture must beat a look-alike — {@code public double compareMargin()}, 0..1. */
+    public static final ManagedParam<Double> COMPARE_MARGIN = ManagedValue.param(SdkValue.Id.COMPARE_MARGIN)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::compareMargin)
+            .shown("How far a picture must beat its look-alike, from 0 to 1", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** The rounds a vision loop runs before the bot is stuck — {@code public int maxRounds()}. */
+    public static final ManagedParam<Integer> MAX_ROUNDS = ManagedValue.param(SdkValue.Id.MAX_ROUNDS)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::maxRounds)
+            .shown("Rounds a repeated look runs before the bot counts as stuck", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** How long a loop's round gives its action to show — {@code public int patience()}, in ms. */
+    public static final ManagedParam<Integer> PATIENCE = ManagedValue.param(SdkValue.Id.PATIENCE)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::patience)
+            .shown("How long, in ms, the bot waits for a press to show before it acts again", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** How long the screen may stay still while the bot acts — {@code public int frozenAfter()}, in ms. */
+    public static final ManagedParam<Integer> FROZEN_AFTER = ManagedValue.param(SdkValue.Id.FROZEN_AFTER)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::frozenAfter)
+            .shown("How long, in ms, the screen may stay still while the bot acts before the game counts as frozen",
+                    Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** How long a plan run may act with no progress — {@code public Duration stuckAfter()}. */
+    public static final ManagedParam<Duration> STUCK_AFTER = ManagedValue.param(SdkValue.Id.STUCK_AFTER)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::stuckAfter)
+            .shown("How long a run may act with no progress before it goes home or restarts the game",
+                    Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** The game restarts a run allows within {@link #RESTARTS_WITHIN} — {@code public int restartCap()}. */
+    public static final ManagedParam<Integer> RESTART_CAP = ManagedValue.param(SdkValue.Id.RESTART_CAP)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::restartCap)
+            .shown("Game restarts allowed in a while before the bot stops instead", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** The time {@link #RESTART_CAP} counts over — {@code public Duration restartsWithin()}. */
+    public static final ManagedParam<Duration> RESTARTS_WITHIN = ManagedValue.param(SdkValue.Id.RESTARTS_WITHIN)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::restartsWithin)
+            .shown("The while the game restarts are counted over", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** Where the game runs — {@code public BotSettings.Where gameRunsIn()}. */
+    public static final ManagedParam<BotSettings.Where> GAME_RUNS_IN = ManagedValue.param(SdkValue.Id.GAME_RUNS_IN)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::gameRunsIn)
+            .shown("Where the game runs: a private display, a game VM, or your desktop", Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** On the desktop, the real mouse and keyboard — {@code public boolean takeOver()}. */
+    public static final ManagedParam<Boolean> TAKE_OVER = ManagedValue.param(SdkValue.Id.TAKE_OVER)
+            .in(SdkValue.Holder.SETTINGS)
+            .startsAs(SdkValues::takeOver)
+            .shown("On your desktop, drive the real mouse and keyboard: for a game that ignores sent clicks",
+                    Param.Visibility.PUBLIC)
+            .because(SETTING);
+
+    /** Which private display hosts the game — {@code public BotSettings.DisplayBackend displayBackend()}. */
+    public static final ManagedParam<BotSettings.DisplayBackend> DISPLAY_BACKEND =
+            ManagedValue.param(SdkValue.Id.DISPLAY_BACKEND)
+                    .in(SdkValue.Holder.SETTINGS)
+                    .startsAs(SdkValues::displayBackend)
+                    .shown("Which private display hosts the game", Param.Visibility.PUBLIC)
+                    .because(SETTING);
+
+    /** Which Linux backend delivers a take-over — {@code public BotSettings.InputBackend inputBackend()}. */
+    public static final ManagedParam<BotSettings.InputBackend> INPUT_BACKEND =
+            ManagedValue.param(SdkValue.Id.INPUT_BACKEND)
+                    .in(SdkValue.Holder.SETTINGS)
+                    .startsAs(SdkValues::inputBackend)
+                    .shown("Which Linux backend drives the real mouse and keyboard", Param.Visibility.PUBLIC)
+                    .because(SETTING);
+
     private static boolean claimed;
 
     private SdkValues() {}
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(PLANS, GOALS, RUN, SETTINGS, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE, GUARD_WORDS);
+        return List.of(PLANS, GOALS, RUN, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
+                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE, GUARD_WORDS,
+                FOUND_DELAY, NOT_FOUND_DELAY, RANDOM_CLICKS, CONFIDENCE, COMPARE_MARGIN, MAX_ROUNDS, PATIENCE,
+                FROZEN_AFTER, STUCK_AFTER, RESTART_CAP, RESTARTS_WITHIN, GAME_RUNS_IN, TAKE_OVER, DISPLAY_BACKEND,
+                INPUT_BACKEND);
+    }
+
+    // The settings' first values: BotSettings.DEFAULTS, field by field.
+
+    private static int foundDelay() {
+        return BotSettings.DEFAULT_FOUND_DELAY;
+    }
+
+    private static int notFoundDelay() {
+        return BotSettings.DEFAULT_NOT_FOUND_DELAY;
+    }
+
+    private static boolean randomClicks() {
+        return BotSettings.DEFAULT_RANDOMIZE_CLICKS;
+    }
+
+    private static double confidence() {
+        return BotSettings.DEFAULT_CONFIDENCE;
+    }
+
+    private static double compareMargin() {
+        return BotSettings.DEFAULT_COMPARE_MARGIN;
+    }
+
+    private static int maxRounds() {
+        return BotSettings.DEFAULT_MAX_ROUNDS;
+    }
+
+    private static int patience() {
+        return BotSettings.DEFAULT_PATIENCE;
+    }
+
+    private static int frozenAfter() {
+        return BotSettings.DEFAULT_FROZEN_AFTER;
+    }
+
+    private static Duration stuckAfter() {
+        return BotSettings.DEFAULT_STUCK_AFTER;
+    }
+
+    private static int restartCap() {
+        return BotSettings.DEFAULT_RESTART_CAP;
+    }
+
+    private static Duration restartsWithin() {
+        return BotSettings.DEFAULT_RESTARTS_WITHIN;
+    }
+
+    private static BotSettings.Where gameRunsIn() {
+        return BotSettings.DEFAULTS.where();
+    }
+
+    private static boolean takeOver() {
+        return BotSettings.DEFAULTS.takeOver();
+    }
+
+    private static BotSettings.DisplayBackend displayBackend() {
+        return BotSettings.DEFAULTS.runIn().displayBackend();
+    }
+
+    private static BotSettings.InputBackend inputBackend() {
+        return BotSettings.DEFAULTS.runIn().inputBackend();
     }
 
     /** {@link #PLAN}'s type and first value: nothing until the runner picks a plan. */
@@ -340,7 +516,6 @@ public final class SdkValues implements ValueHolder {
         }
         claimed = true;
         ManagedValues.claim(RUN, InstalledRun::use);
-        ManagedValues.claim(SETTINGS, BotSettings::use);
         ManagedValues.claim(SCREEN, BotScreen::use);
         ManagedValues.claim(SHADES, ShadeFit::use);
         // The launchers and the VM: InstalledGame reads them by their marks, with the parameters beside them.

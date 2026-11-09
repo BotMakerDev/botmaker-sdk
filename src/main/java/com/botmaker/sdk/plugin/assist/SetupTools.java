@@ -5,14 +5,11 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
-import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.RunParameter;
-import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.types.RunTypes;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
@@ -24,6 +21,8 @@ import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.screen.OpenWindows;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
+import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.ApkDownload;
@@ -52,7 +51,9 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -66,15 +67,13 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Where the bot looks and how it runs: its capture source, its {@code Sdk.settings()}, the emulator it
+ * Where the bot looks and how it runs: its capture source, its settings (the Settings parameters), the emulator it
  * watches, and what it launches. All are the bot's Java, written on the FX thread as their windows write them: the
  * launch target is the first of its {@code launchTargets} this computer's system can launch. Nothing here starts an
  * emulator or a run; {@code launch_game} alone starts the game, on this desktop or in the private display, as a run
  * would.
  */
 final class SetupTools {
-
-    private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     /**
      * One of the bot's settings, as setup's {@code set_setting} names it: how it is read off a {@link BotSettings} and
@@ -163,7 +162,7 @@ final class SetupTools {
     record SetCaptureSource(@Describe("its title in list_windows") String window) implements Step {
     }
 
-    @Describe("change one of the bot's settings in Sdk.settings()")
+    @Describe("change one of the bot's settings, a parameter of its Settings group")
     record SetSetting(@Describe("which setting; read lists them") Setting setting,
                       @Describe("a number, true or false, or an id")
                       String value) implements Step {
@@ -520,7 +519,7 @@ final class SetupTools {
     /** The private display the game runs in, when the settings say one and it is up; null otherwise. */
     private static PrivateSession liveDisplay(StudioServices services) {
         if (services == null || services.resourcesDir() == null) return null;
-        BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
+        BotSettings settings = FxCall.call(() -> SettingsValue.current(services));
         if (settings.where() != BotSettings.Where.PRIVATE_DISPLAY) return null;
         try {
             return SessionHandoff.rejoin(services,
@@ -532,7 +531,7 @@ final class SetupTools {
 
     /** One line a setting, its id, value and label, then the choices the choice settings take. */
     private static String settings(AgentContext context) {
-        BotSettings settings = FxCall.call(() -> SETTINGS.read(context.services()).orElse(BotSettings.DEFAULTS));
+        BotSettings settings = FxCall.call(() -> SettingsValue.current(context.services()));
         List<String> lines = new ArrayList<>();
         for (Setting setting : Setting.values()) {
             lines.add(setting.id() + " = " + setting.read(settings) + " — " + setting.displayName());
@@ -547,27 +546,24 @@ final class SetupTools {
     static AgentReply setSetting(SetSetting change, AgentContext context) {
         StudioServices services = context.services();
         return FxCall.call(() -> {
-            // Asks the host to write Sdk.java first when the project has none, as ⚙ Bot Settings does.
-            Optional<ValueContext> ctx = SETTINGS.openOrCreate(services);
-            if (ctx.isEmpty()) return AgentReply.refused("This project has no Sdk.settings() to write to.");
-            Optional<BotSettings> before = SETTINGS.read(ctx.get());
-            if (before.isEmpty()) {
-                return AgentReply.refused("Sdk.settings() is not a single `return BotSettings.defaults()…;`, so it is "
-                        + "left as you wrote it.");
-            }
+            // One parameter of the Settings group, its method written first when the project lacks it.
+            BotSettings before = SettingsValue.current(services);
             BotSettings after;
             try {
-                after = change.setting().write(before.get(), change.value());
+                after = change.setting().write(before, change.value());
             } catch (IllegalArgumentException e) {
                 return AgentReply.refused(change.setting().id() + ": " + e.getMessage());
             }
-            if (after.equals(before.get())) {
+            if (after.equals(before)) {
                 return AgentReply.text(change.setting().id() + " is already " + change.setting().read(after) + ".");
             }
-            Optional<String> refused = ctx.get().write(after);
+            Optional<String> refused = SettingsValue.write(services, before, after);
             if (refused.isPresent()) return AgentReply.refused(refused.get());
-            return AgentReply.text(change.setting().id() + " is now " + change.setting().read(after)
-                    + " in Sdk.settings().");
+            String where = SettingParams.ALL.stream()
+                    .filter(field -> !Objects.equals(field.read().apply(before), field.read().apply(after)))
+                    .map(SettingsValue::named).collect(Collectors.joining(", "));
+            return AgentReply.text(change.setting().id() + " is now " + change.setting().read(after) + " in "
+                    + where + ".");
         });
     }
 
@@ -689,7 +685,7 @@ final class SetupTools {
             return AgentReply.refused("The bot launches nothing on this computer. list_games and setup's "
                     + "set_launch_target pick what it starts.");
         }
-        BotSettings settings = FxCall.call(() -> SETTINGS.read(services).orElse(BotSettings.DEFAULTS));
+        BotSettings settings = FxCall.call(() -> SettingsValue.current(services));
         if (settings.where() == BotSettings.Where.VM) {
             return AgentReply.refused("The game runs in a game VM: a run starts it there, and a game on this desktop "
                     + "would not be the one the bot sees. run_bot launches it; setup's set_setting run_the_game_in "

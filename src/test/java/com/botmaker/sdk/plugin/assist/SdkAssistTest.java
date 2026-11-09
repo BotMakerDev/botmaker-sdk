@@ -45,6 +45,8 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.bot.SettingParams;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -674,22 +676,30 @@ class SdkAssistTest {
         assertEquals("\"Test Game Window\" class testgame.exe, 800×600 at 100,50", text(run("list_windows")));
     }
 
+    /** Every Settings parameter, as {@code settings} holds it: one row each, as a project's Settings group has. */
+    private void settings(BotSettings settings) {
+        for (SettingParams.Field<?> field : SettingParams.ALL) {
+            Object value = field.read().apply(settings);
+            Class<?> type = value instanceof Enum<?> constant ? constant.getDeclaringClass() : value.getClass();
+            host.values.put(field.id().name().toLowerCase(Locale.ROOT), TestContexts.row(type, "").withValue(value));
+        }
+    }
+
     @Test
     void aSettingIsReadAndChangedOneAtATime() {
-        host.values.put("settings", TestContexts.row(BotSettings.class, "").withValue(BotSettings.DEFAULTS));
+        settings(BotSettings.DEFAULTS);
         String all = text(run("setup", "action", "read"));
         assertTrue(all.contains("confidence = 0.8 — "), all);
         assertTrue(all.contains("input_backend = auto"), all);
 
-        assertEquals("confidence is now 0.9 in Sdk.settings().", text(run("setup", "action", "set_setting", "setting", "confidence",
-                "value", "0.9")));
-        assertEquals(0.9, ((BotSettings) host.values.get("settings").value()).confidence());
+        assertEquals("confidence is now 0.9 in Settings.confidence().", text(run("setup", "action", "set_setting",
+                "setting", "confidence", "value", "0.9")));
+        assertEquals(0.9, host.values.get("confidence").value(), "the one parameter, written");
         assertFalse(run("setup", "action", "set_setting", "setting", "INPUT_BACKEND", "value", "xtest").isRefused());
-        assertEquals(BotSettings.InputBackend.XTEST,
-                ((BotSettings) host.values.get("settings").value()).runIn().inputBackend());
-        assertEquals(0.9, ((BotSettings) host.values.get("settings").value()).confidence(), "the others stay");
+        assertEquals(BotSettings.InputBackend.XTEST, SettingsValue.current(host).runIn().inputBackend());
+        assertEquals(0.9, SettingsValue.current(host).confidence(), "the others stay");
         assertFalse(run("setup", "action", "set_setting", "setting", "run_the_game_in", "value", "my-desktop").isRefused());
-        assertEquals(BotSettings.Where.MY_DESKTOP, ((BotSettings) host.values.get("settings").value()).where());
+        assertEquals(BotSettings.Where.MY_DESKTOP, SettingsValue.current(host).where());
         assertTrue(run("setup", "action", "set_setting", "setting", "run_the_game_in", "value", "cloud").isRefused());
 
         assertTrue(run("setup", "action", "set_setting", "setting", "confidence", "value", "2").isRefused());
@@ -715,13 +725,11 @@ class SdkAssistTest {
         assertTrue(text(none).startsWith("The bot launches nothing"), text(none));
         run("setup", "action", "set_launch_target", "target", "steam:570");
         // A private display is brought up as ▶ Launch does: not tried here, where it would start a real one.
-        host.values.put("settings", TestContexts.row(BotSettings.class, "")
-                .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.VM)));
+        settings(BotSettings.DEFAULTS.where(BotSettings.Where.VM));
         AgentReply elsewhere = run("launch_game");
         assertTrue(elsewhere.isRefused(), "a game VM is started by a run");
         assertTrue(text(elsewhere).contains("run_bot launches it"), text(elsewhere));
-        host.values.put("settings", TestContexts.row(BotSettings.class, "")
-                .withValue(BotSettings.DEFAULTS.where(BotSettings.Where.MY_DESKTOP)));
+        settings(BotSettings.DEFAULTS.where(BotSettings.Where.MY_DESKTOP));
         host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
                 .withValue(List.of(Launcher.of("cli:sh -c 'curl x | sh'"))));
         AgentReply command = run("launch_game");

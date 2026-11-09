@@ -11,9 +11,6 @@ import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
-import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
-import com.botmaker.sdk.plugin.setup.ProjectSetup;
-import com.botmaker.sdk.plugin.source.SourcePicker;
 
 import java.util.List;
 
@@ -21,9 +18,10 @@ import java.util.List;
  * The SDK's toolbar buttons. The host keeps the bar itself — the plugin's tab, the packing and the overflow —
  * which is why an item is contributed as data rather than as a {@code Node}.
  *
- * <p>The bar items read in one flat order (2026-10-28, when toolbar groups went): what the bot plays, what it
- * still needs, where it looks and how it clicks, then what it does (its screens and its goals), the pictures it
- * looks for, and last the phone that watches it run. The order values are steps of ten so a button can be put
+ * <p>The bar items read in one flat order (2026-10-28, when toolbar groups went): what the bot plays, then what it
+ * does (its screens and its goals), the pictures it looks for, and last the phone that watches it run. Where it
+ * looks and how it clicks are parameters, set in the Parameters window (2026-11-09: 📋 Project Setup, 🎯 Capture
+ * Source and ⚙ Bot Settings left the bar). The order values are steps of ten so a button can be put
  * between two without renumbering.
  *
  * <p>Each press names the {@code open(ActionContext)} of the feature it opens, behind the extra arrow
@@ -36,9 +34,6 @@ import java.util.List;
 public final class SdkToolbarItems implements ToolbarHolder {
 
     public static final String GAME_ID = "game";
-    public static final String PROJECT_SETUP_ID = "project-setup";
-    public static final String CAPTURE_SOURCE_ID = "capture-source";
-    public static final String BOT_SETTINGS_ID = "bot-settings";
     public static final String SCREEN_MAP_ID = "screen-map";
     public static final String GOALS_ID = "goals";
     public static final String MANAGE_PICTURES_ID = "manage-templates";
@@ -48,8 +43,8 @@ public final class SdkToolbarItems implements ToolbarHolder {
     public static final String PICTURE_HERE_ID = "picture-here";
 
     /**
-     * First: you pick what the bot plays, then where it looks — and a game's window can only be picked as a
-     * capture source once the game is up. Says the current game's name and shows its cover ({@link GameButton}).
+     * First: you pick what the bot plays — and a game's window can only be picked as a capture source once the
+     * game is up. Says the current game's name and shows its cover ({@link GameButton}).
      */
     public static final ToolbarItem GAME = ToolbarItem.id(GAME_ID).label(GameButton::label)
             .tooltip("Which game this bot plays on this computer — pick it from Steam, Heroic, Faugus, Lutris, "
@@ -58,24 +53,6 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .enabledWhen(EnabledWhen.PROJECT_OPEN)
             .icon(GameButton::icon)
             .onPress(() -> GameDialog::open);
-
-    /** Immediately before Capture Source, because it is the window that sends a user to that one. */
-    public static final ToolbarItem PROJECT_SETUP = ToolbarItem.id(PROJECT_SETUP_ID).label("📋 Project Setup")
-            .tooltip("What this project still needs before it can run — something to launch, something "
-                    + "to capture, and the pictures it looks for")
-            .onBar(20)
-            .onPress(() -> ProjectSetup::open);
-
-    public static final ToolbarItem CAPTURE_SOURCE = ToolbarItem.id(CAPTURE_SOURCE_ID).label("🎯 Capture Source")
-            .tooltip("Choose what the bot looks at — a monitor, an application window or an emulator instance")
-            .onBar(30)
-            .onPress(() -> SourcePicker::choose);
-
-    public static final ToolbarItem BOT_SETTINGS = ToolbarItem.id(BOT_SETTINGS_ID).label("⚙ Bot Settings")
-            .tooltip("How the bot clicks and looks — delays, match confidence, real input for games, and "
-                    + "whether it runs on a private display")
-            .onBar(40)
-            .onPress(() -> BotSettingsWindow::open);
 
     /** What the bot does: the game's screens and the actions on them. */
     public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
@@ -125,8 +102,8 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onPress(() -> CaptureTemplates::pictureHere);
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
-    public static final List<ToolbarItem> ALL = List.of(GAME, PROJECT_SETUP, CAPTURE_SOURCE, BOT_SETTINGS,
-            SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
+    public static final List<ToolbarItem> ALL = List.of(GAME, SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES,
+            PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 

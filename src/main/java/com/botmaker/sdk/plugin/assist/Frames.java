@@ -6,7 +6,6 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.toolkit.ManagedHandle;
-import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Shade;
@@ -24,6 +23,7 @@ import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.session.PrivateSession;
 import com.botmaker.shared.capture.FrameGrab;
@@ -54,7 +54,6 @@ import java.util.function.Supplier;
  */
 final class Frames {
 
-    private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
     private static final ManagedHandle<Shades> SHADES = ManagedHandle.of(SdkValues.SHADES);
 
     /** The shades the bot learned, none when it learned none. */
@@ -261,9 +260,9 @@ final class Frames {
                 : Optional.empty();
     }
 
-    /** The confidence a run holds a match to: the project's {@code Sdk.settings()}, else the SDK's default. */
+    /** The confidence a run holds a match to: the project's {@code confidence()} parameter, else the SDK's default. */
     static double confidence(StudioServices services) {
-        return SETTINGS.read(services).orElse(BotSettings.DEFAULTS).confidence();
+        return SettingsValue.confidence(services);
     }
 
     /** How many frames the picture {@code name}'s file holds, as its constant says; 1 when it says not. */

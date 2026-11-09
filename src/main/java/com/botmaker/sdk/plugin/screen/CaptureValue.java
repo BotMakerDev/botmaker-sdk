@@ -83,7 +83,7 @@ public final class CaptureValue {
         }
         Optional<CaptureSource> window = windowTitled(title);
         if (window.isEmpty()) {
-            services.status("\"" + title + "\" has no window class to find it by — pick it in 🎯 Capture Source.");
+            services.status("\"" + title + "\" has no window class to find it by — pick it in Parameters ▸ Game ▸ captureSource.");
             return;
         }
         point(services, window.get());
@@ -118,7 +118,7 @@ public final class CaptureValue {
     /**
      * Points capture at the device a launch target runs on, when it is an emulator or phone app
      * ({@code emu-app:<package>@<instance>}): there the target says where its pixels are. Any other target leaves
-     * capture alone — its window is picked once it is up (🎯 Capture Source's ▶ Launch and pick), never guessed
+     * capture alone — its window is picked once it is up (the source picker's ▶ Launch and pick), never guessed
      * (2026-10-19). Call it on the JavaFX application thread.
      *
      * @return the device's reference when capture now follows it, else empty

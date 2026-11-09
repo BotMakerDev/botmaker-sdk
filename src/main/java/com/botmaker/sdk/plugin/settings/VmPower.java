@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * A game VM's power in ⚙ Bot Settings: whether it runs, a Shut down button, and when BotMaker shuts it down by
+ * A game VM's power in the {@code vm()} editor ({@link VmEditors}): whether it runs, a Shut down button, and when BotMaker shuts it down by
  * itself ({@link VmAutoStop}: with Studio, or once unused). A started VM otherwise runs until its Windows shuts
  * down, so the next run doesn't wait for it to start.
  */

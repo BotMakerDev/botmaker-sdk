@@ -14,9 +14,7 @@ import com.botmaker.sdk.internal.trace.TraceSources;
  * </ul>
  *
  * <p><b>Default: on.</b> A bot prints its trace out of the box so a first run is legible; turn it off for a
- * quiet production run with {@link #disable()}, or for good in the bot's settings (⚙ Bot Settings, the
- * {@code debug} of its {@code @SdkValue(SdkValue.Id.SETTINGS)} value), which {@code Bot.run} applies before anything
- * prints. A run started with {@code -Dbotmaker.debug=true} or {@code false} (Studio's Debug output toggle)
+ * quiet production run with {@link #disable()}. A run started with {@code -Dbotmaker.debug=true} or {@code false} (Studio's Debug output toggle)
  * starts that way whatever the settings say; {@link #enable()} and {@link #disable()} still work after it.
  *
  * <p>Emit your own trace through {@link #log(String)}: it prints only when debugging is enabled, so bot code

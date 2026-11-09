@@ -70,8 +70,6 @@ public @interface SdkValue {
         RUN,
         /** Where pixels are read from: the game's window — the {@code CaptureSource} parameter {@code captureSource}. */
         CAPTURE,
-        /** How the bot clicks and looks — a {@link BotSettings} method. */
-        SETTINGS,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
         /** The groups 🖼 Manage Pictures files pictures under — a class of {@code PictureTag} constants. */
@@ -120,7 +118,7 @@ public @interface SdkValue {
          * picked by the person running the bot; {@code LaunchChoice.of("")} for the first one this computer can launch.
          */
         LAUNCH_TARGET,
-        /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
+        /** The game VM the game runs in, by name — the {@link GameVm} {@code vm()}; blank for the one there is. */
         VM,
         /**
          * The game server's time zone, which a daily's reset is read in — the {@code ZoneId} parameter
@@ -132,19 +130,56 @@ public @interface SdkValue {
          * spends — the {@code List<String>} {@code guardWords()} in {@code Sdk.java}, matched case-blind as whole words.
          * Currency signs stop it without being listed.
          */
-        GUARD_WORDS
+        GUARD_WORDS,
+        /*
+         * How the bot clicks, looks and recovers, and where its game runs: one parameter each in the Settings group
+         * (2026-11-09, the user's call; was one BotSettings method, SETTINGS). Bot.run reads them into
+         * BotSettings.current(); a bot that marks none runs on BotSettings.DEFAULTS.
+         */
+        /** The pause after a match is found, in ms — the {@code int} parameter {@code foundDelay}. */
+        FOUND_DELAY,
+        /** The pause after a match is not found, in ms — the {@code int} parameter {@code notFoundDelay}. */
+        NOT_FOUND_DELAY,
+        /** Whether a click lands on a random point of the match — the {@code boolean} parameter {@code randomClicks}. */
+        RANDOM_CLICKS,
+        /** How sure a match has to be, 0..1 — the {@code double} parameter {@code confidence}. */
+        CONFIDENCE,
+        /** How far a good picture must beat a look-alike, 0..1 — the {@code double} parameter {@code compareMargin}. */
+        COMPARE_MARGIN,
+        /** The rounds a vision loop runs before the bot is stuck — the {@code int} parameter {@code maxRounds}. */
+        MAX_ROUNDS,
+        /** How long, in ms, a loop's round gives its action to show — the {@code int} parameter {@code patience}. */
+        PATIENCE,
+        /** How long, in ms, the screen may stay still while the bot acts — the {@code int} parameter {@code frozenAfter}. */
+        FROZEN_AFTER,
+        /** How long a plan run may act with no progress — the {@code Duration} parameter {@code stuckAfter}. */
+        STUCK_AFTER,
+        /** The game restarts allowed within {@link #RESTARTS_WITHIN} — the {@code int} parameter {@code restartCap}. */
+        RESTART_CAP,
+        /** The time {@link #RESTART_CAP} counts over — the {@code Duration} parameter {@code restartsWithin}. */
+        RESTARTS_WITHIN,
+        /** Where the game runs — the {@link BotSettings.Where} parameter {@code gameRunsIn}. */
+        GAME_RUNS_IN,
+        /** On the desktop, drive the real mouse and keyboard — the {@code boolean} parameter {@code takeOver}. */
+        TAKE_OVER,
+        /** Which private display hosts the game — the {@link BotSettings.DisplayBackend} parameter {@code displayBackend}. */
+        DISPLAY_BACKEND,
+        /** Which Linux backend delivers a take-over — the {@link BotSettings.InputBackend} parameter {@code inputBackend}. */
+        INPUT_BACKEND
     }
 
     /**
      * The bot's classes the SDK's values live in, one constant each, named by its parts: {@code SDK} is
      * {@code Sdk.java}, {@code SCREENS} is {@code Screens.java}. Studio writes the class when a bot lacks it; a bot
-     * never names this enum. {@code RUNNING} and {@code GAME} are the SDK's parameter groups, {@code Running.java} and
-     * {@code Game.java} in the bot's private {@code params/}, each a category of the Parameters window.
+     * never names this enum. {@code RUNNING}, {@code GAME} and {@code SETTINGS} are the SDK's parameter groups,
+     * {@code Running.java}, {@code Game.java} and {@code Settings.java} in the bot's private {@code params/}, each a
+     * category of the Parameters window.
      */
     enum Holder {
         SDK,
         RUNNING,
         GAME,
+        SETTINGS,
         PLANS,
         GOALS,
         PICTURES,

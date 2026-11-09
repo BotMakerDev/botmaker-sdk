@@ -1,7 +1,7 @@
 package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 
 import samplebot.SampleBot;
-import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.bot.Run;
@@ -20,8 +20,8 @@ public final class Sdk {
     }
 
     @SdkValue(SdkValue.Id.VM)
-    public static String vm() {
-        return "";
+    public static GameVm vm() {
+        return GameVm.of("");
     }
 
     @SdkValue(SdkValue.Id.RUN)
@@ -29,11 +29,6 @@ public final class Sdk {
         return Run.of()
                 .home(SampleBot::goHome)
                 .setup(SampleBot::setup);
-    }
-
-    @SdkValue(SdkValue.Id.SETTINGS)
-    public static BotSettings settings() {
-        return BotSettings.defaults();
     }
 
     @SdkValue(SdkValue.Id.SHADES)

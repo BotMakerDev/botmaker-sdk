@@ -51,13 +51,18 @@ public final class ParamGroups {
      * method of the group beside one of them; null when none marks it or it cannot be called.
      */
     public static Object marked(SdkValue.Id id, Class<?>... values) {
+        return values == null ? null : marked(id, groups(values), values);
+    }
+
+    /** As {@link #marked(SdkValue.Id, Class[])}, among {@code groups} already made: several ids read on one set. */
+    public static Object marked(SdkValue.Id id, List<Object> groups, Class<?>... values) {
         if (values == null) return null;
         for (Class<?> type : values) {
             if (type == null) continue;
             Optional<Object> found = staticMarked(type, id);
             if (found.isPresent()) return found.get();
         }
-        for (Object group : groups(values)) {
+        for (Object group : groups) {
             Optional<Object> found = instanceMarked(group, id);
             if (found.isPresent()) return found.get();
         }

@@ -119,7 +119,8 @@ class SdkPluginSurfaceTest {
             Point.class, Rect.class, Size.class, Area.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
-            com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.screens.State.class);
+            com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.bot.GameVm.class,
+            com.botmaker.sdk.api.screens.State.class);
 
     /**
      * The four vision results, each declared by the host off its {@code @Fills} method: what the pill says
@@ -182,8 +183,10 @@ class SdkPluginSurfaceTest {
         assertEquals(CaptureSource.class, capture.type());
         assertEquals(CaptureSource.desktop().getClass(),
                 assertInstanceOf(ManagedParam.class, capture).initial().getClass());
-        var settings = byId.get(SdkValue.Id.SETTINGS);
-        assertEquals(com.botmaker.sdk.api.bot.BotSettings.class, settings.type());
+        assertEquals("Settings", byId.get(SdkValue.Id.CONFIDENCE).holder(), "a setting is a parameter of its own");
+        assertEquals(Double.class, byId.get(SdkValue.Id.CONFIDENCE).type());
+        assertEquals(java.time.Duration.class, byId.get(SdkValue.Id.STUCK_AFTER).type());
+        assertEquals(com.botmaker.sdk.api.bot.BotSettings.Where.class, byId.get(SdkValue.Id.GAME_RUNS_IN).type());
         var pictures = byId.get(SdkValue.Id.PICTURES);
         assertEquals("Pictures", pictures.holder());
         assertInstanceOf(ManagedOpenSet.OfConstants.class, pictures);
@@ -299,9 +302,9 @@ class SdkPluginSurfaceTest {
     // second by fresh() or freshCall(). The two tests above are what it became.
 
     /**
-     * The nine bar buttons in their one flat order, then the overlay's two. ⚙ Bot Settings joined on 2026-09-27,
-     * when the settings became this plugin's managed value; the groups went on 2026-10-28, when each plugin got
-     * a tab of its own on the bar.
+     * The six bar buttons in their one flat order, then the overlay's two. The groups went on 2026-10-28, when
+     * each plugin got a tab of its own on the bar; 📋 Project Setup, 🎯 Capture Source and ⚙ Bot Settings left
+     * on 2026-11-09, their values parameters now.
      *
      * <p>The order values are asserted rather than only the sequence, because the host sorts on them, not on
      * declaration order — so a wrong number here moves a button on a bar this test cannot see.
@@ -310,19 +313,19 @@ class SdkPluginSurfaceTest {
      * rather than on the main bar, and their subject is the window the HUD is drawn over.
      */
     @Test
-    void the_toolbar_contributes_eleven_items_in_their_places_and_orders() {
+    void the_toolbar_contributes_eight_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("game", "project-setup", "capture-source", "bot-settings", "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
+        assertEquals(List.of("game", "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
         ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar, overlay, overlay),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 40, 60, 65, 70, 80, 90, 10, 20),
+        assertEquals(List.of(10, 60, 65, 70, 80, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {
@@ -377,12 +380,12 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(20, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
                 + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22;"
                 + " Element 2026-10-31; State 2026-11-02, once a look's state became a ButtonState; Activity and"
                 + " Outcome went 2026-11-09 with flows, and Zone for areas beside a picture; Area came the same"
-                + " day, a pill showing its anchor and box");
+                + " day, a pill showing its anchor and box, and GameVm, vm()'s editor once ⚙ Bot Settings went");
     }
 
     /**

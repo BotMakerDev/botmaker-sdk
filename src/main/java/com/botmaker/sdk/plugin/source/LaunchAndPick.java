@@ -11,7 +11,7 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
-import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.settings.VmChoice;
 import com.botmaker.session.PrivateSession;
@@ -43,7 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 🎯 Capture Source's ▶ Launch and pick: starts the game this computer launches — on this desktop, in a private
+ * The source picker's ▶ Launch and pick: starts the game this computer launches — on this desktop, in a private
  * display or in the game VM, as the user chooses here — watches the windows that open, and recommends the one the
  * game opened ({@link WindowWatch}). A pick saves the window by its class, and its title only when the class is one
  * many programs share, so the next run finds it on this computer whatever its process id (2026-10-19).
@@ -95,7 +95,7 @@ final class LaunchAndPick {
         ToggleGroup where = new ToggleGroup();
         HBox places = new HBox(12);
         places.setAlignment(Pos.CENTER_LEFT);
-        BotSettings.Where preferred = BotSettingsWindow.current(services).runIn().where();
+        BotSettings.Where preferred = SettingsValue.current(services).runIn().where();
         for (BotSettings.Where place : BotSettings.Where.values()) {
             RadioButton button = new RadioButton(placeName(place));
             button.setUserData(place);

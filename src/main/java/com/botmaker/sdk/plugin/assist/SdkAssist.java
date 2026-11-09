@@ -15,7 +15,7 @@ import java.util.List;
  * <p>Coordinates are the <b>screenshot's</b> pixels: {@code (0, 0)} is the top-left of what {@code screenshot}
  * returned, so the assistant crops what it was shown. Every write goes through the same path as the SDK's own
  * windows, on the FX thread ({@link FxCall}): the picture files and their {@code Pictures} constants, the
- * {@code Points} and {@code Regions} constants, {@code Sdk.captureSource} and {@code Sdk.settings()}, and this machine's launch target. {@link ActTools}
+ * {@code Points} and {@code Regions} constants, {@code Sdk.captureSource} and the Settings parameters, and this machine's launch target. {@link ActTools}
  * clicks, taps a key or scrolls on the game the look tools see, and says in text what changed; on the user's own
  * desktop only when asked.
  */

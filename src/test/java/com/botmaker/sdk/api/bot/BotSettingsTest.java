@@ -1,8 +1,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.Runs;
-import com.botmaker.plugin.api.managed.ManagedValues;
-import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.shared.capture.NativeControllerFactory;
@@ -35,13 +34,47 @@ class BotSettingsTest {
         }
     }
 
-    /** What a bot's {@code Sdk.java} declares. */
+    /** What a bot's Settings group sets, one parameter each (2026-11-09); the rest keep their defaults. */
     public static final class Values {
-        @SdkValue(SdkValue.Id.SETTINGS)
-        public static BotSettings settings() {
-            return BotSettings.defaults().foundDelay(750).notFoundDelay(125).centredClicks().confidence(0.62)
-                    .compareMargin(0.11).where(BotSettings.Where.MY_DESKTOP)
-                    .displayBackend(BotSettings.DisplayBackend.XEPHYR);
+        @SdkValue(SdkValue.Id.FOUND_DELAY)
+        public static int foundDelay() {
+            return 750;
+        }
+
+        @SdkValue(SdkValue.Id.NOT_FOUND_DELAY)
+        public static int notFoundDelay() {
+            return 125;
+        }
+
+        @SdkValue(SdkValue.Id.RANDOM_CLICKS)
+        public static boolean randomClicks() {
+            return false;
+        }
+
+        @SdkValue(SdkValue.Id.CONFIDENCE)
+        public static double confidence() {
+            return 0.62;
+        }
+
+        @SdkValue(SdkValue.Id.COMPARE_MARGIN)
+        public static double compareMargin() {
+            return 0.11;
+        }
+
+        @SdkValue(SdkValue.Id.GAME_RUNS_IN)
+        public static BotSettings.Where gameRunsIn() {
+            return BotSettings.Where.MY_DESKTOP;
+        }
+
+        @SdkValue(SdkValue.Id.DISPLAY_BACKEND)
+        public static BotSettings.DisplayBackend displayBackend() {
+            return BotSettings.DisplayBackend.XEPHYR;
+        }
+
+        /** Still the old {@code String}: not this parameter's type, so the default stands. */
+        @SdkValue(SdkValue.Id.MAX_ROUNDS)
+        public static String maxRounds() {
+            return "7";
         }
     }
 
@@ -68,8 +101,7 @@ class BotSettingsTest {
 
     @Test
     void theBotsDeclaredSettingsAreInForceOnceInstalled() {
-        SdkValues.claim();
-        ManagedValues.install(Values.class);
+        InstalledGame.settings(Values.class);
 
         BotSettings current = BotSettings.current();
         assertEquals(750, current.foundDelay());
@@ -79,6 +111,11 @@ class BotSettingsTest {
         assertEquals(0.11, current.compareMargin());
         assertEquals(BotSettings.Where.MY_DESKTOP, current.where());
         assertEquals("xephyr", current.runIn().displayBackend().id());
+        assertEquals(BotSettings.DEFAULTS.maxRounds(), current.maxRounds(), "a value of another type is none");
+        assertEquals(BotSettings.DEFAULTS.patience(), current.patience(), "one the bot lacks keeps its default");
+
+        InstalledGame.settings();
+        assertEquals(BotSettings.DEFAULTS, BotSettings.current(), "a bot that marks none runs on the defaults");
     }
 
     @Test

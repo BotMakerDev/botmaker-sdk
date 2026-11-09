@@ -68,7 +68,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
     public enum Failure {
         NO_TARGET("This project has no capture source.",
                 "Picking off the screen needs a frame of the thing the bot will look at. Choose the game "
-                        + "window, or a screen, in 🎯 Capture Source and try again."),
+                        + "window, or a screen, in Parameters ▸ Game ▸ captureSource and try again."),
         BLANK("The capture source produced a blank frame.",
                 "The source is set, but grabbing it returned nothing. This usually means the window is "
                         + "closed, minimised or on another workspace — or, on a Wayland session, that no "

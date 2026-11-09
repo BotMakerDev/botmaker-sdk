@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.capture.CaptureSource;
@@ -39,6 +40,7 @@ import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
 import com.botmaker.sdk.plugin.editors.ScreenEditors;
 import com.botmaker.sdk.plugin.editors.TemplateEditors;
+import com.botmaker.sdk.plugin.settings.VmEditors;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -84,7 +86,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
                 KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                STATE);
+                GAME_VM, STATE);
     }
 
     @Override
@@ -282,8 +284,7 @@ public final class SdkTypes implements TypeHolder {
      * builds it. A fresh one is the ambient source, which keeps following the project's source when that
      * changes later; a concrete source would freeze the declaration into what was true when it was made.
      *
-     * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}), the same picker as the
-     * toolbar's Capture Source.
+     * <p>Drawn as a pill opening the source tiles ({@link CaptureSourceEditors}).
      */
     public static final DeclaredType<CaptureSource> CAPTURE_SOURCE = PluginType.value(CaptureSource.class)
             .fresh(CurrentSource::new)
@@ -322,6 +323,16 @@ public final class SdkTypes implements TypeHolder {
             .editor(() -> LauncherEditors::choice)
             .preview(() -> LauncherEditors::choicePreview)
             .writtenAs(LaunchChoice::of);
+
+    /**
+     * The game VM the game runs in, {@code GameVm.of("win11")}: drawn as this computer's VMs with their setup, screen
+     * and power ({@link VmEditors}, 2026-11-09). A fresh one names none, so a run takes the one VM there is.
+     */
+    public static final DeclaredCallType<GameVm> GAME_VM = PluginType.value(GameVm.class)
+            .fresh(() -> GameVm.of(""))
+            .editor(() -> VmEditors::vm)
+            .preview(() -> VmEditors::preview)
+            .writtenAs(GameVm::of);
 
     /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person

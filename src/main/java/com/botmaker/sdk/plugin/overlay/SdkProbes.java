@@ -3,15 +3,13 @@ package com.botmaker.sdk.plugin.overlay;
 import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.ProbeContext;
 import com.botmaker.plugin.api.overlay.ProbeResult;
-import com.botmaker.plugin.toolkit.ManagedHandle;
-import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
-import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 
 import java.awt.image.BufferedImage;
 import java.util.Locale;
@@ -22,14 +20,12 @@ import java.util.Optional;
  * {@link SdkOverlay} declares.
  *
  * <p>Each reads the call's picture, matches it once with {@link ImageFinder#bestMatch} and compares the score with
- * the <em>project's</em> confidence ({@code Sdk.settings()}), not the confidence of the Studio process, which runs
+ * the <em>project's</em> confidence (its {@code confidence()} parameter), not the confidence of the Studio process, which runs
  * no bot. Nothing here clicks: {@link #wouldClick} says where a click would land.
  *
  * <p>Links no JavaFX; called off the FX thread, up to a few times a second.
  */
 public final class SdkProbes {
-
-    private static final ManagedHandle<BotSettings> SETTINGS = ManagedHandle.of(SdkValues.SETTINGS);
 
     private SdkProbes() {}
 
@@ -80,7 +76,7 @@ public final class SdkProbes {
             best = ImageFinder.bestMatch(template, new Frame(frame.get(), new Point(where.x(), where.y())));
         }
         if (!best.isFound()) return Optional.empty();
-        double needs = SETTINGS.read(context.services()).orElse(BotSettings.DEFAULTS).confidence();
+        double needs = SettingsValue.confidence(context.services());
         return Optional.of(new Matched(best, needs));
     }
 

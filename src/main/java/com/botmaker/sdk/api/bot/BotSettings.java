@@ -12,27 +12,25 @@ import java.util.Optional;
 
 /**
  * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and where the game runs:
- * on a private display of its own, or on the user's desktop, where it may take over the mouse and keyboard. One
- * value, written in the bot's own Java:
+ * on a private display of its own, or on the user's desktop, where it may take over the mouse and keyboard. Each
+ * setting is a parameter of the SDK's Settings group, one method each, in the bot's private {@code params/}
+ * (2026-11-09; until then one {@code Sdk.settings()} method held them all):
  *
  * <pre>{@code
- * @SdkValue(SdkValue.Id.SETTINGS)
- * public static BotSettings settings() {
- *     return BotSettings.defaults()
- *             .foundDelay(400)
- *             .confidence(0.85)
- *             .where(BotSettings.Where.MY_DESKTOP)
- *             .takesOver();
+ * @Param
+ * public class Settings {
+ *     @SdkValue(SdkValue.Id.CONFIDENCE)
+ *     @Param.Shown(description = "How sure a picture match has to be, 0 to 1")
+ *     public double confidence() {
+ *         return 0.85;
+ *     }
  * }
  * }</pre>
  *
- * <p>Each setting is a named link after {@link #defaults()}, written only when it is not the default
- * (2026-10-09), so the method says what this bot changed and nothing else. A setting that is on by default is
- * turned off by a link with a negative name ({@link #centredClicks()}, {@link #debugOff()}).
- *
- * <p>{@code Bot.run(Sdk.class, …)} hands it to {@link #use} before anything runs, so a click never happens on
- * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
- * that wants another value for a while calls {@code BotSettings.use(BotSettings.current().confidence(0.9))}.
+ * <p>{@code Bot.run(Sdk.class, …)} reads them into one value and hands it to {@link #use} before anything runs, so
+ * a click never happens on the defaults and then on the bot's own values; a setting the bot lacks keeps its
+ * default. The Parameters window edits them; a bot that wants another value for a while calls
+ * {@code BotSettings.use(BotSettings.current().confidence(0.9))}, built with the links after {@link #defaults()}.
  *
  * <h2>What this replaced (2026-09-27)</h2>
  *
@@ -315,7 +313,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      * @deprecated since 2026-09-29 debug output is the host's to decide, for every plugin and not only the SDK:
      * Studio's 🐞 Debug button sets {@code -Dbotmaker.debug} on the run, and a run it started ignores this value
      * whenever the button says on or off. The value stays in the bot's settings (this API only grows) and still
-     * applies to a bot run from a terminal; Bot Settings no longer shows it.
+     * applies to a bot run from a terminal; no parameter holds it.
      */
     @Deprecated
     @Override

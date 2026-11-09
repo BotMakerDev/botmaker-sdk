@@ -32,7 +32,7 @@ import java.util.Set;
  * <p>The list never holds one launcher twice, however it was spelled: every write collapses copies (2026-10-19,
  * a list that had grown a copy per pick).
  *
- * <p>Beside {@link BotSettingsWindow} rather than in {@code launch}: the emulator picker writes it and the
+ * <p>Beside {@link SettingsValue} rather than in {@code launch}: the emulator picker writes it and the
  * launch button reads it, and neither package may name the other.
  */
 public final class LaunchTargetValue {

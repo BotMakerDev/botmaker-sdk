@@ -51,8 +51,8 @@ import java.util.function.Function;
  * settings' display backend and {@code botmaker.session.backend} as explicit overrides.
  *
  * <p><b>A missing backend stops the run.</b> It used to log an install hint and run the game on the desktop,
- * which was the opposite of what the user asked for and easy to miss in a log. Studio's ⚙ Bot Settings and
- * ▶ Launch now offer to install it; a bot run says how and stops.
+ * which was the opposite of what the user asked for and easy to miss in a log. Studio's ▶ Launch now and
+ * the pilot's background mode offer to install it; a bot run says how and stops.
  */
 public final class SessionBootstrap {
 
@@ -514,11 +514,11 @@ public final class SessionBootstrap {
             .filter(vm -> vm.stage() == VmRecord.Stage.READY).toList();
         if (ready.size() == 1) return ready.get(0).name();
         throw new IllegalStateException(ready.isEmpty()
-            ? "There's no game VM on this computer. Set one up in ⚙ Bot Settings." + OR_THE_DESKTOP
-            : "There are " + ready.size() + " game VMs on this computer: pick one in ⚙ Bot Settings.");
+            ? "There's no game VM on this computer. Set one up in Sdk.java's vm()." + OR_THE_DESKTOP
+            : "There are " + ready.size() + " game VMs on this computer: pick one in Sdk.java's vm().");
     }
 
-    private static final String OR_THE_DESKTOP = " Or set ⚙ Bot Settings ▸ Run the game in ▸ My desktop.";
+    private static final String OR_THE_DESKTOP = " Or set Parameters ▸ Settings ▸ gameRunsIn to My desktop.";
 
     /**
      * Why a run on a private display can't start without {@code backend}, and the two ways on: the install
@@ -529,6 +529,6 @@ public final class SessionBootstrap {
             .map(i -> "Install it with: " + i.describe() + (i.needsReboot() ? ", then restart" : "") + ".")
             .orElse("To fix it, " + SessionBackends.installHint(backend) + ".");
         return backend.binaryName() + " isn't installed, so the game can't run in a private display. " + install
-            + " Or set ⚙ Bot Settings ▸ Run the game in ▸ My desktop.";
+            + OR_THE_DESKTOP;
     }
 }

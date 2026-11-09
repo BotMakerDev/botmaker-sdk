@@ -51,7 +51,7 @@ final class BackgroundModeBox {
                 + "mirrors your real desktop and Interact moves your actual cursor.");
 
         // No choice of its own: where the game runs and on which display is the bot's settings' to say, so the
-        // pilot, ▶ Launch now and a run can't disagree. Read each time, since ⚙ Bot Settings may change meanwhile.
+        // pilot, ▶ Launch now and a run can't disagree. Read each time, since the Settings parameters may change meanwhile.
         Supplier<SessionBackend> backend = () -> SessionBootstrap.backendFor(launcher.configuredTarget(),
                 project.settings().runIn().displayBackend());
         BooleanSupplier onDesktop = () -> !SessionBootstrap.wantsPrivateDisplay(project.settings());
@@ -132,11 +132,11 @@ final class BackgroundModeBox {
                 return;
             }
             if (onDesktop.getAsBoolean()) {
-                status.setText("● ⚙ Bot Settings run the game on your desktop, so the pilot mirrors it and "
-                        + "Interact moves your real cursor. Choose Run the game in ▸ A private display to keep it.");
+                status.setText("● The settings run the game on your desktop, so the pilot mirrors it and "
+                        + "Interact moves your real cursor. Set Parameters ▸ Settings ▸ gameRunsIn to A private "
+                        + "display to keep it.");
             } else if (spec == null) {
-                status.setText("● Background mode needs a launch target on this computer — 📋 Project Setup "
-                        + "shows what this one has.");
+                status.setText("● Background mode needs a launch target on this computer — 🎮 Game picks one.");
             } else if (!SessionBackends.isAvailable(backend.get())) {
                 status.setText("● " + SessionBootstrap.missingBackend(backend.get()));
             } else {
@@ -156,7 +156,7 @@ final class BackgroundModeBox {
                     refreshButtons.run();
                 }));
         start.setOnAction(e -> {
-            // The box only hears its own events, so ⚙ Bot Settings may have changed since it last looked.
+            // The box only hears its own events, so the Settings parameters may have changed since it last looked.
             refreshButtons.run();
             if (start.isDisabled()) {
                 refreshStatus.run();

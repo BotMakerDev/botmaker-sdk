@@ -53,7 +53,7 @@ import java.util.function.Consumer;
  * The game dialog: what this computer starts for the open bot, picked from what the launchers and the app menu
  * on this computer already have, and a <b>▶ Launch game</b> that starts it without running the bot.
  *
- * <p>Opened from the toolbar's game button and from Project Setup's launch row. A row of radio buttons picks
+ * <p>Opened from the toolbar's game button. A row of radio buttons picks
  * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
  * (Lutris alone on Linux; Steam, Epic, Heroic, … elsewhere), one per emulator instance (its apps by name, dimmed while it is
  * stopped), Waydroid's Android apps, the menu's games, and every other app,
@@ -138,7 +138,7 @@ public final class GameDialog {
 
     /**
      * Opens the dialog, or brings the open one forward. {@code onChanged} runs after each change of target, on
-     * the JavaFX thread — Project Setup re-checks its rows with it.
+     * the JavaFX thread.
      */
     public static void open(StudioServices services, Window owner, Runnable onChanged) {
         if (active != null && active.stage != null && active.stage.isShowing()) {

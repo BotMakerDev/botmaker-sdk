@@ -16,8 +16,9 @@
   `Sdk.run()`, once for the bot; the way home and the setup are **method references**, so a rename is a compile
   error naming the holder; `RunTypes` declares it, `internal.bot.InstalledRun` holds what `Bot.run` installed),
   `Bot.stop("…")` (ends the run saying why), and **`BotSettings`**, the runtime tuning
-  as an immutable value: `@SdkValue(SdkValue.Id.SETTINGS)` in `Sdk.java`, read as `BotSettings.current()`, changed for a
-  while with `BotSettings.use(…)`, edited in ⚙ Bot Settings (`plugin/settings/BotSettingsWindow`).
+  as an immutable value: one parameter per setting in the SDK's Settings group (`internal.bot.SettingParams`,
+  2026-11-09), read as `BotSettings.current()`, changed for a while with `BotSettings.use(…)`, edited in the
+  Parameters window (`plugin/settings/SettingsValue` writes them).
 - `api.plan` (`Goal`, `Need`, `Plan`, `Reset`) and the map's `Do` and `Custom` (`api.screens`) are what a run
   does: `screens.md` § goals and plans. Java that needs no screen is plain Java in `main` before `Bot.run`, or a
   `Custom` input of a screen.

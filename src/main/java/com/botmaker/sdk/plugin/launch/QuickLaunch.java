@@ -17,7 +17,7 @@ import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
-import com.botmaker.sdk.plugin.settings.BotSettingsWindow;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.settings.VmChoice;
 import com.botmaker.shared.emulator.EmulatorInstances;
@@ -66,7 +66,7 @@ import java.util.function.Consumer;
  * nothing.
  *
  * <p><b>Where its two answers come from.</b> The launch target is the first of the bot's {@code launchTargets} this
- * computer's system can launch ({@link LaunchTargetValue}), the isolation flag the bot's own {@code Sdk.settings()}.
+ * computer's system can launch ({@link LaunchTargetValue}), the isolation flag the bot's own {@code gameRunsIn()} setting.
  */
 public final class QuickLaunch {
 
@@ -149,7 +149,7 @@ public final class QuickLaunch {
 
     private static void launch(Button button, LaunchSpec spec, Report report, StudioServices services) {
         button.setDisable(true);
-        BotSettings settings = BotSettingsWindow.current(services);
+        BotSettings settings = SettingsValue.current(services);
         if (SessionBootstrap.wantsVm(settings)) {
             launchInVm(button, spec, report, VmChoice.current(services));
             return;
@@ -170,7 +170,7 @@ public final class QuickLaunch {
     }
 
     /**
-     * Starts {@code spec} on this desktop whatever the settings say — 🎯 Capture Source's ▶ Launch and pick, where
+     * Starts {@code spec} on this desktop whatever the settings say — the source picker's ▶ Launch and pick, where
      * the user chose the place. {@code report} hears progress and how it ended, {@code ended} whether it launched,
      * just before; FX thread.
      */
@@ -294,7 +294,7 @@ public final class QuickLaunch {
      * once the game's window is up there, false and why otherwise. FX thread, and {@code done} runs on it.
      */
     public static void launchPrivately(LaunchSpec spec, StudioServices services, BiConsumer<Boolean, String> done) {
-        BotSettings settings = BotSettingsWindow.current(services);
+        BotSettings settings = SettingsValue.current(services);
         SessionBackend backend = SessionBootstrap.backendFor(spec, settings.runIn().displayBackend());
         if (!SessionBackends.isAvailable(backend)) {
             Platform.runLater(() -> done.accept(false, SessionBootstrap.missingBackend(backend)));
@@ -314,7 +314,7 @@ public final class QuickLaunch {
         CompletableFuture<String> ended = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
-                BotSettings settings = BotSettingsWindow.current(services);
+                BotSettings settings = SettingsValue.current(services);
                 if (usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
                     words.accept("Starting it in a private display");
                     launchPrivately(spec, services, (ok, why) -> ended.complete(ok ? null : why));

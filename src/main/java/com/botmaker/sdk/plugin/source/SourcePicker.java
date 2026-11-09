@@ -144,7 +144,7 @@ public final class SourcePicker {
     }
 
     /**
-     * The 🎯 Capture Source press: chooses what the bot reads pixels from, and writes it into the bot's own
+     * The source picker: chooses what the bot reads pixels from, and writes it into the bot's own
      * Java — its {@code Sdk.captureSource} parameter.
      *
      * <p><b>The item's label is constant.</b> A plugin's toolbar list is built with no {@link StudioServices},
@@ -154,7 +154,7 @@ public final class SourcePicker {
         choose(context.services());
     }
 
-    /** As {@link #choose(ActionContext)}, for a window of this plugin's own — Project Setup's capture row. */
+    /** As {@link #choose(ActionContext)}, for a window of this plugin's own. */
     public static void choose(StudioServices services) {
         new SourcePicker(services, Modals.owner(services), false)
                 .preselect(CaptureValue.current(services))
@@ -604,7 +604,7 @@ public final class SourcePicker {
                 show(screenTile, null);
                 Platform.runLater(() -> into.getChildren().add(hint(found.isEmpty()
                         ? "There's no game VM named \"" + name + "\" on this computer."
-                        : "The VM isn't running: open its screen in ⚙ Bot Settings, then press ↻ Refresh to list "
+                        : "The VM isn't running: open its screen from Sdk.java's vm(), then press ↻ Refresh to list "
                                 + "its windows.")));
                 return;
             }
