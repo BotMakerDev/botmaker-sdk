@@ -105,6 +105,7 @@ final class CutForm {
         SPOT("A spot beside a picture, or its grid", Intent.ACTS, "spot"),
         LOOK("Another look of a button", Intent.READS, "look"),
         SCREEN_LOOK("A look of the screen", Intent.READS, "screen_look"),
+        ANCHOR("A picture to measure an area from", Intent.READS, "icon"),
         READOUT("Words or a number read beside a picture", Intent.READS, "readout"),
         DIGITS("Digits of a number", Intent.READS, "number"),
         RECUT("A new image for a picture", Intent.READS, "recut");
@@ -160,8 +161,8 @@ final class CutForm {
     /** No method: always. */
     private static final String ALWAYS = "Always";
     /** Why an area's cut is refused without its anchor. */
-    private static final String BESIDE = "pick the picture beside it, shown on this frame: it is read where it sits "
-            + "from that picture, at any size.";
+    private static final String BESIDE = "pick the picture beside it, shown on this frame, or cut one as \"A picture "
+            + "to measure an area from\": it is read where it sits from that picture, at any size.";
     /** A strip or tree not on the screen yet. */
     private static final String NEW = "New";
 
@@ -308,7 +309,8 @@ final class CutForm {
                     if (line.reads.getText().isBlank()) {
                         return Optional.of(at + "give the words it shows, as the game writes them.");
                     }
-                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
+                    Optional<String> anchor = anchorWrong(line);
+                    if (anchor.isPresent()) return Optional.of(at + anchor.get());
                 }
                 case SPOT -> {
                     if (on() == null) return Optional.of(at + "a spot is a screen's: pick it.");
@@ -322,11 +324,13 @@ final class CutForm {
                     }
                     if (!line.readout.isSelected()) break;
                     if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
-                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
+                    Optional<String> anchor = anchorWrong(line);
+                    if (anchor.isPresent()) return Optional.of(at + anchor.get());
                 }
                 case READOUT -> {
                     if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
-                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
+                    Optional<String> anchor = anchorWrong(line);
+                    if (anchor.isPresent()) return Optional.of(at + anchor.get());
                 }
                 default -> {
                 }
@@ -351,6 +355,24 @@ final class CutForm {
         Set<String> taken = new HashSet<>(pictures);
         lines.stream().filter(l -> l != line).forEach(l -> taken.add(TemplateLibrary.sanitizeName(l.name.getText())));
         return taken;
+    }
+
+    /**
+     * The pictures {@code line}'s area may be measured from besides the bot's: the names of this form's other cuts
+     * saved as new pictures, which the save writes before the area.
+     */
+    private List<String> cutPictures(Line line) {
+        return lines.stream().filter(l -> l != line && !l.addsFrame() && BoardCuts.picture(l.as()))
+                .map(l -> TemplateLibrary.sanitizeName(l.name.getText()))
+                .filter(n -> !n.isEmpty() && !pictures.contains(n)).distinct().toList();
+    }
+
+    /** Why {@code line}'s area has no anchor the save will have: none is named, or neither the bot nor a cut makes it. */
+    private Optional<String> anchorWrong(Line line) {
+        Optional<String> anchor = line.areaAnchor();
+        if (anchor.isEmpty()) return Optional.of(BESIDE);
+        if (pictures.contains(anchor.get()) || cutPictures(line).contains(anchor.get())) return Optional.empty();
+        return Optional.of("the bot has no picture " + anchor.get() + " and no cut here makes one: " + BESIDE);
     }
 
     /** The size of one frame of the bot's picture {@code name}; empty when it has none, or it cannot be read. */
@@ -463,6 +485,15 @@ final class CutForm {
             areaAnchor.setEditable(true);
             areaAnchor.getItems().setAll(pictures);
             areaAnchor.setPromptText("the picture beside it");
+            // The pictures cut in this form first, by the names they have when the list opens: the anchor is most
+            // often the icon cut beside the readout in the same go.
+            areaAnchor.setOnShowing(e -> {
+                String had = areaAnchor.getEditor().getText();
+                String value = areaAnchor.getValue();
+                areaAnchor.getItems().setAll(Stream.concat(cutPictures(this).stream(), pictures.stream()).toList());
+                areaAnchor.setValue(value);
+                areaAnchor.getEditor().setText(had);
+            });
             shows.setPromptText("the number it shows: 12,500");
             reads.setPromptText("the words it shows: Settings");
             reads.setTooltip(new Tooltip(MapGuide.TEXT_MARKER));
@@ -630,7 +661,7 @@ final class CutForm {
                 case SPOT -> List.of(new Label("beside"), beside, new Label("cells"), rows, new Label("×"), columns);
                 case DIGITS -> List.of(shows, readout, new Label("beside"), areaAnchor);
                 case RECUT -> List.of(picture);
-                case ABSENT, BACK -> List.of();
+                case ABSENT, BACK, ANCHOR -> List.of();
             });
             showWords();
             suggest();
@@ -702,6 +733,7 @@ final class CutForm {
                 case SCREEN_LOOK -> new BoardCuts.ScreenLook(look.getText(), lookMarker.isSelected(), method);
                 case STRIP -> new BoardCuts.Member(field, false, notches.getValue());
                 case TREE -> new BoardCuts.Member(field, true, 0);
+                case ANCHOR -> new BoardCuts.Anchor();
                 case READOUT -> new BoardCuts.Place(areaAnchor().orElse(null), subject.isSelected());
                 case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false, areaAnchor().orElse(null));
                 case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true, areaAnchor().orElse(null));
@@ -711,11 +743,16 @@ final class CutForm {
             };
         }
 
-        /** The picture an area is measured from, as picked or typed; empty when none is. */
+        /**
+         * The picture an area is measured from, as picked or typed: a picture the bot has as it is named, else as a
+         * cut's name is saved ({@link TemplateLibrary#sanitizeName}); empty when none is.
+         */
         Optional<String> areaAnchor() {
             String typed = areaAnchor.getEditor().getText();
             String picked = typed == null || typed.isBlank() ? areaAnchor.getValue() : typed;
-            return picked == null || picked.isBlank() ? Optional.empty() : Optional.of(picked.strip());
+            if (picked == null || picked.isBlank()) return Optional.empty();
+            String named = picked.strip();
+            return Optional.of(pictures.contains(named) ? named : TemplateLibrary.sanitizeName(named));
         }
 
         private static ListCell<Kind> kindCell() {

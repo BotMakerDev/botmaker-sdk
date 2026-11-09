@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -89,6 +90,13 @@ public final class BoardCuts {
      * the frame shows it; the one naming which one the screen shows when {@code subject}.
      */
     public record Place(String anchor, boolean subject) implements As {
+    }
+
+    /**
+     * A picture an area is measured from and nothing else (2026-11-09): saved as the bot's picture, noted on no screen,
+     * so it neither tells the screen nor is pressed. A readout, words or digits of the same save may name it.
+     */
+    public record Anchor() implements As {
     }
 
     /**
@@ -186,20 +194,10 @@ public final class BoardCuts {
         Supplier<List<BufferedImage>> live = watched ? PictureTools.liveLooks(context) : List::of;
         List<String> said = new ArrayList<>();
         List<Integer> refused = new ArrayList<>();
-        List<Box> boxes = cuts.stream().filter(BoardCuts::picture).map(BoardCuts::box).toList();
-        if (!boxes.isEmpty()) {
-            Map<String, FrameWatch.Watched> watchedCuts = new HashMap<>();
-            cuts.stream().filter(c -> picture(c) && c.watched() != null && c.name() != null)
-                    .forEach(c -> watchedCuts.put(c.name(), c.watched()));
-            AgentReply cropped = PictureTools.cropPictures(new PictureTools.Crops(boxes, screen, tags), context, shown,
-                    live, watchedCuts);
-            String text = ScreenDesk.text(cropped);
-            for (int i = 0; i < cuts.size(); i++) {
-                // All refused, or each box refused on its own while the others were saved.
-                if (picture(cuts.get(i)) && (cropped.isRefused() || notSaved(text, cuts.get(i).name()))) refused.add(i);
-            }
-            said.add(text);
-        }
+        // The screen's pictures, noted on it; then the anchors, noted on none: an area measured from one is written
+        // below, once it is saved.
+        crop(context, screen, tags, cuts, c -> picture(c) && !(c.as() instanceof Anchor), shown, live, said, refused);
+        crop(context, null, tags, cuts, c -> c.as() instanceof Anchor, shown, live, said, refused);
         Map<Integer, List<Integer>> joined = joined(cuts);
         for (int i = 0; i < cuts.size(); i++) {
             Cut cut = cuts.get(i);
@@ -308,6 +306,28 @@ public final class BoardCuts {
         }
         writes.replaceAll((i, at) -> List.copyOf(at));
         return writes;
+    }
+
+    /**
+     * The cuts {@code which} takes, saved as pictures in one crop_pictures call, each noted on {@code screen} (null:
+     * on none); what it said is added to {@code said}, and the index of each cut it did not save to {@code refused}.
+     */
+    private static void crop(AgentContext context, String screen, List<String> tags, List<Cut> cuts,
+                             Predicate<Cut> which, Optional<BufferedImage> shown, Supplier<List<BufferedImage>> live,
+                             List<String> said, List<Integer> refused) {
+        List<Box> boxes = cuts.stream().filter(which).map(BoardCuts::box).toList();
+        if (boxes.isEmpty()) return;
+        Map<String, FrameWatch.Watched> watchedCuts = new HashMap<>();
+        cuts.stream().filter(c -> which.test(c) && c.watched() != null && c.name() != null)
+                .forEach(c -> watchedCuts.put(c.name(), c.watched()));
+        AgentReply cropped = PictureTools.cropPictures(new PictureTools.Crops(boxes, screen, tags), context, shown,
+                live, watchedCuts);
+        String text = ScreenDesk.text(cropped);
+        for (int i = 0; i < cuts.size(); i++) {
+            // All refused, or each box refused on its own while the others were saved.
+            if (which.test(cuts.get(i)) && (cropped.isRefused() || notSaved(text, cuts.get(i).name()))) refused.add(i);
+        }
+        said.add(text);
     }
 
     /** Whether crop_pictures said {@code name} was not saved while it saved the others: "Not saved, name: …". */

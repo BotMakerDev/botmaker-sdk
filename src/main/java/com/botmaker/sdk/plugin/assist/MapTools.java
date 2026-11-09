@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1493,6 +1494,28 @@ final class MapTools {
             each.add(name + " " + shows);
         });
         return " Its readouts read: " + String.join(", ", each) + ".";
+    }
+
+    /**
+     * Where each of {@code readouts} reads on {@code frame}, by name: its area placed from where {@code find} finds its
+     * anchor there, clipped to the frame ({@link Reach#onFrame}). Each anchor is looked for once however many areas
+     * measure from it; a readout with no area, whose anchor is not shown or whose box is off the frame, is left out, and
+     * so is one whose anchor could not be looked for.
+     */
+    static Map<String, Rect> areasOn(Map<String, Readout> readouts, BufferedImage frame,
+                                     BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> find) {
+        Map<String, Optional<Rect>> found = new HashMap<>();
+        BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> once =
+                (anchor, shown) -> found.computeIfAbsent(anchor.id(), id -> find.apply(anchor, shown));
+        Map<String, Rect> areas = new LinkedHashMap<>();
+        readouts.forEach((name, readout) -> {
+            try {
+                Reach.onFrame(readout.area(), frame, once).ifPresent(box -> areas.put(name, box));
+            } catch (RuntimeException unlooked) {
+                // Left out, as an anchor not shown is.
+            }
+        });
+        return areas;
     }
 
     /**

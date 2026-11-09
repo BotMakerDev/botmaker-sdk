@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -12,6 +13,7 @@ import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.input.Hands;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.session.PrivateSession;
@@ -208,6 +210,19 @@ public final class ScreenDesk {
     /** The screen {@code typed} names, by its constant or its name; empty when the map has none. */
     public static Optional<String> find(ScreenGraph graph, String typed) {
         return ScreenBook.find(graph, typed);
+    }
+
+    /**
+     * Where each readout of {@code constant} reads on {@code frame}, by name: its area placed from its anchor as the
+     * game shows it there, found as which_screen and a run find it ({@link MapTools#areasOn}); empty for no such
+     * screen or no project. Off the FX thread: it matches each anchor.
+     */
+    public static Map<String, Rect> readoutAreas(AgentContext context, ScreenGraph graph, String constant,
+                                                 BufferedImage frame) {
+        MapScreen screen = constant == null ? null : graph.screens().get(constant);
+        if (screen == null || screen.readouts().isEmpty() || frame == null) return Map.of();
+        return ToolReach.of(context).map(reach -> MapTools.areasOn(screen.readouts(), frame, reach::find))
+                .orElse(Map.of());
     }
 
     /** Saves {@code frame} as {@code constant}'s shot, over the one it had. Off the FX thread: it writes a file. */

@@ -13,6 +13,7 @@
     -bm-screen-plain: -bm-muted;
     -bm-screen-here: -bm-accent;
     -bm-screen-marker: -bm-cat-vision;
+    -bm-screen-area: -bm-cat-variables;
     /* A see-through grey lightens a dark shot and darkens a light one alike, in either theme. */
     -bm-screen-box-hover: rgba(128, 128, 128, 0.3);
 }
@@ -155,6 +156,18 @@
     -fx-stroke: -bm-screen-here;
     -fx-stroke-width: 1;
     -fx-stroke-dash-array: 4 3;
+}
+
+/* A readout's area on the live game, placed from its anchor where the game shows it now, its name above it. */
+.screen-live-area {
+    -fx-fill: transparent;
+    -fx-stroke: -bm-screen-area;
+    -fx-stroke-width: 1.5;
+}
+
+.screen-live-area-name {
+    -fx-text-fill: -bm-screen-area;
+    -fx-font-size: 0.85em;
 }
 
 /* --- an app's elements on a frozen frame: the node under the pointer, the rows ticked, the row picked --- */

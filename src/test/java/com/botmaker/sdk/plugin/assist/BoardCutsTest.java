@@ -91,6 +91,11 @@ class BoardCutsTest {
         assertFalse(BoardCuts.picture(cut(new BoardCuts.Place("gold_icon", true))));
         assertFalse(BoardCuts.picture(cut(new BoardCuts.Digits("12", true, "gold_icon"))));
         assertFalse(BoardCuts.picture(cut(new BoardCuts.Recut("collect"))));
+        Box anchor = BoardCuts.box(cut(new BoardCuts.Anchor()));
+        assertTrue(BoardCuts.picture(cut(new BoardCuts.Anchor())), "an anchor is a new picture");
+        assertNull(anchor.marker(), "an anchor tells no screen");
+        assertNull(anchor.back());
+        assertNull(anchor.sometimes());
     }
 
     @Test

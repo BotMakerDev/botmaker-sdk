@@ -29,7 +29,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   A bot that named a `Zones` constant no longer compiles: recut each area beside its icon. On a block an area is a
   read-only pill, the anchor's thumbnail and `1.2, 0 from gold_icon, 3 x 1`, warning when the picture's file is gone.
   `which_screen` says why a readout reads nothing: `coins nothing (coin_icon is not shown)`, or its box placed off the
-  screen.
+  screen. By hand, the cut form's *A picture to measure an area from* cuts the icon in the same go as its readout,
+  saved as a picture of no screen, and the readout's *beside* lists that cut first. The live board draws each readout's
+  area, named, where its icon shows now, so it follows the icon as the game moves or rescales it.
 - A Digits set reads the marks a game writes a number with (2026-11-09): `save_digits` saves `.`, `,`, `/` and the
   `K`, `M`, `B` multipliers beside the digits, so `37.1K` reads 37100 and `300/300` reads 300, and it splits glyphs
   that touch to the count of characters shown. `Navigate.number` and a number fact read from a text readout parse the

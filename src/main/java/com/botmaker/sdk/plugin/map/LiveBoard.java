@@ -151,6 +151,8 @@ final class LiveBoard {
     /** The screen the game shows now, by its markers; null for none of the map's. */
     private String on;
     private String popup;
+    /** Where each readout of {@link #on} reads on the last frame read, by name: placed from its anchor as shown. */
+    private Map<String, Rect> areas = Map.of();
     /** The last screen recognised: a new screen frozen goes under it. */
     private String lastKnown;
     private LiveWays.Click lastClick;
@@ -471,12 +473,30 @@ final class LiveBoard {
                 + limit;
     }
 
-    /** Which screen {@code image}, taken at {@code takenMs}, shows, handed to the FX thread; one read at a time. */
+    /**
+     * Which screen {@code image}, taken at {@code takenMs}, shows, and where its readouts read on it, each placed from
+     * its anchor as the frame shows it, handed to the FX thread; one read at a time.
+     */
     private void readHere(long mine, PanelContext reads, BufferedImage image, long takenMs) {
         try {
             Optional<ScreenDesk.Here> seen = ScreenDesk.here(reads, image);
             Platform.runLater(() -> {
                 if (generation.get() == mine) heard(seen.orElse(null), takenMs);
+            });
+            // The screen is told first; its areas follow once each anchor is matched, and a failed match costs only
+            // the areas.
+            String screen = seen.map(ScreenDesk.Here::screen).orElse(null);
+            Map<String, Rect> placed;
+            try {
+                placed = ScreenDesk.readoutAreas(reads, graph.get(), screen, image);
+            } catch (RuntimeException unplaced) {
+                placed = Map.of();
+            }
+            Map<String, Rect> drawn = placed;
+            Platform.runLater(() -> {
+                if (generation.get() != mine || !Objects.equals(on, screen)) return;
+                areas = drawn;
+                drawBoxes();
             });
         } catch (RuntimeException unread) {
             // The next second reads it again.
@@ -518,6 +538,19 @@ final class LiveBoard {
         double scale = view.getFitWidth() / frameWidth;
         for (Rect box : markerBoxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-marker"));
         for (Rect box : boxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-box"));
+        // Each readout's area where its anchor is now: it moves and grows with the picture it is measured from.
+        areas.forEach((name, box) -> {
+            boxes.getChildren().add(drawn(box, scale, "screen-live-area"));
+            Label named = new Label(name);
+            named.getStyleClass().add("screen-live-area-name");
+            named.setManaged(false);
+            boxes.getChildren().add(named);
+            named.applyCss();
+            named.autosize();
+            // Above the box, or under it when the box touches the frame's top.
+            double above = box.y() * scale - named.getHeight();
+            named.relocate(box.x() * scale, above >= 0 ? above : (box.y() + box.height()) * scale);
+        });
     }
 
     private static Rectangle drawn(Rect box, double scale, String style) {
@@ -640,6 +673,8 @@ final class LiveBoard {
         readAtMs = takenMs;
         if (!Objects.equals(now, on)) {
             on = now;
+            // Another screen's areas are not this one's: they come with its next read.
+            areas = Map.of();
             lit.accept(now);
         }
         // Each read: a way recorded or a picture recut meanwhile moves the boxes too.

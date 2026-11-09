@@ -288,4 +288,26 @@ class MapToolsTest {
             throw new IllegalStateException("no matcher");
         }), "an anchor that could not be looked for says nothing more");
     }
+
+    @Test
+    void eachReadoutsAreaIsPlacedFromItsAnchorWhereTheFrameShowsIt() {
+        BufferedImage frame = new BufferedImage(400, 200, BufferedImage.TYPE_INT_RGB);
+        Rect icon = new Rect(100, 50, 40, 20);
+        Map<String, Readout> readouts = new LinkedHashMap<>();
+        readouts.put("gems", Readout.text(MapFixtures.area("gems_icon", 1, 0, 2, 1)));
+        readouts.put("gems_below", Readout.text(MapFixtures.area("gems_icon", 0, 1, 1, 1)));
+        readouts.put("coins", Readout.text(MapFixtures.area("coin_icon", 1, 0, 2, 1)));
+        readouts.put("wide", Readout.text(MapFixtures.area("gems_icon", 1, 0, 20, 1)));
+        int[] looks = {0};
+        Map<String, Rect> areas = MapTools.areasOn(readouts, frame, (anchor, shown) -> {
+            looks[0]++;
+            return anchor.id().equals("gems_icon") ? Optional.of(icon) : Optional.empty();
+        });
+        assertEquals(Map.of("gems", new Rect(140, 50, 80, 20), "gems_below", new Rect(100, 70, 40, 20),
+                "wide", new Rect(140, 50, 260, 20)), areas, "coins' anchor is not shown; wide is clipped");
+        assertEquals(2, looks[0], "each anchor looked for once");
+        assertEquals(Map.of(), MapTools.areasOn(readouts, frame, (anchor, shown) -> {
+            throw new IllegalStateException("no matcher");
+        }));
+    }
 }
