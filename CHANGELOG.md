@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A `@Facts` group is locked on the canvas** (2026-11-09): only a run writes facts, so Studio shows the group
+  read-only; its values are seen in the Parameters window. `@Facts` carries the contract's `@Param.WrittenByRun`.
 - **Areas beside a picture replace zones** (2026-11-09, breaking): a readout, a caption's words and a drag's drop are an
   `Area` — `Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1)`, the box 1.2 of the icon's widths right of its top-left corner, 3
   icons wide and 1 high. A run finds the icon and reads there, so the box follows it wherever and at whatever size the

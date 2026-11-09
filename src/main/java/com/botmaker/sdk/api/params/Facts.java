@@ -1,5 +1,7 @@
 package com.botmaker.sdk.api.params;
 
+import com.botmaker.plugin.api.params.Param;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -20,9 +22,11 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * <p>Its method's body before any write is only there to compile.
+ * <p>Its method's body before any write is only there to compile. Only a run writes the values
+ * ({@link Param.WrittenByRun}): Studio locks the group on the canvas, and the Parameters window shows them read-only.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
+@Param.WrittenByRun
 public @interface Facts {}
