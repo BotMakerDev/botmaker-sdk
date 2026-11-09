@@ -53,7 +53,7 @@
         <!-- botmaker-plugin-host version: ClasspathGrammar, which a running bot builds the value grammar with for
              its during-a-run parameters (Params.set, 2026-11-04). Same contract and flatten reason as the ones
              above; plugin-host's botmaker-java is `optional`, so it is declared below. -->
-        <botmaker.pluginhost.version>0.10.2-SNAPSHOT</botmaker.pluginhost.version>
+        <botmaker.pluginhost.version>0.11.1-SNAPSHOT</botmaker.pluginhost.version>
         <!-- botmaker-java version: the value grammar itself, and JDT with it. Same contract and flatten reason. -->
         <botmaker.java.version>0.1.1-SNAPSHOT</botmaker.java.version>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
