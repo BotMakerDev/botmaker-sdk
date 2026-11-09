@@ -2,7 +2,6 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
@@ -37,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SuppressWarnings("removal")
 class MarkPartsTest {
 
-    private static final Caption SHOP = Caption.of(Words.of("Shop"), new Zone(0, 0, 400, 80));
+    private static final Caption SHOP = Caption.of(Words.of("Shop"), MapFixtures.area("bag", 0, 0, 40, 8));
 
     /** Finds what {@code shown} names and reads {@code title} everywhere. */
     private record Seen(Set<String> shown, String title) implements Reach {

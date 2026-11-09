@@ -79,7 +79,7 @@ class SdkPluginHeadlessTest {
             assertNotNull(plugin.getMethod("types").invoke(instance));
             assertNotNull(plugin.getMethod("toolbarItems").invoke(instance));
             // An MCP host lists the assistant's tools and the trial entry; neither may link JavaFX.
-            assertEquals(37,((java.util.List<?>) plugin.getMethod("assistantTools").invoke(instance)).size());
+            assertEquals(36,((java.util.List<?>) plugin.getMethod("assistantTools").invoke(instance)).size());
             assertTrue(((java.util.Optional<?>) plugin.getMethod("trialEntry").invoke(instance)).isPresent());
         }
     }

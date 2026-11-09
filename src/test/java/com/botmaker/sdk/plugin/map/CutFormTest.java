@@ -17,7 +17,7 @@ class CutFormTest {
         assertEquals(List.of(Kind.MARKER, Kind.MORE_MARKER, Kind.ABSENT, Kind.TEXT_MARKER), Intent.TELLS.kinds());
         assertEquals(List.of(Kind.BUTTON, Kind.BACK, Kind.STRIP, Kind.TREE, Kind.TEXT_BUTTON, Kind.SPOT),
                 Intent.ACTS.kinds());
-        assertEquals(List.of(Kind.LOOK, Kind.SCREEN_LOOK, Kind.ZONE, Kind.DIGITS, Kind.RECUT), Intent.READS.kinds());
+        assertEquals(List.of(Kind.LOOK, Kind.SCREEN_LOOK, Kind.READOUT, Kind.DIGITS, Kind.RECUT), Intent.READS.kinds());
     }
 
     @Test

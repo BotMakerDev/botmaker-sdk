@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -143,15 +144,21 @@ class InputInspectorTest {
         assertEquals("types the body's text", ScreenCards.fieldTrait(MapFixtures.click("search").typed()));
     }
 
-    /** The drag editor writes no drag when unticked or with nothing picked, else its drop by kind and its time. */
+    /**
+     * The drag editor writes no drag when unticked or with nothing picked, else its drop by kind and its time; an
+     * area is the one the drag has, never picked here.
+     */
     @Test
-    void aDragIsLetGoOnAPictureOrInAZone() {
-        assertNull(InputInspector.dropOf(false, InputInspector.DropKind.PICTURE, "slot", 400), "unticked: pressed");
-        assertNull(InputInspector.dropOf(true, InputInspector.DropKind.ZONE, " ", 400), "nothing picked yet");
+    void aDragIsLetGoOnAPictureOrInAnArea() {
+        Area end = MapFixtures.area("slider", 4, 0, 1, 1);
+        assertNull(InputInspector.dropOf(false, InputInspector.DropKind.PICTURE, "slot", 400, null), "unticked: pressed");
+        assertNull(InputInspector.dropOf(true, InputInspector.DropKind.AREA, " ", 400, end), "nothing picked yet");
         assertEquals(new InputInspector.Drop("slot", null, Duration.ofMillis(900)),
-                InputInspector.dropOf(true, InputInspector.DropKind.PICTURE, " slot ", 900));
-        assertEquals(new InputInspector.Drop(null, "SLIDER_END", Duration.ofMillis(400)),
-                InputInspector.dropOf(true, InputInspector.DropKind.ZONE, "SLIDER_END", 400));
+                InputInspector.dropOf(true, InputInspector.DropKind.PICTURE, " slot ", 900, null));
+        assertEquals(new InputInspector.Drop(null, end, Duration.ofMillis(400)),
+                InputInspector.dropOf(true, InputInspector.DropKind.AREA, end.said(), 400, end));
+        assertNull(InputInspector.dropOf(true, InputInspector.DropKind.AREA, "x", 400, null),
+                "no area to keep: none is made here");
         assertEquals("dragged onto slot", ScreenCards.dragTrait(MapFixtures.click("card")
                 .dragsOnto(MapFixtures.picture("slot"))));
         assertEquals("dragged onto slot, 900 ms", ScreenCards.dragTrait(MapFixtures.click("card")

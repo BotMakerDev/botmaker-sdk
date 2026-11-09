@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin.map;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues.MethodShape;
 import com.botmaker.plugin.toolkit.Modals;
-import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -17,8 +16,6 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.BoardCuts.As;
 import com.botmaker.sdk.plugin.assist.BotStates;
-import com.botmaker.sdk.plugin.assist.ScreenEdits;
-import com.botmaker.sdk.internal.bot.ConstantNames;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
 import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
@@ -108,7 +105,7 @@ final class CutForm {
         SPOT("A spot beside a picture, or its grid", Intent.ACTS, "spot"),
         LOOK("Another look of a button", Intent.READS, "look"),
         SCREEN_LOOK("A look of the screen", Intent.READS, "screen_look"),
-        ZONE("An area (Zones)", Intent.READS, "zone"),
+        READOUT("Words or a number read beside a picture", Intent.READS, "readout"),
         DIGITS("Digits of a number", Intent.READS, "number"),
         RECUT("A new image for a picture", Intent.READS, "recut");
 
@@ -162,6 +159,9 @@ final class CutForm {
 
     /** No method: always. */
     private static final String ALWAYS = "Always";
+    /** Why an area's cut is refused without its anchor. */
+    private static final String BESIDE = "pick the picture beside it, shown on this frame: it is read where it sits "
+            + "from that picture, at any size.";
     /** A strip or tree not on the screen yet. */
     private static final String NEW = "New";
 
@@ -177,8 +177,6 @@ final class CutForm {
     private final Label wrong = new Label();
     /** The bot's pictures' names: a recut's choices, and names a suggestion takes none of. */
     private final List<String> pictures;
-    /** The bot's zones' constants, read once: a words' zone or a readout is saved as one. */
-    private final List<String> zones;
     /** The size of one frame of each bot's picture asked about, read once: a cut that size may join it. */
     private final Map<String, Optional<Size>> frameSizes = new HashMap<>();
 
@@ -215,7 +213,6 @@ final class CutForm {
         pictures = resources == null ? List.of() : TemplateLibrary.list(resources).stream()
                 .filter(f -> !TemplateLibrary.isUnmodifiedDefaultTemplate(f)).map(TemplateLibrary::baseName)
                 .sorted().toList();
-        zones = ScreenEdits.zones(services);
         GridPane grid = new GridPane(8, 8);
         int row = 0;
         for (int i = 0; i < cuts.size(); i++) {
@@ -311,11 +308,7 @@ final class CutForm {
                     if (line.reads.getText().isBlank()) {
                         return Optional.of(at + "give the words it shows, as the game writes them.");
                     }
-                    // Saving the words' zone over a zone of that name would move what other words read.
-                    if (ScreenEdits.zones(services).contains(ConstantNames.constantFor(name))) {
-                        return Optional.of(at + "Zones has " + ConstantNames.constantFor(name) + " already: give the "
-                                + "words' zone another name.");
-                    }
+                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
                 }
                 case SPOT -> {
                     if (on() == null) return Optional.of(at + "a spot is a screen's: pick it.");
@@ -329,16 +322,11 @@ final class CutForm {
                     }
                     if (!line.readout.isSelected()) break;
                     if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
-                    // Its box is saved as a zone of its name too: over one of that name, it would move what that reads.
-                    if (ScreenEdits.zones(services).contains(ConstantNames.constantFor(name))) {
-                        return Optional.of(at + "Zones has " + ConstantNames.constantFor(name) + " already: give the "
-                                + "number another name.");
-                    }
+                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
                 }
-                case ZONE -> {
-                    if (line.readout.isSelected() && on() == null) {
-                        return Optional.of(at + "a readout is a screen's: pick it.");
-                    }
+                case READOUT -> {
+                    if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
+                    if (line.areaAnchor().isEmpty()) return Optional.of(at + BESIDE);
                 }
                 default -> {
                 }
@@ -358,10 +346,9 @@ final class CutForm {
         return typed == null ? null : graph.screens().get(typed);
     }
 
-    /** The names a suggestion for {@code line} must not take: the bot's pictures and zones, and the other cuts'. */
+    /** The names a suggestion for {@code line} must not take: the bot's pictures, and the other cuts'. */
     private Set<String> taken(Line line) {
         Set<String> taken = new HashSet<>(pictures);
-        zones.forEach(zone -> taken.add(zone.toLowerCase(Locale.ROOT)));
         lines.stream().filter(l -> l != line).forEach(l -> taken.add(TemplateLibrary.sanitizeName(l.name.getText())));
         return taken;
     }
@@ -414,7 +401,11 @@ final class CutForm {
         private final CheckBox lookMarker = new CheckBox("tells the look apart");
         private final ComboBox<String> group = new ComboBox<>();
         private final Spinner<Integer> notches = new Spinner<>(-20, 20, -3);
-        private final ComboBox<Anchor> anchor = new ComboBox<>(FXCollections.observableArrayList(Anchor.values()));
+        /**
+         * The picture an area is measured from (2026-11-09): words, a readout or a number is read where it sits beside
+         * it, in its widths and heights, so it follows the picture at any size.
+         */
+        private final ComboBox<String> areaAnchor = new ComboBox<>();
         private final TextField shows = new TextField();
         private final TextField reads = new TextField();
         private final ComboBox<String> picture = new ComboBox<>();
@@ -422,7 +413,7 @@ final class CutForm {
         private final ComboBox<String> beside = new ComboBox<>();
         private final Spinner<Integer> rows = new Spinner<>(1, 30, 1);
         private final Spinner<Integer> columns = new Spinner<>(1, 30, 1);
-        /** A zone or a number read on the screen as a readout of the cut's name, and whether it names the subject. */
+        /** A number read on the screen as a readout of the cut's name, and whether a readout names the subject. */
         private final CheckBox readout = new CheckBox("read on this screen");
         private final CheckBox subject = new CheckBox("names which one it shows");
         /** The cut as drawn, read by OCR once; null when it is off the frame. */
@@ -469,7 +460,9 @@ final class CutForm {
             InputInspector.typedStates(state);
             state.setValue(State.DISABLED);
             look.setPromptText("the look's name: Halloween");
-            anchor.setValue(Anchor.CENTER);
+            areaAnchor.setEditable(true);
+            areaAnchor.getItems().setAll(pictures);
+            areaAnchor.setPromptText("the picture beside it");
             shows.setPromptText("the number it shows: 12,500");
             reads.setPromptText("the words it shows: Settings");
             reads.setTooltip(new Tooltip(MapGuide.TEXT_MARKER));
@@ -489,7 +482,6 @@ final class CutForm {
             rows.setPrefWidth(64);
             columns.setPrefWidth(64);
             readout.setTooltip(new Tooltip(MapGuide.READOUT));
-            subject.disableProperty().bind(readout.selectedProperty().not());
             details.setAlignment(Pos.CENTER_LEFT);
             asFrame.managedProperty().bind(asFrame.visibleProperty());
             asFrame.setVisible(false);
@@ -633,10 +625,10 @@ final class CutForm {
                 case SCREEN_LOOK -> List.of(look, lookMarker, new Label("shows while"), when);
                 case STRIP -> List.of(new Label("strip"), group, new Label("new: notches"), notches);
                 case TREE -> List.of(new Label("tree"), group);
-                case ZONE -> List.of(new Label("stays with"), anchor, readout, subject);
-                case TEXT_MARKER, TEXT_BUTTON -> List.of(new Label("reads"), reads);
+                case READOUT -> List.of(new Label("beside"), areaAnchor, subject);
+                case TEXT_MARKER, TEXT_BUTTON -> List.of(new Label("reads"), reads, new Label("beside"), areaAnchor);
                 case SPOT -> List.of(new Label("beside"), beside, new Label("cells"), rows, new Label("×"), columns);
-                case DIGITS -> List.of(shows, readout);
+                case DIGITS -> List.of(shows, readout, new Label("beside"), areaAnchor);
                 case RECUT -> List.of(picture);
                 case ABSENT, BACK -> List.of();
             });
@@ -710,14 +702,20 @@ final class CutForm {
                 case SCREEN_LOOK -> new BoardCuts.ScreenLook(look.getText(), lookMarker.isSelected(), method);
                 case STRIP -> new BoardCuts.Member(field, false, notches.getValue());
                 case TREE -> new BoardCuts.Member(field, true, 0);
-                case ZONE -> new BoardCuts.Place(anchor.getValue(), readout.isSelected(),
-                        readout.isSelected() && subject.isSelected());
-                case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false);
-                case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true);
+                case READOUT -> new BoardCuts.Place(areaAnchor().orElse(null), subject.isSelected());
+                case TEXT_MARKER -> new BoardCuts.Reads(reads.getText().strip(), false, areaAnchor().orElse(null));
+                case TEXT_BUTTON -> new BoardCuts.Reads(reads.getText().strip(), true, areaAnchor().orElse(null));
                 case SPOT -> new BoardCuts.Spot(beside.getValue(), rows.getValue(), columns.getValue());
-                case DIGITS -> new BoardCuts.Digits(shows.getText(), readout.isSelected());
+                case DIGITS -> new BoardCuts.Digits(shows.getText(), readout.isSelected(), areaAnchor().orElse(null));
                 case RECUT -> new BoardCuts.Recut(picture.getValue());
             };
+        }
+
+        /** The picture an area is measured from, as picked or typed; empty when none is. */
+        Optional<String> areaAnchor() {
+            String typed = areaAnchor.getEditor().getText();
+            String picked = typed == null || typed.isBlank() ? areaAnchor.getValue() : typed;
+            return picked == null || picked.isBlank() ? Optional.empty() : Optional.of(picked.strip());
         }
 
         private static ListCell<Kind> kindCell() {

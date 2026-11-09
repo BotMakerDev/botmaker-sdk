@@ -1,6 +1,5 @@
 package com.botmaker.sdk.internal.screens;
 
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
@@ -538,7 +537,7 @@ class ScreenGraphTest {
     static Map<String, MapScreen> fight() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("fight"))
-                .withReadout("gold", Readout.digits(new Zone(10, 10, 80, 20), new DigitSet("digits/gold"))));
+                .withReadout("gold", Readout.digits(MapFixtures.area(10, 10, 80, 20), new DigitSet("digits/gold"))));
         screens.put("BATTLE", screen(Setup.named("Battle").markers(marks("battle")).from(ref("HOME", "fight"))
                 .loads(Duration.ofSeconds(30))));
         screens.put("VICTORY", screen(Setup.named("Victory").markers(marks("victory"))
@@ -558,9 +557,9 @@ class ScreenGraphTest {
         assertEquals(30_000, graph.loadMs("BATTLE"));
         assertEquals(Optional.of(new BotConstants.InputName("HOME", "gold")),
                 graph.nameOf(graph.screens().get("HOME").readouts().get("gold")));
-        assertEquals(Optional.empty(), graph.nameOf(Readout.text(new Zone(0, 0, 1, 1))), "a readout of no screen");
+        assertEquals(Optional.empty(), graph.nameOf(Readout.text(MapFixtures.area(0, 0, 1, 1))), "a readout of no screen");
         assertEquals(Optional.empty(), graph.screens().get("HOME").subjectField());
-        MapScreen hero = graph.screens().get("HOME").withReadout("name", Readout.text(new Zone(0, 0, 9, 9)).subject());
+        MapScreen hero = graph.screens().get("HOME").withReadout("name", Readout.text(MapFixtures.area(0, 0, 9, 9)).subject());
         assertEquals(Optional.of("name"), hero.subjectField());
         assertEquals("gold2", hero.fieldFor("gold"), "a readout's name is taken");
     }

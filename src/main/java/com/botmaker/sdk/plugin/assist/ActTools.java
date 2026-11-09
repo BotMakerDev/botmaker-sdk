@@ -419,7 +419,7 @@ final class ActTools {
         if (frame.isEmpty()) return Entered.no(AgentReply.refused(Frames.noScreen()));
         Optional<Rect> place = reach.get().textOrNone(words.caption(), frame.get());
         if (place.isEmpty()) {
-            return Entered.no(AgentReply.text(words.label() + " is not read in its zone on the screen; nothing was "
+            return Entered.no(AgentReply.text(words.label() + " is not read in its area on the screen; nothing was "
                     + "clicked."));
         }
         Point at = reach.get().pointOn(place.get());

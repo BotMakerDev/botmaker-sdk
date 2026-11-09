@@ -7,7 +7,6 @@ import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Readout;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Rect;
@@ -243,9 +242,9 @@ class MapToolsTest {
     /** which_screen says what each readout of the screen shown reads, as a run would (2026-11-09). */
     @Test
     void theScreenShownSaysWhatItsReadoutsRead() {
-        Readout gems = Readout.text(new Zone(780, 65, 64, 33));
-        Readout energy = Readout.text(new Zone(400, 65, 90, 33));
-        Readout rolla = Readout.text(new Zone(612, 65, 84, 33));
+        Readout gems = Readout.text(MapFixtures.area(780, 65, 64, 33));
+        Readout energy = Readout.text(MapFixtures.area(400, 65, 90, 33));
+        Readout rolla = Readout.text(MapFixtures.area(612, 65, 84, 33));
         Map<String, Readout> readouts = new LinkedHashMap<>();
         readouts.put("gems", gems);
         readouts.put("energy", energy);

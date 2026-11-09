@@ -116,7 +116,6 @@ class SdkPluginSurfaceTest {
             ImageTemplate.class, Precision.class, OcrOptions.class, com.botmaker.sdk.api.text.DigitSet.class,
             com.botmaker.sdk.api.text.Words.class, Element.class,
             Point.class, Rect.class, Size.class,
-            com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
             com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.screens.State.class);
@@ -188,8 +187,6 @@ class SdkPluginSurfaceTest {
         assertEquals("Pictures", pictures.holder());
         assertInstanceOf(ManagedOpenSet.OfConstants.class, pictures);
         assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
-        assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
-        assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());
         assertEquals("Digits", byId.get(SdkValue.Id.DIGITS).holder());
         assertEquals(com.botmaker.sdk.api.text.DigitSet.class, byId.get(SdkValue.Id.DIGITS).type());
         assertEquals("Texts", byId.get(SdkValue.Id.TEXTS).holder());
@@ -379,11 +376,11 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(18, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
                 + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22;"
                 + " Element 2026-10-31; State 2026-11-02, once a look's state became a ButtonState; Activity and"
-                + " Outcome went 2026-11-09 with flows");
+                + " Outcome went 2026-11-09 with flows, and Zone for areas beside a picture");
     }
 
     /**

@@ -87,9 +87,9 @@ class BoardCutsTest {
     void onlyAScreensPicturesGoToCropPictures() {
         assertTrue(BoardCuts.picture(cut(new BoardCuts.Member(null, false, -3))));
         assertTrue(BoardCuts.picture(cut(new BoardCuts.Back())));
-        assertFalse(BoardCuts.picture(cut(new BoardCuts.Place(null, false, false))));
-        assertFalse(BoardCuts.picture(cut(new BoardCuts.Place(null, true, true))), "a readout's zone is no picture");
-        assertFalse(BoardCuts.picture(cut(new BoardCuts.Digits("12", true))));
+        assertFalse(BoardCuts.picture(cut(new BoardCuts.Place("gold_icon", false))), "a readout's area is no picture");
+        assertFalse(BoardCuts.picture(cut(new BoardCuts.Place("gold_icon", true))));
+        assertFalse(BoardCuts.picture(cut(new BoardCuts.Digits("12", true, "gold_icon"))));
         assertFalse(BoardCuts.picture(cut(new BoardCuts.Recut("collect"))));
     }
 

@@ -20,7 +20,6 @@ class SdkHoldersTest {
                 Map.entry("Sdk", SdkValues.RUN.holder()),
                 Map.entry(TemplateNames.CLASS_NAME, SdkValues.PICTURES.holder()),
                 Map.entry("Tags", SdkValues.TAGS.holder()),
-                Map.entry("Zones", SdkValues.ZONES.holder()),
                 Map.entry("Digits", SdkValues.DIGITS.holder()),
                 Map.entry("Texts", SdkValues.TEXTS.holder()),
                 Map.entry("Elements", SdkValues.ELEMENTS.holder()),

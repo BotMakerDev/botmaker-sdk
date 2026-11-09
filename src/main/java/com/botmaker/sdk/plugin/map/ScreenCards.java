@@ -405,7 +405,7 @@ final class ScreenCards {
                 : ", " + words.gesture().displayName().toLowerCase(Locale.ROOT));
     }
 
-    /** Where a drag lets go:{@code dragged onto slot_empty}, or {@code dragged onto zone {10, 20, 30x40}, 800 ms}. */
+    /** Where a drag lets go:{@code dragged onto slot_empty}, or {@code dragged onto area 1.2, 0 from slot, 3 x 1, 800 ms}. */
     static String dragTrait(Button dragged) {
         return "dragged onto " + dragged.drag().target() + (dragged.drag().time() == null ? ""
                 : ", " + dragged.dragTime().toMillis() + " ms");

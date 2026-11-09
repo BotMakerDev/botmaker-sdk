@@ -21,7 +21,7 @@ class CutNamesTest {
     void noWordsNamesItByScreenAndKind() {
         assertEquals("home_button_1", CutNames.suggest(null, "HOME", Kind.BUTTON, Set.of()));
         assertEquals("home_marker_2", CutNames.suggest("", "HOME", Kind.MARKER, Set.of("home_marker_1")));
-        assertEquals("cut_zone_1", CutNames.suggest(null, null, Kind.ZONE, Set.of()), "a cut on no screen");
+        assertEquals("cut_readout_1", CutNames.suggest(null, null, Kind.READOUT, Set.of()), "a cut on no screen");
         // A number or one misread letter is no name.
         assertEquals("tavern_number_1", CutNames.suggest("12,500", "TAVERN", Kind.DIGITS, Set.of()));
         assertEquals("tavern_back_1", CutNames.suggest("X", "TAVERN", Kind.BACK, Set.of()));

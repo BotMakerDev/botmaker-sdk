@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
@@ -38,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** What tells a screen: its pictures first, its words read only for a screen the pictures leave in. */
 class MarkersTest {
 
-    private static final Zone TITLE = new Zone(100, 20, 300, 40);
+    /** 100,20 (300x40) beside menu_frame, which the game finds at 0,0 (10x10). */
+    private static final Area TITLE = MapFixtures.area("menu_frame", 10, 2, 30, 4);
     private static final Caption SETTINGS = Caption.of(Words.of("Settings"), TITLE);
     private static final Caption PROFILE = Caption.of(Words.of("Profile"), TITLE);
 

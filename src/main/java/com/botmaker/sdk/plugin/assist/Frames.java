@@ -11,10 +11,15 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.screens.Shades;
+import com.botmaker.sdk.api.vision.ImageFinder;
+import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.api.vision.MatchResult;
+import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.vision.Images;
+import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
@@ -284,6 +289,20 @@ final class Frames {
     static Optional<String> picture(Path resources, String typed) {
         String base = TemplateLibrary.sanitizeName(typed == null ? "" : typed);
         return !base.isEmpty() && TemplateLibrary.exists(resources, base) ? Optional.of(base) : Optional.empty();
+    }
+
+    /**
+     * Where the bot's {@code picture} is on {@code frame}, its file read from {@code resources} and matched anywhere at
+     * {@code confidence}: an area's anchor as a tool finds it. Empty when the bot has no such file or it is not there.
+     */
+    static Optional<Rect> found(Path resources, double confidence, ImageTemplate picture, BufferedImage frame) {
+        if (resources == null || picture == null || frame == null) return Optional.empty();
+        Optional<String> file = picture(resources, picture.id());
+        if (file.isEmpty()) return Optional.empty();
+        ImageTemplate placed = FrameCut.of(picture)
+                .onto(new ImageTemplate(TemplateLibrary.fileForName(resources, file.get()).toString()));
+        MatchResult best = ImageFinder.bestMatch(placed, new StillSource(frame));
+        return best.isFound() && best.confidence() >= confidence ? Optional.of(best.rect()) : Optional.empty();
     }
 
     static String noPicture(String typed) {

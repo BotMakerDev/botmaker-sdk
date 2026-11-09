@@ -7,11 +7,11 @@ import com.botmaker.plugin.api.value.Held;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Answer;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
@@ -72,7 +72,7 @@ public final class ScreenTypes implements TypeHolder {
     public List<ComponentType<?>> components() {
         return List.of(SETUP_SHAPE, WAY_SHAPE, WAY_ON_ITS_OWN_SHAPE, SCREEN_VARIANT_SHAPE, LOOK_SHAPE, SHADES_SHAPE,
                 SHADE_SHAPE, CHANNELS_SHAPE, GEOMETRY_SHAPE, BUTTON_SHAPE,
-                BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
+                BUTTON_BESIDE_SHAPE, BUTTON_ELEMENT_SHAPE, GRID_SHAPE, AREA_SHAPE, PLACE_ABOVE_SHAPE, PLACE_ABOVE_WORDS_SHAPE,
                 PLACE_BELOW_SHAPE, PLACE_BELOW_WORDS_SHAPE, PLACE_LEFT_OF_SHAPE, PLACE_LEFT_OF_WORDS_SHAPE, PLACE_RIGHT_OF_SHAPE,
                 PLACE_RIGHT_OF_WORDS_SHAPE, PLACE_NEAREST_SHAPE, PLACE_NEAREST_WORDS_SHAPE, PLACE_BETWEEN_SHAPE,
                 PLACE_BETWEEN_WORDS_SHAPE, BUTTON_CYCLING_SHAPE, HOTKEY_KEY_SHAPE, HOTKEY_COMBO_SHAPE, CUSTOM_SHAPE, CAPTION_SHAPE,
@@ -198,7 +198,7 @@ public final class ScreenTypes implements TypeHolder {
                 .flag(Button::repeated, ScreenTypes::repeatedWritten)
                 .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
                 .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
-                .<Zone>with(Button::dragsInto, ScreenTypes::dropZone)
+                .<Area>with(Button::dragsInto, ScreenTypes::dropArea)
                 .<Duration>with(Button::dragTime, ScreenTypes::dragTimeWritten);
     }
 
@@ -209,6 +209,12 @@ public final class ScreenTypes implements TypeHolder {
 
     /** {@code Grid.of(int, int, double, double)}: a grid button's rows and columns, its steps in the anchor's size. */
     public static final DeclaredCall<Grid> GRID_SHAPE = ComponentType.part(Grid.class).writtenAs(Grid::of);
+
+    /**
+     * {@code Area.of(ImageTemplate, double, double, double, double)}: a box measured from a picture, in its widths and
+     * heights (2026-11-09), where a readout reads, a caption's words are read and a drag lets go.
+     */
+    public static final DeclaredCall<Area> AREA_SHAPE = ComponentType.part(Area.class).writtenAs(Area::of);
 
     /*
      * A place's side and whether it is a picture or words are told apart by which factory rebuilds it equal, so
@@ -256,13 +262,13 @@ public final class ScreenTypes implements TypeHolder {
         return button.gesture() == Gesture.CLICK || button.hold() != null ? null : button.gesture();
     }
 
-    /** The picture a button is dragged onto; null when it is not dragged, or dragged into a zone. */
+    /** The picture a button is dragged onto; null when it is not dragged, or dragged into an area. */
     private static ImageTemplate dropPicture(Button button) {
         return button.drag() == null ? null : button.drag().onto();
     }
 
-    /** The zone a button is dragged into; null when it is not dragged, or dragged onto a picture. */
-    private static Zone dropZone(Button button) {
+    /** The area a button is dragged into; null when it is not dragged, or dragged onto a picture. */
+    private static Area dropArea(Button button) {
         return button.drag() == null ? null : button.drag().into();
     }
 
@@ -286,11 +292,11 @@ public final class ScreenTypes implements TypeHolder {
             .<Runnable, Custom>writtenAs(Custom::of, Parts.CUSTOM_METHOD.part(ScreenTypes::method))
             .<BooleanSupplier>with(Custom::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
 
-    /** {@code Caption.of(Words, Zone)}: words a screen shows, one of the bot's {@code Texts}, read in a {@code Zones}. */
+    /** {@code Caption.of(Words, Area)}: words a screen shows, one of the bot's {@code Texts}, read in an area. */
     public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class).writtenAs(Caption::of);
 
     /**
-     * {@code Readout.text(Zone)}, then {@code .subject()} when it names which one its screen shows, and {@code
+     * {@code Readout.text(Area)}, then {@code .subject()} when it names which one its screen shows, and {@code
      * .into(Progress::gold).staleAfter(…)} when it feeds a fact.
      */
     public static final DeclaredCall<Readout> READOUT_TEXT_SHAPE = feeding(ComponentType.part(Readout.class)
@@ -312,9 +318,9 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<Readout> READOUT_ELEMENT_SHAPE = feeding(ComponentType.part(Readout.class)
             .<Element, Readout>writtenAs(Readout::element));
 
-    /** {@code Readout.digits(Zone, DigitSet)}: a number read with one of the bot's {@code Digits}, and the same link. */
+    /** {@code Readout.digits(Area, DigitSet)}: a number read with one of the bot's {@code Digits}, and the same link. */
     public static final DeclaredCall<Readout> READOUT_DIGITS_SHAPE = feeding(ComponentType.part(Readout.class)
-            .<Zone, DigitSet, Readout>writtenAs(Readout::digits));
+            .<Area, DigitSet, Readout>writtenAs(Readout::digits));
 
     /**
      * A readout's links to the fact it feeds (2026-11-06): {@code .into(Progress::gold)}, the method reference crossing

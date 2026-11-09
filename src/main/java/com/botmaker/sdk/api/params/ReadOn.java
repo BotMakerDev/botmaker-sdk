@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  * shown, a {@code String} the text, an {@code enum} the constant it names, and a {@code boolean} whether anything shows
  * there at all.
  *
- * <p>Replaced by the readout itself (2026-11-06): {@code Readout.text(Zones.GOLD).into(Progress::gold)}. A readout
+ * <p>Replaced by the readout itself (2026-11-06): {@code Readout.text(Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1)).into(Progress::gold)}. A readout
  * that names the fact wins over this.
  */
 @Deprecated(forRemoval = true)

@@ -3,9 +3,9 @@ package com.botmaker.sdk.internal.screens;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -469,10 +469,15 @@ class ReachTest {
         assertEquals(List.of("click 240", "type \"x\"", "click 240"), column.done);
     }
 
-    /** A column whose drags are told by where they go: {@code drag 50,240 to 50,340 in 400}. */
+    /** A column on an 800x600 frame whose drags are told by where they go: {@code drag 50,240 to 50,340 in 400}. */
     private static final class Dropping extends Column {
         Dropping(Map<String, Integer> slots) {
             super(slots, 0);
+        }
+
+        @Override
+        public Optional<BufferedImage> look() {
+            return Optional.of(new BufferedImage(800, 600, BufferedImage.TYPE_INT_RGB));
         }
 
         @Override
@@ -482,17 +487,21 @@ class ReachTest {
     }
 
     /**
-     * A drag is pressed on its button and let go on its picture, found on the same frame, or at its zone's centre, in
-     * its time; nothing is clicked.
+     * A drag is pressed on its button and let go on its picture, found on the same frame, or at the centre of its area
+     * beside its anchor, in its time; nothing is clicked, and an area whose anchor is not shown drags nowhere.
      */
     @Test
     void aDragGoesFromItsPictureToItsTarget() {
         Dropping column = new Dropping(Map.of("arena", 1, "campaign", 2));
         BufferedImage frame = column.look().orElseThrow();
         assertTrue(column.perform(Button.of(ARENA).dragsOnto(CAMPAIGN), frame));
-        assertTrue(column.perform(Button.of(ARENA).dragsInto(new Zone(400, 300, 100, 50))
+        // campaign sits at 10,300 (80x80): five of its widths right and half its height down, 100x50.
+        assertTrue(column.perform(Button.of(ARENA).dragsInto(MapFixtures.area("campaign", 5, 0.5, 1.25, 0.625))
                 .dragTime(Duration.ofMillis(900)), frame));
-        assertEquals(List.of("drag 50,240 to 50,340 in 400", "drag 50,240 to 450,325 in 900"), column.done);
+        assertEquals(List.of("drag 50,240 to 50,340 in 400", "drag 50,240 to 460,365 in 900"), column.done);
+        assertFalse(column.perform(Button.of(ARENA).dragsInto(MapFixtures.area("gone", 5, 0, 1, 1)), frame),
+                "its anchor not shown: nowhere to let go");
+        assertEquals(2, column.done.size());
     }
 
     /** A drag whose picture is not on the frame is no press: nothing is dragged or clicked. */
@@ -504,13 +513,16 @@ class ReachTest {
         assertTrue(column.dropOn(Button.of(ARENA), column.look().orElseThrow()).isEmpty(), "a button drags nowhere");
     }
 
-    /** A screen of 800x600 whose zones each read {@code lines}, placed inside the part read; each read's size kept. */
+    /**
+     * A screen of 800x600 whose areas each read {@code lines}, placed inside the part read; each read's size kept. Its
+     * one picture, {@code quests_icon}, shows at 10,200 (80x80).
+     */
     private static class Reading extends Column {
         final List<TextResult> lines;
         final List<String> read = new ArrayList<>();
 
         Reading(List<TextResult> lines) {
-            super(Map.of(), 0);
+            super(Map.of("quests_icon", 1), 0);
             this.lines = lines;
         }
 
@@ -527,7 +539,7 @@ class ReachTest {
     }
 
     /**
-     * A text button is pressed by its gesture at the centre of the line that is its words, read only in its zone; a
+     * A text button is pressed by its gesture at the centre of the line that is its words, read only in its area; a
      * line one state on ({@code Claimed}) is not it, and words not read press nothing.
      */
     @Test
@@ -536,24 +548,26 @@ class ReachTest {
                 new TextResult("Claimed", new Rect(10, 0, 60, 20), 90f, TextResult.Level.LINE),
                 new TextResult(" CLAIM! ", new Rect(10, 30, 60, 20), 90f, TextResult.Level.LINE)));
         BufferedImage frame = screen.look().orElseThrow();
-        Zone quests = new Zone(100, 200, 200, 100);
+        Area quests = QUESTS;
         TextButton claim = TextButton.of(Caption.of(Words.of("Claim"), quests));
         assertTrue(screen.perform(claim, frame));
         assertTrue(screen.perform(claim.hold(Duration.ofMillis(900)), frame));
         assertEquals(List.of("click 240", "hold 240 900"), screen.done);
-        assertEquals(List.of("200x100", "200x100"), screen.read, "only the zone is read");
+        assertEquals(List.of("200x100", "200x100"), screen.read, "only the area is read");
         assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Collect"), quests)), frame));
-        assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Claim"), new Zone(900, 700, 50, 50))), frame),
-                "a zone off the frame reads nothing");
+        assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Claim"), OFF_FRAME)), frame),
+                "an area off the frame reads nothing");
+        assertFalse(screen.perform(TextButton.of(Caption.of(Words.of("Claim"), MapFixtures.area("gone", 1, 0, 2, 1))),
+                frame), "an area whose anchor is not shown reads nothing");
         assertEquals(2, screen.done.size(), "words not read are not pressed");
     }
 
     /**
-     * A readout of words reads its zone alone, every line joined by a space; one of digits reads the number its digit
-     * pictures spell in that zone; a zone off the frame reads nothing.
+     * A readout of words reads its area alone, every line joined by a space; one of digits reads the number its digit
+     * pictures spell in that area; an area off the frame, or beside a picture not shown, reads nothing.
      */
     @Test
-    void aReadoutReadsItsZoneOnlyAsWordsOrAsANumber() {
+    void aReadoutReadsItsAreaOnlyAsWordsOrAsANumber() {
         List<Rect> areas = new ArrayList<>();
         Reading screen = new Reading(List.of(
                 new TextResult(" Gold ", new Rect(0, 0, 40, 20), 90f, TextResult.Level.LINE),
@@ -565,12 +579,14 @@ class ReachTest {
             }
         };
         BufferedImage frame = screen.look().orElseThrow();
-        Zone gold = new Zone(100, 200, 200, 100);
+        Area gold = QUESTS;
         assertEquals(Optional.of("Gold 1,250"), screen.readout(Readout.text(gold), frame));
-        assertEquals(List.of("200x100"), screen.read, "only the zone is read");
+        assertEquals(List.of("200x100"), screen.read, "only the area is read");
         assertEquals(Optional.of("1250"), screen.readout(Readout.digits(gold, new DigitSet("digits/gold")), frame));
         assertEquals(List.of(new Rect(100, 200, 200, 100)), areas);
-        assertEquals(Optional.empty(), screen.readout(Readout.text(new Zone(900, 700, 50, 50)), frame));
+        assertEquals(Optional.empty(), screen.readout(Readout.text(OFF_FRAME), frame));
+        assertEquals(Optional.empty(), screen.readout(Readout.text(MapFixtures.area("gone", 1, 0, 2, 1)), frame),
+                "its anchor not shown");
         assertEquals(Optional.empty(), new Reading(List.of()).readout(Readout.text(gold), frame), "nothing read");
     }
 
@@ -584,8 +600,13 @@ class ReachTest {
             }
         };
         BufferedImage frame = broken.look().orElseThrow();
-        assertThrows(Reach.TextUnread.class, () -> broken.readout(Readout.text(new Zone(100, 200, 200, 100)), frame));
+        assertThrows(Reach.TextUnread.class, () -> broken.readout(Readout.text(QUESTS), frame));
     }
+
+    /** 100,200 (200x100) beside {@code quests_icon} at 10,200 (80x80): 1.125 of its widths right, 2.5 by 1.25 of it. */
+    private static final Area QUESTS = MapFixtures.area("quests_icon", 1.125, 0, 2.5, 1.25);
+    /** Twelve widths right of {@code quests_icon}: past the 800-wide frame. */
+    private static final Area OFF_FRAME = MapFixtures.area("quests_icon", 12, 0, 1, 1);
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */
     private static final class Cards extends Column {
@@ -775,7 +796,7 @@ class ReachTest {
     private static final ImageTemplate CLAIM = new ImageTemplate("images/claim.png");
     private static final ImageTemplate DAILY = new ImageTemplate("images/daily.png");
     private static final ImageTemplate AVATAR_FRAME = new ImageTemplate("images/avatar_frame.png");
-    private static final Caption DAILY_WORDS = Caption.of(Words.of("Daily"), new Zone(0, 0, 800, 600));
+    private static final Caption DAILY_WORDS = Caption.of(Words.of("Daily"), MapFixtures.area(0, 0, 1, 1));
 
     @Test
     void aPicturelessButtonIsPressedBesideItsAnchor() {

@@ -7,14 +7,14 @@ import java.time.Duration;
 import java.util.function.BooleanSupplier;
 
 /**
- * Words on a {@link Screen} that are clicked — {@code TextButton.of(Caption.of(Texts.CLAIM, Zones.QUESTS))}: a button
+ * Words on a {@link Screen} that are clicked — {@code TextButton.of(Caption.of(Texts.CLAIM, Area.of(Pictures.QUEST_ROW, 3, 0, 1.5, 1)))}: a button
  * known by what it says, not by a picture, in an app or a game translated into many languages. It is pressed at the
  * centre of the words where they are read, by its {@link #gesture} as a {@link Button} is (2026-10-22).
  *
  * <p>Words that show only on their screen tell it: {@link #marking}; words that never show there tell it apart from a
  * screen alike: {@link #absent} (2026-11-02).
  *
- * @param caption      the words and the zone they are read in
+ * @param caption      the words and the area they are read in, beside a picture
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells

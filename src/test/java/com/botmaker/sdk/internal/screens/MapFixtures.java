@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Custom;
@@ -36,6 +37,19 @@ public final class MapFixtures {
 
     public static ImageTemplate picture(String id) {
         return new ImageTemplate("images/" + id + ".png");
+    }
+
+    /**
+     * An area beside the picture {@code anchor}, {@code offsetX} and {@code offsetY} of its widths and heights from its
+     * corner, {@code sizeX} by {@code sizeY} of them: for a test that reads where it is, its anchor found on a frame.
+     */
+    public static Area area(String anchor, double offsetX, double offsetY, double sizeX, double sizeY) {
+        return Area.of(picture(anchor), offsetX, offsetY, sizeX, sizeY);
+    }
+
+    /** An area of a stand-in anchor, told apart by its numbers: for a test that never reads where it is. */
+    public static Area area(double offsetX, double offsetY, double sizeX, double sizeY) {
+        return area("anchor", offsetX, offsetY, sizeX, sizeY);
     }
 
     /** A screen's markers: the pictures {@code ids}. */

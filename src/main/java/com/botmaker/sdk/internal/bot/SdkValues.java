@@ -17,7 +17,6 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Screen;
@@ -41,7 +40,7 @@ import java.util.List;
  * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code PLANS} and {@code GOALS} are
  * what the bot wants, {@code RUN} the game's home and setup, {@code SETTINGS} how it clicks and looks,
  * {@code SCREEN} the size its pictures were cut at, and {@code PICTURES}, {@code TAGS},
- * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of
+ * {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of
  * constants the bot grows. {@code PLAN} and {@code DO_SETUP} are the
  * run's parameters, methods of the SDK's group {@code params/com_github_botmakerdev/botmaker_sdk/Running.java}, and
  * {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's, in {@code Game.java} beside it
@@ -112,17 +111,6 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.TAGS)
             .because("Tags.java holds the groups 🖼 Manage Pictures files pictures under. Add, rename or delete one"
                     + " there, which changes every picture it holds together.");
-
-    /**
-     * The named areas — {@code static final Zone BAG = new Zone(10, 20, 200, 120)}, in the bot's pixels, which
-     * {@code source.region(Zone)} places on the game as it shows. The assistant's {@code save_region} adds one, or
-     * moves one it names again.
-     */
-    public static final ManagedOpenSet.OfConstants<Zone> ZONES = ManagedValue.openSet(SdkValue.Id.ZONES)
-            .of(Zone.class)
-            .in(SdkValue.Holder.ZONES)
-            .because("Zones.java holds the bot's named areas. Ask Claude to save_region an area again, under its"
-                    + " name, to move it.");
 
     /**
      * The game fonts' digits — {@code static final DigitSet GOLD = new DigitSet("digits/gold")},
@@ -299,7 +287,7 @@ public final class SdkValues implements ValueHolder {
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(PLANS, GOALS, RUN, SETTINGS, PICTURES, TAGS, ZONES, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
+        return List.of(PLANS, GOALS, RUN, SETTINGS, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
                 SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE);
     }
 

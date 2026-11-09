@@ -282,9 +282,6 @@ public final class DigitReader {
 
     /** Where {@code source} narrows its whole surface of {@code live} size to; all of it when it does not. */
     private static Rect area(CaptureSource source, Size live) {
-        if (source instanceof ZoneSource zoned) {
-            return Places.inSource(zoned.zone(), BotScreen.size().orElse(null), live);
-        }
         Rect sub = source.subRegion();
         return sub == null ? new Rect(0, 0, live.width(), live.height()) : sub;
     }

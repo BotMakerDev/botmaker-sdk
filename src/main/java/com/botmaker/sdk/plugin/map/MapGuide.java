@@ -86,14 +86,14 @@ final class MapGuide {
         PRESSED_BY("Pressed by", "How the run presses it: a click, a double or right click, a hold, a hover."),
         TEXT_FIELD("Text field", "A field the run types into: the words typed, the field cleared first, Enter "
                 + "after."),
-        DRAG("Drag", "Dragged rather than clicked: onto a picture or into a zone, over a time."),
+        DRAG("Drag", "Dragged rather than clicked: onto a picture or into an area, over a time."),
         BUTTON_LOOKS("Looks", "Other pictures of this button and what each means: Disabled is never pressed, "
                 + "Selected tells a tab."),
         COPIES("Copies", "When its picture shows more than once: which copy is pressed, and in what order."),
         WHERE("Where", "Where it is found: at its own place, or beside another picture, or a grid of spots there."),
         GROUP("Strip or tree", "Whether it is one button of a strip that scrolls, or a node of a tree."),
         KEYS("Keys", "The key or combination pressed, and how long it is held."),
-        WORDS("Words", "The words it is known by, read in its zone."),
+        WORDS("Words", "The words it is known by, read in its area."),
         CODE("Code", "The bot's own method a run runs as its press. Discovery never tries it."),
         MEMBERS("Members", "The strip's buttons, in their order along it."),
         STRIP_SCROLL("Scroll", "How the strip turns to bring a member into view: wheel notches or a drag, measured "
@@ -165,7 +165,7 @@ final class MapGuide {
             + "cutting then starts on it, its marker first";
     static final String RECORD_WAY = "The input clicked opened this screen: one more way into it, as try_input records";
     static final String CUT_FROZEN = "Draw pictures on this frame, then say what each is: a marker, a button, its way "
-            + "back, a look, a strip's button, a zone, digits or a new image for a picture";
+            + "back, a look, a strip's button, a readout, digits or a new image for a picture";
     static final String CUT_IGNORE = "A drag inside a cut is the part of it a run skips: a timer, a count";
     static final String CUT_SAVE = "Name each cut and say what it is; saved as crop_pictures saves it";
     static final String CUT_WATCH = "For a thing that moves: watches it on the live game until its loop repeats and "
@@ -184,13 +184,14 @@ final class MapGuide {
     static final String KEY_HOLD = "How long the keys stay down; 0 taps them";
     static final String FIELD = "A text box: clicked, then its text typed, one of the bot's Texts. Blank, a body gives "
             + "the text (Navigate.type), and no walk goes through it";
-    static final String DRAG = "Pressed, moved onto a picture or into a zone of the bot's Zones, and let go: a card "
+    static final String DRAG = "Pressed, moved onto a picture or into an area beside one, and let go: a card "
             + "onto its slot, a slider, a swipe. A picture not on the screen leaves it unpressed";
-    static final String TEXT_MARKER = "Words read inside a zone that tell the screen too, read only once its pictures "
+    static final String TEXT_MARKER = "Words read inside an area beside a picture that tell the screen too, read only once its pictures "
             + "say it may be this one: a line that is the words, whatever its case, a misread letter forgiven in longer "
             + "words";
-    static final String TEXT_BUTTON ="Clicked where its words are read inside its zone: a line that is the words, "
-            + "whatever its case, a misread letter forgiven in longer words. Cut a zone around the words to make one";
+    static final String TEXT_BUTTON ="Clicked where its words are read inside its area: a line that is the words, "
+            + "whatever its case, a misread letter forgiven in longer words. Cut around the words, beside a picture, to "
+            + "make one";
     static final String SPOT = "A spot with no picture of its own, an avatar or a custom upload: pressed beside a "
             + "picture that always shows near it, at the same distance in that picture's sizes, and only when it is "
             + "found. Cells: the cut is a grid of that many equal cells, an inventory's slots";

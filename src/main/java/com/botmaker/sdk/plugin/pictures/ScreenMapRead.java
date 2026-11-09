@@ -258,7 +258,7 @@ public final class ScreenMapRead {
 
     /**
      * A hash of the bytes of every {@code .java} file beside the bot's {@code Screens.java}: the classes a map read
-     * reads ({@code Pictures}, {@code Texts}, {@code Zones} and the map itself), by name; null when there is no such
+     * reads ({@code Pictures}, {@code Texts} and the map itself), by name; null when there is no such
      * file or one cannot be read, and a read is never reused then.
      */
     static String stamp(Path project) {

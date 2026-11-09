@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Areas beside a picture replace zones** (2026-11-09, breaking): a readout, a caption's words and a drag's drop are an
+  `Area` — `Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1)`, the box 1.2 of the icon's widths right of its top-left corner, 3
+  icons wide and 1 high. A run finds the icon and reads there, so the box follows it wherever and at whatever size the
+  game draws it; a negative offset is left of or above it, and an icon not shown reads nothing. `Zone`, `Anchor`,
+  `Zones.java`, `CaptureSource.region(Zone)` and the `save_region` tool are gone, with no deprecated release. The
+  assistant's `edit_map add_text`, `add_readout` and `set_input`'s `dragInto` take an `anchor` picture and a `box` of the
+  last screenshot and measure the area themselves; the cut form's readout, words and digits pick the picture beside them.
+  A bot that named a `Zones` constant no longer compiles: recut each area beside its icon.
 - A Digits set reads the marks a game writes a number with (2026-11-09): `save_digits` saves `.`, `,`, `/` and the
   `K`, `M`, `B` multipliers beside the digits, so `37.1K` reads 37100 and `300/300` reads 300, and it splits glyphs
   that touch to the count of characters shown. `Navigate.number` and a number fact read from a text readout parse the

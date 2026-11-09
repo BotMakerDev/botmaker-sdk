@@ -4,9 +4,9 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
@@ -566,7 +566,7 @@ final class InputInspector {
     /** What a drag is let go on, as the drag editor offers it. */
     enum DropKind {
         PICTURE("a picture"),
-        ZONE("a zone");
+        AREA("an area");
 
         private final String displayName;
 
@@ -579,25 +579,28 @@ final class InputInspector {
         }
     }
 
-    /** What the drag editor writes, by name: {@code onto} a picture or {@code into} a zone, the move taking {@code time}. */
-    record Drop(String onto, String into, Duration time) {}
+    /**
+     * What the drag editor writes: {@code onto} a picture by name, or {@code into} an area, the move taking {@code
+     * time}.
+     */
+    record Drop(String onto, Area into, Duration time) {}
 
     private Node drag(String constant, String field, Button button) {
         CheckBox dragged = new CheckBox("Dragged onto");
         dragged.setSelected(button.isDrag());
         dragged.setTooltip(new Tooltip(MapGuide.DRAG));
-        boolean zone = button.isDrag() && button.drag().into() != null;
+        // An area is cut beside its anchor (edit_map set_input dragInto and dragBox); here it is kept, never picked.
+        Area kept = button.isDrag() ? button.drag().into() : null;
         ComboBox<DropKind> kind = new ComboBox<>(FXCollections.observableArrayList(DropKind.values()));
         kind.setConverter(named(DropKind::displayName));
-        kind.setValue(zone ? DropKind.ZONE : DropKind.PICTURE);
+        kind.setValue(kept != null ? DropKind.AREA : DropKind.PICTURE);
         ComboBox<String> target = new ComboBox<>();
         target.setPromptText("which one");
         HBox.setHgrow(target, Priority.ALWAYS);
-        Runnable offer = () -> target.setItems(FXCollections.observableArrayList(kind.getValue() == DropKind.ZONE
-                ? ScreenEdits.zones(services) : ScreenEdits.pictures(services)));
+        Runnable offer = () -> target.setItems(FXCollections.observableArrayList(kind.getValue() == DropKind.AREA
+                ? kept == null ? List.of() : List.of(kept.said()) : ScreenEdits.pictures(services)));
         offer.run();
-        target.setValue(!button.isDrag() ? null : zone ? zoneName(button.drag().into())
-                : button.drag().onto().id());
+        target.setValue(!button.isDrag() ? null : kept != null ? kept.said() : button.drag().onto().id());
         long time = button.isDrag() ? button.dragTime().toMillis() : Button.DRAG_TIME.toMillis();
         Spinner<Integer> ms = new Spinner<>(50, 60_000, (int) time, 50);
         ms.setEditable(true);
@@ -608,7 +611,7 @@ final class InputInspector {
             shown.setManaged(button.isDrag());
         }
         // What was last written from here: a pick, then the spinner losing focus as the panel redraws, write once.
-        Drop[] written = {dropOf(button.isDrag(), kind.getValue(), target.getValue(), (int) time)};
+        Drop[] written = {dropOf(button.isDrag(), kind.getValue(), target.getValue(), (int) time, kept)};
         Runnable write = () -> {
             // Ticked with nothing picked yet, or another kind chosen: the pick is waited for, nothing written, so the
             // panel is not drawn again from a map that has no drag yet.
@@ -617,10 +620,12 @@ final class InputInspector {
                     shown.setVisible(true);
                     shown.setManaged(true);
                 }
-                target.setPromptText("pick the picture or zone it is let go on");
+                target.setPromptText(kind.getValue() == DropKind.AREA
+                        ? "an area is cut beside its anchor: ask Claude, or pick a picture"
+                        : "pick the picture it is let go on");
                 return;
             }
-            Drop now = dropOf(dragged.isSelected(), kind.getValue(), target.getValue(), ms.getValue());
+            Drop now = dropOf(dragged.isSelected(), kind.getValue(), target.getValue(), ms.getValue(), kept);
             if (!Objects.equals(now, written[0])) {
                 written[0] = now;
                 panel.wrote(now == null ? ScreenEdits.setDrag(services, constant, field, null, null, null)
@@ -637,19 +642,15 @@ final class InputInspector {
         return line(dragged, kind, target, ms, unit);
     }
 
-    /** What the drag editor writes: none when it is not dragged, else its drop by name and its time. */
-    static Drop dropOf(boolean dragged, DropKind kind, String target, Integer ms) {
+    /**
+     * What the drag editor writes: none when it is not dragged or nothing is picked, else its drop and its time; an
+     * area's drop is the one it has, {@code kept}, none when it has none.
+     */
+    static Drop dropOf(boolean dragged, DropKind kind, String target, Integer ms, Area kept) {
         if (!dragged || target == null || target.isBlank()) return null;
-        String name = target.strip();
-        return new Drop(kind == DropKind.ZONE ? null : name, kind == DropKind.ZONE ? name : null,
-                ms == null ? null : Duration.ofMillis(ms));
-    }
-
-    /** The name of the bot's zone holding {@code zone}; its place when none does. */
-    private String zoneName(Zone zone) {
-        return ScreenEdits.zones(services).stream()
-                .filter(name -> ScreenEdits.zoneOf(services, name).filter(zone::equals).isPresent())
-                .findFirst().orElse(zone.toString());
+        Duration time = ms == null ? null : Duration.ofMillis(ms);
+        if (kind == DropKind.AREA) return kept == null ? null : new Drop(null, kept, time);
+        return new Drop(target.strip(), null, time);
     }
 
     // --- where a button is found ---
@@ -719,10 +720,10 @@ final class InputInspector {
 
     // --- a text button's words ---
 
-    /** The words a text button is clicked on, and the zone they are read in, as {@code Screens.java} writes them. */
+    /** The words a text button is clicked on, and the area they are read in, as {@code Screens.java} writes them. */
     private Node words(TextButton words) {
         Caption caption = words.caption();
-        String in = caption == null || caption.in() == null ? "nowhere" : "Zones." + zoneName(caption.in());
+        String in = caption == null || caption.in() == null ? "nowhere" : caption.in().said();
         Label said = new Label((caption == null ? "?" : caption.said()) + ", read in " + in
                 + (words.gesture() == Gesture.CLICK ? "" : ", " + words.gesture().displayName().toLowerCase(Locale.ROOT)));
         said.setWrapText(true);

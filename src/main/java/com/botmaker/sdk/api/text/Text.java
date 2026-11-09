@@ -185,7 +185,7 @@ public final class Text {
 
     /**
      * The number shown within {@code source}, read with {@code digits}' pictures rather than OCR — for a game font
-     * OCR misreads: {@code Text.readDigits(game.region(Zones.GOLD), Digits.GOLD).orElse(0)}. Empty when no digit is
+     * OCR misreads: {@code Text.readDigits(game.region(new Rect(40, 12, 90, 24)), Digits.GOLD).orElse(0)}. Empty when no digit is
      * there, or when a gap as wide as a digit the set does not hold sits between two digits; a narrower separator
      * the set does not hold is passed over. A set that holds the marks reads them (2026-11-09): {@code 37.1K} is
      * 37100, {@code 2M} 2000000, and {@code 350/500} 350, the number before the {@code /}; without the {@code /}'s

@@ -10,11 +10,9 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -27,7 +25,6 @@ import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Images;
-import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.internal.bot.ConstantNames;
 import com.botmaker.sdk.plugin.pictures.DigitCuts;
@@ -69,15 +66,12 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * The assistant's pictures and places: each picture a {@code Pictures} constant, each named area a {@code Zones}
- * constant and each game font's digits a {@code Digits}
+ * The assistant's pictures: each picture a {@code Pictures} constant and each game font's digits a {@code Digits}
  * constant, written through the host as the
  * SDK's own windows write them. A box is in the pixels of the last screenshot, as {@code crop_pictures}' is; a
  * place is written in the bot's pixels, which the screenshot's are once the game shows the bot's screen size.
  */
 final class PictureTools {
-
-    private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
     private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
     /** A method reference, {@code Firestone::eventOn}: the only way a condition is written. */
     private static final Pattern METHOD_REFERENCE =
@@ -302,14 +296,6 @@ final class PictureTools {
 
     private static final String IGNORE = "a part of the box a run skips (a timer's digits, a count)";
 
-    record NamedRegion(@Describe("the area's name: bag") String name,
-                       @Describe("left edge, in the screenshot's pixels") int x,
-                       @Describe("top edge") int y,
-                       @Describe("width in pixels") int width,
-                       @Describe("height in pixels") int height,
-                       @Describe(value = ANCHOR, optional = true) Anchor anchor) {
-    }
-
     record NamedDigits(@Describe("the digit set's name, lowercase with underscores: gold") String name,
                        @Describe("left edge of a box around one number the game shows, in the screenshot's pixels")
                        int x,
@@ -319,9 +305,6 @@ final class PictureTools {
                        @Describe("the number exactly as the game shows it, separators included: 12,500")
                        String shows) {
     }
-
-    private static final String ANCHOR = "the part of the screen it stays with when the game shows another shape: "
-            + "a corner or edge for a HUD on it, center (the default) for the game's middle";
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("list_pictures")
@@ -336,10 +319,6 @@ final class PictureTools {
                     .takes(PictureName.class).handledBy(PictureTools::showPicture),
             ToolTiming.actions("edit_pictures", "Renames, deletes, re-cuts or tags the bot's pictures, as 🖼 Manage "
                     + "Pictures does", Edit.class, PictureTools::edit),
-            AssistantTool.named("save_region")
-                    .describedAs("Names an area of the game as a Zones constant, in the bot's pixels, for a block to "
-                            + "narrow a search to with .region(Zones.…), wherever the window sits and at any size")
-                    .takes(NamedRegion.class).handledBy(PictureTools::saveRegion),
             AssistantTool.named("save_digits")
                     .describedAs("Cuts the digits of a number the game shows, in a font OCR misreads, into a Digits "
                             + "constant, for a block to read numbers with Text.readDigits(source, Digits.…). Box one "
@@ -1035,29 +1014,6 @@ final class PictureTools {
                         picture.get().place())));
         return done.ok() ? AgentReply.text(done.said()).and(preview(picture.get()))
                 : AgentReply.refused(done.said());
-    }
-
-    static AgentReply saveRegion(NamedRegion region, AgentContext context) {
-        return saveRegion(region, context, Frames.look(context));
-    }
-
-    /** As {@link #saveRegion(NamedRegion, AgentContext)}, in {@code frame}'s pixels. */
-    static AgentReply saveRegion(NamedRegion region, AgentContext context, Optional<BufferedImage> frame) {
-        String constant = ConstantNames.constantFor(region.name());
-        if (constant == null) return AgentReply.refused("\"" + region.name() + "\" cannot be a constant's name.");
-        if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
-        Optional<Rect> area = Frames.within(frame.get(), region.x(), region.y(), region.width(), region.height());
-        if (area.isEmpty()) return AgentReply.refused(Frames.outside(frame.get()));
-        Rect rect = area.get();
-        Size live = new Size(frame.get().getWidth(), frame.get().getHeight());
-        Placed<Zone> placed = FxCall.call(() -> place(context.services(), ZONES, constant, live,
-                bot -> Places.inBot(rect, region.anchor(), bot, live)));
-        if (!placed.saved().ok()) return AgentReply.refused(placed.saved().done());
-        Frames.mark(context, rect, Marks.Kind.NOTE, constant);
-        Zone zone = placed.value();
-        return AgentReply.text(placed.saved().done() + " Zones." + constant + " = "
-                + Frames.box(new Rect(zone.x(), zone.y(), zone.width(), zone.height())) + placed.of()
-                + "; a block narrows a source to it with .region(Zones." + constant + ").");
     }
 
     static AgentReply saveDigits(NamedDigits digits, AgentContext context) {

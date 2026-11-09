@@ -32,7 +32,7 @@ class HandParityTest {
 
     /** The tools of the look, act, picture, notes and setup lists that act on the map or reach a screen. */
     private static final Set<String> MAP_SIDE = Set.of("which_screen", "missed_frames", "click", "key", "scroll",
-            "describe", "crop_pictures", "edit_pictures", "save_region", "save_digits", "write_notes", "launch_game");
+            "describe", "crop_pictures", "edit_pictures", "save_digits", "write_notes", "launch_game");
 
     private static final Map<String, Hand> HANDS = Map.ofEntries(
             // edit_map's actions
@@ -86,7 +86,6 @@ class HandParityTest {
             entry("describe", Hand.now("the live board itself")),
             entry("crop_pictures", Hand.now("✂ Cut on the frozen board, then the cut form")),
             entry("edit_pictures", Hand.now("🖼 Manage Pictures; a cut on the board as a new image for a picture")),
-            entry("save_region", Hand.now("a cut on the board as an area (Zones)")),
             entry("save_digits", Hand.now("a cut on the board as digits of a number")),
             entry("write_notes", Hand.now("the panel's Notes, Save notes")),
             entry("launch_game", Hand.now("▶ Launch on the board")));

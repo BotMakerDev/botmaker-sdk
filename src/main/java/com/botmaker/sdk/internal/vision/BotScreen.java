@@ -94,7 +94,7 @@ public final class BotScreen {
                 + " (Sdk.screen()): they are scaled, which can miss. Set the game to " + wanted
                 + (window == null ? "." : ", or let its window be resized.")
                 + (Places.otherShape(wanted, live.get()) ? " Its shape differs too: pictures scale by the smaller"
-                + " side, and spots and zones stay with their anchor." : ""));
+                + " side, and spots and areas stay with their anchor." : ""));
         return live;
     }
 

@@ -28,7 +28,6 @@ import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -626,30 +625,6 @@ class SdkAssistTest {
     }
 
     @Test
-    void aPlaceIsSavedInTheBotsPixelsFromTheGamesCorner() {
-        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
-        agent.frame = withPatchAt(120, 80);
-        AgentReply region = run("save_region", "name", "bag", "x", 300, "y", 200, "width", 200, "height", 200);
-        assertTrue(text(region).startsWith("Saved Zones.BAG = 300,200 (100×100)"), "clipped: " + text(region));
-        assertEquals(new Zone(300, 200, 100, 100), host.set("zones").get("BAG").value());
-        assertEquals(new Size(400, 300), host.values.get("screen").value(),
-                "a bot naming no size takes the screenshot's");
-        assertTrue(run("save_region", "name", "2nd", "x", 10, "y", 20, "width", 5, "height", 5).isRefused(),
-                "no constant starts with a digit");
-        assertEquals(List.of("create zones", "add zones BAG"), host.calls);
-    }
-
-    @Test
-    void aPlaceOnAGameShowingAnotherSizeIsWrittenAtTheBotsSize() {
-        host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(200, 150)));
-        agent.frame = withPatchAt(120, 80);
-        assertTrue(text(run("save_region", "name", "claim", "x", 100, "y", 60, "width", 40, "height", 20))
-                .startsWith("Saved Zones.CLAIM = 50,30 (20×10) of the bot's 200×150 screen"),
-                "the 400×300 game is twice it");
-        assertEquals(new Zone(50, 30, 20, 10), host.set("zones").get("CLAIM").value());
-    }
-
-    @Test
     void aNumbersDigitsAreCutIntoADigitSetAndReadBack() {
         host.values.put("screen", TestContexts.row(Size.class, "").withValue(new Size(0, 0)));
         BufferedImage frame = plain(new Color(0x10, 0x20, 0x50));
@@ -838,9 +813,9 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(36, names.size(), "crop_picture and try_inputs merged into crop_pictures and try_input; the flow, "
+        assertEquals(35, names.size(), "crop_picture and try_inputs merged into crop_pictures and try_input; the flow, "
                 + "picture, tag and setup edits into edit_flow, edit_pictures, edit_tags and setup, 2026-10-15; "
-                + "read_flow and edit_flow went with flows, 2026-11-09");
+                + "read_flow and edit_flow went with flows, 2026-11-09; save_region with zones, 2026-11-09");
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 
@@ -1758,10 +1733,36 @@ class SdkAssistTest {
      * A fact is a method of a @Facts group, added by the host, its screen's readout made to read into it; tested in a
      * when, listed with its age, forgotten.
      */
+    /**
+     * add_readout measures its box from the anchor picture on the last screenshot, in the picture's widths and heights;
+     * an anchor the screenshot does not show, or no box, writes nothing.
+     */
+    @Test
+    void aReadoutIsMeasuredFromItsAnchorOnTheScreenshot() {
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore"))));
+        agent.frame = withPatchAt(120, 80);
+        assertFalse(run("screenshot").isRefused());
+        // ore shows at 120,80 (48x48): the box starts 60 px right of it, 96x24.
+        AgentReply added = run("edit_map", "screen", "Home", "action", "add_readout", "name", "ore_count",
+                "anchor", "ore", "box", Map.of("x", 180, "y", 80, "width", 96, "height", 24));
+        assertFalse(added.isRefused(), text(added));
+        assertEquals(List.of("1.25, 0 from ore, 2 x 0.5"), screen("HOME").readouts().values().stream()
+                .map(r -> r.area().said()).toList(), text(added));
+
+        AgentReply gone = run("edit_map", "screen", "Home", "action", "add_readout", "name", "gold",
+                "anchor", "tab", "box", Map.of("x", 180, "y", 80, "width", 96, "height", 24));
+        assertTrue(gone.isRefused(), text(gone));
+        assertTrue(run("edit_map", "screen", "Home", "action", "add_readout", "name", "gold", "anchor", "ore")
+                .isRefused(), "no box");
+        assertTrue(run("edit_map", "screen", "Home", "action", "add_readout", "name", "gold", "anchor", "ore",
+                "box", Map.of("x", 5000, "y", 80, "width", 96, "height", 24)).isRefused(), "a box off the frame");
+        assertEquals(1, screen("HOME").readouts().size(), "nothing more was written");
+    }
+
     @Test
     void aFactIsAddedTestedListedAndForgotten() {
         put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tab")))
-                .withReadout("gold", Readout.digits(new Zone(0, 0, 10, 10), new DigitSet("digits/gold"))));
+                .withReadout("gold", Readout.digits(MapFixtures.area(0, 0, 10, 10), new DigitSet("digits/gold"))));
 
         assertTrue(run("edit_map", "screen", "Home", "action", "input_when", "picture", "tab", "fact",
                 "Progress::gold", "test", "at_least", "value", "5").isRefused(), "no such fact yet");

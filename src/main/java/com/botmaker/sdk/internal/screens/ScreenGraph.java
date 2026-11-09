@@ -7,7 +7,9 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Pick;
+import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
@@ -812,6 +814,9 @@ public final class ScreenGraph {
         List<Input> named = new ArrayList<>(screen.inputs().values());
         if (screen.back() != null && BotConstants.inputName(screen.back()) == null) named.add(screen.back());
         for (Input input : named) ids.addAll(pictureIds(input));
+        // The pictures its areas are measured from: words it is told by, its readouts.
+        for (Caption text : screen.texts()) ids.add(text.in().anchor().id());
+        for (Readout readout : screen.readouts().values()) ids.add(readout.area().anchor().id());
         return List.copyOf(ids);
     }
 
@@ -825,6 +830,10 @@ public final class ScreenGraph {
         if (input instanceof Button button && button.isDrag() && button.drag().onto() != null) {
             ids.add(button.drag().onto().id());
         }
+        if (input instanceof Button button && button.isDrag() && button.drag().into() != null) {
+            ids.add(button.drag().into().anchor().id());
+        }
+        if (input instanceof TextButton text) ids.add(text.caption().in().anchor().id());
         if (input instanceof Strip strip) for (ImageTemplate member : strip.members()) ids.add(member.id());
         if (input instanceof Tree tree) for (ImageTemplate member : tree.members()) ids.add(member.id());
         if (input.locked() != null) ids.add(input.locked().id());

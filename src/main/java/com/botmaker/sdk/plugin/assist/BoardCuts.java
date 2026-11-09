@@ -2,7 +2,6 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
-import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
@@ -38,8 +37,8 @@ import java.util.stream.Stream;
 
 /**
  * Cuts drawn by hand on 🗺's board, on a frame it froze (the user's call, 2026-10-18), saved by the code the tools run:
- * crop_pictures for a picture of a screen, save_region for a zone, save_digits for digits and edit_pictures' replace
- * for a picture cut anew. So both paths write the same, and refuse the same.
+ * crop_pictures for a picture of a screen, save_digits for digits, edit_map for an area measured from its anchor
+ * picture, and edit_pictures' replace for a picture cut anew. So both paths write the same, and refuse the same.
  */
 public final class BoardCuts {
 
@@ -86,18 +85,18 @@ public final class BoardCuts {
     }
 
     /**
-     * An area of the game, a Zones constant; read on the screen as a readout of the cut's name when {@code readout},
-     * the one naming which one it shows when {@code subject}.
+     * An area of the screen read as a readout of the cut's name, measured from the bot's picture {@code anchor} where
+     * the frame shows it; the one naming which one the screen shows when {@code subject}.
      */
-    public record Place(Anchor anchor, boolean readout, boolean subject) implements As {
+    public record Place(String anchor, boolean subject) implements As {
     }
 
     /**
-     * A zone around words the screen shows, {@code text} as the game writes them: what tells the screen, or a text
-     * button clicked on them when {@code button}, its field named from the cut's name. The zone is saved in Zones
-     * under that name.
+     * An area around words the screen shows, {@code text} as the game writes them, measured from the bot's picture
+     * {@code anchor}: what tells the screen, or a text button clicked on them when {@code button}, its field named from
+     * the cut's name.
      */
-    public record Reads(String text, boolean button) implements As {
+    public record Reads(String text, boolean button, String anchor) implements As {
     }
 
     /**
@@ -108,10 +107,10 @@ public final class BoardCuts {
     }
 
     /**
-     * The digits of the number it shows, {@code shows} as the game writes it; with its box saved in Zones too and read
-     * on the screen by them as a readout of the cut's name when {@code readout}.
+     * The digits of the number it shows, {@code shows} as the game writes it; read on the screen by them as a readout
+     * of the cut's name when {@code readout}, its area measured from the bot's picture {@code anchor}.
      */
-    public record Digits(String shows, boolean readout) implements As {
+    public record Digits(String shows, boolean readout, String anchor) implements As {
     }
 
     /** A new image for the picture {@code picture}, keeping its name and every use. */
@@ -208,10 +207,6 @@ public final class BoardCuts {
             // A cut joining the new strip or tree an earlier one of the form made was written with it.
             if (joined.containsKey(i) && joined.get(i).isEmpty()) continue;
             AgentReply reply = switch (cut.as()) {
-                case Place place -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
-                        b.width(), b.height(), place.anchor()), context, shown);
-                case Reads ignored -> PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
-                        b.width(), b.height(), Anchor.CENTER), context, shown);
                 case Digits digits -> PictureTools.saveDigits(new PictureTools.NamedDigits(cut.name(), b.x(), b.y(),
                         b.width(), b.height(), digits.shows()), context, shown);
                 case Recut recut -> PictureTools.replacePicture(replace(cut, recut.picture()), context, shown, live);
@@ -232,40 +227,34 @@ public final class BoardCuts {
             }
             if (one != null && !one.isBlank()) said.add(one);
         }
-        // Words are written on the screen once their zone is saved, as edit_map's add_text writes them.
+        // Words are written on the screen in an area measured from their anchor, as edit_map's add_text writes them.
         for (int i = 0; i < cuts.size(); i++) {
             if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Reads reads)) continue;
-            String zone = ConstantNames.constantFor(cuts.get(i).name());
-            String field = reads.button() ? cuts.get(i).name() : null;
-            String one = FxCall.call(() -> ScreenEdits.addText(context.services(), screen, zone, reads.text(), field));
+            Cut cut = cuts.get(i);
+            String field = reads.button() ? cut.name() : null;
+            String one = FxCall.call(() -> ScreenEdits.areaBeside(context.services(), reads.anchor(), cut.box(), frame)
+                    .map(in -> ScreenEdits.addText(context.services(), screen, in, reads.text(), field))
+                    .orElseGet(() -> ScreenEdits.noArea(reads.anchor())));
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
             said.add(one);
         }
-        // A zone or a number read on the screen, once what it reads is saved: a number's box is a zone of its own.
+        // An area or a number read on the screen, measured from its anchor, once a number's digits are saved.
         for (int i = 0; i < cuts.size(); i++) {
             Cut cut = cuts.get(i);
             boolean number = cut.as() instanceof Digits digits && digits.readout();
-            boolean words = cut.as() instanceof Place place && place.readout();
-            boolean subject = words && ((Place) cut.as()).subject();
+            boolean words = cut.as() instanceof Place;
             if (!number && !words || refused.contains(i)) continue;
             if (screen == null) {
                 refused.add(i);
                 said.add(ScreenEdits.NOT_WRITTEN + cut.name() + ": a readout is a screen's: pick it.");
                 continue;
             }
-            Rect b = cut.box();
-            if (number) {
-                AgentReply zone = PictureTools.saveRegion(new PictureTools.NamedRegion(cut.name(), b.x(), b.y(),
-                        b.width(), b.height(), Anchor.CENTER), context, shown);
-                said.add(ScreenDesk.text(zone));
-                if (zone.isRefused()) {
-                    refused.add(i);
-                    continue;
-                }
-            }
-            String constant = ConstantNames.constantFor(cut.name());
-            String one = FxCall.call(() -> ScreenEdits.addReadout(context.services(), screen, cut.name(), constant,
-                    number ? constant : null, subject));
+            String anchor = number ? ((Digits) cut.as()).anchor() : ((Place) cut.as()).anchor();
+            boolean subject = words && ((Place) cut.as()).subject();
+            String digits = number ? ConstantNames.constantFor(cut.name()) : null;
+            String one = FxCall.call(() -> ScreenEdits.areaBeside(context.services(), anchor, cut.box(), frame)
+                    .map(in -> ScreenEdits.addReadout(context.services(), screen, cut.name(), in, digits, subject))
+                    .orElseGet(() -> ScreenEdits.noArea(anchor)));
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
             said.add(one);
         }

@@ -7,21 +7,10 @@ import com.botmaker.plugin.toolkit.Editors.Pick;
 import com.botmaker.plugin.toolkit.Editors.TupleSpec;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.plugin.toolkit.Slots;
-import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import javafx.scene.Node;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.MenuItem;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * The three editors for the SDK's geometry types, which are one editor three times
@@ -78,52 +67,6 @@ public final class GeometryEditors {
         return ctx.declared(type)
                 .<Node>map(declared -> Editors.tuplePill(ctx, declared, spec, SdkScreenPicks.forSlot(ctx)))
                 .orElseGet(() -> Pills.bare(Slots.sourceOr(ctx, spec.placeholder())));
-    }
-
-    /**
-     * A {@code Zone}: its numbers, and the part of the screen it stays with, which the pill's menu changes. The
-     * numbers are the bot's pixels, which a pick off the live screen is not, so they are moved by naming the zone
-     * again ({@code save_region}) or in its Java.
-     */
-    public static Node zone(ValueContext ctx) {
-        return anchorPill(ctx, Zone.class, GeometryEditors::zoneLabel, Zone::anchored, Zone::anchored);
-    }
-
-    private static <T> Node anchorPill(ValueContext ctx, Class<T> type, Function<T, String> label,
-                                       Function<T, Anchor> anchor, BiFunction<T, Anchor, T> anchored) {
-        MenuButton pill = Pills.bare(ctx.value(type).map(label).orElseGet(() -> Slots.sourceOr(ctx, "Not set")));
-        Pills.onOpen(pill, () -> {
-            List<MenuItem> items = new ArrayList<>();
-            Optional<T> held = ctx.value(type);
-            MenuItem heading = new MenuItem(held.isEmpty() ? "Written by hand: edit it in its Java"
-                    : "Stays with, on a game of another shape:");
-            heading.setDisable(true);
-            items.add(heading);
-            held.ifPresent(value -> {
-                for (Anchor each : Anchor.values()) {
-                    items.add(Pills.item((anchor.apply(value) == each ? "✓ " : "   ") + words(each), () -> {
-                        T moved = anchored.apply(value, each);
-                        ctx.set(moved);
-                        pill.setText(label.apply(moved));
-                    }));
-                }
-            });
-            return items;
-        });
-        return pill;
-    }
-
-    static String zoneLabel(Zone zone) {
-        return zone.x() + ", " + zone.y() + "  " + zone.width() + "×" + zone.height() + kept(zone.anchored());
-    }
-
-    private static String kept(Anchor anchor) {
-        return anchor == Anchor.CENTER ? "" : " · " + words(anchor);
-    }
-
-    /** {@code BOTTOM_RIGHT} as {@code "bottom right"}. */
-    private static String words(Anchor anchor) {
-        return anchor.name().toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 
     /**

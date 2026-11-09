@@ -573,7 +573,7 @@ final class SetupTools {
 
     /**
      * set_screen_size: {@code Sdk.screen()} set, the pictures cut at the old size marked as such
-     * ({@link ScreenSize#change}). Zones and spots carry no frame, so the answer says they are read at the new size.
+     * ({@link ScreenSize#change}). Areas and spots are measured from their anchor picture, so they follow it.
      */
     static AgentReply setScreenSize(SetScreenSize change, AgentContext context) {
         if (change.width() <= 0 || change.height() <= 0) {
@@ -593,8 +593,8 @@ final class SetupTools {
             List<String> lines = new ArrayList<>(List.of("The bot's screen size is now " + size
                     + " in Sdk.screen(); its private display is made at it, and a run brings the game to it."));
             changed.before().ifPresent(old -> lines.add("Pictures and digits cut at " + old + " are written .in("
-                    + old + ") and scaled; recut them for exact matches. Zones and spots are read at the new size:"
-                    + " recut them."));
+                    + old + ") and scaled; recut them for exact matches. Areas and spots follow their anchor"
+                    + " picture."));
             if (!changed.unmarked().isEmpty()) {
                 lines.add("Written by hand, left as they are: " + String.join(", ", changed.unmarked()));
             }

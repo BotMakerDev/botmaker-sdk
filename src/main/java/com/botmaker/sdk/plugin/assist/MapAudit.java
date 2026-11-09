@@ -5,7 +5,6 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
@@ -406,7 +405,8 @@ public final class MapAudit {
             boolean none = fits.subList(shown.size(), fits.size()).stream().allMatch(f -> f.where() == Where.MISSING);
             // Its words are read only where its pictures clash: the shot's title may still tell the two apart.
             if (all && none && set.texts().stream().allMatch(words -> shots.apply(other.getValue())
-                    .flatMap(shot -> Reach.findText(words, shot, Reach::ocr)).isPresent())) {
+                    .flatMap(shot -> Reach.findText(words, shot, Reach::ocr,
+                            (anchor, on) -> Frames.found(resources, confidence, anchor, on))).isPresent())) {
                 return Optional.of(new Clash(c, apart(resources, confidence, cuts, graph.screens().get(constant),
                         other.getValue(), shots)));
             }
@@ -678,7 +678,7 @@ public final class MapAudit {
     /** {@code rect} of a frame of {@code frame} on a shot of {@code live}; as it is when {@code frame} is null. */
     private static Rect onShot(Rect rect, Size frame, Size live) {
         if (frame == null) return rect;
-        return Places.inSource(new Zone(rect.x(), rect.y(), rect.width(), rect.height()), frame, live);
+        return Places.scaled(rect, frame, live);
     }
 
     /**

@@ -241,7 +241,7 @@ public final class MapReport {
             out.append('\n');
         }
         screen.readouts().forEach((field, readout) -> out.append(indent).append("  reads ").append(field).append(": ")
-                .append(readout.label()).append(" in ").append(readout.zone()).append('\n'));
+                .append(readout.label()).append(" in ").append(readout.area() == null ? "nowhere" : readout.area().said()).append('\n'));
         screen.trees().forEach((field, tree) -> nodes(out, indent + "  ", screen, field, tree));
         for (String what : screen.owes()) out.append(indent).append("  owes: ").append(what).append('\n');
         if (screen.notes() != null) {

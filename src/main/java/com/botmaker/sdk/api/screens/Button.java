@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -33,7 +32,7 @@ import java.util.function.BooleanSupplier;
  * ({@code .types(Texts.GUILD)}), which a walk types on its way through, or the text a body gives
  * ({@link #typed()}, {@code Navigate.type}), which no walk goes through (2026-10-22).
  *
- * <p>A button that is dragged is pressed, moved onto a picture ({@link #dragsOnto}) or into a zone ({@link
+ * <p>A button that is dragged is pressed, moved onto a picture ({@link #dragsOnto}) or into an area ({@link
  * #dragsInto}), and let go, in place of its gesture: a card onto its slot, a slider to its end, a swipe on a phone. A
  * drop not on the screen leaves it unpressed (2026-10-22).
  *
@@ -302,9 +301,9 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return drag(new Drag(target, null, drag == null ? null : drag.time()));
     }
 
-    /** This button, dragged into {@code zone}, one of the bot's {@code Zones}: a slider to its end, a swipe. */
-    public Button dragsInto(Zone zone) {
-        return drag(new Drag(null, zone, drag == null ? null : drag.time()));
+    /** This button, dragged into {@code area}, measured from a picture the screen shows: a slider to its end, a swipe. */
+    public Button dragsInto(Area area) {
+        return drag(new Drag(null, area, drag == null ? null : drag.time()));
     }
 
     /** This drag, its move taking {@code time}: {@code .dragTime(Duration.ofSeconds(1))}. A button not dragged stays. */
@@ -391,7 +390,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return List.of(beside == null ? found : beside.place(found));
     }
 
-    /** Whether it is dragged once pressed, onto a picture or into a zone. */
+    /** Whether it is dragged once pressed, onto a picture or into an area. */
     public boolean isDrag() {
         return drag != null;
     }

@@ -76,8 +76,6 @@ public @interface SdkValue {
         PICTURES,
         /** The groups 🖼 Manage Pictures files pictures under — a class of {@code PictureTag} constants. */
         TAGS,
-        /** Named areas of the game, in the bot's pixels — a class of {@code Zone} constants. */
-        ZONES,
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
         DIGITS,
         /** The texts the bot types, one a text field of its map names — a class of {@code Words} constants. */
@@ -145,7 +143,6 @@ public @interface SdkValue {
         GOALS,
         PICTURES,
         TAGS,
-        ZONES,
         DIGITS,
         TEXTS,
         ELEMENTS,

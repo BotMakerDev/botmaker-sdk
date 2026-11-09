@@ -1,8 +1,6 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.meta.Migrate;
-import com.botmaker.sdk.api.geometry.Anchor;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Facts;
 import com.botmaker.sdk.api.params.GameState;
 import com.botmaker.sdk.api.screens.Button;
@@ -35,8 +33,8 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  * {@code isOccasional()}, was {@code comesAndGoes()}), {@code lock()} is {@code locked()}, and a tree's
  * {@code notches()} is {@code wheel()}. Then the rest of the SDK's values: a field's {@code .submits()} and
  * {@code .clears()} are {@code .submitting()} and {@code .clearing()} (read by {@code isSubmitting()},
- * {@code isClearing()}), its {@code text()} is {@code types()} and {@code typedByBody()} is {@code isTyped()}; a
- * zone's {@code anchor()} is {@code anchored()}; {@code OcrOptions}' {@code withX(…)} is {@code x(…)}; a flow
+ * {@code isClearing()}), its {@code text()} is {@code types()} and {@code typedByBody()} is {@code isTyped()};
+ * {@code OcrOptions}' {@code withX(…)} is {@code x(…)}; a flow
  * step's {@code description()} is {@code described()} and its {@code screen()} is {@code on()}.
  *
  * <p>2026-11-02: a button's states other than normal, selected and disabled are the bot's own ({@code ButtonState}),
@@ -139,11 +137,6 @@ final class Migrations {
     @Migrate(Button.class)
     static boolean typedByBody(@Migrate.Self Button self) {
         return self.isTyped();
-    }
-
-    @Migrate(Zone.class)
-    static Anchor anchor(@Migrate.Self Zone self) {
-        return self.anchored();
     }
 
     @Migrate(OcrOptions.class)

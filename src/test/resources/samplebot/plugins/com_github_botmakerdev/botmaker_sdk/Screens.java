@@ -4,9 +4,9 @@ import samplebot.SampleBot;
 import samplebot.params.bot.Progress;
 
 import com.botmaker.sdk.api.bot.SdkValue;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.plan.Reset;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
@@ -49,12 +49,12 @@ public final class Screens {
                 .needs(Condition.of(SampleBot::shopOpen)).last().over(() -> Screens.HOME.claim).once()
                 .until(Condition.of(SampleBot::shopOpen));
         public final Do glance = Do.press(avatar).onSight().every(Duration.ofMinutes(10));
-        public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80))).tried()
+        public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, Area.of(Pictures.GOLD_ICON, 2, -0.5, 6, 2))).tried()
                 .when(Condition.of(SampleBot::shopOpen));
-        public final Readout gold = Readout.digits(new Zone(40, 0, 120, 30),
+        public final Readout gold = Readout.digits(Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1),
                 new DigitSet("src/main/resources/digits/gold")).subject().into(Progress::gold)
                 .staleAfter(Duration.ofMinutes(30));
-        public final Readout title = Readout.text(new Zone(0, 40, 300, 40)).into(Progress::player);
+        public final Readout title = Readout.text(Area.of(Pictures.GOLD_ICON, 0, 1.5, 7.5, 1)).into(Progress::player);
 
         @Override
         public Setup setup() {
@@ -69,7 +69,7 @@ public final class Screens {
                 .looks(List.of(Look.of(Pictures.BUY_MAXED, States.Blocks.MAXED)));
         public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried();
         public final Mark bag = Mark.of(Pictures.BAG);
-        public final Mark title = Mark.of(Caption.of(Texts.SHOP, new Zone(0, 0, 400, 80)));
+        public final Mark title = Mark.of(Caption.of(Texts.SHOP, Area.of(Pictures.ITEMS_TAB, -3, 0, 2.5, 1)));
         public final Mark noBattle = Mark.of(Pictures.BATTLE).absent();
 
         @Override

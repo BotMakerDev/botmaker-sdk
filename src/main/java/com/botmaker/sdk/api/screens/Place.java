@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /**
  * Where a copy of a button sits from something else the screen shows, a picture or {@link Caption words} — {@code
- * Place.rightOf(Caption.of(Texts.DAILY, Zones.QUESTS))}: the Claim on the row whose title reads Daily (the user's call,
+ * Place.rightOf(Caption.of(Texts.DAILY, Area.of(Pictures.QUESTS_ICON, 1.2, 0, 4, 1)))}: the Claim on the row whose title reads Daily (the user's call,
  * 2026-10-22). A button {@link Button#place placed} on the map is only ever found there; a body picks a copy by one
  * with {@link Pick#at}. The copy nearest the anchor that meets the place is taken; none meets it, or the anchor is not
  * shown, and nothing is pressed.
@@ -21,7 +21,7 @@ import java.util.Locale;
  *
  * @param side         where from the anchor
  * @param picture      the anchor, a picture; null when it is words
- * @param words        the anchor, words read in a zone; null when it is a picture
+ * @param words        the anchor, words read in an area; null when it is a picture
  * @param otherPicture the second anchor of {@link Side#BETWEEN}, a picture; null otherwise
  * @param otherWords   the second anchor of {@link Side#BETWEEN}, words; null otherwise
  */

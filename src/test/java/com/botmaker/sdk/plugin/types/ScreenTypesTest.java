@@ -2,14 +2,15 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.plan.Need;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
@@ -230,12 +231,12 @@ class ScreenTypesTest {
     @Test
     void aDragIsWrittenByItsDropAndItsTime() {
         Button onto = Button.of(picture("card")).dragsOnto(picture("slot")).dragTime(Duration.ofMillis(900));
-        Button into = Button.of(picture("knob")).dragsInto(new Zone(600, 300, 40, 40));
+        Button into = Button.of(picture("knob")).dragsInto(MapFixtures.area(600, 300, 40, 40));
         assertEquals(onto, roundTrip(ScreenTypes.BUTTON_SHAPE, onto));
         assertEquals(into, roundTrip(ScreenTypes.BUTTON_SHAPE, into));
-        assertEquals(new Zone(600, 300, 40, 40), link(into, "dragsInto"));
+        assertEquals(MapFixtures.area(600, 300, 40, 40), link(into, "dragsInto"));
         assertNull(link(into, "dragTime"), "the usual time is not written");
-        assertNull(Button.of(picture("knob")).dragsInto(new Zone(0, 0, 1, 1)).dragTime(Button.DRAG_TIME).drag().time());
+        assertNull(Button.of(picture("knob")).dragsInto(MapFixtures.area(0, 0, 1, 1)).dragTime(Button.DRAG_TIME).drag().time());
         Button typed = Button.of(picture("search")).types(Words.of("a")).dragsOnto(picture("slot"));
         assertNull(typed.typing(), "a drag types nothing");
         assertFalse(Button.of(picture("card")).dragsOnto(picture("slot")).gesture(Gesture.DOUBLE).isDrag(),
@@ -251,7 +252,7 @@ class ScreenTypesTest {
     }
 
     /**
-     * Words a screen shows are written as a caption of a {@code Texts} and a {@code Zones} constant, on its setup as a
+     * Words a screen shows are written as a caption of a {@code Texts} constant and an area, on its setup as a
      * marker or as a text button pressed by a gesture; a setup with none writes no {@code .texts}.
      */
     /**
@@ -260,7 +261,7 @@ class ScreenTypesTest {
      */
     @Test
     void aReadoutFieldIsWrittenByItsFactory() {
-        Zone gold = new Zone(10, 10, 80, 20);
+        Area gold =MapFixtures.area(10, 10, 80, 20);
         Readout words = Readout.text(gold);
         assertEquals(words, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, words));
         Readout name = Readout.text(gold).subject();
@@ -273,9 +274,18 @@ class ScreenTypesTest {
         assertEquals("digits gold, subject", number.label());
     }
 
+    /** An area is written by its anchor picture and its four numbers, a fraction or a negative one kept as it is. */
+    @Test
+    void anAreaIsWrittenByItsAnchorAndItsNumbers() {
+        Area left = Area.of(picture("gold_icon"), -2.5, -0.25, 1.75, 1);
+        assertEquals(left, roundTrip(ScreenTypes.AREA_SHAPE, left));
+        Area right = Area.of(picture("gold_icon"), 1.2, 0, 3, 1);
+        assertEquals(right, roundTrip(ScreenTypes.AREA_SHAPE, right));
+    }
+
     @Test
     void wordsAreWrittenAsTheirTextAndTheirZone() {
-        Caption settings = Caption.of(Words.of("Settings"), new Zone(100, 20, 300, 40));
+        Caption settings = Caption.of(Words.of("Settings"), MapFixtures.area(100, 20, 300, 40));
         assertEquals(settings, roundTrip(ScreenTypes.CAPTION_SHAPE, settings));
         Setup told = Setup.named("Settings").markers(marks("menu_frame")).texts(List.of(settings));
         assertEquals(told, roundTrip(ScreenTypes.SETUP_SHAPE, told));
@@ -320,7 +330,7 @@ class ScreenTypesTest {
      */
     @Test
     void placesSpotsAndGridsAreWrittenByTheirFactories() {
-        Caption daily = Caption.of(Words.of("Daily"), new Zone(100, 200, 300, 40));
+        Caption daily = Caption.of(Words.of("Daily"), MapFixtures.area(100, 200, 300, 40));
         Button claim = Button.of(picture("claim")).repeated().place(Place.rightOf(daily));
         assertEquals(claim, roundTrip(ScreenTypes.BUTTON_SHAPE, claim));
         Button avatar = Button.beside(picture("avatar_frame"), 1.5, -0.25).occasional();
@@ -466,7 +476,7 @@ class ScreenTypesTest {
     /** A readout feeding a fact is written as its chain, the fact as its method reference, and read back the same. */
     @Test
     void aReadoutIntoAFactIsWrittenAsItsChain() {
-        Zone gold = new Zone(10, 10, 80, 20);
+        Area gold =MapFixtures.area(10, 10, 80, 20);
         Readout fed = Readout.text(gold).into(ScreenTypes.fact("Progress::gold")).staleAfter(Duration.ofMinutes(30));
         assertEquals(fed, roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, fed));
         assertEquals("Progress::gold", ScreenTypes.factOf(roundTrip(ScreenTypes.READOUT_TEXT_SHAPE, fed)));

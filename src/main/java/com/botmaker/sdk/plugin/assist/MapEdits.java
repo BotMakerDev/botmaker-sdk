@@ -6,8 +6,10 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.source.ParameterWrite;
+import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.params.Facts;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.ButtonState;
@@ -32,6 +34,7 @@ import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 
+import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -132,7 +135,8 @@ final class MapEdits {
                     @Describe(value = "a field: Enter after", optional = true) Boolean submits,
                     @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears,
                     @Describe(value = "dragged onto this picture; blank: no drag", optional = true) String dragOnto,
-                    @Describe(value = "dragged into this Zones zone", optional = true) String dragInto,
+                    @Describe(value = "dragged into dragBox beside this picture", optional = true) String dragInto,
+                    @Describe(value = "dragInto's drop area", optional = true) AreaBox dragBox,
                     @Describe(value = "a drag's time", optional = true) Integer dragMs,
                     @Describe(value = "a button found only at this side of anchor; unknown: anywhere", optional = true)
                     Place.Side side,
@@ -254,9 +258,18 @@ final class MapEdits {
     record LearnInteractions(String screen) implements Edit {
     }
 
-    @Describe("words in a zone: a marker, or with field a text button")
+    /** A box of the last screenshot, the second cut of an area measured from its anchor picture (2026-11-09). */
+    @Describe("a box of your last screenshot, in its pixels")
+    record AreaBox(int x, int y, int width, int height) {
+        Rect rect() {
+            return new Rect(x, y, width, height);
+        }
+    }
+
+    @Describe("words read in box, measured from the picture anchor: a marker, or with field a text button")
     record AddText(String screen, @Describe("as the screen shows them") String text,
-                   @Describe("a Zones constant") String zone,
+                   @Describe("a picture beside the words, shown on the screenshot") String anchor,
+                   @Describe("around the words") AreaBox box,
                    @Describe(value = "", optional = true) String field) implements Edit {
     }
 
@@ -264,9 +277,11 @@ final class MapEdits {
     record RemoveText(String screen, String text) implements Edit {
     }
 
-    @Describe("a readout the screen shows in a zone, as name: words by OCR, or a number by digits; add_fact reads "
-            + "a fact off it")
-    record AddReadout(String screen, String name, @Describe("a Zones constant") String zone,
+    @Describe("a readout the screen shows in box, measured from the picture anchor, as name: words by OCR, or a number "
+            + "by digits; add_fact reads a fact off it")
+    record AddReadout(String screen, String name,
+                      @Describe("a picture beside it, shown on the screenshot: its icon") String anchor,
+                      @Describe("around what it reads") AreaBox box,
                       @Describe(value = "a Digits constant: the number read by it", optional = true) String digits)
             implements Edit {
     }
@@ -367,7 +382,7 @@ final class MapEdits {
             MapScreen on = graph.screens().get(screen.get());
             if (!has(fact.field()) || !on.readouts().containsKey(fact.field().strip())) {
                 return AgentReply.refused(screen.get() + " has no readout " + fact.field() + ": it has "
-                        + on.readouts().keySet() + ". Save one first: save_region its zone, then add_readout. Nothing was written.");
+                        + on.readouts().keySet() + ". Save one first: add_readout, beside its icon. Nothing was written.");
             }
             String field = fact.field().strip();
             if (fact.minutes() != null && fact.minutes() <= 0) return AgentReply.refused("minutes is above 0.");
@@ -439,10 +454,12 @@ final class MapEdits {
             case MoveMarkers ignored -> AgentReply.refused("move_markers runs on the whole map.");
             case LearnShade ignored -> AgentReply.refused("learn_shade runs on the whole bot.");
             case LearnInteractions ignored -> AgentReply.refused("learn_interactions acts on the game.");
-            case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
+            case AddText add -> said(beside(services, add.anchor(), add.box(),
+                    in -> ScreenEdits.addText(services, screen, in, add.text(), add.field())));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
-            case AddReadout readout -> said(ScreenEdits.addReadout(services, screen, readout.name(), readout.zone(),
-                    has(readout.digits()) ? readout.digits() : null, false));
+            case AddReadout readout -> said(beside(services, readout.anchor(), readout.box(),
+                    in -> ScreenEdits.addReadout(services, screen, readout.name(), in,
+                            has(readout.digits()) ? readout.digits() : null, false)));
             case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),
                     spot.across() == null ? 0 : spot.across(), spot.down() == null ? 0 : spot.down(), grid(spot)));
             case SetInput set -> onInput(set, graph, screen, on, field -> setInput(context, screen, on, field, set));
@@ -597,7 +614,8 @@ final class MapEdits {
                     + "written.");
         }
         boolean typed = edit.types() != null || edit.submits() != null || edit.clears() != null;
-        boolean drags = edit.dragOnto() != null || edit.dragInto() != null || edit.dragMs() != null;
+        boolean drags = edit.dragOnto() != null || edit.dragInto() != null || edit.dragMs() != null
+                || edit.dragBox() != null;
         boolean others = settles > 0 || edit.info() != null || edit.sometimes() != null || edit.repeated() != null
                 || edit.gesture() != null || edit.holdMs() != null || typed || drags;
         if (edit.side() != null || edit.anchor() != null || edit.other() != null) {
@@ -644,7 +662,9 @@ final class MapEdits {
             return AgentReply.refused("A field types at most " + ScreenEdits.LONGEST_TEXT + " characters. Nothing was"
                     + " written.");
         }
-        Optional<AgentReply> dragRefused = drags ? dragRefused(context, field, in, edit, gestured || typed)
+        // Measured once: a match on the frame is the cost, and the check and the write must see one area.
+        Optional<Area> drop = has(edit.dragInto()) ? dropArea(context.services(), edit) : Optional.empty();
+        Optional<AgentReply> dragRefused = drags ? dragRefused(context, field, in, edit, gestured || typed, drop)
                 : Optional.empty();
         if (dragRefused.isPresent()) return dragRefused.get();
         if (in instanceof Custom && edit.did() == Result.UNTRIED) {
@@ -675,7 +695,7 @@ final class MapEdits {
             now = ScreenEdits.gestured(b, edit.gesture() == null ? Gesture.HOLD : edit.gesture(), hold);
         }
         if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
-        if (drags && now instanceof Button b) now = dragged(context, b, edit);
+        if (drags && now instanceof Button b) now = dragged(context, b, edit, drop);
         if (typed && now instanceof Button b) {
             Words text = edit.types() == null ? b.types() : edit.types().isBlank() ? null : Words.of(edit.types());
             return said(ScreenEdits.setField(context.services(), screen, field, b.typing(new Typing(text,
@@ -690,7 +710,7 @@ final class MapEdits {
      * press), both drops, a drop the bot lacks, a time out of bounds, or a time alone on a button not dragged.
      */
     private static Optional<AgentReply> dragRefused(AgentContext context, String field, Input in, SetInput edit,
-                                                    boolean pressedElse) {
+                                                    boolean pressedElse, Optional<Area> drop) {
         if (!(in instanceof Button b)) {
             return Optional.of(AgentReply.refused(field + " is no button: only a button is dragged. Nothing was "
                     + "written."));
@@ -718,20 +738,45 @@ final class MapEdits {
         if (has(edit.dragOnto()) && !ActTools.exists(context, edit.dragOnto().strip())) {
             return Optional.of(AgentReply.refused(Frames.noPicture(edit.dragOnto().strip())));
         }
-        if (has(edit.dragInto()) && ScreenEdits.zoneOf(context.services(), edit.dragInto().strip()).isEmpty()) {
-            return Optional.of(AgentReply.refused("The bot has no zone " + edit.dragInto().strip() + " in Zones "
-                    + "(save_region adds one). Nothing was written."));
+        if (edit.dragBox() != null && !has(edit.dragInto())) {
+            return Optional.of(AgentReply.refused("dragBox is dragInto's drop area: give dragInto, the picture beside "
+                    + "it, too. Nothing was written."));
+        }
+        if (has(edit.dragInto()) && drop.isEmpty()) {
+            String why = edit.dragBox() == null ? ScreenEdits.NOT_WRITTEN + "give dragBox, the drop area on your last "
+                    + "screenshot, with dragInto, the picture beside it." : Frames.shown().isEmpty()
+                    ? ScreenEdits.NOT_WRITTEN + "take a screenshot first: dragBox is a box of it."
+                    : ScreenEdits.noArea(edit.dragInto());
+            return Optional.of(AgentReply.refused(why));
         }
         return Optional.empty();
     }
 
+    /** set_input's drop area: {@code dragBox} of the last screenshot, measured from the picture {@code dragInto}. */
+    private static Optional<Area> dropArea(StudioServices services, SetInput edit) {
+        if (edit.dragBox() == null || Frames.shown().isEmpty()) return Optional.empty();
+        return ScreenEdits.areaBeside(services, edit.dragInto(), edit.dragBox().rect(), Frames.shown().get());
+    }
+
+    /**
+     * {@code write} given the area {@code box} of the last screenshot makes beside the picture {@code anchor}, as
+     * add_text and add_readout write it; why not when there is no screenshot, no box, or the anchor is not on it.
+     */
+    private static String beside(StudioServices services, String anchor, AreaBox box, Function<Area, String> write) {
+        if (box == null) return ScreenEdits.NOT_WRITTEN + "give box, the area on your last screenshot.";
+        Optional<BufferedImage> frame = Frames.shown();
+        if (frame.isEmpty()) return ScreenEdits.NOT_WRITTEN + "take a screenshot first: box is a box of it.";
+        return ScreenEdits.areaBeside(services, anchor, box.rect(), frame.get()).map(write)
+                .orElseGet(() -> ScreenEdits.noArea(anchor));
+    }
+
     /** {@code button} dragged as set_input says, checked by {@link #dragRefused}: a blank drop presses it again. */
-    private static Button dragged(AgentContext context, Button button, SetInput edit) {
+    private static Button dragged(AgentContext context, Button button, SetInput edit, Optional<Area> drop) {
         Button now = button;
         if (has(edit.dragOnto())) {
             now = now.dragsOnto(ScreenBook.picture(context.services(), edit.dragOnto().strip()));
         } else if (has(edit.dragInto())) {
-            now = now.dragsInto(ScreenEdits.zoneOf(context.services(), edit.dragInto().strip()).orElseThrow());
+            now = now.dragsInto(drop.orElseThrow());
         } else if (edit.dragOnto() != null || edit.dragInto() != null) {
             now = now.drag(null);
         }

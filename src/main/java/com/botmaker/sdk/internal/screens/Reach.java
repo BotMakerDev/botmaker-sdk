@@ -4,10 +4,10 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
-import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.screens.Answer;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Custom;
@@ -34,9 +34,7 @@ import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.ocr.LineMatch;
 import com.botmaker.sdk.internal.ocr.OcrEngine;
-import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.sdk.internal.vision.DigitReader;
-import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.shared.emulator.tree.UiNode;
 
 import java.awt.image.BufferedImage;
@@ -51,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.function.ToLongFunction;
@@ -183,13 +182,13 @@ public interface Reach {
     }
 
     /**
-     * Where {@code caption}'s words are on {@code frame}: the first line read inside its zone, placed on the frame as
-     * {@code source.region} places one, that is the words ({@link LineMatch#same}). Empty when no line there is.
+     * Where {@code caption}'s words are on {@code frame}: the first line read inside its area, placed from its anchor
+     * found there, that is the words ({@link LineMatch#same}). Empty when no line there is, or its anchor is not shown.
      *
      * @throws TextUnread when the read failed
      */
     default Optional<Rect> findText(Caption caption, BufferedImage frame) {
-        return located(caption, frame, this::read);
+        return located(caption, frame, this::read, this::find);
     }
 
     /** {@link #findText(Caption, BufferedImage)}, empty when the read failed: a press or an anchor finds nothing. */
@@ -213,23 +212,27 @@ public interface Reach {
         }
     }
 
-    /** {@link #findText(Caption, BufferedImage)}, the zone read by {@code read}; empty when the read failed. */
-    static Optional<Rect> findText(Caption caption, BufferedImage frame,
-                                   Function<BufferedImage, List<TextResult>> read) {
+    /**
+     * {@link #findText(Caption, BufferedImage)}, the area read by {@code read} once its anchor is found by {@code find};
+     * empty when the read failed.
+     */
+    static Optional<Rect> findText(Caption caption, BufferedImage frame, Function<BufferedImage, List<TextResult>> read,
+                                   BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> find) {
         try {
-            return located(caption, frame, read);
+            return located(caption, frame, read, find);
         } catch (TextUnread unread) {
             return Optional.empty();
         }
     }
 
-    /** {@link #findText(Caption, BufferedImage, Function)}, a failed read thrown. */
+    /** {@link #findText(Caption, BufferedImage, Function, BiFunction)}, a failed read thrown. */
     private static Optional<Rect> located(Caption caption, BufferedImage frame,
-                                          Function<BufferedImage, List<TextResult>> read) {
+                                          Function<BufferedImage, List<TextResult>> read,
+                                          BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> find) {
         if (caption == null || caption.words() == null || caption.in() == null) return Optional.empty();
-        Optional<Rect> zone = onFrame(caption.in(), frame);
-        if (zone.isEmpty()) return Optional.empty();
-        Rect z = zone.get();
+        Optional<Rect> area = onFrame(caption.in(), frame, find);
+        if (area.isEmpty()) return Optional.empty();
+        Rect z = area.get();
         for (TextResult line : read.apply(frame.getSubimage(z.x(), z.y(), z.width(), z.height()))) {
             if (!LineMatch.same(line.text(), caption.words().text())) continue;
             Rect b = line.bounds();
@@ -238,10 +241,21 @@ public interface Reach {
         return Optional.empty();
     }
 
-    /** {@code zone} placed on {@code frame} as {@code source.region} places it, cut to the frame; empty off it. */
-    private static Optional<Rect> onFrame(Zone zone, BufferedImage frame) {
-        Rect placed = Places.inSource(zone, BotScreen.size().orElse(null),
-                new Size(frame.getWidth(), frame.getHeight()));
+    /** Where {@code area} is on {@code frame}, its anchor found there by this reach; empty when it is not shown. */
+    default Optional<Rect> onFrame(Area area, BufferedImage frame) {
+        return onFrame(area, frame, this::find);
+    }
+
+    /**
+     * {@code area} placed from its anchor, which {@code find} looks for on {@code frame}, cut to the frame; empty when
+     * the anchor is not shown or the box falls off the frame.
+     */
+    static Optional<Rect> onFrame(Area area, BufferedImage frame,
+                                  BiFunction<ImageTemplate, BufferedImage, Optional<Rect>> find) {
+        if (area == null) return Optional.empty();
+        Optional<Rect> found = find.apply(area.anchor(), frame);
+        if (found.isEmpty()) return Optional.empty();
+        Rect placed = area.place(found.get());
         int x = Math.max(0, placed.x());
         int y = Math.max(0, placed.y());
         int w = Math.min(frame.getWidth(), placed.x() + placed.width()) - x;
@@ -270,10 +284,10 @@ public interface Reach {
                     .map(node -> node.text().isBlank() ? node.label().strip() : node.text().strip())
                     .filter(text -> !text.isEmpty());
         }
-        if (readout == null || readout.zone() == null) return Optional.empty();
-        Optional<Rect> zone = onFrame(readout.zone(), frame);
-        if (zone.isEmpty()) return Optional.empty();
-        Rect z = zone.get();
+        if (readout == null || readout.area() == null) return Optional.empty();
+        Optional<Rect> area = onFrame(readout.area(), frame);
+        if (area.isEmpty()) return Optional.empty();
+        Rect z = area.get();
         if (readout.isNumber()) {
             OptionalLong number = number(readout.digits(), z, frame);
             return number.isPresent() ? Optional.of(Long.toString(number.getAsLong())) : Optional.empty();
@@ -341,16 +355,13 @@ public interface Reach {
 
     /**
      * Where {@code button}'s drag lets go on {@code frame}: on its picture, found as any picture is, or at the centre
-     * of its zone, placed on the frame as {@code source.region} places one. Empty when it is no drag, or its picture is
-     * not there.
+     * of its area, placed from its anchor found there. Empty when it is no drag, or its picture or anchor is not there.
      */
     default Optional<Point> dropOn(Button button, BufferedImage frame) {
         Drag drag = button.drag();
         if (drag == null) return Optional.empty();
         if (drag.onto() != null) return find(drag.onto(), frame).map(this::pointOn);
-        if (drag.into() == null) return Optional.empty();
-        Size live = new Size(frame.getWidth(), frame.getHeight());
-        return Optional.of(Places.inSource(drag.into(), BotScreen.size().orElse(null), live).center());
+        return onFrame(drag.into(), frame).map(Rect::center);
     }
 
     void scroll(Point at, int notches);

@@ -8,7 +8,8 @@ import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.geometry.Point;
-import com.botmaker.sdk.api.geometry.Zone;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
@@ -83,7 +84,6 @@ public final class ScreenEdits {
 
     private static final ManagedSet<Words> TEXTS = ManagedSet.of(SdkValues.TEXTS);
 
-    private static final ManagedSet<Zone> ZONES = ManagedSet.of(SdkValues.ZONES);
     private static final ManagedSet<DigitSet> DIGITS = ManagedSet.of(SdkValues.DIGITS);
 
     /** The longest a button or a hotkey is held, as 🗺's spinners offer: past it the game is held, not pressed. */
@@ -728,16 +728,16 @@ public final class ScreenEdits {
     }
 
     /**
-     * {@code constant}'s button {@code field} dragged onto the bot's picture {@code onto}, or into its zone {@code
+     * {@code constant}'s button {@code field} dragged onto the bot's picture {@code onto}, or into the area {@code
      * into}, the move taking {@code time} (null: as long as it took, else {@link Button#DRAG_TIME}); neither: pressed
-     * by its gesture again. A field that is no button, both drops, one the bot lacks, or a time past {@link
+     * by its gesture again. A field that is no button, both drops, a picture the bot lacks, or a time past {@link
      * #LONGEST_HOLD} is refused.
      */
-    public static String setDrag(StudioServices services, String constant, String field, String onto, String into,
+    public static String setDrag(StudioServices services, String constant, String field, String onto, Area into,
                                  Duration time) {
         boolean picture = onto != null && !onto.isBlank();
-        boolean zone = into != null && !into.isBlank();
-        if (picture && zone) return NOT_WRITTEN + "a drag lets go on a picture or in a zone, not both.";
+        boolean area = into != null;
+        if (picture && area) return NOT_WRITTEN + "a drag lets go on a picture or in an area, not both.";
         if (time != null && (time.isNegative() || time.isZero() || time.compareTo(LONGEST_HOLD) > 0)) {
             return NOT_WRITTEN + "a drag takes 1 to " + LONGEST_HOLD.toMillis() + " ms.";
         }
@@ -745,7 +745,7 @@ public final class ScreenEdits {
         if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
             return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is dragged.";
         }
-        if (!picture && !zone) {
+        if (!picture && !area) {
             return said(ScreenBook.update(services, constant, s -> s.withInput(field, button.drag(null))),
                     field + " is pressed by " + button.gesture().displayName() + " now.");
         }
@@ -754,13 +754,11 @@ public final class ScreenEdits {
             if (!pictures(services).contains(onto.strip())) return NOT_WRITTEN + "the bot has no picture " + onto + ".";
             now = button.dragsOnto(picture(services, onto.strip()));
         } else {
-            Optional<Zone> area = zoneOf(services, into.strip());
-            if (area.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + into + " in Zones.";
-            now = button.dragsInto(area.get());
+            now = button.dragsInto(into);
         }
         Button timed = time == null ? now : now.dragTime(time);
         return said(ScreenBook.update(services, constant, s -> s.withInput(field, timed)),
-                field + " is dragged onto " + (picture ? onto.strip() : "zone " + into.strip()) + " in "
+                field + " is dragged onto " + (picture ? onto.strip() : "area " + into.said()) + " in "
                         + timed.dragTime().toMillis() + " ms now.");
     }
 
@@ -768,48 +766,50 @@ public final class ScreenEdits {
     static final int LONGEST_WORDS = 60;
 
     /**
-     * {@code text}, read in the bot's zone {@code zone}, written on {@code constant}: words that tell it when
-     * {@code field} is blank, else a new text button clicked on them, its field named from {@code field}. The words
-     * are kept in the bot's {@code Texts} in the same step.
+     * {@code text}, read in the area {@code in}, written on {@code constant}: words that tell it when {@code field} is
+     * blank, else a new text button clicked on them, its field named from {@code field}. The words are kept in the
+     * bot's {@code Texts} in the same step.
      */
-    public static String addText(StudioServices services, String constant, String zone, String text, String field) {
+    public static String addText(StudioServices services, String constant, Area in, String text, String field) {
         String words = text == null ? "" : text.strip();
         if (words.isEmpty() || words.length() > LONGEST_WORDS || words.contains("\n")) {
             return NOT_WRITTEN + "give the words on one line, as the screen shows them, up to " + LONGEST_WORDS
                     + " letters.";
         }
-        Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
-        if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
+        if (in == null) return NOT_WRITTEN + "words are read in an area: give its anchor picture and its box.";
         ScreenGraph graph = ScreenBook.read(services);
         MapScreen on = graph.screens().get(constant);
         if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
-        Caption caption = Caption.of(Words.of(words), in.get());
+        Caption caption = Caption.of(Words.of(words), in);
         if (field == null || field.isBlank()) {
             Markers was = graph.markers(constant);
-            if (was.texts().contains(caption)) return "It is told by " + caption.said() + " already.";
+            // The same words beside the same picture: a second cut measures a hair apart, and is the same caption.
+            if (was.texts().stream().anyMatch(t -> t.words().equals(caption.words())
+                    && t.in().anchor().id().equals(in.anchor().id()))) {
+                return "It is told by " + caption.said() + " already.";
+            }
             List<Caption> now = new ArrayList<>(was.texts());
             now.add(caption);
             return said(ScreenBook.step(services, "Tell " + graph.shown(constant) + " by " + caption.said(),
                     () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
                             s -> graph.toldBy(constant, s, was.withTexts(now))))),
-                    graph.shown(constant) + " is told by " + caption.said() + " in Zones." + zone.strip() + " too.");
+                    graph.shown(constant) + " is told by " + caption.said() + " in " + in.said() + " too.");
         }
         String named = on.fieldFor(field);
         return said(ScreenBook.step(services, "Text button " + named,
                 () -> keptText(services, caption.words()).or(() -> ScreenBook.update(services, constant,
                         s -> s.withInput(named, TextButton.of(caption))))),
-                named + " clicks " + caption.said() + " where it is read in Zones." + zone.strip() + ".");
+                named + " clicks " + caption.said() + " where it is read in " + in.said() + ".");
     }
 
     /**
-     * {@code constant} reading its zone {@code zone} as the readout {@code field}: words by OCR, or a number by the
-     * bot's digits {@code digits} when given; the one naming which one the screen shows when {@code subject}. What a
-     * zone or digits cut "read on this screen" writes.
+     * {@code constant} reading the area {@code in} as the readout {@code field}: words by OCR, or a number by the bot's
+     * digits {@code digits} when given; the one naming which one the screen shows when {@code subject}. What an area
+     * or digits cut "read on this screen" writes.
      */
-    public static String addReadout(StudioServices services, String constant, String field, String zone,
+    public static String addReadout(StudioServices services, String constant, String field, Area in,
                                     String digits, boolean subject) {
-        Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
-        if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
+        if (in == null) return NOT_WRITTEN + "a readout reads an area: give its anchor picture and its box.";
         PluginValues values = services.pluginValues();
         Optional<DigitSet> set = digits == null || values == null ? Optional.empty()
                 : DIGITS.read(values, Member.of(digits.strip()));
@@ -817,11 +817,11 @@ public final class ScreenEdits {
         ScreenGraph graph = ScreenBook.read(services);
         MapScreen on = graph.screens().get(constant);
         if (on == null) return NOT_WRITTEN + "no screen " + constant + ".";
-        Readout made = set.map(s -> Readout.digits(in.get(), s)).orElseGet(() -> Readout.text(in.get()));
+        Readout made = set.map(s -> Readout.digits(in, s)).orElseGet(() -> Readout.text(in));
         Readout readout = subject ? made.subject() : made;
         String named = on.fieldFor(field);
         return said(ScreenBook.update(services, constant, s -> s.withReadout(named, readout)),
-                named + " reads Zones." + zone.strip() + set.map(s -> " with Digits." + digits.strip()).orElse("")
+                named + " reads " + in.said() + set.map(s -> " with Digits." + digits.strip()).orElse("")
                         + " on " + graph.shown(constant) + (subject ? ", naming which one it shows." : "."));
     }
 
@@ -879,11 +879,11 @@ public final class ScreenEdits {
 
     /**
      * {@code constant}'s button {@code field} only ever found {@code side} of the bot's picture {@code anchor} (between
-     * it and {@code other}), or of {@code words} read in the zone {@code zone}; {@link Place.Side#UNKNOWN}: found
+     * it and {@code other}), or of {@code words} read in the area {@code in}; {@link Place.Side#UNKNOWN}: found
      * anywhere again. The words are kept in the bot's {@code Texts} in the same step.
      */
     public static String setPlace(StudioServices services, String constant, String field, Place.Side side,
-                                  String anchor, String other, String words, String zone) {
+                                  String anchor, String other, String words, Area in) {
         ScreenGraph graph = ScreenBook.read(services);
         if (!(graph.input(constant, field).orElse(null) instanceof Button button)) {
             return NOT_WRITTEN + field + " is no button of " + graph.shown(constant) + ": only a button is placed.";
@@ -919,9 +919,8 @@ public final class ScreenEdits {
             if (said.length() > LONGEST_WORDS || said.contains("\n")) {
                 return NOT_WRITTEN + "give the words on one line, up to " + LONGEST_WORDS + " letters.";
             }
-            Optional<Zone> in = zone == null ? Optional.empty() : zoneOf(services, zone.strip());
-            if (in.isEmpty()) return NOT_WRITTEN + "the bot has no zone " + zone + " in Zones: save_region it first.";
-            Caption caption = Caption.of(Words.of(said), in.get());
+            if (in == null) return NOT_WRITTEN + "words are read in an area: give its anchor picture and its box.";
+            Caption caption = Caption.of(Words.of(said), in);
             place = switch (side) {
                 case ABOVE -> Place.above(caption);
                 case BELOW -> Place.below(caption);
@@ -939,19 +938,29 @@ public final class ScreenEdits {
                 .or(() -> ScreenBook.update(services, constant, s -> s.withInput(field, now)))), done);
     }
 
-    /** Every zone of the bot's {@code Zones}, by name. */
-    public static List<String> zones(StudioServices services) {
-        PluginValues values = services.pluginValues();
-        return values == null ? List.of() : ZONES.members(values).stream().map(Member::name).sorted().toList();
-    }
-
-    /** The bot's zone {@code name}, as its constant holds it; empty when {@code Zones} has none of that name. */
-    public static Optional<Zone> zoneOf(StudioServices services, String name) {
-        PluginValues values = services.pluginValues();
-        if (values == null || ZONES.members(values).stream().noneMatch(m -> m.name().equals(name))) {
+    /**
+     * The area {@code box} of {@code frame} makes beside the bot's picture {@code anchor}, measured from where the
+     * picture is found on that frame (2026-11-09): what a tool writes from two cuts, the anchor's and the box's. Empty
+     * when the bot has no such picture, the frame does not show it, or the box has no size or leaves the frame.
+     */
+    public static Optional<Area> areaBeside(StudioServices services, String anchor, Rect box, BufferedImage frame) {
+        if (anchor == null || box == null || frame == null
+                || Frames.within(frame, box.x(), box.y(), box.width(), box.height()).isEmpty()
+                || !pictures(services).contains(anchor.strip())) {
             return Optional.empty();
         }
-        return ZONES.read(values, Member.of(name));
+        ImageTemplate picture = picture(services, anchor.strip());
+        return Frames.found(services.resourcesDir(), Frames.confidence(services), picture, frame)
+                .map(found -> Area.between(picture, found, box));
+    }
+
+    /** Why {@link #areaBeside} gave no area for {@code anchor}. */
+    public static String noArea(String anchor) {
+        return NOT_WRITTEN + "an area is measured from a picture the frame shows, its box inside the frame: "
+                + (anchor == null || anchor.isBlank() ? "name its anchor picture"
+                : "the bot has no picture " + anchor.strip() + ", this frame does not show it, or the box leaves the"
+                + " frame; cut the anchor first")
+                + ".";
     }
 
     /**
