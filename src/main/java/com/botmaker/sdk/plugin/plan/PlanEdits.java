@@ -72,6 +72,48 @@ public final class PlanEdits {
         return Plan.of(Plan.tier(BotConstants.goal(goal)));
     }
 
+    /** What {@code + Plan}'s tooltip says while it can start a plan. */
+    public static final String PLAN_HELP = "A plan of one tier: the goal picked.";
+
+    /**
+     * Why {@code + Plan} waits (2026-11-09): a new plan's first tier is one of the bot's goals that reads, so with none
+     * {@code + Goal} comes first, and a goal is a check over a fact, so with no fact the fact comes before both; empty
+     * when a goal is there to start one.
+     *
+     * @param goals   the bot's goals whose value reads
+     * @param anyFact whether the bot has a fact {@code + Goal} can check
+     */
+    public static Optional<String> planWaits(List<String> goals, boolean anyFact) {
+        if (!goals.isEmpty()) return Optional.empty();
+        return Optional.of(anyFact
+                ? "Add a goal with + Goal first: a plan's first tier is one of the bot's goals."
+                : "Add a fact first, a method of a @Facts group, then a goal over it with + Goal: a plan's first tier "
+                        + "is one of the bot's goals.");
+    }
+
+    /**
+     * What the window says while no plan of the bot reads.
+     *
+     * @param unread  the constants of {@code Plans} there are, none of whose value reads
+     * @param anyGoal whether the bot has a goal that reads, to start a plan with
+     * @param anyFact whether it has a fact {@code + Goal} can check
+     */
+    public static String noPlanYet(List<String> unread, boolean anyGoal, boolean anyFact) {
+        if (!unread.isEmpty()) {
+            return "No plan of the bot reads: Plans." + String.join(", Plans.", unread)
+                    + ". Fix it in Plans.java, or start another with + Plan.";
+        }
+        if (anyGoal) {
+            return "The bot has no plan yet: a plan is tiers of the goals in Goals.java, written in Plans.java. "
+                    + "+ Plan starts one.";
+        }
+        String first = anyFact ? "First + Goal: a goal is a check over one of the bot's facts, written in Goals.java."
+                : "First a fact, a method of a @Facts group, then + Goal: a goal is a check over a fact, written in "
+                        + "Goals.java.";
+        return "The bot has no plan yet, and no goal. " + first
+                + " Then + Plan: a plan is tiers of those goals, written in Plans.java.";
+    }
+
     // ---- an action's order among those serving its goals: the cards' drags ----------------------------------
 
     /**

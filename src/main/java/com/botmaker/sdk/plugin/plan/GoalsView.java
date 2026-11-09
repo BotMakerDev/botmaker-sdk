@@ -39,6 +39,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseButton;
@@ -47,6 +48,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
@@ -105,6 +107,10 @@ public final class GoalsView {
     private final TextField limitText = new TextField();
     private final TextField planName = new TextField();
     private final ChoiceBox<String> planGoal = new ChoiceBox<>();
+    private final Button addPlan = new Button("+ Plan");
+    /** Around {@link #addPlan}: a disabled button shows no tooltip, so the one saying why it waits is on this. */
+    private final StackPane addPlanBox = new StackPane(addPlan);
+    private final Tooltip addPlanTip = new Tooltip();
     private final Label said = new Label();
     private final Label warnings = new Label();
     private final GraphCanvas<Stop, Edge> route = new GraphCanvas<>(Stop::screen, this::stopView, GoalsView::arrow,
@@ -216,12 +222,15 @@ public final class GoalsView {
      * What one read found: every plan's name that reads, the one shown and its view, or why there is none; the name of
      * every constant of the bot's {@code Plans} and {@code Goals}, read or not, and its facts, for {@code + Plan} and
      * {@code + Goal}; and what the goals and plans ask that a run cannot do ({@link MapAudit#planWarnings}).
+     * {@code readGoals} are the goals whose value reads, which {@code + Plan} offers; {@code planWaits} says why
+     * {@code + Plan} cannot start a plan, null when it can.
      */
     private record Read(List<String> plans, String shown, GoalsViewModel view, String refused, List<String> goals,
-                        List<String> planNames, List<RunParameter> facts, List<String> warnings) {
+                        List<String> planNames, List<RunParameter> facts, List<String> warnings,
+                        List<String> readGoals, String planWaits) {
 
         static Read none(String why) {
-            return new Read(List.of(), null, null, why, List.of(), List.of(), List.of(), List.of());
+            return new Read(List.of(), null, null, why, List.of(), List.of(), List.of(), List.of(), List.of(), why);
         }
 
         static Read of(StudioServices services, String wanted) {
@@ -245,10 +254,12 @@ public final class GoalsView {
                     .filter(fact -> !PlanEdits.shortcuts(fact.type()).isEmpty()).toList();
             ScreenGraph map = ScreenMapRead.read(services);
             List<String> warnings = MapAudit.planWarnings(plans, goals, map);
+            List<String> readGoals = List.copyOf(goals.keySet());
+            String waits = PlanEdits.planWaits(readGoals, !facts.isEmpty()).orElse(null);
             if (plans.isEmpty()) {
-                return new Read(List.of(), null, null, "The bot has no plan yet: a plan is tiers of the goals in "
-                        + "Goals.java, written in Plans.java. + Plan starts one.", List.copyOf(goalNames),
-                        List.copyOf(planNames), facts, warnings);
+                return new Read(List.of(), null, null,
+                        PlanEdits.noPlanYet(planNames, !readGoals.isEmpty(), !facts.isEmpty()),
+                        List.copyOf(goalNames), List.copyOf(planNames), facts, warnings, readGoals, waits);
             }
             String shown = plans.containsKey(wanted) ? wanted : plans.keySet().iterator().next();
             StudioPlan plan = StudioPlan.of(plans.get(shown), goals, map);
@@ -261,13 +272,13 @@ public final class GoalsView {
             try {
                 PlanModel model = new PlanModel(plan.plan(), plan.map(), records, null);
                 return new Read(names, shown, GoalsViewModel.of(model, plan), null, List.copyOf(goalNames),
-                        List.copyOf(planNames), facts, warnings);
+                        List.copyOf(planNames), facts, warnings, readGoals, waits);
             } catch (IllegalArgumentException cycle) {
                 // The cycle is the refusal: said once, not again among the warnings, which found it on their own read.
                 Optional<String> found = PlanModel.overCycle(StudioPlan.of(PlanModel.NO_PLAN, goals, map).map());
                 return new Read(names, shown, null, cycle.getMessage(), List.copyOf(goalNames),
                         List.copyOf(planNames), facts, warnings.stream()
-                        .filter(w -> found.map(f -> !f.equals(w)).orElse(true)).toList());
+                        .filter(w -> found.map(f -> !f.equals(w)).orElse(true)).toList(), readGoals, waits);
             }
         }
     }
@@ -280,7 +291,9 @@ public final class GoalsView {
         cards.getChildren().clear();
         rows.clear();
         offer(factPick, read.facts().stream().map(GoalsView::factName).toList(), false);
-        offer(planGoal, read.goals(), true);
+        offer(planGoal, read.readGoals(), true);
+        addPlan.setDisable(read.planWaits() != null);
+        addPlanTip.setText(read.planWaits() != null ? read.planWaits() : PlanEdits.PLAN_HELP);
         warnings.setText(String.join("\n", read.warnings().stream().map(w -> "⚠ " + w).toList()));
         warnings.setManaged(!read.warnings().isEmpty());
         warnings.setVisible(!read.warnings().isEmpty());
@@ -417,9 +430,9 @@ public final class GoalsView {
         goal.setAlignment(Pos.CENTER_LEFT);
         planName.setPromptText("PLAN_NAME");
         planName.setPrefColumnCount(10);
-        Button addPlan = new Button("+ Plan");
         addPlan.setOnAction(e -> addPlan());
-        HBox plan = new HBox(6, new Label("Plan:"), planName, planGoal, addPlan);
+        Tooltip.install(addPlanBox, addPlanTip);
+        HBox plan = new HBox(6, new Label("Plan:"), planName, planGoal, addPlanBox);
         plan.setAlignment(Pos.CENTER_LEFT);
         return new VBox(4, goal, plan);
     }

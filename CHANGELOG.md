@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **🎯 Goals with no goal yet** (2026-11-09): `+ Plan` is disabled while the bot has no goal that reads, and its
+  tooltip says what comes first: `+ Goal`, or, with no fact either, a `@Facts` method. The empty window says the same
+  order instead of refusing "a plan needs a name and a goal for its first tier" on the press. `+ Plan` offers only the
+  goals that read, and a `Plans` constant that does not read is named rather than taken for "no plan yet"
+  (`PlanEdits.planWaits`, `noPlanYet`).
 - **Keep exploring** (2026-11-09): a second SDK run beside *Explore map* (`SdkRuns.KEEP_EXPLORING`,
   `api/bot/KeepExploring`) plays and explores the game for hours on its own. Each round it presses an input not tried
   yet, else plays a round of the bot's plan, else walks to the nearest screen with one left. It stops on what the bot

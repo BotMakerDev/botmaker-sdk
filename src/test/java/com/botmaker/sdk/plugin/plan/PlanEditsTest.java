@@ -183,4 +183,30 @@ class PlanEditsTest {
         assertThrows(IllegalArgumentException.class, () -> PlanEdits.fromNeed("Progress::gold", Shortcut.AT_LEAST,
                 null));
     }
+
+    /** A plan's first tier needs a goal: with none yet, + Plan waits and both texts say + Goal comes first (2026-11-09). */
+    @Test
+    void withNoGoalPlusPlanWaitsAndSaysPlusGoalFirst() {
+        String waits = PlanEdits.planWaits(List.of(), true).orElseThrow();
+        assertTrue(waits.startsWith("Add a goal with + Goal first"), waits);
+        assertEquals(Optional.empty(), PlanEdits.planWaits(List.of("GOLD_AT_LEAST_100"), true));
+        String noFact = PlanEdits.planWaits(List.of(), false).orElseThrow();
+        assertTrue(noFact.indexOf("@Facts") < noFact.indexOf("+ Goal"), noFact);
+
+        String empty = PlanEdits.noPlanYet(List.of(), false, true);
+        assertTrue(empty.indexOf("+ Goal") >= 0 && empty.indexOf("+ Goal") < empty.indexOf("+ Plan"), empty);
+        String withGoal = PlanEdits.noPlanYet(List.of(), true, true);
+        assertTrue(withGoal.contains("+ Plan starts one"), withGoal);
+        assertFalse(withGoal.contains("+ Goal"), withGoal);
+        String bare = PlanEdits.noPlanYet(List.of(), false, false);
+        assertTrue(bare.indexOf("@Facts") < bare.indexOf("+ Goal"), bare);
+    }
+
+    /** A plan constant there but unreadable is named, never "no plan yet": + Plan would refuse its name. */
+    @Test
+    void anUnreadPlanIsNamedNotTakenForNone() {
+        String said = PlanEdits.noPlanYet(List.of("FARM"), true, true);
+        assertTrue(said.contains("Plans.FARM"), said);
+        assertFalse(said.contains("no plan yet"), said);
+    }
 }
