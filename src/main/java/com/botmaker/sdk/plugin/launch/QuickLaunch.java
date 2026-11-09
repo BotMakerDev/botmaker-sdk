@@ -25,7 +25,9 @@ import com.botmaker.shared.emulator.EmulatorLiveness;
 import com.botmaker.shared.emulator.EmulatorState;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.LaunchPreparation;
 import com.botmaker.shared.launch.Launcher;
+import com.botmaker.sdk.api.geometry.Size;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
@@ -127,10 +129,8 @@ public final class QuickLaunch {
      * <b>only</b> thing the launch button ever did for such a target. It is not a failure to route around: the
      * target is already off the user's desktop, which is what background mode is for.
      *
-     * <p>The question is asked of the <em>spec</em> rather than its kind, because Waydroid answers differently:
-     * its UI is a Wayland client we start under our own gamescope, so it does map a window on a display we own
-     * and does belong in a background session. Kept static and pure so the routing is unit-testable without an
-     * FX button.
+     * <p>Waydroid included (2026-11-09, the user's call): its session runs under a headless gamescope and the bot
+     * reads it over ADB. Kept static and pure so the routing is unit-testable without an FX button.
      */
     public static boolean usesBackgroundSession(LaunchSpec spec, boolean isolated) {
         return isolated && spec != null && !spec.runsOffDesktop();
@@ -196,7 +196,10 @@ public final class QuickLaunch {
         // ("starting Waydroid…", "waiting for Android…"); every other kind says nothing (null) and falls back to
         // the generic line. Launcher.start throws the underlying failure (Steam not installed, no protocol
         // handler, an emulator that never finished booting) precisely so it can be shown here.
+        Optional<Size> screen = ScreenSize.read(services);
         Async.load("quick-launch", () -> {
+            // Waydroid renders at the bot's screen size: its props are set, and the container cycled, before the start.
+            screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
             String[] note = new String[1];
             Launcher.start(spec, message -> {
                 note[0] = message;
@@ -320,7 +323,9 @@ public final class QuickLaunch {
                     launchPrivately(spec, services, (ok, why) -> ended.complete(ok ? null : why));
                     return;
                 }
+                Optional<Size> screen = ScreenSize.read(services);
                 Async.load("fix-start", () -> {
+                    screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
                     Launcher.start(spec, words);
                     return "";
                 }, done -> ended.complete(null), ended::complete);

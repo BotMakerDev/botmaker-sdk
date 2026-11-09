@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Waydroid runs over ADB with no window** (2026-11-09): with "Run the game in" a private display, an emulator
+  app now starts as on the desktop (`SessionBootstrap.launchIsolated` declines it), Waydroid's session under a
+  headless gamescope; watch it in the Pilot or Screens. A run, ▶ Launch now and a Fix's start first set
+  Waydroid's size to the bot's screen (`LaunchPreparation.prepare`), which cycles the container once when it
+  differs. The background-mode box no longer offers Waydroid a private display.
 - **The bot's settings are parameters, one each** (2026-11-09): confidence, the click delays, random clicks,
   the compare margin, max rounds, patience, when a run is stuck, restarts, where the game runs and the
   display and input backends are methods of the SDK's `Settings` group in `params/`, edited in the Parameters

@@ -34,6 +34,7 @@ import com.botmaker.shared.launch.AndroidInstall;
 import com.botmaker.shared.launch.GameInstall;
 import com.botmaker.shared.launch.GameReadiness;
 import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchPreparation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import com.botmaker.session.PrivateSession;
@@ -732,7 +733,12 @@ final class SetupTools {
             return null;
         });
         // Off this thread: a cold emulator app is minutes of start, and the call answers within MAX_LAUNCH_WAIT.
-        CompletableFuture<Void> started = CompletableFuture.runAsync(() -> Launcher.start(spec), LAUNCHING);
+        // Waydroid renders at the bot's screen size, set before a cold start (as ▶ Launch does).
+        Optional<Size> screen = FxCall.call(() -> ScreenSize.read(services));
+        CompletableFuture<Void> started = CompletableFuture.runAsync(() -> {
+            screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
+            Launcher.start(spec);
+        }, LAUNCHING);
         int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
         long until = System.nanoTime() + Math.max(wait, 2) * 1_000_000_000L;
         while (System.nanoTime() < until) {

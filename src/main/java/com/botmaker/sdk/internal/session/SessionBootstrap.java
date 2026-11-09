@@ -8,6 +8,7 @@ import com.botmaker.sdk.internal.vision.BotScreen;
 import com.botmaker.session.launch.LaunchIsolation;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.shared.launch.GameReadiness;
+import com.botmaker.shared.launch.LaunchPreparation;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import com.botmaker.session.DesktopSession;
@@ -297,6 +298,16 @@ public final class SessionBootstrap {
     }
 
     private static boolean launchIsolated(LaunchSpec spec, boolean adoptOffered) {
+        if (spec != null && spec.runsOffDesktop() && where() != BotSettings.Where.VM) {
+            // An emulator app is read and pressed over ADB, never on a display of ours (2026-11-09, the user's call):
+            // the caller's Launcher.start runs it. Waydroid renders at the bot's screen size, set before it starts.
+            if (isolationRequested()) {
+                Debug.log("isolated launch declined — " + spec.describe()
+                        + " runs inside its emulator, read and pressed over ADB, on no display of ours");
+            }
+            BotScreen.size().ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
+            return false;
+        }
         if (!isolationRequested() || spec == null) {
             return false;
         }
