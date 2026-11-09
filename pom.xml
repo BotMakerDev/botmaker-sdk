@@ -238,6 +238,28 @@
             <artifactId>org.eclipse.elk.alg.layered</artifactId>
             <version>0.12.0</version>
         </dependency>
+        <!-- The map's other layout modes (plugin.map.LayoutMode): a tree, a hub, the stress layout (shipped in the
+             force artifact), and disco, which packs the parts of a map no way joins. -->
+        <dependency>
+            <groupId>org.eclipse.elk</groupId>
+            <artifactId>org.eclipse.elk.alg.mrtree</artifactId>
+            <version>0.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.elk</groupId>
+            <artifactId>org.eclipse.elk.alg.radial</artifactId>
+            <version>0.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.elk</groupId>
+            <artifactId>org.eclipse.elk.alg.force</artifactId>
+            <version>0.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.elk</groupId>
+            <artifactId>org.eclipse.elk.alg.disco</artifactId>
+            <version>0.12.0</version>
+        </dependency>
         <!-- Xbase's runtime library, which ELK's classes call and its poms leave out (its OSGi manifest asks for the
              bundle instead): without it ELK's options fail to load. -->
         <dependency>

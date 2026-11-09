@@ -413,7 +413,14 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   plugins stay lean): ranks follow the entrances from the start screen, a way back goes in as a reversed edge,
   popups sit apart, and ELK's orthogonal routes are the links' paths. A card placed by hand keeps its `at` and only
   its own links are routed again (the toolkit's `Placement.pinned`); ELK failing to load falls back to the toolkit's
-  `LayeredLayout`. It caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
+  `LayeredLayout`. **Layout ▾** (`LayoutMode`, 2026-11-09, kept in the preferences as `map.layout`) picks one of
+  six: Layered (the above), Compact (gaps halved), Tree (`mrtree`, a breadth-first tree of the ways on from the
+  root, ways back left out), Hub (`radial`, out from the screen with the most ways), Organic (`stress`) and Groups
+  (layered with one compound node per group, drawn as the toolkit's `GraphCanvas.Frame`). Tree, Hub and Organic
+  place the cards only; the canvas routes their links. Every mode but Groups runs inside `disco` when no way joins
+  some cards to the rest. Groups are `ScreenClusters`: Louvain modularity over the ways taken undirected, weighted
+  by how many join a pair, in the map's order; a group of one is none, a group is named after its busiest member.
+  It caches at most 400 images and places input boxes on any frame shape (`boxOn`, letterboxed). A card's shot loads in
   the background, sized by the file's header (`ScreenShots.size`); the panel's shot loads at once, since its boxes
   need its shape. A list's members are drawn as one scrolling strip over where the list sits, not boxed one by one.
 - **`ScreenPanel`** is the picked screen: its shot with boxes, ▶ Try, 🧭 Go here, ✂ Cut, notes, and the hand

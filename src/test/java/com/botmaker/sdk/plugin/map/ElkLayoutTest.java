@@ -10,7 +10,9 @@ import com.botmaker.plugin.toolkit.graph.GraphLayout.Pt;
 import com.botmaker.sdk.plugin.map.ElkLayout.Way;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,7 +34,109 @@ class ElkLayoutTest {
     private static final Gaps GAPS = new Gaps(90, 28);
 
     private static Placement laid(Direction direction) {
-        return ElkLayout.arrange(CARDS, WAYS, Set.of("REWARD"), "HOME", direction, GAPS);
+        return ElkLayout.arrange(LayoutMode.LAYERED, CARDS, WAYS, Set.of("REWARD"), "HOME", direction, GAPS);
+    }
+
+    private static Placement laid(LayoutMode mode, Direction direction) {
+        return ElkLayout.arrange(mode, CARDS, WAYS, Set.of("REWARD"), "HOME", direction, GAPS);
+    }
+
+    @Test
+    void everyModeLaysOutOneScreen() {
+        for (LayoutMode mode : LayoutMode.values()) {
+            Placement placed = ElkLayout.arrange(mode, List.of(Card.of("HOME", 100, 60)), List.of(), Set.of(), "HOME",
+                    Direction.RIGHT, GAPS);
+            assertEquals(Set.of("HOME"), placed.at().keySet(), mode.id());
+        }
+    }
+
+    @Test
+    void everyModePlacesEveryCard() {
+        for (LayoutMode mode : LayoutMode.values()) {
+            for (Direction direction : Direction.values()) {
+                Placement placed = laid(mode, direction);
+                assertEquals(CARDS.stream().map(Card::id).collect(Collectors.toSet()), placed.at().keySet(),
+                        mode.id());
+                for (Card a : CARDS) {
+                    for (Card b : CARDS) {
+                        if (a != b) {
+                            assertFalse(box(placed, a.id()).overlaps(box(placed, b.id())),
+                                    mode.id() + ": " + a.id() + " on " + b.id());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void treeRootIsOnTop() {
+        Placement placed = laid(LayoutMode.TREE, Direction.DOWN);
+        for (String other : List.of("SHOP", "BAG", "MAIL")) {
+            assertTrue(placed.at().get("HOME").y() < placed.at().get(other).y(), other);
+        }
+    }
+
+    @Test
+    void hubCentreIsTheBusiestScreen() {
+        List<String> order = CARDS.stream().map(Card::id).toList();
+        assertEquals("HOME", ElkLayout.busiest(order, WAYS));
+        Placement placed = laid(LayoutMode.HUB, Direction.RIGHT);
+        Pt home = box(placed, "HOME").centre();
+        // The centre sits inside the box of its ring: SHOP and MAIL, its neighbours, lie on either side of it.
+        double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+        for (String ring : List.of("SHOP", "MAIL", "BAG")) {
+            Pt c = box(placed, ring).centre();
+            minX = Math.min(minX, c.x());
+            maxX = Math.max(maxX, c.x());
+            minY = Math.min(minY, c.y());
+            maxY = Math.max(maxY, c.y());
+        }
+        assertTrue(home.x() > minX - 0.5 && home.x() < maxX + 0.5 || home.y() > minY - 0.5 && home.y() < maxY + 0.5,
+                "the hub is among its ring");
+    }
+
+    @Test
+    void treeHangsAScreenUnderItsEntranceNotAnEarlierWay() {
+        // HOME reaches BAG first by a way on, but BAG's entrance is from SHOP.
+        Map<String, String> parents = ElkLayout.tree("HOME", List.of("HOME", "SHOP", "BAG"), List.of(
+                List.of(new Way("HOME", "SHOP", true, false), new Way("SHOP", "BAG", true, false)),
+                List.of(new Way("HOME", "BAG", false, false))), false);
+        assertEquals(Map.of("SHOP", "HOME", "BAG", "SHOP"), parents);
+    }
+
+    @Test
+    void treeReachesByOtherWaysWhatNoEntranceReaches() {
+        Map<String, String> parents = ElkLayout.tree("HOME", List.of("HOME", "SHOP", "BAG"), List.of(
+                List.of(new Way("SHOP", "BAG", true, false)),
+                List.of(new Way("HOME", "SHOP", false, false))), false);
+        assertEquals(Map.of("SHOP", "HOME", "BAG", "SHOP"), parents);
+    }
+
+    @Test
+    void hubRingHoldsTwelveScreensSideBySide() {
+        List<Card> cards = new ArrayList<>(List.of(Card.of("HUB", 160, 120)));
+        List<Way> ways = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            cards.add(Card.of("S" + i, 160, 120));
+            ways.add(new Way("HUB", "S" + i, true, false));
+        }
+        Placement placed = ElkLayout.arrange(LayoutMode.HUB, cards, ways, Set.of(), "HUB", Direction.RIGHT, GAPS);
+        for (Card a : cards) {
+            for (Card b : cards) {
+                if (a != b) {
+                    assertFalse(a.at(placed.at().get(a.id())).overlaps(b.at(placed.at().get(b.id()))),
+                            a.id() + " on " + b.id());
+                }
+            }
+        }
+    }
+
+    @Test
+    void sameMapSameLayout() {
+        for (LayoutMode mode : LayoutMode.values()) {
+            assertEquals(laid(mode, Direction.RIGHT).at(), laid(mode, Direction.RIGHT).at(), mode.id());
+        }
     }
 
     private static Box box(Placement placed, String id) {

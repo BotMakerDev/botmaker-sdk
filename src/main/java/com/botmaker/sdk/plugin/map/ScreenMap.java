@@ -91,6 +91,7 @@ public final class ScreenMap {
     /** Whether the panel shows and every link is drawn: per viewer, not per project. */
     private static final Preferences PREFS = Preferences.userNodeForPackage(ScreenMap.class);
     private static final String PANEL_KEY = "map.panel";
+    private static final String LAYOUT_KEY = "map.layout";
     private static final String ALL_LINKS_KEY = "map.allLinks";
 
     /** The window open on each project, by its folder. On the FX thread. */
@@ -846,13 +847,26 @@ public final class ScreenMap {
             Button next = new Button("▶▶ Next untried");
             next.setTooltip(new Tooltip(MapGuide.NEXT_UNTRIED));
             next.setOnAction(e -> nextUntried());
-            // One way to lay the map out until the graph modes come (screens-rail phase 3).
             MenuButton layout = new MenuButton("Layout");
             layout.setTooltip(new Tooltip(MapGuide.LAYOUT));
-            RadioMenuItem layered = new RadioMenuItem("Layered");
-            layered.setToggleGroup(new ToggleGroup());
-            layered.setSelected(true);
-            layout.getItems().add(layered);
+            ToggleGroup modes = new ToggleGroup();
+            LayoutMode kept = LayoutMode.fromId(PREFS.get(LAYOUT_KEY, LayoutMode.LAYERED.id()));
+            canvas.setMode(kept);
+            for (LayoutMode mode : LayoutMode.values()) {
+                RadioMenuItem item = new RadioMenuItem(mode.displayName());
+                item.setToggleGroup(modes);
+                item.setSelected(mode == kept);
+                item.setOnAction(e -> {
+                    PREFS.put(LAYOUT_KEY, mode.id());
+                    canvas.setMode(mode);
+                    // The places the user gave cards are theirs: a layout never takes them away, Tidy does.
+                    if (cards != null && cards.stream().anyMatch(card -> card.at() != null)) {
+                        tell("The cards you moved stay where you put them: ⋯ ▸ Tidy lays every card out "
+                                + mode.displayName() + ".");
+                    }
+                });
+                layout.getItems().add(item);
+            }
             panelShown.setTooltip(new Tooltip(MapGuide.PANEL));
             MenuItem tidy = new MenuItem("Tidy");
             tidy.setOnAction(e -> tidy());

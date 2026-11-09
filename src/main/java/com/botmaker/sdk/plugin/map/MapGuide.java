@@ -35,7 +35,10 @@ final class MapGuide {
     static final String GUIDE = "What each sign on the map means";
     static final String PANEL = "Show or hide the side panel of the screen picked, on the right";
     static final String FULL_SCREEN = "The window full screen, or back (F11; Esc leaves it too)";
-    static final String LAYOUT = "How the map is laid out";
+    static final String LAYOUT = "How the map is laid out: Layered (in ranks from the entrance), Compact (the "
+            + "same, tighter), Tree (the entrances' tree), Hub (rings round the busiest screen), Organic "
+            + "(linked screens pulled together) or Groups (screens boxed in the groups their links make). Cards you "
+            + "moved stay put until ⋯ ▸ Tidy";
     static final String MORE = "The map's other actions: every link and other ways; in the 🗺 Screens window also "
             + "tidy, full screen, undo and redo, and the frames the latest run missed";
 

@@ -135,6 +135,7 @@ final class ScreenCanvas {
     private List<Card> cards = List.of();
     private List<Link> links = List.of();
     private String root;
+    private LayoutMode mode = LayoutMode.LAYERED;
     private String trying;
     /** Pictures read before a card is drawn, not after: a drawing made off screen is taken at once. */
     private boolean loadNow;
@@ -146,6 +147,9 @@ final class ScreenCanvas {
     /** What the last layout was of, and what it gave each way. */
     private Laid lastLaid;
     private Map<Direction, Placement> lastEach = Map.of();
+    private List<ScreenClusters.Group> lastGroups = List.of();
+    /** Whether ELK failed on the last layout, and the toolkit's laid it out. */
+    private boolean lastFellBack;
     private Consumer<Map<String, Point>> onMoved = moved -> {};
     /** How much bigger the other way must show the map before the map turns. */
     private static final double TURN = 1.15;
@@ -154,8 +158,8 @@ final class ScreenCanvas {
     record Shape(double width, double height) {}
 
     /** What a layout is of: the measured cards shown, every way, and what is set apart, first or folded away. */
-    private record Laid(List<GraphLayout.Card> shown, List<ElkLayout.Way> ways, Set<String> popups, String root,
-                        Set<String> hidden) {}
+    private record Laid(LayoutMode mode, List<GraphLayout.Card> shown, List<ElkLayout.Way> ways, Set<String> popups,
+                        String root, Set<String> hidden) {}
 
     /**
      * A canvas drawing the pictures in {@code resources}, the project's resources folder (null for none); {@code frames}
@@ -194,6 +198,13 @@ final class ScreenCanvas {
         graph.setOnMoved(moved -> onMoved.accept(corners(moved)));
     }
 
+    /** Lays the map out the way {@code mode} says from now on, drawn again when it is another than before. */
+    void setMode(LayoutMode mode) {
+        if (this.mode == mode) return;
+        this.mode = mode;
+        if (!cards.isEmpty()) redraw();
+    }
+
     /**
      * Gives each card move to {@code onMoved}, as the corners to keep: the first move pins every card shown where it
      * is, so the map comes back as it was left whatever shape the window has then; a later one only the moved cards.
@@ -223,12 +234,12 @@ final class ScreenCanvas {
     }
 
     /**
-     * Every way laid out by ELK in ranks from the first screen, rightward and downward, keeping whichever shows bigger
-     * in the window (the user's call, 2026-10-15: Home's twenty screens made a column a wide window showed small). Not
-     * the entrances' tree alone: that hid the work, and drew every other way around the whole map (2026-10-22). A
-     * folded screen hides what its entrances open; popups, and screens no way reaches, are packed beside the rest.
-     * Should ELK fail on a map, the toolkit's layered layout places it instead, with the ways back run through its
-     * ranks.
+     * Every way laid out by ELK the way {@link #mode} says, rightward and downward, keeping whichever shows bigger
+     * in the window (the user's call, 2026-10-15: Home's twenty screens made a column a wide window showed small). In
+     * Layered, not the entrances' tree alone: that hid the work, and drew every other way around the whole map
+     * (2026-10-22). A folded screen hides what its entrances open; popups, and screens no way reaches, are packed
+     * beside the rest. Should ELK fail on a map, the toolkit's layered layout places it instead, with the ways back
+     * run through its ranks, and no group is boxed.
      *
      * @param solid the entrances, which {@link #links} holds already
      */
@@ -242,24 +253,36 @@ final class ScreenCanvas {
         List<String> roots = root == null ? List.of() : List.of(root);
         // ELK takes tens of milliseconds a map: a redraw of the same cards and ways (a picture, a run's light) lays
         // nothing out again.
-        Laid key = new Laid(shown, ways, popups, root, hidden);
-        Map<Direction, Placement> each = key.equals(lastLaid) ? lastEach : new EnumMap<>(Direction.class);
+        Laid key = new Laid(mode, shown, ways, popups, root, hidden);
+        boolean same = key.equals(lastLaid);
+        List<ScreenClusters.Group> groups = same ? lastGroups
+                : mode == LayoutMode.GROUPS ? ElkLayout.groups(shown, ways, popups) : List.of();
+        Map<Direction, Placement> each = same ? lastEach : new EnumMap<>(Direction.class);
         Map<Direction, Shape> sized = new EnumMap<>(Direction.class);
+        boolean fellBack = same && lastFellBack;
         for (Direction way : Direction.values()) {
             if (!each.containsKey(way)) {
                 Placement ranked;
                 try {
-                    ranked = ElkLayout.arrange(shown, ways, popups, root, way, GAPS);
+                    // Hub and Organic have no direction: laid out once, the same places both ways.
+                    Placement unturned = mode.turns() ? null : each.get(Direction.values()[0]);
+                    ranked = unturned != null ? unturned
+                            : ElkLayout.arrange(mode, shown, ways, popups, root, way, GAPS, groups);
                 } catch (RuntimeException | LinkageError e) {
                     ranked = LayeredLayout.arrange(shown, ways(links, popups), roots, way, GAPS, LayeredLayout.SWEEPS,
                             Loops.THROUGH);
+                    fellBack = true;
                 }
                 each.put(way, new Placement(ranked.at(), hidden, ranked.crossings(), ranked.paths()));
             }
             sized.put(way, shape(each.get(way), cards));
         }
+        // The toolkit's layout knows no groups: a box drawn round cards it put apart would hold others too.
+        graph.setFrames(fellBack ? List.of() : frames(groups));
         lastLaid = key;
         lastEach = each;
+        lastGroups = groups;
+        lastFellBack = fellBack;
         boolean first = shapes.isEmpty();
         shapes = Map.copyOf(sized);
         Bounds view = graph.viewportProperty().get();
@@ -268,6 +291,14 @@ final class ScreenCanvas {
         graph.setDirection(direction);
         laid = each.get(direction);
         return laid;
+    }
+
+    /** Each group as a frame behind its cards, titled by the shown name of the screen it is named after. */
+    private List<GraphCanvas.Frame> frames(List<ScreenClusters.Group> groups) {
+        Map<String, String> names = new HashMap<>();
+        for (Card card : cards) names.put(card.constant(), card.name());
+        return groups.stream()
+                .map(g -> new GraphCanvas.Frame(names.getOrDefault(g.name(), g.name()), g.screens())).toList();
     }
 
     /**

@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Six ways to lay out 🗺 Screens** (2026-11-09): Layout ▾ picks Layered (as before), Compact (tighter gaps),
+  Tree (the entrances' tree from the first screen), Hub (rings round the screen with the most ways), Organic
+  (ELK's stress layout) or Groups (screens boxed in the groups their ways make, each named after its busiest
+  screen; worked out by Louvain modularity, the same map giving the same groups). The pick is remembered per
+  computer. The parts of a map no way joins are packed beside each other in every mode but Groups.
 - **A calmer 🗺 Screens bar** (2026-11-09): the bar is Find a screen, ▶▶ Next untried, Layout ▾, − Fit +,
   ▤ Panel, ⋯ and the count, and no button is cut at the window's least width. ⋯ holds ⇄ All links, Other ways,
   Tidy, ⛶ Full screen, ↶ Undo and ↷ Redo (each saying what it takes back) and *Missed frames ▸*, moved from the
