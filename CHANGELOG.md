@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- `edit_map add_readout(screen, name, zone[, digits])` makes a screen read a Zones area as a readout, by OCR or by a
+  Digits set (2026-11-09). Until now only a cut on the overlay board made one, so an assistant could not give
+  `add_fact` the readout it asks for; its refusal now names `add_readout`.
 - **Flows are gone: a bot runs a plan** (2026-11-09, the user's call: deleted outright, without the two-release rule
   and without `@Migrate` rules).
   - Removed: `api.flow` (`Flow`, `FlowLayout`, cards and arrows), `api.bot.Outcome`, `ActivitySwitch`,

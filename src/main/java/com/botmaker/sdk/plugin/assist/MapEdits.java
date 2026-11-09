@@ -264,6 +264,13 @@ final class MapEdits {
     record RemoveText(String screen, String text) implements Edit {
     }
 
+    @Describe("a readout the screen shows in a zone, as name: words by OCR, or a number by digits; add_fact reads "
+            + "a fact off it")
+    record AddReadout(String screen, String name, @Describe("a Zones constant") String zone,
+                      @Describe(value = "a Digits constant: the number read by it", optional = true) String digits)
+            implements Edit {
+    }
+
     @Describe("a pictureless button: across widths, down heights from anchor's centre; rows×columns a step apart")
     record AddSpot(String screen, String field, String anchor, Double across, Double down,
                    @Describe(value = "", optional = true) Integer rows,
@@ -360,7 +367,7 @@ final class MapEdits {
             MapScreen on = graph.screens().get(screen.get());
             if (!has(fact.field()) || !on.readouts().containsKey(fact.field().strip())) {
                 return AgentReply.refused(screen.get() + " has no readout " + fact.field() + ": it has "
-                        + on.readouts().keySet() + ". Save one first (save_digits, save_region). Nothing was written.");
+                        + on.readouts().keySet() + ". Save one first: save_region its zone, then add_readout. Nothing was written.");
             }
             String field = fact.field().strip();
             if (fact.minutes() != null && fact.minutes() <= 0) return AgentReply.refused("minutes is above 0.");
@@ -434,6 +441,8 @@ final class MapEdits {
             case LearnInteractions ignored -> AgentReply.refused("learn_interactions acts on the game.");
             case AddText add -> said(ScreenEdits.addText(services, screen, add.zone(), add.text(), add.field()));
             case RemoveText remove -> said(ScreenEdits.removeText(services, screen, remove.text()));
+            case AddReadout readout -> said(ScreenEdits.addReadout(services, screen, readout.name(), readout.zone(),
+                    has(readout.digits()) ? readout.digits() : null, false));
             case AddSpot spot -> said(ScreenEdits.addSpot(services, screen, spot.field(), spot.anchor(),
                     spot.across() == null ? 0 : spot.across(), spot.down() == null ? 0 : spot.down(), grid(spot)));
             case SetInput set -> onInput(set, graph, screen, on, field -> setInput(context, screen, on, field, set));
