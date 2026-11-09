@@ -871,7 +871,7 @@ final class MapTools {
         if (services.resourcesDir() != null) ScreenShots.write(services.resourcesDir().resolve(shot), frame);
         String from = graph.shown(screen);
         return AgentReply.text("Opened " + child + ", added to the map as Screens." + constant + ", reached from "
-                        + from + " by " + field + (pick == null ? "" : " " + pick.label()) + "; it owes its marker. 🖼 Manage Pictures groups the "
+                        + from + " by " + field + (pick == null ? "" : " " + pick.label()) + "; it owes its marker. Screens' 🖼 Pictures groups the "
                         + "pictures it names under it. Before leaving it, "
                         + "from the screenshot below: crop_pictures with screen " + child + " and marker set a part "
                         + "only this screen shows, then with screen " + child + " every input on it (each button, "

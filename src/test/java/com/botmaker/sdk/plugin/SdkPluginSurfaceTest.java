@@ -83,7 +83,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * once already, on 2026-08-28, when a non-transitive {@code optional} toolkit left Studio unable to
  * construct {@code SdkPlugin} at all.
  *
- * <p>So the assertions below are deliberately about identity rather than about quality: the six toolbar ids
+ * <p>So the assertions below are deliberately about identity rather than about quality: the five toolbar ids
  * and where they sit, the seventeen value type ids in registration order, the one parameter section. A
  * button that disappears is a red build here instead of a bug report.
  *
@@ -302,9 +302,10 @@ class SdkPluginSurfaceTest {
     // second by fresh() or freshCall(). The two tests above are what it became.
 
     /**
-     * The six bar buttons in their one flat order, then the overlay's two. The groups went on 2026-10-28, when
+     * The three bar buttons in their one flat order, then the overlay's two. The groups went on 2026-10-28, when
      * each plugin got a tab of its own on the bar; 📋 Project Setup, 🎯 Capture Source and ⚙ Bot Settings left
-     * on 2026-11-09, their values parameters now.
+     * on 2026-11-09, their values parameters now, and 🎯 Goals, 🖼 Manage Pictures and ✂ Capture Templates the same
+     * day, views of 🗺 Screens' rail or opened from it.
      *
      * <p>The order values are asserted rather than only the sequence, because the host sorts on them, not on
      * declaration order — so a wrong number here moves a button on a bar this test cannot see.
@@ -313,19 +314,18 @@ class SdkPluginSurfaceTest {
      * rather than on the main bar, and their subject is the window the HUD is drawn over.
      */
     @Test
-    void the_toolbar_contributes_eight_items_in_their_places_and_orders() {
+    void the_toolbar_contributes_five_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("game", "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
-                        "point-here", "picture-here"),
+        assertEquals(List.of("game", "screen-map", "pilot", "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
         ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, overlay, overlay),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 60, 65, 70, 80, 90, 10, 20),
+        assertEquals(List.of(10, 60, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

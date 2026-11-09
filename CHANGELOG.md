@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **🗺 Screens has a left rail** (2026-11-09): 🗺 Map, 🎯 Goals and 🖼 Pictures, one window. Goals and Manage
+  Pictures are no longer toolbar buttons; they are views of the rail, each kept as it was left and re-read when
+  shown again. A double click on a Goals row shows the map with that screen's tab open. ✂ Capture Templates left
+  the bar too: cut a picture from the Screens panel. The toolbar shows the game button, 🗺 Screens and 🎮 Pilot.
 - **Six ways to lay out 🗺 Screens** (2026-11-09): Layout ▾ picks Layered (as before), Compact (tighter gaps),
   Tree (the entrances' tree from the first screen), Hub (rings round the screen with the most ways), Organic
   (ELK's stress layout) or Groups (screens boxed in the groups their ways make, each named after its busiest

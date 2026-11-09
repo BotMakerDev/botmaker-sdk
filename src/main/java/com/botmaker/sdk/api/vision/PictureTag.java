@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * A group of the bot's pictures that no screen owns — the "UI" or "Shared" of 🖼 Manage Pictures — declared as a
+ * A group of the bot's pictures that no screen owns — the "UI" or "Shared" of 🗺 Screens ▸ 🖼 Pictures — declared as a
  * constant of the bot's {@code Tags} class and named by the pictures it holds (2026-10-14):
  *
  * <pre>{@code
@@ -27,13 +27,13 @@ public final class PictureTag {
         this.name = name;
     }
 
-    /** The tag called {@code name}, as 🖼 Manage Pictures shows it: words, spaces allowed. */
+    /** The tag called {@code name}, as 🖼 Pictures shows it: words, spaces allowed. */
     public static PictureTag named(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("A picture tag needs a name");
         return new PictureTag(name.trim().replaceAll("\\s+", " "));
     }
 
-    /** The name 🖼 Manage Pictures shows. */
+    /** The name 🖼 Pictures shows. */
     public String name() {
         return name;
     }

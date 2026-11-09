@@ -122,18 +122,6 @@ public final class CaptureTemplates {
     }
 
     /**
-     * The ✂ Capture Templates press: the tool over the project's target.
-     *
-     * <p>The tag is not pre-filled: <em>which file the editor has open</em> is host state with no member on
-     * the contract for it, and growing one is exactly the move the platform's stop condition exists to refuse.
-     * The tag menu is on the naming dialog either way.
-     */
-    public static void open(ActionContext context) {
-        StudioServices services = context.services();
-        open(services, Modals.owner(services), null);
-    }
-
-    /**
      * The overlay's ✂ Picture of this press: cuts a picture out of the window the overlay is over, rather than
      * out of the project's default target.
      *
@@ -152,23 +140,12 @@ public final class CaptureTemplates {
         open(services, Modals.owner(services), target, null, () -> {});
     }
 
-    /** Opens the tool for the project's default capture target. Must be called on the FX thread. */
-    public static void open(StudioServices services, Window owner, String suggestedTag) {
-        open(services, owner, suggestedTag, () -> {});
-    }
-
     /**
-     * As {@link #open(StudioServices, Window, String)}, running {@code onClosed} once the tool is done with
-     * the screen — including the two paths where it never opens at all (no capture target, or one is already
-     * up), so a caller that hid itself always comes back.
-     */
-    public static void open(StudioServices services, Window owner, String suggestedTag, Runnable onClosed) {
-        open(services, owner, null, suggestedTag, onClosed);
-    }
-
-    /**
-     * As {@link #open(StudioServices, Window, String, Runnable)}, capturing from {@code target} rather than
-     * from the project's default — {@code null} means the default, so this is the one implementation.
+     * Opens the tool over {@code target} — {@code null} means the project's default — running {@code onClosed} once
+     * it is done with the screen, including the two paths where it never opens at all (no capture target, or one
+     * is already up), so a caller that hid itself always comes back. The tool has no button of its own since
+     * 2026-11-09: Screens' cut, a picture slot's Capture new… and the overlay's ✂ open it. Must be called on the FX
+     * thread.
      *
      * <p>The overlay editor's row is the caller with a target of its own: the window its HUD is drawn over.
      * The override lasts as long as the tool and changes no file.

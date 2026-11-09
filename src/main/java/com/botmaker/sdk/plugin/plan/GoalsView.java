@@ -5,8 +5,6 @@ import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.api.source.RunParameter;
-import com.botmaker.plugin.api.toolbar.ActionContext;
-import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.graph.GraphCanvas;
 import com.botmaker.plugin.toolkit.graph.GraphCanvas.Arrow;
 import com.botmaker.plugin.toolkit.graph.LayeredLayout;
@@ -22,7 +20,6 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
-import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Card;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Mark;
@@ -50,12 +47,10 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
 import javax.lang.model.SourceVersion;
 
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -74,7 +69,8 @@ import java.util.function.Function;
 /**
  * 🎯 Goals (2026-11-06, layout A): the goals of a plan, each a card listing the actions that serve it in the order
  * {@link com.botmaker.sdk.internal.plan.Planner#round} would try them; beside them the route of the picked row, only
- * the screens a walk crosses, numbered. A double click opens the action's screen in 🗺 Screens; a row dragged onto
+ * the screens a walk crosses, numbered. A view of 🗺 Screens' rail ({@link #view}); a double click opens the action's
+ * screen in its Map view; a row dragged onto
  * another is tried before it ({@code .over}), onto ★ or ⤓ first or last. During a run the action it is on is marked.
  * Above the cards, the plan's tiers as rows of goal chips (met struck, waiting ⏳ with its due time): a chip dragged onto
  * a tier moves there, onto ＋ into a tier of its own; {@code + Goal} adds a goal from a {@code Need} over a fact,
@@ -94,10 +90,9 @@ public final class GoalsView {
     private static final PseudoClass WAITING = PseudoClass.getPseudoClass("waiting");
     /** What a dragged goal chip carries before its name; a dragged row carries {@code SCREEN.field}. */
     private static final String GOAL_DRAG = "goal:";
-    /** One window a project, as 🗺 Screens has. */
-    private static final Map<Path, GoalsView> OPEN = new HashMap<>();
-
     private final StudioServices services;
+    /** Opens a screen's tab in 🗺 Screens: a row's double click. */
+    private final Consumer<String> openScreen;
     private final BorderPane root = new BorderPane();
     private final ChoiceBox<String> plans = new ChoiceBox<>();
     private final VBox cards = new VBox();
@@ -124,13 +119,13 @@ public final class GoalsView {
     private boolean choosing;
     private String picked;
     private String running;
-    private Stage window;
 
     /** One screen of a route: its place in it, and the action's field on the last. */
     record Stop(int number, String screen, String action) {}
 
-    private GoalsView(StudioServices services) {
+    private GoalsView(StudioServices services, Consumer<String> openScreen) {
         this.services = services;
+        this.openScreen = openScreen;
         root.getStylesheets().add(SHEET);
         root.getStyleClass().add("goals-view");
         cards.getStyleClass().add("goals-cards");
@@ -159,33 +154,20 @@ public final class GoalsView {
         root.setCenter(split);
     }
 
-    /** The 🎯 Goals press: the goals of the bot's first plan, in a window of their own. */
-    public static void open(ActionContext context) {
-        open(context.services());
-    }
-
-    /** The view in its window; asked again, the open one comes to the front and reads the bot again. */
-    public static void open(StudioServices services) {
-        Path project = services.projectDir();
-        GoalsView open = project == null ? null : OPEN.get(project);
-        if (open != null && open.window != null) {
-            open.window.toFront();
-            open.read();
-            return;
-        }
-        GoalsView goals = new GoalsView(services);
-        Stage stage = Modals.window(services, Modals.owner(services),
-                Modals.Frame.modeless("Goals", 1100, 680, 700, 420), goals.root);
-        goals.window = stage;
-        if (project != null) OPEN.put(project, goals);
-        stage.setOnHidden(e -> {
-            goals.stop();
-            if (project != null) OPEN.remove(project, goals);
-        });
-        stage.show();
+    /**
+     * 🎯 Goals, the view 🗺 Screens' rail shows (2026-11-09, spec screens-rail goal 7): the goals of the bot's first
+     * plan, unchanged from the window it had. A row's double click hands its screen to {@code openScreen}; the view
+     * follows the run until {@code onClosed} runs what it is given, and reads the bot again each time it is shown.
+     */
+    public static Node view(StudioServices services, Consumer<String> openScreen, Consumer<Runnable> onClosed) {
+        GoalsView goals = new GoalsView(services, openScreen);
         goals.subscriptions.add(services.runs().onTrace(goals::traced));
         goals.subscriptions.add(services.runs().onStateChanged(on -> Platform.runLater(() -> goals.runningOn(null))));
-        goals.read();
+        onClosed.accept(goals::stop);
+        goals.root.sceneProperty().addListener((o, was, is) -> {
+            if (is != null) goals.read();
+        });
+        return goals.root;
     }
 
     private void stop() {
@@ -568,7 +550,7 @@ public final class GoalsView {
         line.pseudoClassStateChanged(OFF, !row.possible());
         line.setOnMouseClicked(e -> {
             if (e.getButton() != MouseButton.PRIMARY) return;
-            if (e.getClickCount() == 2) ScreenMap.open(services, row.step().screen());
+            if (e.getClickCount() == 2) openScreen.accept(row.step().screen());
             else pick(row);
         });
         line.setOnDragDetected(e -> {

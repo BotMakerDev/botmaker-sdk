@@ -954,12 +954,14 @@ final class ScreenCanvas {
         return scroll;
     }
 
-    /** Selects {@code constant}'s card and brings it into view. */
-    void select(String constant) {
-        cards.stream().filter(c -> c.constant().equals(constant)).findFirst().ifPresent(card -> {
-            graph.selectedProperty().set(card);
+    /** Selects {@code constant}'s card and brings it into view; false when the map has no such screen. */
+    boolean select(String constant) {
+        Optional<Card> card = cards.stream().filter(c -> c.constant().equals(constant)).findFirst();
+        card.ifPresent(found -> {
+            graph.selectedProperty().set(found);
             graph.centreOn(constant);
         });
+        return card.isPresent();
     }
 
     /**

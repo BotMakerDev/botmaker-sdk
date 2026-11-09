@@ -7,7 +7,7 @@ home and setup, whichever plan runs), `LAUNCH_TARGETS` the games the bot support
 `VM` its virtual machine (a `GameVm`; the settings are parameters of the `Settings` group since 2026-11-09), each written as a chain of named calls — then
 **`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, filed under its tags by its own
 chain (`.tags(List.of(Tags.UI))`, 2026-10-14),
-**`Tags.java`** (`TAGS`: one `PictureTag.named("UI")` per custom tag 🖼 Manage Pictures groups pictures under,
+**`Tags.java`** (`TAGS`: one `PictureTag.named("UI")` per custom tag 🗺 Screens ▸ 🖼 Pictures groups pictures under,
 which a picture refers to by its constant),
 **`Goals.java`** (`GOALS`, an open set, 2026-11-06: one `Goal` constant per thing the bot wants, `Goal.of(Need.atLeast(
 Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)` or `Goal.done(() -> Screens.HOME.claim).within(…)`) and

@@ -44,7 +44,7 @@ public class ImageTemplate implements AutoCloseable {
     private final Rect place;
     /** The pixels themselves, for a picture held in memory and never saved; null for a file's. */
     private final BufferedImage image;
-    /** The tags 🖼 Manage Pictures files it under; a run never reads them. */
+    /** The tags 🗺 Screens ▸ 🖼 Pictures files it under; a run never reads them. */
     private final List<PictureTag> tags;
     /** How many frames its file holds side by side; 1 for a picture that holds still. */
     private final int frames;
@@ -122,7 +122,7 @@ public class ImageTemplate implements AutoCloseable {
     }
 
     /**
-     * This picture, filed under {@code tags} in 🖼 Manage Pictures — {@code .tags(List.of(Tags.UI))}, each a constant
+     * This picture, filed under {@code tags} in 🗺 Screens ▸ 🖼 Pictures — {@code .tags(List.of(Tags.UI))}, each a constant
      * of the bot's {@code Tags} class. A run never reads them.
      */
     public ImageTemplate tags(List<PictureTag> tags) {

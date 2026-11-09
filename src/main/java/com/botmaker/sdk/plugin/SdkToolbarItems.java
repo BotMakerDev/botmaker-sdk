@@ -6,9 +6,7 @@ import com.botmaker.plugin.api.toolbar.ToolbarItem;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
-import com.botmaker.sdk.plugin.plan.GoalsView;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
-import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 
@@ -19,7 +17,7 @@ import java.util.List;
  * which is why an item is contributed as data rather than as a {@code Node}.
  *
  * <p>The bar items read in one flat order (2026-10-28, when toolbar groups went): what the bot plays, then what it
- * does (its screens and its goals), the pictures it looks for, and last the phone that watches it run. Where it
+ * does (its screens, whose rail holds its goals and pictures), and last the phone that watches it run. Where it
  * looks and how it clicks are parameters, set in the Parameters window (2026-11-09: 📋 Project Setup, 🎯 Capture
  * Source and ⚙ Bot Settings left the bar). The order values are steps of ten so a button can be put
  * between two without renumbering.
@@ -35,9 +33,6 @@ public final class SdkToolbarItems implements ToolbarHolder {
 
     public static final String GAME_ID = "game";
     public static final String SCREEN_MAP_ID = "screen-map";
-    public static final String GOALS_ID = "goals";
-    public static final String MANAGE_PICTURES_ID = "manage-templates";
-    public static final String CAPTURE_TEMPLATES_ID = "capture-templates";
     public static final String PILOT_ID = "pilot";
     public static final String POINT_HERE_ID = "point-here";
     public static final String PICTURE_HERE_ID = "picture-here";
@@ -54,33 +49,15 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .icon(GameButton::icon)
             .onPress(() -> GameDialog::open);
 
-    /** What the bot does: the game's screens and the actions on them. */
+    /**
+     * What the bot does: the game's screens and the actions on them, and behind its rail the goals and the pictures
+     * (2026-11-09: 🎯 Goals, 🖼 Manage Pictures and ✂ Capture Templates left the bar; Screens cuts pictures itself).
+     */
     public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
             .tooltip("The game's screens as the bot knows them — how each was reached, its inputs and what they "
-                    + "did; try, cut and go to one, and see where a run is")
+                    + "did; try, cut and go to one, and see where a run is. Its rail holds the goals and the pictures")
             .onBar(60)
             .onPress(() -> ScreenMap::open);
-
-    /** Beside the map: the goals of a plan and what the bot would do for each, in its order (2026-11-06). */
-    public static final ToolbarItem GOALS = ToolbarItem.id(GOALS_ID).label("🎯 Goals")
-            .tooltip("The goals of a plan and the actions serving each, in the order a run would try them, with the "
-                    + "screens crossed to reach one; drag a row to reorder")
-            .onBar(65)
-            .onPress(() -> GoalsView::open);
-
-    public static final ToolbarItem MANAGE_PICTURES = ToolbarItem.id(MANAGE_PICTURES_ID).label("🖼 Manage Pictures")
-            .tooltip("Rename, retag, replace, delete, import and export the pictures the bot looks for — "
-                    + "a rename carries every block that uses it")
-            .onBar(70)
-            .onPress(() -> ResourceManagerDialog::open);
-
-    /** Opened <em>over</em> a running target rather than beside the code. */
-    public static final ToolbarItem CAPTURE_TEMPLATES = ToolbarItem.id(CAPTURE_TEMPLATES_ID)
-            .label("✂ Capture Templates")
-            .tooltip("Draw regions over the game and save them as pictures the bot can look for — "
-                    + "one at a time, several in a pass, or an object cut out of its background")
-            .onBar(80)
-            .onPress(() -> CaptureTemplates::open);
 
     /** Streams what the bot sees to a phone; the pilot is kept per project, see {@link RemotePilotUi#open}. */
     public static final ToolbarItem PILOT = ToolbarItem.id(PILOT_ID).label("🎮 Pilot")
@@ -102,8 +79,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onPress(() -> CaptureTemplates::pictureHere);
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
-    public static final List<ToolbarItem> ALL = List.of(GAME, SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES,
-            PILOT, POINT_HERE, PICTURE_HERE);
+    public static final List<ToolbarItem> ALL = List.of(GAME, SCREEN_MAP, PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 

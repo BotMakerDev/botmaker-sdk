@@ -79,7 +79,7 @@ public final class SdkValues implements ValueHolder {
             .referredToAs(BotConstants::goal)
             .in(SdkValue.Holder.GOALS)
             .because("These are the bot's goals: what is wanted, served by the actions of Screens.java and ordered"
-                    + " by the plans of Plans.java. See them in 🎯 Goals.");
+                    + " by the plans of Plans.java. See them in 🗺 Screens ▸ 🎯 Goals.");
 
     /** The game's home and setup — {@code Run.of().home(…)}. */
     public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
@@ -95,7 +95,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.OfConstants<ImageTemplate> PICTURES = ManagedValue.openSet(SdkValue.Id.PICTURES)
             .of(ImageTemplate.class)
             .in(SdkValue.Holder.PICTURES)
-            .because("Picture constants are managed in 🖼 Manage Pictures, which renames the picture and every"
+            .because("Picture constants are managed in 🗺 Screens ▸ 🖼 Pictures, which renames the picture and every"
                     + " use of it together.");
 
     /**
@@ -107,7 +107,7 @@ public final class SdkValues implements ValueHolder {
             .of(PictureTag.class)
             .referredToAs(BotConstants::tag)
             .in(SdkValue.Holder.TAGS)
-            .because("Tags.java holds the groups 🖼 Manage Pictures files pictures under. Add, rename or delete one"
+            .because("Tags.java holds the groups 🗺 Screens ▸ 🖼 Pictures files pictures under. Add, rename or delete one"
                     + " there, which changes every picture it holds together.");
 
     /**

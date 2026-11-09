@@ -34,7 +34,11 @@
   It is not to be proposed for removal again without new facts. (The second, `FlowTypes`' activity body
   written as the text `Collect::body`, went with flows on 2026-11-09.)
 - **Toolbar buttons are `SdkToolbarItems`**: one `ToolbarItem.id(…)` constant per button, each pressing its
-  feature's own `open(ActionContext)` (`RemotePilotUi.open`, `CaptureTemplates.open`, `SourcePicker.choose`,
+  feature's own `open(ActionContext)` (`RemotePilotUi.open`, `ScreenMap.open`, `SourcePicker.choose`,
   `CaptureValue.pointHere`, …). Nothing holds a project in a static: a feature takes `StudioServices` from
-  the context it is handed. The bar's nine read in one flat order (`onBar(10)` to `onBar(90)`, 2026-10-28, when
-  toolbar groups went: Studio gives the plugin a tab of its own); the overlay's two are `inOverlay`.
+  the context it is handed. The bar holds three, the game button, 🗺 Screens and 🎮 Pilot (`onBar(10)`, `60`, `90`;
+  one flat order since 2026-10-28, when toolbar groups went: Studio gives the plugin a tab of its own); the
+  overlay's two, ⌖ Point bot here and ✂ Picture of this, are `inOverlay`. 🎯 Goals, 🖼 Manage Pictures and ✂ Capture
+  Templates left the bar on 2026-11-09 (spec `2026-11-09-screens-rail-design.md`): Goals and Pictures are views of
+  the Screens window's left rail (`plugin/map/ScreensRail`, each built by its class's `view(…)`), and Screens cuts
+  pictures from its panel.

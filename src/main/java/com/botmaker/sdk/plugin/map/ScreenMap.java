@@ -15,7 +15,9 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.pictures.FrameViews;
+import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
+import com.botmaker.sdk.plugin.plan.GoalsView;
 import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.observe.RunFrames;
 import javafx.animation.KeyFrame;
@@ -86,6 +88,8 @@ public final class ScreenMap {
     static final Duration POLL = Duration.seconds(1.5);
     /** The polls after which the map is read again even with {@code Screens.java} unchanged, about 30 s. */
     private static final int READ_ANYWAY = 20;
+    /** The window's least width: the rail, and the map's bar with no label cut ({@code ScreenMapBarTest}). */
+    static final double LEAST_WIDTH = 760;
     /** A search hit's marker. */
     private static final double HIT_THUMB = 26;
     /** Whether the panel shows and every link is drawn: per viewer, not per project. */
@@ -107,6 +111,8 @@ public final class ScreenMap {
     private final ScreenPanel panel;
     /** The 🗺 Screens window ({@code true}), with its tabs, panel and every action; false: the overlay's pane. */
     private final boolean full;
+    /** The full window's left rail and the view it shows, this map one of them; null in the overlay's pane. */
+    private final ScreensRail rail;
     /** The full window's centre: the graph, then a tab per screen open ({@link ScreenTabs}). */
     private final TabPane tabs = new TabPane();
     private final Tab graphTab = new Tab("Graph");
@@ -221,6 +227,8 @@ public final class ScreenMap {
         if (panel != null) {
             remembered(panelShown.selectedProperty(), PANEL_KEY, true, is -> root.setRight(is ? panel.node() : null));
         }
+        // The window's views beside the map; the overlay's pane has none (2026-11-09, spec screens-rail goal 1).
+        rail = full ? new ScreensRail(this::view) : null;
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
@@ -482,6 +490,42 @@ public final class ScreenMap {
         return root;
     }
 
+    /** What the window shows: the rail with the view it is on; the map alone in the overlay's pane. */
+    Node windowNode() {
+        return rail == null ? root : rail.node();
+    }
+
+    /** The rail's views: this map, or one built the first time the rail shows it. */
+    private Node view(ScreensRail.View view) {
+        return switch (view) {
+            case MAP -> root;
+            case GOALS -> GoalsView.view(services, this::openScreen, closing -> subscriptions.add(closing::run));
+            case PICTURES -> ResourceManagerDialog.view(services, () -> window);
+            case EXPLORE -> new Label("Explore comes with its run.");
+        };
+    }
+
+    /** The rail on {@code view}; nothing in the overlay's pane. */
+    void showView(ScreensRail.View view) {
+        if (rail != null) rail.show(view);
+    }
+
+    /** The rail's view shown; {@link ScreensRail.View#MAP} in the overlay's pane. */
+    ScreensRail.View viewShown() {
+        return rail == null ? ScreensRail.View.MAP : rail.showing();
+    }
+
+    /** The Map view with {@code constant} picked and its tab in front (Goals' double click); null picks nothing. */
+    void openScreen(String constant) {
+        showView(ScreensRail.View.MAP);
+        if (constant == null) return;
+        if (canvas.select(constant)) {
+            showScreen();
+        } else {
+            services.status("The map has no screen " + constant + ".");
+        }
+    }
+
     /** The 🗺 Screens press: the map in a window of its own, beside the editor. */
     public static void open(ActionContext context) {
         open(context.services(), null);
@@ -489,7 +533,7 @@ public final class ScreenMap {
 
     /**
      * The map in its window with {@code constant} picked: a {@code Screens} constant in the editor asked for it. A
-     * project has one such window: asked again, the open one comes to the front.
+     * project has one such window: asked again, the open one comes to the front on its Map view.
      */
     public static void open(StudioServices services, String constant) {
         Path project = services.projectDir();
@@ -497,12 +541,16 @@ public final class ScreenMap {
         if (open != null && open.window instanceof Stage shown) {
             shown.toFront();
             shown.requestFocus();
-            if (constant != null) open.canvas.select(constant);
+            // A screen asked for is on the map; a bare press keeps the view the window was left on.
+            if (constant != null) {
+                open.showView(ScreensRail.View.MAP);
+                open.canvas.select(constant);
+            }
             return;
         }
         ScreenMap map = new ScreenMap(services, true);
         Stage stage = Modals.window(services, Modals.owner(services),
-                Modals.Frame.modeless("Screens", 1180, 720, 760, 460), (BorderPane) map.node());
+                Modals.Frame.modeless("Screens", 1180, 720, LEAST_WIDTH, 460), (BorderPane) map.windowNode());
         map.window = stage;
         // On the window, so the keys work wherever its focus is; the overlay's pane leaves them to Studio's.
         stage.addEventHandler(KeyEvent.KEY_PRESSED, key -> HistoryKeys.handle(key, map::step));
@@ -594,6 +642,11 @@ public final class ScreenMap {
             return new Read(null, null,
                     Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
         }
+    }
+
+    /** Draws {@code read} as a read of the bot's Java would: a map built without one ({@code ScreensRailTest}). */
+    void draw(ScreenGraph read) {
+        apply(new Read(read, ScreenDesk.stages(read), null));
     }
 
     /**

@@ -2,8 +2,7 @@ package com.botmaker.sdk.plugin.pictures;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
-import com.botmaker.plugin.api.toolbar.ActionContext;
-import com.botmaker.plugin.toolkit.Modals;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -24,7 +23,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+import javafx.scene.Node;
 import javafx.stage.Window;
 
 import javax.imageio.ImageIO;
@@ -41,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 
 /**
  * Manages the project's saved image templates (PNGs under {@code src/main/resources/images}): preview, rename,
@@ -74,7 +74,8 @@ import java.util.TreeSet;
 public final class ResourceManagerDialog {
 
     private final StudioServices services;
-    private final Window owner;
+    /** The window this view is shown in, owner of the dialogs it opens. */
+    private final Supplier<Window> window;
 
     private TemplateGallery gallery;
     private final ImageView preview = new ImageView();
@@ -91,7 +92,6 @@ public final class ResourceManagerDialog {
     private final Button removeFromTagButton = new Button("Remove from tag");
     private final Button deleteButton = new Button("Delete");
     private final Label statusLabel = new Label();
-    private Stage stage;
 
     /**
      * Which templates share their picture with which others, as of the last {@link #reload()}. Held for the
@@ -100,9 +100,35 @@ public final class ResourceManagerDialog {
      */
     private Map<String, List<String>> duplicates = Map.of();
 
-    public ResourceManagerDialog(StudioServices services, Window owner) {
+    private ResourceManagerDialog(StudioServices services, Supplier<Window> window) {
         this.services = services;
-        this.owner = owner;
+        this.window = window;
+    }
+
+    /**
+     * 🖼 Pictures, the view 🗺 Screens' rail shows (2026-11-09, spec screens-rail goal 8): what Manage Pictures' window
+     * held, unchanged inside but for its Close. {@code window} is the window it is shown in. Shown again after the
+     * rail showed another view, it reads the library again: Screens may have cut a picture meanwhile.
+     */
+    public static Node view(StudioServices services, Supplier<Window> window) {
+        ResourceManagerDialog pictures = new ResourceManagerDialog(services, window);
+        Node root = pictures.build();
+        boolean[] shownOnce = {false};
+        root.sceneProperty().addListener((o, was, is) -> {
+            if (is == null) return;
+            if (shownOnce[0]) {
+                pictures.reload();
+            } else {
+                shownOnce[0] = true;
+                // After the rail's switch is done: its alert waits, and a nested loop inside setCenter would not.
+                Platform.runLater(pictures::reportMissing);
+            }
+        });
+        return root;
+    }
+
+    private Window window() {
+        return window.get();
     }
 
     /** The project's picture folder — every library call below is made against it. */
@@ -115,7 +141,7 @@ public final class ResourceManagerDialog {
         return services.pluginValues();
     }
 
-    public void show() {
+    private Node build() {
         // Multi-select: plain click toggles a tile, so filing or deleting a group is the same gesture as
         // picking one. Every bulk action below reads gallery.selectedFiles().
         gallery = new TemplateGallery(services, true);
@@ -148,23 +174,17 @@ public final class ResourceManagerDialog {
         exportBtn.setOnAction(e -> export(selectedFiles()));
         Button importBtn = new Button("Import...");
         importBtn.setOnAction(e -> importArchive());
-        Button close = new Button("Close");
-        close.setOnAction(e -> stage.close());
-
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox buttons = new HBox(8, addToTagButton, removeFromTagButton, manageTagsBtn,
-                deleteButton, exportBtn, importBtn, spacer, close);
+                deleteButton, exportBtn, importBtn, spacer);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
         VBox root = new VBox(12, content, statusLabel, buttons);
         root.setPadding(new Insets(16));
 
         reload();
-        stage = Modals.window(services, owner,
-                Modals.Frame.modal("Resource Manager — Image Templates", 880, 620, 700, 460), root);
-        stage.show();
-        reportMissing();
+        return root;
     }
 
     /** Re-reads the library after a change here (or in the tag manager) so the grid and the rail counts agree. */
@@ -406,7 +426,7 @@ public final class ResourceManagerDialog {
         }
         if (!addTagButton.getItems().isEmpty()) addTagButton.getItems().add(new SeparatorMenuItem());
         MenuItem create = new MenuItem("New tag…");
-        create.setOnAction(e -> TagPicker.promptNewTag(services, stage).ifPresent(tag -> {
+        create.setOnAction(e -> TagPicker.promptNewTag(services, window()).ifPresent(tag -> {
             Optional<String> undeclared = TemplateLibrary.declareTag(services, tag);
             List<String> refused = undeclared.isPresent() ? List.of(undeclared.get())
                     : TemplateLibrary.addTag(services, List.of(templateName), tag);
@@ -450,7 +470,7 @@ public final class ResourceManagerDialog {
                 // Offer only what is not already filed here — re-adding is a no-op the user would have to
                 // check for themselves.
                 .withFilter(file -> !manifest.tagsOf(TemplateLibrary.baseName(file)).contains(tag));
-        TemplateGalleryDialog.open(services, stage, options, files -> {
+        TemplateGalleryDialog.open(services, window(), options, files -> {
             List<String> refused = TemplateLibrary.addTag(services,
                     files.stream().map(TemplateLibrary::baseName).toList(), tag);
             published();
@@ -478,7 +498,7 @@ public final class ResourceManagerDialog {
 
     /** Opens the tag manager, and picks up whatever it changed when it closes. */
     private void manageTags() {
-        new TagManagerDialog(stage, services, () -> {
+        new TagManagerDialog(window(), services, () -> {
             published();
             reload();
         }).show();
@@ -488,22 +508,19 @@ public final class ResourceManagerDialog {
     // Capture, replace
     // -------------------------------------------------------------------------
 
-    // A new picture is captured through the ✂ Capture Templates toolbar item. What is here is everything
+    // A new picture is cut from 🗺 Screens' panel, which opens Capture Templates. What is here is everything
     // about pictures that already exist, including the per-picture "Capture a new picture…", which is a
-    // region crop this window runs itself.
+    // region crop this view runs itself.
 
     /**
      * Recaptures a template's picture from the project's capture source — the surface the bot matches it on,
-     * where it is cut its constant records — keeping everything else about it. This window steps aside while the
-     * surface is up and comes back however the capture ends, a cancel included.
+     * where it is cut its constant records — keeping everything else about it. The Screens window is modeless, so it
+     * stays where it is while the surface is up, as its own cut does.
      */
     private void replaceByCapture(Path file) {
         if (file == null) return;
-        stage.hide();
-        CaptureTemplates.recapture(services, owner, (picture, cut) -> {
-            stage.show();
-            applyReplacement(file, picture, cut);
-        }, stage::show);
+        CaptureTemplates.recapture(services, window(), (picture, cut) -> applyReplacement(file, picture, cut),
+                () -> {});
     }
 
     /** Replaces a template's picture with an image file from disk. */
@@ -599,7 +616,7 @@ public final class ResourceManagerDialog {
                         + "working, and the template goes.",
                 transfer, ButtonType.CANCEL);
         services.theme().apply(alert);
-        alert.initOwner(stage);
+        alert.initOwner(window());
         alert.setTitle("Still in use");
         alert.setHeaderText(used.size() == 1
                 ? "\"" + used.keySet().iterator().next() + "\" is still used by your blocks"
@@ -618,7 +635,7 @@ public final class ResourceManagerDialog {
         TemplateGalleryDialog.Options options = TemplateGalleryDialog.Options
                 .pickOne("Point those blocks at…")
                 .withFilter(file -> !going.contains(file));
-        TemplateGalleryDialog.open(services, stage, options, picked -> {
+        TemplateGalleryDialog.open(services, window(), options, picked -> {
             if (picked.isEmpty()) return;
             String replacement = TemplateLibrary.baseName(picked.getFirst());
             for (String name : used.keySet()) {
@@ -765,7 +782,7 @@ public final class ResourceManagerDialog {
         if (!details.isEmpty()) content.getChildren().add(hint(details));
 
         Alert alert = services.theme().alert(Alert.AlertType.INFORMATION);
-        alert.initOwner(stage);
+        alert.initOwner(window());
         alert.setTitle("Import finished");
         alert.setHeaderText(result.count() == 0
                 ? "Nothing new to import."
@@ -821,7 +838,7 @@ public final class ResourceManagerDialog {
         ButtonType repoint = new ButtonType("Point those blocks at another template…", ButtonType.OK.getButtonData());
         Alert alert = new Alert(Alert.AlertType.WARNING, body.toString().stripTrailing());
         services.theme().apply(alert);
-        alert.initOwner(stage);
+        alert.initOwner(window());
         alert.setTitle("Missing template files");
         alert.setHeaderText(missing.size() == 1 ? "A template's file is gone" : "Some template files are gone");
         alert.getDialogPane().setMinWidth(560);
@@ -832,7 +849,7 @@ public final class ResourceManagerDialog {
         if (chosen == forget) {
             forgetMissing(missing);
         } else if (chosen == repoint) {
-            TemplateGalleryDialog.open(services, stage,
+            TemplateGalleryDialog.open(services, window(),
                     TemplateGalleryDialog.Options.pickOne("Point those blocks at…"),
                     picked -> {
                         if (picked.isEmpty()) return;
@@ -880,20 +897,5 @@ public final class ResourceManagerDialog {
      */
     private void published() {
         statusLabel.setText("");
-    }
-
-    /**
-     * The 🖼 Manage Pictures press: the other end of Capture Templates, managing the pictures that exist. Its
-     * rename and delete change the bot's {@code Pictures} constants through {@link PluginValues}, by binding.
-     * Not single-instance: it owns no port and no display.
-     */
-    public static void open(ActionContext context) {
-        StudioServices services = context.services();
-        open(services, Modals.owner(services));
-    }
-
-    /** Opens the manager for the project {@code services} describes. */
-    public static void open(StudioServices services, Window owner) {
-        new ResourceManagerDialog(services, owner).show();
     }
 }

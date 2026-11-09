@@ -4,8 +4,8 @@ The **BotMaker SDK** is one jar with two jobs:
 
 - **the runtime** a bot compiles against — find a picture on the screen, read text, click, type, wait, and
   run a plan: walk the game's screens and press what serves the goals that matter most;
-- **plugin #1** of [BotMaker Studio](https://github.com/BotMakerDev/botmaker-studio) — the 🗺 Screens map,
-  the 🎯 Goals window, the picture tools, the capture source and launch target, the run overlay and the Remote
+- **plugin #1** of [BotMaker Studio](https://github.com/BotMakerDev/botmaker-studio) — the 🗺 Screens window
+  with its rail of views (the map, 🎯 Goals, 🖼 Pictures), the picture tools, the capture source and launch target, the run overlay and the Remote
   Pilot.
 
 Studio bundles no plugin and never depends on this jar. A project that declares the SDK in its `pom.xml`
@@ -88,9 +88,7 @@ method is a compile error, never a button that silently does nothing.
 
 | Toolbar | What it does |
 |---|---|
-| 🗺 **Screens** | the game's screens, their buttons and the ways between them, live over the game — `Screens.java` |
-| 🎯 **Goals** | the plans' tiers, each goal and the actions that serve it — `Goals.java` and `Plans.java` |
-| 🖼 **Manage Pictures** | rename, retag, replace, delete, import and export pictures; a rename moves every use |
+| 🗺 **Screens** | the game's screens, their buttons and the ways between them, live over the game — `Screens.java`; its left rail shows 🎯 **Goals** (the plans' tiers, each goal and the actions that serve it — `Goals.java` and `Plans.java`) and 🖼 **Pictures** (rename, retag, replace, delete, import and export pictures; a rename moves every use) |
 | the game button | which game this bot plays on this computer — from Steam, Heroic, Faugus, Lutris, Waydroid or the app menu — and start it without running the bot |
 | 🎮 **Pilot** | stream the run to a phone or browser, start and stop it, take over the input |
 | ⌖ **Point bot here**, ✂ **Picture of this** | on the overlay editor's row: make the window under the overlay the capture source, or cut a picture out of it |

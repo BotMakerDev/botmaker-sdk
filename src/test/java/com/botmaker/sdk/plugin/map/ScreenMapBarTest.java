@@ -41,9 +41,6 @@ class ScreenMapBarTest extends ApplicationTest {
         System.setProperty("java.awt.headless", "true");
     }
 
-    /** The window's least width, as {@code ScreenMap.open} frames it. */
-    private static final double LEAST_WIDTH = 760;
-
     @TempDir
     static Path project;
 
@@ -52,7 +49,8 @@ class ScreenMapBarTest extends ApplicationTest {
     @Override
     public void start(Stage stage) {
         map = new ScreenMap(services(project), true);
-        stage.setScene(new Scene((BorderPane) map.node(), LEAST_WIDTH, 460));
+        // The window as ScreenMap.open frames it: the rail beside the map, at its least width.
+        stage.setScene(new Scene((BorderPane) map.windowNode(), ScreenMap.LEAST_WIDTH, 460));
         stage.show();
     }
 

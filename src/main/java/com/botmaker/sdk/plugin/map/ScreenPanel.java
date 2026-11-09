@@ -1059,7 +1059,7 @@ final class ScreenPanel {
                 : link.via() == null ? graph.shown(link.from()) + " has no way back of its own: a walk closes it by the usual close button, "
                 + "never a key."
                 : link.label() + " is " + graph.shown(link.from()) + "'s way back, not one of its inputs: its "
-                + "picture shows in 🖼 Manage Pictures."));
+                + "picture shows in the rail's 🖼 Pictures."));
     }
 
     /** {@code constant} picked and shown big, in the Screen tab: the wheel zooms it. */

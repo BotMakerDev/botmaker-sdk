@@ -156,7 +156,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`SdkValue.Id.PLAN`) by `RunGame`, and nothing when it is `Plan.NONE` or has no goals. The Runner's plan row is a
   pick among the bot's `Plans`. Flows, `Routine` and `Bot.runFlow` were deleted outright on 2026-11-09 (the user's
   call: no deprecated release, no `@Migrate` rule).
-- **🎯 Goals** (`plugin/plan`, 2026-11-06, layout A) shows a plan in Studio, read from the bot's Java.
+- **🎯 Goals** (`plugin/plan`, 2026-11-06, layout A) shows a plan in Studio, read from the bot's Java. Since
+  2026-11-09 it is a view of the 🗺 Screens window's rail (`GoalsView.view`), not a toolbar window; a double click
+  on a row shows the map with that screen's tab open (`ScreenMap.openScreen`).
   - **How Studio reads it.** `PlanTypes` declares how `Plan`, `Goal`, `Need`, `Do` and `Retry` are written.
     `ScreenMapRead.of` keeps each `Do` field of a screen as `MapScreen.actions`. Read, a value names another only
     by reference: `Goals.X` reads as `BotConstants.goal`, `() -> Screens.S.f` as a supplier of the field's

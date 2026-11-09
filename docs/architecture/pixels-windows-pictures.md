@@ -29,6 +29,11 @@
   `remove`); Studio resolves the constant, compiles each change as the whole bot and refuses one that breaks
   it. A path literal a user wrote is not rewritten. Naming a capture (`TemplateNaming`, one class for one crop
   and a batch) refuses blank, taken and reserved names with one wording.
+- **The pictures are managed in 🗺 Screens ▸ 🖼 Pictures** (2026-11-09; the 🖼 Manage Pictures window before):
+  `ResourceManagerDialog.view` is a view of the Screens window's rail, built once and re-read each time it is shown
+  again, its dialogs owned by the Screens window. That window is modeless, so a picture's recapture no longer
+  hides it. A new picture is cut from the Screens panel, which opens `CaptureTemplates`; ✂ Capture Templates has no
+  toolbar button of its own.
 - **The Remote Pilot is this plugin's feature** (`plugin/pilot`, the web client under
   `src/main/resources/pilot/`): a toolbar button opens it and the plugin's `onProjectClosing` step releases its port and nested
   display. Telemetry crosses as `TelemetryFrame` bytes (`Runs.onTelemetry`), decoded with the shared codec the

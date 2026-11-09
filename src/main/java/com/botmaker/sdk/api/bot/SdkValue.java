@@ -72,7 +72,7 @@ public @interface SdkValue {
         CAPTURE,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
-        /** The groups 🖼 Manage Pictures files pictures under — a class of {@code PictureTag} constants. */
+        /** The groups 🗺 Screens ▸ 🖼 Pictures files pictures under — a class of {@code PictureTag} constants. */
         TAGS,
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
         DIGITS,

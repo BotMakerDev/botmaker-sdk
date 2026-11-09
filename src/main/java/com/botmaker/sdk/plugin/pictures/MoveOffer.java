@@ -46,7 +46,7 @@ public final class MoveOffer {
         Alert alert = services.theme().alert(Alert.AlertType.CONFIRMATION, waiting + (waiting == 1 ? " file" : " files")
                 + " of the SDK's — pictures, digits, screen shots — are at the resources' root, where another plugin's"
                 + " could take their names. Move them into " + where + "/?\n\nThe bot finds them in either place;"
-                + " until they move, Manage Pictures and Screens do not show them.", move, later);
+                + " until they move, Screens and its Pictures do not show them.", move, later);
         alert.setTitle("Move the SDK's files");
         alert.setHeaderText(null);
         services.dialogs().ownerWindow().ifPresent(alert::initOwner);
