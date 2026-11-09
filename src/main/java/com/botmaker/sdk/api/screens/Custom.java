@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.function.BooleanSupplier;
@@ -15,15 +16,16 @@ import java.util.function.BooleanSupplier;
  * @param method       what its press runs
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells
- * @param never        why it is never done; null when it may be
+ * @param verdict      whether a run exploring on its own may run it; {@link Verdict#NONE} when null
  * @param isOccasional whether it works only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when it works, for one that comes and goes; null when not known
  */
-public record Custom(Runnable method, boolean isLeaving, boolean isInfo, String never, boolean isOccasional,
+public record Custom(Runnable method, boolean isLeaving, boolean isInfo, Verdict verdict, boolean isOccasional,
                      ImageTemplate locked, BooleanSupplier when) implements Input {
 
     public Custom {
+        verdict = verdict == null ? Verdict.NONE : verdict;
         isOccasional = isOccasional || when != null;
     }
 
@@ -45,32 +47,47 @@ public record Custom(Runnable method, boolean isLeaving, boolean isInfo, String 
 
     @Override
     public Custom leaving() {
-        return new Custom(method, true, isInfo, never, isOccasional, locked, when);
+        return new Custom(method, true, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Custom info() {
-        return new Custom(method, isLeaving, true, never, isOccasional, locked, when);
+        return new Custom(method, isLeaving, true, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Custom never(String why) {
-        return new Custom(method, isLeaving, isInfo, why, isOccasional, locked, when);
+        return verdict(Verdict.never(why));
+    }
+
+    @Override
+    public Custom free() {
+        return verdict(Verdict.FREE);
+    }
+
+    @Override
+    public <G, T> Custom spends(Params.Of<G, T> fact) {
+        return verdict(new Verdict.Spends(fact));
+    }
+
+    @Override
+    public Custom verdict(Verdict verdict) {
+        return new Custom(method, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Custom occasional() {
-        return new Custom(method, isLeaving, isInfo, never, true, locked, when);
+        return new Custom(method, isLeaving, isInfo, verdict, true, locked, when);
     }
 
     @Override
     public Custom locked(ImageTemplate proof) {
-        return new Custom(method, isLeaving, isInfo, never, isOccasional, proof, when);
+        return new Custom(method, isLeaving, isInfo, verdict, isOccasional, proof, when);
     }
 
     @Override
     public Custom when(BooleanSupplier condition) {
-        return new Custom(method, isLeaving, isInfo, never, isOccasional, locked, condition);
+        return new Custom(method, isLeaving, isInfo, verdict, isOccasional, locked, condition);
     }
 
     @Override

@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -33,6 +34,7 @@ import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenDesk.Trying;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
+import com.botmaker.sdk.plugin.assist.Verdicts;
 import com.botmaker.sdk.plugin.map.MapGuide.Part;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
@@ -312,7 +314,24 @@ final class InputInspector {
         proof.setOnAction(e -> {
             if (locked.isSelected()) writeLock.run();
         });
-        return new VBox(6, resultLine, new FlowPane(12, 6, info, sometimes), line(never, why), line(locked, proof));
+        // Exploring alone (2026-11-09): free, spends a fact, never (typed with why) or none, as crop_pictures takes it.
+        ComboBox<String> verdict = new ComboBox<>(FXCollections.observableArrayList(Verdicts.offered(services)));
+        verdict.setEditable(true);
+        verdict.setValue(Verdicts.said(input));
+        verdict.setTooltip(new Tooltip(MapGuide.VERDICT));
+        HBox.setHgrow(verdict, Priority.ALWAYS);
+        // The verdict last written from here: an editable combo commits on focus loss too, as the lock's does.
+        Verdict[] judged = {input.verdict()};
+        verdict.setOnAction(e -> {
+            Verdicts.Read read = Verdicts.read(services, verdict.getValue());
+            if (read.refused() != null) panel.wrote(read.refused());
+            else if (!read.verdict().equals(judged[0])) {
+                judged[0] = read.verdict();
+                set(constant, field, input.verdict(read.verdict()));
+            }
+        });
+        return new VBox(6, resultLine, new FlowPane(12, 6, info, sometimes), line(new Label("Exploring alone"),
+                verdict), line(never, why), line(locked, proof));
     }
 
     // --- a button's looks ---
@@ -1323,7 +1342,7 @@ final class InputInspector {
     static Tree scrolled(Tree tree, TreeScroll kind, int notches) {
         TreeScroll by = kind == null ? TreeScroll.NONE : kind;
         return new Tree(tree.nodes(), by == TreeScroll.DRAG, by == TreeScroll.WHEEL ? notches : 0, tree.isTried(),
-                tree.isLeaving(), tree.isInfo(), tree.never(), tree.isOccasional(), tree.locked(), tree.when());
+                tree.isLeaving(), tree.isInfo(), tree.verdict(), tree.isOccasional(), tree.locked(), tree.when());
     }
 
     // --- ▶ Try ---

@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
@@ -37,11 +38,13 @@ import com.botmaker.sdk.plugin.types.ScreenTypes;
 import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
@@ -302,6 +305,20 @@ final class MapEdits {
                      @Describe(value = "", optional = true) String key) implements Edit, OfInput {
     }
 
+    /** One input set_verdict judges: named as try_input names it, on its own screen or the call's. */
+    record Judged(@Describe(value = "its screen; blank: the call's", optional = true) String screen,
+                  @Describe(value = PICTURE, optional = true) String picture,
+                  @Describe(value = SCROLL, optional = true) Integer scroll,
+                  @Describe(value = KEY, optional = true) String key,
+                  @Describe(Verdicts.SAY) String verdict) implements OfInput {
+    }
+
+    @Describe("whether a run exploring alone may press each input; every input needs one (read_map lists the untagged)")
+    record SetVerdict(@Describe(value = "the screen of inputs that name none", optional = true) String screen,
+                      @Describe("the inputs, one or many, each with its verdict") List<Judged> inputs)
+            implements Edit {
+    }
+
     static final List<AssistantTool<?>> TOOLS = List.of(
             ToolTiming.actions("edit_map", "Fixes the bot's Screens when try_input recorded wrong or the game "
                     + "changed", Edit.class,
@@ -426,6 +443,8 @@ final class MapEdits {
     private static AgentReply edited(Edit edit, AgentContext context) {
         StudioServices services = context.services();
         ScreenGraph graph = ScreenBook.read(services);
+        // Many screens' inputs in one call: each names its own screen, or the call's.
+        if (edit instanceof SetVerdict set) return verdicts(set, graph, services);
         Optional<String> found = ScreenBook.find(graph, edit.screen());
         // A start screen the map lacks is added.
         if (found.isEmpty() && edit instanceof SetKind set && set.as() == Kind.START) {
@@ -472,10 +491,54 @@ final class MapEdits {
             case InputWhen when -> onInput(when, graph, screen, on,
                     field -> when(ScreenEdits.condition(services, when.method(), when.fact(), when.test(), when.value()),
                             given -> ScreenEdits.setInputWhen(services, screen, field, given)));
+            case SetVerdict set -> verdicts(set, graph, services);
             case Group group -> said(grouped(context, screen, on, group));
             case Link link -> said(ScreenEdits.link(services, screen, on, link.picture(),
                     link.after() == null ? List.of() : link.after()));
         };
+    }
+
+    /**
+     * set_verdict: each input of {@code set} given its verdict, every one checked before any is written, all in one
+     * step of Studio's undo. Refused whole when one names no input or no verdict.
+     */
+    private static AgentReply verdicts(SetVerdict set, ScreenGraph graph, StudioServices services) {
+        List<Judged> inputs = set.inputs() == null ? List.of() : set.inputs();
+        if (inputs.isEmpty()) return AgentReply.refused("Give the inputs to judge. Nothing was written.");
+        Map<String, Map<String, Verdict>> judged = new LinkedHashMap<>();
+        for (Judged one : inputs) {
+            String named = has(one.screen()) ? one.screen() : set.screen();
+            Optional<String> screen = has(named) ? ScreenBook.find(graph, named) : Optional.empty();
+            if (screen.isEmpty()) {
+                return AgentReply.refused("No screen " + (has(named) ? named.strip() : "named") + " in the bot's Screens"
+                        + ". Nothing was written.");
+            }
+            String unnamed = unnamed(one);
+            if (unnamed != null) return AgentReply.refused(unnamed);
+            Optional<String> field = field(graph.screens().get(screen.get()), one);
+            if (field.isEmpty()) return AgentReply.refused(noInput(graph, screen.get(), one));
+            Verdicts.Read verdict = Verdicts.read(services, one.verdict());
+            if (verdict.refused() != null) {
+                return AgentReply.refused(field.get() + " of " + graph.shown(screen.get()) + ": " + verdict.refused()
+                        + " Nothing was written.");
+            }
+            judged.computeIfAbsent(screen.get(), s -> new LinkedHashMap<>()).put(field.get(), verdict.verdict());
+        }
+        Map<String, UnaryOperator<MapScreen>> changes = new LinkedHashMap<>();
+        judged.forEach((screen, fields) -> changes.put(screen, s -> {
+            MapScreen now = s;
+            for (Map.Entry<String, Verdict> f : fields.entrySet()) {
+                now = now.withInput(f.getKey(), now.inputs().get(f.getKey()).verdict(f.getValue()));
+            }
+            return now;
+        }));
+        Optional<String> failed = ScreenBook.updateAll(services, "Set verdicts", changes);
+        if (failed.isPresent()) return AgentReply.refused(ScreenEdits.NOT_WRITTEN + failed.get());
+        int count = judged.values().stream().mapToInt(Map::size).sum();
+        int left = ScreenBook.read(services).untagged().size();
+        return AgentReply.text("Judged " + count + (count == 1 ? " input" : " inputs") + "; "
+                + (left == 0 ? "every input has its verdict." : left + " still " + (left == 1 ? "has" : "have")
+                + " none (read_map lists them)."));
     }
 
     /** {@code spot}'s grid: none for one spot, a step of none along a side of one cell. */

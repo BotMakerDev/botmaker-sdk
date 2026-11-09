@@ -114,6 +114,8 @@ public final class ScreenTypes implements TypeHolder {
                 when -> when.parameter() instanceof NamedParameter(String source) ? source : "");
         static final Held<Readout, String> READOUT_FACT = Held.as(String.class,
                 readout -> factOf(readout).isEmpty() ? null : factOf(readout));
+        static final Held<Input, String> INPUT_SPENDS = Held.as(String.class,
+                input -> spentOf(input).isEmpty() ? null : spentOf(input));
         static final Held<Custom, String> CUSTOM_METHOD = Held.as(String.class, ScreenTypes::methodOf);
         static final Held<Condition.Of, Object> OF_METHOD = Held.as(Object.class, of -> held(of.method()));
     }
@@ -195,6 +197,7 @@ public final class ScreenTypes implements TypeHolder {
     private static DeclaredCall<Button> pressed(DeclaredCall<Button> button) {
         return button
                 .<BooleanSupplier>with(Button::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+                .<Params.Of>with(Button::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact))
                 .flag(Button::repeated, ScreenTypes::repeatedWritten)
                 .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
                 .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
@@ -274,17 +277,20 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Hotkey.of(Key)} and its links: one key, tapped. */
     public static final DeclaredCall<Hotkey> HOTKEY_KEY_SHAPE = ComponentType.part(Hotkey.class)
             .<Key, Hotkey>writtenAs(Hotkey::of)
-            .<BooleanSupplier>with(Hotkey::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Hotkey::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(Hotkey::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact));
 
     /** {@code Hotkey.of(Combo)} and the same links: keys pressed together, or held. */
     public static final DeclaredCall<Hotkey> HOTKEY_COMBO_SHAPE = ComponentType.part(Hotkey.class)
             .<Combo, Hotkey>writtenAs(Hotkey::of)
-            .<BooleanSupplier>with(Hotkey::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Hotkey::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(Hotkey::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact));
 
     /** {@code Custom.of(Puzzles::solve)} and its links: the bot's own method, crossing as the text it is written as. */
     public static final DeclaredCall<Custom> CUSTOM_SHAPE = ComponentType.part(Custom.class)
             .<Runnable, Custom>writtenAs(Custom::of, Parts.CUSTOM_METHOD.part(ScreenTypes::method))
-            .<BooleanSupplier>with(Custom::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Custom::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(Custom::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact));
 
     /** {@code Caption.of(Words, Area)}: words a screen shows, one of the bot's {@code Texts}, read in an area. */
     public static final DeclaredCall<Caption> CAPTION_SHAPE = ComponentType.part(Caption.class).writtenAs(Caption::of);
@@ -330,6 +336,7 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<TextButton> TEXT_BUTTON_SHAPE = ComponentType.part(TextButton.class)
             .writtenAs(TextButton::of)
             .<BooleanSupplier>with(TextButton::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(TextButton::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact))
             .<Gesture>with(TextButton::gesture, ScreenTypes::gestureWritten)
             .<Duration>with(TextButton::hold, TextButton::hold);
 
@@ -341,7 +348,8 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Strip.of(Scroll, List<ImageTemplate>)} and its links: its members' defaults. */
     public static final DeclaredCall<Strip> STRIP_SHAPE = ComponentType.part(Strip.class)
             .writtenAs(Strip::of)
-            .<BooleanSupplier>with(Strip::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Strip::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(Strip::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact));
 
     /** {@code Beside.of(ImageTemplate, double, double)}: a node's offset from a connected one, in that one's size. */
     public static final DeclaredCall<Beside> BESIDE_SHAPE = ComponentType.part(Beside.class).writtenAs(Beside::of);
@@ -352,7 +360,8 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Tree.of(List<Node>)} and its links: how it scrolls, and its nodes' defaults. */
     public static final DeclaredCall<Tree> TREE_SHAPE = ComponentType.part(Tree.class)
             .writtenAs(Tree::of)
-            .<BooleanSupplier>with(Tree::when, Parts.INPUT_WHEN.part(ScreenTypes::condition));
+            .<BooleanSupplier>with(Tree::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
+            .<Params.Of>with(Tree::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact));
 
     /** {@code Scroll.wheel(int)} and its links: how a strip scrolls, and what Discovery measured of it. */
     public static final DeclaredCall<Scroll> SCROLL_SHAPE = ComponentType.part(Scroll.class)
@@ -502,6 +511,11 @@ public final class ScreenTypes implements TypeHolder {
     /** The method reference of the fact {@code readout} is read into, {@code Progress::gold}, or {@code ""}. */
     public static String factOf(Readout readout) {
         return readout.fact() instanceof NamedParameter(String source) ? source : "";
+    }
+
+    /** The method reference of the fact {@code input} spends, {@code Progress::gems}, or {@code ""}. */
+    public static String spentOf(Input input) {
+        return input.spends() instanceof NamedParameter(String source) ? source : "";
     }
 
     /** {@code reference}, a method reference ({@code Puzzles::solve}), as Studio holds it in a {@code Custom.of(…)}. */

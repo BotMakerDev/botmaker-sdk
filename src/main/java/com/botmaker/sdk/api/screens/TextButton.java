@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.value.Link;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.time.Duration;
@@ -18,7 +19,7 @@ import java.util.function.BooleanSupplier;
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells
- * @param never        why it is never done; null when it may be
+ * @param verdict      whether a run exploring on its own may press it; {@link Verdict#NONE} when null
  * @param isOccasional whether it shows only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when it is there, for one that comes and goes; null when not known
@@ -27,11 +28,12 @@ import java.util.function.BooleanSupplier;
  * @param isMarking    whether its words tell its screen: read there while the game shows it
  * @param isAbsent     whether its words are never read while the game shows its screen
  */
-public record TextButton(Caption caption, boolean isTried, boolean isLeaving, boolean isInfo, String never,
+public record TextButton(Caption caption, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
                          boolean isOccasional, ImageTemplate locked, BooleanSupplier when, Gesture gesture,
                          Duration hold, boolean isMarking, boolean isAbsent) implements Input {
 
     public TextButton {
+        verdict = verdict == null ? Verdict.NONE : verdict;
         isOccasional = isOccasional || when != null;
         gesture = gesture == null ? Gesture.CLICK : gesture;
         if (gesture != Gesture.HOLD) hold = null;
@@ -45,13 +47,13 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
 
     @Override
     public TextButton tried() {
-        return new TextButton(caption, true, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, true, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     @Override
     public TextButton leaving() {
-        return new TextButton(caption, isTried, true, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, true, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
@@ -63,19 +65,34 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
 
     @Override
     public TextButton info() {
-        return new TextButton(caption, isTried, isLeaving, true, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, true, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     @Override
     public TextButton never(String why) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, why, isOccasional, locked, when, gesture, hold,
+        return verdict(Verdict.never(why));
+    }
+
+    @Override
+    public TextButton free() {
+        return verdict(Verdict.FREE);
+    }
+
+    @Override
+    public <G, T> TextButton spends(Params.Of<G, T> fact) {
+        return verdict(new Verdict.Spends(fact));
+    }
+
+    @Override
+    public TextButton verdict(Verdict verdict) {
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     @Override
     public TextButton occasional() {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, true, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, true, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
@@ -87,51 +104,51 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
 
     @Override
     public TextButton locked(ImageTemplate proof) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, proof, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     @Override
     public TextButton when(BooleanSupplier condition) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, condition, gesture,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition, gesture,
                 hold, isMarking, isAbsent);
     }
 
     /** This button, reading {@code caption} instead. */
     public TextButton caption(Caption caption) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
     public TextButton gesture(Gesture gesture) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public TextButton hold(Duration time) {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, Gesture.HOLD,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, Gesture.HOLD,
                 time, isMarking, isAbsent);
     }
 
     /** This button, its words telling its screen: read there while the game shows it. */
     @Link
     public TextButton marking() {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 true, false);
     }
 
     /** This button, its words telling its screen apart from one alike by never being read there. */
     @Link
     public TextButton absent() {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 false, true);
     }
 
     /** This button, its words telling nothing of its screen: neither {@link #marking} nor {@link #absent}. */
     public TextButton unmarked() {
-        return new TextButton(caption, isTried, isLeaving, isInfo, never, isOccasional, locked, when, gesture, hold,
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
                 false, false);
     }
 

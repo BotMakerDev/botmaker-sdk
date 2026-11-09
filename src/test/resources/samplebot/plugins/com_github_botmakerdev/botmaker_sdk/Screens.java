@@ -36,12 +36,12 @@ import java.util.List;
 public final class Screens {
 
     public static final class Home extends Screen {
-        public final Button collect = Button.of(Pictures.COLLECT).tried().occasional()
+        public final Button collect = Button.of(Pictures.COLLECT).tried().free().occasional()
                 .looks(List.of(Look.of(Pictures.COLLECT_BADGE, States.Presses.BADGE)));
-        public final Button battle = Button.of(Pictures.BATTLE).tried().gesture(Gesture.DOUBLE).marking();
-        public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).clearing().submitting();
-        public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
-        public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
+        public final Button battle = Button.of(Pictures.BATTLE).tried().free().gesture(Gesture.DOUBLE).marking();
+        public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).free().clearing().submitting();
+        public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).free().hold(Duration.ofMillis(900));
+        public final Custom solve = Custom.of(SampleBot::solvePuzzle).free().occasional();
         public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY).first()
                 .daily(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris"))).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2))
                 .takes(Duration.ofSeconds(3));
@@ -50,7 +50,7 @@ public final class Screens {
                 .until(Condition.of(SampleBot::shopOpen));
         public final Do glance = Do.press(avatar).onSight().every(Duration.ofMinutes(10));
         public final TextButton shop = TextButton.of(Caption.of(Texts.SHOP, Area.of(Pictures.GOLD_ICON, 2, -0.5, 6, 2))).tried()
-                .when(Condition.of(SampleBot::shopOpen));
+                .free().when(Condition.of(SampleBot::shopOpen));
         public final Readout gold = Readout.digits(Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1),
                 new DigitSet("src/main/resources/digits/gold")).subject().into(Progress::gold)
                 .staleAfter(Duration.ofMinutes(30));
@@ -63,11 +63,12 @@ public final class Screens {
     }
 
     public static final class Shop extends Screen {
-        public final Button item = Button.of(Pictures.ITEM).dragsOnto(Pictures.BAG).dragTime(Duration.ofMillis(500));
+        public final Button item = Button.of(Pictures.ITEM).dragsOnto(Pictures.BAG).dragTime(Duration.ofMillis(500))
+                .free();
         public final Button buy = Button.of(Pictures.BUY).place(Place.below(Pictures.ITEM)).repeated()
-                .when(Params.when(Progress::gold).atLeast(5))
+                .spends(Progress::gold).when(Params.when(Progress::gold).atLeast(5))
                 .looks(List.of(Look.of(Pictures.BUY_MAXED, States.Blocks.MAXED)));
-        public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried();
+        public final Button itemsTab = Button.of(Pictures.ITEMS_TAB).tried().free();
         public final Mark bag = Mark.of(Pictures.BAG);
         public final Mark title = Mark.of(Caption.of(Texts.SHOP, Area.of(Pictures.ITEMS_TAB, -3, 0, 2.5, 1)));
         public final Mark noBattle = Mark.of(Pictures.BATTLE).absent();
@@ -90,7 +91,7 @@ public final class Screens {
     }
 
     public static final class Settings extends Screen {
-        public final Button sound = Button.of(Elements.SOUND).tried();
+        public final Button sound = Button.of(Elements.SOUND).tried().free();
         public final Readout volume = Readout.element(Elements.VOLUME).into(Progress::soundShown);
         public final Mark list = Mark.of(Elements.SETTINGS_LIST);
 

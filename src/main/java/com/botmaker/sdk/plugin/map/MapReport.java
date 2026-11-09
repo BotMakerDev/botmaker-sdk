@@ -16,9 +16,11 @@ import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Node;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MarkerSets;
 import com.botmaker.sdk.internal.screens.Markers;
@@ -32,6 +34,7 @@ import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.assist.ServesProposal;
+import com.botmaker.sdk.plugin.assist.Verdicts;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Row;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
@@ -228,6 +231,11 @@ public final class MapReport {
         }
         for (Row row : ScreenCards.rows(graph, constant)) {
             out.append(indent).append("  - ").append(row.label()).append(": ").append(row.result());
+            // Its verdict for a run exploring alone; a never is said in its result already, a read-only one needs none.
+            // Free and spends said here; never is the row's own word, and none is listed in the problems.
+            if (row.input().verdict() instanceof Verdict.Free || row.input().verdict() instanceof Verdict.Spends) {
+                out.append(" · ").append(Verdicts.said(row.input()));
+            }
             if (!row.kind().isEmpty()) out.append(" (").append(row.kind()).append(')');
             if (!row.traits().isEmpty()) out.append(" {").append(row.traits()).append('}');
             if (row.input() instanceof Button b && b.isBeside()) out.append(" ").append(b.label());
@@ -343,6 +351,7 @@ public final class MapReport {
     static List<String> problems(ScreenGraph graph, Predicate<String> named, Predicate<String> file, String only) {
         List<String> problems = new ArrayList<>();
         Optional<String> root = ScreenCards.root(graph);
+        List<InputName> unjudged = graph.untagged();
         for (String c : graph.screens().keySet()) {
             if (only != null && !only.equals(c)) continue;
             MapScreen screen = graph.screens().get(c);
@@ -358,6 +367,13 @@ public final class MapReport {
                     .filter(via -> !(via instanceof Hotkey || via instanceof Custom)).isEmpty()) {
                 problems.add(name + ": a popup with no way out mapped, so a walk that meets it stops unless the usual "
                         + "close button shows: map its close button, or set_kind screen when it goes by itself.");
+            }
+            List<String> untagged = unjudged.stream().filter(n -> n.screen().equals(c))
+                    .map(InputName::field).toList();
+            if (!untagged.isEmpty()) {
+                problems.add(name + ": " + String.join(", ", untagged) + (untagged.size() == 1 ? " has" : " have")
+                        + " no verdict, so a run exploring alone will not press " + (untagged.size() == 1 ? "it" : "them")
+                        + ": set_verdict free, spends:<fact> or never:<why>.");
             }
             for (String field : graph.unseen(c)) {
                 // Its method says when to look.

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.value.Link;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.function.BooleanSupplier;
@@ -40,8 +41,23 @@ public sealed interface Input extends ScreenPart permits Button, TextButton, Hot
     /** Whether it only tells: help, rules, a leaderboard. Discovery tries it last, and what it opens after the rest. */
     boolean isInfo();
 
+    /** Whether a run exploring on its own may press it: free, spending a fact, never, or none said yet. */
+    Verdict verdict();
+
     /** Why it is never done (it spends premium currency or real money); null when it may be. */
-    String never();
+    default String never() {
+        return verdict() instanceof Verdict.Never(String why) ? why : null;
+    }
+
+    /** Whether it costs nothing the bot counts. */
+    default boolean isFree() {
+        return verdict() instanceof Verdict.Free;
+    }
+
+    /** The fact it spends, a method of a {@code @Facts} group ({@code Progress::gems}); null when it spends none. */
+    default Params.Of<?, ?> spends() {
+        return verdict() instanceof Verdict.Spends(Params.Of<?, ?> fact) ? fact : null;
+    }
 
     /** Whether it shows only at times: a Claim when loot is ready, an event's icon. */
     boolean isOccasional();
@@ -67,6 +83,16 @@ public sealed interface Input extends ScreenPart permits Button, TextButton, Hot
     /** This input, never done because {@code why}: it spends premium currency or real money. */
     @Link
     Input never(String why);
+
+    /** This input, costing nothing the bot counts: a run exploring on its own may press it. */
+    @Link
+    Input free();
+
+    /** This input, spending {@code fact}, a method of a {@code @Facts} group: {@code .spends(Progress::gems)}. */
+    <G, T> Input spends(Params.Of<G, T> fact);
+
+    /** This input, judged {@code verdict}. */
+    Input verdict(Verdict verdict);
 
     /** This input, showing only at times. */
     @Link

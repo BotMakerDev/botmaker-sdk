@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Every input has a verdict** (2026-11-09): whether a run exploring on its own may press it. `.free()` spends nothing,
+  `.spends(Progress::gems)` spends what a fact counts, `.never("real money")` is never pressed, and an input with none
+  is not pressed until it is judged. `never(why)` is one of the verdicts now. The assistant gives verdicts with
+  `crop_pictures`' `verdict` or `edit_map set_verdict` (several in one call), and `read_map` shows each input's and
+  lists the inputs that have none; by hand, the cut form's *exploring alone* and the picked input's *Exploring alone*.
 - **A `@Facts` group is locked on the canvas** (2026-11-09): only a run writes facts, so Studio shows the group
   read-only; its values are seen in the Parameters window. `@Facts` carries the contract's `@Param.WrittenByRun`.
 - **Areas beside a picture replace zones** (2026-11-09, breaking): a readout, a caption's words and a drag's drop are an

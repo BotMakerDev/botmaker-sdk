@@ -48,10 +48,11 @@ class MapReportTest {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         screens.put("CONSENT", screen(Setup.named("Consent").elements(List.of(Element.byLabel(
                 Words.of("User Agreement")))).start(), Button.of(Element.byText(Words.of("Confirm"))
-                .shot("elements/confirm.png"))));
+                .shot("elements/confirm.png")).free()));
         ScreenGraph graph = ScreenGraph.of(screens);
         String text = MapReport.text(graph, Map.of(), id -> false, id -> false, id -> false, "CONSENT");
         assertTrue(text.contains("marker element \"User Agreement\""), text);
+        assertTrue(text.contains(" · free"), "a verdict given is said on its row: " + text);
         assertEquals(List.of(), MapReport.problems(graph, id -> false, id -> false, "CONSENT"));
     }
 
@@ -94,8 +95,12 @@ class MapReportTest {
     void whatTheMapCannotDoIsSaid() {
         List<String> problems = MapReport.problems(map(), NAMED::contains, id -> !id.equals("market_title"), null);
         assertEquals(List.of(
+                "Home: tavern, event have no verdict, so a run exploring alone will not press them: set_verdict "
+                        + "free, spends:<fact> or never:<why>.",
                 "Home: event comes and goes and was never seen, and no method says when it is there "
                         + "(a crop_pictures box's when).",
+                "Tavern: market, play, close have no verdict, so a run exploring alone will not press them: "
+                        + "set_verdict free, spends:<fact> or never:<why>.",
                 "Market: the picture market_title has no file.",
                 "Reward: the picture claim_inline is written inline in Screens.java, not as one of the bot's Pictures."),
                 problems);
@@ -132,7 +137,8 @@ class MapReportTest {
         assertTrue(text.contains("in from Home by tavern (while Firestone::tavernOpen)\n"), text);
         assertTrue(text.contains("look Halloween: marker pumpkin\n"), text);
         assertTrue(text.contains("- candy: untried [look Halloween]\n"), text);
-        assertTrue(MapReport.problems(graph, id -> true, id -> true, null).isEmpty(),
+        assertTrue(MapReport.problems(graph, id -> true, id -> true, null).stream()
+                        .noneMatch(p -> p.contains("comes and goes")),
                 "a method saying when it is there answers for what comes and goes");
     }
 
@@ -200,7 +206,9 @@ class MapReportTest {
                 + "    damage\n"
                 + "      health: from damage (1.2, -0.6); Blocks.MAXED health_max\n"
                 + "        speed\n"), text);
-        assertEquals(List.of("Research: damage_tree's speed has no offsets joining it to damage, so a run cannot "
+        assertEquals(List.of("Research: damage, health, speed have no verdict, so a run exploring alone "
+                + "will not press them: set_verdict free, spends:<fact> or never:<why>.",
+                "Research: damage_tree's speed has no offsets joining it to damage, so a run cannot "
                 + "bring it into view: link them, then try_input scroll over a node."),
                 MapReport.problems(graph, id -> true, id -> true, "RESEARCH"));
     }

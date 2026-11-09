@@ -38,6 +38,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -437,7 +438,7 @@ class SdkAssistTest {
         FrameWatch.Watched watched = new FrameWatch.Watched(frames, 60, 60, Duration.ofSeconds(1),
                 Optional.of(Duration.ofMillis(300)), FrameWatch.Ending.LOOP_CLOSED);
         return new BoardCuts.Cut(name, new Rect(120, 80, SIZE, SIZE), CutShape.RECT, List.of(), null,
-                new BoardCuts.Press(false, null, null), watched);
+                new BoardCuts.Press(false, null, null, null), watched);
     }
 
     /** {@code n} different poses of the box at 120,80. */
@@ -1757,6 +1758,64 @@ class SdkAssistTest {
         assertTrue(run("edit_map", "screen", "Home", "action", "add_readout", "name", "gold", "anchor", "ore",
                 "box", Map.of("x", 5000, "y", 80, "width", 96, "height", 24)).isRefused(), "a box off the frame");
         assertEquals(1, screen("HOME").readouts().size(), "nothing more was written");
+    }
+
+    /** set_verdict judges inputs of several screens in one call, or none of them when one is wrong. */
+    @Test
+    void setVerdictTagsSeveral() {
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("ore")), Button.of(picture("tab")),
+                Button.of(picture("chest")), Hotkey.of(Key.ESCAPE)));
+        put("SHOP", MapFixtures.screen(Setup.named("Shop").markers(marks("shop")), Button.of(picture("buy"))));
+        host.parameters.add(ParameterWrite.of("Progress", "gems", 0));
+
+        AgentReply wrong = run("edit_map", "action", "set_verdict", "screen", "Home", "inputs", List.of(
+                Map.of("picture", "tab", "verdict", "free"),
+                Map.of("picture", "chest", "verdict", "spends:Progress::coins")));
+        assertTrue(wrong.isRefused() && text(wrong).contains("No fact Progress::coins"), text(wrong));
+        assertTrue(input("HOME", "tab").verdict() instanceof Verdict.None, "refused whole: nothing written");
+        assertTrue(run("edit_map", "action", "set_verdict", "screen", "Home", "inputs", List.of(
+                Map.of("picture", "tab", "verdict", "maybe"))).isRefused(), "no such verdict");
+
+        AgentReply judged = run("edit_map", "action", "set_verdict", "screen", "Home", "inputs", List.of(
+                Map.of("picture", "tab", "verdict", "free"),
+                Map.of("picture", "chest", "verdict", "spends:Progress::gems"),
+                Map.of("key", "Escape", "verdict", "never:closes the game"),
+                Map.of("screen", "Shop", "picture", "buy", "verdict", "never:real money")));
+        assertFalse(judged.isRefused(), text(judged));
+        assertTrue(text(judged).contains("Judged 4 inputs; every input has its verdict."), text(judged));
+        assertTrue(input("HOME", "tab").isFree());
+        assertEquals("Progress::gems", ScreenTypes.spentOf(input("HOME", "chest")));
+        assertEquals("closes the game", input("HOME", "key_escape").never());
+        assertEquals("real money", input("SHOP", "buy").never());
+        assertEquals(1, host.steps.stream().filter("Set verdicts"::equals).count(), "one step of Studio's undo");
+    }
+
+    @Test
+    void cropPicturesGivesEachInputItsVerdict() {
+        agent.frame = noise(WATCHED.width(), WATCHED.height(), 31);
+        run("screenshot");
+        cropOne("name", "home", "x", 10, "y", 10, "width", SIZE, "height", SIZE, "screen", "Home",
+                "marker", "set");
+        host.parameters.add(ParameterWrite.of("Progress", "gems", 0));
+
+        assertTrue(run("crop_pictures", "boxes", List.of(box("tab", 200, 120, 48, 48, "verdict", "free")))
+                .isRefused(), "a verdict is an input's: a screen is given");
+        AgentReply wrong = run("crop_pictures", "screen", "Home", "boxes", List.of(
+                box("tab", 200, 120, 48, 48, "verdict", "free"),
+                box("chest", 80, 20, 48, 48, "verdict", "spends:Progress::coins")));
+        assertTrue(wrong.isRefused() && text(wrong).contains("No fact Progress::coins"), text(wrong));
+        assertTrue(text(wrong).contains("Nothing was saved."), text(wrong));
+
+        AgentReply cut = run("crop_pictures", "screen", "Home", "boxes", List.of(
+                box("tab", 200, 120, 48, 48, "verdict", "free"),
+                box("chest", 80, 20, 48, 48, "verdict", "spends:Progress::gems"),
+                box("shop", 90, 75, 40, 40, "sometimes", true, "verdict", "never:real money"),
+                box("help", 300, 40, 48, 48)));
+        assertFalse(cut.isRefused(), text(cut));
+        assertTrue(input("HOME", "tab").isFree());
+        assertEquals("Progress::gems", ScreenTypes.spentOf(input("HOME", "chest")));
+        assertEquals("real money", input("HOME", "shop").never());
+        assertTrue(input("HOME", "help").verdict() instanceof Verdict.None, "no verdict given: none");
     }
 
     @Test

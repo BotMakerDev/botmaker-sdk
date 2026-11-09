@@ -100,6 +100,10 @@ final class Protocol {
                      of any screen they opened, main screens before their panels; help, rules and leaderboards
                      (purpose info) last. One that leads to a screen mapped already is a way into it, or this
                      screen's way back.
+                     Every input needs a verdict, whether a run exploring alone presses it: free (nothing
+                     spent), spends:<fact> (it costs what that fact counts, Progress::gold) or never:<why>
+                     (premium currency, real money). Give it with crop_pictures' verdict when cut, else edit_map
+                     set_verdict, several in one call; read_map lists the inputs that have none.
                   4. A screen is finished when nothing on it is untried. try_input then walks by itself to the next
                      screen to explore, the shallowest with inputs left (read_guide names it), and checks that
                      screen's marker; stay true on the last input keeps the screen open.

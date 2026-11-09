@@ -16,6 +16,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.BoardCuts.As;
 import com.botmaker.sdk.plugin.assist.BotStates;
+import com.botmaker.sdk.plugin.assist.Verdicts;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
 import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
@@ -416,6 +417,9 @@ final class CutForm {
         private final ComboBox<String> when = new ComboBox<>();
         private final ComboBox<Gesture> gesture = new ComboBox<>(FXCollections.observableArrayList(
                 Arrays.stream(Gesture.values()).filter(g -> g != Gesture.UNKNOWN).toList()));
+        /** Whether a run exploring alone presses the button: free, spends a fact, never (typed with why), none. */
+        private final ComboBox<String> verdict = new ComboBox<>(
+                FXCollections.observableArrayList(Verdicts.offered(services)));
         private final ComboBox<String> input = new ComboBox<>();
         private final ComboBox<ButtonState> state = new ComboBox<>(FXCollections.observableArrayList(
                 BotStates.offered(services.pluginValues()).stream().filter(s -> s != State.NORMAL).toList()));
@@ -506,6 +510,9 @@ final class CutForm {
             gesture.setCellFactory(list -> cell(Gesture::displayName));
             gesture.setValue(Gesture.CLICK);
             gesture.setTooltip(new Tooltip(MapGuide.GESTURE));
+            verdict.setEditable(true);
+            verdict.setValue(Verdicts.NONE);
+            verdict.setTooltip(new Tooltip(MapGuide.VERDICT));
             picture.getItems().setAll(pictures);
             picture.setPromptText("the picture");
             beside.setPromptText("its anchor");
@@ -651,7 +658,8 @@ final class CutForm {
             name.setDisable(!kind().named());
             details.getChildren().setAll(switch (kind()) {
                 case MARKER, MORE_MARKER -> List.of(popup);
-                case BUTTON -> List.of(gesture, sometimes, new Label("there while"), when);
+                case BUTTON -> List.of(gesture, sometimes, new Label("there while"), when, new Label("exploring alone"),
+                        verdict);
                 case LOOK -> List.of(new Label("of"), input, new Label("meaning"), state);
                 case SCREEN_LOOK -> List.of(look, lookMarker, new Label("shows while"), when);
                 case STRIP -> List.of(new Label("strip"), group, new Label("new: notches"), notches);
@@ -727,7 +735,8 @@ final class CutForm {
                 case MARKER -> new BoardCuts.Marker(popup.isSelected());
                 case MORE_MARKER -> new BoardCuts.MoreMarker(popup.isSelected());
                 case ABSENT -> new BoardCuts.Absent();
-                case BUTTON -> new BoardCuts.Press(sometimes.isSelected(), method, gesture.getValue());
+                case BUTTON -> new BoardCuts.Press(sometimes.isSelected(), method, gesture.getValue(),
+                        Verdicts.given(verdict.getEditor().getText()));
                 case BACK -> new BoardCuts.Back();
                 case LOOK -> new BoardCuts.LookOf(input.getValue(), state.getValue());
                 case SCREEN_LOOK -> new BoardCuts.ScreenLook(look.getText(), lookMarker.isSelected(), method);

@@ -73,7 +73,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   never the ones it leads to, so no constant names one declared after it. A popup is in no tree: a marker and a
   way out only.
 - **`Input`**: a picture click, a key or a scroll, with `tried()` (opened nothing), `leaving()` (to a screen
-  reached otherwise), `info()` (only tells: tried last), `never`, `occasional`, `locked`, `when` and button looks (`variants`). A
+  reached otherwise), `info()` (only tells: tried last), its verdict, `occasional`, `locked`, `when` and button looks
+  (`variants`). The verdict (`Verdict`, 2026-11-09) says whether a run exploring alone presses it: `free()`,
+  `spends(Progress::gems)` (a fact it costs), `never(why)`, or none, not pressed until judged; an info input needs
+  none, and `ScreenGraph.untagged()` lists the rest that have none. A
   picture shown more than once is one input per copy, `nth` (from 1, in reading order: `Reach.readingOrder`), since
   copies may open different screens; `each` does every copy in turn (the user's call, 2026-10-16). A button is
   pressed by its `Gesture` (`.gesture(Gesture.DOUBLE)`, right, middle, hover; `.hold(Duration)` a hold, else

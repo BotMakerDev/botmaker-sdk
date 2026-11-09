@@ -2,6 +2,7 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.function.BooleanSupplier;
@@ -14,15 +15,16 @@ import java.util.function.BooleanSupplier;
  * @param isTried      whether Discovery tried it and it opened no screen
  * @param isLeaving    whether it goes to a screen mapped already that it is no way into
  * @param isInfo       whether it only tells
- * @param never        why it is never done; null when it may be
+ * @param verdict      whether a run exploring on its own may press it; {@link Verdict#NONE} when null
  * @param isOccasional whether it works only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when it works, for one that comes and goes; null when not known
  */
-public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean isInfo, String never,
+public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
                      boolean isOccasional, ImageTemplate locked, BooleanSupplier when) implements Input {
 
     public Hotkey {
+        verdict = verdict == null ? Verdict.NONE : verdict;
         isOccasional = isOccasional || when != null;
     }
 
@@ -48,12 +50,12 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey tried() {
-        return new Hotkey(combo, true, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Hotkey(combo, true, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Hotkey leaving() {
-        return new Hotkey(combo, isTried, true, isInfo, never, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, true, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
@@ -64,17 +66,32 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey info() {
-        return new Hotkey(combo, isTried, isLeaving, true, never, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, true, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Hotkey never(String why) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, why, isOccasional, locked, when);
+        return verdict(Verdict.never(why));
+    }
+
+    @Override
+    public Hotkey free() {
+        return verdict(Verdict.FREE);
+    }
+
+    @Override
+    public <G, T> Hotkey spends(Params.Of<G, T> fact) {
+        return verdict(new Verdict.Spends(fact));
+    }
+
+    @Override
+    public Hotkey verdict(Verdict verdict) {
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Hotkey occasional() {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, never, true, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, true, locked, when);
     }
 
     @Override
@@ -85,17 +102,17 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey locked(ImageTemplate proof) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, never, isOccasional, proof, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when);
     }
 
     @Override
     public Hotkey when(BooleanSupplier condition) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, never, isOccasional, locked, condition);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition);
     }
 
     /** This hotkey, pressing {@code combo} instead. */
     public Hotkey combo(Combo combo) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override

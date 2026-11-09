@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants;
@@ -918,6 +919,25 @@ public final class ScreenGraph {
     public List<String> fields(String constant) {
         MapScreen screen = screens.get(constant);
         return screen == null ? List.of() : List.copyOf(screen.inputs().keySet());
+    }
+
+    /**
+     * Every input a run exploring on its own cannot judge: its verdict, with its strip's or tree's, is
+     * {@link Verdict.None}. An input only read ({@link Input#isInfo}) is never pressed, so it needs none.
+     */
+    public List<InputName> untagged() {
+        List<InputName> untagged = new ArrayList<>();
+        for (Map.Entry<String, MapScreen> screen : screens.entrySet()) {
+            for (String field : screen.getValue().inputs().keySet()) {
+                Input input = screen.getValue().effective(field).orElseThrow();
+                // A strip or a tree is scrolled, never pressed: its members are judged, or take its verdict.
+                if (input instanceof Strip || input instanceof Tree) continue;
+                if (!input.isInfo() && input.verdict() instanceof Verdict.None) {
+                    untagged.add(new InputName(screen.getKey(), field));
+                }
+            }
+        }
+        return untagged;
     }
 
     private boolean comesAndGoes(String constant, String field) {

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.value.Link;
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.ArrayDeque;
@@ -33,16 +34,17 @@ import java.util.function.BooleanSupplier;
  * @param isTried      whether Discovery scrolled it
  * @param isLeaving    whether its nodes go to screens mapped already that they are no way into
  * @param isInfo       whether its nodes only tell
- * @param never        why its nodes are never done; null when they may be
+ * @param verdict      whether a run exploring on its own may press its nodes; {@link Verdict#NONE} when null
  * @param isOccasional whether its nodes each show only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when its nodes are there; null when not known
  */
 public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTried, boolean isLeaving,
-                   boolean isInfo, String never, boolean isOccasional, ImageTemplate locked, BooleanSupplier when)
+                   boolean isInfo, Verdict verdict, boolean isOccasional, ImageTemplate locked, BooleanSupplier when)
         implements Input {
 
     public Tree {
+        verdict = verdict == null ? Verdict.NONE : verdict;
         nodes = nodes == null ? List.of() : List.copyOf(nodes);
         isOccasional = isOccasional || when != null;
     }
@@ -58,13 +60,13 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
     /** This tree, scrolled by dragging its view. */
     @Link
     public Tree dragged() {
-        return new Tree(nodes, true, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Tree(nodes, true, wheel, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     /** This tree, scrolled by the wheel, {@code notches} a scroll: how far only, a walk turns it the way a node lies. */
     @Link
     public Tree wheel(int notches) {
-        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     /** How many notches one wheel scroll turns; 0 when the wheel does not scroll it. */
@@ -75,12 +77,12 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
 
     @Override
     public Tree tried() {
-        return new Tree(nodes, isDragged, wheel, true, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Tree(nodes, isDragged, wheel, true, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Tree leaving() {
-        return new Tree(nodes, isDragged, wheel, isTried, true, isInfo, never, isOccasional, locked, when);
+        return new Tree(nodes, isDragged, wheel, isTried, true, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
@@ -91,17 +93,32 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
 
     @Override
     public Tree info() {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, true, never, isOccasional, locked, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, true, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Tree never(String why) {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, why, isOccasional, locked, when);
+        return verdict(Verdict.never(why));
+    }
+
+    @Override
+    public Tree free() {
+        return verdict(Verdict.FREE);
+    }
+
+    @Override
+    public <G, T> Tree spends(Params.Of<G, T> fact) {
+        return verdict(new Verdict.Spends(fact));
+    }
+
+    @Override
+    public Tree verdict(Verdict verdict) {
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Tree occasional() {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, true, locked, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, true, locked, when);
     }
 
     @Override
@@ -112,17 +129,17 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
 
     @Override
     public Tree locked(ImageTemplate proof) {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, proof, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when);
     }
 
     @Override
     public Tree when(BooleanSupplier condition) {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, condition);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition);
     }
 
     /** This tree, its nodes {@code nodes}. */
     public Tree nodes(List<Node> nodes) {
-        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     /** This tree without the node whose picture is {@code id}, and with no unlock line or offset naming it. */

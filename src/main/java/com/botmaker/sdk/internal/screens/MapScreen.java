@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -416,7 +417,9 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         if (now.when() == null && s.when() != null) now = now.when(s.when());
         if (!now.isInfo() && s.isInfo()) now = now.info();
         if (!now.isLeaving() && s.isLeaving()) now = now.leaving();
-        if (now.never() == null && s.never() != null) now = now.never(s.never());
+        // A strip never done holds every member back; one with no verdict of its own takes the strip's.
+        boolean stripNever = s.never() != null && now.never() == null;
+        if (stripNever || now.verdict() instanceof Verdict.None) now = now.verdict(s.verdict());
         if (now.locked() == null && s.locked() != null) now = now.locked(s.locked());
         return now;
     }

@@ -61,9 +61,9 @@ public final class BoardCuts {
 
     /**
      * One of its buttons, shown only at times when {@code sometimes}, only while {@code when} holds when given, pressed
-     * by {@code gesture} (null: a click).
+     * by {@code gesture} (null: a click), judged by {@code verdict} as {@link Verdicts} says one (null: not yet).
      */
-    public record Press(boolean sometimes, String when, Gesture gesture) implements As {
+    public record Press(boolean sometimes, String when, Gesture gesture, String verdict) implements As {
     }
 
     /** Its way back: its close button. */
@@ -412,7 +412,8 @@ public final class BoardCuts {
                 press != null && press.sometimes() ? Boolean.TRUE : null, popup ? Boolean.TRUE : null,
                 lookOf == null ? null : lookOf.input(),
                 lookOf == null || lookOf.state() == null ? null : lookOf.state().id(), when,
-                screenLook == null ? null : blankless(screenLook.look()), null);
+                screenLook == null ? null : blankless(screenLook.look()), null,
+                press == null ? null : Verdicts.given(press.verdict()));
     }
 
     /** edit_pictures' replace of {@code picture} by {@code cut}. */

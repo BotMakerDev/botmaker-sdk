@@ -29,6 +29,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -94,38 +95,44 @@ public final class ScreenEdits {
     /** {@code input} as it was cut, untried: tried, leaving, never and lock cleared, the rest kept. */
     public static Input untried(Input input) {
         return switch (input) {
-            case Button b -> new Button(b.picture(), false, false, b.isInfo(), null, b.isOccasional(), null,
+            case Button b -> new Button(b.picture(), false, false, b.isInfo(), judged(b), b.isOccasional(), null,
                     b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
                     b.isMarking(), b.isAbsent());
-            case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), null, h.isOccasional(), null, h.when());
-            case Custom c -> new Custom(c.method(), false, c.isInfo(), null, c.isOccasional(), null, c.when());
-            case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), null, t.isOccasional(), null,
-                    t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
-            case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), null, s.isOccasional(), null,
-                    s.when());
-            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), false, false, t.isInfo(), null,
+            case Hotkey h -> new Hotkey(h.combo(), false, false, h.isInfo(), judged(h), h.isOccasional(), null,
+                    h.when());
+            case Custom c -> new Custom(c.method(), false, c.isInfo(), judged(c), c.isOccasional(), null, c.when());
+            case TextButton t -> new TextButton(t.caption(), false, false, t.isInfo(), judged(t), t.isOccasional(),
+                    null, t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
+            case Strip s -> new Strip(s.scroll(), s.members(), false, false, s.isInfo(), judged(s), s.isOccasional(),
+                    null, s.when());
+            case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), false, false, t.isInfo(), judged(t),
                     t.isOccasional(), null, t.when());
         };
+    }
+
+    /** What an input untried again keeps of its verdict: free or spends, which say what it costs; never goes. */
+    private static Verdict judged(Input input) {
+        return input.verdict() instanceof Verdict.Never ? Verdict.NONE : input.verdict();
     }
 
     /** {@code input} shown only at times, or always ({@code sometimes} false: when it is there goes too). */
     public static Input sometimes(Input input, boolean sometimes) {
         if (sometimes) return input.occasional();
         return switch (input) {
-            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.never(), false,
+            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), b.isInfo(), b.verdict(), false,
                     b.locked(), b.looks(), null, b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
                     b.isMarking(), b.isAbsent());
-            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.never(), false, h.locked(),
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), h.isInfo(), h.verdict(), false, h.locked(),
                     null);
-            case Custom c -> new Custom(c.method(), c.isLeaving(), c.isInfo(), c.never(), false, c.locked(), null);
-            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.never(), false,
+            case Custom c -> new Custom(c.method(), c.isLeaving(), c.isInfo(), c.verdict(), false, c.locked(), null);
+            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), t.isInfo(), t.verdict(), false,
                     t.locked(), null, t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
-            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.never(),
+            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), s.isInfo(), s.verdict(),
                     false, s.locked(), null);
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), t.isInfo(),
-                    t.never(), false, t.locked(), null);
+                    t.verdict(), false, t.locked(), null);
         };
     }
 
@@ -133,20 +140,20 @@ public final class ScreenEdits {
     public static Input info(Input input, boolean info) {
         if (info) return input.info();
         return switch (input) {
-            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.never(), b.isOccasional(),
+            case Button b -> new Button(b.picture(), b.isTried(), b.isLeaving(), false, b.verdict(), b.isOccasional(),
                     b.locked(), b.looks(), b.when(), b.repeats(), b.cycles(), b.gesture(), b.hold(),
                     b.typing(), b.drag(), b.place(), b.beside(), b.grid(), b.element(), b.keeps(),
                     b.isMarking(), b.isAbsent());
-            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.never(), h.isOccasional(),
+            case Hotkey h -> new Hotkey(h.combo(), h.isTried(), h.isLeaving(), false, h.verdict(), h.isOccasional(),
                     h.locked(), h.when());
-            case Custom c -> new Custom(c.method(), c.isLeaving(), false, c.never(), c.isOccasional(), c.locked(),
+            case Custom c -> new Custom(c.method(), c.isLeaving(), false, c.verdict(), c.isOccasional(), c.locked(),
                     c.when());
-            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.never(),
+            case TextButton t -> new TextButton(t.caption(), t.isTried(), t.isLeaving(), false, t.verdict(),
                     t.isOccasional(), t.locked(), t.when(), t.gesture(), t.hold(), t.isMarking(), t.isAbsent());
-            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.never(),
+            case Strip s -> new Strip(s.scroll(), s.members(), s.isTried(), s.isLeaving(), false, s.verdict(),
                     s.isOccasional(), s.locked(), s.when());
             case Tree t -> new Tree(t.nodes(), t.isDragged(), t.wheel(), t.isTried(), t.isLeaving(), false,
-                    t.never(), t.isOccasional(), t.locked(), t.when());
+                    t.verdict(), t.isOccasional(), t.locked(), t.when());
         };
     }
 
@@ -253,7 +260,7 @@ public final class ScreenEdits {
                 .map(n -> n.picture() == null ? n : kept.getOrDefault(n.picture().id(), n)).toList());
         if (had != null) {
             made = new Tree(made.nodes(), tree.isDragged(), tree.wheel(), had.isTried(), had.isLeaving(),
-                    had.isInfo(), had.never(), had.isOccasional(), had.locked(), had.when());
+                    had.isInfo(), had.verdict(), had.isOccasional(), had.locked(), had.when());
         }
         for (String gone : kept.keySet()) {
             if (made.members().stream().noneMatch(p -> p != null && p.id().equals(gone))) made = made.without(gone);
@@ -679,7 +686,7 @@ public final class ScreenEdits {
 
     /** {@code button} stepping through its looks on each press ({@link Button#cycling}), or not. */
     public static Button cycles(Button button, boolean cycles) {
-        return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.never(),
+        return new Button(button.picture(), button.isTried(), button.isLeaving(), button.isInfo(), button.verdict(),
                 button.isOccasional(), button.locked(), button.looks(), button.when(), button.repeats(), cycles,
                 button.gesture(), button.hold(), button.typing(), button.drag(), button.place(), button.beside(),
                 button.grid(), button.element(), button.keeps(), button.isMarking(), button.isAbsent());

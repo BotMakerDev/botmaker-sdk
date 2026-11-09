@@ -17,6 +17,8 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -309,6 +311,20 @@ class ScreenGraphTest {
 
         screens.put("GUILD", screens.get("GUILD").setup(s -> s.alsoFrom(List.of(Way.of(ref("CAMPAIGN", "guild"))))));
         assertEquals(ScreenGraph.Presence.ALWAYS, ScreenGraph.of(screens).presence("GUILD"), "the best way in");
+    }
+
+    /** A run exploring on its own asks only about inputs that say nothing of whether it may press them. */
+    @Test
+    void untaggedListsOnlyInputsWithNoVerdict() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign").free(),
+                click("engineer"), click("gold").info(), click("chest").spends(ScreenTypes.fact("Progress::gems")),
+                Strip.of(Scroll.wheel(-5), marks("engineer")).free()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of(new InputName("CAMPAIGN", "claim"), new InputName("CAMPAIGN", "map"),
+                new InputName("MAP", "key_escape")), graph.untagged(),
+                "free, spends, never, read only and a free strip's member are judged; the rest are asked");
     }
 
     /** A strip's traits are its members' defaults (the user's call, 2026-10-16). */

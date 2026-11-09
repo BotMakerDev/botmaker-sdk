@@ -56,10 +56,12 @@ class BoardCutsTest {
 
     @Test
     void aButtonTakesWhenItShowsAndALookWhatItIsOf() {
-        Box press = BoardCuts.box(cut(new BoardCuts.Press(true, " Bot::eventOn ", null)));
+        Box press = BoardCuts.box(cut(new BoardCuts.Press(true, " Bot::eventOn ", null, " free ")));
         assertNull(press.marker());
         assertEquals(Boolean.TRUE, press.sometimes());
         assertEquals("Bot::eventOn", press.when());
+        assertEquals("free", press.verdict());
+        assertNull(BoardCuts.box(cut(new BoardCuts.Press(false, null, null, Verdicts.NONE))).verdict());
         Box look = BoardCuts.box(cut(new BoardCuts.LookOf("collect_button", State.DISABLED)));
         assertEquals("collect_button", look.variantOf());
         assertEquals(State.DISABLED.id(), look.state());
@@ -74,7 +76,7 @@ class BoardCutsTest {
     void aPolygonGoesByItsCornersAndTheSkippedPartAlong() {
         List<Point> corners = List.of(new Point(10, 20), new Point(40, 20), new Point(25, 60));
         Box box = BoardCuts.box(new Cut("gem", BOX, CutShape.POLYGON, corners, new Rect(12, 22, 4, 4),
-                new BoardCuts.Press(false, null, null)));
+                new BoardCuts.Press(false, null, null, null)));
         assertNull(box.x());
         assertNull(box.width());
         assertEquals(3, box.points().size());

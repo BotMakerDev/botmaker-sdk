@@ -47,7 +47,9 @@ class HandParityTest {
                     + "never, locked, a button's Pressed by (its gesture and hold time, or its drag), Text field, "
                     + "looks, repeated and cycles, Where (a side of a picture), a "
                     + "hotkey's keys and hold; ⋯ input")),
-            entry("ResetInput", Hand.now("⋯ input ▸ Result ▸ Untried")),
+            entry("SetVerdict", Hand.now("the picked input's Exploring alone: free, spends a fact, never, or not "
+                    + "judged yet")),
+            entry("ResetInput",Hand.now("⋯ input ▸ Result ▸ Untried")),
             entry("RemoveInput", Hand.now("⋯ input ▸ Remove from this screen")),
             entry("UseAsBack", Hand.now("⋯ input ▸ Use as the way back")),
             entry("RemoveBack", Hand.now("the panel's Way back ✕")),

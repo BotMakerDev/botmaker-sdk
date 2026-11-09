@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -50,6 +51,7 @@ import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -230,7 +232,10 @@ final class PictureTools {
                String screenLook,
                @Describe(value = "true when it moves (an idle monster): watched until its loop repeats, its frames "
                        + "kept", optional = true)
-               Boolean moving) {
+               Boolean moving,
+               @Describe(value = "the input's verdict, whether a run exploring alone presses it: " + Verdicts.SAY,
+                       optional = true)
+               String verdict) {
     }
 
     record Crops(@Describe("the boxes to cut, in the last screenshot's pixels; one picture is a list of one")
@@ -385,6 +390,35 @@ final class PictureTools {
             }
         }
         String screen = blankless(crops.screen());
+        Map<String, Verdict> verdicts = new LinkedHashMap<>();
+        for (Box box : boxes) {
+            if (blankless(box.verdict()) == null) continue;
+            if (screen == null) {
+                return AgentReply.refused(box.name() + ": a verdict is an input's; give the screen it is on. Nothing "
+                        + "was saved.");
+            }
+            Verdicts.Read read = FxCall.call(() -> Verdicts.read(context.services(), box.verdict()));
+            if (read.refused() != null) return AgentReply.refused(box.name() + ": " + read.refused() + " Nothing was saved.");
+            verdicts.put(TemplateLibrary.sanitizeName(box.name()), read.verdict());
+        }
+        AgentReply cut = cut(crops, context, shown, live, watched, boxes, screen);
+        return cut.isRefused() || verdicts.isEmpty() ? cut : judged(cut, context, screen, verdicts);
+    }
+
+    /** {@code cut} with {@code verdicts} given to the inputs it noted on {@code screen}, and what that said. */
+    private static AgentReply judged(AgentReply cut, AgentContext context, String screen, Map<String, Verdict> verdicts) {
+        Optional<String> constant = FxCall.call(() -> ScreenBook.find(ScreenBook.read(context.services()), screen));
+        if (constant.isEmpty()) return cut.and(AgentReply.text("\nNo verdict given: no screen " + screen + "."));
+        List<String> missed = new ArrayList<>();
+        Optional<String> failed = MapTools.judgeAll(context.services(), constant.get(), verdicts, missed);
+        if (failed.isPresent()) return cut.and(AgentReply.text("\nNo verdict given: " + failed.get()));
+        return missed.isEmpty() ? cut : cut.and(AgentReply.text("\nNo input " + String.join(", ", missed)
+                + " to give a verdict: set_verdict once it is one."));
+    }
+
+    private static AgentReply cut(Crops crops, AgentContext context, Optional<BufferedImage> shown,
+                                  Supplier<List<BufferedImage>> live, Map<String, FrameWatch.Watched> watched,
+                                  List<Box> boxes, String screen) {
         List<Crop> cuts = new ArrayList<>(boxes.stream().map(b -> Crop.of(b, crops.tags(), screen)).toList());
         Optional<String> wrong = cuts.size() == 1 ? Optional.empty() : refusal(cuts, screen);
         if (wrong.isPresent()) return AgentReply.refused(wrong.get() + " Nothing was saved.");

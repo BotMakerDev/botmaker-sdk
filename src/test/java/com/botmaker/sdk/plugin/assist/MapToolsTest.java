@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.Order;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -138,7 +139,7 @@ class MapToolsTest {
         assertTrue(cycling.cycles());
         assertEquals(buy, ScreenEdits.cycles(cycling, false));
         Hotkey q = Hotkey.of(Key.Q).info().never("spends gems");
-        assertEquals(new Hotkey(Combo.of(Key.W), false, false, true, "spends gems", false, null, null),
+        assertEquals(new Hotkey(Combo.of(Key.W), false, false, true, new Verdict.Never("spends gems"), false, null, null),
                 q.combo(Combo.of(Key.W)));
     }
 

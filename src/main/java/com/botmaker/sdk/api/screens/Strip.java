@@ -1,5 +1,6 @@
 package com.botmaker.sdk.api.screens;
 
+import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
 import java.util.List;
@@ -25,15 +26,16 @@ import java.util.function.BooleanSupplier;
  * @param isTried      whether Discovery scrolled it
  * @param isLeaving    whether its members go to screens mapped already that they are no way into
  * @param isInfo       whether its members only tell
- * @param never        why its members are never done; null when they may be
+ * @param verdict      whether a run exploring on its own may press its members; {@link Verdict#NONE} when null
  * @param isOccasional whether its members each show only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when its members are there; null when not known
  */
 public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried, boolean isLeaving, boolean isInfo,
-                    String never, boolean isOccasional, ImageTemplate locked, BooleanSupplier when) implements Input {
+                    Verdict verdict, boolean isOccasional, ImageTemplate locked, BooleanSupplier when) implements Input {
 
     public Strip {
+        verdict = verdict == null ? Verdict.NONE : verdict;
         members = members == null ? List.of() : List.copyOf(members);
         isOccasional = isOccasional || when != null;
     }
@@ -45,12 +47,12 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried,
 
     @Override
     public Strip tried() {
-        return new Strip(scroll, members, true, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Strip(scroll, members, true, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Strip leaving() {
-        return new Strip(scroll, members, isTried, true, isInfo, never, isOccasional, locked, when);
+        return new Strip(scroll, members, isTried, true, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
@@ -61,17 +63,32 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried,
 
     @Override
     public Strip info() {
-        return new Strip(scroll, members, isTried, isLeaving, true, never, isOccasional, locked, when);
+        return new Strip(scroll, members, isTried, isLeaving, true, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Strip never(String why) {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, why, isOccasional, locked, when);
+        return verdict(Verdict.never(why));
+    }
+
+    @Override
+    public Strip free() {
+        return verdict(Verdict.FREE);
+    }
+
+    @Override
+    public <G, T> Strip spends(Params.Of<G, T> fact) {
+        return verdict(new Verdict.Spends(fact));
+    }
+
+    @Override
+    public Strip verdict(Verdict verdict) {
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     @Override
     public Strip occasional() {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, true, locked, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, true, locked, when);
     }
 
     @Override
@@ -82,22 +99,22 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried,
 
     @Override
     public Strip locked(ImageTemplate proof) {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, isOccasional, proof, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when);
     }
 
     @Override
     public Strip when(BooleanSupplier condition) {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, isOccasional, locked, condition);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition);
     }
 
     /** This strip, its members {@code members}. */
     public Strip members(List<ImageTemplate> members) {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     /** This strip, scrolled by {@code scroll}. */
     public Strip scroll(Scroll scroll) {
-        return new Strip(scroll, members, isTried, isLeaving, isInfo, never, isOccasional, locked, when);
+        return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
     }
 
     /** Whether {@code picture} is one of its members, by its id. */

@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -1340,6 +1341,24 @@ final class MapTools {
                 now = had.isPresent() ? now.withInput(had.get(), now.inputs().get(had.get()).occasional())
                         : now.withInput(now.fieldFor(cut.id()), Button.of(cut).occasional());
                 noted.add(picture + ": comes and goes");
+            }
+            return now;
+        }));
+    }
+
+    /**
+     * Gives each button of {@code constant} whose picture {@code verdicts} names that verdict, in one write of it; the
+     * pictures with no button there are said in {@code missed}. Empty, or why the screen could not be written.
+     */
+    static Optional<String> judgeAll(StudioServices services, String constant, Map<String, Verdict> verdicts,
+                                     List<String> missed) {
+        if (verdicts.isEmpty()) return Optional.empty();
+        return FxCall.call(() -> ScreenBook.update(services, constant, s -> {
+            MapScreen now = s;
+            for (Map.Entry<String, Verdict> one : verdicts.entrySet()) {
+                Optional<String> field = buttonOf(now, ScreenBook.picture(services, one.getKey()));
+                if (field.isEmpty()) missed.add(one.getKey());
+                else now = now.withInput(field.get(), now.inputs().get(field.get()).verdict(one.getValue()));
             }
             return now;
         }));
