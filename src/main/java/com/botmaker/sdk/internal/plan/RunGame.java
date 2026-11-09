@@ -28,6 +28,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.Set;
 
 /** A {@link PlanRun}'s {@link PlanRun.Game} on the running bot's game: the map's walk and presses, its facts. */
@@ -62,6 +63,19 @@ public final class RunGame implements PlanRun.Game {
                         + " Have the action need a goal nearer the plan.");
             }
         };
+    }
+
+    /**
+     * {@code plan} one round at a time, over the installed map and the bot's done-records, for a run that interleaves
+     * it with its own presses (<em>Keep exploring</em>): each call runs one round, true when it did a step of the plan;
+     * false when it only waited (every goal met or waiting) or the plan ended, so the run tries something else.
+     */
+    public static BooleanSupplier rounds(Plan plan, Class<?>... holders) {
+        ScreenGraph map = ScreenMaps.installed();
+        Map<Goal, String> names = names(holders);
+        PlanRun run = new PlanRun(plan, map, DoneRecords.run(), new RunGame(map), names::get,
+                BotSettings.current().stuckAfter());
+        return () -> run.round().isEmpty() && run.acted();
     }
 
     /** Each {@code public static final Goal} of the classes beside {@code holders}, by its field's name. */

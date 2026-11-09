@@ -87,8 +87,11 @@ public final class Guards {
                 .toList());
     }
 
-    /** Whether {@code input} may be pressed with {@code around} as it is, else the first guard in the way. */
-    public Refusal check(Input input, Around around) {
+    /**
+     * Whether anything may be pressed with {@code around}'s foreground: a press with no input of its own (a way back
+     * by the map's close button) is guarded by this alone.
+     */
+    public Refusal front(Around around) {
         Foreground front = around.foreground();
         if (!front.dialog().isEmpty()) {
             return new Refusal(Kind.SYSTEM_DIALOG, "A system dialog is in front: " + front.dialog() + ".");
@@ -99,6 +102,13 @@ public final class Guards {
                     ? new Refusal(Kind.SYSTEM_DIALOG, "A system dialog is in front (" + now + "), not " + front.target() + ".")
                     : new Refusal(Kind.FOREIGN_WINDOW, now + " is in front, not " + front.target() + ".");
         }
+        return PRESS;
+    }
+
+    /** Whether {@code input} may be pressed with {@code around} as it is, else the first guard in the way. */
+    public Refusal check(Input input, Around around) {
+        Refusal front = front(around);
+        if (front.refused()) return front;
         Optional<String> field = around.at().stream().map(Guards::sensitive).flatMap(Optional::stream).findFirst();
         if (field.isPresent()) return new Refusal(Kind.SENSITIVE_FIELD, field.get());
         Verdict verdict = input.verdict();

@@ -123,6 +123,8 @@ public final class PlanRun {
     private Unproven unproven;
     /** The due time the run last said it idles until; null when it is not idling. */
     private Instant idling;
+    /** Whether the last round did a step of the plan, rather than wait or end. */
+    private boolean acted;
     /** The action last put after another on arrival, with nothing pressed since; null otherwise. */
     private Do deferred;
     /** How long the run may act with no progress before it is stuck. */
@@ -185,6 +187,11 @@ public final class PlanRun {
      * One round: something done, gone to, waited for, or the end. A round that acted ends at the watchdog's
      * {@link #checkpoint}.
      */
+    /** Whether the last {@link #round()} did a step of the plan: false when it only waited, or ended the plan. */
+    boolean acted() {
+        return acted;
+    }
+
     Optional<End> round() {
         if (progressed == null) progressed();
         prove();
@@ -192,6 +199,7 @@ public final class PlanRun {
         PlanModel model = model(at);
         progressSeen(model, at);
         Round round = Planner.round(model);
+        acted = !round.doing().isEmpty();
         if (round.doing().isEmpty()) {
             Instant from = records.clock().instant();
             Optional<End> end = idleOrEnd(model, round);

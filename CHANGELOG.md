@@ -19,6 +19,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Keep exploring** (2026-11-09): a second SDK run beside *Explore map* (`SdkRuns.KEEP_EXPLORING`,
+  `api/bot/KeepExploring`) plays and explores the game for hours on its own. Each round it presses an input not tried
+  yet, else plays a round of the bot's plan, else walks to the nearest screen with one left. It stops on what the bot
+  does not know: a screen the map lacks, a way that arrived elsewhere, one that worked before and does nothing now with
+  nothing saying when, a value on screen no readout covers, inputs with no verdict (one stop listing them all), a guard
+  refusal, a crash, nothing pressed for 15 minutes. A stop waits for a command; nobody answering in 10 minutes parks it
+  and the run goes on avoiding its place. A foreign window or system dialog never parks: the run waits until the game
+  is in front again. A resume reloads the bot as its next generation and checks the fix took where the stop was; the
+  same stop again says "the fix did not take". The journal is `explore/` in the SDK's state folder of the bot:
+  `events.jsonl` (appended, read back past a cut last line), `queue.json` (the parked stops) and `command`
+  (`resume <id> [ignore]` or `stop`). The run property `botmaker.explore.hours` gives it a budget.
 - **The bot reloaded in a running run** (2026-11-09): `internal/explore/Generation` compiles the bot's sources in the
   run's JVM into `target/botmaker-explore/gen-<n>` and loads them child-first over the run's own loader, so a fix that
   adds a readout or an input takes without restarting the game. A compile error refuses the reload with its errors and

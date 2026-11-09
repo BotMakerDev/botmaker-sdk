@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.run;
 
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.api.bot.ExploreMap;
+import com.botmaker.sdk.api.bot.KeepExploring;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import org.junit.jupiter.api.Test;
 
@@ -12,11 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class SdkRunsTest {
 
     @Test
-    void theSdkDeclaresExploreMap() {
+    void theSdkDeclaresExploreMapAndKeepExploring() {
         List<RunEntry> entries = new SdkPlugin().runEntries();
 
-        assertEquals(1, entries.size());
-        assertEquals("Explore map", entries.getFirst().title());
-        assertEquals(ExploreMap.class.getName(), entries.getFirst().mainClass());
+        assertEquals(List.of("Explore map", "Keep exploring"), entries.stream().map(RunEntry::title).toList());
+        assertEquals(List.of(ExploreMap.class.getName(), KeepExploring.class.getName()),
+                entries.stream().map(RunEntry::mainClass).toList());
     }
 }

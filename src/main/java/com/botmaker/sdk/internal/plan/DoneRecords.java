@@ -31,8 +31,8 @@ import java.util.Set;
 public final class DoneRecords {
 
     /** The SDK's coordinate, which names its state folder. */
-    private static final String GROUP = "com.github.BotMakerDev";
-    private static final String ARTIFACT = "botmaker-sdk";
+    public static final String GROUP = "com.github.BotMakerDev";
+    public static final String ARTIFACT = "botmaker-sdk";
     /** The file in that folder. */
     static final String FILE = "done.json";
 
