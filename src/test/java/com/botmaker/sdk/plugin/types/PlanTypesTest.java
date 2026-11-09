@@ -13,6 +13,7 @@ import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.junit.jupiter.api.Test;
@@ -164,6 +165,20 @@ class PlanTypesTest {
         assertEquals(Reset.daily(LocalTime.of(5, 0)), action.daily(), "no zone of its own: the game's");
         String written = grammar.write(Do.class, action, NAMES).orElseThrow().source();
         assertTrue(written.endsWith(".daily(Reset.daily(LocalTime.of(5, 0, 0)))"), written);
+    }
+
+    /**
+     * The game zone parameter's first value, this computer's zone, written as bind writes it (2026-11-09):
+     * {@code ZoneId.of("…")}, which reads back the same zone.
+     */
+    @Test
+    void theGameZonesFirstValueIsWrittenAsTheZoneItIs() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(PlanTypes.ZONE_ID));
+        ZoneId first = SdkValues.GAME_ZONE.initial();
+        assertEquals(ZoneId.systemDefault(), first);
+        JavaValue java = grammar.spell(ZoneId.class, first).orElseThrow();
+        assertEquals("ZoneId.of(\"" + first.getId() + "\")", java.source());
+        assertEquals(Optional.of(first), grammar.read(ZoneId.class, "java.time." + java.source()));
     }
 
     /** What an action takes, as its author writes it by hand, read as the duration it is and written back the same. */

@@ -29,6 +29,7 @@ import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -269,17 +270,18 @@ public final class SdkValues implements ValueHolder {
             .because("This is the game VM ⚙ Bot Settings runs the game in. Change it there.");
 
     /**
-     * The game server's time zone — {@code public String gameZone()}, a zone id such as {@code Europe/Paris}, which a
-     * {@code Reset} with no zone of its own is read in (2026-11-09). A parameter, since one game's servers sit in
-     * several zones and the runner plays on one; blank for this computer's zone.
+     * The game server's time zone — {@code public ZoneId gameZone()}, {@code ZoneId.of("Europe/Paris")}, which a
+     * {@code Reset} with no zone of its own is read in. A parameter, since one game's servers sit in several zones and
+     * the runner plays on one. A {@code ZoneId} since 2026-11-09, the user's call: it starts as the zone of the
+     * computer that binds it, since a value cannot say "this computer's" (an {@code Optional} would, but the grammar
+     * writes none). The {@code String} it was is another type: an upgrade removes it and bind writes this one.
      */
-    public static final ManagedParam<String> GAME_ZONE = ManagedValue.param(SdkValue.Id.GAME_ZONE)
+    public static final ManagedParam<ZoneId> GAME_ZONE = ManagedValue.param(SdkValue.Id.GAME_ZONE)
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::thisComputersZone)
-            .shown("The game server's time zone, such as Europe/Paris, that its daily reset is read in; blank for"
-                    + " this computer's", Param.Visibility.PUBLIC)
-            .because("The SDK reads this parameter whenever a daily asks for the game's last reset. Type the"
-                    + " server's zone id, such as Europe/Paris, in the Runner or in Project ▸ Parameters.");
+            .shown("The game server's time zone, that its daily reset is read in", Param.Visibility.PUBLIC)
+            .because("The SDK reads this parameter whenever a daily asks for the game's last reset. Set the"
+                    + " server's zone, such as Europe/Paris, in the Runner or in Project ▸ Parameters.");
 
     /**
      * Words a run exploring on its own refuses to press beside — {@code public static List<String> guardWords()} in
@@ -318,9 +320,9 @@ public final class SdkValues implements ValueHolder {
         return LaunchChoice.of("");
     }
 
-    /** {@link #GAME_ZONE}'s: blank, this computer's zone, until the runner names the server's. */
-    private static String thisComputersZone() {
-        return "";
+    /** {@link #GAME_ZONE}'s: this computer's zone, until the runner names the server's. */
+    private static ZoneId thisComputersZone() {
+        return ZoneId.systemDefault();
     }
 
     /** {@link #CAPTURE}'s: the whole desktop until the game's window is picked. */

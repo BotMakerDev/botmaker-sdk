@@ -265,7 +265,7 @@ public final class GoalsView {
             StudioPlan plan = StudioPlan.of(plans.get(shown), goals, map);
             // Timed in the game server's zone, as a run is, so a daily's reset reads the same here.
             Clock clock = Clock.system(InstalledGame.zone(values.open(SdkValues.GAME_ZONE)
-                    .flatMap(ctx -> ctx.value(String.class)).orElse("")));
+                    .flatMap(ctx -> ctx.value(ZoneId.class)).orElse(null)));
             DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, clock))
                     .orElseGet(() -> new DoneRecords(null, clock));
             List<String> names = List.copyOf(plans.keySet());

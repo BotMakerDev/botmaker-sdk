@@ -15,7 +15,7 @@ import java.util.Objects;
  *
  * @param at   the time of day the game resets at
  * @param zone the zone that time is read in; {@code null} for the game's, the SDK's {@code gameZone} parameter, or this
- *             computer's when that is blank
+ *             computer's when the bot has none
  */
 public record Reset(LocalTime at, ZoneId zone) {
 

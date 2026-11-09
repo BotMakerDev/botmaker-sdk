@@ -123,8 +123,8 @@ public @interface SdkValue {
         /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
         VM,
         /**
-         * The game server's time zone, which a daily's reset is read in — the {@code String} parameter {@code gameZone},
-         * a zone id such as {@code Europe/Paris}; blank for this computer's.
+         * The game server's time zone, which a daily's reset is read in — the {@code ZoneId} parameter
+         * {@code gameZone}, such as {@code ZoneId.of("Europe/Paris")}.
          */
         GAME_ZONE,
         /**

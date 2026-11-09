@@ -5,6 +5,8 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 
+import java.time.ZoneId;
+
 /** The BotMaker SDK's game parameters on this computer: which game it launches and where it reads pixels. */
 @Param
 public class Game {
@@ -22,9 +24,8 @@ public class Game {
     }
 
     @SdkValue(SdkValue.Id.GAME_ZONE)
-    @Param.Shown(description = "The game server's time zone, such as Europe/Paris, that its daily reset is read in;"
-            + " blank for this computer's")
-    public String gameZone() {
-        return "";
+    @Param.Shown(description = "The game server's time zone, that its daily reset is read in")
+    public ZoneId gameZone() {
+        return ZoneId.of("Europe/Paris");
     }
 }

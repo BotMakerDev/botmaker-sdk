@@ -9,6 +9,7 @@ import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,6 +66,42 @@ class InstalledGameTest {
     @AfterEach
     void forget() {
         InstalledGame.install();
+    }
+
+    /** A bot's game zone, a {@code ZoneId} (2026-11-09). */
+    public static final class Zoned {
+        @SdkValue(SdkValue.Id.GAME_ZONE)
+        public static ZoneId server() {
+            return ZoneId.of("Asia/Tokyo");
+        }
+    }
+
+    /** A game zone still written as the old {@code String}: no zone, so this computer's. */
+    public static final class OldZone {
+        @SdkValue(SdkValue.Id.GAME_ZONE)
+        public static String server() {
+            return "Asia/Tokyo";
+        }
+    }
+
+    /** A zone id with a typo: the body throws, said on the error stream, and the run goes on. */
+    public static final class BadZone {
+        @SdkValue(SdkValue.Id.GAME_ZONE)
+        public static ZoneId server() {
+            return ZoneId.of("Asia/Tokio");
+        }
+    }
+
+    @Test
+    void theGameZoneIsTheZoneIdTheBotMarksElseThisComputers() {
+        InstalledGame.install(Zoned.class);
+        assertEquals(ZoneId.of("Asia/Tokyo"), InstalledGame.gameZone());
+        InstalledGame.install(BadZone.class);
+        assertEquals(ZoneId.systemDefault(), InstalledGame.gameZone(), "a zone that throws is none");
+        InstalledGame.install(OldZone.class);
+        assertEquals(ZoneId.systemDefault(), InstalledGame.gameZone(), "a String is no zone now");
+        InstalledGame.install(Sdk.class);
+        assertEquals(ZoneId.systemDefault(), InstalledGame.gameZone(), "a bot that marks none");
     }
 
     @Test

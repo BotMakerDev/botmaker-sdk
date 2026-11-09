@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The game zone is a `ZoneId`** (2026-11-09): `gameZone()` in the `Game` parameters returns
+  `ZoneId.of("Asia/Tokyo")`, not a zone id `String`, and starts as the zone of the computer that binds it. The
+  `String` form is another type: an upgrade removes it and bind writes the `ZoneId` one, so a zone typed before must
+  be set again; nothing carries it over. A parameter whose body throws, such as a mistyped zone, is said on the
+  error stream and read as none.
 - **🎯 Goals with no goal yet** (2026-11-09): `+ Plan` is disabled while the bot has no goal that reads, and its
   tooltip says what comes first: `+ Goal`, or, with no fact either, a `@Facts` method. The empty window says the same
   order instead of refusing "a plan needs a name and a goal for its first tier" on the press. `+ Plan` offers only the

@@ -6,6 +6,7 @@ import com.botmaker.sdk.api.bot.SdkValue;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.JarURLConnection;
@@ -258,6 +259,11 @@ public final class ParamGroups {
         try {
             method.setAccessible(true);
             return Optional.ofNullable(method.invoke(target));
+        } catch (InvocationTargetException threw) {
+            // The bot's own body threw, ZoneId.of("Asia/Tokio"): said, so a typo does not silently become no value.
+            System.err.println("The parameter " + method.getDeclaringClass().getSimpleName() + "." + method.getName()
+                    + "() cannot be read, so it is taken as none: " + threw.getCause());
+            return Optional.empty();
         } catch (ReflectiveOperationException | RuntimeException unreadable) {
             return Optional.empty();
         }
