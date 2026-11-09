@@ -16,7 +16,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -1159,12 +1159,7 @@ final class ScreenPanel {
 
     private void goHere(String constant) {
         PanelContext context = new PanelContext(services, CaptureValue.current(services));
-        run("Going to " + graph.shown(constant) + "…", constant, () -> {
-            ScreenDesk.Walked walked = ScreenDesk.walk(context, constant);
-            // Recorded only once there: a walk that did not arrive is not a step of the activity.
-            if (walked.arrived()) Platform.runLater(() -> live.recordWalk(constant));
-            return walked.said();
-        });
+        run("Going to " + graph.shown(constant) + "…", constant, () -> ScreenDesk.walk(context, constant).said());
     }
 
     /** Runs {@code work} off the FX thread, the card pulsing, and says what it answered. */

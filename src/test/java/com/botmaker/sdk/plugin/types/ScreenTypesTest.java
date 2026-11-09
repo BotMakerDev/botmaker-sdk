@@ -38,7 +38,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.java.grammar.JavaValue;
 import com.botmaker.java.grammar.ValueGrammar;

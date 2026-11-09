@@ -4,7 +4,7 @@ import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 

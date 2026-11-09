@@ -20,7 +20,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.StillSource;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.Planner;
 import com.botmaker.sdk.internal.plan.StudioPlan;

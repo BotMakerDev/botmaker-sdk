@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin.pictures;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.SdkLog;
-import com.botmaker.sdk.plugin.flow.FlowValue;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -271,27 +270,11 @@ public final class TemplateLibrary {
     }
 
     /**
-     * The project's declared tags — one per activity, plus the custom ones {@code Tags} declares. Read afresh
-     * for the same reason the tags are (see above): the activities are edited by a dialog, a canvas and a
-     * repair pass, and a cache here would be another of them to invalidate.
-     *
-     * <p>It takes the services rather than a folder because half of it is the flow, which is a value in the
-     * bot's own Java and read through the host.
+     * The project's declared tags: the custom ones {@code Tags} declares, read afresh for the same reason the tags
+     * are (see above). No activity tags since 2026-11-09, when flows were deleted.
      */
     public static TagCatalog tagCatalog(StudioServices services) {
-        return TagCatalog.of(activityNames(services), manifest(services).customTags());
-    }
-
-    /**
-     * The project's activity names in the order its flows list them, each once, or none.
-     *
-     * <p>Degrading rather than throwing is the difference between a tag picklist that is short and one that
-     * will not open — an unreadable flow is reported by the flow editor, not by a tag menu.
-     */
-    private static List<String> activityNames(StudioServices services) {
-        return FlowValue.labels(services.pluginValues(), null).stream()
-                .filter(name -> !name.isBlank())
-                .toList();
+        return TagCatalog.of(List.of(), manifest(services).customTags());
     }
 
     /**

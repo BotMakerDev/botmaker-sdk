@@ -5,7 +5,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Strip;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 

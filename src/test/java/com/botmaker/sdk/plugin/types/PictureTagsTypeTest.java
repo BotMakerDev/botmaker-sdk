@@ -1,10 +1,9 @@
 package com.botmaker.sdk.plugin.types;
 
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import org.junit.jupiter.api.Test;
 
@@ -17,16 +16,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A picture's tags and activities in its Java (2026-10-14): {@code .tags(List.of(Tags.UI))} and
- * {@code .activities(List.of(Activities.Collect.class))} come apart and go back together with the rest of it, and a
- * tag inside a picture is only ever written as its constant.
+ * A picture's tags in its Java (2026-10-14): {@code .tags(List.of(Tags.UI))} comes apart and goes back together with
+ * the rest of it, and a tag inside a picture is only ever written as its constant.
  */
 class PictureTagsTypeTest {
 
     private static final ImageTemplate ORE = new ImageTemplate("src/main/resources/images/ore.png")
             .at(new Rect(1, 2, 3, 4))
-            .tags(List.of(BotConstants.tag("UI"), BotConstants.tag("SHARED")))
-            .inActivities(List.of(new Activity("Collect")));
+            .tags(List.of(BotConstants.tag("UI"), BotConstants.tag("SHARED")));
 
     @Test
     void aTaggedPictureComesApartAndGoesBackTogetherWhole() {
@@ -52,11 +49,10 @@ class PictureTagsTypeTest {
     }
 
     @Test
-    void tagsAndActivitiesAreHowAPictureDiffersAndTheirOrderIsNot() {
+    void tagsAreHowAPictureDiffersAndTheirOrderIsNot() {
         ImageTemplate untagged = new ImageTemplate("src/main/resources/images/ore.png").at(new Rect(1, 2, 3, 4));
         assertNotEquals(untagged, ORE, "a picture filed elsewhere is written again");
-        assertEquals(ORE, untagged.inActivities(List.of(new Activity("Collect")))
-                .tags(List.of(BotConstants.tag("SHARED"), BotConstants.tag("UI"))));
+        assertEquals(ORE, untagged.tags(List.of(BotConstants.tag("SHARED"), BotConstants.tag("UI"))));
         assertEquals(ORE.tags(), ORE.at(new Rect(9, 9, 9, 9)).in(null).tags(), "a recut keeps them");
     }
 

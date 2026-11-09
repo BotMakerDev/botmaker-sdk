@@ -7,7 +7,7 @@ import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Retry;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords.Done;
 import com.botmaker.sdk.internal.screens.Conditions;
 import com.botmaker.sdk.internal.screens.ScreenGraph;

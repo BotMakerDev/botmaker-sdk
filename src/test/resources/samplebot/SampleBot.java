@@ -11,18 +11,19 @@ import com.botmaker.sdk.api.vision.ImageClicker;
  * A bot shaped as Studio writes one, compiled by {@code SampleBotCompileTest} against the SDK under test: an
  * {@code api.*} change that breaks a bot fails the SDK's own tests. Test data only; nothing ships it.
  *
- * <p>Three activities and a flow deciding which of them runs next ({@code Flows.java} in {@code plugins/}), the run's
- * values ({@code Sdk.java} beside it), the pictures, texts and screens Studio keeps, and the parameters.
+ * <p>A plan of goals deciding what the run does next ({@code Plans.java} and {@code Goals.java} in {@code plugins/}),
+ * the run's values ({@code Sdk.java} beside it), the pictures, texts and screens Studio keeps, the bot's own steps
+ * ({@code Collect}, {@code Battle}, {@code Rest}), and the parameters.
  */
 public final class SampleBot {
 
     private SampleBot() {}
 
     public static void main(String[] args) {
-        Bot.runFlow(Sdk.class);
+        Bot.run(Sdk.class);
     }
 
-    /** Back to the screen every activity expects to start from — the run's {@code .home(SampleBot::goHome)}. */
+    /** Back to the screen the bot starts from — the run's {@code .home(SampleBot::goHome)}. */
     public static void goHome() {
         for (int attempt = 0; attempt < 5; attempt++) {
             if (!ImageClicker.click(Pictures.HOME)) {
@@ -45,7 +46,7 @@ public final class SampleBot {
     public static void solvePuzzle() {
     }
 
-    /** Whether an activity that has not got anywhere yet should keep trying, by {@link Parameters#maxAttempts}. */
+    /** Whether a step that has not got anywhere yet should keep trying, by {@link Parameters#maxAttempts}. */
     static boolean keepTrying(int attempt) {
         return attempt < Parameters.maxAttempts;
     }

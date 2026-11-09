@@ -1,12 +1,15 @@
 package com.botmaker.sdk.internal.bot;
 
+import com.botmaker.sdk.api.bot.SdkValue;
+import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.config.ParamGroups;
-import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.launch.GameVersion;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
@@ -27,15 +30,15 @@ public final class RunDetails {
     }
 
     /**
-     * The SDK's words for the run: {@code flow}, {@code launchTarget} (its kind), {@code gameVersion} (best effort,
+     * The SDK's words for the run: {@code plan} (the {@code Plans} constant picked), {@code launchTarget} (its kind), {@code gameVersion} (best effort,
      * {@link GameVersion}: at most two seconds, else {@code unknown}), {@code platform} (an emulator's
      * instance, else the OS) and each parameter of the groups beside {@code values} ({@link ParamGroups}) whose value
      * is plain text, a number, a switch or a choice, as {@code param.<name>}.
      */
     static Map<String, String> of(Class<?>... values) {
         Map<String, String> out = new LinkedHashMap<>();
-        String flow = InstalledRun.flow() == null ? null : InstalledRun.nameOf(InstalledRun.flow());
-        if (flow != null) out.put("flow", flow);
+        String plan = planName(values);
+        if (!plan.isEmpty()) out.put("plan", plan);
         LaunchTarget target = Target.current();
         out.put("launchTarget", target == null ? "none" : target.getClass().getSimpleName());
         out.put("gameVersion", target == null ? GameVersion.UNKNOWN : GameVersion.of(target.launchSpec()));
@@ -59,6 +62,30 @@ public final class RunDetails {
             }
         }
         return out;
+    }
+
+    /**
+     * The name of the {@code Plans} constant the {@code plan} parameter holds, {@code DAILY}: the {@code Plans} class
+     * beside each of {@code values} ({@code Sdk.class}), read by identity. Blank when the bot picked none or holds it
+     * elsewhere.
+     */
+    static String planName(Class<?>... values) {
+        if (!(InstalledGame.marked(SdkValue.Id.PLAN, values) instanceof Plan picked)) return "";
+        for (Class<?> holder : values == null ? new Class<?>[0] : values) {
+            if (holder == null) continue;
+            try {
+                Class<?> plans = Class.forName(holder.getPackageName() + ".Plans", true, holder.getClassLoader());
+                for (Field field : plans.getDeclaredFields()) {
+                    if (field.getType() == Plan.class && Modifier.isStatic(field.getModifiers())
+                            && field.trySetAccessible() && field.get(null) == picked) {
+                        return field.getName();
+                    }
+                }
+            } catch (ReflectiveOperationException | LinkageError none) {
+                // No Plans beside this holder, or one it cannot read: the next holder may name it.
+            }
+        }
+        return "";
     }
 
     /** Whether {@code value} says itself in a word: text, a number, a switch or an enum's constant. */

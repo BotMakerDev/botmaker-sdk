@@ -53,8 +53,6 @@ public final class SettingHints {
             Map.entry(whole(BotSettings::frozenAfter), new Hint("Frozen after",
                     "Milliseconds the screen may stay still while the bot acts (≥ 1000):", " ms", 1000, 3_600_000,
                     1000, BotSettings.DEFAULT_FROZEN_AFTER)),
-            Map.entry(whole(BotSettings::maxRetryAttempts), new Hint("Max stuck checks",
-                    "Checks before considered stuck (≥ 1):", "", 1, 600_000, 1, 20)),
             Map.entry(whole(BotSettings::restartCap), new Hint("Restart cap",
                     "Game restarts before the run stops (≥ 0):", "", 0, 1_000, 1, BotSettings.DEFAULT_RESTART_CAP)),
             Map.entry(flag(BotSettings::takeOver), Hint.flag("Take over the mouse and keyboard")),

@@ -7,7 +7,6 @@ import com.botmaker.plugin.api.overlay.OverlayPart;
 import com.botmaker.plugin.api.overlay.Probe;
 import com.botmaker.plugin.api.overlay.Watched;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -29,8 +28,7 @@ import java.util.Optional;
  * The SDK's part of the overlay editor.
  *
  * <ul>
- *   <li><b>Targets:</b> every activity body, by type. A bot passes each one to {@code Flow.activity} as an
- *       {@link ActivityBody} method reference, so Studio offers {@code Collect.body()} as a chip.</li>
+ *   <li><b>Targets:</b> none since 2026-11-09, when activity bodies went with flows.</li>
  *   <li><b>Watched:</b> the screen {@code Sdk.captureSource} names. ⇄ Change opens the 🎯 Capture Source
  *       picker.</li>
  *   <li><b>Frames:</b> that source's own capture, at its origin — what the bot's matchers read.</li>
@@ -45,13 +43,11 @@ import java.util.Optional;
 public final class SdkOverlay implements OverlayHolder {
 
     public static final OverlayPart PART = OverlayPart.of()
-            .targets(ActivityBody.class, "Activities")
             .watched(SdkOverlay::watched)
             .changeWatched(() -> SourcePicker::choose)
             .frames(SdkOverlay::frames)
             .tool(SdkTools.PICTURE)
             .tool(SdkTools.POINT)
-            .tool(SdkTools.FLOW)
             .tool(SdkTools.SCREENS)
             .probe(ImageFinder::find, ImageTemplate.class, SdkProbes::find)
             .probe(ImageWaiter::waitFor, ImageTemplate.class, Duration.class, SdkProbes::find)

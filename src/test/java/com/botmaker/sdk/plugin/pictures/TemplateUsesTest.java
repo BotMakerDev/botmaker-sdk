@@ -4,11 +4,10 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.plugin.SpelledValues;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -110,16 +109,15 @@ class TemplateUsesTest {
     }
 
     @Test
-    void aRenameKeepsThePicturesTagsAndActivities() {
+    void aRenameKeepsThePicturesTags() {
         Host host = new Host("ORE");
         // What the constant holds once the host has renamed it, before its path is rewritten.
         host.held.put("IRON", new ImageTemplate(TemplateLibrary.pathForName("ore"))
-                .tags(List.of(BotConstants.tag("UI"))).inActivities(List.of(new Activity("Collect"))));
+                .tags(List.of(BotConstants.tag("UI"))));
 
         assertEquals(Optional.empty(), TemplateUses.rename(host, "ore", "iron"));
         ImageTemplate renamed = (ImageTemplate) host.opened.value();
         assertEquals(List.of(BotConstants.tag("UI")), renamed.tags());
-        assertEquals(List.of(new Activity("Collect")), renamed.activities());
     }
 
     @Test

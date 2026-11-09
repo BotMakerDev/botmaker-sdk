@@ -12,7 +12,7 @@ import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Retry;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.junit.jupiter.api.Test;

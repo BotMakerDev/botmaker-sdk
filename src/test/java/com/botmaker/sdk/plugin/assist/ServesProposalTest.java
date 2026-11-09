@@ -3,7 +3,7 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.plugin.assist.ServesProposal.Proposed;

@@ -82,9 +82,13 @@ public final class PlanTypes implements TypeHolder {
 
     // ---- a plan ----------------------------------------------------------------------------------------
 
-    /** {@code Plan.of(Plan.tier(…), …)}: the tiers, most important first. */
+    /**
+     * {@code Plan.of(Plan.tier(…), …)}: the tiers, most important first. A plan with no tier, the {@code plan}
+     * parameter's "run nothing", is written {@code Plan.NONE}.
+     */
     public static final DeclaredCall<Plan> PLAN_SHAPE = ComponentType.part(Plan.class)
-            .writtenAsEach(Plan::of, Plan::tiers);
+            .writtenAsEach(Plan::of, Plan::tiers)
+            .constants(Plan.NONE);
 
     /** {@code Plan.tier(Goals.A, Goals.B)}: goals with no order among them, each a reference to its constant. */
     public static final DeclaredCall<Plan.Tier> TIER_SHAPE = ComponentType.part(Plan.Tier.class)

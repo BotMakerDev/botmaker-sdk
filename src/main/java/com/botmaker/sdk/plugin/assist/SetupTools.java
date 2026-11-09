@@ -6,11 +6,14 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.plugin.toolkit.ManagedHandle;
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.plugin.types.RunTypes;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
@@ -115,10 +118,7 @@ final class SetupTools {
                         BotSettings.DisplayBackend::id))),
         INPUT_BACKEND("input_backend", "Which Linux backend delivers a take-over",
                 s -> s.runIn().inputBackend().id(),
-                (s, v) -> s.inputBackend(choice(BotSettings.InputBackend.values(), v, BotSettings.InputBackend::id))),
-        MAX_RETRY_ATTEMPTS("max_retry_attempts", "No-progress checks before the bot is stuck, 1 or more",
-                s -> String.valueOf(s.maxRetryAttempts()),
-                (s, v) -> s.maxRetryAttempts(whole(v, 1)));
+                (s, v) -> s.inputBackend(choice(BotSettings.InputBackend.values(), v, BotSettings.InputBackend::id)));
 
         private final String id;
         private final String displayName;
@@ -206,6 +206,18 @@ final class SetupTools {
     record Forget(@Describe("Progress::gold") String fact) implements Step {
     }
 
+    /** Which of {@code Sdk.run()}'s methods set_run_method sets. */
+    enum RunHook {
+        HOME, SETUP
+    }
+
+    @Describe("set the bot's home or setup in Sdk.run() to a method of the bot; write the method first")
+    record SetRunMethod(@Describe("home gets the game back to a known screen; setup makes it ready after the bot "
+                                + "starts it, when doSetup is ticked") RunHook which,
+                        @Describe(value = "a public static void method of the bot with no parameter, MyBot::setup; "
+                                + "leave out for none", optional = true) String method) implements Step {
+    }
+
     @Describe("the target emulator's checks: ok, and whether fix repairs it")
     record EmulatorChecks() implements Step {
     }
@@ -260,7 +272,34 @@ final class SetupTools {
             case Fix fix -> ChecksTools.fix(fix.check(), Boolean.TRUE.equals(fix.undo()), context);
             case GameFacts ignored -> FxCall.call(() -> gameFacts(context.services().pluginValues().runParameters()));
             case Forget forget -> FxCall.call(() -> forget(forget.fact(), context));
+            case SetRunMethod set -> setRunMethod(set, context);
         };
+    }
+
+    /** Points {@code Sdk.run()}'s home or setup at one of the bot's {@code public static void} methods, or none. */
+    static AgentReply setRunMethod(SetRunMethod set, AgentContext context) {
+        if (set.which() == null) return AgentReply.refused("Say which: home or setup.");
+        String which = set.which().name().toLowerCase(Locale.ROOT);
+        String method = set.method() == null ? "" : set.method().strip();
+        StudioServices services = context.services();
+        return FxCall.call(() -> {
+            if (!method.isEmpty()) {
+                List<String> held = services.pluginValues() == null ? List.of()
+                        : services.pluginValues().methods(PluginValues.MethodShape.VOID);
+                if (!held.contains(method)) {
+                    return AgentReply.refused("The bot has no public static void method " + method + "() with no "
+                            + "parameter. It has: " + (held.isEmpty() ? "none" : String.join(", ", held)) + ".");
+                }
+            }
+            NotesTools.RunRead read = NotesTools.readRun(services);
+            if (read.problem() != null) return AgentReply.refused(read.problem());
+            Runnable to = RunTypes.method(method);
+            Run now = set.which() == RunHook.HOME ? read.run().home(to) : read.run().setup(to);
+            Optional<String> refused = now.equals(read.run()) ? Optional.empty() : NotesTools.RUN.write(services, now);
+            return refused.map(AgentReply::refused)
+                    .orElseGet(() -> AgentReply.text(method.isEmpty() ? "The bot has no " + which + " now."
+                            : "The bot's " + which + " is now " + method + "."));
+        });
     }
 
     /** Each value a run keeps, and how long ago a run wrote it. */

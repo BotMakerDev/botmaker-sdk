@@ -39,7 +39,7 @@ public final class SettingsTypes implements TypeHolder {
 
     /**
      * {@code BotSettings.defaults()} and its links: those marked {@code @Link} on {@code BotSettings} first
-     * ({@code .maxRetryAttempts(…)}, then the others by name), then these, which read a part another way — a
+     * ({@code .confidence(…)}, then the others by name), then these, which read a part another way — a
      * negative flag, a nested part, or a flag whose reader is not {@code isX()}. The deprecated {@code debug} is
      * still one: the bot's Java writes it, and a value read must be written back.
      */

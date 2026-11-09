@@ -2,7 +2,6 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.managed.ManagedId;
 import com.botmaker.plugin.api.managed.ManagedMarker;
-import com.botmaker.plugin.api.meta.Migrate;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -40,7 +39,7 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * <p>{@code Bot.runFlow(Sdk.class)} reads each marked member off the class it is given and applies the value
+ * <p>{@code Bot.run(Sdk.class)} reads each marked member off the class it is given and applies the value
  * before the first click. Everywhere else a marked member is ordinary Java: a misspelt {@link Id} is a
  * compile error, and a developer with no BotMaker installed reads the whole bot by opening its files.
  */
@@ -56,11 +55,6 @@ public @interface SdkValue {
     /** The SDK's values, one constant each. */
     enum Id implements ManagedId<Holder> {
         /**
-         * The bot's activity flows, one per way of playing: what runs, in what order, and what stops it — a class
-         * of {@code Flow} constants.
-         */
-        FLOWS,
-        /**
          * The bot's plans, what matters most as tiers of goals — a class of {@code Plan} constants, {@code Plans.java}
          * beside {@code Goals.java}.
          */
@@ -71,21 +65,17 @@ public @interface SdkValue {
          */
         GOALS,
         /**
-         * The game's home and setup, which no flow owns — a {@code Run} method.
+         * The game's home and setup, which no plan owns — a {@link Run} method.
          */
         RUN,
-        /** Where each flow's cards sit in the Activity Flow — a {@code FlowLayout} method a run ignores. */
-        FLOW_LAYOUT,
         /** Where pixels are read from: the game's window — the {@code CaptureSource} parameter {@code captureSource}. */
         CAPTURE,
         /** How the bot clicks and looks — a {@link BotSettings} method. */
         SETTINGS,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
-        /** The groups 🖼 Manage Pictures files pictures under that no activity owns — a class of {@code PictureTag} constants. */
+        /** The groups 🖼 Manage Pictures files pictures under — a class of {@code PictureTag} constants. */
         TAGS,
-        /** The cards of the Activity Flow — a class of enums, one per activity, whose {@link Outcome} constants are its exits. */
-        ACTIVITIES,
         /** Named areas of the game, in the bot's pixels — a class of {@code Zone} constants. */
         ZONES,
         /** A game font's digits as pictures, for {@code Text.readDigits} — a class of {@code DigitSet} constants. */
@@ -115,23 +105,12 @@ public @interface SdkValue {
          */
         SCREEN,
         /**
-         * What a run runs, one of the {@code Flows} or of the {@code Plans} — the {@code Routine} parameter
-         * {@code routine}, set in the Runner. While it is {@code Flow.NONE} a run takes {@link #FLOW}'s value.
+         * What a run runs, one of the {@code Plans} — the {@code Plan} parameter {@code plan}, set in the Runner;
+         * {@code Plan.NONE} runs nothing.
          */
-        ROUTINE,
-        /**
-         * Which flow a run walks — the {@code Flow} parameter {@code flow}, which {@link #ROUTINE} replaces; a run reads
-         * it only while {@code routine} is {@code Flow.NONE}.
-         */
-        @Deprecated(forRemoval = true)
-        @Migrate.Dropped("a run runs routine(), a flow or a plan; pick the flow there in the Runner")
-        FLOW,
+        PLAN,
         /** Whether a run sets the game up first — the {@code boolean} parameter {@code doSetup}. */
         DO_SETUP,
-        /** The activities a run switched off — the parameter {@code skip}, which no run reads since 2026-11-05. */
-        @Deprecated(forRemoval = true)
-        @Migrate.Dropped("a run switches no activity off; an activity is on or off in its flow")
-        SKIP,
         /**
          * The launchers the bot supports, preferred first — the {@code List<Launcher>} parameter {@code launchTargets}
          * ({@code Launcher.of("steam:1145350")}), which its author lists. A run takes {@link #LAUNCH_TARGET}'s pick
@@ -162,12 +141,10 @@ public @interface SdkValue {
         SDK,
         RUNNING,
         GAME,
-        FLOWS,
         PLANS,
         GOALS,
         PICTURES,
         TAGS,
-        ACTIVITIES,
         ZONES,
         DIGITS,
         TEXTS,

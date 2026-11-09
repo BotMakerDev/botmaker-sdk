@@ -102,7 +102,7 @@ final class ToolTiming {
                         () -> handler.handle(action, context)));
     }
 
-    /** The action's id as the wire names it: its record's simple name in snake_case, SetFlowMethod set_flow_method. */
+    /** The action's id as the wire names it: its record's simple name in snake_case, SetRunMethod set_run_method. */
     static String actionId(Object action) {
         return action.getClass().getSimpleName().replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }

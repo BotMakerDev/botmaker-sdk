@@ -10,7 +10,7 @@ import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.internal.config.ParamGroups;
-import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -282,7 +282,7 @@ public final class RunFacts {
             }
         } catch (RuntimeException unreadable) {
             for (Throwable at = unreadable; at != null; at = at.getCause() == at ? null : at.getCause()) {
-                if (FlowWalker.isStop(at)) throw (RuntimeException) at;
+                if (InstalledRun.isStop(at)) throw (RuntimeException) at;
             }
             Debug.log("The facts on " + constant + " were not read: " + unreadable);
         } finally {

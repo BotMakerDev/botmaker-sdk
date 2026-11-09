@@ -29,7 +29,7 @@ import com.botmaker.sdk.internal.vision.DigitReader;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.internal.vision.Places;
 import com.botmaker.sdk.internal.vision.TemplateNames;
-import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.internal.bot.ConstantNames;
 import com.botmaker.sdk.plugin.pictures.DigitCuts;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.FrameStrip;
@@ -1043,7 +1043,7 @@ final class PictureTools {
 
     /** As {@link #saveRegion(NamedRegion, AgentContext)}, in {@code frame}'s pixels. */
     static AgentReply saveRegion(NamedRegion region, AgentContext context, Optional<BufferedImage> frame) {
-        String constant = FlowNames.constantFor(region.name());
+        String constant = ConstantNames.constantFor(region.name());
         if (constant == null) return AgentReply.refused("\"" + region.name() + "\" cannot be a constant's name.");
         if (frame.isEmpty()) return AgentReply.refused(Frames.noScreen());
         Optional<Rect> area = Frames.within(frame.get(), region.x(), region.y(), region.width(), region.height());
@@ -1069,7 +1069,7 @@ final class PictureTools {
         Optional<Path> resources = Frames.resources(context);
         if (resources.isEmpty()) return AgentReply.refused(Frames.noProject());
         String name = TemplateLibrary.sanitizeName(digits.name());
-        String constant = FlowNames.constantFor(name);
+        String constant = ConstantNames.constantFor(name);
         if (name.isEmpty() || constant == null) {
             return AgentReply.refused("\"" + digits.name() + "\" cannot be a constant's name.");
         }

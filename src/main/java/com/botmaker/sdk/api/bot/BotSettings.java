@@ -30,7 +30,7 @@ import java.util.Optional;
  * (2026-10-09), so the method says what this bot changed and nothing else. A setting that is on by default is
  * turned off by a link with a negative name ({@link #centredClicks()}, {@link #debugOff()}).
  *
- * <p>{@code Bot.runFlow(…, Sdk.class)} hands it to {@link #use} before anything runs, so a click never happens on
+ * <p>{@code Bot.run(Sdk.class, …)} hands it to {@link #use} before anything runs, so a click never happens on
  * the defaults and then on the bot's own values. Studio's ⚙ Bot Settings window edits the expression; a bot
  * that wants another value for a while calls {@code BotSettings.use(BotSettings.current().confidence(0.9))}.
  *
@@ -57,14 +57,11 @@ import java.util.Optional;
  * @param loops            how long a vision loop gives each action to show, and how many rounds it runs before
  *                         the bot is stuck
  * @param runIn           where the game runs, and whether the bot takes over the mouse and keyboard there
- * @param maxRetryAttempts how many no-progress checks {@link Watchdog} tolerates before the bot is stuck; at
- *                         least 1
- * @param debug            whether the SDK's debug output starts on, for a run that does not say: a
+ * @param debug           whether the SDK's debug output starts on, for a run that does not say: a
  *                         {@code -Dbotmaker.debug=true|false} on the run (Studio's Debug output toggle) wins
  * @param recovery         when a plan run is stuck, and how many restarts a run makes before it stops
  */
-public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn, int maxRetryAttempts,
-                          boolean debug, Recovery recovery) {
+public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn, boolean debug, Recovery recovery) {
 
     /** Pause after a successful match, in ms — long enough for a game's animation to settle. */
     public static final int DEFAULT_FOUND_DELAY = 500;
@@ -85,13 +82,6 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      * {@code goodScore - badScore >= margin}.
      */
     public static final double DEFAULT_COMPARE_MARGIN = 0.05;
-
-    /**
-     * How many consecutive no-progress checks {@link Watchdog} tolerates before it throws
-     * {@link BotStuckException} at the next {@code checkpoint()} — how long a frozen screen or a repeated no-op
-     * click may run before the bot counts as stuck and is restarted.
-     */
-    public static final int DEFAULT_MAX_RETRY_ATTEMPTS = 20;
 
     /**
      * How many rounds a vision loop ({@code whileFindAny}, {@code untilFind}, …) runs before it throws
@@ -304,10 +294,10 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
             new Vision(DEFAULT_CONFIDENCE, DEFAULT_COMPARE_MARGIN),
             new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE, DEFAULT_FROZEN_AFTER),
             new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO),
-            DEFAULT_MAX_RETRY_ATTEMPTS, true,
+            true,
             new Recovery(DEFAULT_STUCK_AFTER, DEFAULT_RESTART_CAP, DEFAULT_RESTARTS_WITHIN));
 
-    /** A missing part is its default, and fewer than one retry is one. */
+    /** A missing part is its default. */
     public BotSettings {
         recovery = recovery == null ? new Recovery(DEFAULT_STUCK_AFTER, DEFAULT_RESTART_CAP, DEFAULT_RESTARTS_WITHIN)
                 : recovery;
@@ -317,7 +307,6 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
         loops = loops == null ? new Loops(DEFAULT_MAX_ROUNDS, DEFAULT_PATIENCE, DEFAULT_FROZEN_AFTER) : loops;
         runIn = runIn == null ? new RunIn(Where.PRIVATE_DISPLAY, false, DisplayBackend.AUTO, InputBackend.AUTO)
                 : runIn;
-        maxRetryAttempts = Math.max(1, maxRetryAttempts);
     }
 
     /**
@@ -345,7 +334,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     private static volatile BotSettings current = DEFAULTS;
 
-    /** The settings the bot is running with: its own once {@code Bot.runFlow} has installed them. */
+    /** The settings the bot is running with: its own once {@code Bot.run} has installed them. */
     public static BotSettings current() {
         return current;
     }
@@ -355,7 +344,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      *
      * <p><b>A take-over is one-way.</b> On Linux it swaps the process-wide input backend, which cannot be swapped
      * back, so a later value with {@code takeOver = false} only stops a future escalation. That is why
-     * {@code Bot.runFlow} installs the bot's settings before anything else runs: the swap has to precede the first
+     * {@code Bot.run} installs the bot's settings before anything else runs: the swap has to precede the first
      * click, or the click is dropped silently. For the same reason the Linux backend is pinned only when nothing
      * has pinned it yet — an explicit {@code -Dbotmaker.linux.input} on the command line wins.
      *
@@ -496,14 +485,12 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     @Link
     public BotSettings confidence(double confidence) {
-        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), loops, runIn, maxRetryAttempts,
-                debug, recovery);
+        return new BotSettings(clicks, new Vision(confidence, vision.compareMargin), loops, runIn, debug, recovery);
     }
 
     @Link
     public BotSettings compareMargin(double margin) {
-        return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, maxRetryAttempts, debug,
-                recovery);
+        return new BotSettings(clicks, new Vision(vision.confidence, margin), loops, runIn, debug, recovery);
     }
 
     @Link
@@ -519,11 +506,6 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     @Link
     public BotSettings frozenAfter(int milliseconds) {
         return withLoops(new Loops(loops.maxRounds, loops.patience, milliseconds));
-    }
-
-    @Link
-    public BotSettings maxRetryAttempts(int attempts) {
-        return new BotSettings(clicks, vision, loops, runIn, attempts, debug, recovery);
     }
 
     /** See {@link #DEFAULT_STUCK_AFTER}. */
@@ -549,7 +531,7 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     public BotSettings debug(boolean on) {
-        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, on, recovery);
+        return new BotSettings(clicks, vision, loops, runIn, on, recovery);
     }
 
     /** Clicks land on the match's centre rather than a random point of it. */
@@ -590,19 +572,19 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     }
 
     private BotSettings withClicks(Clicks next) {
-        return new BotSettings(next, vision, loops, runIn, maxRetryAttempts, debug, recovery);
+        return new BotSettings(next, vision, loops, runIn, debug, recovery);
     }
 
     private BotSettings withLoops(Loops next) {
-        return new BotSettings(clicks, vision, next, runIn, maxRetryAttempts, debug, recovery);
+        return new BotSettings(clicks, vision, next, runIn, debug, recovery);
     }
 
     private BotSettings withRunIn(RunIn next) {
-        return new BotSettings(clicks, vision, loops, next, maxRetryAttempts, debug, recovery);
+        return new BotSettings(clicks, vision, loops, next, debug, recovery);
     }
 
     private BotSettings withRecovery(Recovery next) {
-        return new BotSettings(clicks, vision, loops, runIn, maxRetryAttempts, debug, next);
+        return new BotSettings(clicks, vision, loops, runIn, debug, next);
     }
 
     private static double unit(double value, double fallback) {

@@ -18,7 +18,7 @@ import com.botmaker.sdk.plugin.assist.BoardCuts;
 import com.botmaker.sdk.plugin.assist.BoardCuts.As;
 import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
-import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.internal.bot.ConstantNames;
 import com.botmaker.sdk.plugin.map.CutLayer.Drawn;
 import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
@@ -312,8 +312,8 @@ final class CutForm {
                         return Optional.of(at + "give the words it shows, as the game writes them.");
                     }
                     // Saving the words' zone over a zone of that name would move what other words read.
-                    if (ScreenEdits.zones(services).contains(FlowNames.constantFor(name))) {
-                        return Optional.of(at + "Zones has " + FlowNames.constantFor(name) + " already: give the "
+                    if (ScreenEdits.zones(services).contains(ConstantNames.constantFor(name))) {
+                        return Optional.of(at + "Zones has " + ConstantNames.constantFor(name) + " already: give the "
                                 + "words' zone another name.");
                     }
                 }
@@ -330,8 +330,8 @@ final class CutForm {
                     if (!line.readout.isSelected()) break;
                     if (on() == null) return Optional.of(at + "a readout is a screen's: pick it.");
                     // Its box is saved as a zone of its name too: over one of that name, it would move what that reads.
-                    if (ScreenEdits.zones(services).contains(FlowNames.constantFor(name))) {
-                        return Optional.of(at + "Zones has " + FlowNames.constantFor(name) + " already: give the "
+                    if (ScreenEdits.zones(services).contains(ConstantNames.constantFor(name))) {
+                        return Optional.of(at + "Zones has " + ConstantNames.constantFor(name) + " already: give the "
                                 + "number another name.");
                     }
                 }

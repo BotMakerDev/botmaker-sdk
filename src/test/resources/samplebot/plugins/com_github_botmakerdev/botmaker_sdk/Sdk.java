@@ -4,14 +4,12 @@ import samplebot.SampleBot;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
-import com.botmaker.sdk.api.flow.FlowLayout;
-import com.botmaker.sdk.api.flow.Run;
+import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.screens.Shade;
 import com.botmaker.sdk.api.screens.Shades;
 import com.botmaker.sdk.api.screens.State;
 
 import java.util.List;
-import java.util.Map;
 
 /** The BotMaker SDK's values for this bot, each an {@code @SdkValue} the SDK reads off this class. */
 public final class Sdk {
@@ -31,15 +29,6 @@ public final class Sdk {
         return Run.of()
                 .home(SampleBot::goHome)
                 .setup(SampleBot::setup);
-    }
-
-    @SdkValue(SdkValue.Id.FLOW_LAYOUT)
-    public static FlowLayout flowLayout() {
-        return FlowLayout.of(Map.ofEntries(
-                Map.entry("MAIN", FlowLayout.cards(Map.ofEntries(
-                        Map.entry("Collect", FlowLayout.at(80, 80)),
-                        Map.entry("Battle", FlowLayout.at(380, 80)),
-                        Map.entry("Rest", FlowLayout.at(380, 300)))))), true);
     }
 
     @SdkValue(SdkValue.Id.SETTINGS)

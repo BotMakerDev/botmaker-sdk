@@ -49,7 +49,7 @@ class PaletteFillabilityTest {
      * Offered members whose parameter the host fills itself: an entry point's ({@code @EntryPoint}) run of
      * classes is the bot's classes holding managed values, which only the host knows ({@code Sdk.class}).
      */
-    private static final Set<String> FILLED_BY_THE_HOST = Set.of("Bot#runFlow(Class[])");
+    private static final Set<String> FILLED_BY_THE_HOST = Set.of("Bot#run(Class[])");
 
     /**
      * Types no plugin gives a fresh value, whose slot a plugin's editor fills by picking one of the bot's constants:

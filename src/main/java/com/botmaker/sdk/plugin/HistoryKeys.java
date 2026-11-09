@@ -11,8 +11,8 @@ import javafx.scene.input.KeyEvent;
 import java.util.function.Consumer;
 
 /**
- * Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z in a plugin window whose ↶ and ↷ are Studio's history: 🗺 Screens and the
- * Activity Flow. A key pressed in a field the user types in is that field's own undo, and is left to it.
+ * Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z in a plugin window whose ↶ and ↷ are Studio's history: 🗺 Screens. A
+ * key pressed in a field the user types in is that field's own undo, and is left to it.
  */
 public final class HistoryKeys {
 

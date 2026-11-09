@@ -20,8 +20,8 @@ import com.botmaker.sdk.plugin.run.SdkRuns;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
-import com.botmaker.sdk.plugin.types.FlowTypes;
 import com.botmaker.sdk.plugin.types.PlanTypes;
+import com.botmaker.sdk.plugin.types.RunTypes;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import com.botmaker.sdk.plugin.types.SettingsTypes;
@@ -70,7 +70,7 @@ public final class SdkPlugin extends DeclaredPlugin {
      */
     public SdkPlugin() {
         super(StudioPlugin.declare()
-                .types(SdkTypes.class, FlowTypes.class, ScreenTypes.class, PlanTypes.class, CaptureTypes.class, SettingsTypes.class)
+                .types(SdkTypes.class, RunTypes.class, ScreenTypes.class, PlanTypes.class, CaptureTypes.class, SettingsTypes.class)
                 .editors(SdkEditors.class)
                 .values(SdkValues.class)
                 .toolbar(SdkToolbarItems.class)

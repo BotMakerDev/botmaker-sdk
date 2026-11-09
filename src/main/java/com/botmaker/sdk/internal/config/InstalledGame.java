@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The game half of the bot's {@code Sdk} values, read off the classes {@code Bot.runFlow} is handed and the parameter
+ * The game half of the bot's {@code Sdk} values, read off the classes {@code Bot.run} is handed and the parameter
  * group beside them ({@link ParamGroups}): the launchers the bot supports and the game VM it runs in (the author's,
  * in {@code Sdk.java}), the one launcher its runner picked and the capture source it reads (the runner's, in
  * {@code params/}) — and the launch target a run starts ({@link #launchTarget}). A {@code -D} given to a bot started
@@ -133,7 +133,7 @@ public final class InstalledGame {
 
     /**
      * The value marked {@code id} in {@code values} or the parameter group beside them ({@link ParamGroups}), or null
-     * when none marks it — how {@code Bot.runFlow} reads the run's own parameters ({@code flow}, {@code doSetup}).
+     * when none marks it — how {@code Bot.run} reads the run's own parameters ({@code plan}).
      */
     public static Object marked(SdkValue.Id id, Class<?>... values) {
         return ParamGroups.marked(id, values);

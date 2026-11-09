@@ -19,6 +19,22 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Flows are gone: a bot runs a plan** (2026-11-09, the user's call: deleted outright, without the two-release rule
+  and without `@Migrate` rules).
+  - Removed: `api.flow` (`Flow`, `FlowLayout`, cards and arrows), `api.bot.Outcome`, `ActivitySwitch`,
+    `api.plan.Routine`, the `FLOWS`, `FLOW`, `FLOW_LAYOUT`, `ROUTINE`, `SKIP` and `ACTIVITIES` ids, and the
+    🔀 Activity Flow window. A bot that used them no longer compiles; Studio's upgrade repairs what it can.
+  - `Bot.run(Sdk.class)` replaces `Bot.runFlow`. It runs the plan the `plan` parameter picks
+    (`@SdkValue(SdkValue.Id.PLAN) public Plan plan()` in `params/…/Running`, one of the bot's `Plans`); with no plan
+    it says so and returns. `Run` (home, setup, notes) stays, in `api.bot`.
+  - A chore is a `Do` of its screen, or a `Custom` input for work a press cannot say; what was an activity's body is
+    a plain method of the bot.
+  - `BotSettings.maxRetryAttempts` is gone, and so is the watchdog's per-activity counter: a stuck run recovers
+    through the home and the plan picks again.
+  - Live's *⏺ Record into…*, the screen cards' ⚙ activity pills, the overlay's activity targets and pictures' activity
+    tags are gone with activities.
+  - The assistant's `edit_flow` is gone; setup's `set_run_method` sets the run's home or setup. The guide's Build and
+    Trial stages speak of actions and the plan.
 - **Light effects and action cost** (2026-11-09).
   - `Do.takes(Duration)` says how long an action keeps the game busy once pressed. The planner counts it beside the
     walk: of two actions serving a goal the quicker in all comes first, and a tier's quick goals before its slow ones.

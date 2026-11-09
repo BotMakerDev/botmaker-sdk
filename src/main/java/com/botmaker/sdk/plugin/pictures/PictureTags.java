@@ -5,12 +5,10 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
-import com.botmaker.sdk.api.bot.Outcome;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.bot.SdkValues;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.util.ArrayList;
@@ -26,23 +24,22 @@ import java.util.TreeSet;
 
 /**
  * The pictures' tags as the bot's Java holds them (2026-10-14): a custom tag is a constant of {@code Tags}
- * ({@code PictureTag.named("UI")}), and a picture names its tags and activities on its own constant —
- * {@code .tags(List.of(Tags.UI)).activities(List.of(Activities.Collect.class))}. Nothing is stored beside the
- * pictures; {@code templates.json} is gone, and nothing reads it.
+ * ({@code PictureTag.named("UI")}), and a picture names its tags on its own constant —
+ * {@code .tags(List.of(Tags.UI))}. Nothing is stored beside the pictures; {@code templates.json} is gone, and nothing
+ * reads it.
  *
- * <p>Tags are shown and named by their words ("Arena of Kings"), an activity by its label ("Daily reward"), as
- * {@link TagCatalog} lists them; this class maps those words to the constants and enums the Java holds. Every
+ * <p>Tags are shown and named by their words ("Arena of Kings"), as {@link TagCatalog} lists them; this class maps
+ * those words to the constants the Java holds. Every
  * method is on the FX thread, where the host's values are.
  */
 public final class PictureTags {
 
     static final ManagedSet<PictureTag> TAGS = ManagedSet.of(SdkValues.TAGS);
-    private static final ManagedSet<Outcome> ACTIVITIES = ManagedSet.of(SdkValues.ACTIVITIES);
 
     private PictureTags() {}
 
     /**
-     * Every picture's tags and activities by its name, and the custom tags {@code Tags} declares; empty for a bot
+     * Every picture's tags by its name, and the custom tags {@code Tags} declares; empty for a bot
      * with no values.
      */
     public static TemplateManifest read(StudioServices services) {
@@ -59,7 +56,6 @@ public final class PictureTags {
                     String label = labelOf(tag, labels);
                     if (label != null) tags.add(label);
                 }
-                picture.activities().forEach(activity -> tags.add(activity.label()));
                 byPicture.put(baseName, tags);
             });
         }
@@ -67,8 +63,7 @@ public final class PictureTags {
     }
 
     /**
-     * Files the picture {@code baseName} under exactly {@code labels}: each a custom tag's words or an activity's
-     * label, the rest dropped. Its constant is declared first when it has none.
+     * Files the picture {@code baseName} under exactly {@code labels}: each a custom tag's words, the rest dropped. Its constant is declared first when it has none.
      *
      * @return empty when written; else why not
      */
@@ -84,21 +79,14 @@ public final class PictureTags {
             return Optional.of(TemplateNames.CLASS_NAME + "." + member + " is written by hand; its tags were left as they are.");
         }
         Map<String, String> constants = tagConstants(values);
-        Map<String, Activity> activities = activities(values);
         // A tag spelled out on the picture by hand is no constant of Tags, so nothing here names it: it stays.
         List<PictureTag> tags = new ArrayList<>(held.get().tags().stream()
                 .filter(tag -> BotConstants.tagName(tag) == null).toList());
-        List<Activity> filed = new ArrayList<>();
         for (String label : labels) {
-            Activity activity = activities.get(label);
-            if (activity != null) {
-                filed.add(activity);
-                continue;
-            }
             String constant = constants.get(label);
             if (constant != null) tags.add(BotConstants.tag(constant));
         }
-        ImageTemplate now = held.get().tags(tags).inActivities(filed);
+        ImageTemplate now = held.get().tags(tags);
         if (now.equals(held.get())) return Optional.empty();
         return ctx.get().write(now)
                 .map(refused -> TemplateNames.CLASS_NAME + "." + member + " was not rewritten: " + refused);
@@ -183,16 +171,6 @@ public final class PictureTags {
         Map<String, String> constants = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         tagLabels(values).forEach((constant, label) -> constants.putIfAbsent(label, constant));
         return constants;
-    }
-
-    /** Each of the bot's activities, by its label, case-insensitively. */
-    private static Map<String, Activity> activities(PluginValues values) {
-        Map<String, Activity> activities = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        for (String group : ACTIVITIES.groups(values)) {
-            Activity activity = new Activity(group);
-            activities.putIfAbsent(activity.label(), activity);
-        }
-        return activities;
     }
 
     /**

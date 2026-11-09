@@ -26,7 +26,7 @@ import java.util.jar.JarEntry;
 import java.util.stream.Stream;
 
 /**
- * What a run reads its values from: each class {@code Bot.runFlow} is handed — {@code Sdk.class}, the bot's data —
+ * What a run reads its values from: each class {@code Bot.run} is handed — {@code Sdk.class}, the bot's data —
  * and the parameter groups beside it, which {@code main} never names (2026-11-04, the user's call).
  *
  * <p>A plugin's groups mirror its holder's place: the holder {@code com.mybot.plugins.g.a.Sdk} has its parameters in

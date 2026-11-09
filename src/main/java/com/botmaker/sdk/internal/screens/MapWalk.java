@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.runlog.api.Level;
 import com.botmaker.sdk.api.screens.Answer;
-import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -395,7 +395,7 @@ public final class MapWalk {
     /** Rethrows {@code e} when it is a stop, or wraps one (a move run on an executor). */
     private static void rethrowStop(RuntimeException e) {
         for (Throwable at = e; at != null; at = at.getCause() == at ? null : at.getCause()) {
-            if (FlowWalker.isStop(at)) throw (RuntimeException) at;
+            if (InstalledRun.isStop(at)) throw (RuntimeException) at;
         }
     }
 }

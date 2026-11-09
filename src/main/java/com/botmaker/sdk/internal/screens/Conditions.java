@@ -2,7 +2,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Condition;
-import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 
 import java.util.function.BooleanSupplier;
 
@@ -27,7 +27,7 @@ public final class Conditions {
             return condition instanceof Condition c ? c.answer() : Answer.of(condition.getAsBoolean());
         } catch (RuntimeException unknown) {
             for (Throwable at = unknown; at != null; at = at.getCause() == at ? null : at.getCause()) {
-                if (FlowWalker.isStop(at)) throw (RuntimeException) at;
+                if (InstalledRun.isStop(at)) throw (RuntimeException) at;
             }
             return Answer.UNKNOWN;
         }

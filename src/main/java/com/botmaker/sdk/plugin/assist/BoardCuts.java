@@ -19,7 +19,7 @@ import com.botmaker.sdk.plugin.assist.MapTools.Mark;
 import com.botmaker.sdk.plugin.assist.PictureTools.Box;
 import com.botmaker.sdk.plugin.assist.PictureTools.Corner;
 import com.botmaker.sdk.plugin.assist.PictureTools.Skip;
-import com.botmaker.sdk.plugin.flow.FlowNames;
+import com.botmaker.sdk.internal.bot.ConstantNames;
 import com.botmaker.sdk.plugin.pictures.FrameWatch;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
@@ -235,7 +235,7 @@ public final class BoardCuts {
         // Words are written on the screen once their zone is saved, as edit_map's add_text writes them.
         for (int i = 0; i < cuts.size(); i++) {
             if (screen == null || refused.contains(i) || !(cuts.get(i).as() instanceof Reads reads)) continue;
-            String zone = FlowNames.constantFor(cuts.get(i).name());
+            String zone = ConstantNames.constantFor(cuts.get(i).name());
             String field = reads.button() ? cuts.get(i).name() : null;
             String one = FxCall.call(() -> ScreenEdits.addText(context.services(), screen, zone, reads.text(), field));
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);
@@ -263,7 +263,7 @@ public final class BoardCuts {
                     continue;
                 }
             }
-            String constant = FlowNames.constantFor(cut.name());
+            String constant = ConstantNames.constantFor(cut.name());
             String one = FxCall.call(() -> ScreenEdits.addReadout(context.services(), screen, cut.name(), constant,
                     number ? constant : null, subject));
             if (one.startsWith(ScreenEdits.NOT_WRITTEN)) refused.add(i);

@@ -11,7 +11,7 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.OcrLanguage;
 import com.botmaker.sdk.api.text.TextMatch;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.screens.ShadeFit.Fit;
 import com.botmaker.sdk.internal.vision.FrameChange;

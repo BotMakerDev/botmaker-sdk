@@ -1,16 +1,13 @@
 package com.botmaker.sdk.plugin.overlay;
 
-import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.Marks;
 import com.botmaker.plugin.api.overlay.OverlayTool;
 import com.botmaker.plugin.api.overlay.OverlayToolContext;
-import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Mouse;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.PictureCuts;
 import javafx.scene.Node;
@@ -30,7 +27,6 @@ import java.util.Optional;
  *   <li><b>Picture:</b> drag a box on the game, name it, and it is a {@code Pictures} constant. Optionally a
  *       click on it is inserted at the caret.</li>
  *   <li><b>Point:</b> click a spot on the game, and {@code Mouse.click(new Point(x, y))} is inserted.</li>
- *   <li><b>Flow:</b> opens 🔀 Activity Flow.</li>
  *   <li><b>Screens:</b> the bot's screen map, lit where a run is; opens 🗺 Screens ({@link ScreenMap}).</li>
  * </ul>
  *
@@ -41,7 +37,6 @@ public final class SdkTools {
 
     public static final OverlayTool PICTURE = OverlayTool.id("picture").named("Picture").pane(SdkTools::picture);
     public static final OverlayTool POINT = OverlayTool.id("point").named("Point").pane(SdkTools::point);
-    public static final OverlayTool FLOW = OverlayTool.id("flow").named("Flow").pane(SdkTools::flow);
     public static final OverlayTool SCREENS = OverlayTool.id("screens").named("Screens").pane(ScreenMap::pane);
 
     private SdkTools() {}
@@ -94,17 +89,6 @@ public final class SdkTools {
         })));
         return column(new Label("A click at a fixed screen point. Prefer a picture when the thing has one."), pick,
                 status);
-    }
-
-    static Node flow(OverlayToolContext context) {
-        Button open = new Button("🔀 Open Activity Flow");
-        open.setMaxWidth(Double.MAX_VALUE);
-        open.setOnAction(e -> ActivityFlowDialog.open(actions(context.services())));
-        return column(new Label("Add, rename and wire activities. Each activity is a chip above."), open);
-    }
-
-    private static ActionContext actions(StudioServices services) {
-        return () -> services;
     }
 
     private static VBox column(Node... children) {

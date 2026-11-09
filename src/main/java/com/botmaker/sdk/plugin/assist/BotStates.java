@@ -6,7 +6,7 @@ import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.internal.bot.SdkValues;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 
 import java.util.ArrayList;
 import java.util.List;

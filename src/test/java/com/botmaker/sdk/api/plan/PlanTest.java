@@ -1,13 +1,11 @@
 package com.botmaker.sdk.api.plan;
 
-import com.botmaker.sdk.api.flow.Flow;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,8 +42,7 @@ class PlanTest {
     }
 
     @Test
-    void aRunRunsAFlowOrAPlan() {
-        assertInstanceOf(Routine.class, Flow.NONE);
-        assertInstanceOf(Routine.class, Plan.of(Plan.tier(A)));
+    void noPlanHasNoTiers() {
+        assertTrue(Plan.NONE.tiers().isEmpty());
     }
 }

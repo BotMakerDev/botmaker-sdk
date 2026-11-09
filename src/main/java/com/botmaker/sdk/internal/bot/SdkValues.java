@@ -11,17 +11,12 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
-import com.botmaker.sdk.api.bot.Outcome;
+import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.Activity;
-import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.api.flow.FlowLayout;
-import com.botmaker.sdk.api.flow.Run;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
-import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
@@ -32,8 +27,6 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
-import com.botmaker.sdk.internal.flow.BotConstants;
-import com.botmaker.sdk.internal.flow.InstalledRun;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
 
@@ -45,37 +38,26 @@ import java.util.List;
  * <p>One declaration per {@link SdkValue.Id} constant, which a bot writes as {@code @SdkValue(…)}: the
  * plugin names this class ({@code .values(SdkValues.class)}), so each value {@link #values()} lists is one of
  * its {@code managedValues()}, in list order; its windows open each one through a toolkit
- * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code FLOWS} are the activity
- * flows, {@code RUN} the game's home and setup, {@code FLOW_LAYOUT} where the
- * flow editor draws each card (a run ignores it), {@code SETTINGS} how it clicks and looks, {@code SCREEN} the
- * size its pictures were cut at, and {@code PICTURES}, {@code TAGS}, {@code ACTIVITIES},
- * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of constants the bot grows. {@code ROUTINE} and {@code DO_SETUP} are the
+ * {@code ManagedHandle}, and {@link #claim()} hands each to the runtime typed. {@code PLANS} and {@code GOALS} are
+ * what the bot wants, {@code RUN} the game's home and setup, {@code SETTINGS} how it clicks and looks,
+ * {@code SCREEN} the size its pictures were cut at, and {@code PICTURES}, {@code TAGS},
+ * {@code ZONES}, {@code DIGITS}, {@code TEXTS}, {@code ELEMENTS}, {@code STATES} and {@code SCREEN_MAP} the classes of
+ * constants the bot grows. {@code PLAN} and {@code DO_SETUP} are the
  * run's parameters, methods of the SDK's group {@code params/com_github_botmakerdev/botmaker_sdk/Running.java}, and
  * {@code LAUNCH_TARGET} and {@code CAPTURE} (where pixels are read from) the game's, in {@code Game.java} beside it
- * (2026-11-05: a group per holder, which is its category); {@code Bot.runFlow} reads them by their marks and nothing
+ * (2026-11-05: a group per holder, which is its category); {@code Bot.run} reads them by their marks and nothing
  * claims them. {@code LAUNCH_TARGETS} and {@code VM} are the author's game data in
  * {@code Sdk.java}.
  *
  * <p><b>It is {@code internal} because a bot never names it</b>, and the plugin half may. It names contract,
- * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#runFlow} calls
+ * {@code api} and shared types only — no toolkit — so it is safe in a bot. {@link com.botmaker.sdk.api.bot.Bot#run} calls
  * {@link #claim()} before installing, which is the only ordering anyone has to get right.
  */
 public final class SdkValues implements ValueHolder {
 
     /**
-     * The flows — {@code static final Flow MAIN = Flow.of(…)}, one per way of playing. 🔀 Activity Flow draws one,
-     * keeping its activities, wires and layout in step.
-     */
-    public static final ManagedOpenSet.OfConstants<Flow> FLOWS = ManagedValue.openSet(SdkValue.Id.FLOWS)
-            .of(Flow.class)
-            .referredToAs(BotConstants::flow)
-            .in(SdkValue.Holder.FLOWS)
-            .because("These are the bot's activity flows. Draw them in 🔀 Activity Flow, which keeps the"
-                    + " activities, the wires and the layout in step.");
-
-    /**
      * The plans — {@code static final Plan DAILY = Plan.of(…)}, each tiers of the goals of {@code Goals.java}. A
-     * reference to one, as the {@code routine} parameter holds, reads as its name.
+     * reference to one, as the {@code plan} parameter holds, reads as its name.
      */
     public static final ManagedOpenSet.OfConstants<Plan> PLANS = ManagedValue.openSet(SdkValue.Id.PLANS)
             .of(Plan.class)
@@ -100,13 +82,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedMethod<Run> RUN = ManagedValue.method(SdkValue.Id.RUN)
             .in(SdkValue.Holder.SDK)
             .holds(Run.class, Run.NONE)
-            .because("This says how the bot gets the game home and sets it up. Change them in 🔀 Activity Flow.");
-
-    public static final ManagedMethod<FlowLayout> FLOW_LAYOUT = ManagedValue.method(SdkValue.Id.FLOW_LAYOUT)
-            .in(SdkValue.Holder.SDK)
-            .holds(FlowLayout.class, FlowLayout.NONE)
-            .because("These are where the Activity Flow's cards sit. Drag them in 🔀 Activity Flow, which keeps"
-                    + " them in step with the activities' names.");
+            .because("This says how the bot gets the game home and sets it up. Change it in Sdk.java's run().");
 
     public static final ManagedMethod<BotSettings> SETTINGS = ManagedValue.method(SdkValue.Id.SETTINGS)
             .in(SdkValue.Holder.SDK)
@@ -136,19 +112,6 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.TAGS)
             .because("Tags.java holds the groups 🖼 Manage Pictures files pictures under. Add, rename or delete one"
                     + " there, which changes every picture it holds together.");
-
-    /**
-     * The activities, each an enum of its outcomes nested in one class —
-     * {@code final class Activities { enum Collect implements Outcome { NEXT, NOTHING_LEFT } }} (2026-10-10).
-     * 🔀 Activity Flow adds, renames and removes an enum with its card and a constant with its exit, together with
-     * every step, wire, body and {@code ActivitySwitch} call naming them.
-     */
-    public static final ManagedOpenSet.EnumGroups<Outcome> ACTIVITIES = ManagedValue.openSet(SdkValue.Id.ACTIVITIES)
-            .ofEnumGroups(Outcome.class, BotConstants::outcome)
-            .groupedAs(Activity.class, BotConstants::activity)
-            .in(SdkValue.Holder.ACTIVITIES)
-            .because("Activities and their outcomes are managed in 🔀 Activity Flow, which renames the card or the"
-                    + " exit and every use of it together.");
 
     /**
      * The named areas — {@code static final Zone BAG = new Zone(10, 20, 200, 120)}, in the bot's pixels, which
@@ -221,7 +184,7 @@ public final class SdkValues implements ValueHolder {
      * The game's screens — {@code static final class Campaign extends Screen} with its constant {@code CAMPAIGN}: its
      * inputs and readouts are its fields ({@code public final Button claim = Button.of(…)}), the rest its {@link
      * Screen#setup}. A
-     * screen and an input are named by their constant and field, read by name like a sub-flow ({@link
+     * screen and an input are named by their constant and field, read by name like a plan ({@link
      * BotConstants#screen}, {@link BotConstants#input}), so one equal to another, or not filled in yet, is still its
      * own.
      */
@@ -250,18 +213,15 @@ public final class SdkValues implements ValueHolder {
             + " Runner or in Project ▸ Parameters.";
 
     /**
-     * What a run runs — {@code public Routine routine()} in the SDK's parameter group, one of the {@code Flows} or of
-     * the {@code Plans}, read by {@code Bot.runFlow} by its mark. Like each parameter below, the host writes it there
-     * and in {@code starting-params/} on bind.
+     * What a run runs — {@code public Plan plan()} in the SDK's parameter group, one of the {@code Plans}, read by
+     * {@code Bot.run} by its mark. Like each parameter below, the host writes it there and in {@code starting-params/}
+     * on bind.
      */
-    public static final ManagedParam<Routine> ROUTINE = ManagedValue.param(SdkValue.Id.ROUTINE)
+    public static final ManagedParam<Plan> PLAN = ManagedValue.param(SdkValue.Id.PLAN)
             .in(SdkValue.Holder.RUNNING)
-            .startsAs(SdkValues::noRoutine)
-            .shown("What the bot runs: a flow or a plan", Param.Visibility.PUBLIC)
+            .startsAs(SdkValues::noPlan)
+            .shown("What the bot runs: one of its plans", Param.Visibility.PUBLIC)
             .because(RUN_PARAM);
-
-    // The flow parameter ROUTINE replaces is no value of the SDK's any more, so bind writes it in no bot: a bot that
-    // has one keeps it marked, and a run reads it by that mark while routine is Flow.NONE, until it goes next release.
 
     /** Whether a run sets the game up first — {@code public boolean doSetup()}. */
     public static final ManagedParam<Boolean> DO_SETUP = ManagedValue.param(SdkValue.Id.DO_SETUP)
@@ -300,7 +260,7 @@ public final class SdkValues implements ValueHolder {
 
     /**
      * Where the bot reads pixels from — {@code public CaptureSource captureSource()}, the game's window as the
-     * person running the bot picked it (2026-10-13: a parameter, so the Runner shows it). {@code Bot.runFlow} reads
+     * person running the bot picked it (2026-10-13: a parameter, so the Runner shows it). {@code Bot.run} reads
      * it by its mark ({@code InstalledGame}).
      */
     public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
@@ -339,14 +299,13 @@ public final class SdkValues implements ValueHolder {
 
     @Override
     public List<ManagedValue<?>> values() {
-        return List.of(FLOWS, PLANS, GOALS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS,
-                STATES, SCREEN_MAP, SCREEN, SHADES, ROUTINE, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM,
-                GAME_ZONE);
+        return List.of(PLANS, GOALS, RUN, SETTINGS, PICTURES, TAGS, ZONES, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
+                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE);
     }
 
-    /** {@link #ROUTINE}'s type and first value: nothing until the runner picks a flow or a plan. */
-    private static Routine noRoutine() {
-        return Flow.NONE;
+    /** {@link #PLAN}'s type and first value: nothing until the runner picks a plan. */
+    private static Plan noPlan() {
+        return Plan.NONE;
     }
 
     /** {@link #DO_SETUP}'s: a new bot sets its game up on its first run. */
@@ -371,7 +330,7 @@ public final class SdkValues implements ValueHolder {
 
     /**
      * Registers this plugin's values with {@link ManagedValues}. Idempotent, and cheap enough to be called on
-     * every {@code Bot.runFlow} rather than guarded by its caller.
+     * every {@code Bot.run} rather than guarded by its caller.
      */
     public static synchronized void claim() {
         if (claimed) {
@@ -382,9 +341,6 @@ public final class SdkValues implements ValueHolder {
         ManagedValues.claim(SETTINGS, BotSettings::use);
         ManagedValues.claim(SCREEN, BotScreen::use);
         ManagedValues.claim(SHADES, ShadeFit::use);
-        // Where the flow editor's cards sit: the editor's, and nothing at runtime reads it. Claimed so a run
-        // does not report it as a value nobody takes.
-        ManagedValues.claim(FLOW_LAYOUT, layout -> { });
         // The launchers and the VM: InstalledGame reads them by their marks, with the parameters beside them.
         ManagedValues.claim(LAUNCH_TARGETS, launchers -> { });
         ManagedValues.claim(VM, vm -> { });

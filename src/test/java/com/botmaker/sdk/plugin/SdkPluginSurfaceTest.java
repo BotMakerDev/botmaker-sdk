@@ -13,6 +13,7 @@ import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.plugin.toolkit.testing.PluginTests;
 import com.botmaker.plugin.toolkit.testing.TestContexts;
+import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Point;
@@ -22,6 +23,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.KeySequence;
 import com.botmaker.sdk.api.input.MouseButton;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.text.OcrOptions;
 import com.botmaker.sdk.api.text.TextMatch;
@@ -37,7 +39,7 @@ import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
-import com.botmaker.sdk.plugin.types.FlowTypes;
+import com.botmaker.sdk.plugin.types.RunTypes;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
 import com.botmaker.sdk.plugin.types.SettingsTypes;
@@ -117,8 +119,7 @@ class SdkPluginSurfaceTest {
             com.botmaker.sdk.api.geometry.Zone.class,
             Key.class, MouseButton.class, Combo.class,
             KeySequence.class, CaptureSource.class, ImageTemplateGroup.class, com.botmaker.sdk.api.bot.Launcher.class,
-            com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.flow.Activity.class, com.botmaker.sdk.api.bot.Outcome.class,
-            com.botmaker.sdk.api.screens.State.class);
+            com.botmaker.sdk.api.bot.LaunchChoice.class, com.botmaker.sdk.api.screens.State.class);
 
     /**
      * The four vision results, each declared by the host off its {@code @Fills} method: what the pill says
@@ -153,9 +154,9 @@ class SdkPluginSurfaceTest {
     }
 
     /**
-     * A project with no {@code Sdk.java} can be given one: the flow and the capture source share the
-     * {@code Sdk} holder, each typed with what its method returns and starting as the template's does; the
-     * pictures are an open set, an empty {@code Pictures} class.
+     * A project with no {@code Sdk.java} can be given one: the run sits in the {@code Sdk} holder, typed with what
+     * its method returns and starting as the template's does; the pictures are an open set, an empty
+     * {@code Pictures} class.
      */
     @Test
     void each_managed_value_says_where_the_host_creates_it() {
@@ -164,28 +165,20 @@ class SdkPluginSurfaceTest {
             plugin.managedValues().stream().filter(v -> v.id().equals(ManagedValue.idOf(id))).findFirst()
                     .ifPresent(v -> byId.put(id, v));
         }
-        var flows = byId.get(SdkValue.Id.FLOWS);
-        assertEquals(SdkValue.class.getName(), flows.marker());
-        assertEquals("Flows", flows.holder());
-        assertInstanceOf(ManagedOpenSet.OfConstants.class, flows);
-        assertEquals(com.botmaker.sdk.api.flow.Flow.class, flows.type());
         var run = byId.get(SdkValue.Id.RUN);
+        assertEquals(SdkValue.class.getName(), run.marker());
         assertEquals("Sdk", run.holder());
-        assertEquals(com.botmaker.sdk.api.flow.Run.class, run.type());
-        assertEquals(com.botmaker.sdk.api.flow.Run.NONE, assertInstanceOf(ManagedMethod.class, run).initial());
-        var layout = byId.get(SdkValue.Id.FLOW_LAYOUT);
-        assertEquals("Sdk", layout.holder());
-        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.class, layout.type());
-        assertEquals(com.botmaker.sdk.api.flow.FlowLayout.NONE,
-                assertInstanceOf(ManagedMethod.class, layout).initial());
+        assertEquals(Run.class, run.type());
+        assertEquals(Run.NONE, assertInstanceOf(ManagedMethod.class, run).initial());
         var capture = byId.get(SdkValue.Id.CAPTURE);
         assertEquals("Game", capture.holder());
-        assertFalse(byId.containsKey(SdkValue.Id.FLOW), "bind writes no flow(): routine replaces it");
-        assertEquals("Running", byId.get(SdkValue.Id.ROUTINE).holder());
+        var plan = byId.get(SdkValue.Id.PLAN);
+        assertEquals("Running", plan.holder(), "the Runner's choice: which plan the run runs");
+        assertEquals(Plan.class, plan.type());
+        assertEquals(Plan.NONE, assertInstanceOf(ManagedParam.class, plan).initial());
         assertEquals("Plans", byId.get(SdkValue.Id.PLANS).holder());
         assertEquals("Running", byId.get(SdkValue.Id.DO_SETUP).holder());
         assertEquals("Game", byId.get(SdkValue.Id.LAUNCH_TARGET).holder());
-        assertFalse(byId.containsKey(SdkValue.Id.SKIP), "skip is no value of the SDK's any more");
         assertEquals(CaptureSource.class, capture.type());
         assertEquals(CaptureSource.desktop().getClass(),
                 assertInstanceOf(ManagedParam.class, capture).initial().getClass());
@@ -195,12 +188,6 @@ class SdkPluginSurfaceTest {
         assertEquals("Pictures", pictures.holder());
         assertInstanceOf(ManagedOpenSet.OfConstants.class, pictures);
         assertEquals(com.botmaker.sdk.api.vision.ImageTemplate.class, pictures.type());
-        assertEquals("Activities", byId.get(SdkValue.Id.ACTIVITIES).holder());
-        assertEquals(com.botmaker.sdk.api.bot.Outcome.class, byId.get(SdkValue.Id.ACTIVITIES).type());
-        ManagedOpenSet.EnumGroups<?> activities = assertInstanceOf(ManagedOpenSet.EnumGroups.class,
-                byId.get(SdkValue.Id.ACTIVITIES), "one enum of outcomes per activity");
-        assertEquals("Collect", activities
-                .byGroup(com.botmaker.sdk.api.flow.Activity.class, "Collect").orElseThrow().name());
         assertEquals("Zones", byId.get(SdkValue.Id.ZONES).holder());
         assertEquals(com.botmaker.sdk.api.geometry.Zone.class, byId.get(SdkValue.Id.ZONES).type());
         assertEquals("Digits", byId.get(SdkValue.Id.DIGITS).holder());
@@ -230,7 +217,7 @@ class SdkPluginSurfaceTest {
     @Test
     void a_host_can_load_the_plugin_and_every_holder_lists_every_field() {
         PluginTests.assertDeclared(SdkPlugin.class);
-        for (Class<?> holder : List.of(SdkTypes.class, FlowTypes.class, ScreenTypes.class, CaptureTypes.class,
+        for (Class<?> holder : List.of(SdkTypes.class, RunTypes.class, ScreenTypes.class, CaptureTypes.class,
                 SettingsTypes.class, SdkValues.class, SdkEditors.class, SdkToolbarItems.class, SdkRunOverlay.class,
                 SdkOverlay.class, SdkAssistant.class)) {
             PluginTests.assertListsEveryField(holder);
@@ -325,20 +312,19 @@ class SdkPluginSurfaceTest {
      * rather than on the main bar, and their subject is the window the HUD is drawn over.
      */
     @Test
-    void the_toolbar_contributes_twelve_items_in_their_places_and_orders() {
+    void the_toolbar_contributes_eleven_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("game", "project-setup", "capture-source", "bot-settings", "activity-flow",
-                        "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
+        assertEquals(List.of("game", "project-setup", "capture-source", "bot-settings", "screen-map", "goals", "manage-templates", "capture-templates", "pilot",
                         "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
         ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar, bar, bar, overlay, overlay),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 40, 50, 60, 65, 70, 80, 90, 10, 20),
+        assertEquals(List.of(10, 20, 30, 40, 60, 65, 70, 80, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {
@@ -393,10 +379,11 @@ class SdkPluginSurfaceTest {
             if (!(type instanceof EditableType<?>)) plain.add(type.type().getSimpleName());
         }
         assertEquals(List.of(), plain);
-        assertEquals(21, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
+        assertEquals(19, plugin.types().size(), "Direction went on 2026-10-01; Activity and Outcome came 2026-10-02;"
                 + " Spot, Zone and DigitSet 2026-10-11; Launcher 2026-10-13; Spot went 2026-10-15; the four"
                 + " vision results became @Fills 2026-10-19; LaunchChoice came 2026-10-19; Words 2026-10-22;"
-                + " Element 2026-10-31; State 2026-11-02, once a look's state became a ButtonState");
+                + " Element 2026-10-31; State 2026-11-02, once a look's state became a ButtonState; Activity and"
+                + " Outcome went 2026-11-09 with flows");
     }
 
     /**

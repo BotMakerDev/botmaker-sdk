@@ -14,7 +14,7 @@ import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants.InputName;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
@@ -66,30 +66,21 @@ final class ScreenCards {
      * @param inputs    its inputs
      * @param stage     what its notes say it reached ({@code surveyed}), empty when nothing
      * @param at        where its card was moved to, null for where the layout puts it
-     * @param activities the activities whose flow card says they work here ({@code .on(Screens.X)}), by label
+     * @param shots     its shots by name
      */
     record Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
                 boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at,
-                List<String> activities, Map<String, String> shots) {
+                Map<String, String> shots) {
 
         Card {
-            activities = activities == null ? List.of() : List.copyOf(activities);
             shots = shots == null ? Map.of() : Map.copyOf(shots);
         }
 
         /** A card whose Java names no shot. */
         Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
-             boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at,
-             List<String> activities) {
-            this(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs, stage, at,
-                    activities, Map.of());
-        }
-
-        /** A card no activity works on. */
-        Card(String constant, String name, String marker, State state, String said, String shape, boolean popup,
              boolean start, String panelOf, ScreenGraph.Presence presence, int tried, int inputs, String stage, Point at) {
             this(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs, stage, at,
-                    List.of());
+                    Map.of());
         }
 
         /** Whether it shows only at times, or is locked: drawn dashed. */
@@ -100,13 +91,7 @@ final class ScreenCards {
         /** This card moved to {@code at}, null for where the layout puts it. */
         Card withAt(Point at) {
             return new Card(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs,
-                    stage, at, activities, shots);
-        }
-
-        /** This card with {@code activities} working on it. */
-        Card withActivities(List<String> activities) {
-            return new Card(constant, name, marker, state, said, shape, popup, start, panelOf, presence, tried, inputs,
-                    stage, at, activities, shots);
+                    stage, at, shots);
         }
 
         /**
@@ -214,15 +199,9 @@ final class ScreenCards {
 
     /** Every screen's card, in the order the bot declares them; {@code stages} by constant. */
     static List<Card> cards(ScreenGraph graph, Map<String, String> stages) {
-        return cards(graph, stages, Map.of());
-    }
-
-    /** {@link #cards(ScreenGraph, Map)}, each lit by the activities that say they work on it, by screen constant. */
-    static List<Card> cards(ScreenGraph graph, Map<String, String> stages, Map<String, List<String>> activities) {
         List<Card> cards = new ArrayList<>();
         for (String constant : graph.screens().keySet()) {
-            cards.add(card(graph, constant, stages.getOrDefault(constant, ""))
-                    .withActivities(activities.getOrDefault(constant, List.of())));
+            cards.add(card(graph, constant, stages.getOrDefault(constant, "")));
         }
         return cards;
     }
@@ -253,7 +232,7 @@ final class ScreenCards {
         return new Card(constant, graph.shown(constant), screen.firstMarkerId(), state,
                 said, shape, screen.isPopup(), screen.isStart(), graph.panelOf(constant).map(graph::shown).orElse(null),
                 graph.presence(constant), tried, fields.size(),
-                stage == null ? "" : stage, screen.at(), List.of(), shots(screen));
+                stage == null ? "" : stage, screen.at(), shots(screen));
     }
 
     /** The shots {@code screen}'s Java names, by look, its own under {@code ""}. */
@@ -278,7 +257,6 @@ final class ScreenCards {
         if (card.panelOf() != null) pills.add(new Pill("panel of " + card.panelOf(), "screen-pill-plain"));
         if (card.conditional()) pills.add(new Pill(card.presence().name().toLowerCase(Locale.ROOT), "screen-pill-plain"));
         if (!card.stage().isEmpty()) pills.add(new Pill(card.stage(), "screen-pill-stage"));
-        for (String activity : card.activities()) pills.add(new Pill("⚙ " + activity, "screen-pill-activity"));
         return pills;
     }
 

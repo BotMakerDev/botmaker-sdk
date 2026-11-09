@@ -1,5 +1,4 @@
 package com.botmaker.sdk.api.bot;
-import com.botmaker.plugin.api.assist.TrialEntry;
 import com.botmaker.plugin.api.managed.ManagedValues;
 import com.botmaker.plugin.api.palette.EntryPoint;
 import com.botmaker.plugin.api.palette.Hidden;
@@ -9,19 +8,14 @@ import com.botmaker.plugin.api.palette.Untraced;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.bot.BotStuckException;
-import com.botmaker.sdk.api.flow.Activity;
-import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.plan.Plan;
-import com.botmaker.sdk.api.plan.Routine;
 import com.botmaker.sdk.internal.plan.RunGame;
 import com.botmaker.sdk.internal.bot.RestartCap;
 import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.InstalledGame;
-import com.botmaker.sdk.internal.flow.FlowTree;
-import com.botmaker.sdk.internal.flow.FlowWalker;
-import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
@@ -47,53 +41,52 @@ import java.util.function.Consumer;
  * {@link BotStuckException} from the {@link Watchdog}, or any other {@link RuntimeException} — catches it,
  * resets the watchdog and runs your recovery (typically {@code goHome()} then {@code startGame()}) to get
  * back to a known-good state before restarting. This is the "restart the bot on failure" machinery a game
- * bot needs; the body, the recovery hooks and the per-activity logic stay in editable user code.
+ * bot needs; the body is the plan the runner picked, and the recovery hooks stay in editable user code.
  *
- * <p>{@link #runFlow} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
+ * <p>{@link #run} also runs a start-up sequence <em>once</em> before the first loop pass — launch the
  * project's configured target, then the run's {@code setup} when the bot's {@code doSetup} parameter is ticked,
  * then its {@code home} — so a fresh launch actually opens the game, sets it as the bot needs and reaches a known
  * screen instead of assuming it is already running. A first launch leaves an already-open game alone; a recovery
  * shuts a frozen one down first. A recovery runs the setup only when it has not yet returned.
  *
- * <p>The bot ends when {@link #stop()} is called — from an activity that is done, or automatically by the
- * generated loop once every activity is disabled. {@code stop()} unwinds the supervise loop cleanly and
- * {@code supervise} returns, rather than treating it as a crash to recover from.
+ * <p>The bot ends when {@link #stop()} is called — from a setup or a {@code Custom} input that finds the game
+ * cannot go on, or by the plan run once no goal of it comes due again. {@code stop()} unwinds the supervise loop
+ * cleanly and {@code supervise} returns, rather than treating it as a crash to recover from.
  *
- * <p><b>Curated for the palette</b> (see {@code @Palette}): {@link #stop()} is offered — it is exactly the
- * statement an activity that has finished its work writes, from anywhere in the call stack. {@link #runFlow}
- * is offered inside {@code main} only: it <em>is</em> the bot, and it does not return. It replaced
- * {@code run(goHome, values…)} on 2026-10-10, when what gets home moved onto the flow.
+ * <p><b>Curated for the palette</b> (see {@code @Palette}): {@link #stop()} is offered, from anywhere in the call
+ * stack. {@link #run} is offered inside {@code main} only: it <em>is</em> the bot, and it does not return. It
+ * replaced {@code runFlow} on 2026-11-09, when flows were deleted.
  */
 @Palette(category = "bot", categoryLabel = "Bot", icon = "🤖")
 public class Bot {
 
     /**
-     * For {@code extends Bot} alone — see {@link #runFlow}. There is nothing to construct here and nothing to
-     * override; the class is extendable so a bot's entry point can call {@code runFlow(…)} unqualified, and so
+     * For {@code extends Bot} alone — see {@link #run}. There is nothing to construct here and nothing to
+     * override; the class is extendable so a bot's entry point can call {@code run(…)} unqualified, and so
      * that <em>this class is a bot's entry point</em> is a fact javac knows rather than a convention.
      */
     protected Bot() {}
 
     /**
-     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs the
-     * flow its {@code flow} parameter names — the whole of a bot's {@code main}.
+     * Installs this bot's managed values (the SDK's {@code @SdkValue} ones and any other plugin's) and runs the plan
+     * its {@code plan} parameter names — the whole of a bot's {@code main}. Java that needs no screen goes before it
+     * in {@code main}, or in a {@code Custom} input of a screen.
      *
      * <pre>{@code
      * public final class MyBot extends Bot {
      *
      *     public static void main(String[] args) {
-     *         runFlow(Sdk.class);
+     *         run(Sdk.class);
      *     }
      * }
      * }</pre>
      *
      * <p>What the person running the bot chooses is the bot's own {@code @Param}s, read off {@code values} by their
-     * marks ({@code @SdkValue(SdkValue.Id.ROUTINE)}, {@code DO_SETUP}): which of the {@code Flows} or {@code Plans}
-     * runs, and whether the game is set up first. A plan runs round after round until no goal of it comes due again
-     * ({@code PlanRun}). A bot with no {@code routine} runs nothing; with no {@code doSetup} it skips the setup. What
-     * gets the game back to
-     * a known screen is {@code Sdk.run()}'s {@link com.botmaker.sdk.api.flow.Run#home}, run at start-up, after
-     * anything unexpected and before each step that goes home; a run with none goes nowhere.
+     * marks ({@code @SdkValue(SdkValue.Id.PLAN)}, {@code DO_SETUP}): which of the {@code Plans} runs, and whether the
+     * game is set up first. The plan runs round after round until no goal of it comes due again ({@code PlanRun}). A
+     * bot whose {@code plan} is {@link Plan#NONE}, or that has none, runs nothing; with no {@code doSetup} it skips the
+     * setup. What gets the game back to a known screen is {@code Sdk.run()}'s {@link Run#home}, run at start-up and
+     * after anything unexpected; a run with none walks to the map's home screen.
      *
      * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
      * a second supervised run inside the first.
@@ -102,24 +95,22 @@ public class Bot {
      *                this project now owns
      */
     @EntryPoint
-    @PaletteLabel("Run activity flow")
+    @PaletteLabel("Run the bot's plan")
     @Untraced("holds the whole run")
-    public static void runFlow(Class<?>... values) {
+    public static void run(Class<?>... values) {
         observe();
         MissFrames.start();
         SdkValues.claim();
         ManagedValues.install(values);
         InstalledGame.install(values);
-        InstalledRun.nameFlows(values);
         ScreenMaps.install(values);
         RunFacts.install(values);
-        Routine routine = routine(values);
-        if (routine instanceof Flow flow) InstalledRun.walk(flow);
-        else {
-            InstalledRun.walk(null);
-            if (routine == null) Debug.log("No routine or flow parameter in the classes runFlow was given: nothing runs.");
+        Plan plan = plan(values);
+        if (plan == null) {
+            Debug.error("No plan was picked, or the plan picked has no goals: pick one of the bot's plans in the "
+                    + "Runner. Nothing runs.");
+            return;
         }
-        // Once the flow is known: the log's facts name it.
         RunDetails.start(values);
         boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
@@ -127,23 +118,13 @@ public class Bot {
             if (home != null) home.run();
         };
         PopupGuard.enabled(true);
-        Runnable body = routine instanceof Plan plan ? RunGame.body(plan, values)
-                : () -> FlowWalker.run(InstalledRun.flow(), InstalledRun.home());
-        lifecycle(body, goHome, startUp(doSetup ? InstalledRun.installed().setup() : null));
+        lifecycle(RunGame.body(plan, values), goHome, startUp(doSetup ? InstalledRun.installed().setup() : null));
     }
 
-    /**
-     * What a run runs: the {@code routine} parameter, a flow or a plan; while it is {@link Flow#NONE}, the
-     * {@code flow} parameter it replaces, so a bot that picked a flow before keeps running it. Null when the bot has
-     * neither.
-     */
-    @SuppressWarnings("removal")
-    static Routine routine(Class<?>... values) {
-        Object routine = InstalledGame.marked(SdkValue.Id.ROUTINE, values);
-        if (routine instanceof Plan plan) return plan;
-        if (routine instanceof Flow flow && !flow.equals(Flow.NONE)) return flow;
-        Object flow = InstalledGame.marked(SdkValue.Id.FLOW, values);
-        return flow instanceof Flow old ? old : routine instanceof Flow none ? none : null;
+    /** What a run runs: the {@code plan} parameter; null when the bot has none, or it is {@link Plan#NONE}. */
+    static Plan plan(Class<?>... values) {
+        return InstalledGame.marked(SdkValue.Id.PLAN, values) instanceof Plan plan && !plan.tiers().isEmpty() ? plan
+                : null;
     }
 
     /**
@@ -160,19 +141,18 @@ public class Bot {
     }
 
     /**
-     * Installs this bot's managed values as {@link #runFlow} does, then runs {@code body} once and returns —
+     * Installs this bot's managed values as {@link #run} does, then runs {@code body} once and returns —
      * what Studio's ▶ Try calls with one statement as the body, from a caller it writes outside the project's
      * sources.
      *
-     * <p>No launch, no recovery: a try is the statement against the screen as it is now — in the private display
-     * Studio offers when the game runs in one. Home runs only before an activity's body run whole whose card goes
-     * home, as the run does. An exception from {@code body} is the try's
-     * failure and propagates; {@link #stop()} ends it quietly.
+     * <p>No launch, no recovery, no home: a try is the statement against the screen as it is now — in the private
+     * display Studio offers when the game runs in one. An exception from {@code body} is the try's failure and
+     * propagates; {@link #stop()} ends it quietly.
      *
      * @param body   the statement, and the locals it reads
-     * @param values each plugin's values class, as {@link #runFlow} takes them
+     * @param values each plugin's values class, as {@link #run} takes them
      */
-    @Hidden("the entry Studio's Try calls; a bot runs through runFlow()")
+    @Hidden("the entry Studio's Try calls; a bot runs through run()")
     @Untraced("holds the whole try")
     public static void trial(Runnable body, Class<?>... values) {
         observe();
@@ -187,36 +167,10 @@ public class Bot {
         // Switched back on each run, so a warm JVM keeps no switch a body of the run before left off.
         PopupGuard.enabled(true);
         try {
-            homeFirst(body, values);
             body.run();
         } catch (BotStoppedException e) {
             Debug.log("Stopped by request.");
         }
-    }
-
-    /**
-     * Runs the bot's home before a try that runs an activity's body whole ({@link TrialEntry#TARGET}) when that
-     * activity's card goes home, as the run would. The card is the one of the activity the method returns.
-     */
-    private static void homeFirst(Runnable body, Class<?>... values) {
-        // Read once: a later trial in this JVM that names no method must not find it.
-        String target = System.getProperty(TrialEntry.TARGET, "");
-        System.clearProperty(TrialEntry.TARGET);
-        int hash = target.indexOf('#');
-        Runnable home = InstalledRun.home();
-        if (hash < 0 || home == null || !(routine(values) instanceof Flow flow)) return;
-        Class<?> returned;
-        try {
-            returned = Class.forName(target.substring(0, hash), false, body.getClass().getClassLoader())
-                    .getDeclaredMethod(target.substring(hash + 1)).getReturnType();
-        } catch (ReflectiveOperationException | LinkageError e) {
-            return;
-        }
-        if (!Outcome.class.isAssignableFrom(returned)) return;
-        Flow.Step card = FlowTree.find(flow, Activity.of(returned.asSubclass(Outcome.class)));
-        if (card == null || !card.goHome()) return;
-        Debug.log("Going home first, as the " + card.label() + " card does.");
-        home.run();
     }
 
     /** Why the supervisor invokes the start-up step: the first launch, or a recovery after a crash. */
@@ -345,7 +299,7 @@ public class Bot {
      * {@link Watchdog} so stuck states surface as {@link BotStuckException}. Does not return under normal
      * operation.
      *
-     * <p>Package-private: bots call {@link #runFlow} —{@code supervise} is the internal loop.
+     * <p>Package-private: bots call {@link #run} —{@code supervise} is the internal loop.
      *
      * @param body     the bot's main work (e.g. one pass of the macro loop; it is re-run continuously)
      * @param recovery run after a crash/stuck to restore a known-good state before the next attempt

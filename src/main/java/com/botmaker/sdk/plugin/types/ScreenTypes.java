@@ -43,7 +43,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.NamedMethod;
 
@@ -54,8 +54,7 @@ import java.util.regex.Pattern;
 
 /**
  * The shapes of the {@code SCREEN_MAP} value, {@code Screens.java}: a screen's setup, its ways in, and its inputs
- * (each a field of the screen's class), as the calls the host reads and writes. Like a flow's, none is picked on its
- * own ({@link FlowTypes}).
+ * (each a field of the screen's class), as the calls the host reads and writes. None is picked on its own.
  *
  * <p>An input named inside a setup — the {@code HOME.market} of {@code .from(HOME.market)} — is a reference to that
  * field, held by its screen and field ({@code BotConstants.input}) and written back as the field, never spelled out.

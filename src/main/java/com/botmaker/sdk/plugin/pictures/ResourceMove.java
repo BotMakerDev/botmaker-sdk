@@ -148,7 +148,7 @@ public final class ResourceMove {
         if (values == null) return 0;
         List<Pending> pending = new ArrayList<>();
         pending.addAll(opened(values, PICTURES, ImageTemplate::filePath, left, (held, path) -> FrameCut.of(held)
-                .onto(new ImageTemplate(path)).tags(held.tags()).inActivities(held.activities())));
+                .onto(new ImageTemplate(path)).tags(held.tags())));
         pending.addAll(opened(values, DIGITS, DigitSet::folder, left,
                 (held, path) -> new DigitSet(path).in(held.frame())));
         if (pending.isEmpty()) return 0;

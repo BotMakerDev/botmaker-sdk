@@ -41,7 +41,7 @@ class BotSettingsTest {
         public static BotSettings settings() {
             return BotSettings.defaults().foundDelay(750).notFoundDelay(125).centredClicks().confidence(0.62)
                     .compareMargin(0.11).where(BotSettings.Where.MY_DESKTOP)
-                    .displayBackend(BotSettings.DisplayBackend.XEPHYR).maxRetryAttempts(7);
+                    .displayBackend(BotSettings.DisplayBackend.XEPHYR);
         }
     }
 
@@ -77,7 +77,6 @@ class BotSettingsTest {
         assertFalse(current.randomizeClicks());
         assertEquals(0.62, current.confidence());
         assertEquals(0.11, current.compareMargin());
-        assertEquals(7, current.maxRetryAttempts());
         assertEquals(BotSettings.Where.MY_DESKTOP, current.where());
         assertEquals("xephyr", current.runIn().displayBackend().id());
     }
@@ -126,10 +125,9 @@ class BotSettingsTest {
 
     @Test
     void aValueOutsideItsRangeIsClampedNotThrown() {
-        BotSettings clamped = BotSettings.DEFAULTS.confidence(5).foundDelay(-3).maxRetryAttempts(0);
+        BotSettings clamped = BotSettings.DEFAULTS.confidence(5).foundDelay(-3);
         assertEquals(1.0, clamped.confidence());
         assertEquals(0, clamped.foundDelay());
-        assertEquals(1, clamped.maxRetryAttempts());
     }
 
     @Test

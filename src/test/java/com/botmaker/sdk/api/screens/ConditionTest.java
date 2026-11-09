@@ -1,7 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
 import com.botmaker.sdk.api.bot.Bot;
-import com.botmaker.sdk.internal.flow.FlowWalker;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.screens.Conditions;
 import org.junit.jupiter.api.Test;
 
@@ -84,7 +84,7 @@ class ConditionTest {
     void aStopInsideAConditionEndsTheRun() {
         RuntimeException stop = assertThrows(RuntimeException.class,
                 () -> Condition.all(Condition.of(() -> { Bot.stop(); return true; })).answer());
-        assertTrue(FlowWalker.isStop(stop));
+        assertTrue(InstalledRun.isStop(stop));
         assertThrows(RuntimeException.class, () -> Conditions.holds(() -> { Bot.stop(); return true; }));
     }
 

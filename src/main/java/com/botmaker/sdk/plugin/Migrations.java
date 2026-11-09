@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin;
 
 import com.botmaker.plugin.api.meta.Migrate;
-import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.api.geometry.Anchor;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Facts;
@@ -10,7 +9,6 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pressed;
-import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
@@ -196,16 +194,6 @@ final class Migrations {
     @Migrate(OcrOptions.class)
     static OcrOptions withLevel(@Migrate.Self OcrOptions self, TextResult.Level level) {
         return self.level(level);
-    }
-
-    @Migrate(Flow.Step.class)
-    static String description(@Migrate.Self Flow.Step self) {
-        return self.described();
-    }
-
-    @Migrate(Flow.Step.class)
-    static Screen screen(@Migrate.Self Flow.Step self) {
-        return self.on();
     }
 
     @Migrate(value = Pressed.Result.class, kind = Migrate.Kind.FIELD)

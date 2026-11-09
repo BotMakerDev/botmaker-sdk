@@ -37,7 +37,7 @@ final class Protocol {
     enum Stage {
         SETUP("Stage 0, Setup: the game in view and a way home", """
                 - setup's set_launch_target and launch_game, then screenshot.
-                - Make the home method (add_method, then edit_flow's set_flow_method home). Its marker is a picture no other
+                - Make the home method (add_method, then setup's set_run_method home). Its marker is a picture no other
                   screen shows (a sidebar icon shown everywhere is not one), and it stays visible under a popup.
                   untilFind(marker, action) presses Escape and gives the game the bot's patience
                   (BotSettings.patience, 3 s) to show the marker before it presses again; untilFind(marker,
@@ -105,7 +105,7 @@ final class Protocol {
                      screen's marker; stay true on the last input keeps the screen open.
                      go_to_screen walks the map as a run does, and which_screen says where the game is.
                 - try_input says a screen's shape once nothing on it is untried (menu when every input opened a
-                  screen, else activity: a fact for Build, not a rule here), and then asks once whether every
+                  screen, else chores: a fact for Build, not a rule here), and then asks once whether every
                   list was scrolled and every tab opened: answer it on that screen (go_to_screen back to it when
                   try_input went on). It refuses while a screen owes its marker. What cannot be cut yet the screen owes (write_notes with its
                   screen and owes); Discovery is not done while anything is owed or untried; a debt paid by
@@ -143,12 +143,12 @@ final class Protocol {
                 """),
         BUILD("Stage 2, Build: one chore at a time", """
                 - Use the game's shortcut for a chore before writing a loop that repeats a click.
-                - Before writing a step, find it: describe looks, click, key and scroll act. Then write it in the
-                  activity's body and run_activity it.
-                - A body opens with Navigate.to(Screens.X), X the screen its chore is on. False (the way there is
-                  locked or closed now) returns its LOCKED or NOT_NOW outcome: connect the activity on it to the
-                  activity after it in the lap, so the flow comes back to it next lap. Then it presses X's own
-                  inputs by the map: Navigate.press(Screens.X.field[, Pick]) walks there, scrolls its strip, picks
+                - Before writing a step, find it: describe looks, click, key and scroll act. A chore one press
+                  does is a Do field of its screen, Do.press(input).serves(Goals.X), and the goal it serves a
+                  check in Goals.java placed in a tier of Plans.java. Work a press cannot say is a Custom input,
+                  a method of its own: write it a statement at a time, each proved with try_statement (read_tree
+                  gives its id).
+                - A Custom method presses its screen's own inputs by the map: Navigate.press(Screens.X.field[, Pick]) walks there, scrolls its strip, picks
                   the copy (Pick.each(Order.NORTH), Pick.untilNone() until it is gone or disabled) and waits where
                   it leads; switch on its result() (DONE, DISABLED, ABSENT, NOT_NOW, LEFT). No picture chains:
                   the loop methods below are for what no input holds.
@@ -162,9 +162,8 @@ final class Protocol {
                   without looking again. A group is ImageTemplateGroup.of(…, …). No loop blocks, no chain of
                   separate find-then-click calls.
                 - A loop that runs BotSettings.maxRounds rounds (50) without ending throws BotStuckException: the
-                  run walks back to the screen the body's Navigate.to reached and runs the body once more, then
-                  recovers through the home, restarting the game when that fails too. A body does not count its
-                  own tries.
+                  run recovers through the home, restarting the game when that fails too, and the plan picks
+                  again. A method does not count its own tries.
                 - Click pictures, never places: no Mouse.click on x, y, which cannot tell whether
                   they landed. A tab or button gets a picture. Scroll and drag on pictures too:
                   ImageScroller.scrollAt(item, notches), drag(item, dx, dy) (fractions of the game's window) and
@@ -178,24 +177,25 @@ final class Protocol {
                   a run never presses one shown Disabled. Two different things that look alike are acted on with
                   the compare forms, the right one as good: ImageFinder.whileFindCompare(good, bad, action),
                   clickCompare.
-                - Done when its run_activity went through once: write_notes its screen with reached built.
+                - Done when each of the screen's actions went through once: write_notes its screen with reached
+                  built.
                 """),
-        TRIAL("Stage 3, Trial: prove each activity, then the whole flow", """
-                - run_activity each activity from three states: work to do, nothing to do, and interrupted (a
-                  popup over it, or started from another screen). read_trace each run: every step ended on a
-                  picture, and no BotStuckException.
-                - Then run the whole flow for three laps. Then look at the whole screen once more: a badge still
-                  lit is work the bot missed, so that screen goes back to Discovery.
-                - When the person offers a new account, run the flow there too: it shows which locks the bot
+        TRIAL("Stage 3, Trial: prove each action, then the whole plan", """
+                - run_bot from three states of each action: work to do, nothing to do, and interrupted (a popup
+                  over it, or started from another screen). read_trace each run: every step ended on a picture,
+                  and no BotStuckException.
+                - Then run the whole plan for three rounds. Then look at the whole screen once more: a badge
+                  still lit is work the bot missed, so that screen goes back to Discovery.
+                - When the person offers a new account, run the plan there too: it shows which locks the bot
                   meets and whether it skips them.
-                - Done when all three states and the laps passed: write_notes its screen with reached tried.
+                - Done when all three states and the rounds passed: write_notes its screen with reached tried.
                 """),
         TUNING("Stage 4, Tuning: faster, once it is right", """
                 - Every click pauses the bot's found delay (500 ms unless set): once every step proves itself by
                   a picture, set it to 150 (setup's set_setting).
                 - read_trace says where a run spends its time. Use the game's shortcuts at their widest (x50,
-                  Auto), order the flow so chores on one screen run together, and let a body that reads its
-                  chore's timer still running (read_text on the timer) return at once.
+                  Auto), and give an action whose chore waits on a timer its wait (Do's every or daily), so
+                  the plan does not walk to it early.
                 - Every change goes through the stage 3 trial again; then write_notes its screen with reached tuned.
                 """),
         UPKEEP("Stage 5, Upkeep: when the game changes", """
@@ -308,9 +308,9 @@ final class Protocol {
         }
         return new Where(earliest, switch (earliest) {
             case DISCOVERY -> "a screen on the map is not surveyed yet.";
-            case BUILD -> "a surveyed screen has no activity yet.";
-            case TRIAL -> "a built activity is not tried yet.";
-            default -> "every activity passed its trial.";
+            case BUILD -> "a surveyed screen has no action yet.";
+            case TRIAL -> "a built screen is not tried yet.";
+            default -> "every screen passed its trial.";
         }, screens);
     }
 }

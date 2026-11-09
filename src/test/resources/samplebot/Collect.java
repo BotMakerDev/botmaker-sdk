@@ -1,6 +1,5 @@
 package samplebot;
 
-import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Activities;
 import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Pictures;
 import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.Screens;
 import samplebot.plugins.com_github_botmakerdev.botmaker_sdk.States;
@@ -21,16 +20,17 @@ public final class Collect {
 
     private Collect() {}
 
-    public static Activities.Collect body() {
+    /** Whether there was something to collect. */
+    public static boolean body() {
         if (!Navigate.press(Screens.HOME.collect).done()) {
-            return Activities.Collect.NOTHING_LEFT;
+            return false;
         }
         OptionalLong gold = Navigate.number(Screens.HOME.gold);
         if (gold.isPresent() && gold.getAsLong() > 100) {
             Pressed bought = Navigate.press(Screens.SHOP.buy, Pick.at(Place.rightOf(Pictures.ITEM)));
             switch (bought.state()) {
                 case States.Blocks.MAXED -> {
-                    return Activities.Collect.NOTHING_LEFT;
+                    return false;
                 }
                 default -> {
                 }
@@ -38,6 +38,6 @@ public final class Collect {
         }
         Navigate.read(Screens.HOME.title).ifPresent(title -> Wait.milliseconds(title.length()));
         Wait.between(Duration.ofMillis(600), Duration.ofMillis(1200));
-        return Activities.Collect.NEXT;
+        return true;
     }
 }

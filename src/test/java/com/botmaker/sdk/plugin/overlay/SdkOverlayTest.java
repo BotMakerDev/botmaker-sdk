@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.overlay.Area;
 import com.botmaker.plugin.api.overlay.OverlayPart;
 import com.botmaker.plugin.api.overlay.Watched;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.ActivityBody;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.vision.ImageClicker;
 import com.botmaker.sdk.api.vision.ImageFinder;
@@ -60,10 +59,10 @@ class SdkOverlayTest {
     }
 
     @Test
-    void activitiesAreTargetsByTypeAndClicksAreActing() throws NoSuchMethodException {
+    void noTargetsAndClicksAreActing() throws NoSuchMethodException {
         OverlayPart part = SdkOverlay.PART;
-        assertEquals(List.of(new OverlayPart.TargetType(ActivityBody.class.getName(), "Activities")), part.targets());
-        assertEquals(List.of("picture", "point", "flow", "screens"), part.tools().stream().map(t -> t.id()).toList());
+        assertEquals(List.of(), part.targets());
+        assertEquals(List.of("picture", "point", "screens"), part.tools().stream().map(t -> t.id()).toList());
         assertTrue(part.changeWatched().isPresent());
 
         assertTrue(part.probeFor(ImageFinder.class.getMethod("find", ImageTemplate.class)).orElseThrow().readsOnly());

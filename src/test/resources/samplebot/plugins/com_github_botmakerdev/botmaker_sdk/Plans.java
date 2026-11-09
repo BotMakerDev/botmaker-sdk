@@ -3,7 +3,7 @@ package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.plan.Plan;
 
-/** What matters most, as tiers of this bot's goals: one constant per plan, which the Runner offers beside the flows. */
+/** What matters most, as tiers of this bot's goals: one constant per plan, which the Runner offers. */
 @SdkValue(SdkValue.Id.PLANS)
 public final class Plans {
 

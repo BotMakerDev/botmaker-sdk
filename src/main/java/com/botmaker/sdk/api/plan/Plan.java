@@ -4,7 +4,8 @@ import java.util.List;
 
 /**
  * What matters most, as an ordered list of tiers of goals. Between tiers the order is strict; inside a tier there is
- * none. It says nothing of how: a plan acts only through a screen's actions, a {@code Flow} only through its activities.
+ * none. It says nothing of how: a plan acts only through a screen's actions. A run runs one: the bot's {@code plan}
+ * parameter, picked in the Runner ({@code Bot.run}).
  *
  * <pre>{@code
  * public static final Plan DAILY = Plan.of(
@@ -15,15 +16,18 @@ import java.util.List;
  *
  * @param tiers its tiers, what matters most first
  */
-public record Plan(List<Tier> tiers) implements Routine {
+public record Plan(List<Tier> tiers) {
 
     public Plan {
         tiers = List.copyOf(tiers);
-        if (tiers.isEmpty()) throw new IllegalArgumentException("A plan holds at least one tier of goals.");
     }
 
-    /** The plan of {@code tiers}, what matters most first. */
+    /** No plan: what the {@code plan} parameter holds until the runner picks one. A run of it runs nothing. */
+    public static final Plan NONE = new Plan(List.of());
+
+    /** The plan of {@code tiers}, what matters most first: at least one. */
     public static Plan of(Tier... tiers) {
+        if (tiers.length == 0) throw new IllegalArgumentException("A plan holds at least one tier of goals.");
         return new Plan(List.of(tiers));
     }
 

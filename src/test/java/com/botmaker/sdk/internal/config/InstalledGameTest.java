@@ -44,8 +44,8 @@ class InstalledGameTest {
     @Test
     void theRunsOwnParametersAreReadByTheirMarksFromTheFirstClassMarkingThem() {
         assertEquals(Boolean.TRUE, InstalledGame.marked(SdkValue.Id.DO_SETUP, null, Object.class, Sdk.class));
-        assertNull(InstalledGame.marked(SdkValue.Id.FLOW, Sdk.class), "a bot with no flow method has none");
-        assertNull(InstalledGame.marked(SdkValue.Id.FLOW, (Class<?>[]) null));
+        assertNull(InstalledGame.marked(SdkValue.Id.PLAN, Sdk.class), "a bot with no plan method has none");
+        assertNull(InstalledGame.marked(SdkValue.Id.PLAN, (Class<?>[]) null));
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.sdk.plugin.flow.ActivityFlowDialog;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
@@ -23,7 +22,7 @@ import java.util.List;
  * which is why an item is contributed as data rather than as a {@code Node}.
  *
  * <p>The bar items read in one flat order (2026-10-28, when toolbar groups went): what the bot plays, what it
- * still needs, where it looks and how it clicks, then what it does (the flow and its screens), the pictures it
+ * still needs, where it looks and how it clicks, then what it does (its screens and its goals), the pictures it
  * looks for, and last the phone that watches it run. The order values are steps of ten so a button can be put
  * between two without renumbering.
  *
@@ -40,7 +39,6 @@ public final class SdkToolbarItems implements ToolbarHolder {
     public static final String PROJECT_SETUP_ID = "project-setup";
     public static final String CAPTURE_SOURCE_ID = "capture-source";
     public static final String BOT_SETTINGS_ID = "bot-settings";
-    public static final String ACTIVITY_FLOW_ID = "activity-flow";
     public static final String SCREEN_MAP_ID = "screen-map";
     public static final String GOALS_ID = "goals";
     public static final String MANAGE_PICTURES_ID = "manage-templates";
@@ -79,13 +77,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onBar(40)
             .onPress(() -> BotSettingsWindow::open);
 
-    public static final ToolbarItem ACTIVITY_FLOW = ToolbarItem.id(ACTIVITY_FLOW_ID).label("🔀 Activity Flow")
-            .tooltip("Define what this bot does, one card per activity, and wire each outcome to what "
-                    + "runs next — the graph, its loop safety, and which activities are on")
-            .onBar(50)
-            .onPress(() -> ActivityFlowDialog::open);
-
-    /** After the flow: the screens the activities are done on. */
+    /** What the bot does: the game's screens and the actions on them. */
     public static final ToolbarItem SCREEN_MAP = ToolbarItem.id(SCREEN_MAP_ID).label("🗺 Screens")
             .tooltip("The game's screens as the bot knows them — how each was reached, its inputs and what they "
                     + "did; try, cut and go to one, and see where a run is")
@@ -134,7 +126,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
     public static final List<ToolbarItem> ALL = List.of(GAME, PROJECT_SETUP, CAPTURE_SOURCE, BOT_SETTINGS,
-            ACTIVITY_FLOW, SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
+            SCREEN_MAP, GOALS, MANAGE_PICTURES, CAPTURE_TEMPLATES, PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 

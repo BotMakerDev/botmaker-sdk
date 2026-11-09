@@ -3,8 +3,6 @@ package com.botmaker.sdk.plugin.editors;
 import com.botmaker.plugin.api.EditorHolder;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
-import com.botmaker.sdk.api.flow.ActivityClass;
-import com.botmaker.sdk.api.flow.Flow;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.map.ScreenConstantView;
@@ -21,8 +19,8 @@ import java.util.List;
  * <ul>
  *   <li><b>By parameter or call.</b> An emulator name and a setting are plain values; the api says which is
  *       which by annotating the parameter or by a table keyed on the method, and the editor is chosen by that.
- *       These are absent from the Parameters window, which has no call behind a row. Activities and outcomes
- *       are types of their own ({@code SdkTypes}), claimed by type.</li>
+ *       These are absent from the Parameters window, which has no call behind a row. The run's plan
+ *       is picked from the bot's {@code Plans} ({@code PlanChoice}).</li>
  *   <li><b>By a run of pictures</b>, which neither a parameter nor a type can say: only the host knows that
  *       several arguments are one list.</li>
  *   <li><b>By another plugin's type</b>: plugin-basics declares {@code java.awt.Color}; this plugin offers a
@@ -46,18 +44,14 @@ public final class SdkEditors implements EditorHolder {
     public static final List<SlotEditor> ALL = List.of(
             SlotEditor.when(SettingHints::claims).draw(() -> SettingsEditors::setting),
             SlotEditor.onParameter(EmulatorName.class).draw(() -> ctx -> EmulatorEditors.instanceName(ctx, QuickLaunch::startAndWait)),
-            // An activity is its enum's class literal, which no type of this plugin's can claim: a Class.
-            SlotEditor.onParameter(ActivityClass.class).draw(() -> ActivityEditors::activity),
-            // The bot's run choice, the @Param Bot.runFlow reads: which flow. Only a value with no call site, a
-            // parameter's: a Flows constant's own Flow.of(…) is the flow editor's.
-            SlotEditor.when(ActivityEditors::isFlowChoice).draw(() -> ActivityEditors::flow),
-            // A constant of Flows.java or Screens.java, shown as its window shows it (the user's call, 2026-10-15):
-            // the file is the plugin's, so the editor asks for a preview, and the view is both; the windows edit them.
-            SlotEditor.when(FlowConstantView::isFlowConstant)
-                    .draw(() -> FlowConstantView::node, () -> FlowConstantView::node),
+            // The bot's run choice, the plan parameter Bot.run reads: which plan. Only a value with no call site, a
+            // parameter's: a Plans constant's own Plan.of(…) is the plan's own shape.
+            SlotEditor.when(PlanChoice::isPlanChoice).draw(() -> PlanChoice::plan),
+            // A constant of Screens.java, shown as its window shows it (the user's call, 2026-10-15): the file is the
+            // plugin's, so the editor asks for a preview, and the view is both; the window edits them.
             SlotEditor.when(ScreenConstantView::isScreenConstant)
                     .draw(() -> ScreenConstantView::node, () -> ScreenConstantView::node),
-            // A screen of the bot's map in a block, Navigate.to(Screens.HOME). A Screen is only parts, like Flow:
+            // A screen of the bot's map in a block, Navigate.to(Screens.HOME). A Screen is only parts:
             // no type of this plugin's holds it, so no type's editor can draw it.
             SlotEditor.when(ScreenEditors::isScreen).draw(() -> ScreenEditors::screen),
             // An input of the map in a block, Navigate.press(Screens.MARKET.beerBuy): a screen, then one of its fields

@@ -27,7 +27,7 @@ import java.util.stream.Stream;
  * What a run saw when a wait timed out, kept as a picture so whoever reads the trace — the user, or Claude
  * through {@code read_trace} — looks at one file instead of polling screenshots (2026-10-11).
  *
- * <p>Only a bot's run saves ({@link #start}, from {@code Bot.runFlow} and {@code Bot.trial}): a host calling the
+ * <p>Only a bot's run saves ({@link #start}, from {@code Bot.run} and {@code Bot.trial}): a host calling the
  * finders in its own JVM saves nothing. Each run gets a folder under {@code target/botmaker-runs/} in the bot's
  * folder as it starts, so the newest folder is always the latest run's, empty when nothing failed. A timeout saves
  * the frame it looked at, the search area boxed when the source was a region, and says so in one warning line

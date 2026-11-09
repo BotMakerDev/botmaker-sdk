@@ -18,10 +18,8 @@ class SdkHoldersTest {
     void eachHolderNamesTheClassBotsAlreadyHave() {
         Map<String, String> names = Map.ofEntries(
                 Map.entry("Sdk", SdkValues.RUN.holder()),
-                Map.entry("Flows", SdkValues.FLOWS.holder()),
                 Map.entry(TemplateNames.CLASS_NAME, SdkValues.PICTURES.holder()),
                 Map.entry("Tags", SdkValues.TAGS.holder()),
-                Map.entry("Activities", SdkValues.ACTIVITIES.holder()),
                 Map.entry("Zones", SdkValues.ZONES.holder()),
                 Map.entry("Digits", SdkValues.DIGITS.holder()),
                 Map.entry("Texts", SdkValues.TEXTS.holder()),

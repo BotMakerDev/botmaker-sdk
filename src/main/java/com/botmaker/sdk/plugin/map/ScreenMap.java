@@ -12,7 +12,6 @@ import com.botmaker.sdk.plugin.HistoryKeys;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.assist.ScreenShots;
-import com.botmaker.sdk.plugin.flow.ActivityScreens;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.pictures.FrameViews;
@@ -610,26 +609,15 @@ public final class ScreenMap {
     }
 
     /** The map as one read found it, or why it could not be read ({@code failed} non-null). */
-    private record Read(ScreenGraph graph, Map<String, String> stages, Map<String, List<String>> activities,
-                        String failed) {}
+    private record Read(ScreenGraph graph, Map<String, String> stages, String failed) {}
 
     private Read read() {
         try {
             ScreenGraph read = ScreenDesk.read(services);
-            return new Read(read, ScreenDesk.stages(read), activities(read), null);
+            return new Read(read, ScreenDesk.stages(read), null);
         } catch (RuntimeException unreadable) {
-            return new Read(null, null, null,
+            return new Read(null, null,
                     Objects.requireNonNullElse(unreadable.getMessage(), unreadable.toString()));
-        }
-    }
-
-    /** The activities each screen is worked by, as the flows say; none when the flows cannot be read. */
-    private Map<String, List<String>> activities(ScreenGraph read) {
-        try {
-            return ActivityScreens.byScreen(ActivityScreens.targets(services.pluginValues(), read));
-        } catch (RuntimeException unreadable) {
-            // A flow being written or hand-edited: the cards are drawn without their activities.
-            return Map.of();
         }
     }
 
@@ -705,7 +693,7 @@ public final class ScreenMap {
             read = read();
         } catch (Throwable broken) {
             // A half-built plugin jar fails with an Error, not an exception: said, and the next poll reads again.
-            read = new Read(null, null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
+            read = new Read(null, null, Objects.requireNonNullElse(broken.getMessage(), broken.toString()));
         }
         Read done = read;
         // Null while there is nothing to look in: no source tree yet reads as an empty map, not a failed one.
@@ -788,7 +776,7 @@ public final class ScreenMap {
         }
         emptyOnce = false;
         graph = read;
-        List<Card> nowCards = ScreenCards.cards(read, stages, map.activities());
+        List<Card> nowCards = ScreenCards.cards(read, stages);
         List<Link> nowLinks = ScreenCards.links(read);
         if (!nowCards.equals(cards) || !nowLinks.equals(links)) {
             cards = nowCards;

@@ -1,14 +1,14 @@
-package com.botmaker.sdk.api.flow;
+package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.value.Link;
 
 /**
- * What a run of the bot does around its flows: how the game gets back to a known screen, and how it is made ready
- * for the bot (2026-10-11).
+ * What a run of the bot does around its plan: how the game gets back to a known screen, and how it is made ready
+ * for the bot (2026-10-11; in {@code api.bot} since flows were deleted, 2026-11-09).
  *
- * <p>A bot can have several flows ({@code Flows.MAIN}, {@code Flows.DAILY}…), but one game: its home screen
- * and its settings do not change with the flow, so they are said once, here, and not in each flow. Which flow
- * runs is the bot's {@code @Param}, which {@code Bot.runFlow} reads off {@code Sdk.java} beside this.
+ * <p>A bot can have several plans ({@code Plans.MAIN}, {@code Plans.DAILY}…), but one game: its home screen
+ * and its settings do not change with the plan, so they are said once, here. Which plan runs is the bot's
+ * {@code plan} parameter, which {@code Bot.run} reads beside this.
  *
  * <p>Popups the game opens on its own are screens of the bot's map ({@code Setup.popup()}), each closed by its
  * way back before every vision call: no run method clears them (2026-10-16).
@@ -22,11 +22,9 @@ import com.botmaker.plugin.api.value.Link;
  * }
  * }</pre>
  *
- * @param home  what gets the game back to a known screen: before a step that {@link Flow.Step#goHome() goes
- *              home}, at start-up and after anything unexpected; {@code null} walks to the root screen of the bot's
- *              map ({@code Navigate.to} the first screen reached from none), or does nothing when it has no map.
- *              It is the last resort: a step of an activity that gets stuck first walks back to the screen the
- *              activity's {@code Navigate.to} reached and runs it once more
+ * @param home  what gets the game back to a known screen: at start-up and after anything unexpected; {@code null}
+ *              walks to the root screen of the bot's map ({@code Navigate.to} the first screen reached from none), or
+ *              does nothing when it has no map
  * @param setup what makes the game ready for this bot, once it is started: its settings, such as the ones a
  *              user chose in the bot's {@code @Param}s. Run when the bot's {@code doSetup} parameter is ticked;
  *              {@code null} for nothing

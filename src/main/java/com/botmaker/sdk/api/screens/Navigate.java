@@ -6,7 +6,7 @@ import com.botmaker.plugin.api.palette.ReadsScreen;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotStuckException;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.observe.Bots;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.screens.MapScreen;

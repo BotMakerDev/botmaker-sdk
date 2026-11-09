@@ -5,11 +5,14 @@ import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.ManagedHandle;
+import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
-import com.botmaker.sdk.plugin.flow.FlowValue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -73,11 +76,29 @@ final class NotesTools {
 
     private NotesTools() {}
 
+    /** The game's home, setup and notes: {@code Sdk.run()}. setup's set_run_method writes it too. */
+    static final ManagedHandle<Run> RUN = ManagedHandle.of(SdkValues.RUN);
+
+    /** {@code Sdk.run()} as read, or why it cannot be: {@code run} is never null, {@code problem} null when read. */
+    record RunRead(Run run, String problem) {}
+
+    /** Opens {@code Sdk.run()}, written first when the bot lacks it. On the FX thread. */
+    static RunRead readRun(StudioServices services) {
+        Optional<ValueContext> value = RUN.openOrCreate(services);
+        if (value.isEmpty()) {
+            return new RunRead(Run.NONE, "BotMaker has no @SdkValue(RUN) method it can write: the project is open "
+                    + "read-only, Sdk.run() is hand-written in a form it cannot read, or no Sdk class carries the "
+                    + "@SdkValue marks.");
+        }
+        return RUN.read(value.get()).map(run -> new RunRead(run, null)).orElseGet(() -> new RunRead(Run.NONE,
+                "Sdk.run() isn't written as Run.of() this tool reads. Edit it in Sdk.java, or replace it with Run.of()."));
+    }
+
     static AgentReply readNotes(Section section, AgentContext context) {
         StudioServices services = context.services();
         if (services.projectDir() == null) return AgentReply.refused(Frames.noProject());
-        record Read(ScreenGraph graph, FlowValue.Target target) {}
-        Read read = FxCall.call(() -> new Read(ScreenBook.read(services), FlowValue.target(services)));
+        record Read(ScreenGraph graph, RunRead target) {}
+        Read read = FxCall.call(() -> new Read(ScreenBook.read(services), readRun(services)));
         ScreenGraph graph = read.graph();
         if (section.screen() != null && !section.screen().isBlank()) {
             Optional<String> constant = ScreenBook.find(graph, section.screen());
@@ -85,8 +106,7 @@ final class NotesTools {
             return AgentReply.text(FROM + screen(graph, constant.get()));
         }
         StringBuilder out = new StringBuilder(FROM).append("The game:\n");
-        String game = read.target().problem() == null && read.target().run() != null ? read.target().run().notes()
-                : null;
+        String game = read.target().problem() == null ? read.target().run().notes() : null;
         out.append(game == null ? "(nothing yet: write_notes with no screen)" : game.strip()).append('\n');
         for (String constant : graph.screens().keySet()) out.append('\n').append(screen(graph, constant));
         return AgentReply.text(out.toString().stripTrailing());
@@ -116,9 +136,10 @@ final class NotesTools {
                             + "written.");
                 }
                 Optional<String> failed = FxCall.call(() -> {
-                    FlowValue.Target target = FlowValue.target(services);
+                    RunRead target = readRun(services);
                     if (target.problem() != null) return Optional.of(target.problem());
-                    return Optional.ofNullable(FlowValue.writeRun(services, target, target.run().notes(note.text())));
+                    Run now = target.run().notes(note.text());
+                    return now.equals(target.run()) ? Optional.<String>empty() : RUN.write(services, now);
                 });
                 return failed.map(AgentReply::refused).orElseGet(() -> AgentReply.text(note.text().isBlank()
                         ? "Removed the game's notes." : "Kept the game's notes, on the run in Sdk."));
@@ -155,8 +176,8 @@ final class NotesTools {
         }
         StudioServices services = context.services();
         if (services.projectDir() == null) return AgentReply.refused(Frames.noProject());
-        // Opened as read_flow opens it: the bot's home is its run's.
-        FlowValue.Target target = FxCall.call(() -> FlowValue.target(services));
+        // The bot's home is its run's.
+        RunRead target = FxCall.call(() -> readRun(services));
         if (target.problem() != null) return AgentReply.refused(target.problem());
         try {
             ScreenGraph map = FxCall.call(() -> ScreenBook.read(services));

@@ -8,9 +8,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.vision.ImageFinder;
 import com.botmaker.sdk.api.vision.ImageTemplate;
-import com.botmaker.sdk.api.flow.Flow;
-import com.botmaker.sdk.internal.flow.FlowWalker;
-import com.botmaker.sdk.internal.flow.InstalledRun;
+import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -72,70 +70,6 @@ class DebugTraceTest {
 
     private static List<String> linesMatching(String output, String needle) {
         return output.lines().filter(l -> l.contains(needle)).toList();
-    }
-
-    // --- Activity ---
-
-    /** The activity, an enum of its outcomes; {@code Gone} is one the flow no longer has. */
-    enum Mining implements Outcome { NEXT, BAG_FULL }
-
-    enum Gone implements Outcome { NEXT }
-
-    /** Mining reporting {@code reported}; BAG_FULL leads to an activity the flow lacks, which ends the run quietly. */
-    private static Flow mining(Mining reported) {
-        return Flow.of(List.of(Flow.activity(Mining.class, () -> reported)),
-                List.of(Flow.edge(Mining.BAG_FULL, Gone.class)), Mining.class, Flow.limits(10, 0));
-    }
-
-    /** Walks {@code flow} to its end, which is {@code Bot.stop()} throwing. */
-    private static void run(Flow flow) {
-        InstalledRun.walk(flow);
-        try {
-            FlowWalker.run(flow, null);
-        } catch (RuntimeException ended) {
-            // the run is over; only what it printed matters here
-        }
-    }
-
-    private static void runMining() {
-        run(mining(Mining.BAG_FULL));
-    }
-
-    /**
-     * An outcome nothing is wired to ends the run — a bot must not die over its flow's bookkeeping — and the run
-     * says why it ended there, debugging on or off.
-     */
-    @Test
-    void anUnwiredOutcomeSaysSoWhenTheRunEndsOnIt() {
-        Debug.disable();
-
-        String output = printed(() -> run(mining(Mining.NEXT)));
-
-        assertTrue(output.contains("Mining reported 'Next', and nothing is wired to it"), output);
-    }
-
-    @Test
-    void aWiredOutcomeEndsTheRunQuietly() {
-        Debug.disable();
-
-        assertEquals("", printed(DebugTraceTest::runMining));
-    }
-
-    @Test
-    void anActivityReportsWhichOutcomeItReached() {
-        String output = printed(DebugTraceTest::runMining);
-
-        List<String> lines = linesMatching(output, "[Activity]");
-        assertEquals(1, lines.size(), "one activity, one line: " + output);
-        assertTrue(lines.get(0).contains("Mining → Bag full"),
-                "the line names the activity and the outcome the flow will route on: " + lines.get(0));
-    }
-
-    @Test
-    void aQuietRunSaysNothingAboutActivities() {
-        Debug.disable();
-
-        assertEquals("", printed(DebugTraceTest::runMining), "Debug.disable() means silence, not less noise");
     }
 
     // --- PopupGuard ---

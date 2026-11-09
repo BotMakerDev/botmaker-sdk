@@ -5,13 +5,10 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.DeclaredCallType;
 import com.botmaker.plugin.api.value.DeclaredType;
-import com.botmaker.plugin.api.value.Held;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
-import com.botmaker.sdk.api.bot.Outcome;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.flow.Activity;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -32,9 +29,8 @@ import com.botmaker.sdk.api.vision.ImageTemplateGroup;
 import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
-import com.botmaker.sdk.internal.flow.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.vision.TemplateNames;
-import com.botmaker.sdk.plugin.editors.ActivityEditors;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
@@ -76,7 +72,6 @@ import java.util.List;
  * project's file says {@code com.botmaker.sdk.api.geometry.Point} because that is what the field is declared
  * as. A renamed factory or accessor is a compile error here rather than a call written into a bot's file.
  *
- * @see FlowTypes the shapes a {@code Flow} and its layout are written as, which are parts and never picked
  * @see CaptureTypes the calls a {@code CaptureSource} is written as
  * @see SettingsTypes the calls a {@code BotSettings} is written as
  */
@@ -89,7 +84,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, ZONE, KEY,
                 MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                ACTIVITY, OUTCOME, STATE);
+                STATE);
     }
 
     @Override
@@ -106,13 +101,6 @@ public final class SdkTypes implements TypeHolder {
     }
 
     /**
-     * A picture's activities as the host holds them: each enum's class literal crosses as its {@link Activity}
-     * ({@code ManagedValue.groupedAs}), which {@link ImageTemplate#inActivities} takes.
-     */
-    private static final Held<ImageTemplate, List<Activity>> PICTURE_ACTIVITIES =
-            Held.list(Activity.class, ImageTemplate::activities);
-
-    /**
      * A named picture, {@code new ImageTemplate("images/ore.png")}.
      *
      * <p><b>The one type whose fresh value is a choice rather than a fallback.</b> A new picture value
@@ -127,10 +115,6 @@ public final class SdkTypes implements TypeHolder {
             .with(ImageTemplate::at, ImageTemplate::place)
             .with(ImageTemplate::in, ImageTemplate::frame)
             .with(ImageTemplate::tags, ImageTemplate::tags)
-            // The part's type spelled out: a held link names it only in the wither, an overloaded method
-            // reference javac cannot infer from (the tags link above infers it from its accessor).
-            .<List<Class<? extends Outcome>>, List<Activity>>with(ImageTemplate::activities, PICTURE_ACTIVITIES,
-                    ImageTemplate::inActivities)
             .with(ImageTemplate::frames, ImageTemplate::frames);
 
     /**
@@ -335,31 +319,6 @@ public final class SdkTypes implements TypeHolder {
             .editor(() -> LauncherEditors::choice)
             .preview(() -> LauncherEditors::choicePreview)
             .writtenAs(LaunchChoice::of);
-
-    /**
-     * One activity of the flow: the bot's {@code Activities.Collect} enum, which an editor holds by name
-     * ({@link BotConstants#activity}) and the host writes as its class literal. A fresh one is no activity; the
-     * picker offers the flow's.
-     *
-     * <p>The call is what the host compares a value with a constant through, never what it writes: every value
-     * the editors hand back is a constant's, declared first ({@code FlowConstants}).
-     */
-    public static final DeclaredCallType<Activity> ACTIVITY = PluginType.value(Activity.class)
-            .fresh(() -> Activity.NONE)
-            .editor(() -> ActivityEditors::activity)
-            .writtenAs(BotConstants::activity, Activity::name)
-            .constants(Activity.NONE);
-
-    /**
-     * What an activity reports: a constant of its enum, {@code Activities.Collect.NOTHING_LEFT}, held by its two
-     * names ({@link BotConstants#outcome}) and written as that constant. A fresh one is
-     * {@link Outcome#NONE}, written so; the picker offers the activity's.
-     */
-    public static final DeclaredCallType<Outcome> OUTCOME = PluginType.value(Outcome.class)
-            .fresh(() -> Outcome.NONE)
-            .editor(() -> ActivityEditors::outcome)
-            .writtenAs(BotConstants::outcome, outcome -> outcome.activity().name(), Outcome::name)
-            .constants(Outcome.NONE);
 
     /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person

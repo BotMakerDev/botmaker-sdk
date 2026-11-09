@@ -324,9 +324,9 @@ public final class TemplateUses {
         return constant == null ? null : Member.of(constant);
     }
 
-    /** {@code picture} filed under what {@code held} is: its tags and activities. */
+    /** {@code picture} filed under what {@code held} is: its tags. */
     private static ImageTemplate filed(ImageTemplate picture, ImageTemplate held) {
-        return picture.tags(held.tags()).inActivities(held.activities());
+        return picture.tags(held.tags());
     }
 
     private static ImageTemplate picture(String baseName) {

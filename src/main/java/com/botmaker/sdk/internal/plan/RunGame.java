@@ -168,8 +168,6 @@ public final class RunGame implements PlanRun.Game {
 
     @Override
     public void checkpoint() {
-        // The match-repeat count is a flow's: the map's markers, found in place at every look, would grow it here.
-        Watchdog.progress();
-        Watchdog.checkpointGame();
+        Watchdog.checkpoint();
     }
 }
