@@ -126,7 +126,13 @@ public @interface SdkValue {
          * The game server's time zone, which a daily's reset is read in — the {@code String} parameter {@code gameZone},
          * a zone id such as {@code Europe/Paris}; blank for this computer's.
          */
-        GAME_ZONE
+        GAME_ZONE,
+        /**
+         * Words that stop a run exploring on its own from pressing what they are written beside, unless the input
+         * spends — the {@code List<String>} {@code guardWords()} in {@code Sdk.java}, matched case-blind as whole words.
+         * Currency signs stop it without being listed.
+         */
+        GUARD_WORDS
     }
 
     /**

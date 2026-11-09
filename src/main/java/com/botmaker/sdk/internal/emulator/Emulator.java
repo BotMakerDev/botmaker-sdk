@@ -206,6 +206,19 @@ public final class Emulator implements CaptureSource {
         return device.currentApp();
     }
 
+    /**
+     * The package of the window in focus — a dialog's over the app while one is up, where {@link #currentApp()} reads
+     * the activity behind it — or {@code ""} when unknown.
+     */
+    public String focusedPackage() {
+        return device.focusedPackage().orElse("");
+    }
+
+    /** How Android's own dialog in focus says itself ("isn't responding"), or {@code ""} when none is up. */
+    public String systemDialog() {
+        return device.systemDialog().map(shown -> shown.dialog().said()).orElse("");
+    }
+
     /** Reboots the Android guest ({@code adb reboot}); the ADB connection drops until it comes back up. */
     public void reboot() {
         Debug.log("reboot " + name());

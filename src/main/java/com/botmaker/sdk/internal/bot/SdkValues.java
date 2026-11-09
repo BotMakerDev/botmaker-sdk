@@ -281,6 +281,18 @@ public final class SdkValues implements ValueHolder {
             .because("The SDK reads this parameter whenever a daily asks for the game's last reset. Type the"
                     + " server's zone id, such as Europe/Paris, in the Runner or in Project ▸ Parameters.");
 
+    /**
+     * Words a run exploring on its own refuses to press beside — {@code public static List<String> guardWords()} in
+     * {@code Sdk.java}, the author's, matched case-blind as whole words (2026-11-09). Seeded empty: the guards are
+     * general, currency signs are built in, and the author adds the app's own words and language.
+     */
+    @SuppressWarnings("unchecked")
+    public static final ManagedMethod<List<String>> GUARD_WORDS = ManagedValue.method(SdkValue.Id.GUARD_WORDS)
+            .in(SdkValue.Holder.SDK)
+            .holds((Class<List<String>>) (Class<?>) List.class, List.of())
+            .because("These are words a run exploring on its own never presses beside unless the input spends, such"
+                    + " as Buy or Delete in the app's language. Currency signs are refused without being listed.");
+
     private static boolean claimed;
 
     private SdkValues() {}
@@ -288,7 +300,7 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(PLANS, GOALS, RUN, SETTINGS, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE);
+                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM, GAME_ZONE, GUARD_WORDS);
     }
 
     /** {@link #PLAN}'s type and first value: nothing until the runner picks a plan. */

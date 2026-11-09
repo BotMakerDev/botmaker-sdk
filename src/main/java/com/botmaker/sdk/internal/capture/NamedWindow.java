@@ -70,6 +70,12 @@ public final class NamedWindow implements CaptureSource, WindowBacked {
         return title.isEmpty() ? windowClass : title;
     }
 
+    /** Whether the window in front now is the one this names; false when none is in front or this names none. */
+    public boolean inFront() {
+        GenericWindow front = Window.controller().getForegroundWindow();
+        return front != null && find(List.of(front)).isPresent();
+    }
+
     private Optional<Window> resolve() {
         return identity().flatMap(Window::named);
     }

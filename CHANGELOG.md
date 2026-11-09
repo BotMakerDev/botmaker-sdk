@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Guards before a press** (2026-11-09): what a run exploring on its own checks before each press, general to any
+  app. It presses nothing while another app or a system dialog (permissions, the store, an account sheet) is in front
+  of the game, nothing on a password or payment field, nothing without a verdict or marked never, and nothing free
+  beside a currency sign or one of the author's words: `@SdkValue(SdkValue.Id.GUARD_WORDS) public static List<String>
+  guardWords()` in `Sdk.java`, empty until the author lists the app's own (`Buy`, `Acheter`). An input that spends
+  passes the text check.
 - **Every input has a verdict** (2026-11-09): whether a run exploring on its own may press it. `.free()` spends nothing,
   `.spends(Progress::gems)` spends what a fact counts, `.never("real money")` is never pressed, and an input with none
   is not pressed until it is judged. `never(why)` is one of the verdicts now. The assistant gives verdicts with

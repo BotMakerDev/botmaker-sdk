@@ -128,6 +128,21 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
     }
 
     /**
+     * The package of the window in focus on the instance — a dialog's over the app while one is up — or {@code ""}
+     * when it is not connected or none is known.
+     */
+    public String focusedPackage() {
+        Emulator emu = resolve();
+        return emu == null ? "" : emu.focusedPackage();
+    }
+
+    /** How Android's own dialog in focus says itself ("isn't responding"), or {@code ""} when none is up. */
+    public String systemDialog() {
+        Emulator emu = resolve();
+        return emu == null ? "" : emu.systemDialog();
+    }
+
+    /**
      * Keeps other apps off {@code packageName} for the rest of the run (the user's call, 2026-11-01): every
      * permission it asks for granted (2026-11-02), and Do Not Disturb on until this JVM ends, then put back as it
      * was. Once per instance whatever the restarts; the permissions again each time, which is cheap.
