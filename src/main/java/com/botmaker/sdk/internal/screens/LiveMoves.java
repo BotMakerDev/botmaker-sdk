@@ -57,13 +57,14 @@ public final class LiveMoves implements MapWalk.Moves {
     }
 
     @Override
-    public Took take(ScreenGraph.Edge edge) {
+    public Took take(ScreenGraph.Edge edge, long withinMs) {
+        ScreenWalk bounded = walk().by(reach.nowMs() + withinMs);
         if (edge.input() != null) {
             // A tab's copied way is its parent's field, a way back through another screen's names it "SCREEN.field":
             // pressed on the screen holding it, as a walk's step does.
             String field = graph.nameOf(edge.via()).map(BotConstants.InputName::field).orElse(edge.input());
             String holder = graph.holder(edge);
-            ScreenWalk.Press press = walk().press(holder, field, edge.pick());
+            ScreenWalk.Press press = bounded.press(holder, field, edge.pick());
             // A press that did not move the game says the screen holding the button: the game is still on the tab.
             if (holder.equals(press.at()) && !holder.equals(edge.from())) {
                 press = new ScreenWalk.Press(press.result(), edge.from(), press.times(), press.why(), press.state());
@@ -72,7 +73,7 @@ public final class LiveMoves implements MapWalk.Moves {
             else ScreenMaps.seen(press.at());
             return pressed(edge, press);
         }
-        ScreenWalk.Result took = went(walk().take(edge));
+        ScreenWalk.Result took = went(bounded.take(edge));
         if (took.arrived()) return new Took(Arrival.AT_TARGET, edge.to());
         return arrived(edge, took.at(), took.why());
     }

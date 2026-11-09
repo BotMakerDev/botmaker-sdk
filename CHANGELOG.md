@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Waits and deadlines** (2026-11-09).
+  - A walk waits on what the game shows, never a fixed sleep: after an on-sight press, a press with nowhere to lead
+    and between the copies `Pick.each` presses, it waits for the game to answer and hold still (two looks alike), up
+    to two seconds; a press that changes nothing goes on after 600 ms, as before. A screen with no marker is taken as
+    reached once the game holds still, not after one blind look.
+  - Every wait of a walk stops at once on a game the run finds frozen, the popup and result waits too.
+  - A walk has one deadline: twice the time its way takes by the map, plus a step for each replan. Past it,
+    `Navigate.to` ends stuck and says the ways took longer than the map says. ExploreMap's 30 s for one way now bounds
+    the way while it runs.
+  - The bot settings' restart cap has its label and range in the settings editor.
 - **Facts under a panel, composed conditions** (2026-11-09).
   - While a panel (`Setup.panelOf`) covers its screen, `Navigate.isOn(screen)` is false and the run is on the panel;
     the screen's readouts are not read until the panel is gone, so no fact is read off a covered screen.

@@ -74,7 +74,10 @@ public interface Reach {
     /** Scrolls in a row the first way with no member showing before the strip is scrolled the other way. */
     int BLIND_SCROLLS = 3;
 
-    /** How long the game is let settle between two copies of a button {@link Pick#each} presses. */
+    /**
+     * How long a press that changed nothing is waited on before the game is taken to have settled ({@link Wait#settled}):
+     * between two copies of a button {@link Pick#each} presses, and after a press with nowhere to lead.
+     */
     long CLICK_SETTLE_MS = 600;
 
     /** How long a text field is given to take its click before its text is typed. */
@@ -747,7 +750,7 @@ public interface Reach {
      * those scrolls was done.
      *
      * <p>A repeated button is pressed on the copy {@code pick} names; {@link Pick#each} presses every copy the frame
-     * shows but a disabled one, the game let settle {@link #CLICK_SETTLE_MS} between them, last to first along its
+     * shows but a disabled one, the game let settle between them ({@link Wait#settled}), last to first along its
      * order: a card claimed and gone shifts the ones after it, never one still to press. False for that one when no
      * copy was pressed.
      *
@@ -801,14 +804,17 @@ public interface Reach {
             on = now.get();
         }
         boolean any = false;
+        BufferedImage last = on;    // the game before the last press, then once it settled after it
         for (Seen copy : copies(button, strip, pick.order(), on).reversed()) {
             if (copy.state().blocks()) continue;
             if (any) {
-                pause(CLICK_SETTLE_MS);
+                Optional<BufferedImage> settled = Wait.settled(this, last, CLICK_SETTLE_MS, nowMs() + Wait.SETTLE_MS);
                 if (Thread.currentThread().isInterrupted()) return true;
+                // No look in the wait: a fresh one, never the frame from before the last press.
+                last = settled.isPresent() ? settled.get() : look().orElse(on);
             }
             // A drag after the first is let go where its drop is now: the last one may have filled the slot it found.
-            BufferedImage drops = any && button.isDrag() ? look().orElse(on) : on;
+            BufferedImage drops = any && button.isDrag() ? last : on;
             any |= press(button, copy.place(), drops);
         }
         return any;

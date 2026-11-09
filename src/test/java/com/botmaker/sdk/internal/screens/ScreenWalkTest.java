@@ -234,6 +234,28 @@ class ScreenWalkTest {
         return new ScreenWalk(game.map, game, STEP_MS, reached::add).go(target, null);
     }
 
+    /** A walk past its deadline ends stuck at once, saying so; no wait of it outlasts the deadline (audit #14). */
+    @Test
+    void aWalkPastItsDeadlineEndsStuck() {
+        Game game = new Game("HOME");
+        ScreenWalk.Result result = new ScreenWalk(game.map, game, STEP_MS, null).by(1).go("MAP", "HOME");
+        assertEquals(ScreenWalk.Outcome.STUCK, result.outcome());
+        assertTrue(result.why().contains("walk's time"), result.why());
+        assertTrue(game.now < STEP_MS, "its step's wait ended at the deadline: " + game.now);
+    }
+
+    /** Every click lost to lag: the walk gives up within the time its ways take, not a step's time per try. */
+    @Test
+    void aWalkWhoseClicksAreLostEndsWithinItsTime() {
+        Game game = new Game("HOME");
+        game.deaf = 1_000;
+        ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+        long given = walk.walkMs("MAP", "HOME");
+        ScreenWalk.Result result = walk.go("MAP", "HOME");
+        assertEquals(ScreenWalk.Outcome.STUCK, result.outcome());
+        assertTrue(game.now <= given + Wait.POLL_MS, "took " + game.now + " of " + given);
+    }
+
     /** Back on Hades II's title, its logo shows before the menu fades in: the walk waits for Options to draw. */
     @Test
     void aButtonDrawnAfterItsScreensMarkerIsWaitedFor() {
@@ -1374,7 +1396,7 @@ class ScreenWalkTest {
         ScreenGraph.Edge copied = graph.edges().stream()
                 .filter(e -> e.from().equals("GEAR") && e.to().equals("SKILLS")).findFirst().orElseThrow();
 
-        MapWalk.Took took = new LiveMoves(graph, game, () -> {}).take(copied);
+        MapWalk.Took took = new LiveMoves(graph, game, () -> {}).take(copied, ScreenWalk.STEP_MS);
 
         assertEquals(MapWalk.Arrival.AT_TARGET, took.arrival(), took.toString());
         assertEquals(List.of("click skills_tab"), game.done);

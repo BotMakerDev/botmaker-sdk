@@ -122,8 +122,11 @@ public final class MapWalk {
             return true;
         }
 
-        /** Presses {@code edge}'s input from its {@code from} (or waits, for one {@link ScreenGraph.Edge#onItsOwn}). */
-        Took take(ScreenGraph.Edge edge);
+        /**
+         * Presses {@code edge}'s input from its {@code from} (or waits, for one {@link ScreenGraph.Edge#onItsOwn}),
+         * every wait of it over within {@code withinMs}: the walk's time for one way bounds it while it runs.
+         */
+        Took take(ScreenGraph.Edge edge, long withinMs);
 
         /**
          * The screen of the map the game shows now, a loader the map lacks waited out a while; empty when none
@@ -278,7 +281,7 @@ public final class MapWalk {
                 Took took;
                 String crash = null;
                 try {
-                    took = moves.take(edge);
+                    took = moves.take(edge, perEdge);
                 } catch (RuntimeException e) {
                     rethrowStop(e);
                     took = null;

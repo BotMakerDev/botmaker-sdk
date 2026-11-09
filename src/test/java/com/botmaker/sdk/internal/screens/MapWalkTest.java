@@ -44,6 +44,7 @@ class MapWalkTest {
         Predicate<String> at = s -> true;
         Optional<String> where = Optional.empty();
         final List<ScreenGraph.Edge> taken = new ArrayList<>();
+        final List<Long> given = new ArrayList<>();
         int restarts;
         long nowMs;
 
@@ -53,8 +54,9 @@ class MapWalkTest {
         }
 
         @Override
-        public Took take(ScreenGraph.Edge edge) {
+        public Took take(ScreenGraph.Edge edge, long withinMs) {
             taken.add(edge);
+            given.add(withinMs);
             return arrival.apply(edge);
         }
 

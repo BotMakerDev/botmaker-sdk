@@ -707,7 +707,8 @@ class ReachTest {
         assertTrue(cards.perform(GO, null, Pick.each(Order.NORTH), cards.look().orElseThrow()));
         assertEquals(List.of("click 340,420", "click 340,120", "click 140,130"), cards.done,
                 "last to first: a card claimed and gone shifts none still to press");
-        assertEquals(2 * Reach.CLICK_SETTLE_MS, cards.now);
+        // Nothing on the cards' frame moves: each gap waits out the quiet time, never the whole settle.
+        assertTrue(cards.now >= 2 * Reach.CLICK_SETTLE_MS && cards.now < 2 * Wait.SETTLE_MS, "waited " + cards.now);
     }
 
     @Test

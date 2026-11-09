@@ -220,7 +220,7 @@ final class TreeWalk {
      * row show the nodes seen before the move at the same places, away from where they were, for up to
      * {@link Scroll#SETTLE}. Nodes still where they were are looked at to the end of that time, and at least twice: a
      * game may start gliding late, and a slow look can pass the time on the first one. Empty when the game could not
-     * be captured or the walk was stopped.
+     * be captured, the walk was stopped or the game looks frozen ({@link Wait#stopped}).
      */
     private static Optional<BufferedImage> settled(Reach reach, Tree tree, Map<String, Rect> seen,
                                                    Map<String, Button> buttons) {
@@ -229,7 +229,7 @@ final class TreeWalk {
         while (true) {
             reach.pause(Reach.SCROLL_SETTLE_MS);
             Optional<BufferedImage> frame = reach.look();
-            if (frame.isEmpty() || Thread.currentThread().isInterrupted()) return Optional.empty();
+            if (frame.isEmpty() || Wait.stopped(reach)) return Optional.empty();
             Map<String, Rect> now = new LinkedHashMap<>();
             for (ImageTemplate picture : tree.members()) {
                 if (picture == null || !seen.containsKey(picture.id())) continue;

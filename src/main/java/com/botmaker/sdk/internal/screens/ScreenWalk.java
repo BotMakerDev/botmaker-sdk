@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -93,8 +94,6 @@ public final class ScreenWalk {
     public static final long STEP_MS = 10_000;
     /** The least a step into a measured screen is given, however quick it showed when measured. */
     static final long LEAST_STEP_MS = 2_000;
-    /** How often the screen is read while waiting for a marker. */
-    static final long POLL_MS = 250;
     /** How many popups in a row are closed before a step; more is a loop. */
     static final int MOST_POPUPS = 3;
     /** How many steps may land elsewhere before the walk gives up. */
@@ -115,6 +114,8 @@ public final class ScreenWalk {
     private final boolean uncovers;
     /** Where what {@link #go} does on sight is kept; null when it does none. */
     private final DoneRecords records;
+    /** When every wait of this walk ends, on {@link Reach#nowMs}: {@link Long#MAX_VALUE} for none ({@link #by}). */
+    private final long deadline;
 
     /** How long a screen of the map is given to show once an overlay's close was pressed: short, a wait timed out. */
     static final long UNCOVER_MS = 2_000;
@@ -125,11 +126,11 @@ public final class ScreenWalk {
      * input clicks the map's own close button ({@link ScreenGraph#close}), while it shows.
      */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached) {
-        this(graph, reach, stepMs, reached, graph.close(), false, null);
+        this(graph, reach, stepMs, reached, graph.close(), false, null, Long.MAX_VALUE);
     }
 
     private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close,
-                       boolean uncovers, DoneRecords records) {
+                       boolean uncovers, DoneRecords records, long deadline) {
         this.graph = graph;
         this.reach = reach;
         this.stepMs = stepMs;
@@ -137,6 +138,7 @@ public final class ScreenWalk {
         this.close = close;
         this.uncovers = uncovers;
         this.records = records;
+        this.deadline = deadline;
     }
 
     /**
@@ -144,7 +146,7 @@ public final class ScreenWalk {
      * {@code records}: a run's {@code Navigate}. The assistant's walks and ExploreMap do none.
      */
     public ScreenWalk doing(DoneRecords records) {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records);
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, deadline);
     }
 
     /**
@@ -153,7 +155,43 @@ public final class ScreenWalk {
      * assistant's do while the screen it explores is not mapped yet.
      */
     public ScreenWalk uncovering() {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, true, records);
+        return new ScreenWalk(graph, reach, stepMs, reached, close, true, records, deadline);
+    }
+
+    /**
+     * This walk, every wait of it over by {@code deadlineMs} on {@link Reach#nowMs}, or by its own deadline when that
+     * is sooner: ExploreMap's time for one way bounds the way while it runs ({@link MapWalk.Moves#take}). A
+     * {@link #go} past it ends {@link Outcome#STUCK}.
+     */
+    public ScreenWalk by(long deadlineMs) {
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, Math.min(deadline, deadlineMs));
+    }
+
+    /** When a wait of {@code ms} from now ends: then, or at this walk's deadline when that is sooner. */
+    private long within(long ms) {
+        return Math.min(deadline, reach.nowMs() + ms);
+    }
+
+    /**
+     * How long {@link #go} is given to {@code target} from {@code near}: twice the time the map's shortest way from it
+     * gives its steps ({@link #waitMs}) and the settle of each press done on sight on the way, then a step for each
+     * replan and for each popup closed, on top. Where the game is is not known ({@code near} null or not in the map),
+     * or no way leads there: a step for each screen of the map, and the start's load.
+     */
+    long walkMs(String target, String near) {
+        Optional<List<ScreenGraph.Edge>> path = near != null && graph.screens().containsKey(near)
+                ? graph.pathTo(near, target, e -> true) : Optional.empty();
+        long steps = path.map(edges -> edges.stream()
+                        .mapToLong(edge -> waitMs(edge) + onSightOn(edge.to()) * Wait.SETTLE_MS).sum())
+                .orElse(stepMs * graph.screens().size() + graph.start().map(graph::loadMs).orElse(0L));
+        return 2 * steps + stepMs * (MOST_REPLANS + MOST_POPUPS);
+    }
+
+    /** How many of {@code constant}'s actions are done on sight: each may be pressed, and settled, as a walk passes. */
+    private long onSightOn(String constant) {
+        MapScreen screen = graph.screens().get(constant);
+        return screen == null || records == null ? 0
+                : screen.actions().values().stream().filter(Do::isOnSight).count();
     }
 
     /** The screen the game shows now, {@code near}'s neighbours looked for first; popups aside. */
@@ -282,11 +320,12 @@ public final class ScreenWalk {
     /**
      * Walks to {@code target} from where the game is, {@code near} the screen it was last seen on, or null. A popup of
      * the map that will not close ends it {@link Outcome#STUCK}; an overlay the map lacks is cleared once
-     * ({@link #uncover}), and the walk's answer says so.
+     * ({@link #uncover}), and the walk's answer says so. The walk has one deadline, {@link #walkMs}: past it, or past
+     * this walk's own ({@link #by}), it ends {@link Outcome#STUCK}, and no wait of it outlasts it.
      */
     public Result go(String target, String near) {
         try {
-            return walk(target, near);
+            return by(reach.nowMs() + walkMs(target, near)).walk(target, near);
         } catch (Stayed stayed) {
             return new Result(Outcome.STUCK, near, List.of(), stayed.getMessage());
         }
@@ -307,7 +346,7 @@ public final class ScreenWalk {
                         + graph.shown(edge.from()) + (edge.via() == null && close == null ? ": no close button is "
                         + "mapped for a way back with none." : "."));
             }
-            if (arrives(edge)) {
+            if (arrives(edge, frame.get())) {
                 reached.accept(edge.to());
                 return new Result(Outcome.ARRIVED, edge.to(), List.of(edge.to()), "On " + graph.shown(edge.to()) + ".");
             }
@@ -355,7 +394,7 @@ public final class ScreenWalk {
                 if (!lookedAgain) {
                     // A frame caught mid-transition shows no screen either: one more look before pressing anything.
                     lookedAgain = true;
-                    reach.pause(POLL_MS);
+                    reach.pause(Wait.POLL_MS);    // the loop's top ends it on a stop or a frozen game
                     continue;
                 }
                 Optional<Uncovered> cleared = uncover(frame.get(), at);
@@ -400,6 +439,11 @@ public final class ScreenWalk {
                 return new Result(Outcome.ARRIVED, at, walked, "On " + graph.shown(at) + "."
                         + (uncovered == null ? "" : " " + uncovered));
             }
+            // Read after the arrival: a last step that got there just past the deadline still arrived.
+            if (reach.nowMs() >= deadline) {
+                return new Result(Outcome.STUCK, at, walked, "Not on " + graph.shown(target) + " in the walk's time; "
+                        + "last on " + graph.shown(at) + ". Its ways took longer than the map says they take.");
+            }
             String from = at;
             BufferedImage seen = frame.get();
             Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge)
@@ -413,7 +457,7 @@ public final class ScreenWalk {
                 missed.add(next);    // another way, or why none
                 continue;
             }
-            if (arrives(next)) {
+            if (arrives(next, seen)) {
                 // Read again from the next look: a way back may land on another screen than the map's parent.
                 at = next.to();
                 // A tab whose button has no Selected look yet is as unmarked: nothing tells it either.
@@ -486,7 +530,7 @@ public final class ScreenWalk {
                 any = true;
                 // Kept before the wait where nothing is to be asked after it: a stop then loses no press.
                 if (action.checks() == null) records.done(key, true);
-                reach.pause(Reach.CLICK_SETTLE_MS);
+                Wait.settled(reach, frame.get(), Reach.CLICK_SETTLE_MS, within(Wait.SETTLE_MS));
                 if (action.checks() != null) records.pressed(key, action, true);
                 Debug.log("Done on sight: " + graph.shown(at) + "'s " + field.getKey() + ".");
             } finally {
@@ -520,7 +564,7 @@ public final class ScreenWalk {
      * there first): a key pressed, a strip scrolled once, a button scrolled to along its strip and clicked on the copy
      * {@code pick} names (null: the first), popups closed before each look. Then it waits for where the map says the
      * input leads, its copy and its look matching (a lead that is a popup looked for before popups are closed); with
-     * nowhere to go, it lets the game settle {@link Reach#CLICK_SETTLE_MS}, and reads where the game is. A press that
+     * nowhere to go, it waits for the game to settle ({@link Wait#settled}), and reads where the game is. A press that
      * leaves the game on its screen though the map says it leads away is pressed once more: a click lost to lag.
      *
      * <p>{@link Pick#untilNone} presses again while the game stays on {@code constant}, until the button is gone or
@@ -576,7 +620,9 @@ public final class ScreenWalk {
         ButtonState pressedIn = null;
         String walked = null;
         try {
-            for (int i = 0; i < most && !Thread.currentThread().isInterrupted(); i++) {
+            // A press again only while the walk's time lasts: a bounded take presses nothing past it.
+            for (int i = 0; i < most && !Thread.currentThread().isInterrupted() && (i == 0 || reach.nowMs() < deadline);
+                 i++) {
                 Optional<BufferedImage> frame = closePopups(reach.look());
                 if (times == 0 && input instanceof Button button && strip == null) {
                     // A node out of view is walked to: what is waited for is a tree that has drawn a node.
@@ -632,7 +678,7 @@ public final class ScreenWalk {
                 }
                 times++;
                 List<String> leads = leads(constant, field, input, p, look);
-                Optional<String> landed = landing(constant, leads);
+                Optional<String> landed = landing(constant, leads, frame.get());
                 // A popup the press brings up is closed by the next look: each Claim's rewards (Firestone's Map,
                 // 2026-10-17).
                 if (most > 1 && landed.flatMap(graph::screen).filter(MapScreen::isPopup).isPresent()) continue;
@@ -644,6 +690,9 @@ public final class ScreenWalk {
                 }
                 // Still here though the map says it leads away: a click lost to lag is pressed once more, and a second
                 // stay is not what the map says (Firestone's mission pin opened a view the map lacked, 2026-10-17).
+                // A frozen game ended the wait for the lead: no second press into it.
+                Optional<String> frozen = reach.frozen();
+                if (frozen.isPresent()) return new Press(Pressed.Result.LEFT, constant, times, frozen.get(), pressedIn);
                 if (most == 1 && !leads.isEmpty() && !leads.contains(constant)) {
                     // A field that keeps what it holds is never typed twice: its text would be there twice. Nor is a
                     // drag done twice: what it moved is gone from where it was, and another may sit there now. Nor the
@@ -695,14 +744,16 @@ public final class ScreenWalk {
      * strip is not: the press scrolls to it instead.
      */
     private Optional<BufferedImage> awaited(Predicate<BufferedImage> shows, Optional<BufferedImage> frame) {
-        long deadline = reach.nowMs() + stepMs;
-        Optional<BufferedImage> now = frame;
-        while (now.isPresent() && !shows.test(now.get()) && reach.nowMs() < deadline
-                && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty()) {
-            reach.pause(POLL_MS);
-            now = closePopups(reach.look());
-        }
-        return now;
+        if (frame.isEmpty() || shows.test(frame.get()) || Wait.stopped(reach)) return frame;
+        long until = within(stepMs);
+        if (reach.nowMs() >= until) return frame;
+        AtomicReference<Optional<BufferedImage>> last = new AtomicReference<>(frame);
+        // A look that could not be taken ends the wait, as one that shows it does: the caller says no frame.
+        return Wait.until(reach, until, () -> {
+            Optional<BufferedImage> now = closePopups(reach.look());
+            last.set(now);
+            return now.isEmpty() || shows.test(now.get()) ? Optional.of(now) : Optional.empty();
+        }).orElseGet(last::get);
     }
 
     /**
@@ -740,32 +791,30 @@ public final class ScreenWalk {
     }
 
     /**
-     * Where the game is once a press settled: the first of {@code leads} whose markers show within a step into the
-     * slowest of them (one
-     * with no markers is taken as reached), else the screen a look after {@link Reach#CLICK_SETTLE_MS} shows, popups
-     * closed; empty when it shows none.
+     * Where the game is once a press made on {@code before} settled: the first of {@code leads} whose markers show
+     * within a step into the slowest of them (one with no markers is taken as reached once the game holds still),
+     * else the screen the game shows once it settled ({@link Wait#settled}), popups closed; empty when it shows none.
      */
-    private Optional<String> landing(String from, List<String> leads) {
+    private Optional<String> landing(String from, List<String> leads, BufferedImage before) {
         Optional<String> unmarked = leads.stream().filter(to -> !graph.markers(to).any()).findFirst();
         if (unmarked.isPresent()) {
-            reach.pause(POLL_MS);
+            // Nothing tells it: the game is taken to be there once the press's answer holds still.
+            Wait.settled(reach, before, Reach.CLICK_SETTLE_MS, within(Wait.SETTLE_MS));
             return unmarked;
         }
-        if (!leads.isEmpty()) {
-            long deadline = reach.nowMs() + leads.stream().mapToLong(this::stepInto).max().orElse(stepMs);
-            do {
-                reach.pause(POLL_MS);
-                // Looked for before popups are closed, since a lead may be one (a confirm), then once they are.
-                Optional<BufferedImage> raw = reach.look();
-                Optional<String> shown = raw.flatMap(frame -> shownLead(leads, frame));
-                if (shown.isPresent()) return shown;
-                shown = closePopups(raw).flatMap(frame -> shownLead(leads, frame));
-                if (shown.isPresent()) return shown;
-            } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty());
-        } else {
-            reach.pause(Reach.CLICK_SETTLE_MS);
+        if (leads.isEmpty()) {
+            Optional<BufferedImage> settled = Wait.settled(reach, before, Reach.CLICK_SETTLE_MS,
+                    within(Wait.SETTLE_MS));
+            return closePopups(settled.isPresent() ? settled : reach.look()).flatMap(frame -> whereOn(frame, from));
         }
-        return closePopups(reach.look()).flatMap(frame -> whereOn(frame, from));
+        long until = within(leads.stream().mapToLong(this::stepInto).max().orElse(stepMs));
+        Optional<String> shown = Wait.until(reach, until, () -> {
+            // Looked for before popups are closed, since a lead may be one (a confirm), then once they are.
+            Optional<BufferedImage> raw = reach.look();
+            return raw.flatMap(frame -> shownLead(leads, frame))
+                    .or(() -> closePopups(raw).flatMap(frame -> shownLead(leads, frame)));
+        });
+        return shown.isPresent() ? shown : closePopups(reach.look()).flatMap(frame -> whereOn(frame, from));
     }
 
     /** The first of {@code leads} whose markers {@code frame} shows. */
@@ -902,27 +951,21 @@ public final class ScreenWalk {
      * own is given the time the screen it leaves {@link ScreenGraph#loadMs loads in}, any other {@link #waitMs}. A way into a
      * transition arrives too once a screen after it shows: the game may have shown the transition too briefly to see.
      */
-    private boolean arrives(ScreenGraph.Edge edge) {
+    private boolean arrives(ScreenGraph.Edge edge, BufferedImage before) {
         MapScreen screen = graph.screens().get(edge.to());
         Markers left = graph.markers(edge.from());
         Markers shows = edge.back() ? left : graph.markers(edge.to());
         if (!shows.any()) {
-            reach.pause(POLL_MS);
-            return true;    // a screen with no marker cannot be told: the walk takes it as reached, or left
+            // A screen with no marker cannot be told: the walk takes it as reached, or left, once the game holds still.
+            Wait.settled(reach, before, Reach.CLICK_SETTLE_MS, within(Wait.SETTLE_MS));
+            return true;
         }
         List<Markers> after = edge.back() ? List.of() : graph.followers(edge.to()).stream()
                 .map(graph::markers).filter(Markers::any).toList();
-        long deadline = reach.nowMs() + waitMs(edge);
-        do {
-            reach.pause(POLL_MS);
-            Optional<BufferedImage> frame = closePopups(reach.look());
-            if (frame.isPresent() && (edge.back() ? !left.on(reach, frame.get()) && (!screen.hasMarker()
-                    || whereOn(frame.get(), edge.to()).filter(c -> !c.equals(edge.from())).isPresent())
-                    : shows.on(reach, frame.get()) || after.stream().anyMatch(m -> m.on(reach, frame.get())))) {
-                return true;
-            }
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
-        return false;
+        return Wait.until(reach, within(waitMs(edge)), () -> closePopups(reach.look())
+                .filter(frame -> edge.back() ? !left.on(reach, frame) && (!screen.hasMarker()
+                        || whereOn(frame, edge.to()).filter(c -> !c.equals(edge.from())).isPresent())
+                        : shows.on(reach, frame) || after.stream().anyMatch(m -> m.on(reach, frame)))).isPresent();
     }
 
     /**
@@ -941,13 +984,8 @@ public final class ScreenWalk {
 
     /** The first look within {@code ms} that shows a screen of the map, popups closed; empty when none did. */
     private Optional<BufferedImage> shows(long ms) {
-        long deadline = reach.nowMs() + ms;
-        do {
-            reach.pause(POLL_MS);
-            Optional<BufferedImage> frame = closePopups(reach.look());
-            if (frame.isPresent() && whereOn(frame.get(), null).isPresent()) return frame;
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted() && reach.frozen().isEmpty());
-        return Optional.empty();
+        return Wait.until(reach, within(ms),
+                () -> closePopups(reach.look()).filter(frame -> whereOn(frame, null).isPresent()));
     }
 
     /**
@@ -1024,21 +1062,13 @@ public final class ScreenWalk {
             if (markers.any()) results.put(result, markers);
         }
         if (results.isEmpty()) return Optional.empty();
-        long deadline = reach.nowMs() + graph.loadMs(from);
-        do {
-            reach.pause(POLL_MS);
-            Optional<BufferedImage> frame;
-            try {
-                frame = closePopups(reach.look());
-            } catch (Stayed stayed) {
-                return Optional.empty();
-            }
-            if (frame.isEmpty()) continue;
-            for (Map.Entry<String, Markers> result : results.entrySet()) {
-                if (result.getValue().on(reach, frame.get())) return Optional.of(result.getKey());
-            }
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
-        return Optional.empty();
+        try {
+            return Wait.until(reach, within(graph.loadMs(from)), () -> closePopups(reach.look())
+                    .flatMap(frame -> results.entrySet().stream().filter(result -> result.getValue().on(reach, frame))
+                            .map(Map.Entry::getKey).findFirst()));
+        } catch (Stayed stayed) {
+            return Optional.empty();
+        }
     }
 
     /** The popup whose marker {@code frame} shows, if any: what {@link #whereOn} leaves out. */
@@ -1096,13 +1126,7 @@ public final class ScreenWalk {
 
     /** The first look within a step's time that no longer shows {@code shows}; empty when it stays. */
     private Optional<BufferedImage> gone(Markers shows) {
-        long deadline = reach.nowMs() + stepMs;
-        do {
-            reach.pause(POLL_MS);
-            Optional<BufferedImage> frame = reach.look();
-            if (frame.isPresent() && !shows.on(reach, frame.get())) return frame;
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
-        return Optional.empty();
+        return Wait.until(reach, within(stepMs), () -> reach.look().filter(frame -> !shows.on(reach, frame)));
     }
 
     /** What cleared an overlay the map does not know, and the screen of the map it uncovered. */
@@ -1164,13 +1188,8 @@ public final class ScreenWalk {
 
     /** The screen of the map the game shows within {@link #UNCOVER_MS}, its popups closed; empty when none shows. */
     private Optional<String> screenWithin(String near) {
-        long deadline = reach.nowMs() + Math.min(stepMs, UNCOVER_MS);
-        do {
-            reach.pause(POLL_MS);
-            Optional<String> at = closePopups(reach.look()).flatMap(f -> whereOn(f, near));
-            if (at.isPresent()) return at;
-        } while (reach.nowMs() < deadline && !Thread.currentThread().isInterrupted());
-        return Optional.empty();
+        return Wait.until(reach, within(Math.min(stepMs, UNCOVER_MS)),
+                () -> closePopups(reach.look()).flatMap(f -> whereOn(f, near)));
     }
 
     /** Which look of {@code constant} {@code frame} shows: the first whose markers show; empty for none. */

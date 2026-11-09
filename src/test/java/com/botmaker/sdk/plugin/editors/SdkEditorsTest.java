@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,11 +51,13 @@ class SdkEditorsTest {
         assertTrue(claimed(TestContexts.slot(
                 TestContexts.call((Ref.Of2<BotSettings, Boolean, BotSettings>) BotSettings::debug), 0, "true")));
         // Every wither that takes one number or flag is in the table: a new one without a hint is a free-typed
-        // number. One taking an enum needs none, its constants say what it can be.
+        // number. One taking anything else needs none: an enum's constants say what it can be, and a Duration's own
+        // editor shows it in units.
         for (Method wither : BotSettings.class.getDeclaredMethods()) {
             if (java.lang.reflect.Modifier.isStatic(wither.getModifiers()) || wither.getParameterCount() != 1
                     || wither.getReturnType() != BotSettings.class || !java.lang.reflect.Modifier.isPublic(
-                    wither.getModifiers()) || wither.getParameterTypes()[0].isEnum()) continue;
+                    wither.getModifiers()) || wither.getParameterTypes()[0].isEnum()
+                    || wither.getParameterTypes()[0] == Duration.class) continue;
             assertNotNull(SettingHints.of(wither.getParameters()[0]), wither.getName() + " has no hint");
         }
     }
