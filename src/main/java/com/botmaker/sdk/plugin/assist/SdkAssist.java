@@ -24,7 +24,7 @@ public final class SdkAssist {
     /** Every tool, by group, each timed ({@link ToolTiming}). */
     public static final List<AssistantTool<?>> ALL = join(LookTools.TOOLS, ActTools.TOOLS, PictureTools.TOOLS,
             ElementTools.TOOLS, TagTools.TOOLS, SetupTools.TOOLS, NotesTools.TOOLS, MapTools.TOOLS,
-            MapEdits.TOOLS);
+            MapEdits.TOOLS, ExploreTools.TOOLS);
 
     /**
      * How a bot on the SDK is laid out, said to the assistant beside these tools: a bot is its screen map, the
@@ -51,6 +51,8 @@ public final class SdkAssist {
               the whole plan.
             - Stage 4, Tuning: faster, once it is right.
             - Stage 5, Upkeep: a marker or an entrance stops being found; edit_map moves the map with the game.
+            - Keep exploring, once the map has its inputs: run_bot entry "Keep exploring" plays on its own;
+              explore wait answers the stop it meets, fix it with the map tools, explore resume, wait again.
 
             The bot's shape
             - One action per chore: a Do field of its screen (Do.press(input)), saying the goal it serves.

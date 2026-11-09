@@ -814,9 +814,10 @@ class SdkAssistTest {
     void everyToolHasADistinctNameAndNoneIsCalledWire() {
         List<String> names = SdkAssist.ALL.stream().map(AssistantTool::name).toList();
         assertEquals(names.size(), names.stream().distinct().count(), names.toString());
-        assertEquals(35, names.size(), "crop_picture and try_inputs merged into crop_pictures and try_input; the flow, "
+        assertEquals(36, names.size(), "crop_picture and try_inputs merged into crop_pictures and try_input; the flow, "
                 + "picture, tag and setup edits into edit_flow, edit_pictures, edit_tags and setup, 2026-10-15; "
-                + "read_flow and edit_flow went with flows, 2026-11-09; save_region with zones, 2026-11-09");
+                + "read_flow and edit_flow went with flows, 2026-11-09; save_region with zones, 2026-11-09; "
+                + "explore added for Keep exploring, 2026-11-09");
         assertTrue(SdkAssist.ALL.stream().noneMatch(t -> t.paramsType().getSimpleName().contains("Wire")));
     }
 

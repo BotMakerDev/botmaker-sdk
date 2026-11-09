@@ -30,6 +30,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   same stop again says "the fix did not take". The journal is `explore/` in the SDK's state folder of the bot:
   `events.jsonl` (appended, read back past a cut last line), `queue.json` (the parked stops) and `command`
   (`resume <id> [ignore]` or `stop`). The run property `botmaker.explore.hours` gives it a budget.
+- **The `explore` tool** (2026-11-09): the assistant's half of *Keep exploring*. `wait` blocks (a watch on the journal)
+  until the run stops, finds a screen or ends, and answers the open stop whole (frame path, text read, facts, last
+  presses), else a stop parked since the last wait, else the new screens, else "still running" with the counts.
+  `status`, `queue`, `resume` (answers once the run reloaded, or with the compile's errors; one resume at a time, a
+  second of the same stop answers the first's generation) and `stop`. A parked stop can be resumed while the run plays.
+  The journal now says when a run began and ended (also when it threw), and each call of the tool.
 - **The bot reloaded in a running run** (2026-11-09): `internal/explore/Generation` compiles the bot's sources in the
   run's JVM into `target/botmaker-explore/gen-<n>` and loads them child-first over the run's own loader, so a fix that
   adds a readout or an input takes without restarting the game. A compile error refuses the reload with its errors and

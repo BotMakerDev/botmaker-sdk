@@ -76,9 +76,38 @@ public final class ExploreLoop {
     /** Why the loop ended. */
     public enum End {
         /** The plugin side asked it to stop. */
-        STOPPED,
+        STOPPED("stopped", "Stopped"),
         /** Its budget ({@link Settings#hours}) ran out. */
-        BUDGET
+        BUDGET("budget", "Budget spent"),
+        /** It threw: the bot crashed, or the run was stopped from Studio. Only the journal says it. */
+        BROKE("broke", "Crashed or stopped from Studio"),
+        /** An end this SDK does not know, read from a journal a newer one wrote. */
+        @JsonEnumDefaultValue
+        UNKNOWN("unknown", "Unknown");
+
+        private final String id;
+        private final String displayName;
+
+        End(String id, String displayName) {
+            this.id = id;
+            this.displayName = displayName;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        /** The end whose {@link #id()} is {@code id}; {@link #UNKNOWN} for any other. */
+        public static End fromId(String id) {
+            for (End end : values()) {
+                if (end.id.equals(id)) return end;
+            }
+            return UNKNOWN;
+        }
     }
 
     /**
@@ -213,9 +242,29 @@ public final class ExploreLoop {
     public End run() {
         began = nowMs.getAsLong();
         lastPress = began;
+        // A command a run before left is not this run's.
+        journal.takeCommand();
+        emit(new ExploreEvent.Began(began));
+        End end = End.BROKE;
+        try {
+            end = rounds();
+            return end;
+        } finally {
+            // Said however it ends, so the plugin side never waits on a run that is gone.
+            emit(new ExploreEvent.Ended(end, nowMs.getAsLong()));
+        }
+    }
+
+    private End rounds() {
         while (true) {
             if (spent()) return End.BUDGET;
-            if (journal.takeCommand().orElse(null) instanceof Journal.Command.End) return End.STOPPED;
+            Journal.Command command = journal.takeCommand().orElse(null);
+            if (command instanceof Journal.Command.End) return End.STOPPED;
+            // Between stops only a parked stop can be resumed: its fix is loaded and its place tried again.
+            if (command instanceof Journal.Command.Resume(String stopId, boolean ignore)) {
+                if (parked(stopId)) resume(null, stopId, ignore);
+                else stale(stopId);
+            }
             if (!round()) return spent() ? End.BUDGET : End.STOPPED;
         }
     }
@@ -487,11 +536,15 @@ public final class ExploreLoop {
             Optional<Journal.Command> command = journal.takeCommand();
             if (command.orElse(null) instanceof Journal.Command.End || spent()) return Paused.END;
             // A resume of a stop that is neither this one nor parked is stale: it changes nothing.
-            if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore)
-                    && (stop.id().equals(stopId) || parked.values().stream().anyMatch(s -> s.id().equals(stopId)))) {
-                Optional<Paused> resumedNow = resume(stop, stopId, ignore);
-                if (resumedNow.isPresent()) return resumedNow.get();
-                deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
+            if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore)) {
+                if (stop.id().equals(stopId) || parked(stopId)) {
+                    Optional<Paused> resumedNow = resume(stop, stopId, ignore);
+                    if (resumedNow.isPresent()) return resumedNow.get();
+                    // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
+                    if (stop.id().equals(stopId)) deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
+                } else {
+                    stale(stopId);
+                }
             }
             if (stop.kind() == StopKind.GUARD && neverParks) {
                 Foreground front = play.front();
@@ -509,13 +562,25 @@ public final class ExploreLoop {
         }
     }
 
+    /** Whether the queue holds the stop {@code stopId}. */
+    private boolean parked(String stopId) {
+        return parked.values().stream().anyMatch(s -> s.id().equals(stopId));
+    }
+
+    /** A resume of {@code stopId}, neither open nor parked, answered as refused so the tool waiting on it hears. */
+    private void stale(String stopId) {
+        emit(new ExploreEvent.Reloaded(stopId, generation, List.of("No stop " + stopId + " is open or parked."),
+                nowMs.getAsLong()));
+    }
+
     /**
-     * A resume of {@code stopId} while paused on {@code open}: the bot reloaded. Refused, the run stays paused (empty).
+     * A resume of {@code stopId} while paused on {@code open} (null: between stops, a parked one): the bot reloaded.
+     * Refused, the run stays paused (empty).
      * A parked stop resumed leaves the queue and its place is tried again; the open stop stays open (empty). The open
      * stop resumed: what the next round meets says whether the fix took.
      */
     private Optional<Paused> resume(Stop open, String stopId, boolean ignore) {
-        Stop parkedStop = open.id().equals(stopId) ? null
+        Stop parkedStop = open != null && open.id().equals(stopId) ? null
                 : parked.values().stream().filter(s -> s.id().equals(stopId)).findFirst().orElse(null);
         Reload.Reloaded done = reload.reload();
         if (!done.errors().isEmpty()) {

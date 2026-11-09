@@ -264,7 +264,56 @@ class ExploreLoopTest {
         loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
 
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "parked on time despite the stale resumes");
-        assertTrue(events(ExploreEvent.Reloaded.class).isEmpty(), "a stale resume reloads nothing");
+        assertTrue(events(ExploreEvent.Reloaded.class).stream().allMatch(ExploreEvent.Reloaded::refused),
+                "a stale resume reloads nothing, and says so");
+    }
+
+    @Test
+    void aRunThatThrowsSaysItEnded() {
+        Game game = new Game();
+        // What the loop does not take for a stop of its own goes on up: an error of the JVM here.
+        game.arrival = edge -> {
+            throw new StackOverflowError("deep");
+        };
+
+        try {
+            loop(map(), game, same(map()), Duration.ofMinutes(5)).run();
+        } catch (StackOverflowError expected) {
+            // gone up, as it should
+        }
+
+        assertTrue(journal().events().getLast() instanceof ExploreEvent.Ended(ExploreLoop.End end, long at)
+                && end == ExploreLoop.End.BROKE, journal().events().toString());
+    }
+
+    @Test
+    void parkedStopResumedWhileRunning() {
+        Game game = new Game();
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "D") : new Took(Arrival.AT_TARGET, edge.to());
+        ExploreLoop.Reload reload = () -> {
+            game.arrival = edge -> new Took(Arrival.AT_TARGET, edge.to());
+            return new ExploreLoop.Reload.Reloaded(2, map(), null, List.of());
+        };
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !journal().queue().isEmpty()) {
+                sent[0] = true;
+                journal().command("resume " + journal().queue().getFirst().id());
+            }
+        };
+
+        loop(map(), game, reload, Duration.ofMinutes(14)).run();
+
+        String parked = events(ExploreEvent.Parked.class).getFirst().stopId();
+        List<ExploreEvent.Reloaded> reloaded = events(ExploreEvent.Reloaded.class);
+        assertEquals(1, reloaded.size(), reloaded.toString());
+        assertFalse(reloaded.getFirst().refused());
+        assertTrue(events(ExploreEvent.Fixed.class).stream().anyMatch(f -> f.stopId().equals(parked)));
+        assertTrue(journal().queue().isEmpty(), "it left the queue");
+        assertEquals(2, game.taken.stream().filter("A.b→B"::equals).count(), "its place tried again");
+        assertTrue(journal().events().getFirst() instanceof ExploreEvent.Began);
+        assertTrue(journal().events().getLast() instanceof ExploreEvent.Ended(ExploreLoop.End end, long at)
+                && end == ExploreLoop.End.BUDGET);
     }
 
     @Test

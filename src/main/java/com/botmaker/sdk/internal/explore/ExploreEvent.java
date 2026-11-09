@@ -23,6 +23,9 @@ public sealed interface ExploreEvent {
             case Fixed ignored -> "fixed";
             case Parked ignored -> "parked";
             case Reloaded ignored -> "reloaded";
+            case Began ignored -> "began";
+            case Ended ignored -> "ended";
+            case Claude ignored -> "claude";
         };
     }
 
@@ -37,9 +40,24 @@ public sealed interface ExploreEvent {
             case "fixed" -> Fixed.class;
             case "parked" -> Parked.class;
             case "reloaded" -> Reloaded.class;
+            case "began" -> Began.class;
+            case "ended" -> Ended.class;
+            case "claude" -> Claude.class;
             default -> null;
         };
     }
+
+    /** A run started: what the journal held before it is an earlier run's. */
+    record Began(long at) implements ExploreEvent {}
+
+    /** The run ended, {@code end} why (null: an end this SDK does not know). */
+    record Ended(ExploreLoop.End end, long at) implements ExploreEvent {}
+
+    /**
+     * Claude called the {@code explore} tool: {@code call} its action and argument ({@code wait},
+     * {@code resume NO_VERDICT-1}). Written by the plugin side; the Explore tab shows the last one.
+     */
+    record Claude(String call, long at) implements ExploreEvent {}
 
     /** A screen this run reached for the first time, from {@code from} by {@code by} (both null at the start). */
     record NewScreen(String screen, String from, String by, long at) implements ExploreEvent {}

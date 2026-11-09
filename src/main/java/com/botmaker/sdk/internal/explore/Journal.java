@@ -36,7 +36,7 @@ import java.util.Optional;
 public final class Journal {
 
     static final String FOLDER = "explore";
-    static final String EVENTS = "events.jsonl";
+    public static final String EVENTS = "events.jsonl";
     static final String QUEUE = "queue.json";
     static final String COMMAND = "command";
 
@@ -133,9 +133,13 @@ public final class Journal {
     /** The command waiting, read and deleted; empty when there is none, or it does not read. */
     public Optional<Command> takeCommand() {
         Path file = folder.resolve(COMMAND);
+        if (!Files.exists(file)) return Optional.empty();
+        // Moved aside before it is read, so a command written meanwhile is a new file, never deleted unread.
+        Path taken = folder.resolve(COMMAND + ".taken");
         try {
-            String said = Files.readString(file, StandardCharsets.UTF_8);
-            Files.deleteIfExists(file);
+            Files.move(file, taken, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            String said = Files.readString(taken, StandardCharsets.UTF_8);
+            Files.deleteIfExists(taken);
             return Command.parse(said);
         } catch (IOException unread) {
             return Optional.empty();
