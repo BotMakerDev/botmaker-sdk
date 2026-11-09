@@ -7,6 +7,10 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **● Live draws a portrait game as landscape** (2026-11-09): the Screen tab's live board shows a portrait game's
   frames stretched to a landscape box. Draw each frame at its own aspect.
 
+- **🔭 Explore grabs its own frame** (2026-11-09): while an explore run goes, the view captures the game and matches
+  markers once a second (`ExploreView`, `ScreenDesk.here`), beside the run's own capture. Carry the run's frame and
+  screen in its telemetry and draw that instead.
+
 - **Left from 🎯 Goals (2026-11-06)**:
   - **Times basics cannot read.** `Do.every(Duration.ofMinutes(30))` and `.daily(LocalTime.of(5, 0))` do not
     read in Studio. botmaker-plugin-basics declares `Duration` only as `Duration.ofMillis`, and `LocalTime` only as

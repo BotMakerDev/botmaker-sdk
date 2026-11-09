@@ -145,7 +145,7 @@ public final class Versions {
         }
     }
 
-    /** What 🗺 Screens' map panel lists under *Shades the game shows*: the fits proposed and the shades learned. */
+    /** The shades the game shows, as the assistant's tools list them: the fits proposed and the shades learned. */
     public record Shown(List<Proposal> proposed, List<Shade> learned) {}
 
     /** A project's sightings and presses, oldest first; changed only under the class's lock. */

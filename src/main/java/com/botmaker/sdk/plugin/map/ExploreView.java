@@ -52,6 +52,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -102,10 +103,13 @@ final class ExploreView {
     private int frameWidth;
     private Map<String, Rect> areas = Map.of();
     private boolean closed;
-    /** The journal as last read; read again only once its files changed. */
+    /** The journal as last shown. */
     private JournalView last = new JournalView(List.of(), List.of(), List.of());
-    /** The journal files' sizes and times when {@link #last} was read; the reading thread's, one at a time. */
-    private volatile String lastStamp = "";
+    /** The journal as last read, with its files' sizes and times then; the reading thread's, one at a time. */
+    private volatile Read lastRead = new Read("", last);
+
+    /** A read of the journal and the stamp of its files it was made at, kept together. */
+    private record Read(String stamp, JournalView view) {}
 
     ExploreView(StudioServices services, Supplier<ScreenGraph> graph, Journal journal, LongSupplier nowMs) {
         this.services = services;
@@ -159,7 +163,8 @@ final class ExploreView {
         pinnedStop.setWrapText(true);
         pinnedClaude.setWrapText(true);
         pinnedClaude.getStyleClass().add("explore-claude");
-        feed.setPlaceholder(new Label("Nothing yet: ▶ " + SdkRuns.KEEP_EXPLORING + " explores the game, and what it finds shows here."));
+        feed.setPlaceholder(new Label("Nothing yet: ▶ " + SdkRuns.KEEP_EXPLORING
+                + " explores the game, and what it finds shows here."));
         Label feedTitle = new Label("Feed");
         feedTitle.getStyleClass().add("explore-heading");
         VBox right = new VBox(6, feedTitle, pinned, feed);
@@ -220,23 +225,36 @@ final class ExploreView {
         boolean running = services.runs().isRunning();
         start.setDisable(running || journal == null);
         // Only an explore run's: the bot's own run is stopped where it was started.
-        stop.setDisable(!running || !last.running());
+        stop.setDisable(!live(last));
     }
 
-    /** Reads the journal, and a frame while a run goes, off the FX thread; one read at a time. */
+    /**
+     * Whether {@code read}'s run is the one the host runs now. The journal says a run goes until it writes its end,
+     * which a killed run never does; and a bot's own run started after it is not it: its process began later.
+     */
+    private boolean live(JournalView read) {
+        if (!read.running() || !services.runs().isRunning()) return false;
+        OptionalLong pid = services.runs().pid();
+        Optional<Instant> started = pid.isEmpty() ? Optional.empty()
+                : ProcessHandle.of(pid.getAsLong()).flatMap(process -> process.info().startInstant());
+        // A second's slack: a process's start is kept to the clock tick.
+        return started.isEmpty() || read.beganAt() >= started.get().toEpochMilli() - 1_000;
+    }
+
+    /** Reads the journal, and a frame while an explore run goes, off the FX thread; one read at a time. */
     private void tick() {
         buttons();
         if (journal == null || closed || !reading.compareAndSet(false, true)) return;
         ScreenGraph map = graph.get();
-        PanelContext context = services.runs().isRunning() ? context() : null;
+        PanelContext context = live(last) ? context() : null;
         if (context == null) forgetFrame();
-        JournalView before = last;
         Thread.ofVirtual().name("explore-view").start(() -> {
             try {
                 // A run of hours writes thousands of lines: parsed again only when the files changed.
                 String stamp = stamp(journal);
-                JournalView read = stamp.equals(lastStamp) ? before : JournalView.of(journal);
-                lastStamp = stamp;
+                Read before = lastRead;
+                JournalView read = stamp.equals(before.stamp()) ? before.view() : JournalView.of(journal);
+                lastRead = new Read(stamp, read);
                 Seen seen = context == null ? null : look(context, map);
                 Platform.runLater(() -> {
                     if (closed) return;
@@ -317,9 +335,9 @@ final class ExploreView {
 
     /** {@code read} drawn: the status line, the stop pinned, the feed and the facts of the screen it is on. */
     void show(JournalView read) {
+        boolean changed = read != last;
         last = read;
-        // The journal says a run goes until it writes its end, which a killed run never does: the host says too.
-        boolean live = read.running() && services.runs().isRunning();
+        boolean live = live(read);
         status.setText(statusLine(read, graph.get().screens().size(), nowMs.getAsLong(), live));
         Optional<Stop> open = live ? read.open() : Optional.empty();
         pinned.setVisible(open.isPresent());
@@ -327,10 +345,13 @@ final class ExploreView {
         open.ifPresent(waiting -> {
             pinnedStop.setText("⏸ " + waiting.id() + " — " + waiting.kind().displayName() + " on "
                     + (waiting.screen() == null ? "an unknown screen" : waiting.screen()) + ": " + waiting.missing());
-            pinnedClaude.setText(lastClaude(read).map(call -> "Claude: " + call).orElse("Claude: not on it yet"));
+            pinnedClaude.setText(claudeSince(read, waiting).map(call -> "Claude: " + call)
+                    .orElse("Claude: not on it yet"));
         });
-        List<String> lines = feedLines(read);
-        if (!lines.equals(feed.getItems())) feed.getItems().setAll(lines);
+        if (changed) {
+            List<String> lines = feedLines(read);
+            if (!lines.equals(feed.getItems())) feed.getItems().setAll(lines);
+        }
         String on = liveScreen != null ? liveScreen : read.where().orElse(null);
         screenName.setText(on == null ? "No screen of the map" : on);
         List<String> factLines = factLines(on);
@@ -357,6 +378,10 @@ final class ExploreView {
         return start;
     }
 
+    Button stopButton() {
+        return stop;
+    }
+
     /** The status line: how long, how many screens, how many stops fixed, and whether it runs or waits on Claude. */
     static String statusLine(JournalView read, int screensKnown, long nowMs, boolean live) {
         if (!read.began()) return "No explore run yet · " + screensKnown + " screens known";
@@ -379,9 +404,9 @@ final class ExploreView {
         List<String> lines = new ArrayList<>();
         for (ExploreEvent event : read.events()) {
             String line = line(event);
-            if (line != null) lines.addFirst(clock(event.at()) + "  " + line);
+            if (line != null) lines.add(clock(event.at()) + "  " + line);
         }
-        return lines;
+        return lines.reversed();
     }
 
     private static String line(ExploreEvent event) {
@@ -408,9 +433,14 @@ final class ExploreView {
         };
     }
 
-    private static Optional<String> lastClaude(JournalView read) {
-        return read.events().stream().filter(ExploreEvent.Claude.class::isInstance)
-                .map(e -> ((ExploreEvent.Claude) e).call()).reduce((first, last) -> last);
+    /** The last tool Claude called since the run last stopped on {@code open}; empty when none since. */
+    private static Optional<String> claudeSince(JournalView read, Stop open) {
+        String call = null;
+        for (ExploreEvent event : read.events()) {
+            if (event instanceof ExploreEvent.Stopped stopped && stopped.stop().id().equals(open.id())) call = null;
+            else if (event instanceof ExploreEvent.Claude claude) call = claude.call();
+        }
+        return Optional.ofNullable(call);
     }
 
     private static String clock(long atMs) {

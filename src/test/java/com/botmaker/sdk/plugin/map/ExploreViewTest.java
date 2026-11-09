@@ -54,6 +54,8 @@ class ExploreViewTest extends ApplicationTest {
     private final List<RunEntry> started = new ArrayList<>();
     /** What the fake host says of a run: the explore run's JVM up or not. */
     private boolean running;
+    /** The process the fake host runs; none known by default. */
+    private OptionalLong pid = OptionalLong.empty();
     private Journal journal;
     private ExploreView view;
     private Stage stage;
@@ -131,6 +133,42 @@ class ExploreViewTest extends ApplicationTest {
     }
 
     @Test
+    void laterRunIsNotTheExploreRun() {
+        Stop stop = new Stop("GUARD-1", StopKind.GUARD, "HOME", "HOME", "", List.of(), List.of(), Map.of(), List.of(),
+                "a foreign window", 2_000);
+        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Stopped(stop, false, 4_000));
+
+        // The explore run was killed; the host now runs a process that began long after it: the bot's own run.
+        running = true;
+        pid = OptionalLong.of(ProcessHandle.current().pid());
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertTrue(view.statusText().endsWith("ended"), view.statusText());
+        assertEquals(List.of(), view.pinnedLines());
+        assertTrue(view.stopButton().isDisabled(), "Stop never ends the bot's own run");
+    }
+
+    @Test
+    void claudeBeforeTheStopIsNotPinned() {
+        running = true;
+        Stop first = new Stop("MISSING_FACT-1", StopKind.MISSING_FACT, "HOME", "HOME#10,10", "", List.of(), List.of(),
+                Map.of(), List.of(), "the gold no readout reads", 2_000);
+        Stop second = new Stop("MISSING_FACT-2", StopKind.MISSING_FACT, "SHOP", "SHOP#5,5", "", List.of(), List.of(),
+                Map.of(), List.of(), "the gems no readout reads", 5_000);
+        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Stopped(first, false, 2_000));
+        journal.append(new ExploreEvent.Claude("edit_map", 3_000));
+        journal.append(new ExploreEvent.Fixed("MISSING_FACT-1", "a readout", 4_000));
+        journal.append(new ExploreEvent.Stopped(second, false, 5_000));
+
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertEquals("Claude: not on it yet", view.pinnedLines().get(1));
+        assertFalse(view.stopButton().isDisabled(), "the explore run's Stop");
+    }
+
+    @Test
     void noJournalShowsEmpty() {
         // The scene's tick read the journal folder, which no run ever made.
         WaitForAsyncUtils.waitForFxEvents();
@@ -172,7 +210,7 @@ class ExploreViewTest extends ApplicationTest {
 
             @Override
             public OptionalLong pid() {
-                return OptionalLong.empty();
+                return pid;
             }
 
             @Override

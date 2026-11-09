@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A run's explore journal, the files the run and the SDK plugin (the {@code explore} tool, the Explore tab) talk
+ * A run's explore journal, the files the run and the SDK plugin (the {@code explore} tool, 🗺 Screens' 🔭 Explore) talk
  * through, in the SDK's state folder of the bot under {@code explore/}: run data, never versioned.
  *
  * <ul>

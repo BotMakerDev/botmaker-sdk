@@ -396,6 +396,24 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   once after the user's own edit (a read the other overtook draws nothing). One read of a 45-screen map takes about
   a second. It redraws only when a `ScreenCards` value or a picture's file time changed; an empty read is trusted
   on the second in a row. The card a run is on is lit from telemetry.
+- **The rail** (`ScreensRail`, 2026-11-09, spec `../docs/superpowers/specs/2026-11-09-screens-rail-design.md` in the
+  umbrella) is the window's left edge: 🗺 Map, 🎯 Goals, 🔭 Explore and 🖼 Pictures, one view in the centre at a
+  time. Each view is built on its first press and kept (`ScreenMap.showView`); a press on the view shown keeps it.
+  Goals (`GoalsView.view`) and Pictures were toolbar windows before; a Goals row's double click comes back to the
+  map with its screen's tab in front (`ScreenMap.openScreen`). The toolbar keeps the game button, 🗺 Screens and
+  🎮 Pilot.
+- **🔭 Explore** (`ExploreView`, 2026-11-09; continuous-explore spec §7, layout A) starts and watches a run
+  exploring the game. Both explore runs are `SdkRuns` entries off the bar (`RunEntry.offBar`): ▶ Keep exploring
+  starts the long one, its ▾ *Explore map* the single pass, through `services.runs().start(entry)`; ■ Stop is the
+  host's stop. Once a second, while the view is in a scene, a virtual thread reads the run's `Journal` as a
+  `JournalView`, parsed again only when `events.jsonl`'s or `queue.json`'s size or time changed. The status line
+  gives the time run, the screens known (+ new), the stops fixed and *running*, *⏸ waiting on Claude* or *ended*.
+  A run is live only while the journal has no Ended line **and** the host runs it: a run killed from Studio reads
+  *ended*, its time counted to its last event, and pins nothing. Left, the frame now (`ScreenDesk.here`) with its
+  screen's name, its areas boxed (`FrameBoxes`, shared with the live board) and the facts it reads
+  (`pluginValues().runParameters()`); right, the feed newest first, with the open stop and Claude's last tool call
+  pinned above it while the run is live. The frame is grabbed by the window, beside the run's own capture; the
+  run's telemetry could carry it instead (`ROADMAP.md`).
 - **Reads on the FX thread** go through `ScreenMapRead.orEmpty` (`plugin/pictures`): one read per FX event, shared
   by every card and editor drawn in it, dropped after it; a write calls `forget()`. A picture opens on its own cut
   (`TemplateUses.cut`), never on every picture constant's. A read after a step is skipped while the files beside
