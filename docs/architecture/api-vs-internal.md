@@ -18,9 +18,9 @@
   (`SourceOrder`, alphabetical on any failure). **Constructors are not catalogued**: a palette entry inserts
   a *call*.
 
-- **Recording is the screen map's.** 🗺's *Record into* appends typed map calls (`Navigate.press`, `type`,
-  `to`) to an activity's body through the contract's `PluginValues.appendCall`; the host writes them. The macro
-  recorder's `@Records` marks and `PictureAt` went on 2026-10-22: they wrote raw clicks at a spot.
+- **Nothing records into a method.** 🗺's *Record into* appended typed map calls to an activity's body; it went
+  with flows on 2026-11-09. What a screen does is a `Do` field of it. The macro recorder's `@Records` marks and
+  `PictureAt` went on 2026-10-22: they wrote raw clicks at a spot.
 
 - **No `api` signature may name a type a bot cannot write**: not `internal` (`PluginLayersTest`, by
   reflection), and not `botmaker-shared` or OpenCV, which are freely breakable. `ImageTemplate.getMat()`
@@ -30,13 +30,13 @@
   engine). **`../docs/refactor/22-api-audit.md` is the record** of the shared audit.
 
 - **`com.botmaker.sdk.api.*` is what a bot writes, in packages named by what a bot does** (2026-10-01):
-  `api.bot`, `api.flow`, `api.capture`, `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`,
+  `api.bot`, `api.screens`, `api.plan`, `api.capture`, `api.input` (`Mouse`, `MouseButton`, `Keyboard`, `Key`, `Combo`,
   `KeySequence`), `api.time` (`Wait`, `Time`), `api.vision`, `api.text` (OCR), `api.geometry` (`Point`,
   `Rect`, `Size`), `api.sound`, `api.random` (`Chance`), `api.console` (`Debug`, `Ask`) —
   `PluginLayersTest` holds the list.
   **The `api` root holds no classes**. Plumbing the plugin half needs and a bot never names is public in
   `internal`: `internal.launch` (`Game`, `Target`, `LaunchTarget`), `internal.emulator`, `internal.bot`
-  (`Session`, `Watchdog`, `BotStuckException`), `internal.flow.Flows`, `internal.capture.Window`.
+  (`Session`, `Watchdog`, `BotStuckException`), `internal.capture.Window`.
   **One exception (2026-11-04, the user's call): `api.bot.SdkValue.Holder`.** A bot never names it, but the
   contract checks at compile time that a value's holder is a constant of the enum its marker's `Id` names
   (`enum Id implements ManagedId<Holder>`), so it sits beside `Id`. The `ManagedId` it names is a contract type
@@ -45,8 +45,8 @@
 - **The package tree is `api` / `internal` / `plugin`, and nothing else** (`../docs/refactor/34-plugin-package-tree.md`,
   enforced by `plugin/PluginLayersTest`). `api` and `internal` are what a bot links: no JavaFX, no toolkit, no
   `com.botmaker.sdk.plugin` name. `plugin/` is the Studio half: `SdkPlugin` (the declaration),
-  `SdkToolbarItems`, `types/` (`SdkTypes`, `FlowTypes`, `CaptureTypes`, `SettingsTypes`, `PictureAt`),
-  `editors/`, and one package per feature — `flow`, `pictures`, `screen`, `source`, `settings`, `pilot`
+  `SdkToolbarItems`, `types/` (`SdkTypes`, `RunTypes`, `ScreenTypes`, `PlanTypes`, `CaptureTypes`, `SettingsTypes`),
+  `editors/`, and one package per feature — `map`, `plan`, `pictures`, `screen`, `source`, `settings`, `pilot`
   (+ `pilot/ui`), `emulator`, `launch`, `setup`. **No class under `plugin/` reads or writes Java text**: an
   editor reads the value the host hands it and hands one back.
 

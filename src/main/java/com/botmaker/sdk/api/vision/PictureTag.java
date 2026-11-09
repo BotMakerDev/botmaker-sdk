@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * A group of the bot's pictures that no activity owns — the "UI" or "Shared" of 🖼 Manage Pictures — declared as a
+ * A group of the bot's pictures that no screen owns — the "UI" or "Shared" of 🖼 Manage Pictures — declared as a
  * constant of the bot's {@code Tags} class and named by the pictures it holds (2026-10-14):
  *
  * <pre>{@code
@@ -16,9 +16,7 @@ import java.util.Objects;
  * public static final ImageTemplate CLOSE_X = new ImageTemplate("…/close_x.png").tags(List.of(Tags.UI));
  * }</pre>
  *
- * <p>A picture an activity uses is filed under that activity with {@link ImageTemplate#activities}, not a tag: the
- * activity's own enum names it, so it follows a rename and goes with the activity. A screen's pictures are read off
- * the bot's {@code Screens} map and are no tag either. A run never reads a tag; it is how the bot's author finds a
+ * <p>A screen's pictures are read off the bot's {@code Screens} map and are no tag. A run never reads a tag; it is how the bot's author finds a
  * picture.
  */
 public final class PictureTag {

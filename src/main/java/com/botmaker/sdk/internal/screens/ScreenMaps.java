@@ -43,7 +43,6 @@ public final class ScreenMaps {
         }
         installed = found;
         last = null;
-        reached = null;
         lost();
         // The run's last lines: one per screen it came to, which only a local run's reports read.
         SdkRun.atEnd(ScreenMaps::sayTime);
@@ -66,7 +65,6 @@ public final class ScreenMaps {
     public static void use(ScreenGraph map) {
         installed = map == null ? ScreenGraph.of(Map.of()) : map;
         last = null;
-        reached = null;
         lost();
     }
 
@@ -107,21 +105,6 @@ public final class ScreenMaps {
     /** Tells {@code listener} each screen the game is seen on from now; {@code null} tells nobody. */
     public static void onSeen(Consumer<String> listener) {
         onSeen = listener;
-    }
-
-    /**
-     * The screen the running activity's last {@code Navigate.to} arrived on: where the run walks back to when a step of
-     * the activity gets stuck. Cleared as each activity starts.
-     */
-    private static volatile String reached;
-
-    public static String reached() {
-        return reached;
-    }
-
-    /** Remembers {@code constant} as the screen the running activity reached; {@code null} forgets it. */
-    public static void reached(String constant) {
-        reached = constant;
     }
 
     /** The running bot's map, as {@link #install} learned it. */

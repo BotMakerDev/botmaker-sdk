@@ -53,15 +53,6 @@ public final class Bots {
         }
     }
 
-    /** Tells every observer the flow entered the activity labelled {@code label}. */
-    public static void fireActivity(String label) {
-        for (BotObserver observer : OBSERVERS) {
-            try {
-                observer.onActivity(label);
-            } catch (RuntimeException ignored) {
-            }
-        }
-    }
 
     /** Tells every observer the game shows the screen {@code constant} of the map, called {@code name}. */
     public static void fireScreen(String constant, String name) {

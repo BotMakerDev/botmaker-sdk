@@ -27,7 +27,7 @@ public final class TemplateGalleryModel {
     /** A rail entry: either a group heading or a selectable tag. */
     public sealed interface Row permits Heading, TagRow {}
 
-    /** A non-selectable group label ("Activities", "Custom"). */
+    /** A non-selectable group label ("Screens", "Custom"). */
     public record Heading(String text) implements Row {}
 
     /**
@@ -39,7 +39,7 @@ public final class TemplateGalleryModel {
 
     /**
      * The rail for {@code byTag} (as {@link TemplateLibrary#listByTag} returns it) over {@code catalog}:
-     * All, then the activity tags under a heading, then the custom ones under theirs, then Untagged when
+     * All, then the custom tags under a heading, then Untagged when
      * anything is untagged. A declared tag with nothing in it is still a row — it is somewhere to file to.
      */
     public static List<Row> rows(Map<String, List<Path>> byTag, TagCatalog catalog) {
@@ -47,15 +47,14 @@ public final class TemplateGalleryModel {
     }
 
     /**
-     * The same, with each screen of the bot's map under a heading of its own after the activities: {@code screens}
-     * are their keys in {@code byTag} ({@link #screenKey}), read-only rows like an activity's.
+     * The same, with each screen of the bot's map under a heading of its own before the custom tags: {@code screens}
+     * are their keys in {@code byTag} ({@link #screenKey}), read-only rows.
      */
     public static List<Row> rows(Map<String, List<Path>> byTag, TagCatalog catalog, List<String> screens) {
         List<Row> rows = new ArrayList<>();
         rows.add(new TagRow(TemplateManifest.ALL, count(byTag, TemplateManifest.ALL), false));
-        addGroup(rows, "Activities", catalog.namesOf(TagCatalog.Kind.ACTIVITY), byTag, true);
         addGroup(rows, "Screens", screens, byTag, true);
-        addGroup(rows, "Custom", catalog.namesOf(TagCatalog.Kind.CUSTOM), byTag, false);
+        addGroup(rows, "Custom", catalog.names(), byTag, false);
         if (byTag.containsKey(TemplateManifest.UNTAGGED)) {
             rows.add(new TagRow(TemplateManifest.UNTAGGED, count(byTag, TemplateManifest.UNTAGGED), false));
         }

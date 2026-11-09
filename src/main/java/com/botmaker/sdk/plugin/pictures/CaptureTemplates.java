@@ -84,8 +84,7 @@ public final class CaptureTemplates {
     private final CaptureSource target;
 
     /**
-     * The tag a batch is pre-filled with — the activity that was open when the tool was opened, or
-     * {@code null}. Fixed at open time on purpose: the tool is long-lived and deliberately keeps the editor
+     * The tag a batch is pre-filled with, or {@code null}. Fixed at open time on purpose: the tool is long-lived and deliberately keeps the editor
      * out of the way, so a tag that changed underneath the user would be a worse default than the one they
      * started from.
      */

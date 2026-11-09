@@ -22,9 +22,6 @@ public final class IpcObserver implements BotObserver {
 
     private static final AtomicReference<IpcObserver> INSTALLED = new AtomicReference<>();
 
-    /** The activity the flow last entered, which a screen reached is a step of; empty before the first. */
-    private volatile String activity = "";
-
     IpcObserver() {}
 
     /** Registers the observer, once: it sends on whichever channel the run holds ({@link SdkRun#channel()}). */
@@ -55,17 +52,13 @@ public final class IpcObserver implements BotObserver {
                 event.end().y(), event.durationMs(), botLine()));
     }
 
-    /** Where the bot is in its flow, for the host's run overlay: the activity, with no action yet. */
-    @Override
-    public void onActivity(String label) {
-        activity = label;
-        send(new RunEvent.Step(label, "", -1));
-    }
-
-    /** The screen a walk of the map reached, as a step of the activity it is in ({@link ScreenStep}). */
+    /**
+     * The screen a walk of the map reached, as a step ({@link ScreenStep}). Its activity is empty since flows were
+     * deleted (2026-11-09); the field stays, since the host relays the event whole.
+     */
     @Override
     public void onScreen(String constant, String name) {
-        send(new RunEvent.Step(activity, ScreenStep.action(constant, name), -1));
+        send(new RunEvent.Step("", ScreenStep.action(constant, name), -1));
     }
 
     /** Sends {@code event}; one too long for a frame (a text over 64 KB) is dropped, never thrown at the bot. */

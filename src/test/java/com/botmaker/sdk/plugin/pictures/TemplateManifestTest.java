@@ -31,9 +31,8 @@ class TemplateManifestTest {
 
     @Test
     void aTemplateCanCarryTwoTagsAndIsStillOneTemplate() {
-        TemplateManifest manifest = manifest(Map.of("gold_ore", List.of("Mining", "Shared")), "Shared");
-        Map<String, List<String>> byTag = manifest.byTag(List.of("gold_ore"),
-                TagCatalog.of(List.of("Mining"), manifest.customTags()));
+        TemplateManifest manifest = manifest(Map.of("gold_ore", List.of("Mining", "Shared")), "Mining", "Shared");
+        Map<String, List<String>> byTag = manifest.byTag(List.of("gold_ore"), TagCatalog.of(manifest.customTags()));
 
         assertEquals(List.of("gold_ore"), byTag.get("Mining"));
         assertEquals(List.of("gold_ore"), byTag.get("Shared"));
@@ -42,9 +41,9 @@ class TemplateManifestTest {
 
     @Test
     void theListingIsOverTheDeclaredSetNotOverWhatWasAssigned() {
-        TagCatalog catalog = TagCatalog.of(null, List.of("Shared", "Empty"));
+        TagCatalog catalog = TagCatalog.of(List.of("Shared", "Empty"));
         TemplateManifest manifest = manifest(Map.of("gold_ore", List.of("Shared"),
-                // "Mining" was an activity that has since been removed: still on the picture, no longer declared.
+                // "Mining" was a tag that has since been removed: still on the picture, no longer declared.
                 "orphan", List.of("Mining")), "Shared", "Empty");
 
         Map<String, List<String>> byTag = manifest.byTag(List.of("gold_ore", "orphan"), catalog);
@@ -60,7 +59,7 @@ class TemplateManifestTest {
 
     @Test
     void anAssignmentFindsItsRowWhateverTheSpelling() {
-        TagCatalog catalog = TagCatalog.of(null, List.of("Shared"));
+        TagCatalog catalog = TagCatalog.of(List.of("Shared"));
         TemplateManifest manifest = manifest(Map.of("a", List.of("SHARED")), "Shared");
 
         assertEquals(List.of("a"), manifest.byTag(List.of("a"), catalog).get("Shared"));

@@ -1,6 +1,5 @@
 package com.botmaker.sdk.plugin.pictures;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -8,8 +7,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Which tags a project has — the declared set, assembled from its two halves and consulted before any tag is
- * shown or assigned.
+ * Which tags a project has — the declared set, consulted before any tag is shown or assigned.
  *
  * <p><b>Why declared.</b> Tags used to come into existence by being typed: a batch capture started inside an
  * activity pre-filled that activity's name, a free-text field accepted anything, and the set of tags was
@@ -18,33 +16,16 @@ import java.util.TreeSet;
  * makes the set finite and knowable: every assignment UI is a picklist over <em>this</em>, never a text
  * field, so a tag cannot be invented by a typo and cannot vanish by accident.
  *
- * <p><b>Two kinds, one of them managed.</b> An {@link Kind#ACTIVITY} tag is no declaration of its own — it is
- * an activity of the bot's flow, and a picture names it by the activity's enum ({@code .activities(…)}). It
- * appears when the activity is created and is gone when the activity is, which is exactly the lifecycle a
- * hand-managed copy would fail to keep. It cannot be renamed or deleted here; rename the activity. A
- * {@link Kind#CUSTOM} tag is the user's own, a constant of the bot's {@code Tags} class ({@link PictureTags}),
- * edited in one place.
+ * <p>Every tag is the user's own, a constant of the bot's {@code Tags} class ({@link PictureTags}), edited in one
+ * place. (An activity's tag, which followed its activity, went with flows on 2026-11-09.)
  *
  * <p>Assignments to tags this catalog doesn't declare are inert rather than erroneous — see
  * {@link TemplateManifest#byTag(Collection, TagCatalog)} for what that buys.
  */
 public record TagCatalog(List<Tag> tags) {
 
-    /** Who owns a tag's existence: the activity list, or the user. */
-    public enum Kind {
-        /** Named after an activity; created and removed with it, never edited by hand. */
-        ACTIVITY,
-        /** Declared by the user in the tag manager, and theirs to rename or delete. */
-        CUSTOM
-    }
-
     /** One declared tag. */
-    public record Tag(String name, Kind kind) {
-        /** True when the tag's existence is not the user's to change — an activity tag. */
-        public boolean isManaged() {
-            return kind == Kind.ACTIVITY;
-        }
-    }
+    public record Tag(String name) {}
 
     public TagCatalog {
         tags = List.copyOf(tags == null ? List.of() : tags);
@@ -54,44 +35,20 @@ public record TagCatalog(List<Tag> tags) {
         return new TagCatalog(List.of());
     }
 
-    /**
-     * The catalog for a project: one tag per activity (in the order the flow lists them, which is the order
-     * the flow editor shows), then the declared custom tags alphabetically.
-     *
-     * <p>A custom tag that collides with an activity name is dropped rather than listed twice — the activity
-     * owns the name, and the user's copy would be the one that couldn't be kept in step.
-     *
-     * <p>It takes the activity <em>names</em>, in flow order, rather than the flow itself, so a caller may
-     * read them whichever way it already does.
-     */
-    public static TagCatalog of(List<String> activityNames, Collection<String> customTags) {
-        Set<String> taken = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        List<Tag> all = new ArrayList<>();
-        if (activityNames != null) {
-            for (String name : activityNames) {
-                if (name == null || name.isBlank() || !taken.add(name)) continue;
-                all.add(new Tag(name, Kind.ACTIVITY));
-            }
-        }
+    /** The catalog for a project: its declared tags alphabetically, one per spelling whatever its case. */
+    public static TagCatalog of(Collection<String> customTags) {
+        Set<String> sorted = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         if (customTags != null) {
-            Set<String> sorted = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            sorted.addAll(customTags);
-            for (String tag : sorted) {
-                if (tag == null || tag.isBlank() || !taken.add(tag)) continue;
-                all.add(new Tag(tag, Kind.CUSTOM));
+            for (String tag : customTags) {
+                if (tag != null && !tag.isBlank()) sorted.add(tag);
             }
         }
-        return new TagCatalog(all);
+        return new TagCatalog(sorted.stream().map(Tag::new).toList());
     }
 
-    /** Every declared tag name, activity tags first. */
+    /** Every declared tag name, in catalog order. */
     public List<String> names() {
         return tags.stream().map(Tag::name).toList();
-    }
-
-    /** The declared tags of {@code kind}, in catalog order. */
-    public List<String> namesOf(Kind kind) {
-        return tags.stream().filter(t -> t.kind() == kind).map(Tag::name).toList();
     }
 
     /** The declared tag spelled like {@code name} (case-insensitively), or {@code null} if there is none. */
@@ -104,12 +61,6 @@ public record TagCatalog(List<Tag> tags) {
     /** True when {@code name} is a tag this project has. */
     public boolean isDeclared(String name) {
         return find(name) != null;
-    }
-
-    /** True when {@code name} is declared and not the user's to rename or delete. */
-    public boolean isManaged(String name) {
-        Tag tag = find(name);
-        return tag != null && tag.isManaged();
     }
 
     /**
@@ -127,10 +78,7 @@ public record TagCatalog(List<Tag> tags) {
             return "A name starting with 🗺 is a screen of the bot's map. Choose a different name.";
         }
         Tag existing = find(tag);
-        if (existing == null) return null;
-        return existing.isManaged()
-                ? "\"" + existing.name() + "\" is the tag of the activity of that name — it already exists."
-                : "There is already a tag called \"" + existing.name() + "\".";
+        return existing == null ? null : "There is already a tag called \"" + existing.name() + "\".";
     }
 
     /**

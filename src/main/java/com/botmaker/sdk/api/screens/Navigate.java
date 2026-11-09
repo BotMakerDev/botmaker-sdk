@@ -31,12 +31,10 @@ import java.util.stream.Collectors;
  * finds where the game is, then does each input on the way and waits for each screen's marker. A popup that shows is
  * closed on the way.
  *
- * <p>An activity runs on the map (2026-10-16): its body opens with {@code if (!Navigate.to(Screens.TAVERN)) return
- * Activities.Tavern.NOT_NOW;}, then does its chores by pressing the screen's own inputs, {@code
- * Navigate.press(Screens.MARKET.beerBuy, Pick.untilNone())}, never by picture chains (2026-10-17). A press walks to
- * its input's screen first, so a chore that leaves the screen walks back by the map, never by hand. When a step of the
- * activity gets stuck, the run walks back to the screen its last {@code Navigate.to} reached and runs the activity
- * once more, before the run's home.
+ * <p>A bot method run on a screen (a {@code Custom} input) does its chores by pressing the screen's own inputs,
+ * {@code Navigate.press(Screens.MARKET.beerBuy, Pick.untilNone())}, never by picture chains (2026-10-17). A press walks
+ * to its input's screen first, so a chore that leaves the screen walks back by the map, never by hand. When a step gets
+ * stuck, the run goes home and its plan picks again.
  *
  * <p>A block's screen is picked from the map ({@code ScreenEditors}); one dropped and not picked yet is {@code null},
  * which every method here reads as no screen.
@@ -62,18 +60,12 @@ public final class Navigate {
                     + " is not in the bot's screen map.");
             return false;
         }
-        // Forgotten while walking: a walk that gets stuck is no step to walk back from to where it set out.
-        ScreenMaps.reached(null);
         String from = ScreenMaps.lastSeen();
         ScreenWalk walk = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, constant -> tell(map, constant));
         ScreenWalk.Result walked = walk.uncovering().doing(DoneRecords.run()).go(target.get(), from);
         if (walked.at() == null) ScreenMaps.lost();
         else ScreenMaps.seen(walked.at());
-        if (walked.arrived()) {
-            // Where the activity walks back to when one of its steps gets stuck.
-            ScreenMaps.reached(target.get());
-            return true;
-        }
+        if (walked.arrived()) return true;
         // Said here, at the bot's line that walked, at its outcome's level; the recovery from a throw says only itself.
         Map<String, String> move = move(map, from, target.get(), walked.at());
         switch (walked.outcome().level()) {

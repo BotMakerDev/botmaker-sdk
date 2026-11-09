@@ -3,9 +3,10 @@
 The **BotMaker SDK** is one jar with two jobs:
 
 - **the runtime** a bot compiles against — find a picture on the screen, read text, click, type, wait, and
-  walk a flow of activities;
-- **plugin #1** of [BotMaker Studio](https://github.com/BotMakerDev/botmaker-studio) — the Activity Flow
-  canvas, the picture tools, the capture source and launch target, the run overlay and the Remote Pilot.
+  run a plan: walk the game's screens and press what serves the goals that matter most;
+- **plugin #1** of [BotMaker Studio](https://github.com/BotMakerDev/botmaker-studio) — the 🗺 Screens map,
+  the 🎯 Goals window, the picture tools, the capture source and launch target, the run overlay and the Remote
+  Pilot.
 
 Studio bundles no plugin and never depends on this jar. A project that declares the SDK in its `pom.xml`
 gets both halves: its bot runs on the first, and Studio loads the second from that project's classpath.
@@ -39,23 +40,25 @@ and a direct entry wins by Maven's nearest-wins rule at a version the SDK was no
 
 ```java
 public static void main(String[] args) {
-    // walk the flow the bot's @Params pick, with the home, setup and capture source read off Sdk.java
-    Bot.runFlow(Sdk.class);
+    // run the plan the bot's plan parameter picks, with the home, setup and capture source read off Sdk.java
+    Bot.run(Sdk.class);
 }
 
-public static Activities.Collect body() {           // one activity: do one unit of work, report an outcome
-    if (!ImageClicker.click(Pictures.COLLECT)) {
-        return Activities.Collect.NOTHING_LEFT;
-    }
-    Wait.between(Duration.ofMillis(600), Duration.ofMillis(1200));
-    return Activities.Collect.NEXT;
-}
+// Goals.java: what the bot wants, each a check
+public static final Goal CLAIMED_TODAY = Goal.done(() -> Screens.HOME.claim).since(Reset.daily(LocalTime.of(5, 0)));
+
+// Plans.java: tiers of goals, the first tier first
+public static final Plan DAILY = Plan.of(Plan.tier(Goals.CLAIMED_TODAY), Plan.tier(Goals.ENOUGH_GOLD));
+
+// Screens.java: on the screen where it is pressed, the action that serves a goal
+public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY);
 ```
 
 | Package (`com.botmaker.sdk.api.*`) | What it holds |
 |---|---|
-| `bot` | `Bot.runFlow`, `Bot.stop`; `BotSettings`; `PopupGuard`; `ActivitySwitch`; the `@SdkValue` marker |
-| `flow` | `Flow` — which activity starts, which method each runs, where each outcome leads, how the bot gets home |
+| `bot` | `Bot.run`, `Bot.stop`; `Run` (the home and the setup); `BotSettings`; `PopupGuard`; the `@SdkValue` marker |
+| `screens` | the map: `Screen`, `Button`, `Way`, `Readout`, `Do` (an action and the goal it serves), `Custom` (a bot method run on a screen), `Navigate` |
+| `plan` | `Goal`, `Need`, `Plan` (tiers of goals), `Reset` (when a daily comes due again) |
 | `vision` | `ImageFinder`, `ImageClicker`, `ImageWaiter` over `ImageTemplate` pictures (OpenCV matching); `ColorMatch`, `Pixel` |
 | `text` | `Text` — OCR (Tesseract): read, find, wait for text on screen |
 | `input` | `Mouse`, `Keyboard`, `Key`, `Combo` |
@@ -67,25 +70,26 @@ A bot's facts are Java in its own project:
 The SDK's files are in the bot's `plugins/com_github_botmakerdev/botmaker_sdk/` (its coordinate; `plugins/sdk/`
 before 2026-10-27, still found):
 
-- **activities** are `public static` methods, each returning a constant of its own enum in
-  `Activities.java` — a body cannot report another activity's outcome;
-- **the flow, capture source and settings** are `@SdkValue` methods in `Sdk.java`, each
+- **screens** are classes in `Screens.java`, their buttons, readouts and `Do` actions fields of them;
+- **goals** are constants in `Goals.java`, **plans** constants in `Plans.java`;
+- **the run, capture source and settings** are `@SdkValue` methods in `Sdk.java`, each
   `public static T id() { return <expr>; }`; the plugin hands Studio a value and Studio rewrites only that
   expression, so comments and helpers around it survive;
 - **pictures** are constants in `Pictures.java`, one per file under `src/main/resources/images`;
-- **parameters** are `@Param` static fields (the annotation is the plugin contract's, which the SDK brings).
-  The run's own three — `flow`, `doSetup`, `skip` in `Sdk.java` — also carry `@SdkValue(…)`: the SDK declared
-  them, so Studio writes one back if it goes missing and lets the runner change only its value.
+- **parameters** are methods of `@Param` groups in the bot's `params` package (the annotation is the plugin
+  contract's, which the SDK brings). The run's own two — `plan` and `doSetup`, in
+  `params/com_github_botmakerdev/botmaker_sdk/Running.java` — also carry `@SdkValue(…)`: the SDK declared them,
+  so Studio writes one back if it goes missing.
 
-The canvas and the code are joined by method reference (`Collect::body`), so a renamed or deleted activity is
-a compile error, never a card that silently does nothing.
+The map and the code are joined by method reference (`Custom.of(MyBot::solvePuzzle)`), so a renamed or deleted
+method is a compile error, never a button that silently does nothing.
 
 ## Plugin #1: what it adds to Studio
 
 | Toolbar | What it does |
 |---|---|
-| 🔀 **Activity Flow** | the activity cards and the arrows between their outcomes — `Sdk.flow()` and `Activities.java` |
-| ✂ **Capture Templates** | draw regions over the game and save them as pictures |
+| 🗺 **Screens** | the game's screens, their buttons and the ways between them, live over the game — `Screens.java` |
+| 🎯 **Goals** | the plans' tiers, each goal and the actions that serve it — `Goals.java` and `Plans.java` |
 | 🖼 **Manage Pictures** | rename, retag, replace, delete, import and export pictures; a rename moves every use |
 | the game button | which game this bot plays on this computer — from Steam, Heroic, Faugus, Lutris, Waydroid or the app menu — and start it without running the bot |
 | 📋 **Project Setup** | what the project still needs before it can run: something to launch, something to capture, the pictures |
@@ -95,7 +99,7 @@ a compile error, never a card that silently does nothing.
 | ⌖ **Point bot here**, ✂ **Picture of this** | on the overlay editor's row: make the window under the overlay the capture source, or cut a picture out of it |
 
 It also declares the editors for its own types (pictures, points, regions, keys, colours by eyedropper, OCR
-options), the run overlay (the current activity and the last match, over the game), tools for Studio's
+options), the run overlay (the goal being served and the last match, over the game), tools for Studio's
 overlay editor and Assistant, and ▶ Try (`Bot.trial`), which runs one statement against the screen as it is.
 
 The native work underneath — windows, input, emulators and adb, installed-game discovery, game VMs — is

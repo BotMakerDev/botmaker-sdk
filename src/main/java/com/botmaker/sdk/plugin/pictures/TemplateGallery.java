@@ -83,7 +83,7 @@ public final class TemplateGallery extends HBox {
     private static final double BAND_THRESHOLD = 4;
 
     /**
-     * The project's host services: the picture folder, and the flow whose activities are half the tag rail.
+     * The project's host services: the picture folder, and the bot's tags and screens the rail lists.
      */
     private final StudioServices services;
     private final Path resourcesDir;
@@ -692,7 +692,7 @@ public final class TemplateGallery extends HBox {
         setSelection(next);
     }
 
-    /** A rail row: a heading, or a tag with its count and — for an activity tag — where it comes from. */
+    /** A rail row: a heading, or a tag with its count. */
     private static final class RailCell extends ListCell<TemplateGalleryModel.Row> {
         @Override protected void updateItem(TemplateGalleryModel.Row item, boolean isEmpty) {
             super.updateItem(item, isEmpty);

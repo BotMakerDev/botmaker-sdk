@@ -110,13 +110,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `Readiness` says from that and its traits whether it may be done; an unknown never holds one back. A run's
   `Navigate.to` walks `.doing(DoneRecords.run())`: on each screen it comes to, what is `.onSight()` and ready is pressed
   if it shows now, nothing waited for, and the walk looks again. The assistant's walks and ExploreMap do none.
-  `Navigate.press(Do)` presses whatever is due or not, and records it: a flow says when.
+  `Navigate.press(Do)` presses whatever is due or not, and records it: the plan says when.
 - **`api.plan`** holds what is wanted (2026-11-06): a `Goal` is a constant holding a check, `Goal.of(BooleanSupplier)`, which
   a `Condition` is, or `Goal.done(Supplier<Do>)`, optionally `.within(Duration)`, which reads the done-record
   (`Readiness.met`) and answers unknown for an action no screen holds. `Need` builds a `Condition` on a fact through
   `Params.when`, refusing a lambda or a method of no `@Param` class at once; `above` and `below` are the `not` of
-  `atMost` and `atLeast`. A `Plan` is tiers of goals. `Routine` is what a run will run, `Flow` or `Plan`; it cannot be
-  sealed, since the SDK has no module and they are in two packages. A bot's plans are the `Plans` open set
+  `atMost` and `atLeast`. A `Plan` is tiers of goals; `Plan.NONE` has none and runs nothing. A bot's plans are the `Plans` open set
   (`SdkValue.Id.PLANS`, `Plans.java` beside `Goals.java`, which holds goals only), read by name through
   `BotConstants.plan`. `Condition` also has `nor`, `nand`, `xor` and `xnor`; xor answers only once every part has.
 - **`Planner.round(PlanModel)`** chooses, walking and pressing nothing (`internal.plan`, 2026-11-06). The model is the
@@ -141,9 +140,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (another choice now replans), presses, reads the action's and its goals' facts again, and writes the done-record:
   held when the press was DONE and `.checks` holds. An input absent, disabled or not now, or a screen not reached, holds
   the action off for 5 minutes (`PlanModel.heldOff`, which the planner answers `Waiting`). Each decision is one trace
-  line carrying `plan.goal` and `plan.action` (`PlanValues`). `Bot.runFlow` runs the `routine` parameter
-  (`SdkValue.Id.ROUTINE`): a flow by `FlowWalker`, a plan by `RunGame`; while it is `Flow.NONE`, the deprecated
-  `flow` parameter's value, gone next release. The Runner's flow row lists the bot's plans below its flows.
+  line carrying `plan.goal` and `plan.action` (`PlanValues`). `Bot.run` runs the `plan` parameter
+  (`SdkValue.Id.PLAN`) by `RunGame`, and nothing when it is `Plan.NONE` or has no goals. The Runner's plan row is a
+  pick among the bot's `Plans`. Flows, `Routine` and `Bot.runFlow` were deleted outright on 2026-11-09 (the user's
+  call: no deprecated release, no `@Migrate` rule).
 - **🎯 Goals** (`plugin/plan`, 2026-11-06, layout A) shows a plan in Studio, read from the bot's Java.
   - **How Studio reads it.** `PlanTypes` declares how `Plan`, `Goal`, `Need`, `Do` and `Retry` are written.
     `ScreenMapRead.of` keeps each `Do` field of a screen as `MapScreen.actions`. Read, a value names another only
@@ -196,12 +196,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   because the host reads `HERO.name` anywhere as the input reference `BotConstants.input` makes, never as a readout.
   A result is a screen that follows another on its own: Victory and Defeat are each `.after(BATTLE)`, and
   `Navigate.next(BATTLE)` waits up to Battle's `loads` for whichever shows (`ScreenGraph.results`, one step on;
-  `followers` goes on past them), popups closed meanwhile. A body that waited on pictures by hand,
+  `followers` goes on past them), popups closed meanwhile. A method that waited on pictures by hand,
 
   ```java
-  if (!Navigate.press(Screens.HOME.battle).done()) return Activities.Battle.LOST;
-  return Navigate.next(Screens.BATTLE).filter(Screens.VICTORY::equals).isPresent()
-          ? Activities.Battle.WON : Activities.Battle.LOST;
+  if (!Navigate.press(Screens.HOME.battle).done()) return false;
+  return Navigate.next(Screens.BATTLE).filter(Screens.VICTORY::equals).isPresent();
   ```
 
   names the map's screens only. 🗺's cut form saves a zone or digits *read on this screen* as a readout of the cut's
@@ -326,22 +325,12 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   path, and a walk needing one ends MISSING, "map the button that does it". A `Navigate` walk (`uncovering()`) does that once,
   after a second look, and says so; the assistant's walks never do. A timed-out wait clicks only, through
   `PopupGuard.uncover`, which warns "an unmapped popup covered …: map it in Upkeep".
-- **Activities run on the map** (2026-10-16): a body opens with `Navigate.to(Screens.X)`, which on arrival sets
-  `ScreenMaps.reached`. `FlowWalker` clears it as each activity starts; a `BotStuckException` from the body walks back
-  there (`Navigate.to`) and runs the body once more, before the run's home. `InstalledRun.home()` is the run's home
-  method, else a walk to `ScreenGraph.home()`: the `root()` (the start screen, else the first screen reached from
-  none, popups aside), or past a start screen the one its loading ends on. Nothing leads back to a start screen.
-- **An activity names its screen** (2026-10-22): `Flow.activity(Tavern.class, Tavern::body).on(Screens.TAVERN)`
-  (`Flow.Step.screen`, written by `FlowTypes` as a wither). A stuck body walks back there rather than to the screen
-  it last reached (`FlowWalker.backTo`). `plugin/flow/ActivityScreens` reads which activity works where off the
-  flows: 🗺 shows a `⚙ Tavern` pill on that card, and the input picker in `Tavern::body` (the slot's
-  `enclosingMethodSource`) offers TAVERN first.
-- **Record into <activity>** (2026-10-22): Live's ⏺ menu picks an activity of the flows; then a click or drag on a
-  known input appends `Navigate.press(Screens.X.field);` (a hotkey's key too, a field the body types into
-  `Navigate.type(field, "<asked>")`), and 🧭 Go here, once arrived, `Navigate.to(Screens.X);`. `BodyRecorder`
-  names each call as a typed `Ref` and each argument as a `PluginValues.Argument.member` of `SCREEN_MAP`; the host
-  writes the line before the body's closing `return` (`PluginValues.appendCall`, contract 0.11.0). *Record: A ·
-  input → B* stays the map's: it writes a way in, not the body.
+- **A run recovers through its home**: a `BotStuckException` from a press or a `Custom` method ends the round, the
+  run goes home and the plan picks again. `InstalledRun.home()` is the run's home method, else a walk to
+  `ScreenGraph.home()`: the `root()` (the start screen, else the first screen reached from none, popups aside), or
+  past a start screen the one its loading ends on. Nothing leads back to a start screen. (Activities, their screen
+  pills on 🗺 and Live's *Record into* went with flows on 2026-11-09.) *Record: A · input → B* stays the map's: it
+  writes a way in.
 - **`Reach`** is what acts: `RunReach` for a run (the bot's capture, confidence and click spread),
   `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
   Duration)`, `keys(Combo)`, a field's `type(text, clears, submits)` and a drag's `drag(from, dropOn(…), time)`
@@ -427,8 +416,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   in and out and fades the rest. Only opacity and order change, nothing is routed again. **⇄ All links** draws every
   way full, remembered per computer.
 - **Undo** is Studio's own, through the contract's `StudioServices.history()`: each hand edit, move and Tidy is one
-  `History.batch` step beside the user's code edits. ↶/↷ and Ctrl+Z/Ctrl+Y (`plugin/HistoryKeys`, shared with the
-  Activity Flow) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
+  `History.batch` step beside the user's code edits. ↶/↷ and Ctrl+Z/Ctrl+Y (`plugin/HistoryKeys`) walk that history, and the assistant's MCP `undo`/`redo` walk it too. Nothing in the window
   keeps an undo of its own.
 - **`PictureView`** is one window beside the map: an input's picture at whole-pixel zoom, never blurred, with
   "← <screen>" back to its screen's board, or a tree's drawing big. A screen's shot is shown big on the board.

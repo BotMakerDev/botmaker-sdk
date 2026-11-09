@@ -12,8 +12,8 @@ import java.util.stream.Stream;
 
 /**
  * The pictures of each screen of the bot's map, read off its {@code Screens} class rather than stored (the user's
- * call, 2026-10-14): a screen's group is the pictures its marker and its inputs name. Like an activity's tag it is
- * nobody's to edit here; a picture used on two screens is under both, and a renamed picture follows its constant.
+ * call, 2026-10-14): a screen's group is the pictures its marker and its inputs name. It is nobody's to edit
+ * here; a picture used on two screens is under both, and a renamed picture follows its constant.
  */
 final class ScreenGroups {
 

@@ -23,12 +23,7 @@ import java.util.Map;
  * The one place the project's tags are edited — "declared, not invented" needs somewhere the declaring
  * happens, and this is it.
  *
- * <p>It shows both kinds together because the useful question is "what can I file a template under", and the
- * answer is one list. What differs is what may be done to a row: a <b>custom</b> tag is the user's, so it can
- * be renamed or deleted here; an <b>activity</b> tag is a rendering of the bot's flow and has no
- * independent existence, so it is shown with its origin and both buttons refuse it. Renaming one means
- * renaming the activity, which is the flow editor's job — offering it here would be offering an edit that
- * either lies (the tag comes back on reload) or reaches across into a different model.
+ * <p>Every tag is the user's, so each can be renamed or deleted here.
  *
  * <p>Deleting a custom tag also strips it from every template that carried it: the alternative leaves
  * assignments nobody can see, which come back to life the day someone declares the same name again.
@@ -59,9 +54,7 @@ public final class TagManagerDialog {
                 }
                 int count = countFor(item.name());
                 String suffix = count == 1 ? " · 1 template" : " · " + count + " templates";
-                setText(item.isManaged()
-                        ? item.name() + suffix + "   (activity)"
-                        : item.name() + suffix);
+                setText(item.name() + suffix);
             }
         });
 
@@ -79,8 +72,7 @@ public final class TagManagerDialog {
         HBox buttons = new HBox(8, create, rename, delete, spacer, close);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
-        Label hint = new Label("Every activity has a tag of its own, created and removed with the activity. "
-                + "Custom tags are yours.");
+        Label hint = new Label("Tags group pictures the map's screens do not: home, popups. They are yours.");
         hint.setWrapText(true);
 
         VBox root = new VBox(10, hint, list, status, buttons);
@@ -120,10 +112,6 @@ public final class TagManagerDialog {
             status.setText("Select a tag to rename.");
             return;
         }
-        if (tag.isManaged()) {
-            status.setText("\"" + tag.name() + "\" follows its activity — rename the activity to rename it.");
-            return;
-        }
         TagPicker.promptRenameTag(services, stage, tag.name()).ifPresent(renamed -> {
             changed(PictureTags.rename(services, tag.name(), renamed).orElse("Renamed to \"" + renamed + "\"."));
         });
@@ -133,10 +121,6 @@ public final class TagManagerDialog {
         TagCatalog.Tag tag = list.getSelectionModel().getSelectedItem();
         if (tag == null) {
             status.setText("Select a tag to delete.");
-            return;
-        }
-        if (tag.isManaged()) {
-            status.setText("\"" + tag.name() + "\" belongs to its activity — delete the activity to remove it.");
             return;
         }
         int count = countFor(tag.name());

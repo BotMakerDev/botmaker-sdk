@@ -62,11 +62,10 @@ class ScreenGroupsTest {
         byTag.put(TemplateManifest.ALL, List.of(HOME, ORE));
         byTag.put("Campaign", List.of(ORE));
         byTag.put("🗺 Campaign", List.of(HOME));
-        TagCatalog catalog = TagCatalog.of(List.of("Collect"), List.of("Campaign"));
+        TagCatalog catalog = TagCatalog.of(List.of("Campaign"));
 
         List<TemplateGalleryModel.Row> rows = TemplateGalleryModel.rows(byTag, catalog, List.of("🗺 Campaign"));
         assertEquals(List.of(new TemplateGalleryModel.TagRow(TemplateManifest.ALL, 2, false),
-                new TemplateGalleryModel.Heading("Activities"), new TemplateGalleryModel.TagRow("Collect", 0, true),
                 new TemplateGalleryModel.Heading("Screens"), new TemplateGalleryModel.TagRow("🗺 Campaign", 1, true),
                 new TemplateGalleryModel.Heading("Custom"), new TemplateGalleryModel.TagRow("Campaign", 1, false)),
                 rows, "an older bot's screen tag stays a custom tag beside the map's group");

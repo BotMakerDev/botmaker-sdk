@@ -205,7 +205,7 @@ public final class ParamGroups {
         return found.stream().filter(group -> group.isAnnotationPresent(Param.class)).toList();
     }
 
-    /** A holder constant's class name, {@code FLOW_LAYOUT} as {@code FlowLayout}. */
+    /** A holder constant's class name, {@code SCREEN_MAP} as {@code ScreenMap}. */
     private static String className(SdkValue.Holder holder) {
         StringBuilder out = new StringBuilder();
         for (String part : holder.name().split("_")) {

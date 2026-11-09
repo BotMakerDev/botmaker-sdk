@@ -95,8 +95,7 @@ public final class TemplateNaming {
      * The naming step for a single freshly captured picture: a thumbnail of {@code preview} so the user sees
      * what they are naming, the name field, and the tag picker.
      *
-     * <p>{@code suggestedTag} is preselected when the project declares it (the open activity's tag,
-     * normally); it is a selection over declared tags, never a new one. ARGB (ellipse/object) crops preview
+     * <p>{@code suggestedTag} is preselected when the project declares it; it is a selection over declared tags, never a new one. ARGB (ellipse/object) crops preview
      * with their transparency.
      *
      * <p>Only ever reached for a <em>new</em> picture: renaming is inline in the resource manager, under the
@@ -164,8 +163,7 @@ public final class TemplateNaming {
      * Shows the modal naming dialog for {@code crops} and returns the kept, named pictures (empty if the user
      * cancelled or discarded them all). Must be called on the FX thread.
      *
-     * <p>{@code suggestedTag} seeds every row's tags — the open activity's tag when the capture started from
-     * one, since that is the grouping the user would otherwise choose by hand. It is only a default: each
+     * <p>{@code suggestedTag} seeds every row's tags. It is only a default: each
      * row's picker can be changed, and the "Tag them all" control at the bottom re-applies a selection across
      * every kept row for the case where the whole batch belongs together.
      */

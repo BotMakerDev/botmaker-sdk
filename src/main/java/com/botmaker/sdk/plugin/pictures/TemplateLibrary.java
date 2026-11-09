@@ -274,7 +274,7 @@ public final class TemplateLibrary {
      * are (see above). No activity tags since 2026-11-09, when flows were deleted.
      */
     public static TagCatalog tagCatalog(StudioServices services) {
-        return TagCatalog.of(List.of(), manifest(services).customTags());
+        return TagCatalog.of(manifest(services).customTags());
     }
 
     /**

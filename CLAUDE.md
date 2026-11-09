@@ -22,10 +22,11 @@ The architecture is in `docs/architecture/`, one file per section (moved there u
 | Touching | Read (`docs/architecture/`) |
 |---|---|
 | what goes in `api` vs `internal` vs `plugin`, `@Palette`, recording, renames and removals | `api-vs-internal.md` |
-| a class in `api.*` (`vision`, `text`, `bot`, `flow`, `capture`, `console.Ask`, `BotSettings`, activities/outcomes) | `what-the-api-holds.md` |
+| a class in `api.*` (`vision`, `text`, `bot`, `capture`, `console.Ask`, `BotSettings`, `Run`) | `what-the-api-holds.md` |
+| `api/plan`, `Do`, `Goals.java`/`Plans.java`, `internal/plan` (the plan run) | `screens.md` |
 | `internal/*` (`observe`, `config`, `ocr`, `trace`, …) | `internal.md` |
 | `Sdk.java`, `Pictures.java`, `SdkValues` | `plugin-values.md` |
-| `SdkPlugin`, `SdkTypes`, `FlowTypes`, `CaptureTypes`, `SdkToolbarItems` | `declaration.md` |
+| `SdkPlugin`, `SdkTypes`, `RunTypes`, `PlanTypes`, `CaptureTypes`, `SdkToolbarItems` | `declaration.md` |
 | `plugin/editors`, a slot editor, a screen pick | `editors.md` |
 | `EditorFrame`, `ScreenOverlay`, `OverlayStage`, `TemplateLibrary`, the Remote Pilot | `pixels-windows-pictures.md` |
 | an `org.opencv` type, `ImageTemplate`, matching | `opencv.md` |
@@ -100,7 +101,9 @@ static facades (`ImageFinder`, `ImageClicker`, …) are stateless dispatchers.
   `@Deprecated(forRemoval = true)` and adds its `@Migrate` rule to `plugin/Migrations` (written with `value =`,
   compiled here against the element still present); release N+1 deletes the element and its rule together. Studio
   reads the rules from the SDK's sources jar; a bot's own rule wins (`../docs/refactor/25-compatibility.md` §8).
-  Move the sample bot off the deprecated element in N, so `SampleBotCompileTest` stays green in N+1.
+  Move the sample bot off the deprecated element in N, so `SampleBotCompileTest` stays green in N+1. One
+  exception: flows (`api.flow`, `Outcome`, `ActivitySwitch`, `Routine`) were deleted outright on 2026-11-09, the
+  user's call, with no deprecated release and no rule.
 - **The palette is discovered, never listed**: `@Palette` marks what is offered, value types carry nothing.
 - **No class under `plugin/` reads or writes Java text**; an editor reads the value and hands one back.
 - **Nothing is stored outside the bot's Java (`Sdk.java`, `Pictures.java`, its private `params/`) and run properties; no reader of

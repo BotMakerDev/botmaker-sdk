@@ -36,12 +36,11 @@ import java.util.Set;
  *
  * <p><b>It is the plugin's, and the reason is that a tag is a tag <em>of a picture</em>.</b> A picture is
  * {@code ImageTemplate}'s concept and the catalog it draws is {@link TagCatalog}, read out of the bot's
- * {@code Tags} class and its activities through {@link StudioServices#pluginValues()}. The host is the only possible source of which
+ * {@code Tags} class through {@link StudioServices#pluginValues()}. The host is the only possible source of which
  * project is open; everything after that is vocabulary, and vocabulary on the contract is the back door the
  * platform exists to close.
  *
- * <p>Activity tags are listed first under their own heading, custom ones after, matching the catalog's order
- * so the same two groups appear here, in the gallery and in the tag manager. Ticking does not close the menu
+ * <p>Tags are listed in the catalog's order, as in the gallery and the tag manager. Ticking does not close the menu
  * ({@code hideOnClick(false)}): tagging is usually plural, and a menu that shut after each tick would make
  * three tags three trips.
  */
@@ -81,32 +80,12 @@ public class TagPicker extends MenuButton {
 
     private void rebuild() {
         getItems().clear();
-        List<String> activityTags = catalog.namesOf(TagCatalog.Kind.ACTIVITY);
-        List<String> customTags = catalog.namesOf(TagCatalog.Kind.CUSTOM);
-
-        if (!activityTags.isEmpty()) {
-            getItems().add(heading("Activities"));
-            activityTags.forEach(tag -> getItems().add(tagItem(tag)));
-        }
-        if (!customTags.isEmpty()) {
-            if (!activityTags.isEmpty()) getItems().add(new SeparatorMenuItem());
-            getItems().add(heading("Custom"));
-            customTags.forEach(tag -> getItems().add(tagItem(tag)));
-        }
+        catalog.names().forEach(tag -> getItems().add(tagItem(tag)));
         if (!getItems().isEmpty()) getItems().add(new SeparatorMenuItem());
 
         MenuItem create = new MenuItem("New tag…");
         create.setOnAction(e -> createTag());
         getItems().add(create);
-    }
-
-    /** A non-clickable group label, so the two kinds of tag read as two groups without nesting them. */
-    private static MenuItem heading(String text) {
-        Label label = new Label(text);
-        label.getStyleClass().add("tag-picklist-heading");
-        CustomMenuItem item = new CustomMenuItem(label, false);
-        item.setDisable(true);
-        return item;
     }
 
     /**
@@ -150,8 +129,7 @@ public class TagPicker extends MenuButton {
 
     /**
      * Asks for a new custom tag name. Shared with the tag manager and the parameters screen so "what may a tag
-     * be called" has one answer: non-blank, not one of the computed buckets, and not already declared —
-     * including by an activity, whose tag is the activity's to name.
+     * be called" has one answer: non-blank, not one of the computed buckets, and not already declared.
      *
      * <p><b>It says why inline, as you type.</b> The refusal used to be a second window on top of this one,
      * arriving after Create and taking the typed name away with it — so learning that a category already
@@ -226,6 +204,6 @@ public class TagPicker extends MenuButton {
      */
     private static TagCatalog catalogOf(StudioServices services) {
         Path resources = services == null ? null : services.resourcesDir();
-        return resources == null ? TagCatalog.of(List.of(), List.of()) : TemplateLibrary.tagCatalog(services);
+        return resources == null ? TagCatalog.empty() : TemplateLibrary.tagCatalog(services);
     }
 }

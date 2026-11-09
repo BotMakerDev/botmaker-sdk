@@ -7,11 +7,11 @@ package com.botmaker.sdk.api.screens;
 public enum Reached {
     /** Every input on it tried: Discovery is done with it. */
     SURVEYED,
-    /** Its activity is written. */
+    /** Its actions are written. */
     BUILT,
-    /** Its activity passed its trial. */
+    /** Its actions passed their trial. */
     TRIED,
-    /** Its activity is as fast as it gets. */
+    /** Its actions are as fast as they get. */
     TUNED,
     /** It cannot be opened on this account yet: it waits for its unlock. */
     LOCKED

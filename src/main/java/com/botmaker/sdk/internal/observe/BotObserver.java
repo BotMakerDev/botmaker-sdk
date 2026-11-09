@@ -21,9 +21,6 @@ public interface BotObserver {
     /** The interaction layer performed a drag/swipe — reported once, when the gesture is complete. */
     default void onSwipe(SwipeEvent event) {}
 
-    /** The flow entered the activity labelled {@code label}. */
-    default void onActivity(String label) {}
-
     /** The game shows the screen {@code constant} of the bot's map, which the game calls {@code name}. */
     default void onScreen(String constant, String name) {}
 }

@@ -32,7 +32,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - `BotSettings.maxRetryAttempts` is gone, and so is the watchdog's per-activity counter: a stuck run recovers
     through the home and the plan picks again.
   - Live's *⏺ Record into…*, the screen cards' ⚙ activity pills, the overlay's activity targets and pictures' activity
-    tags are gone with activities.
+    tags are gone with activities. 🖼 Manage Pictures, its tag picker and the assistant's list_tags show custom tags
+    only; every tag can be renamed and deleted. A stuck step no longer walks back to the screen its last
+    `Navigate.to` reached: the run goes home.
   - The assistant's `edit_flow` is gone; setup's `set_run_method` sets the run's home or setup. The guide's Build and
     Trial stages speak of actions and the plan.
 - **Light effects and action cost** (2026-11-09).

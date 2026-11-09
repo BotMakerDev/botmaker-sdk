@@ -17,13 +17,13 @@ import java.util.TreeSet;
  *
  * <p><b>Why not folders.</b> A template's identity is the path its {@code Pictures} constant holds
  * ({@code new ImageTemplate("src/main/resources/images/accept.png")}), so moving one into a folder rewrites
- * the bot's source. Worse, a template shared by two activities would have to live in one folder or be
+ * the bot's source. Worse, a template shared by two groups would have to live in one folder or be
  * duplicated into both — and duplicates drift. Tags are many-to-one by construction: the file never moves,
  * {@link TemplateLibrary#pathForName} never changes, and a shared template simply carries both tags. The
  * gallery's rail lists the tags, so it still <em>reads</em> like folders.
  *
- * <p><b>Assignments here, the catalog elsewhere.</b> A picture's tags are its custom tags' words and its
- * activities' labels together; {@link TagCatalog} says which of them exist, and an assignment naming a tag the
+ * <p><b>Assignments here, the catalog elsewhere.</b> A picture's tags are its custom tags' words;
+ * {@link TagCatalog} says which of them exist, and an assignment naming a tag the
  * catalog doesn't declare is inert rather than an error.
  *
  * <p>Immutable. Names are matched case-insensitively, the same way {@link TemplateLibrary#exists} treats template
@@ -104,11 +104,11 @@ public record TemplateManifest(Map<String, SortedSet<String>> tagsByTemplate, So
 
     /**
      * The grouping the UI renders: {@link #ALL} first, then every tag {@code catalog} declares — in its
-     * order, activity tags before custom ones — and finally {@link #UNTAGGED}.
+     * order — and finally {@link #UNTAGGED}.
      *
      * <p>A declared tag is listed <b>even when empty</b>, because the point of declaring is that the tag is there
      * to file things under. An assignment to an <b>undeclared</b> tag is ignored — it does not create a row, and a
-     * template carrying nothing else counts as untagged — so a deleted activity cannot leave a ghost group behind,
+     * template carrying nothing else counts as untagged — so a deleted tag cannot leave a ghost group behind,
      * and its templates surface where someone will find them again.
      */
     public Map<String, List<String>> byTag(Collection<String> allTemplateNames, TagCatalog catalog) {

@@ -3,6 +3,7 @@ package com.botmaker.sdk.internal.observe;
 import com.botmaker.plugin.api.run.RunChannel;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,7 +91,7 @@ class IpcObserverTest {
 
     @Test
     void aStepRoundTrips() throws Exception {
-        new IpcObserver().onActivity("Collect");
-        assertEquals(new RunEvent.Step("Collect", "", -1), read(0));
+        new IpcObserver().onScreen("HOME", "Home");
+        assertEquals(new RunEvent.Step("", ScreenStep.action("HOME", "Home"), -1), read(0));
     }
 }

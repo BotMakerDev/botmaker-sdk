@@ -19,9 +19,8 @@ import java.util.Optional;
 /**
  * The assistant's picture tags, each edit the one 🖼 Manage Pictures and its tag manager make: a picture tagged,
  * untagged or given its whole set (edit_pictures' tag, untag and set_tags), a custom tag declared, renamed or deleted
- * (edit_tags). A tag is offered from the project's catalog and nothing else — an activity's own tag and the custom
- * ones — so a typo is refused with the names there are rather than becoming a group. An activity's tag follows its
- * activity: it is not renamed or deleted here.
+ * (edit_tags). A tag is offered from the project's catalog and nothing else, so a typo is refused with the names there
+ * are rather than becoming a group.
  */
 final class TagTools {
 
@@ -29,7 +28,7 @@ final class TagTools {
     sealed interface Edit {
     }
 
-    @Describe("declare a custom tag, for grouping pictures no activity owns (home, popups)")
+    @Describe("declare a custom tag, for grouping pictures no screen owns (home, popups)")
     record Declare(@Describe("the tag: a label, spaces allowed; rename and delete take a custom one, as list_tags "
             + "names it") String tag) implements Edit {
     }
@@ -44,7 +43,7 @@ final class TagTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             AssistantTool.named("list_tags")
-                    .describedAs("The project's picture tags, an activity's own first, then the custom ones, each "
+                    .describedAs("The project's custom picture tags, each "
                             + "with the pictures it groups, then the untagged pictures")
                     .takesNothing().handledBy(TagTools::listTags),
             ToolTiming.actions("edit_tags", "Declares, renames or deletes a custom picture tag, as 🖼 Manage "
@@ -68,10 +67,9 @@ final class TagTools {
         Map<String, List<Path>> grouped = FxCall.call(() -> TemplateLibrary.listByTag(services));
         List<String> lines = new ArrayList<>();
         for (TagCatalog.Tag tag : catalog.tags()) {
-            lines.add(tag.name() + (tag.isManaged() ? " (activity)" : "") + ": "
-                    + names(grouped.getOrDefault(tag.name(), List.of())));
+            lines.add(tag.name() + ": " + names(grouped.getOrDefault(tag.name(), List.of())));
         }
-        if (lines.isEmpty()) lines.add("No tags yet: edit_tags' declare makes one, and each activity has its own.");
+        if (lines.isEmpty()) lines.add("No tags yet: edit_tags' declare makes one.");
         List<Path> untagged = grouped.getOrDefault(TemplateManifest.UNTAGGED, List.of());
         if (!untagged.isEmpty()) lines.add("untagged: " + names(untagged));
         return AgentReply.text(String.join("\n", lines));
@@ -138,9 +136,6 @@ final class TagTools {
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         TagCatalog.Tag tag = catalog.find(rename.tag());
         if (tag == null) return AgentReply.refused(undeclared(rename.tag(), catalog));
-        if (tag.isManaged()) {
-            return AgentReply.refused(tag.name() + " follows its activity: rename the activity to rename it.");
-        }
         String to = TemplateManifest.sanitizeTag(rename.to());
         String problem = catalog.nameProblem(to, tag.name());
         if (problem != null) return AgentReply.refused(problem);
@@ -155,9 +150,6 @@ final class TagTools {
         TagCatalog catalog = FxCall.call(() -> TemplateLibrary.tagCatalog(context.services()));
         TagCatalog.Tag tag = catalog.find(delete.tag());
         if (tag == null) return AgentReply.refused(undeclared(delete.tag(), catalog));
-        if (tag.isManaged()) {
-            return AgentReply.refused(tag.name() + " belongs to its activity: remove the activity to remove it.");
-        }
         Optional<String> refused = FxCall.call(() -> PictureTags.delete(context.services(), tag.name()));
         if (refused.isPresent()) return AgentReply.refused(refused.get());
         return AgentReply.text("Deleted " + tag.name() + "; its pictures stay.");
