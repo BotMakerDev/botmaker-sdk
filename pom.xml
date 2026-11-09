@@ -55,7 +55,7 @@
              above; plugin-host's botmaker-java is `optional`, so it is declared below. -->
         <botmaker.pluginhost.version>0.10.2-SNAPSHOT</botmaker.pluginhost.version>
         <!-- botmaker-java version: the value grammar itself, and JDT with it. Same contract and flatten reason. -->
-        <botmaker.java.version>0.1.0-SNAPSHOT</botmaker.java.version>
+        <botmaker.java.version>0.1.1-SNAPSHOT</botmaker.java.version>
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
         <javafx.version>27</javafx.version>
