@@ -320,6 +320,19 @@ public final class SdkValues implements ValueHolder {
             .holds(String.class, "")
             .because("This is the game VM ⚙ Bot Settings runs the game in. Change it there.");
 
+    /**
+     * The game server's time zone — {@code public String gameZone()}, a zone id such as {@code Europe/Paris}, which a
+     * {@code Reset} with no zone of its own is read in (2026-11-09). A parameter, since one game's servers sit in
+     * several zones and the runner plays on one; blank for this computer's zone.
+     */
+    public static final ManagedParam<String> GAME_ZONE = ManagedValue.param(SdkValue.Id.GAME_ZONE)
+            .in(SdkValue.Holder.GAME)
+            .startsAs(SdkValues::thisComputersZone)
+            .shown("The game server's time zone, such as Europe/Paris, that its daily reset is read in; blank for"
+                    + " this computer's", Param.Visibility.PUBLIC)
+            .because("The SDK reads this parameter whenever a daily asks for the game's last reset. Type the"
+                    + " server's zone id, such as Europe/Paris, in the Runner or in Project ▸ Parameters.");
+
     private static boolean claimed;
 
     private SdkValues() {}
@@ -327,7 +340,8 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(FLOWS, PLANS, GOALS, RUN, FLOW_LAYOUT, SETTINGS, PICTURES, TAGS, ACTIVITIES, ZONES, DIGITS, TEXTS, ELEMENTS,
-                STATES, SCREEN_MAP, SCREEN, SHADES, ROUTINE, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM);
+                STATES, SCREEN_MAP, SCREEN, SHADES, ROUTINE, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, VM,
+                GAME_ZONE);
     }
 
     /** {@link #ROUTINE}'s type and first value: nothing until the runner picks a flow or a plan. */
@@ -343,6 +357,11 @@ public final class SdkValues implements ValueHolder {
     /** {@link #LAUNCH_TARGET}'s: no pick, so the first launcher this computer can launch. */
     private static LaunchChoice firstAvailable() {
         return LaunchChoice.of("");
+    }
+
+    /** {@link #GAME_ZONE}'s: blank, this computer's zone, until the runner names the server's. */
+    private static String thisComputersZone() {
+        return "";
     }
 
     /** {@link #CAPTURE}'s: the whole desktop until the game's window is picked. */

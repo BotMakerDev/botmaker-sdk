@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.plan;
 
 import com.botmaker.plugin.api.PluginState;
 import com.botmaker.sdk.api.screens.Do;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.screens.Conditions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +15,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -46,10 +48,32 @@ public final class DoneRecords {
     public record Done(Instant at, boolean held, int fails) {}
 
     private static final class Run {
-        // Read on a run's first walk; only a Do done writes it.
+        // Read on a run's first walk; only a Do done writes it. Timed in the game server's zone, which a reset with
+        // none of its own is read in.
         static final DoneRecords RECORDS = new DoneRecords(PluginState
-                .folder(Path.of(System.getProperty("user.dir", ".")), GROUP, ARTIFACT).resolve(FILE),
-                Clock.systemDefaultZone());
+                .folder(Path.of(System.getProperty("user.dir", ".")), GROUP, ARTIFACT).resolve(FILE), new GameClock());
+    }
+
+    /**
+     * The system clock in the game server's zone as the bot's parameters say it now ({@link InstalledGame#gameZone}),
+     * read on each use: records made before the parameters were installed, or kept across a second run in one JVM,
+     * still read the zone that run set.
+     */
+    private static final class GameClock extends Clock {
+        @Override
+        public ZoneId getZone() {
+            return InstalledGame.gameZone();
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.system(zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return Instant.now();
+        }
     }
 
     private final Path file;

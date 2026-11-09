@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Dailies by reset** (2026-11-09).
+  - `Reset.daily(LocalTime.of(5, 0))` is when the game starts a new day, `.in(ZoneId.of("Europe/Paris"))` when it has
+    a zone of its own. `Do.daily` takes a `Reset` (it took a `LocalTime`), and `Goal.done(…).since(reset)` is met
+    when the action held since the game's last reset: a press at 04:59 and one at 05:01 count for two days.
+    `.within(Duration)` stays for real durations; a goal takes one or the other.
+  - A reset with no zone is read in the game server's zone, the new game parameter `gameZone` (a zone id, blank for
+    this computer's). A run and the 🎯 Goals view both read it; a zone that does not exist falls back to this
+    computer's and says so. A clock change keeps the reset at its time of day.
+  - The 🎯 Goals view says a daily goal as "done since 05:00 (Europe/Paris)".
 - **Waits and deadlines** (2026-11-09).
   - A walk waits on what the game shows, never a fixed sleep: after an on-sight press, a press with nowhere to lead
     and between the copies `Pick.each` presses, it waits for the game to answer and hold still (two looks alike), up

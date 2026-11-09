@@ -1,6 +1,7 @@
 package com.botmaker.sdk.internal.plan;
 
 import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
@@ -13,7 +14,8 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 /** Whether a {@link Do} may be done now, from what its traits say and its done-record. An unknown never holds one back. */
@@ -51,7 +53,33 @@ public final class Readiness {
         if (name.isEmpty()) return Answer.UNKNOWN;
         Optional<Done> last = records.last(DoneRecords.key(name.get().screen(), name.get().field()));
         if (last.isEmpty() || !last.get().held()) return Answer.NO;
-        return Answer.of(goal.within() == null || records.clock().instant().isBefore(last.get().at().plus(goal.within())));
+        Instant now = records.clock().instant();
+        if (goal.since() != null) return Answer.of(!last.get().at().isBefore(lastReset(goal.since(), now, records.clock())));
+        return Answer.of(goal.within() == null || now.isBefore(last.get().at().plus(goal.within())));
+    }
+
+    /**
+     * The latest time {@code reset} came at or before {@code now}: its time of day on the game's calendar, in its own
+     * zone or else {@code clock}'s, the game's ({@link #zoneOf}). A time a clock change skips is moved on by the gap's
+     * length, as {@code ZonedDateTime} does: 02:30 on a day that jumps from 02:00 to 03:00 is 03:30.
+     */
+    public static Instant lastReset(Reset reset, Instant now, Clock clock) {
+        ZoneId zone = zoneOf(reset, clock);
+        LocalDate day = now.atZone(zone).toLocalDate();
+        Instant today = day.atTime(reset.at()).atZone(zone).toInstant();
+        return today.isAfter(now) ? day.minusDays(1).atTime(reset.at()).atZone(zone).toInstant() : today;
+    }
+
+    /** The first time {@code reset} comes after {@code after}: {@link #lastReset}'s next one. */
+    public static Instant nextReset(Reset reset, Instant after, Clock clock) {
+        ZoneId zone = zoneOf(reset, clock);
+        LocalDate day = lastReset(reset, after, clock).atZone(zone).toLocalDate().plusDays(1);
+        return day.atTime(reset.at()).atZone(zone).toInstant();
+    }
+
+    /** The zone {@code reset} is read in: its own, else {@code clock}'s, which a run sets to the game server's. */
+    public static ZoneId zoneOf(Reset reset, Clock clock) {
+        return reset.zone() != null ? reset.zone() : clock.getZone();
     }
 
     /** Its {@link Do#until} has not come, and its cadence, or its retry when its check last said no, lets it. */
@@ -80,10 +108,7 @@ public final class Readiness {
     private static Optional<Instant> cadence(Do action, Done done, Clock clock) {
         if (action.isOnce()) return Optional.empty();
         if (action.every() != null) return Optional.of(done.at().plus(action.every()));
-        if (action.daily() != null) {
-            ZonedDateTime sameDay = done.at().atZone(clock.getZone()).with(action.daily());
-            return Optional.of((sameDay.toInstant().isAfter(done.at()) ? sameDay : sameDay.plusDays(1)).toInstant());
-        }
+        if (action.daily() != null) return Optional.of(nextReset(action.daily(), done.at(), clock));
         return Optional.of(clock.instant());
     }
 }

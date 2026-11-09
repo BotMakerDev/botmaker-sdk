@@ -1,11 +1,13 @@
 package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.java.grammar.BotNames;
+import com.botmaker.plugin.basics.values.BasicsTypes;
 import com.botmaker.java.grammar.JavaValue;
 import com.botmaker.java.grammar.SourceNode;
 import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
@@ -15,6 +17,8 @@ import com.botmaker.sdk.internal.params.ParamCheck;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -139,5 +143,25 @@ class PlanTypesTest {
         Goal.Done goal = (Goal.Done) read(Goal.class, PLAN + "Goal.done(() -> Screens.ARENA.fight)");
         assertEquals(BotConstants.input("ARENA", "fight"), goal.action().get());
         assertEquals(goal, again(Goal.class, goal));
+    }
+
+    /** A daily by the game's reset, its zone the game's or its own, read off the bot and written back the same. */
+    @Test
+    void aResetReadsWithItsZoneAndIsWrittenBackTheSame() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(BasicsTypes.TIME),
+                List.of(PlanTypes.GOAL_DONE_SHAPE, PlanTypes.DO_SHAPE, PlanTypes.ZONE_ID, PlanTypes.RESET));
+        String time = "java.time.LocalTime.of(5, 0, 0)";
+        Goal.Done goal = (Goal.Done) grammar.read(Goal.class, SourceNode.parse(PLAN + "Goal.done(() -> Screens.ARENA.fight)"
+                + ".since(" + PLAN + "Reset.daily(" + time + ").in(java.time.ZoneId.of(\"Europe/Paris\")))").orElseThrow(),
+                NAMES).orElseThrow();
+        assertEquals(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris")), goal.since());
+        String java = grammar.write(Goal.class, goal, NAMES).orElseThrow().source();
+        assertTrue(java.contains("Reset.daily(LocalTime.of(5, 0, 0)).in(ZoneId.of(\"Europe/Paris\"))"), java);
+
+        Do action = (Do) grammar.read(Do.class, SourceNode.parse(SCREENS + "Do.press(Screens.SHOP.chest).daily(" + PLAN
+                + "Reset.daily(" + time + "))").orElseThrow(), NAMES).orElseThrow();
+        assertEquals(Reset.daily(LocalTime.of(5, 0)), action.daily(), "no zone of its own: the game's");
+        String written = grammar.write(Do.class, action, NAMES).orElseThrow().source();
+        assertTrue(written.endsWith(".daily(Reset.daily(LocalTime.of(5, 0, 0)))"), written);
     }
 }

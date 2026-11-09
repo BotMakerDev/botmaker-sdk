@@ -5,16 +5,19 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.Held;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.plugin.api.value.Ref;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Need;
 import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.params.ParamCheck.Test;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 
@@ -37,11 +40,28 @@ public final class PlanTypes implements TypeHolder {
         return List.of();
     }
 
+    // ---- a game's day ----------------------------------------------------------------------------------
+
+    /**
+     * A time zone, {@code ZoneId.of("Europe/Paris")}: what a {@link Reset} is read in. No JDK plugin declares it, and
+     * the SDK's resets are its only use. A part, edited as the call holding it is: no editor of its own.
+     */
+    public static final DeclaredCall<ZoneId> ZONE_ID = ComponentType.part(ZoneId.class)
+            .writtenAs((Ref.Of1<String, ZoneId>) ZoneId::of, ZoneId::getId);
+
+    /**
+     * {@code Reset.daily(LocalTime.of(5, 0))} and {@code .in(ZoneId)} when it has its own zone: when the game starts a
+     * new day, which {@code Do.daily} and {@code Goal.done(…).since} take.
+     */
+    public static final DeclaredCall<Reset> RESET = ComponentType.part(Reset.class)
+            .writtenAs(Reset::daily)
+            .with(Reset::in, Reset::zone);
+
     @Override
     public List<ComponentType<?>> components() {
         return List.of(PLAN_SHAPE, TIER_SHAPE, GOAL_OF_SHAPE, GOAL_DONE_SHAPE, DO_SHAPE, RETRY_AGAIN_SHAPE,
                 RETRY_LATER_SHAPE, RETRY_NEVER_SHAPE, NEED_AT_LEAST_SHAPE, NEED_AT_MOST_SHAPE, NEED_EQUAL_TO_SHAPE,
-                NEED_IS_SHAPE, NEED_ABOVE_SHAPE, NEED_BELOW_SHAPE, NEED_NOT_SHAPE);
+                NEED_IS_SHAPE, NEED_ABOVE_SHAPE, NEED_BELOW_SHAPE, NEED_NOT_SHAPE, ZONE_ID, RESET);
     }
 
     /** The parts held as something the factory or the link does not take: a condition as its text, a fact as its. */
@@ -74,7 +94,10 @@ public final class PlanTypes implements TypeHolder {
     public static final DeclaredCall<Goal.Of> GOAL_OF_SHAPE = ComponentType.part(Goal.Of.class)
             .<BooleanSupplier, Goal>writtenAs(Goal::of, Parts.CHECK.part(PlanTypes::condition));
 
-    /** {@code Goal.done(() -> Screens.ARENA.fight)} and {@code .within(Duration)} when its last time is bounded. */
+    /**
+     * {@code Goal.done(() -> Screens.ARENA.fight)}, and {@code .within(Duration)} or {@code .since(Reset)} when its last
+     * time is bounded.
+     */
     public static final DeclaredCall<Goal.Done> GOAL_DONE_SHAPE = ComponentType.part(Goal.Done.class)
             .writtenAs(Goal::done);
 

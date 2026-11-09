@@ -1,10 +1,12 @@
 package com.botmaker.sdk.plugin.plan;
 
 import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.Planner;
+import com.botmaker.sdk.internal.plan.Readiness;
 import com.botmaker.sdk.internal.plan.Round;
 import com.botmaker.sdk.internal.plan.Round.Considered;
 import com.botmaker.sdk.internal.plan.Round.Step;
@@ -193,10 +195,16 @@ public final class GoalsViewModel {
                 String action = Optional.ofNullable(done.action().get())
                         .flatMap(each -> model.actions().stream().filter(step -> step.action() == each).findFirst())
                         .map(step -> step.screen() + "." + step.field()).orElse("an action");
-                yield action + " done" + (done.within() == null ? "" : " within " + duration(done.within()));
+                yield action + " done" + (done.within() != null ? " within " + duration(done.within())
+                        : done.since() != null ? " " + since(done.since()) : "");
             }
             case Goal.Of of -> condition(of.check());
         };
+    }
+
+    /** {@code since 05:00 (Europe/Paris)}: the reset's time, in its zone or else the game's, as the run reads it. */
+    private String since(Reset reset) {
+        return "since " + AT.format(reset.at()) + " (" + Readiness.zoneOf(reset, model.clock()).getId() + ")";
     }
 
     private static String condition(Condition check) {

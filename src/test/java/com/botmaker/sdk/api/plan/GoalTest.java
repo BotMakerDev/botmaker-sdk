@@ -19,7 +19,10 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 
@@ -135,7 +138,40 @@ class GoalTest {
         assertThrows(NullPointerException.class, () -> Goal.done(() -> HOME.claim).within(null));
         assertThrows(NullPointerException.class, () -> Goal.of((BooleanSupplier) null));
         assertThrows(NullPointerException.class, () -> new Goal.Of(null), "else its check would always say yes");
-        assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ZERO, null));
+        assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ofDays(1),
+                Reset.daily(LocalTime.of(5, 0))), "a time or a reset, not both");
+        assertThrows(NullPointerException.class, () -> Goal.done(() -> HOME.claim).since(null));
+    }
+
+    /**
+     * The review focus's daily: the game resets at 05:00 in Tokyo, this computer runs on UTC. A press at 04:59 there
+     * counts for the day before; one at 05:01 for the new day, though the two are two minutes apart.
+     */
+    @Test
+    void sinceCountsFromTheGamesResetInItsZoneNotTheComputers() {
+        ZoneId tokyo = ZoneId.of("Asia/Tokyo");
+        Instant beforeReset = ZonedDateTime.of(2026, 11, 7, 4, 59, 0, 0, tokyo).toInstant();
+        Instant afterReset = beforeReset.plus(Duration.ofMinutes(2));
+        Goal.Done ownZone = Goal.done(() -> HOME.claim).since(Reset.daily(LocalTime.of(5, 0)).in(tokyo));
+        Goal.Done gameZone = Goal.done(() -> HOME.claim).since(Reset.daily(LocalTime.of(5, 0)));
+        Path file = folder.resolve("done.json");
+
+        new DoneRecords(file, Clock.fixed(beforeReset, ZoneOffset.UTC)).done(KEY, true);
+        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(beforeReset.plusSeconds(30),
+                ZoneOffset.UTC))), "the same game day");
+        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset, ZoneOffset.UTC))),
+                "pressed before 05:00 in Tokyo: the new day wants it again");
+        assertEquals(Answer.NO, Readiness.met(gameZone, MAP, new DoneRecords(file, Clock.fixed(afterReset, tokyo))),
+                "no zone of its own: the run's clock, in the game's zone, says the same");
+        assertEquals(Answer.YES, Readiness.met(gameZone, MAP, new DoneRecords(file, Clock.fixed(afterReset,
+                ZoneOffset.UTC))), "read in UTC the reset is 05:00Z, still to come: what the game zone fixes");
+
+        new DoneRecords(file, Clock.fixed(afterReset, ZoneOffset.UTC)).done(KEY, true);
+        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset.plus(
+                Duration.ofHours(23)), ZoneOffset.UTC))), "05:01 counts until the next 05:00");
+        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset.plus(
+                Duration.ofHours(24)), ZoneOffset.UTC))));
     }
 
     /** Goals loaded first, reaching Screens only when asked. */

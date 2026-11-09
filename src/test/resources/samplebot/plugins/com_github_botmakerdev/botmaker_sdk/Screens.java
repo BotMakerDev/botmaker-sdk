@@ -6,6 +6,7 @@ import samplebot.params.bot.Progress;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.params.Params;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
@@ -24,6 +25,7 @@ import com.botmaker.sdk.api.text.DigitSet;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -41,7 +43,7 @@ public final class Screens {
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
         public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY).first()
-                .daily(LocalTime.of(5, 0)).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2));
+                .daily(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris"))).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2));
         public final Do solved = Do.press(solve).needs(Goals.SHOP_OPEN)
                 .needs(Condition.of(SampleBot::shopOpen)).last().over(() -> Screens.HOME.claim).once()
                 .until(Condition.of(SampleBot::shopOpen));

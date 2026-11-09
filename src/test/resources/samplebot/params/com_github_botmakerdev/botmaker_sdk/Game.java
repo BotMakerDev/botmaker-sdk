@@ -20,4 +20,11 @@ public class Game {
     public CaptureSource captureSource() {
         return CaptureSource.desktop();
     }
+
+    @SdkValue(SdkValue.Id.GAME_ZONE)
+    @Param.Shown(description = "The game server's time zone, such as Europe/Paris, that its daily reset is read in;"
+            + " blank for this computer's")
+    public String gameZone() {
+        return "";
+    }
 }

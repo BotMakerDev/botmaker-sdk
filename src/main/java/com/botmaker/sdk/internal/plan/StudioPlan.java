@@ -37,7 +37,7 @@ public record StudioPlan(Plan plan, ScreenGraph map, Map<Goal, String> names) {
         Map<Goal, String> names = new IdentityHashMap<>();
         goals.forEach((name, goal) -> {
             Goal each = switch (goal) {
-                case Goal.Done done -> new Goal.Done(lazily(done.action(), actions), done.within());
+                case Goal.Done done -> new Goal.Done(lazily(done.action(), actions), done.within(), done.since());
                 case Goal.Of of -> of;
             };
             resolved.put(name, each);

@@ -20,7 +20,8 @@ import java.util.function.Supplier;
  * <pre>{@code
  * public static final Goal ENOUGH_GOLD   = Goal.of(Need.atLeast(Progress::gold, 100));
  * public static final Goal EVENT_DONE    = Goal.of(GameLogic::eventFinished);   // true yes, false no, a throw unknown
- * public static final Goal DAILY_CLAIMED = Goal.done(() -> Screens.MARKET.claimDaily).within(Duration.ofDays(1));
+ * public static final Goal DAILY_CLAIMED = Goal.done(() -> Screens.MARKET.claimDaily).since(Reset.daily(LocalTime.of(5, 0)));
+ * public static final Goal FOUGHT_LATELY = Goal.done(() -> Screens.ARENA.fight).within(Duration.ofHours(4));
  * }</pre>
  */
 public sealed interface Goal permits Goal.Of, Goal.Done {
@@ -38,11 +39,11 @@ public sealed interface Goal permits Goal.Of, Goal.Done {
 
     /**
      * The goal met once {@code action} was done and its check held, by whatever did it; {@link Done#within} bounds how
-     * long ago. Named by a supplier, as a screen's field read from outside it is: {@code Goals} and {@code Screens} may
-     * name each other.
+     * long ago, {@link Done#since} from which reset of the game. Named by a supplier, as a screen's field read from
+     * outside it is: {@code Goals} and {@code Screens} may name each other.
      */
     static Done done(Supplier<Do> action) {
-        return new Done(action, null);
+        return new Done(action, null, null);
     }
 
     /** {@link #of}. */
@@ -59,25 +60,35 @@ public sealed interface Goal permits Goal.Of, Goal.Done {
     }
 
     /**
-     * {@link #done}: no when its last time did not hold, or was {@code within} ago or longer; unknown for an action no
-     * screen of the map holds.
+     * {@link #done}: no when its last time did not hold, was {@code within} ago or longer, or came before the last
+     * {@code since} reset; unknown for an action no screen of the map holds.
      *
      * @param action the action, read each time it is asked
-     * @param within how long its last time counts; {@code null} for always
+     * @param within how long its last time counts; {@code null} for always, or until a reset
+     * @param since  the reset its last time counts until; {@code null} for none
      */
-    record Done(Supplier<Do> action, Duration within) implements Goal {
+    record Done(Supplier<Do> action, Duration within, Reset since) implements Goal {
 
         public Done {
             Objects.requireNonNull(action, "action");
             if (within != null && (within.isNegative() || within.isZero())) {
                 throw new IllegalArgumentException("Goal.done(…).within takes a time, not " + within + ".");
             }
+            if (within != null && since != null) {
+                throw new IllegalArgumentException("Goal.done(…) counts within a time or since a reset, not both.");
+            }
         }
 
-        /** Its last time counts for {@code time}. */
+        /** Its last time counts for {@code time}, in place of any {@link #since}: a real duration, not a day. */
         @Link
         public Done within(Duration time) {
-            return new Done(action, Objects.requireNonNull(time, "time"));
+            return new Done(action, Objects.requireNonNull(time, "time"), null);
+        }
+
+        /** Its last time counts until the game's next {@code reset}, in place of any {@link #within}: a daily. */
+        @Link
+        public Done since(Reset reset) {
+            return new Done(action, null, Objects.requireNonNull(reset, "reset"));
         }
 
         @Override

@@ -1,6 +1,7 @@
 package com.botmaker.sdk.api.screens;
 
 import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Reset;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -54,8 +55,9 @@ class DoTest {
     @Test
     void oneCadenceAtATime() {
         Do every = Do.press(click("chest")).every(Duration.ofHours(1));
-        assertEquals(LocalTime.of(5, 0), every.daily(LocalTime.of(5, 0)).daily());
-        assertNull(every.daily(LocalTime.of(5, 0)).every(), "the last one said is the one");
+        Reset five = Reset.daily(LocalTime.of(5, 0));
+        assertEquals(five, every.daily(five).daily());
+        assertNull(every.daily(five).every(), "the last one said is the one");
         assertTrue(every.once().isOnce());
         assertNull(every.once().every());
         assertFalse(every.once().every(Duration.ofHours(1)).isOnce());

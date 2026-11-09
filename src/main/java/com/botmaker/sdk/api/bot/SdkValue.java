@@ -144,7 +144,12 @@ public @interface SdkValue {
          */
         LAUNCH_TARGET,
         /** The game VM the game runs in, by name — the {@code String} parameter {@code vm}; blank for the one there is. */
-        VM
+        VM,
+        /**
+         * The game server's time zone, which a daily's reset is read in — the {@code String} parameter {@code gameZone},
+         * a zone id such as {@code Europe/Paris}; blank for this computer's.
+         */
+        GAME_ZONE
     }
 
     /**

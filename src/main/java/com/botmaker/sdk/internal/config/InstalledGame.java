@@ -9,6 +9,8 @@ import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +33,7 @@ public final class InstalledGame {
     private static volatile List<String> launchTargets = List.of();
     private static volatile String launchChoice = "";
     private static volatile String vm = "";
+    private static volatile ZoneId gameZone = ZoneId.systemDefault();
 
     private InstalledGame() {}
 
@@ -44,6 +47,7 @@ public final class InstalledGame {
         launchTargets = targets == null ? List.of() : targets;
         launchChoice = marked(SdkValue.Id.LAUNCH_TARGET, values) instanceof LaunchChoice choice ? choice.spec() : "";
         vm = marked(SdkValue.Id.VM, values) instanceof String named ? named.trim() : "";
+        gameZone = zone(marked(SdkValue.Id.GAME_ZONE, values) instanceof String named ? named : "");
         Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
                 && !(source instanceof CurrentSource) ? source : null);
     }
@@ -61,6 +65,26 @@ public final class InstalledGame {
     /** The game VM's name the bot gives, or {@code ""} for the one VM there is. */
     public static String vm() {
         return vm;
+    }
+
+    /** The game server's zone the bot's {@code gameZone} parameter names, or this computer's when it names none. */
+    public static ZoneId gameZone() {
+        return gameZone;
+    }
+
+    /**
+     * The zone {@code id} names, a {@code gameZone} parameter's value: this computer's when it is blank, or names no
+     * zone (said on the error stream each time it is read, so a typo does not silently move every daily).
+     */
+    public static ZoneId zone(String id) {
+        if (id == null || id.isBlank()) return ZoneId.systemDefault();
+        try {
+            return ZoneId.of(id.trim());
+        } catch (DateTimeException unknown) {
+            System.err.println("The game zone \"" + id + "\" is no time zone; this computer's, " + ZoneId.systemDefault()
+                    + ", is used: " + unknown.getMessage());
+            return ZoneId.systemDefault();
+        }
     }
 
     /**

@@ -2,9 +2,9 @@ package com.botmaker.sdk.api.screens;
 
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Reset;
 
 import java.time.Duration;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +16,7 @@ import java.util.function.Supplier;
  * beside the input it presses; an input that only leads to another screen needs none, the map walks it.
  *
  * <pre>{@code
- * public final Do claimChest = Do.press(chest).serves(Goals.ENOUGH_GOLD).first().daily(LocalTime.of(5, 0));
+ * public final Do claimChest = Do.press(chest).serves(Goals.ENOUGH_GOLD).first().daily(Reset.daily(LocalTime.of(5, 0)));
  * public final Do sellLoot   = Do.press(sellLootButton).serves(Goals.ENOUGH_GOLD).over(() -> Screens.ARENA.fight);
  * public final Do closeAd    = Do.press(adClose).onSight();
  * }</pre>
@@ -38,14 +38,14 @@ import java.util.function.Supplier;
  * @param over           the actions it is tried before, for a goal both serve; named lazily, as screens name each other
  * @param isOnSight      whether it is done whenever its screen shows and it is ready, whatever the goals
  * @param every          how long after it was done it may be done again; null when no such time holds it back
- * @param daily          the time of day it may be done again from; null when no such time holds it back
+ * @param daily          the game's reset it may be done again from; null when no reset holds it back
  * @param isOnce         whether it is done once for good, once its check held
  * @param until          what ends it: not done once this says yes; null when nothing does
  * @param checks         how a run knows it worked; null when only its press tells
  * @param onFail         what it does once its check says no
  */
 public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Condition> conditionNeeds, boolean isFirst,
-                 boolean isLast, List<Supplier<Do>> over, boolean isOnSight, Duration every, LocalTime daily,
+                 boolean isLast, List<Supplier<Do>> over, boolean isOnSight, Duration every, Reset daily,
                  boolean isOnce, Condition until, Condition checks, Retry onFail) {
 
     public Do {
@@ -125,11 +125,14 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
                 until, checks, onFail);
     }
 
-    /** Done again only once {@code time} of day has come since, in place of any {@link #every} or {@link #once}. */
+    /**
+     * Done again only once the game's {@code reset} has come since, in place of any {@link #every} or {@link #once}:
+     * {@code .daily(Reset.daily(LocalTime.of(5, 0)))}.
+     */
     @Link
-    public Do daily(LocalTime time) {
+    public Do daily(Reset reset) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, null,
-                Objects.requireNonNull(time, "time"), false, until, checks, onFail);
+                Objects.requireNonNull(reset, "reset"), false, until, checks, onFail);
     }
 
     /** Done once for good, in place of any {@link #every} or {@link #daily}. */

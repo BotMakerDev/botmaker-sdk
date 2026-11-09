@@ -13,6 +13,7 @@ import com.botmaker.plugin.toolkit.graph.LayeredLayout;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.PlanValues;
@@ -251,8 +252,11 @@ public final class GoalsView {
             }
             String shown = plans.containsKey(wanted) ? wanted : plans.keySet().iterator().next();
             StudioPlan plan = StudioPlan.of(plans.get(shown), goals, map);
-            DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, Clock.systemDefaultZone()))
-                    .orElseGet(DoneRecords::none);
+            // Timed in the game server's zone, as a run is, so a daily's reset reads the same here.
+            Clock clock = Clock.system(InstalledGame.zone(values.open(SdkValues.GAME_ZONE)
+                    .flatMap(ctx -> ctx.value(String.class)).orElse("")));
+            DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, clock))
+                    .orElseGet(() -> new DoneRecords(null, clock));
             List<String> names = List.copyOf(plans.keySet());
             try {
                 PlanModel model = new PlanModel(plan.plan(), plan.map(), records, null);

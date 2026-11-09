@@ -2,6 +2,7 @@ package com.botmaker.sdk.plugin.plan;
 
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
+import com.botmaker.sdk.api.plan.Reset;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
@@ -20,6 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -128,6 +131,19 @@ class GoalsViewModelTest {
         assertEquals(GoalsViewModel.Mark.LAST, cards.getFirst().rows().getLast().mark());
         assertEquals(List.of("CRYPT.digging"), cards.get(1).rows().stream().map(GoalsViewModel.Row::name).toList());
         assertEquals(List.of("ARENA.fighting"), view.round().route().stream().map(Round.Step::key).toList());
+    }
+
+    /** A daily's card says its reset and the zone it is read in: its own, else the game's the view's clock is in. */
+    @Test
+    void aDailyGoalSaysItsResetAndZone() {
+        Map<String, Map<String, Do>> actions = Map.of("HOME", Map.of("opening", press("HOME", "chest")));
+        GoalsViewModel view = view(Plan.of(Plan.tier(BotConstants.goal("GOLD"))), Map.of("GOLD", unmet()), actions);
+        Reset five = Reset.daily(LocalTime.of(5, 0));
+
+        assertEquals("an action done since 05:00 (Europe/Paris)",
+                view.fill(Goal.done(() -> null).since(five.in(ZoneId.of("Europe/Paris")))));
+        assertEquals("an action done since 05:00 (Z)", view.fill(Goal.done(() -> null).since(five)),
+                "no zone of its own: the game's, here the view's UTC clock");
     }
 
     @Test
