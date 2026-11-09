@@ -71,7 +71,7 @@ public record StudioPlan(Plan plan, ScreenGraph map, Map<Goal, String> names) {
                 action.goalNeeds().stream().map(goal -> goal(goal, goals, null)).toList(), action.conditionNeeds(),
                 action.isFirst(), action.isLast(), action.over().stream().map(over -> lazily(over, actions)).toList(),
                 action.isOnSight(), action.every(), action.daily(), action.isOnce(), action.until(), action.checks(),
-                action.onFail());
+                action.onFail(), action.takes());
     }
 
     /** The bot's goal a reference names, else the goal itself; noted by its name when {@code names} is given. */

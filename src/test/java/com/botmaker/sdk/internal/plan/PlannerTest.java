@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.key;
@@ -633,5 +634,42 @@ class PlannerTest {
         assertEquals(List.of("VAULT.far"), keys(Planner.round(model(Plan.of(Plan.tier(goal)), "CRYPT")).route()));
         assertEquals(List.of("HOME.near"), keys(Planner.round(model(Plan.of(Plan.tier(goal)), "NOWHERE")).route()),
                 "a screen not on the map is taken as home");
+    }
+
+    @Test
+    void ofTwoActionsForAGoalTheQuickerInAllComesFirst() {
+        Goal goal = unmet();
+        on("SHOP", "slow", press("slow").serves(goal).takes(Duration.ofMinutes(1)));
+        on("SHOP", "quick", press("quick").serves(goal));
+        assertEquals(List.of("SHOP.quick"), keys(round(Plan.of(Plan.tier(goal))).route()), "same walk, less to do");
+
+        Goal other = unmet();
+        on("HOME", "long", press("long").serves(other).takes(Duration.ofSeconds(30)));
+        on("ARENA", "short", press("short").serves(other));
+        assertEquals(List.of("ARENA.short"), keys(round(Plan.of(Plan.tier(other))).route()),
+                "a nine-second walk beats half a minute's work here");
+    }
+
+    @Test
+    void aTiersQuickGoalsAreMetBeforeItsSlowOnes() {
+        Goal slow = unmet();
+        Goal quick = unmet();
+        on("HOME", "fight", press("fight").serves(slow).takes(Duration.ofSeconds(20)));
+        on("HOME", "claim", press("claim").serves(quick).takes(Duration.ofSeconds(1)));
+
+        assertEquals(List.of("HOME.claim", "HOME.fight"), keys(round(Plan.of(Plan.tier(slow, quick))).route()));
+    }
+
+    @Test
+    void aGoalAssumedMetIsMetWhateverItsCheckSays() {
+        Goal goal = unmet();
+        on("SHOP", "sell", press("sell").serves(goal));
+        PlanModel model = new PlanModel(Plan.of(Plan.tier(goal)), map(), records(), "HOME", Map.of(), Set.of(goal));
+
+        Round round = Planner.round(model);
+
+        assertTrue(round.route().isEmpty() && round.tier().isEmpty(), "nothing to do: the press's effect is assumed");
+        assertEquals(Set.of(goal), model.assumedMet());
+        assertEquals(Answer.NO, model.read(goal), "its own check still says what it says");
     }
 }

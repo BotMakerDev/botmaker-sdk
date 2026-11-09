@@ -44,6 +44,8 @@ public final class PlanModel {
     private final Map<Do, Set<Do>> over = new IdentityHashMap<>();
     /** What a run found it could not do on arrival, by identity, and until when it leaves it be. */
     private final Map<Do, Instant> heldOff;
+    /** The goals counted as met by an action that held, before anything read says so. */
+    private final Set<Goal> assumedMet;
 
     /**
      * {@code at} is the screen the game shows; one the map does not hold is taken as the map's home, and so is a popup,
@@ -55,10 +57,20 @@ public final class PlanModel {
 
     /** As {@link #PlanModel(Plan, ScreenGraph, DoneRecords, String)}, each of {@code heldOff} waiting until its time. */
     public PlanModel(Plan plan, ScreenGraph map, DoneRecords records, String at, Map<Do, Instant> heldOff) {
+        this(plan, map, records, at, heldOff, Set.of());
+    }
+
+    /**
+     * As {@link #PlanModel(Plan, ScreenGraph, DoneRecords, String, Map)}, each of {@code assumedMet} met whatever its
+     * check says: a goal an action that held serves, its effect not read yet ({@link #assumedMet}).
+     */
+    public PlanModel(Plan plan, ScreenGraph map, DoneRecords records, String at, Map<Do, Instant> heldOff,
+                     Set<Goal> assumedMet) {
         this.plan = Objects.requireNonNull(plan, "plan");
         this.map = Objects.requireNonNull(map, "map");
         this.records = Objects.requireNonNull(records, "records");
         this.heldOff = new IdentityHashMap<>(heldOff);
+        this.assumedMet = Set.copyOf(assumedMet);
         boolean aPlace = at != null && map.screen(at).filter(screen -> !screen.isPopup()).isPresent();
         this.at = aPlace ? at : map.home().orElse(at);
         List<Step> all = new ArrayList<>();
@@ -116,8 +128,23 @@ public final class PlanModel {
         return records.last(step.key());
     }
 
-    /** What {@code goal} says, a done-goal from this model's map and records rather than the run's. */
+    /**
+     * The goals counted as met with nothing read to say so, the light effects of what a run pressed: each a goal an
+     * action that held serves, until a fact it reads is read again, or, for one that reads none (a bot's own method),
+     * until that action's cadence makes it due. Nothing predicts a fact. Only a run fills it; a preview of the plan (a
+     * later project) would play it forward, and Studio's Goals view, which presses nothing, leaves it empty.
+     */
+    public Set<Goal> assumedMet() {
+        return assumedMet;
+    }
+
+    /** What {@code goal} says: yes when it is {@link #assumedMet}, else as {@link #read} has it. */
     public Answer answer(Goal goal) {
+        return assumedMet.contains(goal) ? Answer.YES : read(goal);
+    }
+
+    /** What {@code goal}'s own check says, a done-goal from this model's map and records rather than the run's. */
+    public Answer read(Goal goal) {
         return switch (goal) {
             case Goal.Done done -> Conditions.answer((Condition) () -> Readiness.met(done, map, records));
             case Goal.Of of -> of.answer();

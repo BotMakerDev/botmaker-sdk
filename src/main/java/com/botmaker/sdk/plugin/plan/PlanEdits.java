@@ -105,7 +105,7 @@ public final class PlanEdits {
     static Do marked(Do action, Mark mark) {
         return new Do(action.input(), action.serves(), action.goalNeeds(), action.conditionNeeds(), mark == Mark.FIRST,
                 mark == Mark.LAST, action.over(), action.isOnSight(), action.every(), action.daily(), action.isOnce(),
-                action.until(), action.checks(), action.onFail());
+                action.until(), action.checks(), action.onFail(), action.takes());
     }
 
     /**

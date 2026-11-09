@@ -64,6 +64,16 @@ class DoTest {
     }
 
     @Test
+    void itsTimeIsKeptByEveryLinkAndBounded() {
+        Do fight = Do.press(click("fight")).takes(Duration.ofSeconds(40));
+        assertEquals(Duration.ofSeconds(40), fight.first().every(Duration.ofHours(1)).onFail(Retry.never()).takes(),
+                "each link keeps it");
+        assertNull(Do.press(click("fight")).takes(), "none unless it says");
+        assertThrows(IllegalArgumentException.class, () -> fight.takes(Duration.ofSeconds(-1)));
+        assertThrows(IllegalArgumentException.class, () -> fight.takes(Duration.ofDays(2)), "past a day is a typo");
+    }
+
+    @Test
     void overTakesSuppliers() {
         AtomicInteger asked = new AtomicInteger();
         Do fight = Do.press(click("fight"));

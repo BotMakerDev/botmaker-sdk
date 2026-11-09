@@ -47,7 +47,10 @@ public final class Planner {
      */
     public static final Duration RECHECK = Duration.ofMinutes(1);
 
-    /** Among actions of one bucket and in no {@code .over}: no sub-goal first, known first, then the least to walk. */
+    /**
+     * Among actions of one bucket and in no {@code .over}: no sub-goal first, known first, then the least time in all,
+     * the walk there and what each action {@link Do#takes}.
+     */
     private static final Comparator<Option> CHEAPEST = Comparator.comparing((Option o) -> o.before() > 0)
             .thenComparing(o -> !o.known()).thenComparingLong(Option::cost);
 
@@ -91,7 +94,7 @@ public final class Planner {
      * An action as looked at.
      *
      * @param chain  what to do for it, in order, itself last; empty when it is no choice
-     * @param cost   what walking to them costs, each from where the game is, in ms
+     * @param cost   what walking to them costs, each from where the game is, and what each {@link Do#takes}, in ms
      * @param known  whether everything it asks has answered
      * @param before how many actions come before it
      */
@@ -279,7 +282,7 @@ public final class Planner {
         // What it needs may be what opens the way; once that is done, the next round looks again.
         Optional<Long> walk = cost(model.at(), step.screen());
         if (walk.isEmpty() && before == 0) return Option.none(step, new Why.Blocked(Block.NO_WAY_THERE));
-        cost += walk.orElse(0L);
+        cost += walk.orElse(0L) + takes(action);
         addOnce(chain, step);
         Why why = before > 0 ? new Why.Needs(firstUnmet, before)
                 : action.isLast() ? new Why.LastResort()
@@ -311,7 +314,10 @@ public final class Planner {
         return action.isFirst() ? 0 : action.isLast() ? 2 : 1;
     }
 
-    /** The chains as one route: of what comes next in each, the nearest to where the last step left the game. */
+    /**
+     * The chains as one route: of what comes next in each, the quickest from where the last step left the game, its
+     * walk there and what it {@link Do#takes}; a tier's quick goals are met before its slow ones.
+     */
     private List<Step> merge(List<List<Step>> chains) {
         List<List<Step>> left = new ArrayList<>();
         for (List<Step> chain : chains) left.add(new ArrayList<>(chain));
@@ -322,7 +328,8 @@ public final class Planner {
             if (left.isEmpty()) return route;
             String from = at;
             Step next = left.stream().map(List::getFirst)
-                    .min(Comparator.comparingLong(s -> cost(from, s.screen()).orElse(Long.MAX_VALUE))).orElseThrow();
+                    .min(Comparator.comparingLong(s -> cost(from, s.screen()).map(walk -> walk + takes(s.action()))
+                            .orElse(Long.MAX_VALUE))).orElseThrow();
             route.add(next);
             at = next.screen();
             for (List<Step> chain : left) chain.removeIf(s -> s.action() == next.action());
@@ -397,6 +404,11 @@ public final class Planner {
     static boolean isOpen(Edge edge) {
         if (!Conditions.holds(edge.when())) return false;
         return edge.via() == null || ScreenWalk.walkable(edge.via()) && Readiness.canPress(edge.via()) != Answer.NO;
+    }
+
+    /** What {@code action} {@link Do#takes} once pressed, in ms: 0 when it says none. */
+    static long takes(Do action) {
+        return action.takes() == null ? 0 : action.takes().toMillis();
     }
 
     private static boolean holds(List<Step> steps, Step step) {

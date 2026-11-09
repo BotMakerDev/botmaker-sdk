@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Light effects and action cost** (2026-11-09).
+  - `Do.takes(Duration)` says how long an action keeps the game busy once pressed. The planner counts it beside the
+    walk: of two actions serving a goal the quicker in all comes first, and a tier's quick goals before its slow ones.
+  - After a press that holds, a goal the action serves counts as met until one of its facts is read again; a goal no
+    fact tells (a bot's own method) until the action comes due again. The next round moves on instead of pressing
+    the same action twice before its effect is seen. A plan never ends on an assumption: it plans again from what
+    the game says.
 - **Dailies by reset** (2026-11-09).
   - `Reset.daily(LocalTime.of(5, 0))` is when the game starts a new day, `.in(ZoneId.of("Europe/Paris"))` when it has
     a zone of its own. `Do.daily` takes a `Reset` (it took a `LocalTime`), and `Goal.done(…).since(reset)` is met

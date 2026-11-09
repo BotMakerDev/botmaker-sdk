@@ -137,6 +137,16 @@ public final class PlanRun {
     /** The plan's goals met at a round's start since the last progress. */
     private final Set<Goal> metSince = new LinkedHashSet<>();
 
+    /** The goals counted as met by an action that held, before anything read says so ({@link PlanModel#assumedMet}). */
+    private final Map<Goal, Assumed> assumed = new HashMap<>();
+
+    /**
+     * A goal counted as met: until one of {@code facts} is read at or after {@code settled}, the press plus what its
+     * action {@link Do#takes} (a reading taken mid-fight shows the game before the fight's effect), or, reading none,
+     * until {@code until}, when the action that served it comes due again.
+     */
+    private record Assumed(Instant settled, Set<Method> facts, Instant until) {}
+
     /** A press of {@code step} for {@code goal} at {@code pressed}, which came to {@code result}, its check not read since. */
     private record Unproven(Step step, Goal goal, Instant pressed, Pressed.Result result) {}
 
@@ -204,7 +214,8 @@ public final class PlanRun {
      */
     private void progressSeen(PlanModel model, String at) {
         Set<Goal> nowMet = new LinkedHashSet<>();
-        plan.tiers().forEach(tier -> tier.goals().stream().filter(goal -> model.answer(goal) == Answer.YES)
+        // What the game says: a goal only assumed met after a press is no progress.
+        plan.tiers().forEach(tier -> tier.goals().stream().filter(goal -> model.read(goal) == Answer.YES)
                 .forEach(nowMet::add));
         boolean moved = at != null && !screensSince.contains(at);
         boolean cameMet = !metSince.containsAll(nowMet);
@@ -238,8 +249,30 @@ public final class PlanRun {
     }
 
     private PlanModel model(String at) {
-        heldOff.values().removeIf(until -> !until.isAfter(records.clock().instant()));
-        return new PlanModel(plan, map, records, at, heldOff);
+        Instant now = records.clock().instant();
+        heldOff.values().removeIf(until -> !until.isAfter(now));
+        assumed.values().removeIf(held -> held.facts().isEmpty() ? !held.until().isAfter(now)
+                : held.facts().stream().anyMatch(fact -> game.readAt(fact).filter(read -> !read.isBefore(held.settled()))
+                        .isPresent()));
+        return new PlanModel(plan, map, records, at, heldOff, assumed.keySet());
+    }
+
+    /**
+     * The light effects of {@code step}, pressed at {@code pressed} and held: each goal of facts it serves counts as
+     * met until one of them is read once the action's {@link Do#takes} has passed, and each that reads none until the
+     * action comes due again. A done-goal reads the record just kept; an action due again at once, or never (done for
+     * good), leaves a goal of no fact as its check says.
+     */
+    private void assume(Step step, Instant pressed) {
+        Instant now = records.clock().instant();
+        Optional<Instant> due = Readiness.dueAt(step.action(), records.last(step.key()), records.clock());
+        Instant settled = pressed.plusMillis(Planner.takes(step.action()));
+        for (Goal goal : step.action().serves()) {
+            if (!(goal instanceof Goal.Of)) continue;
+            Set<Method> facts = FactsRead.of(goal);
+            if (facts.isEmpty() && due.filter(until -> until.isAfter(now)).isEmpty()) continue;
+            assumed.put(goal, new Assumed(settled, facts, facts.isEmpty() ? due.get() : null));
+        }
     }
 
     /**
@@ -259,6 +292,14 @@ public final class PlanRun {
         }
         idling = null;
         if (round.tier().isEmpty()) {
+            // A plan is done on what the game says, never on what a press was assumed to do: plan again from that.
+            List<Goal> doubted = assumed.keySet().stream().filter(goal -> model.read(goal) != Answer.YES).toList();
+            assumed.clear();
+            if (!doubted.isEmpty()) {
+                say("Every goal is met or waiting, " + doubted.stream().map(this::name).collect(Collectors.joining(", "))
+                        + " only as assumed after a press: planned again from what the game says.", null, null);
+                return Optional.empty();
+            }
             say("Every goal of the plan is met, and none comes due again: the plan is done.", null, null);
             return Optional.of(End.MET);
         }
@@ -483,6 +524,7 @@ public final class PlanRun {
         if (records.last(next.key()).map(DoneRecords.Done::held).orElse(false)) {
             if (result == Pressed.Result.DONE) progressed();
             countFruitless(next);
+            assume(next, pressed);
             return;
         }
         fruitless = null;
@@ -503,9 +545,10 @@ public final class PlanRun {
         Do action = next.action();
         PlanModel after = model(game.where().orElse(null));
         Optional<Goal> blind = action.serves().stream()
-                .filter(g -> g instanceof Goal.Of && FactsRead.of(g).isEmpty() && after.answer(g) != Answer.YES)
+                .filter(g -> g instanceof Goal.Of && FactsRead.of(g).isEmpty() && after.read(g) != Answer.YES)
                 .findFirst();
-        boolean anyMet = action.serves().stream().anyMatch(g -> after.answer(g) == Answer.YES);
+        // What the game says, never what an earlier press's light effect assumes.
+        boolean anyMet = action.serves().stream().anyMatch(g -> after.read(g) == Answer.YES);
         if (blind.isEmpty() || anyMet) {
             fruitless = null;
             return;

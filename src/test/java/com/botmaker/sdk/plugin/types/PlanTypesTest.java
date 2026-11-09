@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.params.ParamCheck;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -163,5 +164,20 @@ class PlanTypesTest {
         assertEquals(Reset.daily(LocalTime.of(5, 0)), action.daily(), "no zone of its own: the game's");
         String written = grammar.write(Do.class, action, NAMES).orElseThrow().source();
         assertTrue(written.endsWith(".daily(Reset.daily(LocalTime.of(5, 0, 0)))"), written);
+    }
+
+    /** What an action takes, as its author writes it by hand, read as the duration it is and written back the same. */
+    @Test
+    void anActionsTimeReadsAsWrittenByHand() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(BasicsTypes.DURATION), List.of(PlanTypes.DO_SHAPE,
+                BasicsTypes.DURATION_SECONDS, BasicsTypes.DURATION_MINUTES, BasicsTypes.DURATION_HOURS));
+        Do action = (Do) grammar.read(Do.class, SourceNode.parse(SCREENS + "Do.press(Screens.SHOP.chest)"
+                + ".every(java.time.Duration.ofHours(4)).takes(java.time.Duration.ofSeconds(40))").orElseThrow(),
+                NAMES).orElseThrow();
+        assertEquals(Duration.ofSeconds(40), action.takes());
+        assertEquals(Duration.ofHours(4), action.every());
+        Do again = (Do) grammar.read(Do.class, SourceNode.parse(grammar.write(Do.class, action, NAMES).orElseThrow()
+                .source()).orElseThrow(), NAMES).orElseThrow();
+        assertEquals(action, again);
     }
 }

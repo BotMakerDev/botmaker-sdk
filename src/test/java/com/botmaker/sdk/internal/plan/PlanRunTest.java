@@ -696,4 +696,89 @@ class PlanRunTest {
         assertTrue(game.said.contains("SHOP.bonus goes first once there; SHOP.sell after it."),
                 String.join("\n", game.said));
     }
+
+    /** A press that held counts its goal of facts met until one is read: the tier below goes on, nothing pressed twice. */
+    @Test
+    void aGoalOfFactsCountsAsMetAfterAPressUntilItsFactIsRead() throws ReflectiveOperationException {
+        Goal hero = Goal.of(Need.atLeast(Hero::level, 1_000_000));
+        AtomicBoolean tapped = new AtomicBoolean();
+        Goal below = metWhen(tapped);
+        on("ARENA", "fight", Do.press(click("fight")).serves(hero));
+        // A last resort, so it is not done on the way to the fight.
+        on("HOME", "tap", Do.press(click("tap")).serves(below).last());
+        FakeGame game = new FakeGame();
+        game.effects.put("HOME.tap", () -> tapped.set(true));
+        PlanRun run = run(Plan.of(Plan.tier(hero), Plan.tier(below)), game, records());
+
+        run.round();
+        run.round();
+        assertEquals(List.of("walk ARENA", "press ARENA.fight", "read ARENA", "walk HOME", "press HOME.tap"), game.did,
+                "the fight assumed to have done its work: the tier below next, the fight not pressed again");
+
+        run.round();
+        assertTrue(game.said.getLast().startsWith("Every goal is met or waiting, GOAL only as assumed after a press"),
+                game.said.getLast());
+        run.round();
+        assertEquals(List.of("press ARENA.fight", "read ARENA"), game.did.subList(game.did.size() - 2, game.did.size()),
+                "planned again from what the game says: not met");
+
+        // Its fact read after the press: what was read rules at once.
+        game.readAt.put(Hero.class.getMethod("level"), clock.now.plusSeconds(1));
+        clock.now = clock.now.plusSeconds(2);
+        long presses = game.did.stream().filter("press ARENA.fight"::equals).count();
+        run.round();
+        assertEquals(presses + 1, game.did.stream().filter("press ARENA.fight"::equals).count(),
+                "the reading says no: pressed again");
+    }
+
+    /** A reading taken while the action still takes its time shows the game before its effect: the goal stays met. */
+    @Test
+    void aReadingWhileTheActionTakesItsTimeEndsNoAssumption() throws ReflectiveOperationException {
+        Goal hero = Goal.of(Need.atLeast(Hero::level, 1_000_000));
+        AtomicBoolean tapped = new AtomicBoolean();
+        Goal below = metWhen(tapped);
+        on("ARENA", "fight", Do.press(click("fight")).serves(hero).takes(Duration.ofSeconds(40)));
+        on("HOME", "tap", Do.press(click("tap")).serves(below).last());
+        FakeGame game = new FakeGame();
+        game.readOn.put(Hero.class.getMethod("level"), List.of("ARENA"));
+        game.effects.put("HOME.tap", () -> tapped.set(true));
+        PlanRun run = run(Plan.of(Plan.tier(hero), Plan.tier(below)), game, records());
+
+        run.round();
+        assertTrue(game.readAt.containsKey(Hero.class.getMethod("level")), "read where the fight left the game");
+        run.round();
+        assertEquals(List.of("walk ARENA", "press ARENA.fight", "read ARENA", "walk HOME", "press HOME.tap"), game.did,
+                "read mid-fight: the fight not pressed again");
+    }
+
+    /** An action done for good leaves a goal no fact tells as its check says: nothing assumed for the rest of the run. */
+    @Test
+    void anActionDoneForGoodAssumesNothingOfAGoalOfNoFact() {
+        Goal never = metWhen(new AtomicBoolean());
+        on("HOME", "tap", Do.press(click("tap")).serves(never).once());
+        FakeGame game = new FakeGame();
+        PlanRun run = run(Plan.of(Plan.tier(never)), game, records());
+
+        run.round();
+
+        assertEquals(Optional.of(End.STUCK), run.round(), "unmet, its action done: stuck at once, not hours later");
+        assertTrue(game.said.stream().noneMatch(line -> line.contains("only as assumed")), String.join("\n", game.said));
+    }
+
+    /** A goal no fact tells, served by an action with a cadence, counts as met until the action comes due again. */
+    @Test
+    void aGoalOfNoFactCountsAsMetUntilItsActionIsDue() {
+        Goal never = metWhen(new AtomicBoolean());
+        on("HOME", "tap", Do.press(click("tap")).serves(never).every(Duration.ofHours(1)));
+        FakeGame game = new FakeGame();
+        PlanRun run = run(Plan.of(Plan.tier(never)), game, records());
+
+        run.round();
+        run.round();
+        assertTrue(game.said.getLast().startsWith("Every goal is met or waiting, GOAL only as assumed after a press"),
+                "the plan does not end on an assumption: " + game.said.getLast());
+        assertEquals(Optional.empty(), run.round(), "planned again: the tap waits for its hour");
+        assertEquals(List.of("press HOME.tap"), game.did);
+        assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled);
+    }
 }

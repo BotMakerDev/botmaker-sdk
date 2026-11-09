@@ -43,7 +43,8 @@ public final class Screens {
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).hold(Duration.ofMillis(900));
         public final Custom solve = Custom.of(SampleBot::solvePuzzle).occasional();
         public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY).first()
-                .daily(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris"))).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2));
+                .daily(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris"))).checks(Condition.of(SampleBot::shopOpen)).onFail(Retry.again(2))
+                .takes(Duration.ofSeconds(3));
         public final Do solved = Do.press(solve).needs(Goals.SHOP_OPEN)
                 .needs(Condition.of(SampleBot::shopOpen)).last().over(() -> Screens.HOME.claim).once()
                 .until(Condition.of(SampleBot::shopOpen));

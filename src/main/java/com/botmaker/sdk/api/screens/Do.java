@@ -18,6 +18,7 @@ import java.util.function.Supplier;
  * <pre>{@code
  * public final Do claimChest = Do.press(chest).serves(Goals.ENOUGH_GOLD).first().daily(Reset.daily(LocalTime.of(5, 0)));
  * public final Do sellLoot   = Do.press(sellLootButton).serves(Goals.ENOUGH_GOLD).over(() -> Screens.ARENA.fight);
+ * public final Do fight      = Do.press(fightButton).serves(Goals.LEVEL_UP).takes(Duration.ofSeconds(40));
  * public final Do closeAd    = Do.press(adClose).onSight();
  * }</pre>
  *
@@ -43,10 +44,12 @@ import java.util.function.Supplier;
  * @param until          what ends it: not done once this says yes; null when nothing does
  * @param checks         how a run knows it worked; null when only its press tells
  * @param onFail         what it does once its check says no
+ * @param takes          how long it keeps the game busy once pressed (a fight, an animation), beside the walk there;
+ *                       null when it takes no time worth counting
  */
 public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Condition> conditionNeeds, boolean isFirst,
                  boolean isLast, List<Supplier<Do>> over, boolean isOnSight, Duration every, Reset daily,
-                 boolean isOnce, Condition until, Condition checks, Retry onFail) {
+                 boolean isOnce, Condition until, Condition checks, Retry onFail, Duration takes) {
 
     public Do {
         Objects.requireNonNull(input, "A Do presses an input of its screen, declared above it.");
@@ -60,40 +63,40 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     /** The action of pressing {@code input}, a field of its screen declared above it. */
     public static Do press(Input input) {
         return new Do(input, List.of(), List.of(), List.of(), false, false, List.of(), false, null, null, false, null,
-                null, null);
+                null, null, null);
     }
 
     /** These goals too are what it is meant to meet; the planner chains only through what an action serves. */
     @Link
     public Do serves(Goal... goals) {
         return new Do(input, plus(serves, goals), goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every,
-                daily, isOnce, until, checks, onFail);
+                daily, isOnce, until, checks, onFail, takes);
     }
 
     /** These goals must be met first: an unmet one becomes a sub-goal. */
     public Do needs(Goal... goals) {
         return new Do(input, serves, plus(goalNeeds, goals), conditionNeeds, isFirst, isLast, over, isOnSight, every,
-                daily, isOnce, until, checks, onFail);
+                daily, isOnce, until, checks, onFail, takes);
     }
 
     /** These must hold first: one that says no only blocks. */
     public Do needs(Condition... conditions) {
         return new Do(input, serves, goalNeeds, plus(conditionNeeds, conditions), isFirst, isLast, over, isOnSight,
-                every, daily, isOnce, until, checks, onFail);
+                every, daily, isOnce, until, checks, onFail, takes);
     }
 
     /** Preferred among the actions serving the same goal; no more a {@link #last}. */
     @Link
     public Do first() {
         return new Do(input, serves, goalNeeds, conditionNeeds, true, false, over, isOnSight, every, daily, isOnce,
-                until, checks, onFail);
+                until, checks, onFail, takes);
     }
 
     /** The last resort among the actions serving the same goal; no more a {@link #first}. */
     @Link
     public Do last() {
         return new Do(input, serves, goalNeeds, conditionNeeds, false, true, over, isOnSight, every, daily, isOnce,
-                until, checks, onFail);
+                until, checks, onFail, takes);
     }
 
     /** Tried before these, for a goal both serve: {@code .over(() -> Screens.ARENA.fight)}. */
@@ -101,7 +104,7 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     @SafeVarargs
     public final Do over(Supplier<Do>... others) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, plus(over, others), isOnSight, every,
-                daily, isOnce, until, checks, onFail);
+                daily, isOnce, until, checks, onFail, takes);
     }
 
     /**
@@ -111,7 +114,7 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     @Link
     public Do onSight() {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, true, every, daily, isOnce,
-                until, checks, onFail);
+                until, checks, onFail, takes);
     }
 
     /** Done again only {@code time} after it was last done, in place of any {@link #daily} or {@link #once}. */
@@ -122,7 +125,7 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
             throw new IllegalArgumentException("Do.every takes a time ahead, not " + time + ".");
         }
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, time, null, false,
-                until, checks, onFail);
+                until, checks, onFail, takes);
     }
 
     /**
@@ -132,33 +135,48 @@ public record Do(Input input, List<Goal> serves, List<Goal> goalNeeds, List<Cond
     @Link
     public Do daily(Reset reset) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, null,
-                Objects.requireNonNull(reset, "reset"), false, until, checks, onFail);
+                Objects.requireNonNull(reset, "reset"), false, until, checks, onFail, takes);
     }
 
     /** Done once for good, in place of any {@link #every} or {@link #daily}. */
     @Link
     public Do once() {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, null, null, true,
-                until, checks, onFail);
+                until, checks, onFail, takes);
     }
 
     /** Not done once {@code condition} says yes: "fight until the enemy falls". */
     public Do until(Condition condition) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
-                condition, checks, onFail);
+                condition, checks, onFail, takes);
     }
 
     /** How a run knows it worked: it held unless {@code condition} says no. */
     public Do checks(Condition condition) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
-                until, condition, onFail);
+                until, condition, onFail, takes);
     }
 
     /** What it does once its check says no, in place of {@link Retry#DEFAULT}. */
     @Link
     public Do onFail(Retry retry) {
         return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
-                until, checks, retry);
+                until, checks, retry, takes);
+    }
+
+    /**
+     * How long it keeps the game busy once pressed: a fight, a chest's animation. The planner counts it beside the
+     * walk there, so of two actions serving a goal the quicker in all comes first, and a tier's quick ones before its
+     * slow ones.
+     */
+    @Link
+    public Do takes(Duration time) {
+        Objects.requireNonNull(time, "time");
+        if (time.isNegative() || time.compareTo(Duration.ofDays(1)) > 0) {
+            throw new IllegalArgumentException("Do.takes takes a length of time up to a day, not " + time + ".");
+        }
+        return new Do(input, serves, goalNeeds, conditionNeeds, isFirst, isLast, over, isOnSight, every, daily, isOnce,
+                until, checks, onFail, time);
     }
 
     private static <T> List<T> plus(List<T> had, T[] more) {
