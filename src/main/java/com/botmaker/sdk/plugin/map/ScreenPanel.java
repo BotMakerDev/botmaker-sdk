@@ -6,13 +6,11 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
-import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Hotkey;
 import com.botmaker.sdk.api.screens.ScreenVariant;
 import com.botmaker.sdk.api.screens.Shade;
-import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -20,7 +18,6 @@ import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.Markers;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
-import com.botmaker.sdk.plugin.assist.BotStates;
 import com.botmaker.sdk.plugin.assist.FxCall;
 import com.botmaker.sdk.plugin.assist.Interactions;
 import com.botmaker.sdk.plugin.assist.MapAudit;
@@ -78,7 +75,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -116,10 +112,6 @@ final class ScreenPanel {
     private ScreenGraph graph = ScreenGraph.of(Map.of());
     /** Whether {@link #show} gave the map yet: before, the empty graph is unread, not a bot without a map. */
     private boolean read;
-    /** The shades listed when no screen is picked, read off the FX thread; null until read. */
-    private Versions.Shown shades;
-    /** Whether {@link #shades} is being or was read since the panel last showed a screen or learned one. */
-    private boolean shadesAsked;
     private String selected;
     /** What the panel last drew, so a poll that changed nothing redraws nothing. */
     private Object drawn;
@@ -136,8 +128,7 @@ final class ScreenPanel {
     /** The game live on the board, and frames frozen off it. */
     private final LiveBoard live;
     private final Runnable showBoard;
-    private final BiConsumer<String, String> inputPicked;
-    /** The field of the selected screen's input picked on the board or the outline; null for none. */
+    /** The field of the selected screen's input picked on the board or in the panel; null for none. */
     private String picked;
     /** The input drawn picked: a pick restyles the board's boxes and swaps the picked input's part, nothing else. */
     private String pickedDrawn;
@@ -179,17 +170,15 @@ final class ScreenPanel {
     /**
      * @param changed     run once an action wrote the map, so the window reads it at once rather than at its next poll
      * @param showBoard   brings the Screen tab to the front
-     * @param inputPicked an input picked here, by its screen's constant and its field
      * @param liveOn      the screen the live board sees the game on, to light; null for none
      */
     ScreenPanel(StudioServices services, ScreenCanvas canvas, Supplier<Window> owner, Runnable changed,
-                Runnable showBoard, BiConsumer<String, String> inputPicked, Consumer<String> liveOn) {
+                Runnable showBoard, Consumer<String> liveOn) {
         this.services = services;
         this.canvas = canvas;
         this.owner = owner;
         this.changed = changed;
         this.showBoard = showBoard;
-        this.inputPicked = inputPicked;
         viewer = new PictureView(services, owner);
         hands = new ScreenHands(services, () -> graph, this::wrote);
         live = new LiveBoard(services, board, hands, () -> graph, this::wrote, canvas::select, liveOn,
@@ -228,6 +217,16 @@ final class ScreenPanel {
         live.close();
     }
 
+    /** The frames the latest run saved when a wait timed out, for the map's ⋯ menu; empty when none did. */
+    List<Path> missedFrames() {
+        return live.missedFrames();
+    }
+
+    /** {@code file} opened frozen on the board, {@code shows} told first the screen it shows (null: none). */
+    void openMissed(Path file, Consumer<String> shows) {
+        live.openMissed(file, shows);
+    }
+
     /** The Screen tab was left: the live board stops reading the game. */
     void boardHidden() {
         live.pause();
@@ -256,8 +255,6 @@ final class ScreenPanel {
         if (now == null || !now.equals(selected) || picked != null && graph.input(now, picked).isEmpty()) {
             picked = null;
         }
-        // Back on the map: which_screen may have seen more shades meanwhile.
-        if (now == null && selected != null) rereadShades();
         this.selected = now;
         written = now == null ? null : written(graph, now);
         stated++;
@@ -307,10 +304,9 @@ final class ScreenPanel {
                 .map(canvas::pictureTime).toList());
     }
 
-    /** A box or a panel row right-clicked: its input picked, here, on the board and in the outline. */
-    private void picked(String constant, Row row) {
+    /** A box or a panel row right-clicked: its input picked, here and on the board. */
+    private void picked(Row row) {
         pickInput(row.field());
-        inputPicked.accept(constant, row.field());
     }
 
     /**
@@ -318,7 +314,7 @@ final class ScreenPanel {
      * a click goes, a right-click picks); one it opens none of yet is picked instead.
      */
     private void go(String constant, Row row) {
-        graph.opens(constant, row.field()).ifPresentOrElse(this::showScreen, () -> picked(constant, row));
+        graph.opens(constant, row.field()).ifPresentOrElse(this::showScreen, () -> picked(row));
     }
 
     /** Whether {@code e} was a click on a button inside {@code line}, which acts on its own. */
@@ -351,8 +347,7 @@ final class ScreenPanel {
         // Everything the panel shows: that, its card, its way from the first screen, its ways in, how wide it is
         // drawn, and whether a try runs.
         Object now = selected == null
-                ? List.of(read, graph.screens().values().stream().allMatch(MapScreen::isPopup), busy,
-                        Optional.ofNullable(shades))
+                ? List.of(read, graph.screens().values().stream().allMatch(MapScreen::isPopup), busy)
                 : List.of(shown, card(selected), ScreenCards.path(graph, selected), ways(selected), width, busy);
         if (now.equals(drawn)) {
             if (Objects.equals(picked, pickedDrawn)) return;
@@ -395,7 +390,7 @@ final class ScreenPanel {
         List<String> markers = markerIds(constant);
         // The input picked when it is drawn: a pick since restyles the drawing, and a zoom draws it picked.
         board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
-                markers, strips, cuts, audit, picked, row -> go(constant, row), row -> picked(constant, row), null));
+                markers, strips, cuts, audit, picked, row -> go(constant, row), row -> picked(row), null));
         board.repick(picked);
     }
 
@@ -534,14 +529,11 @@ final class ScreenPanel {
         if (!read) return List.of(heading("Screens"), text("Reading the map…"));
         // Popups alone start no tree: the first screen is still to be cut.
         if (!graph.screens().values().stream().allMatch(MapScreen::isPopup)) {
-            List<Node> all = new ArrayList<>(List.of(heading("Screens"), text("Pick a screen to see it big, its "
-                    + "inputs, try them, cut more and go there. Solid arrows are how each screen was found; dashed "
-                    + "ones are other ways in and ways back. A screen's right-click folds what is below it. ▶▶ Next "
-                    + "untried picks the next input to try.")));
-            // Folded until opened (the user's call, 2026-11-02: open, it crowded the map's first look).
-            List<Node> shades = shades();
-            if (!shades.isEmpty()) all.add(PanelParts.of(Part.SHADES, null, shades));
-            return all;
+            // No Shades section (2026-11-09, the user's call): what which_screen learns of them stays in the bot.
+            return List.of(heading("Screens"), text("Pick a screen to see it big, its inputs, try them, cut more and "
+                    + "go there. Solid arrows are how each screen was found; dashed ones are other ways in and ways "
+                    + "back. A screen's right-click folds what is below it. ▶▶ Next untried picks the next input to "
+                    + "try."));
         }
         TextField first = new TextField();
         first.setPromptText("the first screen's name, as the game shows it");
@@ -781,7 +773,7 @@ final class ScreenPanel {
                 + graph.shown(to) + ". ").orElse("") + "Right-click: pick it, with its editors."));
         line.setOnMouseClicked(e -> {
             if (onAControl(e, line)) return;
-            if (e.getButton() == MouseButton.SECONDARY) picked(constant, row);
+            if (e.getButton() == MouseButton.SECONDARY) picked(row);
             else if (e.getButton() == MouseButton.PRIMARY) go(constant, row);
             e.consume();
         });
@@ -861,10 +853,7 @@ final class ScreenPanel {
         }
         Button leadsTo = action("Leads to…", MapGuide.LEADS_TO, () -> hands.addWay(constant, row.field()));
         leadsTo.setDisable(busy);
-        Button unpick = action("✕", "Pick no input", () -> {
-            pickInput(null);
-            inputPicked.accept(constant, null);
-        });
+        Button unpick = action("✕", "Pick no input", () -> pickInput(null));
         acts.getChildren().addAll(leadsTo, unpick);
         List<Node> all = new ArrayList<>(List.of(heading("Picked input"), row(constant, row), acts));
         all.addAll(inspector().of(constant, row));
@@ -916,7 +905,7 @@ final class ScreenPanel {
 
             @Override
             public void pick(String constant, Row row) {
-                picked(constant, row);
+                picked(row);
             }
 
             @Override
@@ -1052,13 +1041,6 @@ final class ScreenPanel {
         return menu;
     }
 
-    /** The right-click menu of {@code row}, an input of {@code constant}: its ⋯ menu's edits. */
-    ContextMenu rowMenuFor(String constant, Row row) {
-        ContextMenu menu = new ContextMenu(hands.rowMenu(constant, row).getItems().toArray(MenuItem[]::new));
-        menu.getItems().forEach(item -> item.setDisable(busy));
-        return menu;
-    }
-
     /** The right-click menu of {@code link}: its picture, and when its way is open. */
     ContextMenu linkMenu(ScreenCards.Link link) {
         ContextMenu menu = hands.linkMenu(link, () -> showLink(link));
@@ -1098,7 +1080,7 @@ final class ScreenPanel {
                 canvas::pictureSize, width, (id, side) -> canvas.thumb(id, side, "screen-row-thumb"),
                 id -> ScreenCards.rows(graph, constant).stream()
                         .filter(r -> r.input() instanceof com.botmaker.sdk.api.screens.Button && id.equals(r.picture()))
-                        .findFirst().ifPresentOrElse(r -> picked(constant, r), () -> say(id + " is in "
+                        .findFirst().ifPresentOrElse(r -> picked(r), () -> say(id + " is in "
                                 + field + " but is no button of " + graph.shown(constant) + ": crop_pictures it with "
                                 + "screen " + graph.shown(constant) + ".")))));
     }
@@ -1243,79 +1225,6 @@ final class ScreenPanel {
         drawn = null;
         draw();
         say(said);
-    }
-
-    /**
-     * *Shades the game shows* (2026-11-02, the user's pick of three): each fit which_screen saw on two buttons or more,
-     * with what it means and Learn, the hand path of {@code edit_map learn_shade}; a fit seen on one button only; and
-     * the shades learned, each with ✕. Bot-wide, as the shades are, so under the map rather than a screen.
-     */
-    private List<Node> shades() {
-        if (!shadesAsked) {
-            shadesAsked = true;
-            Thread.ofVirtual().name("screen-shades").start(() -> {
-                Versions.Shown seen;
-                try {
-                    seen = Versions.shown(services);
-                } catch (RuntimeException unread) {
-                    seen = new Versions.Shown(List.of(), List.of());
-                }
-                Versions.Shown now = seen;
-                Platform.runLater(() -> {
-                    shades = now;
-                    draw();
-                });
-            });
-        }
-        if (shades == null || shades.proposed().isEmpty() && shades.learned().isEmpty()) return List.of();
-        List<Node> all = new ArrayList<>();
-        List<ButtonState> states = shades.proposed().stream().anyMatch(Versions.Proposal::shared)
-                ? BotStates.offered(services.pluginValues()).stream().filter(s -> s != State.NORMAL).toList()
-                : List.of();
-        for (Versions.Proposal proposal : shades.proposed()) {
-            Shade shade = proposal.shade();
-            Label what = new Label(shade.kind().displayName() + " · on " + String.join(", ", proposal.pictures()));
-            if (!proposal.shared()) {
-                all.add(line(swatches(shade), what, text("seen once more on another button, it is proposed")));
-                continue;
-            }
-            ComboBox<ButtonState> meaning = new ComboBox<>(FXCollections.observableArrayList(states));
-            InputInspector.typedStates(meaning);
-            // A state the game told (a toast's words, a version that lasts) is proposed for the author to confirm.
-            meaning.setValue(proposal.asks() == null ? shade.state() : proposal.asks());
-            Button learn = action("Learn", "Every button shown " + shade.kind().displayName() + " like this means the "
-                    + "state picked, for the whole bot", () -> {
-                // A typed name no state has reads as null: said, never learned as the kind's meaning instead.
-                ButtonState picked = meaning.getValue();
-                if (picked == null || picked == State.NORMAL) {
-                    say("Pick what the shade means: no state is named " + meaning.getEditor().getText().strip() + ".");
-                    return;
-                }
-                run("Learning…", null, () -> FxCall.call(() -> {
-                    rereadShades();
-                    return Versions.learn(services, proposal.id(), picked);
-                }));
-            });
-            all.add(line(swatches(shade), what));
-            if (proposal.why() != null) all.add(text(proposal.why()));
-            all.add(line(meaning, learn));
-        }
-        for (Shade shade : shades.learned()) {
-            Button forget = action("✕", "Forget this shade: its fit is proposed again", () -> run("Forgetting…", null,
-                    () -> FxCall.call(() -> {
-                        rereadShades();
-                        return Versions.unlearn(services, shade);
-                    })));
-            all.add(line(swatches(shade), new Label(shade.kind().displayName() + " · "
-                    + BotStates.label(shade.state())), forget));
-        }
-        return all;
-    }
-
-    /** Reads the shades again on the next draw, the old list gone at once so none of its buttons acts on it. */
-    private void rereadShades() {
-        shadesAsked = false;
-        shades = null;
     }
 
     private static HBox line(Node... nodes) {

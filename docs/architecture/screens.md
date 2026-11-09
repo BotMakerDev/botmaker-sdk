@@ -34,10 +34,9 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   live one. `RunReach.rescaled` matches every picture drawn at each learned size (`ShadeFit.sizes`, `scaled`,
   `scaledAround`) in one `bestMatchesNear` call: near a match when found, which keeps a 40-button poll within 1.3×
   (`ScaledMatchTest`), and the better score wins.
-- **Shades the game shows** (2026-11-02, spec `../docs/superpowers/specs/2026-11-02-shades-panel-design.md`): the
-  map panel with no screen picked lists `Versions.shown` — proposals with a state picker and Learn
-  (`Versions.learn(services, id, meaning)`, the hand path of `learn_shade`), learned GAME shades with ✕
-  (`Versions.unlearn`) — read off the FX thread.
+- **Shades the game shows** (2026-11-02): `Versions.shown` lists proposals and learned GAME shades;
+  `Versions.learn(services, id, meaning)` is `learn_shade`'s path. The map panel no longer shows them (2026-11-09,
+  the user's call); the assistant's tools still do.
 - **Discovery deduces versions** (2026-11-02, `plugin/assist/Versions`): which_screen fits every button it finds
   against its cut (`ShadeFit.fit`). A fit off the cut (`Fit.offIdentity`) is a version of that button, unless the
   largest set of alike fits (`Fit.alike`) covers 3 buttons or more and more than half the frame's: that is a shade over
@@ -448,15 +447,11 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 the window and the assistant write `Screens.java` one way. **`HandParityTest`** lists each `MapEdits.Edit` and each
 map tool against the hand path that covers it, and fails on one with none.
 
-- **The outline** (`ScreenOutline`, its model `Outline`, apart from JavaFX): the screens as a text tree, left of the
-  `Graph | Screen` tabs (full window only). Under a screen are its inputs, under an input the screen it opens first;
-  popups and screens not reached sit in groups below. The filter keeps the lines down to a hit; Owes and Untried
-  narrow it. A click shows the screen on the Screen tab; a right-click opens the card's or the input's ⋯ menu.
-  ⊟/⊞ fold or open every line; *Inputs that open a screen* folds away each tried input no link uses
-  (`Outline.opening`); **Recent** lists the 10 screens whose shot was taken last (`Entry.recent`, by the shot
-  file's time). A start screen heads the tree, a screen that follows another on its own sits beside it, and a panel
-  says "panel of Home".
-- **The window** hides the outline (☰) or the panel (▤), remembered per computer, and ⛶/F11 makes it full screen.
+- **The bar** (2026-11-09, spec `../docs/superpowers/specs/2026-11-09-screens-rail-design.md` in the umbrella):
+  Find a screen, ▶▶ Next untried, Layout ▾, − Fit +, ▤ Panel, ⋯ and the count. Every button keeps its width; only
+  the count gives way (`ScreenMapBarTest`, at the window's least width). ⋯ holds ⇄ All links, Other ways, Tidy,
+  ⛶ Full screen (F11), ↶ Undo and ↷ Redo, each saying what it takes back, and *Missed frames ▸* when the latest run
+  saved one. The text outline and the PNG export are gone. The window hides the panel (▤), remembered per computer.
 - **Screen tabs** (`ScreenTabs`, apart from JavaFX; 2026-10-30, the user's pick, spec
   `../docs/superpowers/specs/2026-10-30-screen-tabs-design.md` in the umbrella): after *Graph*, a tab per screen
   open. A screen opened goes into the one *italic* preview tab, which the next one replaces; editing it (any step of
@@ -491,7 +486,7 @@ map tool against the hand path that covers it, and fails on one with none.
   keeps the last lossless frame: retake a screen's shot, or a new screen under the one last recognised, opened by
   the input last clicked. A frame of no screen of the map offers New screen… first (its parent, or "none: the game
   opens on it", a start screen); once written, the frame is that screen's and cutting starts on its marker.
-  Missed frames (`missed_frames`) open frozen. ▶ Launch starts the game when it is not up.
+  Missed frames (`missed_frames`, from the bar's ⋯) open frozen. ▶ Launch starts the game when it is not up.
 - **Cuts on the frozen frame** (`CutLayer`, `CutForm`, `assist/BoardCuts`): a box, an oval or a polygon drawn on the
   board, ▨ the part a run skips, then each cut said what it is — a marker (set, add or absent), a button, the way
   back, a look of a button or of the screen, a strip's button, a picture to measure an area from, words or digits read

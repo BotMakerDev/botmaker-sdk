@@ -21,8 +21,8 @@ class MapGuideTest {
     void theLegendRepeatsTheTooltipsItKeeps() {
         String said = MapGuide.sections().stream().flatMap(s -> s.entries().stream())
                 .map(MapGuide.Entry::meaning).collect(Collectors.joining("\n"));
-        for (String tip : List.of(MapGuide.OTHER_WAYS, MapGuide.TIDY, MapGuide.PNG, MapGuide.LOCKED,
-                MapGuide.FOLDED, MapGuide.FILTER_OWES, MapGuide.FILTER_UNTRIED, MapGuide.TRY_NEXT,
+        for (String tip : List.of(MapGuide.OTHER_WAYS, MapGuide.TIDY, MapGuide.LOCKED,
+                MapGuide.FOLDED, MapGuide.LAYOUT, MapGuide.MORE, MapGuide.PANEL, MapGuide.FULL_SCREEN, MapGuide.TRY_NEXT,
                 MapGuide.CUT_INPUTS, MapGuide.CUT_MARKER, MapGuide.GO_HERE, MapGuide.ADD_MARKER, MapGuide.LEADS_TO,
                 MapGuide.REMOVE_BACK, MapGuide.LIVE, MapGuide.FREEZE, MapGuide.MISSED, MapGuide.RETAKE_FROZEN,
                 MapGuide.NEW_FROM_FROZEN, MapGuide.RECORD_WAY, MapGuide.CUT_FROZEN, MapGuide.CUT_IGNORE,

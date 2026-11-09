@@ -31,20 +31,13 @@ final class MapGuide {
     static final String ZOOM_OUT = "Zoom out (the wheel zooms about the pointer; a right drag pans)";
     static final String ZOOM_IN = "Zoom in";
     static final String TIDY = "Put every card you moved back where the layout puts it";
-    static final String PNG = "Save the whole map as a picture, at full size";
     static final String OPEN = "Open 🗺 Screens, with each screen's inputs and actions";
     static final String GUIDE = "What each sign on the map means";
-    static final String OUTLINE = "Show or hide the outline of screens, on the left";
     static final String PANEL = "Show or hide the side panel of the screen picked, on the right";
     static final String FULL_SCREEN = "The window full screen, or back (F11; Esc leaves it too)";
-
-    // --- the outline ---
-    static final String FILTER_OWES = "Only screens owing their marker or with nothing cut";
-    static final String FILTER_UNTRIED = "Only screens and inputs left to try";
-    static final String OPENING_ONLY = "Every input, or only those that open a screen or are not tried yet: an input "
-            + "tried that opened nothing is folded away";
-    static final String COLLAPSE_ALL = "Shut every line, down to the screens at the top";
-    static final String EXPAND_ALL = "Open every line";
+    static final String LAYOUT = "How the map is laid out";
+    static final String MORE = "The map's other actions: every link and other ways; in the 🗺 Screens window also "
+            + "tidy, full screen, undo and redo, and the frames the latest run missed";
 
     // --- a card's badges ---
     static final String LOCKED = "Every way in is locked on this account";
@@ -81,8 +74,6 @@ final class MapGuide {
         NOTES("Notes", "Your notes on it: what it spends and earns, its timers, its quirks."),
         ANSWERS("How buttons answer the bot", "How a button looks while the bot hovers, holds or focuses it, so a "
                 + "run never takes that for a version: tried on two of this screen's buttons, kept by hand."),
-        SHADES("Shades the game shows", "How the game dims, greys or lights a button to mean a state, for the whole "
-                + "bot: a shade seen on two buttons is proposed with Learn, a learned one is forgotten by ✕."),
         PRESSED_BY("Pressed by", "How the run presses it: a click, a double or right click, a hold, a hover."),
         TEXT_FIELD("Text field", "A field the run types into: the words typed, the field cleared first, Enter "
                 + "after."),
@@ -129,7 +120,7 @@ final class MapGuide {
                      TREE_SCROLL, TRY -> true;
                 case TEXT_FIELD -> input instanceof Button button && button.isField();
                 case DRAG -> input instanceof Button button && button.isDrag();
-                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, ANSWERS, SHADES, COPIES, WHERE, GROUP -> false;
+                case WAYS_IN, SCREEN_LOOKS, WAY_BACK, OWES, NOTES, ANSWERS, COPIES, WHERE, GROUP -> false;
             };
         }
 
@@ -233,37 +224,26 @@ final class MapGuide {
             new Section("The toolbar", List.of(
                     new Entry("Find a screen…", null, "Lists the screens whose name, constant, inputs, pictures or "
                             + "notes have the words; ↑ ↓ and Enter or a click zooms to one, Esc fits the map again."),
-                    new Entry("Other ways", null, OTHER_WAYS + "."),
-                    new Entry("⇄ All links", null, ALL_LINKS + "; this computer remembers which."),
-                    new Entry("− Fit +", null, FIT + "; the wheel zooms about the pointer, a right drag pans."),
-                    new Entry("↶ ↷", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y): a map edit "
-                            + "and a code edit are undone in the order they were made."),
-                    new Entry("Tidy", null, TIDY + "."),
                     new Entry("▶▶ Next untried", null, NEXT_UNTRIED + "."),
-                    new Entry("⤓ PNG", null, PNG + "."),
-                    new Entry("☰ Outline ▤ Panel", null, "Show or hide the outline and the side panel; this "
-                            + "computer remembers which."),
-                    new Entry("⛶", null, FULL_SCREEN + ". ↶ ↷, Tidy, ⤓ PNG, ☰ ▤ and ⛶ are in the 🗺 Screens "
-                            + "window, not the overlay's tab."))),
+                    new Entry("Layout ▾", null, LAYOUT + "."),
+                    new Entry("− Fit +", null, FIT + "; the wheel zooms about the pointer, a right drag pans."),
+                    new Entry("▤ Panel", null, PANEL + "; this computer remembers which."),
+                    new Entry("⋯", null, MORE + "; each is below. ▶▶, Layout, ▤ and all of ⋯ but ⇄ All links and "
+                            + "Other ways are in the 🗺 Screens window, not the overlay's tab."),
+                    new Entry("⋯ ⇄ All links", null, ALL_LINKS + "; this computer remembers which."),
+                    new Entry("⋯ Other ways", null, OTHER_WAYS + "."),
+                    new Entry("⋯ Tidy", null, TIDY + "."),
+                    new Entry("⋯ ⛶ Full screen", null, FULL_SCREEN + "."),
+                    new Entry("⋯ ↶ Undo ↷ Redo", null, "Undo and redo, in Studio's own history (Ctrl+Z, Ctrl+Y), "
+                            + "each named for its step: a map edit and a code edit are undone in the order they were "
+                            + "made."),
+                    new Entry("⋯ Missed frames ▸", null, MISSED + ", to make it a screen's shot or a new screen; "
+                            + "there only when the latest run saved one."))),
             new Section("Screen tabs", List.of(
                     new Entry("GUILD (italic)", null, SCREEN_TAB + "."),
                     new Entry("◀ ▶", null, JUMP_BACK + "; " + JUMP_FORWARD + "."),
                     new Entry("GUILD ▾", null, JUMP_ANY + "."),
                     new Entry("ways out · back · recent", null, JUMP_CHIPS + "."))),
-            new Section("The outline", List.of(
-                    new Entry("Filter screens and inputs…", null, "Keeps the screens and inputs whose words have the "
-                            + "text, and the lines down to them. Under each screen are its inputs, and under an "
-                            + "input the screen it opens first; popups and screens not reached sit in groups below."),
-                    new Entry("◻ ⌨ ☰ 🌳", null, "A button, a hotkey, a strip, a tree."),
-                    new Entry("Owes", null, FILTER_OWES + "."),
-                    new Entry("Untried", null, FILTER_UNTRIED + "."),
-                    new Entry("⊟ Collapse all ⊞ Expand all", null, COLLAPSE_ALL + ", or open every "
-                            + "line; a line shut stays shut as the map changes."),
-                    new Entry("All inputs | Inputs that open a screen", null, OPENING_ONLY + "."),
-                    new Entry("Recent", null, "The " + Outline.RECENT_COUNT + " screens whose shot was taken last, "
-                            + "the newest first; a click picks the screen as its line below does."),
-                    new Entry("a click", null, "Picks the screen and shows it big in the Screen tab; an input's line "
-                            + "picks that input too; a right-click opens its ⋯ menu."))),
             new Section("The Screen tab", List.of(
                     new Entry("Graph | Screen", null, "The map, or the picked screen's shot as big as the tab."),
                     new Entry("a box", null, "Picks its input: the panel shows it first, with the screens it leads "
@@ -284,13 +264,12 @@ final class MapGuide {
                             + "mapped already."),
                     new Entry("Fit", null, "Draws the shot as wide as the tab; the wheel zooms, a drag moves it."),
                     new Entry("● Live", null, LIVE + ", as the click, key and scroll tools give it. The line under "
-                            + "the bar names the screen it shows, by its markers, which the graph and the outline "
-                            + "light; its inputs are boxed."),
+                            + "the bar names the screen it shows, by its markers, which the graph "
+                            + "lights; its inputs are boxed."),
                     new Entry("Record: A · input → B", null, RECORD_WAY + "."),
                     new Entry("❄ Freeze", null, FREEZE + ": Retake its shot — " + RETAKE_FROZEN + " — or New "
                             + "screen: " + NEW_FROM_FROZEN + ". A frame of no screen of the map offers New screen "
                             + "first: name it, then cut."),
-                    new Entry("Missed frames", null, MISSED + ", to make it a screen's shot or a new screen."),
                     new Entry("✂ Cut", null, CUT_FROZEN + ". ▢ ⬭ ✎ pick the shape (✎: click its corners, then "
                             + "its first corner again or ✓ Close shape); ▨ Skip a part: " + CUT_IGNORE + "; a click "
                             + "on a cut (its number, for a free shape) picks it: a drag moves it, its corners resize "

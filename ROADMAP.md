@@ -4,6 +4,9 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 
 ## Open
 
+- **● Live draws a portrait game as landscape** (2026-11-09): the Screen tab's live board shows a portrait game's
+  frames stretched to a landscape box. Draw each frame at its own aspect.
+
 - **Left from 🎯 Goals (2026-11-06)**:
   - **Times basics cannot read.** `Do.every(Duration.ofMinutes(30))` and `.daily(LocalTime.of(5, 0))` do not
     read in Studio. botmaker-plugin-basics declares `Duration` only as `Duration.ofMillis`, and `LocalTime` only as
@@ -16,7 +19,7 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **Markers as parts, the rest (2026-11-02)**: the next release deletes `Setup.markers/absent/texts/elements` and
   their `@Migrate.Dropped`; first move the SDK's own callers (`MapTools`, `ScreenEdits`, `ElementSaves`, the tests'
   fixtures) to parts. A look (`ScreenVariant`) is still told by marker lists: tell it by parts too. 🗺 Screens draws a
-  `Mark` field only through its screen's markers; give it a row in the outline and a marking/absent toggle in the
+  `Mark` field only through its screen's markers; give it a row in the panel and a marking/absent toggle in the
   input inspector.
 - **Shades, the rest (2026-11-02)**: a tint or scale shade is matched tinted or scaled only by
   `findEachScored`/`findAllScored`; a strip's band (`findWithinScored`), markers (`findEach*`) and the assistant's

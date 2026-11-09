@@ -34,8 +34,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -118,7 +116,6 @@ final class LiveBoard {
 
     private final ToggleButton liveButton = new ToggleButton("● Live");
     private final Button freeze = new Button("❄ Freeze");
-    private final MenuButton missed = new MenuButton("Missed frames");
     private final ImageView view = new ImageView();
     private final Pane boxes = new Pane();
     private final StackPane game = new StackPane(view, boxes);
@@ -231,11 +228,9 @@ final class LiveBoard {
         freeze.setTooltip(new Tooltip(MapGuide.FREEZE));
         freeze.setOnAction(e -> freeze());
         freeze.disableProperty().bind(liveButton.selectedProperty().not());
-        missed.setTooltip(new Tooltip(MapGuide.MISSED));
-        missed.setOnShowing(e -> missed.getItems().setAll(missedItems()));
-        missed.getItems().add(new MenuItem());
         Button launch = QuickLaunch.button(services, (ok, message) -> done.accept(message));
-        board.controls(liveButton, freeze, launch, missed);
+        // Missed frames moved to the map's ⋯ menu (2026-11-09): the board's bar keeps what the game is seen by.
+        board.controls(liveButton, freeze, launch);
         view.setPreserveRatio(true);
         frozenView.setPreserveRatio(true);
         boxes.setMouseTransparent(true);
@@ -946,23 +941,17 @@ final class LiveBoard {
                 }));
     }
 
-    /** The frames the latest run saved when a wait timed out, each opened frozen. */
-    private List<MenuItem> missedItems() {
+    /** The frames the latest run saved when a wait timed out; empty when none did. */
+    List<Path> missedFrames() {
         Path project = services.projectDir();
-        List<Path> frames = project == null ? List.of() : MissFrames.latest(project);
-        if (frames.isEmpty()) {
-            MenuItem none = new MenuItem("The latest run saved no frame: no wait timed out.");
-            none.setDisable(true);
-            return List.of(none);
-        }
-        return frames.stream().map(file -> {
-            MenuItem item = new MenuItem(file.getFileName().toString());
-            item.setOnAction(e -> openMissed(file));
-            return item;
-        }).toList();
+        return project == null ? List.of() : MissFrames.latest(project);
     }
 
-    private void openMissed(Path file) {
+    /**
+     * {@code file}, a missed frame, opened frozen on the board; {@code shows} is told first the screen it shows (null:
+     * none of the map's), so the window brings a board to the front for it.
+     */
+    void openMissed(Path file, Consumer<String> shows) {
         if (liveButton.isSelected()) stop();
         PanelContext reads = context();
         Thread.ofVirtual().name("live-missed").start(() -> {
@@ -973,12 +962,18 @@ final class LiveBoard {
                 image = null;
             }
             if (image == null) {
-                Platform.runLater(() -> done.accept(file.getFileName() + " could not be read."));
+                Platform.runLater(() -> {
+                    shows.accept(null);
+                    done.accept(file.getFileName() + " could not be read.");
+                });
                 return;
             }
             BufferedImage read = image;
-            String shows = ScreenDesk.here(reads, read).map(ScreenDesk.Here::screen).orElse(null);
-            Platform.runLater(() -> frozen(read, shows, true, false));
+            String on = ScreenDesk.here(reads, read).map(ScreenDesk.Here::screen).orElse(null);
+            Platform.runLater(() -> {
+                shows.accept(on);
+                frozen(read, on, true, false);
+            });
         });
     }
 

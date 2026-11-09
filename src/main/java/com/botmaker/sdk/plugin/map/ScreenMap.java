@@ -21,21 +21,25 @@ import com.botmaker.sdk.internal.observe.RunFrames;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.SplitPane;
+import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -51,7 +55,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -85,11 +88,8 @@ public final class ScreenMap {
     private static final int READ_ANYWAY = 20;
     /** A search hit's marker. */
     private static final double HIT_THUMB = 26;
-    /** The outline's share of the window's width, beside the centre. */
-    private static final double OUTLINE_SHARE = 0.26;
-    /** Whether the outline and the panel show: per viewer, not per project. */
+    /** Whether the panel shows and every link is drawn: per viewer, not per project. */
     private static final Preferences PREFS = Preferences.userNodeForPackage(ScreenMap.class);
-    private static final String OUTLINE_KEY = "map.outline";
     private static final String PANEL_KEY = "map.panel";
     private static final String ALL_LINKS_KEY = "map.allLinks";
 
@@ -104,7 +104,8 @@ public final class ScreenMap {
     private final StudioServices services;
     private final ScreenCanvas canvas;
     private final ScreenPanel panel;
-    private final ScreenOutline outline;
+    /** The 🗺 Screens window ({@code true}), with its tabs, panel and every action; false: the overlay's pane. */
+    private final boolean full;
     /** The full window's centre: the graph, then a tab per screen open ({@link ScreenTabs}). */
     private final TabPane tabs = new TabPane();
     private final Tab graphTab = new Tab("Graph");
@@ -133,16 +134,15 @@ public final class ScreenMap {
                          boolean back, boolean forward) {}
     private final BorderPane root = new BorderPane();
     private final Label said = new Label();
-    /** Studio's own ↶ and ↷, in the full window: a map edit and a code edit are one history. */
-    private final Button undo = new Button("↶");
-    private final Button redo = new Button("↷");
-    /** Whether the outline and the side panel show, in the full window; remembered on this computer. */
-    private final ToggleButton outlineShown = new ToggleButton("☰ Outline");
+    /** Studio's own ↶ and ↷, in the full window's ⋯: a map edit and a code edit are one history. */
+    private final MenuItem undo = new MenuItem("↶ Undo");
+    private final MenuItem redo = new MenuItem("↷ Redo");
+    /** Whether the side panel shows, in the full window; remembered on this computer. */
     private final ToggleButton panelShown = new ToggleButton("▤ Panel");
-    /** The outline beside the centre; null in the overlay's pane. */
-    private SplitPane split;
-    /** The outline's share of the window's width, as last shown. */
-    private double outlineShare = OUTLINE_SHARE;
+    /** The bar's ⋯: what the map does less often ({@link #moreItems}). */
+    private final MenuButton more = new MenuButton("⋯");
+    /** The items ⋯ always holds, in their order; Missed frames ▸ comes after them when there is one. */
+    private final List<MenuItem> fixedMore = new ArrayList<>();
     private final Timeline poll;
     private final List<AutoCloseable> subscriptions = new ArrayList<>();
     private Window window;
@@ -173,21 +173,17 @@ public final class ScreenMap {
     /** The map with its side panel ({@code withPanel}) or without, for the overlay editor's narrow pane. */
     ScreenMap(StudioServices services, boolean withPanel) {
         this.services = services;
+        full = withPanel;
         project = services.projectDir();
         canvas = new ScreenCanvas(services.resourcesDir(), name -> FrameViews.frames(services, name));
         panel = withPanel ? new ScreenPanel(services, canvas, () -> window, this::refresh,
-                this::showScreen, this::inputPicked, this::liveOn) : null;
+                this::showScreen, this::liveOn) : null;
         root.getStyleClass().add("screen-map");
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.setTop(toolbar(withPanel));
-        // The full window's outline beside the graph and the picked screen big; the overlay's narrow pane keeps the
-        // graph alone. A line picked shows its screen big, and its input picked on it.
-        outline = withPanel ? new ScreenOutline((constant, field) -> {
-            canvas.select(constant);
-            panel.pickInput(field);
-            showScreen();
-        }, panel::menuFor, panel::rowMenuFor, canvas::shotTime) : null;
-        if (outline != null) {
+        // The full window's graph and a tab per screen opened big; the overlay's narrow pane keeps the graph alone.
+        // No outline beside it (2026-11-09, the user's call): Find a screen and the jump bar reach any screen.
+        if (full) {
             graphTab.setContent(canvas.graph());
             graphTab.setClosable(false);
             jumps.getStyleClass().add("screen-jumps");
@@ -217,23 +213,20 @@ public final class ScreenMap {
                     if (canvas.graph().selectedProperty().get() != null) showScreen();
                 });
             });
-            split = new SplitPane(outline.node(), tabs);
-            split.setDividerPositions(OUTLINE_SHARE);
-            SplitPane.setResizableWithParent(outline.node(), false);
-            root.setCenter(split);
-            remembered(outlineShown, OUTLINE_KEY, true, this::showOutline);
+            root.setCenter(tabs);
         } else {
             root.setCenter(canvas.graph());
         }
-        if (panel != null) remembered(panelShown, PANEL_KEY, true, is -> root.setRight(is ? panel.node() : null));
+        if (panel != null) {
+            remembered(panelShown.selectedProperty(), PANEL_KEY, true, is -> root.setRight(is ? panel.node() : null));
+        }
         canvas.graph().selectedProperty().addListener((o, was, is) -> {
             if (is != null) selected = is.constant();
             else if (was != null) selected = null;
             // A screen picked, on the map or through an input that opens it: the board shows its shot, inputs boxed,
             // and the panel what it is and does.
             if (panel != null) panel.show(graph, selected);
-            if (outline != null) {
-                outline.select(selected);
+            if (full) {
                 if (selected != null) {
                     // Opened in its tab, or the preview; brought to the front unless the graph is.
                     opened.open(selected, !stepping);
@@ -260,26 +253,13 @@ public final class ScreenMap {
     }
 
     /** {@code toggle} shown as this computer last left it, and each change applied and kept. */
-    private static void remembered(ToggleButton toggle, String key, boolean fallback, Consumer<Boolean> apply) {
-        toggle.setSelected(PREFS.getBoolean(key, fallback));
-        apply.accept(toggle.isSelected());
-        toggle.selectedProperty().addListener((o, was, is) -> {
+    private static void remembered(BooleanProperty toggle, String key, boolean fallback, Consumer<Boolean> apply) {
+        toggle.set(PREFS.getBoolean(key, fallback));
+        apply.accept(toggle.get());
+        toggle.addListener((o, was, is) -> {
             PREFS.putBoolean(key, is);
             apply.accept(is);
         });
-    }
-
-    /** The outline beside the centre, or the centre alone. */
-    private void showOutline(boolean shown) {
-        boolean there = split.getItems().contains(outline.node());
-        if (shown && !there) {
-            split.getItems().addFirst(outline.node());
-            split.setDividerPositions(outlineShare);
-        } else if (!shown && there) {
-            // The width the user dragged it to comes back with it.
-            outlineShare = split.getDividerPositions()[0];
-            split.getItems().remove(outline.node());
-        }
     }
 
     /** The window full screen, or back: ⛶ and F11. */
@@ -287,14 +267,9 @@ public final class ScreenMap {
         if (window instanceof Stage stage) stage.setFullScreen(!stage.isFullScreen());
     }
 
-    /** An input picked on the board or in the panel, its line picked in the outline; null {@code field}: none. */
-    private void inputPicked(String constant, String field) {
-        if (outline != null) outline.selectInput(constant, field);
-    }
-
     /** The selected screen's tab brought to the front, its board in it; none selected, nothing changes. */
     private void showScreen() {
-        if (selected == null || outline == null) return;
+        if (selected == null || !full) return;
         if (!screenTabs.containsKey(selected)) {
             // Its tab was closed while it stayed picked: picking it again changes no selection, so it opens here.
             opened.open(selected, false);
@@ -381,7 +356,7 @@ public final class ScreenMap {
      */
     private void keepFront() {
         Tab front = tabs.getSelectionModel().getSelectedItem();
-        if (outline == null || front == null || front == graphTab || window == null || !window.isFocused()) return;
+        if (!full || front == null || front == graphTab || window == null || !window.isFocused()) return;
         String constant = (String) front.getUserData();
         if (!opened.isPreview(constant)) return;
         opened.keep(constant);
@@ -470,10 +445,9 @@ public final class ScreenMap {
         drawJumps();
     }
 
-    /** The screen the live board sees the game on, lit on the graph and in the outline; null lights none. */
+    /** The screen the live board sees the game on, lit on the graph; null lights none. */
     private void liveOn(String constant) {
         canvas.setHere(constant);
-        if (outline != null) outline.setHere(constant);
     }
 
     /**
@@ -494,13 +468,13 @@ public final class ScreenMap {
         tell((back ? "Took back: " : "Did again: ") + label + ".");
     }
 
-    /** ↶ and ↷ named for the step each takes. On the FX thread. */
+    /** ↶ and ↷ named for the step each takes, as their tooltips said on the bar. On the FX thread. */
     private void showHistory() {
         History history = services.history();
         undo.setDisable(!history.canUndo());
         redo.setDisable(!history.canRedo());
-        undo.setTooltip(new Tooltip(history.canUndo() ? "Undo: " + history.undoLabel() + " (Ctrl+Z)" : "Nothing to undo"));
-        redo.setTooltip(new Tooltip(history.canRedo() ? "Redo: " + history.redoLabel() + " (Ctrl+Y)" : "Nothing to redo"));
+        undo.setText(history.canUndo() ? "↶ Undo: " + history.undoLabel() + " (Ctrl+Z)" : "↶ Undo: nothing to undo");
+        redo.setText(history.canRedo() ? "↷ Redo: " + history.redoLabel() + " (Ctrl+Y)" : "↷ Redo: nothing to redo");
     }
 
     Node node() {
@@ -679,8 +653,6 @@ public final class ScreenMap {
                 if (stopped || !stillOpen()) return;
                 if (filesChanged) {
                     canvas.redraw();
-                    // A shot retaken moves its screen to the top of Recent.
-                    if (outline != null) outline.show(graph, cards, links);
                 }
                 if (panel != null) panel.filesSeen(seen);
             });
@@ -785,13 +757,11 @@ public final class ScreenMap {
         } else if (canvas.filesChanged()) {
             canvas.redraw();
         }
-        // Its lines hold each input's row, which an edit changes with no card or link changing; it redraws on a change.
-        if (outline != null) outline.show(read, cards, links);
         if (!saidOnce) said.setText(summary(nowCards));
         saidOnce = false;
         if (selected != null && !read.screens().containsKey(selected)) selected = null;
         if (panel != null) panel.show(read, selected);
-        if (outline != null) {
+        if (full) {
             // A screen deleted closes its tab and leaves ◀ ▶; a way added or gone changes the jump bar.
             opened.retain(read.screens().keySet());
             drawTabs();
@@ -846,14 +816,13 @@ public final class ScreenMap {
         TextField search = canvas.graph().searchField(card -> ScreenCards.terms(graph, card.constant()), this::hitRow);
         search.setPromptText("Find a screen…");
         search.setPrefColumnCount(full ? 16 : 10);
-        CheckBox others = new CheckBox("Other ways");
-        others.setSelected(true);
-        others.setTooltip(new Tooltip(MapGuide.OTHER_WAYS));
-        others.selectedProperty().addListener((o, was, is) -> canvas.graph().setShowDashed(is));
         // Faint until a screen is focused, unless every link is asked for: a whole map of arrows hid the work.
-        ToggleButton all = new ToggleButton("⇄ All links");
-        all.setTooltip(new Tooltip(MapGuide.ALL_LINKS));
-        remembered(all, ALL_LINKS_KEY, false, is -> canvas.graph().setFocusLinks(!is));
+        CheckMenuItem all = new CheckMenuItem("⇄ All links");
+        remembered(all.selectedProperty(), ALL_LINKS_KEY, false, is -> canvas.graph().setFocusLinks(!is));
+        CheckMenuItem others = new CheckMenuItem("Other ways");
+        others.setSelected(true);
+        others.selectedProperty().addListener((o, was, is) -> canvas.graph().setShowDashed(is));
+        fixedMore.addAll(List.of(all, others));
         Button fit = new Button("Fit");
         fit.setTooltip(new Tooltip(MapGuide.FIT));
         fit.setOnAction(e -> canvas.graph().fit());
@@ -869,32 +838,46 @@ public final class ScreenMap {
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         said.getStyleClass().add("screen-panel-path");
-        HBox bar = new HBox(8, search, others, all, out, fit, in);
+        more.setTooltip(new Tooltip(MapGuide.MORE));
+        // Read again each time it opens: the latest run's missed frames change while the window is open.
+        more.setOnShowing(e -> more.getItems().setAll(moreItems()));
+        HBox bar = new HBox(8, search);
         if (full) {
-            undo.setOnAction(e -> step(true));
-            redo.setOnAction(e -> step(false));
-            bar.getChildren().addAll(undo, redo);
-            Button tidy = new Button("Tidy");
-            tidy.setTooltip(new Tooltip(MapGuide.TIDY));
-            tidy.setOnAction(e -> tidy());
-            Button png = new Button("⤓ PNG");
-            png.setTooltip(new Tooltip(MapGuide.PNG));
-            png.setOnAction(e -> savePng());
-            outlineShown.setTooltip(new Tooltip(MapGuide.OUTLINE));
-            panelShown.setTooltip(new Tooltip(MapGuide.PANEL));
-            Button whole = new Button("⛶");
-            whole.setTooltip(new Tooltip(MapGuide.FULL_SCREEN));
-            whole.setOnAction(e -> fullScreen());
             Button next = new Button("▶▶ Next untried");
             next.setTooltip(new Tooltip(MapGuide.NEXT_UNTRIED));
             next.setOnAction(e -> nextUntried());
-            bar.getChildren().addAll(next, tidy, png, outlineShown, panelShown, whole);
+            // One way to lay the map out until the graph modes come (screens-rail phase 3).
+            MenuButton layout = new MenuButton("Layout");
+            layout.setTooltip(new Tooltip(MapGuide.LAYOUT));
+            RadioMenuItem layered = new RadioMenuItem("Layered");
+            layered.setToggleGroup(new ToggleGroup());
+            layered.setSelected(true);
+            layout.getItems().add(layered);
+            panelShown.setTooltip(new Tooltip(MapGuide.PANEL));
+            MenuItem tidy = new MenuItem("Tidy");
+            tidy.setOnAction(e -> tidy());
+            MenuItem whole = new MenuItem("⛶ Full screen");
+            whole.setOnAction(e -> fullScreen());
+            undo.setOnAction(e -> step(true));
+            redo.setOnAction(e -> step(false));
+            fixedMore.addAll(List.of(tidy, whole, undo, redo));
+            bar.getChildren().addAll(next, layout, out, fit, in, panelShown, more);
         } else {
             Button open = new Button("🗺 Open");
             open.setTooltip(new Tooltip(MapGuide.OPEN));
             open.setOnAction(e -> open(() -> services));
-            bar.getChildren().add(open);
+            bar.getChildren().addAll(out, fit, in, more, open);
         }
+        more.getItems().setAll(moreItems());
+        // Never "…" in the window: a button keeps its whole label, and only the count beside them gives way. The
+        // overlay's narrow pane lets its buttons shrink, so none runs off its edge.
+        if (full) {
+            for (Node each : bar.getChildren()) {
+                if (each instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
+            }
+            help.setMinWidth(Region.USE_PREF_SIZE);
+        }
+        said.setMinWidth(0);
         bar.getChildren().addAll(help, gap, said);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(8, 10, 8, 10));
@@ -917,7 +900,6 @@ public final class ScreenMap {
         String field = graph.untried(constant).stream().findFirst().orElse(null);
         canvas.select(constant);
         panel.pickInput(field);
-        inputPicked(constant, field);
         showScreen();
         tell(field == null ? graph.shown(constant) + " has nothing cut yet: ✂ Cut inputs on it."
                 : "Next to try: " + graph.shown(constant) + " · " + field + ". ▶ Try it in the panel.");
@@ -966,15 +948,45 @@ public final class ScreenMap {
         saidOnce = true;
     }
 
-    private void savePng() {
-        Optional<Path> file = services.dialogs().saveFile("Save the screen map", null, "screen-map.png", "png").path();
-        if (file.isEmpty()) return;
-        try {
-            canvas.graph().savePng(file.get());
-            said.setText("Saved " + file.get().getFileName() + ".");
-        } catch (IOException failed) {
-            said.setText("Not saved: " + Objects.requireNonNullElse(failed.getMessage(), failed.toString()));
+    /**
+     * What ⋯ holds: every link, other ways, and in the full window Tidy, full screen, ↶ and ↷, then Missed frames ▸,
+     * the frames the latest run saved when a wait timed out, only when it saved one.
+     */
+    List<MenuItem> moreItems() {
+        List<MenuItem> items = new ArrayList<>(fixedMore);
+        List<Path> frames = panel == null ? List.of() : panel.missedFrames();
+        if (frames.isEmpty()) return items;
+        Menu missed = new Menu("Missed frames");
+        for (Path file : frames) {
+            MenuItem item = new MenuItem(file.getFileName().toString());
+            item.setMnemonicParsing(false);
+            item.setOnAction(e -> openMissed(file));
+            missed.getItems().add(item);
         }
-        saidOnce = true;
+        items.add(new SeparatorMenuItem());
+        items.add(missed);
+        return items;
+    }
+
+    /**
+     * A missed frame opened frozen on a screen's board: the screen it shows, else the one picked, else the map's first,
+     * so a board is in front to show it.
+     */
+    private void openMissed(Path file) {
+        panel.openMissed(file, shows -> {
+            String on = shows != null ? shows : selected != null ? selected : ScreenCards.root(graph).orElse(null);
+            if (on == null) {
+                // No screen to put the board under: the frame waits there, and the count says so.
+                tell(file.getFileName() + " is open on a screen's board; map a screen first to see it.");
+                return;
+            }
+            if (!on.equals(selected)) canvas.select(on);
+            showScreen();
+        });
+    }
+
+    /** The bar, for a test. */
+    Node bar() {
+        return root.getTop();
     }
 }

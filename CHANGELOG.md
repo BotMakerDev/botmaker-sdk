@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A calmer 🗺 Screens bar** (2026-11-09): the bar is Find a screen, ▶▶ Next untried, Layout ▾, − Fit +,
+  ▤ Panel, ⋯ and the count, and no button is cut at the window's least width. ⋯ holds ⇄ All links, Other ways,
+  Tidy, ⛶ Full screen, ↶ Undo and ↷ Redo (each saying what it takes back) and *Missed frames ▸*, moved from the
+  live board. The text outline, the ⤓ PNG export and the panel's Shades section are gone.
 - **Waydroid runs over ADB with no window** (2026-11-09): with "Run the game in" a private display, an emulator
   app now starts as on the desktop (`SessionBootstrap.launchIsolated` declines it), Waydroid's session under a
   headless gamescope; watch it in the Pilot or Screens. A run, ▶ Launch now and a Fix's start first set
