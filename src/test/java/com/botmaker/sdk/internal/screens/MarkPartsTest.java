@@ -132,6 +132,16 @@ class MarkPartsTest {
         assertTrue(Markers.of(home).same(Markers.of(moved)), "the screen is told as before");
     }
 
+    /** A marking button that comes and goes is in no set, yet a screen written back as parts keeps it marking. */
+    @Test
+    void aMarkingButtonThatComesAndGoesStaysMarkingWhenWrittenBack() {
+        MapScreen home = screen("Home", click("hero").marking(), click("claim").marking().occasional());
+        MapScreen written = MarkParts.toldBy(home, Markers.of(home));
+        assertTrue(((Button) written.inputs().get("claim")).isMarking());
+        assertTrue(((Button) written.inputs().get("hero")).isMarking());
+        assertEquals(Set.of("hero"), Markers.of(written).keys());
+    }
+
     /** An element marker found by its words is named by them, not {@code input}. */
     @Test
     void anElementMarkIsNamedByItsWords() {

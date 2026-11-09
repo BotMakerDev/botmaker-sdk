@@ -704,7 +704,7 @@ final class MapTools {
         if (reach.isEmpty() || ActTools.desktopRefusal(context, reach.get().hands(), desktop).isPresent()) {
             return Optional.of("");
         }
-        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(screen, null);
+        ScreenWalk.Result walked = closing(context, graph, reach.get()).go(screen, null);
         seen(graph, walked.at());
         return walked.arrived() ? Optional.empty() : Optional.of(" Walking back: " + walked.why());
     }
@@ -730,7 +730,7 @@ final class MapTools {
                 || ActTools.desktopRefusal(context, reach.get().hands(), input.desktop()).isPresent()) {
             return said;
         }
-        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(to.get(),
+        ScreenWalk.Result walked = closing(context, graph, reach.get()).go(to.get(),
                 screen);
         seen(graph, walked.at());
         if (walked.arrived()) retakeShot(context, reach.get(), graph, walked.at());
@@ -812,11 +812,19 @@ final class MapTools {
                 ? Optional.of(match.rect()) : Optional.empty();
     }
 
-    /** The game's usual close button, the bot's picture {@value #CLOSE}, as a way back with none tries it first. */
+    /** A walk over {@code graph} that goes, its ways back with no input clicking the bot's close button. */
+    private static ScreenWalk closing(AgentContext context, ScreenGraph graph, ToolReach reach) {
+        return new ScreenWalk(graph.withClose(close(context)), reach, STEP_MS, null);
+    }
+
+    /**
+     * The game's usual close button, the bot's picture {@value ScreenGraph#CLOSE}, as a way back with none tries it
+     * first.
+     */
     private static Button close(AgentContext context) {
-        if (!ActTools.exists(context, CLOSE)) return null;
+        if (!ActTools.exists(context, ScreenGraph.CLOSE)) return null;
         try {
-            return FxCall.call(() -> Button.of(ScreenBook.picture(context.services(), CLOSE)));
+            return FxCall.call(() -> Button.of(ScreenBook.picture(context.services(), ScreenGraph.CLOSE)));
         } catch (IllegalStateException busy) {
             return null;
         }
@@ -835,9 +843,6 @@ final class MapTools {
     private static Duration measured(Duration took) {
         return took.isZero() ? null : took;
     }
-
-    /** The picture name a way back with no input of its own clicks: Firestone's close_x. */
-    static final String CLOSE = "close_x";
 
     /**
      * {@code base}, which opened a screen the map has not: added below the others, owing its marker, and showing
@@ -1425,7 +1430,7 @@ final class MapTools {
         if (reach.isEmpty()) return AgentReply.refused(Frames.noProject());
         Optional<AgentReply> desktop = ActTools.desktopRefusal(context, reach.get().hands(), goal.desktop());
         if (desktop.isPresent()) return desktop.get();
-        ScreenWalk.Result walked = new ScreenWalk(graph, reach.get(), STEP_MS, null, close(context)).go(target.get(),
+        ScreenWalk.Result walked = closing(context, graph, reach.get()).go(target.get(),
                 lastSeen);
         seen(graph, walked.at());
         if (walked.arrived()) retakeShot(context, reach.get(), graph, walked.at());

@@ -588,7 +588,8 @@ class ScreenWalkTest {
         game.shows.get("CAMPAIGN").add("close_x");
         game.leads.put("CAMPAIGN click close_x", "HOME");
 
-        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("ENGINEER", null);
+        ScreenWalk.Result walked = new ScreenWalk(game.map.withClose(click("close_x")), game, STEP_MS, null)
+                .go("ENGINEER", null);
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
         assertEquals(List.of("click back", "click close_x", "click engineer"), game.done);
@@ -613,7 +614,8 @@ class ScreenWalkTest {
                 .back(MapFixtures.key(Key.ESCAPE))));
         Game game = new Game("MAP", ScreenGraph.of(screens));
 
-        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("HOME", null);
+        ScreenWalk.Result walked = new ScreenWalk(game.map.withClose(click("close_x")), game, STEP_MS, null)
+                .go("HOME", null);
 
         assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome(), walked.why());
         assertEquals(List.of(), game.done, "no key pressed, and the close button is no way for a mapped key");
@@ -666,7 +668,8 @@ class ScreenWalkTest {
         game.popup = "NEWS";
         game.shows.get("NEWS").add("close_x");
 
-        ScreenWalk.Result walked = new ScreenWalk(game.map, game, STEP_MS, null, click("close_x")).go("CAMPAIGN", null);
+        ScreenWalk.Result walked = new ScreenWalk(game.map.withClose(click("close_x")), game, STEP_MS, null)
+                .go("CAMPAIGN", null);
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
         assertEquals(List.of("click close_x", "click campaign"), game.done);
@@ -1318,6 +1321,60 @@ class ScreenWalkTest {
         result = go(game, "HOME", new ArrayList<>());
         assertTrue(result.arrived(), result.why());
         assertEquals(List.of("click back"), game.done, "left as the screen it is in is");
+    }
+
+    /**
+     * ExploreMap takes a tab's copied way, its sibling's button, by pressing it on the screen holding it: the parent's
+     * field, never the tab's, which has none.
+     */
+    @Test
+    void exploringPressesACopiedWayOnTheScreenHoldingIt() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home_title")), click("hero")));
+        screens.put("HERO", screen(Setup.named("Hero").markers(marks("hero_title")).from(ref("HOME", "hero"))
+                        .back(click("back")),
+                click("gear_tab").looks(List.of(Look.of(picture("gear_tab_on"), State.SELECTED))),
+                click("skills_tab").looks(List.of(Look.of(picture("skills_tab_on"), State.SELECTED)))));
+        screens.put("GEAR", screen(Setup.named("Gear").from(ref("HERO", "gear_tab")).tab()));
+        screens.put("SKILLS", screen(Setup.named("Skills").from(ref("HERO", "skills_tab")).tab()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Game game = new Game("GEAR", graph);
+        game.shows.put("GEAR", new HashSet<>(Set.of("hero_title", "gear_tab_on", "skills_tab", "back")));
+        game.shows.put("SKILLS", new HashSet<>(Set.of("hero_title", "gear_tab", "skills_tab_on", "back")));
+        game.leads.put("GEAR click skills_tab", "SKILLS");
+        ScreenGraph.Edge copied = graph.edges().stream()
+                .filter(e -> e.from().equals("GEAR") && e.to().equals("SKILLS")).findFirst().orElseThrow();
+
+        MapWalk.Took took = new LiveMoves(graph, game, () -> {}).take(copied);
+
+        assertEquals(MapWalk.Arrival.AT_TARGET, took.arrival(), took.toString());
+        assertEquals(List.of("click skills_tab"), game.done);
+    }
+
+    /**
+     * A way back with no input of its own is taken by the map's close button, a run's walk as the assistant's: with
+     * none, no walk takes it.
+     */
+    @Test
+    void aWayBackWithNoInputIsTakenByTheMapsCloseButton() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").markers(marks("home_title")), click("info")));
+        screens.put("INFO", screen(Setup.named("Info").markers(marks("info_title")).from(ref("HOME", "info"))));
+        Game game = new Game("INFO", ScreenGraph.of(screens));
+        game.shows.get("INFO").add("close_x");
+        game.leads.put("INFO click close_x", "HOME");
+
+        assertFalse(go(game, "HOME", new ArrayList<>()).arrived(), "no close button: no way back");
+        assertEquals(List.of(), game.done);
+
+        ScreenGraph closing = ScreenGraph.of(screens).withClose(click(ScreenGraph.CLOSE));
+        ScreenWalk.Result result = new ScreenWalk(closing, game, STEP_MS, s -> {}).go("HOME", null);
+        assertTrue(result.arrived(), result.why());
+        assertEquals(List.of("click close_x"), game.done);
+        ScreenGraph.Edge back = closing.edges().stream().filter(e -> e.from().equals("INFO") && e.back())
+                .findFirst().orElseThrow();
+        assertTrue(new LiveMoves(closing, game, () -> {}).open(back), "ExploreMap takes it too");
+        assertFalse(new LiveMoves(ScreenGraph.of(screens), game, () -> {}).open(back));
     }
 
     @Test

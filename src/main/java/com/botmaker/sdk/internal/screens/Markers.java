@@ -1,9 +1,11 @@
 package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Look;
 import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Readout;
@@ -108,6 +110,19 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         return new Markers(look.markers(), look.absent());
     }
 
+    /**
+     * Whether {@code part} is a marking input that shows only at times ({@code occasional}, or with a {@code when}):
+     * no screen's set requires it, and a set written back as parts leaves its marking as it is.
+     */
+    static boolean marksAtTimes(ScreenPart part) {
+        boolean absent = switch (part) {
+            case Button b -> b.isAbsent();
+            case TextButton t -> t.isAbsent();
+            default -> false;
+        };
+        return part instanceof Input input && !absent && (input.isOccasional() || input.when() != null);
+    }
+
     /** A screen's set as it is gathered: its setup's lists, then each part's. */
     private static final class Sets {
         final List<ImageTemplate> shown;
@@ -129,6 +144,8 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         }
 
         private void add(ScreenPart part) {
+            // A marking input that shows only at times tells nothing while it is away: never a required marker.
+            if (marksAtTimes(part)) return;
             switch (part) {
                 case Mark m when m.picture() != null -> (m.isAbsent() ? absent : shown).add(m.picture());
                 case Mark m when m.caption() != null -> (m.isAbsent() ? absentTexts : texts).add(m.caption());
@@ -280,10 +297,12 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
                 : seen(absents, reach.findEach(List.copyOf(absents.values()), frame));
         Map<Element, Boolean> inTree = new IdentityHashMap<>();
         Map<Element, Boolean> pickedInTree = new IdentityHashMap<>();
-        Map<Caption, Boolean> read = new HashMap<>();
+        // Words a read failed on are unknown: neither a marker that shows nor an absent one that is away.
+        Map<Caption, Answer> read = new HashMap<>();
         Predicate<ImageTemplate> found = p -> shownNear.getOrDefault(p.id(), false);
         Predicate<Element> held = element -> inTree.computeIfAbsent(element, e -> !reach.elements(e, frame).isEmpty());
-        Predicate<Caption> said = words -> read.computeIfAbsent(words, w -> reach.findText(w, frame).isPresent());
+        Predicate<Caption> said = words -> read.computeIfAbsent(words, w -> reach.shows(w, frame)) == Answer.YES;
+        Predicate<Caption> away = words -> read.computeIfAbsent(words, w -> reach.shows(w, frame)) == Answer.NO;
         return sets.stream().map(set -> set.any()
                 && set.shown.stream().allMatch(found)
                 && set.either.stream().allMatch(group -> group.stream().anyMatch(found))
@@ -294,7 +313,7 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
                         e -> reach.elements(e, frame).stream()
                                 .anyMatch(node -> ElementMatch.state(node) == State.SELECTED)))
                 && set.texts.stream().allMatch(said)
-                && set.absentTexts.stream().noneMatch(said)).toList();
+                && set.absentTexts.stream().allMatch(away)).toList();
     }
 
     private static Map<String, Boolean> seen(Map<String, ImageTemplate> pictures, List<Optional<Rect>> found) {

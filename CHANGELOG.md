@@ -19,6 +19,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run walks the map as the assistant does** (2026-11-09).
+  - A way back with no input of its own clicks the bot's `close_x` picture in a run too, as Discovery's walks always
+    did: such a way is no longer dropped from every path of a run, and ExploreMap takes it.
+  - ExploreMap presses a tab's copied way, and a way back through another screen's button, on the screen holding the
+    button, instead of reporting it missed.
+  - A marking button that is `occasional` or has a `when` is no longer a required marker: its screen is told while it
+    is away.
+  - A read of words that fails is unknown, never "no words": a screen told or ruled out by words is not told on it,
+    and the facts of that look are left as they were, so a flag never reads as false.
+  - A strip marked `leaving` makes each of its buttons leaving, as its other traits already did.
+
 - **A plan run recovers when it is stuck, and stops after too many restarts** (2026-11-09).
   - The watchdog looks once a round of a plan run: a game Android says crashed or stopped answering is restarted, a
     frozen game recovers, as in a flow.

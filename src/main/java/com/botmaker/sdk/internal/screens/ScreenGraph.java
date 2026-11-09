@@ -102,15 +102,37 @@ public final class ScreenGraph {
     private final Map<String, MapScreen> screens;
     /** The bot's own screens by the constant holding each, at run time; empty for a map read by Studio's tools. */
     private final Map<Screen, String> instances;
+    /**
+     * The game's usual close button, the bot's picture {@value #CLOSE}: what a way back with no input of its own
+     * clicks. Null when the bot has none, so such a way is never taken.
+     */
+    private final Button close;
 
-    private ScreenGraph(Map<String, MapScreen> screens, Map<Screen, String> instances) {
+    /** The picture name of the game's usual close button, the one a way back with no input clicks: Firestone's. */
+    public static final String CLOSE = "close_x";
+
+    private ScreenGraph(Map<String, MapScreen> screens, Map<Screen, String> instances, Button close) {
         this.screens = Collections.unmodifiableMap(new LinkedHashMap<>(screens));
         this.instances = instances;
+        this.close = close;
     }
 
     /** The graph of {@code screens}, constant name to screen, in the order the bot declares them. */
     public static ScreenGraph of(Map<String, MapScreen> screens) {
-        return new ScreenGraph(screens == null ? Map.of() : screens, Map.of());
+        return new ScreenGraph(screens == null ? Map.of() : screens, Map.of(), null);
+    }
+
+    /**
+     * This map, its ways back with no input clicking {@code close}; null for none. Every walk over the map, a run's
+     * and the assistant's, takes its close button from here, so the two never disagree on one map.
+     */
+    public ScreenGraph withClose(Button close) {
+        return new ScreenGraph(screens, instances, close);
+    }
+
+    /** The game's usual close button, set by {@link #withClose}; null when the bot has none. */
+    public Button close() {
+        return close;
     }
 
     /** The graph of the bot's own {@code screens}, constant name to screen, in the order the bot declares them. */
@@ -121,7 +143,7 @@ public final class ScreenGraph {
             read.put(constant, MapScreen.of(screen));
             instances.put(screen, constant);
         });
-        return new ScreenGraph(read, Collections.unmodifiableMap(instances));
+        return new ScreenGraph(read, Collections.unmodifiableMap(instances), null);
     }
 
     public Map<String, MapScreen> screens() {

@@ -1,7 +1,11 @@
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Screen;
+import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.trace.SdkRun;
+import com.botmaker.sdk.internal.vision.TemplateNames;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -157,6 +161,27 @@ public final class ScreenMaps {
                 // Not the bot's to read here: the map lacks that screen, and a walk to it says so.
             }
         }
-        return ScreenGraph.ofScreens(screens);
+        return ScreenGraph.ofScreens(screens).withClose(close(holder));
+    }
+
+    /**
+     * The game's usual close button: the {@code Pictures} constant beside {@code holder} named for
+     * {@value ScreenGraph#CLOSE}, as the assistant's walks click it. Null when the bot has none.
+     */
+    static Button close(Class<?> holder) {
+        try {
+            Class<?> pictures = Class.forName(holder.getPackageName() + "." + TemplateNames.CLASS_NAME, true,
+                    holder.getClassLoader());
+            Field field = pictures.getField(TemplateNames.constantFor(ScreenGraph.CLOSE));
+            return Modifier.isStatic(field.getModifiers()) && field.get(null) instanceof ImageTemplate picture
+                    ? Button.of(picture) : null;
+        } catch (ReflectiveOperationException none) {
+            return null;
+        } catch (LinkageError broken) {
+            // A Pictures class that fails to load fails elsewhere too; its first cause is said here.
+            Debug.log("The bot's " + TemplateNames.CLASS_NAME + " did not load, so a run has no close button: "
+                    + broken);
+            return null;
+        }
     }
 }

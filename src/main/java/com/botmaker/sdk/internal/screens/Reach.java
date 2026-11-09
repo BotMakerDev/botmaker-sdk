@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Custom;
@@ -151,9 +152,19 @@ public interface Reach {
     }
 
     /**
-     * The lines of text {@code image} shows, each with its place in it, read by OCR as {@code Text} reads them. A read
-     * that fails reads none; natives that cannot load still throw, as they do for {@code Text}, so they never pass for
-     * a screen with no words.
+     * A read of words that failed: what the image shows is not known, never "no words". Natives that cannot load throw
+     * their own error, as they do for {@code Text}.
+     */
+    final class TextUnread extends RuntimeException {
+        public TextUnread(RuntimeException cause) {
+            super("The words could not be read: " + cause.getMessage(), cause);
+        }
+    }
+
+    /**
+     * The lines of text {@code image} shows, each with its place in it, read by OCR as {@code Text} reads them.
+     *
+     * @throws TextUnread when the read fails, so a failed read never passes for a screen with no words
      */
     default List<TextResult> read(BufferedImage image) {
         return ocr(image);
@@ -164,21 +175,54 @@ public interface Reach {
         try {
             return OcrEngine.recognize(image, Text.DEFAULT_OPTIONS);
         } catch (RuntimeException e) {
-            return List.of();
+            throw new TextUnread(e);
         }
     }
 
     /**
      * Where {@code caption}'s words are on {@code frame}: the first line read inside its zone, placed on the frame as
      * {@code source.region} places one, that is the words ({@link LineMatch#same}). Empty when no line there is.
+     *
+     * @throws TextUnread when the read failed
      */
     default Optional<Rect> findText(Caption caption, BufferedImage frame) {
-        return findText(caption, frame, this::read);
+        return located(caption, frame, this::read);
     }
 
-    /** {@link #findText(Caption, BufferedImage)}, the zone read by {@code read}. */
+    /** {@link #findText(Caption, BufferedImage)}, empty when the read failed: a press or an anchor finds nothing. */
+    default Optional<Rect> textOrNone(Caption caption, BufferedImage frame) {
+        try {
+            return findText(caption, frame);
+        } catch (TextUnread unread) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Whether {@code frame} shows {@code caption}'s words: {@link Answer#UNKNOWN} when the read failed, so a marker
+     * or an absent marker read by words never decides on a read that did not happen.
+     */
+    default Answer shows(Caption caption, BufferedImage frame) {
+        try {
+            return Answer.of(findText(caption, frame).isPresent());
+        } catch (TextUnread unread) {
+            return Answer.UNKNOWN;
+        }
+    }
+
+    /** {@link #findText(Caption, BufferedImage)}, the zone read by {@code read}; empty when the read failed. */
     static Optional<Rect> findText(Caption caption, BufferedImage frame,
                                    Function<BufferedImage, List<TextResult>> read) {
+        try {
+            return located(caption, frame, read);
+        } catch (TextUnread unread) {
+            return Optional.empty();
+        }
+    }
+
+    /** {@link #findText(Caption, BufferedImage, Function)}, a failed read thrown. */
+    private static Optional<Rect> located(Caption caption, BufferedImage frame,
+                                          Function<BufferedImage, List<TextResult>> read) {
         if (caption == null || caption.words() == null || caption.in() == null) return Optional.empty();
         Optional<Rect> zone = onFrame(caption.in(), frame);
         if (zone.isEmpty()) return Optional.empty();
@@ -202,9 +246,20 @@ public interface Reach {
         return w <= 0 || h <= 0 ? Optional.empty() : Optional.of(new Rect(x, y, w, h));
     }
 
+    /** {@link #readout}, empty when its words could not be read: for a reader to whom unread and none are alike. */
+    default Optional<String> readoutOrNone(Readout readout, BufferedImage frame) {
+        try {
+            return readout(readout, frame);
+        } catch (TextUnread unread) {
+            return Optional.empty();
+        }
+    }
+
     /**
      * What {@code readout} shows on {@code frame}: the lines read in its zone, joined by a space, or the number its
      * digits spell there. Empty when nothing is read.
+     *
+     * @throws TextUnread when its words could not be read: what it shows is not known, never "nothing shows"
      */
     default Optional<String> readout(Readout readout, BufferedImage frame) {
         if (readout != null && readout.element() != null) {
@@ -509,7 +564,7 @@ public interface Reach {
     /** Where an anchor shows on {@code frame}: its picture found, or its words read in their zone. */
     private Optional<Rect> anchorOf(ImageTemplate picture, Caption words, BufferedImage frame) {
         if (picture != null) return find(picture, frame);
-        return words == null ? Optional.empty() : findText(words, frame);
+        return words == null ? Optional.empty() : textOrNone(words, frame);
     }
 
     /**
@@ -711,7 +766,7 @@ public interface Reach {
                 yield true;
             }
             case TextButton words -> {
-                Optional<Rect> place = findText(words.caption(), frame);
+                Optional<Rect> place = textOrNone(words.caption(), frame);
                 place.ifPresent(at -> press(pointOn(at), words.gesture(), words.holdTime()));
                 yield place.isPresent();
             }

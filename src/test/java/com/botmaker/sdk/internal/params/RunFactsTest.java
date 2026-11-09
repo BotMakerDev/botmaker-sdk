@@ -10,6 +10,7 @@ import com.botmaker.sdk.internal.params.fixture.params.bot.Progress;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Veteran;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Wallet;
 import com.botmaker.sdk.internal.params.fixture.plugins.Holder;
+import com.botmaker.sdk.internal.screens.Reach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import org.junit.jupiter.api.AfterEach;
@@ -186,6 +187,19 @@ class RunFactsTest {
         assertEquals(1, reads.size());
         assertEquals(Optional.empty(), Params.known(Hero::level));
         assertEquals(Optional.empty(), Params.known(Hero::badge), "not shown is not known from a look that missed");
+    }
+
+    /** A look whose words could not be read keeps nothing: a flag is unknown, never "not shown". */
+    @Test
+    void aFailedReadOfWordsKeepsNothing() {
+        RunFacts.use(List.of(Hero.class), (constant, fields) -> {
+            throw new Reach.TextUnread(new IllegalStateException("tesseract failed"));
+        });
+
+        RunFacts.seen("HOME");
+
+        assertEquals(Optional.empty(), Params.known(Hero::badge));
+        assertEquals(Optional.empty(), Params.known(Hero::level));
     }
 
     @Test

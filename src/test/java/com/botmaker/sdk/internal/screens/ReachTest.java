@@ -38,6 +38,7 @@ import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -571,6 +572,19 @@ class ReachTest {
         assertEquals(List.of(new Rect(100, 200, 200, 100)), areas);
         assertEquals(Optional.empty(), screen.readout(Readout.text(new Zone(900, 700, 50, 50)), frame));
         assertEquals(Optional.empty(), new Reading(List.of()).readout(Readout.text(gold), frame), "nothing read");
+    }
+
+    /** A read of words that failed is not "nothing shows": the readout says so, and what it shows stays unknown. */
+    @Test
+    void aReadoutWhoseReadFailedIsUnread() {
+        Reading broken = new Reading(List.of()) {
+            @Override
+            public List<TextResult> read(BufferedImage image) {
+                throw new Reach.TextUnread(new IllegalStateException("tesseract failed"));
+            }
+        };
+        BufferedImage frame = broken.look().orElseThrow();
+        assertThrows(Reach.TextUnread.class, () -> broken.readout(Readout.text(new Zone(100, 200, 200, 100)), frame));
     }
 
     /** Three Go buttons on a grid of mission cards: two on the top row, one below, found out of reading order. */

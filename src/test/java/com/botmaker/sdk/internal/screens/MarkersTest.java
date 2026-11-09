@@ -4,10 +4,12 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Look;
+import com.botmaker.sdk.api.screens.Mark;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.text.TextResult;
@@ -41,7 +43,7 @@ class MarkersTest {
     private static final Caption PROFILE = Caption.of(Words.of("Profile"), TITLE);
 
     /** A game showing {@code shown} pictures and, in every zone, the line {@code title}; each read counted. */
-    private static final class Game implements Reach {
+    private static class Game implements Reach {
         final Set<String> shown;
         final String title;
         final List<String> reads = new ArrayList<>();
@@ -123,6 +125,41 @@ class MarkersTest {
         assertEquals(List.of(true, true), Markers.onEach(game,
                 List.of(new Markers(List.of(), List.of(), List.of(SETTINGS)), settings), frame));
         assertEquals(List.of("300x40"), game.reads, "words two screens name are read once");
+    }
+
+    /** A marking button that comes and goes tells nothing while it is away, so it is never required. */
+    @Test
+    void aMarkingInputThatComesAndGoesIsNotRequired() {
+        MapScreen home = screen(Setup.named("Home").markers(marks("home_title")), click("hero").marking(),
+                click("claim").marking().occasional(), click("guild").marking().when(() -> true),
+                click("offer").absent().occasional());
+        Markers markers = Markers.of(home);
+
+        Game game = new Game(Set.of("home_title", "hero"), "");
+        assertTrue(markers.on(game, game.look().orElseThrow()), "told with its Claim and Guild away");
+        assertFalse(markers.on(new Game(Set.of("home_title", "hero", "offer"), ""), game.look().orElseThrow()),
+                "an absent marker that comes and goes still rules its screen out while it shows");
+    }
+
+    /** A read of words that failed is unknown: a marker by words is not told, and an absent one does not pass. */
+    @Test
+    void wordsAFailedReadMissedDecideNothing() {
+        Game game = new Game(Set.of("menu_frame"), "Settings") {
+            @Override
+            public List<TextResult> read(BufferedImage image) {
+                throw new Reach.TextUnread(new IllegalStateException("tesseract failed"));
+            }
+        };
+        BufferedImage frame = game.look().orElseThrow();
+        Markers settings = new Markers(marks("menu_frame"), List.of(), List.of(SETTINGS));
+        Markers notProfile = Markers.of(screen(Setup.named("Settings").markers(marks("menu_frame")))
+                .withMark("not_profile", Mark.of(PROFILE).absent()));
+
+        assertEquals(Answer.UNKNOWN, game.shows(SETTINGS, frame));
+        assertEquals(Optional.empty(), game.textOrNone(SETTINGS, frame), "a press finds nothing to act on");
+        assertEquals(List.of(false, false), Markers.onEach(game, List.of(settings, notProfile), frame));
+        assertEquals(List.of(true), Markers.onEach(new Game(Set.of("menu_frame"), "Settings"), List.of(notProfile),
+                frame), "the same absent words, read, rule nothing out");
     }
 
     /** A tab needs no marker: its button picked tells it, through the reference its way in names it by. */

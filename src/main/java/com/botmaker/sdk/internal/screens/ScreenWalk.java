@@ -121,15 +121,11 @@ public final class ScreenWalk {
 
     /**
      * A walk over {@code graph} by {@code reach}, giving each step {@code stepMs} to show the next screen's marker,
-     * and telling {@code reached} each screen it is on by constant, the one it starts on first.
+     * and telling {@code reached} each screen it is on by constant, the one it starts on first. A way back with no
+     * input clicks the map's own close button ({@link ScreenGraph#close}), while it shows.
      */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached) {
-        this(graph, reach, stepMs, reached, null);
-    }
-
-    /** As above; a way back with no input clicks {@code close}, the game's usual close button, while it shows. */
-    public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close) {
-        this(graph, reach, stepMs, reached, close, false, null);
+        this(graph, reach, stepMs, reached, graph.close(), false, null);
     }
 
     private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close,
@@ -957,6 +953,9 @@ public final class ScreenWalk {
     /**
      * What {@code constant}'s readouts {@code fields} show, all read off one look, by field; a field read as nothing is
      * left out. Empty when that look does not show the screen, a screen with no marker included. Nothing is walked to.
+     *
+     * @throws Reach.TextUnread when a readout's words could not be read: what the look shows is not known, so none of
+     *                          it is kept, never a flag read as "not shown"
      */
     public Optional<Map<String, String>> readAll(String constant, List<String> fields) {
         Markers markers = graph.markers(constant);
@@ -974,7 +973,8 @@ public final class ScreenWalk {
 
     /**
      * What {@code constant}'s readout {@code field} shows, read off one look; empty when that look does not show the
-     * screen, a screen with no marker included, or nothing is read there. Nothing is walked to or closed.
+     * screen, a screen with no marker included, nothing is read there, or its words could not be read. Nothing is
+     * walked to or closed.
      */
     public Optional<String> read(String constant, String field) {
         Optional<Readout> readout = graph.screen(constant).flatMap(screen -> screen.readout(field));
@@ -982,7 +982,7 @@ public final class ScreenWalk {
         Markers markers = graph.markers(constant);
         if (!markers.any()) return Optional.empty();
         return reach.look().filter(frame -> markers.on(reach, frame))
-                .flatMap(frame -> reach.readout(readout.get(), frame));
+                .flatMap(frame -> reach.readoutOrNone(readout.get(), frame));
     }
 
     /**

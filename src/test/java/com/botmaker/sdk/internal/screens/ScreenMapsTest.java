@@ -4,6 +4,8 @@ import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.screens.closing.Pictures;
+import com.botmaker.sdk.internal.screens.closing.Screens;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +50,15 @@ class ScreenMapsTest {
         int before = SOLVED.get();
         solve.method().run();
         assertEquals(before + 1, SOLVED.get(), "a run holds the bot's own method, not its name");
+    }
+
+    /** A run's map clicks the bot's close_x for a way back with none, as the assistant's walks do; no picture, none. */
+    @Test
+    void theMapHoldsTheBotsCloseButton() {
+        ScreenGraph map = ScreenMaps.read(Screens.class);
+
+        assertSame(Pictures.CLOSE_X, map.close().picture());
+        assertEquals(null, ScreenMaps.read(Bot.class).close(), "a bot with no close_x picture");
     }
 
     @Test

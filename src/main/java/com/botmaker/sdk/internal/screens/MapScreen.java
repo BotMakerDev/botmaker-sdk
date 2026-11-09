@@ -415,6 +415,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         if (s.isOccasional() && !now.isOccasional()) now = now.occasional();
         if (now.when() == null && s.when() != null) now = now.when(s.when());
         if (!now.isInfo() && s.isInfo()) now = now.info();
+        if (!now.isLeaving() && s.isLeaving()) now = now.leaving();
         if (now.never() == null && s.never() != null) now = now.never(s.never());
         if (now.locked() == null && s.locked() != null) now = now.locked(s.locked());
         return now;

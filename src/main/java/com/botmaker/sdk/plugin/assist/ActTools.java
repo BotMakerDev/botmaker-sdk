@@ -301,7 +301,7 @@ final class ActTools {
         }
         Optional<ToolReach> reach = markers.texts().isEmpty() ? Optional.empty() : ToolReach.of(context);
         return markers.on(p -> shows(context, p.id(), frame),
-                words -> reach.flatMap(r -> r.findText(words, frame)).isPresent());
+                words -> reach.flatMap(r -> r.textOrNone(words, frame)).isPresent());
     }
 
     /** Whether a run would find {@code picture} on {@code frame}. */
@@ -417,7 +417,7 @@ final class ActTools {
         Optional<ToolReach> reach = ToolReach.of(context);
         Optional<BufferedImage> frame = reach.flatMap(Reach::look);
         if (frame.isEmpty()) return Entered.no(AgentReply.refused(Frames.noScreen()));
-        Optional<Rect> place = reach.get().findText(words.caption(), frame.get());
+        Optional<Rect> place = reach.get().textOrNone(words.caption(), frame.get());
         if (place.isEmpty()) {
             return Entered.no(AgentReply.text(words.label() + " is not read in its zone on the screen; nothing was "
                     + "clicked."));

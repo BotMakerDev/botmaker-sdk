@@ -187,8 +187,8 @@ public final class ServesProposal {
         feeding.forEach((fact, readout) -> {
             was.remove(fact);
             is.remove(fact);
-            reach.get().readout(readout, before).ifPresent(value -> was.put(fact, value));
-            reach.get().readout(readout, after).ifPresent(value -> is.put(fact, value));
+            reach.get().readoutOrNone(readout, before).ifPresent(value -> was.put(fact, value));
+            reach.get().readoutOrNone(readout, after).ifPresent(value -> is.put(fact, value));
         });
         Map.Entry<String, Do> action = on.actions().entrySet().stream()
                 .filter(e -> presses(e.getValue(), screen, on, field)).findFirst().orElse(null);

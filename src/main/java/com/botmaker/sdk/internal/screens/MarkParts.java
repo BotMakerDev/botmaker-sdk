@@ -119,6 +119,8 @@ public final class MarkParts {
         /** Whether {@code part} tells the screen as the set still says, taking what it holds. */
         boolean keeps(ScreenPart part) {
             if (!telling(part)) return false;
+            // No set holds it (Markers.marksAtTimes): it keeps its marking as the author wrote it.
+            if (Markers.marksAtTimes(part)) return true;
             return switch (part) {
                 case Mark m when m.picture() != null -> (m.isAbsent() ? absent : shown).remove(m.picture().id()) != null;
                 case Mark m when m.caption() != null -> (m.isAbsent() ? absentTexts : texts).remove(m.caption());

@@ -329,6 +329,18 @@ class ScreenGraphTest {
                 graph.screens().get("HOME").stripOf(campaign));
     }
 
+    /** A leaving strip, a row of Home buttons deep down, makes each member leaving, as its other traits do. */
+    @Test
+    void aLeavingStripMakesEachMemberLeaving() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("HOME", with(screens.get("HOME"),
+                Strip.of(Scroll.wheel(-5), marks("campaign", "engineer")).leaving()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertTrue(graph.input("HOME", "campaign").orElseThrow().isLeaving());
+        assertFalse(graph.input("HOME", "gold").orElseThrow().isLeaving(), "a button off the strip is its own");
+    }
+
     @Test
     void anInputThatComesAndGoesNeverSeenIsOwedWithoutHoldingItsScreen() {
         Map<String, MapScreen> screens = firestone();

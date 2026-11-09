@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Pick;
 import com.botmaker.sdk.api.screens.Strip;
+import com.botmaker.sdk.internal.flow.BotConstants;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 
@@ -38,14 +39,14 @@ public final class LiveMoves implements MapWalk.Moves {
     }
 
     /**
-     * Whether {@code edge} is one a run takes now. A way back with no input is not: a run's walk has no close button
-     * to press for it. One whose lead needs a look of its button is taken while the button shows that look, or is not
+     * Whether {@code edge} is one a run takes now. A way back with no input is while the map has its close button to
+     * press for it. One whose lead needs a look of its button is taken while the button shows that look, or is not
      * in view (its press then says it is absent), or is pressed until it shows it. The bot's own code is not: exploring
      * never runs it, since no one knows what it spends.
      */
     @Override
     public boolean open(ScreenGraph.Edge edge) {
-        if (edge.via() == null) return edge.onItsOwn();
+        if (edge.via() == null) return edge.onItsOwn() || graph.close() != null;
         if (edge.via() instanceof Custom) return false;
         if (edge.state() == null || !(edge.via() instanceof Button button)) return true;
         if (edge.pick() != null && edge.pick().mode() == Pick.Mode.UNTIL) return true;
@@ -58,7 +59,15 @@ public final class LiveMoves implements MapWalk.Moves {
     @Override
     public Took take(ScreenGraph.Edge edge) {
         if (edge.input() != null) {
-            ScreenWalk.Press press = walk().press(edge.from(), edge.input(), edge.pick());
+            // A tab's copied way is its parent's field, a way back through another screen's names it "SCREEN.field":
+            // pressed on the screen holding it, as a walk's step does.
+            String field = graph.nameOf(edge.via()).map(BotConstants.InputName::field).orElse(edge.input());
+            String holder = graph.holder(edge);
+            ScreenWalk.Press press = walk().press(holder, field, edge.pick());
+            // A press that did not move the game says the screen holding the button: the game is still on the tab.
+            if (holder.equals(press.at()) && !holder.equals(edge.from())) {
+                press = new ScreenWalk.Press(press.result(), edge.from(), press.times(), press.why(), press.state());
+            }
             if (press.at() == null) ScreenMaps.lost();
             else ScreenMaps.seen(press.at());
             return pressed(edge, press);
