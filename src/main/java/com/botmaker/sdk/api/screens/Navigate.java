@@ -19,6 +19,7 @@ import com.botmaker.sdk.internal.screens.ScreenValues;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.trace.Say;
 
+import java.awt.image.BufferedImage;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -234,23 +235,29 @@ public final class Navigate {
                 press.times(), press.state());
     }
 
-    /** Whether the game shows {@code screen} now: its markers are on the screen, and none of its absent pictures. */
+    /**
+     * Whether the game shows {@code screen} now: its markers are on the screen, none of its absent pictures, and no
+     * panel of it over it ({@link Setup#panelOf}). Under a panel its markers stay in view, but the game is on the
+     * panel: false, and the panel is where the run was last seen.
+     */
     public static boolean isOn(Screen screen) {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> constant = map.constantOf(screen);
         Optional<Markers> markers = constant.flatMap(map::screen).map(Markers::of).filter(Markers::any);
         if (markers.isEmpty()) return false;
         RunReach reach = new RunReach();
-        boolean on = reach.look().map(frame -> markers.get().on(reach, frame)).orElse(false);
-        // Remembered, not told: a screen's marker stays in view under a panel opened over it, so this may be its parent.
-        if (on) ScreenMaps.seen(constant.get());
-        return on;
+        Optional<BufferedImage> frame = reach.look().filter(f -> markers.get().on(reach, f));
+        if (frame.isEmpty()) return false;
+        Optional<String> panel = new ScreenWalk(map, reach, ScreenWalk.STEP_MS, null)
+                .panelOver(constant.get(), frame.get());
+        ScreenMaps.seen(panel.orElse(constant.get()));
+        return panel.isEmpty();
     }
 
     /**
      * What {@code readout} shows now, a readout of a screen of the map ({@code Screens.HOME.gold}): the words read in
-     * its zone, or the number its digits spell. Nothing is walked to: empty when the game does not show its screen, or
-     * nothing is read there.
+     * its zone, or the number its digits spell. Nothing is walked to: empty when the game does not show its screen, a
+     * panel of it covers it ({@link Setup#panelOf}), or nothing is read there.
      */
     @Hidden("no block can pick a readout yet: Studio reads Screens.HOME.gold as an input; written in Java")
     @ReadsScreen
@@ -283,7 +290,7 @@ public final class Navigate {
 
     /**
      * Which one {@code screen} shows, read off its {@link Readout#subject() subject} readout: the hero's name on a
-     * hero's page. Empty when it has none, the game does not show it, or nothing is read.
+     * hero's page. Empty when it has none, the game does not show it, a panel of it covers it, or nothing is read.
      */
     public static Optional<String> subject(Screen screen) {
         ScreenGraph map = ScreenMaps.installed();

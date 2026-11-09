@@ -165,16 +165,9 @@ public final class PlanTypes implements TypeHolder {
 
     // ---- conditions ------------------------------------------------------------------------------------
 
-    /**
-     * What a condition part gives to be written: a method reference's text, a typed condition as itself, or
-     * {@code ""} for none, which writes no link.
-     */
+    /** What a condition part gives to be written, as {@link ScreenTypes#held} gives it. */
     static Object held(BooleanSupplier condition) {
-        return switch (condition) {
-            case null -> "";
-            case ScreenTypes.NamedCondition(String source) -> source;
-            default -> condition;
-        };
+        return ScreenTypes.held(condition);
     }
 
     /** The condition a part holds: a method reference's text as a name, a typed condition as itself, else none. */

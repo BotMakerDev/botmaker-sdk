@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Facts under a panel, composed conditions** (2026-11-09).
+  - While a panel (`Setup.panelOf`) covers its screen, `Navigate.isOn(screen)` is false and the run is on the panel;
+    the screen's readouts are not read until the panel is gone, so no fact is read off a covered screen.
+  - An input's `.when(…)` that is a `Need` (`Need.above(Progress::level, 4)`) or a composed condition
+    (`Condition.all(…)`, `any`, `xor`, `not`, `Condition.of(Bot::m)`) is kept when Studio writes the screen back;
+    it used to vanish. A plan's goals and actions write the same conditions.
+
 - **A run walks the map as the assistant does** (2026-11-09).
   - A way back with no input of its own clicks the bot's `close_x` picture in a run too, as Discovery's walks always
     did: such a way is no longer dropped from every path of a run, and ExploreMap takes it.

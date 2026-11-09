@@ -1117,6 +1117,35 @@ class ScreenWalkTest {
                 "near the screen it is in");
     }
 
+    /** Under a panel, the screen it is in is not read, its markers in view: its facts wait until the panel is gone. */
+    @Test
+    void aScreenUnderAPanelIsNotRead() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(named("Home", "home", null, null), click("mail")));
+        screens.put("MAIL", screen(named("Mail", "mail_title", "HOME", "mail")
+                .panelOf(BotConstants.screen("HOME"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        ScreenWalk covered = new ScreenWalk(map, new Shows("home", "mail_title"), STEP_MS, null);
+        assertEquals(Optional.of("MAIL"), covered.panelOver("HOME", frame));
+        assertEquals(Optional.empty(), covered.readAll("HOME", List.of()), "nothing read under the panel");
+        assertEquals(Optional.empty(), covered.panelOver("MAIL", frame), "nothing is over the panel");
+
+        ScreenWalk gone = new ScreenWalk(map, new Shows("home"), STEP_MS, null);
+        assertEquals(Optional.empty(), gone.panelOver("HOME", frame));
+        assertEquals(Optional.of(Map.of()), gone.readAll("HOME", List.of()), "read once the panel is gone");
+
+        // A panel of the panel, open over both: the one nothing hides, though the first panel comes first in the map.
+        screens.put("MAIL", screen(named("Mail", "mail_title", "HOME", "mail")
+                .panelOf(BotConstants.screen("HOME")), click("letter")));
+        screens.put("LETTER", screen(named("Letter", "letter_title", "MAIL", "letter")
+                .panelOf(BotConstants.screen("MAIL"))));
+        ScreenWalk both = new ScreenWalk(ScreenGraph.of(screens), new Shows("home", "mail_title", "letter_title"),
+                STEP_MS, null);
+        assertEquals(Optional.of("LETTER"), both.panelOver("HOME", frame));
+    }
+
     @Test
     void anAbsentPictureTellsTwoScreensWithOneTitleApart() {
         ScreenGraph map = tabs();

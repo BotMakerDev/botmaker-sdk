@@ -952,7 +952,8 @@ public final class ScreenWalk {
 
     /**
      * What {@code constant}'s readouts {@code fields} show, all read off one look, by field; a field read as nothing is
-     * left out. Empty when that look does not show the screen, a screen with no marker included. Nothing is walked to.
+     * left out. Empty when that look does not show the screen, a screen with no marker included, or shows a panel of it
+     * over it ({@link #panelOver}): what the panel covers is read once it is gone. Nothing is walked to.
      *
      * @throws Reach.TextUnread when a readout's words could not be read: what the look shows is not known, so none of
      *                          it is kept, never a flag read as "not shown"
@@ -960,7 +961,8 @@ public final class ScreenWalk {
     public Optional<Map<String, String>> readAll(String constant, List<String> fields) {
         Markers markers = graph.markers(constant);
         if (!markers.any()) return Optional.empty();
-        Optional<BufferedImage> frame = reach.look().filter(f -> markers.on(reach, f));
+        Optional<BufferedImage> frame = reach.look()
+                .filter(f -> markers.on(reach, f) && panelOver(constant, f).isEmpty());
         if (frame.isEmpty()) return Optional.empty();
         Map<String, String> read = new LinkedHashMap<>();
         for (String field : fields) {
@@ -973,16 +975,41 @@ public final class ScreenWalk {
 
     /**
      * What {@code constant}'s readout {@code field} shows, read off one look; empty when that look does not show the
-     * screen, a screen with no marker included, nothing is read there, or its words could not be read. Nothing is
-     * walked to or closed.
+     * screen, a screen with no marker included, the look shows a panel over it, nothing is read there, or its words
+     * could not be read. Nothing is walked to or closed.
      */
     public Optional<String> read(String constant, String field) {
         Optional<Readout> readout = graph.screen(constant).flatMap(screen -> screen.readout(field));
         if (readout.isEmpty()) return Optional.empty();
         Markers markers = graph.markers(constant);
         if (!markers.any()) return Optional.empty();
-        return reach.look().filter(frame -> markers.on(reach, frame))
+        return reach.look().filter(frame -> markers.on(reach, frame) && panelOver(constant, frame).isEmpty())
                 .flatMap(frame -> reach.readoutOrNone(readout.get(), frame));
+    }
+
+    /**
+     * The panel {@code frame} shows over {@code constant} ({@code Setup.panelOf}, or a panel of one of its panels): its
+     * markers in view, and {@code constant}'s with them, though the game is on the panel; of several shown, the one
+     * nothing else shown hides. Empty when none shows, or none of its panels has a marker.
+     */
+    public Optional<String> panelOver(String constant, BufferedImage frame) {
+        List<String> panels = new ArrayList<>();
+        for (String c : graph.screens().keySet()) {
+            Set<String> seen = new HashSet<>();
+            for (Optional<String> up = graph.panelOf(c); up.isPresent() && seen.add(up.get());
+                 up = graph.panelOf(up.get())) {
+                if (!up.get().equals(constant)) continue;
+                if (graph.markers(c).any()) panels.add(c);
+                break;
+            }
+        }
+        if (panels.isEmpty()) return Optional.empty();
+        List<Boolean> on = Markers.onEach(reach, panels.stream().map(graph::markers).toList(), frame);
+        List<String> shown = new ArrayList<>();
+        for (int i = 0; i < panels.size(); i++) {
+            if (Boolean.TRUE.equals(on.get(i))) shown.add(panels.get(i));
+        }
+        return shown.isEmpty() ? Optional.empty() : shownTop(shown);
     }
 
     /**

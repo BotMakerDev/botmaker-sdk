@@ -81,7 +81,8 @@ public final class ScreenTypes implements TypeHolder {
                 MARK_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE, WHEN_SHAPE, AT_LEAST_SHAPE,
-                AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE);
+                AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE, CONDITION_OF_SHAPE, CONDITION_ALL_SHAPE, CONDITION_ANY_SHAPE,
+                CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE);
     }
 
     /**
@@ -115,6 +116,7 @@ public final class ScreenTypes implements TypeHolder {
         static final Held<Readout, String> READOUT_FACT = Held.as(String.class,
                 readout -> factOf(readout).isEmpty() ? null : factOf(readout));
         static final Held<Custom, String> CUSTOM_METHOD = Held.as(String.class, ScreenTypes::methodOf);
+        static final Held<Condition.Of, Object> OF_METHOD = Held.as(Object.class, of -> held(of.method()));
     }
 
     /**
@@ -420,6 +422,31 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<ParamCheck> IS_TRUE_SHAPE = ComponentType.part(ParamCheck.class)
             .<Params.When, Condition>writtenAs(Params.When::isTrue, ParamCheck::when);
 
+    /** {@code Condition.of(Firestone::eventOn)}: a bot method asked, its reference crossing as the text it is written as. */
+    public static final DeclaredCall<Condition.Of> CONDITION_OF_SHAPE = ComponentType.part(Condition.Of.class)
+            .<BooleanSupplier, Condition>writtenAs(Condition::of, Parts.OF_METHOD.part(ScreenTypes::condition));
+
+    /** {@code Condition.all(…)}: every one of its conditions, each written as itself. */
+    public static final DeclaredCall<Condition.All> CONDITION_ALL_SHAPE = ComponentType.part(Condition.All.class)
+            .writtenAsEach(Condition::all, Condition.All::conditions);
+
+    /** {@code Condition.any(…)}. */
+    public static final DeclaredCall<Condition.Any> CONDITION_ANY_SHAPE = ComponentType.part(Condition.Any.class)
+            .writtenAsEach(Condition::any, Condition.Any::conditions);
+
+    /** {@code Condition.xor(…)}. */
+    public static final DeclaredCall<Condition.Xor> CONDITION_XOR_SHAPE = ComponentType.part(Condition.Xor.class)
+            .writtenAsEach(Condition::xor, Condition.Xor::conditions);
+
+    /**
+     * {@code Condition.not(…)}; a {@code Need}'s own negation ({@code Need.above}, {@code below}, {@code not}) is
+     * written by {@code PlanTypes}. A {@code Need.equalTo} has none, so its negation is written here.
+     */
+    public static final DeclaredCall<Condition.Not> CONDITION_NOT_SHAPE = ComponentType.part(Condition.Not.class)
+            .<Condition, Condition>writtenAs(Condition::not, Condition.Not::condition)
+            .when(not -> !(not.condition() instanceof ParamCheck check && check.byNeed()
+                    && check.test() != ParamCheck.Test.IS));
+
     /**
      * The condition a {@code .when(…)} part holds: a method reference, {@code Firestone::eventOn}, as the text it is
      * written as, or {@code null} when blank; a test of a parameter as the value it is.
@@ -432,10 +459,17 @@ public final class ScreenTypes implements TypeHolder {
         };
     }
 
-    /** What a {@code .when(…)} part gives to be written: a method reference's text, a test as itself, or {@code ""}. */
-    private static Object held(BooleanSupplier condition) {
-        return condition instanceof NamedCondition(String source) ? source
-                : condition instanceof ParamCheck check ? check : "";
+    /**
+     * What a condition part gives to be written, here and in {@code PlanTypes}: a method reference's text, any other
+     * condition as itself (a test, a {@code Need}, {@code Condition.all(…)}), or {@code ""} for none, which writes no
+     * link.
+     */
+    static Object held(BooleanSupplier condition) {
+        return switch (condition) {
+            case null -> "";
+            case NamedCondition(String source) -> source;
+            default -> condition;
+        };
     }
 
     private static final Pattern METHOD = Pattern.compile("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*::[A-Za-z_$][\\w$]*");

@@ -5,10 +5,12 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Zone;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
+import com.botmaker.sdk.api.plan.Need;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Caption;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
@@ -425,6 +427,40 @@ class ScreenTypesTest {
             String qualified = Params.class.getPackageName() + "." + java;
             assertEquals(check, grammar.read(ParamCheck.class, qualified).orElseThrow(() -> new AssertionError(qualified)));
         });
+    }
+
+    /** An input's composed condition, a Need or several joined, comes apart and goes back whole, and is written. */
+    @Test
+    void anInputsComposedConditionIsKept() {
+        // Need.above(Progress::level, 4) as Studio holds it: the fact by its name, the test marked as written by Need.
+        ParamCheck atMost = ScreenTypes.test("Progress::level", ParamCheck.Test.AT_MOST, 4);
+        Condition above = new Condition.Not(new ParamCheck(atMost.when(), atMost.test(), atMost.value(), true));
+        Condition eventOn = Condition.of(ScreenTypes.condition("Firestone::eventOn"));
+        Condition both = Condition.all(above, Condition.not(eventOn));
+        for (Condition condition : List.of(above, both)) {
+            Button buy = Button.of(picture("buy")).when(condition);
+            assertEquals(buy, roundTrip(ScreenTypes.BUTTON_SHAPE, buy), condition.toString());
+        }
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(PlanTypes.NEED_AT_LEAST_SHAPE,
+                PlanTypes.NEED_AT_MOST_SHAPE, PlanTypes.NEED_ABOVE_SHAPE, PlanTypes.NEED_BELOW_SHAPE,
+                PlanTypes.NEED_NOT_SHAPE, ScreenTypes.WHEN_SHAPE, ScreenTypes.AT_LEAST_SHAPE,
+                ScreenTypes.AT_MOST_SHAPE, ScreenTypes.IS_SHAPE, ScreenTypes.IS_TRUE_SHAPE,
+                ScreenTypes.CONDITION_OF_SHAPE, ScreenTypes.CONDITION_ALL_SHAPE, ScreenTypes.CONDITION_ANY_SHAPE,
+                ScreenTypes.CONDITION_XOR_SHAPE, ScreenTypes.CONDITION_NOT_SHAPE));
+        assertEquals("Need.above(Progress::level, 4)", grammar.write(BooleanSupplier.class, above).orElseThrow().source());
+        String java = "Condition.all(Need.above(Progress::level, 4), Condition.not(Condition.of(Firestone::eventOn)))";
+        assertEquals(java, grammar.write(BooleanSupplier.class, both).orElseThrow().source());
+        String qualified = java.replace("Condition.", Condition.class.getName() + ".")
+                .replace("Need.", Need.class.getName() + ".");
+        assertEquals(both, grammar.read(Condition.All.class, qualified).orElseThrow(() -> new AssertionError(qualified)));
+
+        // Need.equalTo has no negation of its own: Condition.not writes it, never a Need of another test.
+        ParamCheck is = ScreenTypes.test("Progress::rank", ParamCheck.Test.IS, "gold");
+        Condition notGold = Condition.not(new ParamCheck(is.when(), is.test(), is.value(), true));
+        assertEquals("Condition.not(Need.equalTo(Progress::rank, \"gold\"))",
+                ValueGrammar.of(List.of(), List.of(PlanTypes.NEED_EQUAL_TO_SHAPE, PlanTypes.NEED_ABOVE_SHAPE,
+                        PlanTypes.NEED_NOT_SHAPE, ScreenTypes.CONDITION_NOT_SHAPE))
+                        .write(BooleanSupplier.class, notGold).orElseThrow().source());
     }
 
     /** A readout feeding a fact is written as its chain, the fact as its method reference, and read back the same. */
