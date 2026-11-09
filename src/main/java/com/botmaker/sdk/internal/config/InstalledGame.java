@@ -43,13 +43,21 @@ public final class InstalledGame {
      * {@code Source.current()} names none: it is what this sets.
      */
     public static void install(Class<?>... values) {
+        settings(values);
+        Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
+                && !(source instanceof CurrentSource) ? source : null);
+    }
+
+    /**
+     * Takes the game parameters as {@link #install} does, leaving the capture source as it is: a reloaded bot keeps
+     * the game and the connection it has.
+     */
+    public static void settings(Class<?>... values) {
         List<String> targets = specs(marked(SdkValue.Id.LAUNCH_TARGETS, values));
         launchTargets = targets == null ? List.of() : targets;
         launchChoice = marked(SdkValue.Id.LAUNCH_TARGET, values) instanceof LaunchChoice choice ? choice.spec() : "";
         vm = marked(SdkValue.Id.VM, values) instanceof String named ? named.trim() : "";
         gameZone = zone(marked(SdkValue.Id.GAME_ZONE, values) instanceof String named ? named : "");
-        Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
-                && !(source instanceof CurrentSource) ? source : null);
     }
 
     /** The launch specs the bot lists, preferred first; empty when it lists none. */

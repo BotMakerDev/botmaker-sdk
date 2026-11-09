@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -149,5 +150,38 @@ class ParamsTest {
     void aValueThatCannotBeComparedIsUnknown() {
         assertEquals(Answer.UNKNOWN, Params.when(Progress::unspellable).is("x").answer());
         assertEquals(Answer.UNKNOWN, Params.when(Progress::tries).isTrue().answer());
+    }
+
+    @Test
+    void aValueSetMovesToTheBotLoadedAgain() throws Exception {
+        Params.set(Progress::level, 5);
+        Params.set(Progress::rank, Progress.Rank.HIGH);
+        long at = RunParams.keptAt(Progress.class.getDeclaredMethod("level")).orElseThrow();
+        ClassLoader again = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (!name.startsWith(Progress.class.getName())) return super.loadClass(name, resolve);
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> loaded = findLoadedClass(name);
+                    if (loaded != null) return loaded;
+                    try (var in = getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
+                        byte[] bytes = in.readAllBytes();
+                        return defineClass(name, bytes, 0, bytes.length);
+                    } catch (IOException e) {
+                        throw new ClassNotFoundException(name, e);
+                    }
+                }
+            }
+        };
+        Class<?> reloaded = again.loadClass(Progress.class.getName());
+        assertFalse(reloaded == Progress.class);
+
+        RunParams.newGeneration(again);
+
+        assertEquals(at, RunParams.keptAt(reloaded.getDeclaredMethod("level")).orElseThrow(), "the value's time moved");
+        assertTrue(RunParams.keptAt(Progress.class.getDeclaredMethod("level")).isEmpty(), "the old class holds none");
+        Object rank = RunParams.setValue(reloaded.getDeclaredMethod("rank")).orElseThrow();
+        assertEquals("HIGH", ((Enum<?>) rank).name());
+        assertSame(again, rank.getClass().getClassLoader(), "the bot's own enum, as the new classes load it");
     }
 }

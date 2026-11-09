@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The bot reloaded in a running run** (2026-11-09): `internal/explore/Generation` compiles the bot's sources in the
+  run's JVM into `target/botmaker-explore/gen-<n>` and loads them child-first over the run's own loader, so a fix that
+  adds a readout or an input takes without restarting the game. A compile error refuses the reload with its errors and
+  the classes in use keep serving. Installing a generation re-reads the managed values, the game's settings (the capture
+  source stays), the map and the facts; values set during the run move to the reloaded classes
+  (`RunParams.newGeneration`). `InstalledGame.settings` is `install` without the capture source.
 - **Guards before a press** (2026-11-09): what a run exploring on its own checks before each press, general to any
   app. It presses nothing while another app or a system dialog (permissions, the store, an account sheet) is in front
   of the game, nothing on a password or payment field, nothing without a verdict or marked never, and nothing free

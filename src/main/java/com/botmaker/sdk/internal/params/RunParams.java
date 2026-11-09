@@ -122,6 +122,11 @@ public final class RunParams {
         return SET.get(parameter);
     }
 
+    /** What this run set for {@code parameter}, or empty; for a test. */
+    static synchronized Optional<Object> setValue(Method parameter) {
+        return Optional.ofNullable(SET.get(parameter)).map(Held::value);
+    }
+
     /** What this run set for the parameter {@code reference} names, else what {@code method} answers on its group. */
     public static <G, T> T get(Serializable reference, Function<G, T> method) {
         Method parameter = parameterOf(reference);
@@ -316,6 +321,58 @@ public final class RunParams {
         SET.clear();
         FORGOTTEN.clear();
         WARNED.clear();
+    }
+
+    /**
+     * The bot's classes are loaded again by {@code loader} (a generation of a run exploring on its own, 2026-11-09):
+     * method references resolve afresh, and what this run set, forgot or warned of moves to the same parameter of the
+     * new classes, by class and method name. A parameter the new classes no longer have is dropped. A value of a type
+     * the bot declares is an instance of the old classes: an enum constant moves by its name, any other such value is
+     * dropped, and the new classes read it from what was written. Called while nothing of the old classes runs.
+     */
+    public static synchronized void newGeneration(ClassLoader loader) {
+        REFERENCES.clear();
+        Map<Method, Held> set = new HashMap<>();
+        SET.forEach((parameter, held) -> again(parameter, loader).ifPresent(now -> movedValue(held, parameter, loader)
+                .ifPresent(moved -> set.put(now, moved))));
+        SET.clear();
+        SET.putAll(set);
+        moveAll(FORGOTTEN, loader);
+        moveAll(WARNED, loader);
+    }
+
+    private static void moveAll(Set<Method> parameters, ClassLoader loader) {
+        Set<Method> moved = new HashSet<>();
+        parameters.forEach(parameter -> again(parameter, loader).ifPresent(moved::add));
+        parameters.clear();
+        parameters.addAll(moved);
+    }
+
+    /** {@code held} for the reloaded classes: as it is, an enum constant of the bot's by name, or empty. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Optional<Held> movedValue(Held held, Method parameter, ClassLoader loader) {
+        Object value = held.value();
+        if (value == null || value.getClass().getClassLoader() != parameter.getDeclaringClass().getClassLoader()) {
+            return Optional.of(held);
+        }
+        if (!(value instanceof Enum<?> constant)) return Optional.empty();
+        try {
+            Class<?> type = Class.forName(constant.getDeclaringClass().getName(), false, loader);
+            if (!type.isEnum()) return Optional.empty();
+            return Optional.of(new Held(Enum.valueOf((Class) type, constant.name()), held.at(), held.written()));
+        } catch (ReflectiveOperationException | LinkageError | IllegalArgumentException gone) {
+            return Optional.empty();
+        }
+    }
+
+    /** {@code parameter} as {@code loader} loads its class, or empty when that class or method is gone. */
+    private static Optional<Method> again(Method parameter, ClassLoader loader) {
+        try {
+            return Optional.of(Class.forName(parameter.getDeclaringClass().getName(), false, loader)
+                    .getDeclaredMethod(parameter.getName()));
+        } catch (ReflectiveOperationException | LinkageError gone) {
+            return Optional.empty();
+        }
     }
 
     /** Times this run by {@code now}, for a test. */
