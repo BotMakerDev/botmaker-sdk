@@ -86,11 +86,21 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   ends NOT_NOW naming. `.clearing()` selects what it holds first (Ctrl+A; an emulator, with no select-all, keeps
   it), `.submitting()` presses Enter after (2026-10-22; `.clears()`/`.submits()` until 2026-11-01). A drag is a button too (`Drag`, built as a trait like the field so
   pictures, looks, copies and strips stay as they are): `.dragsOnto(Pictures.SLOT)`, let go on a picture found on the
-  same frame, or `.dragsInto(Zones.END)`, at a zone's centre placed on the frame as `source.region` places it
+  same frame, or `.dragsInto(area)`, at the centre of an `Area` placed beside its picture on the frame
   (a slider, a swipe); `.dragTime(Duration)`, else `Button.DRAG_TIME`. It takes the place of the gesture and the
   text; a picture drop not on the frame is no press, ABSENT saying so (2026-10-22).
-- **Words** (`Caption.of(Texts.SETTINGS, Zones.TITLE)`, a `Texts` and a `Zones` constant): what a screen shows, read
-  by OCR inside the zone only. `Setup.texts(List.of(…))` tells a screen by them too: `Markers.onEach` reads them last,
+- **Areas** (`api/screens/Area`, 2026-11-09; `Zone`, `Anchor` and `Zones.java` deleted outright, the user's call): every
+  box the bot reads or acts in is measured from a picture the screen shows, never a fixed place.
+  `Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1)` is the box whose top-left corner is 1.2 of the icon's widths right of the
+  icon's top-left corner and 0 of its heights below, 3 icons wide and 1 high; a negative offset is left or above,
+  sizes are positive. The numbers are in the anchor's own units, no pixel, so a recut icon at another resolution still
+  places it. Nobody types them: `Area.between(anchor, found, cut)` computes them from where the anchor was found and
+  the second cut (the assistant's `anchor` + `box` fields, 🗺's cut form). A run finds the anchor on the frame and
+  works in `Area.place(found)` (`Reach.onFrame(area, frame, find)`, clipped to the frame); an anchor not shown is an
+  area not shown, a readout then reading nothing, which `which_screen` says (`coins nothing (coin_icon is not shown)`).
+  A capture crop (`CaptureSource.region`) keeps a plain `Rect`: it has no picture to measure from.
+- **Words** (`Caption.of(Texts.SETTINGS, area)`, a `Texts` constant and an `Area`): what a screen shows, read
+  by OCR inside the area only. `Setup.texts(List.of(…))` tells a screen by them too: `Markers.onEach` reads them last,
   and only for a set its pictures leave in, each caption once per frame, so a screen of one frame and another title, or
   of no picture of its own, is told apart at the cost of OCR only where pictures cannot decide. `TextButton.of(caption)`
   is a fifth `Input`, clicked at the centre of the line that is its words, by a gesture as a button is. A line matches
@@ -188,7 +198,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   by the place; `Reach.seen` takes the nearest for a place, the cell for a cell. 🗺's board still boxes a spot on its
   anchor (`ScreenCanvas` was another session's at the time).
 - **Readouts and results** (2026-10-22): a `Readout` is a field of its screen beside its inputs, never pressed,
-  `public final Readout gold = Readout.digits(Zones.GOLD, Digits.GOLD);` or `Readout.text(Zones.HERO_NAME)` by OCR.
+  `public final Readout gold = Readout.digits(Area.of(Pictures.GOLD_ICON, 1.2, 0, 3, 1), Digits.GOLD);` or
+  `Readout.text(Area.of(Pictures.HERO_FRAME, 0, 1, 1, 0.3))` by OCR.
   Both kinds are a `ScreenPart`, the type the contract's `SCREEN_MAP` fields are of; `MapScreen` keeps them apart
   (`inputs`, `readouts`). `Navigate.read(readout)` and `Navigate.number(readout)` read one off a single look, walking
   nothing: empty when that look does not show its screen. A screen of one of several (hero N) names which by a readout
@@ -203,8 +214,10 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   return Navigate.next(Screens.BATTLE).filter(Screens.VICTORY::equals).isPresent();
   ```
 
-  names the map's screens only. 🗺's cut form saves a zone or digits *read on this screen* as a readout of the cut's
-  name (a number's box becomes a zone of that name too); read_map lists them.
+  names the map's screens only. 🗺's cut form saves words or digits *read beside a picture* as a readout of the cut's
+  name, its area measured from the picture its *beside* names: a stored one, or one cut in the same go as *A picture
+  to measure an area from* (`BoardCuts.Anchor`, a picture of no screen, saved before the areas). The live board draws
+  each readout's area where its anchor shows now; read_map lists them.
 - **`Strip`** (a field of the screen): some of a screen's buttons in one list that scrolls or column whose slots
   shift, named by their pictures and its `Scroll` — never by a rectangle (the user's call, 2026-10-16, after Home's
   left column over a moving fight). A member is looked for anywhere in the band its members were cut in
@@ -335,7 +348,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `ToolReach` for the assistant. `perform` is the one place an input is done, each through `press(Point, Gesture,
   Duration)`, `keys(Combo)`, a field's `type(text, clears, submits)` and a drag's `drag(from, dropOn(…), time)`
   (`press(Button, Rect, frame)`, false when the drop is missing); words are found by `findText(caption, frame)`,
-  the zone placed as `source.region` places it and cut out, then `read` (OCR, a test's fake). A list member not in view is scrolled
+  the area placed beside its anchor on the frame and cut out, then `read` (OCR, a test's fake). A list member not in view is scrolled
   to over a member that shows (past them all, where the last one showed; none yet, the band's middle),
   its `Scroll.most` times each way. After each scroll the list is looked at until two looks agree (`Reach.settled`, up
   to `SCROLL_SETTLE_MAX_MS`; members still where they were are watched to the limit, as a game may glide late); a
@@ -478,10 +491,10 @@ map tool against the hand path that covers it, and fails on one with none.
   Missed frames (`missed_frames`) open frozen. ▶ Launch starts the game when it is not up.
 - **Cuts on the frozen frame** (`CutLayer`, `CutForm`, `assist/BoardCuts`): a box, an oval or a polygon drawn on the
   board, ▨ the part a run skips, then each cut said what it is — a marker (set, add or absent), a button, the way
-  back, a look of a button or of the screen, a strip's button, a zone (`save_region`), digits (`save_digits`) or a
-  new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The kinds are offered by
+  back, a look of a button or of the screen, a strip's button, a picture to measure an area from, words or digits read
+  beside a picture (`save_digits` for the glyphs) or a new image for a picture — with crop_pictures' tags, sometimes, popup and "only while". The kinds are offered by
   what a cut is for (`CutForm.Intent`: tells the screen, acts, reads or fixes), and each cut's name is suggested
-  (`CutNames`): the words OCR reads on it, else `<screen>_<kind>_<n>`, taken by no picture, zone or other cut, and
+  (`CutNames`): the words OCR reads on it, else `<screen>_<kind>_<n>`, taken by no picture or other cut, and
   replaced while the field still holds it. The pixels are the frame's,
   never grabbed again. ✂'s ▾ keeps the cut over the game window (`CaptureTemplates`) as a fallback. An object cut
   (the magic wand) is not on the board: crop_pictures has no shape for it.

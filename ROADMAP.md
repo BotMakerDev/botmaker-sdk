@@ -138,8 +138,9 @@ Completed work up to 2026-10-05: see CHANGELOG.md, docs/refactor/, and `git show
 - **`OcrOptions`**: `withLanguages(OcrLanguage...)` is not a declared chain (the host would need to read a
   varargs argument inside a receiver chain); `Text.DEFAULT_OPTIONS` shows as written — an `OcrOptions`
   constant plus `.constants(…)` would fix both reading and fresh blocks.
-- **`Spots` and `Zones`**: only the assistant's `save_point`/`save_region` write their numbers; Studio locks
-  the files as it locks every `@SdkValue` holder, and a window only changes a place's anchor.
+- **Areas, open from the review (2026-11-09)**: an anchor shown twice has no rule for which copy an area is measured
+  from, and each run-time area does its own full-frame match of its anchor (the live board shares one per anchor;
+  the tools still match on the FX thread).
 - **Read-only chains**: a hand-written capture chain (`CaptureSource.window("G").region(r)`) and a
   `Precision` wither chain; the host writes the one-call forms.
 - **Remote Pilot**: a quick tunnel's address changes at every start, so the APK's saved connection goes

@@ -10,7 +10,7 @@ import java.util.Set;
  * The name the cut form suggests for a cut, so a cut is saved without typing one (2026-10-22: Firestone's map needed
  * some 240 names typed by hand): the words OCR reads on it ({@code Claim all!} → {@code claim_all}), else
  * {@code <screen>_<kind>_<n>} ({@code home_button_3}); lowercase with underscores, as a picture's name is, and taken by
- * no picture, zone or other cut.
+ * no picture or other cut.
  */
 final class CutNames {
 

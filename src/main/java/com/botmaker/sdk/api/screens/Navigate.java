@@ -249,7 +249,7 @@ public final class Navigate {
 
     /**
      * What {@code readout} shows now, a readout of a screen of the map ({@code Screens.HOME.gold}): the words read in
-     * its zone, or the number its digits spell. Nothing is walked to: empty when the game does not show its screen, a
+     * its area, or the number its digits spell. Nothing is walked to: empty when the game does not show its screen, a
      * panel of it covers it ({@link Setup#panelOf}), or nothing is read there.
      */
     @Hidden("no block can pick a readout yet: Studio reads Screens.HOME.gold as an input; written in Java")

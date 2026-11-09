@@ -14,7 +14,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
  * another's is told apart by a part {@link #absent} from it.
  *
  * @param picture  the picture that shows, looked for near where it was cut; null for words or an element
- * @param caption  the words read in their zone; null for a picture or an element
+ * @param caption  the words read in their area; null for a picture or an element
  * @param element  the element the app's tree holds; null for a picture or words
  * @param isAbsent whether it never shows while the game shows its screen, telling it apart from one alike
  */
@@ -26,7 +26,7 @@ public record Mark(ImageTemplate picture, Caption caption, Element element, bool
         return new Mark(picture, null, null, false);
     }
 
-    /** {@code caption}'s words, read in their zone while the game shows the screen. */
+    /** {@code caption}'s words, read in their area while the game shows the screen. */
     public static Mark of(Caption caption) {
         if (caption == null) throw new IllegalArgumentException("A mark of words needs the caption");
         return new Mark(null, caption, null, false);

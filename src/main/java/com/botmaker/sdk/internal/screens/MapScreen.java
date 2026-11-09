@@ -202,7 +202,7 @@ public record MapScreen(Setup setup, Map<String, Input> inputs, Map<String, Read
         return firstMarker() == null ? null : firstMarker().id();
     }
 
-    /** The words that tell it, each read in its zone: its setup's and its parts'. */
+    /** The words that tell it, each read in its area: its setup's and its parts'. */
     public List<Caption> texts() {
         return Markers.of(this).texts();
     }

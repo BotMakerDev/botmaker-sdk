@@ -29,7 +29,7 @@ import java.util.function.Predicate;
 
 /**
  * What tells a screen or a look: pictures that all show, pictures none of which may show, words that all show, each
- * in its zone, and an app's elements that all show in the screen's tree. The one rule every reader of the map tells a
+ * in its area, and an app's elements that all show in the screen's tree. The one rule every reader of the map tells a
  * screen by — a walk, {@code Navigate.isOn}, the assistant's tools and the audit.
  *
  * <p>A screen's set is its parts that mark and those absent from it ({@link #of(MapScreen)}), with what its setup
@@ -37,12 +37,12 @@ import java.util.function.Predicate;
  *
  * @param shown          pictures that all show; empty: no picture tells it
  * @param absent         pictures none of which may show
- * @param texts          words that all show, each read in its zone
+ * @param texts          words that all show, each read in its area
  * @param elements       elements the screen's tree holds, each once or more
  * @param picked         elements the screen's tree holds picked ({@link State#SELECTED}): an app's tab button, which
  *                       shows on every tab and tells only its own picked
  * @param either         groups of pictures, one of each showing: a marking button's looks
- * @param absentTexts    words none of which may be read, each in its zone
+ * @param absentTexts    words none of which may be read, each in its area
  * @param absentElements elements the screen's tree may not hold
  */
 public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, List<Caption> texts,

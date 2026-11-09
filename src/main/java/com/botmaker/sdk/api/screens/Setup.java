@@ -51,7 +51,7 @@ import java.util.function.BooleanSupplier;
  * @param name     the name the game shows for it, in plain words
  * @param markers  pictures that all show while the game shows this screen; empty until one is cut
  * @param absent   pictures none of which shows while the game shows this screen
- * @param texts    words that all show while the game shows this screen, each read in its zone: what tells apart
+ * @param texts    words that all show while the game shows this screen, each read in its area: what tells apart
  *                 screens whose pictures are alike, or one with no picture of its own (2026-10-22)
  * @param elements the app's elements that all show in the screen's tree while it shows this screen (2026-10-31)
  * @param from    the way in that made it known, through an input of another screen ({@code .from(HOME.market)},
@@ -138,7 +138,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     }
 
     /**
-     * This screen, told by {@code texts} too: all of them show, each in its zone, while the game shows it. A
+     * This screen, told by {@code texts} too: all of them show, each in its area, while the game shows it. A
      * {@code Mark.of(Caption)} or a text button that is {@code .marking()} tells it now.
      */
     @Link

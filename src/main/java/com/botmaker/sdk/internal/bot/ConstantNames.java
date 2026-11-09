@@ -1,7 +1,7 @@
 package com.botmaker.sdk.internal.bot;
 
 /**
- * The constant a typed name is written as: a screen, a zone or a region the author names in words becomes an
+ * The constant a typed name is written as: a screen or a picture the author names in words becomes an
  * UPPER_SNAKE constant of the bot's Java. Moved out of the flow names on 2026-11-09, when flows were deleted.
  */
 public final class ConstantNames {

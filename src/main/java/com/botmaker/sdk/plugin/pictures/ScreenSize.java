@@ -99,8 +99,8 @@ public final class ScreenSize {
     }
 
     /**
-     * The bot's screen size, which becomes {@code frame} when the bot names none yet: what a picture, a spot or a
-     * zone cut from {@code frame} is written against. Empty when the bot names none and it could not be written. On
+     * The bot's screen size, which becomes {@code frame} when the bot names none yet: what a picture cut from
+     * {@code frame} is written against. Empty when the bot names none and it could not be written. On
      * the FX thread.
      */
     public static Optional<Size> adopt(StudioServices services, Size frame) {

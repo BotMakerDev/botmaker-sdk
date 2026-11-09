@@ -150,7 +150,7 @@ public final class ServesProposal {
      */
     static Optional<String> after(AgentContext context, String screen, MapScreen on, String field, boolean stayed,
                                   BufferedImage before, BufferedImage after) {
-        // A press that left the screen shows another one after: its readouts' zones hold something else there.
+        // A press that left the screen shows another one after: its readouts' areas hold something else there.
         if (!stayed || before == null || after == null) return Optional.empty();
         Map<String, Readout> shown = new LinkedHashMap<>();
         on.readouts().values().forEach(readout -> {

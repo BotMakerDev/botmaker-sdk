@@ -410,7 +410,7 @@ final class ActTools {
 
     /**
      * {@code words} pressed by their gesture where a fresh look reads them, as a run reads and presses them. Nothing
-     * pressed when they are not read in their zone.
+     * pressed when they are not read in their area.
      */
     static Entered enterText(AgentContext context, String screen, TextButton words, Boolean desktop, int settleMs,
                              double share) {

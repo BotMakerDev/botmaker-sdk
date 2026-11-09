@@ -822,7 +822,7 @@ final class ScreenPanel {
         return line;
     }
 
-    /** Words that tell the screen, read in their zone, with ✕ to take them off. */
+    /** Words that tell the screen, read in their area, with ✕ to take them off. */
     private Node textRow(String constant, Caption words, boolean busy) {
         Label label = new Label(words.said());
         label.getStyleClass().add("screen-row-label");

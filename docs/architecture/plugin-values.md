@@ -13,10 +13,9 @@ which a picture refers to by its constant),
 Progress::gold, 100))`, `Goal.of(GameLogic::eventFinished)` or `Goal.done(() -> Screens.HOME.claim).within(…)`) and
 **`Plans.java`** (`PLANS`: one `Plan` constant per plan, its tiers of goals, `Plan.of(Plan.tier(Goals.A), …)`). What
 is done on a screen is a `Do` field of that screen in `Screens.java`, beside the input it presses, never a value of its
-own (`screens.md` § Actions). Beside them the host writes **`Zones.java`** (`ZONES`, 2026-10-11):
-named `Zone`s in the bot's pixels from the game's corner, which the assistant's `save_region` adds and a run
-places on the live game (`internal/vision/Places`). `Spots.java` (`SPOTS`) went on 2026-10-15: a bot clicks
-pictures, never places. They replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
+own (`screens.md` § Actions). `Zones.java` (`ZONES`, named boxes in the bot's pixels) went on 2026-11-09 for an
+`Area` measured from a picture, written in place in the readout, caption or drag that uses it (`screens.md` § Areas);
+`Spots.java` (`SPOTS`) went on 2026-10-15: a bot clicks pictures, never places. They replaced `POINTS`/`REGIONS` (desktop `Point`s, source `Rect`s, 2026-10-06),
 which nothing converts. **`Digits.java`** (`DIGITS`,
 2026-10-11) holds a `DigitSet` per game font, a folder of `0.png`–`9.png` under `src/main/resources/digits/`
 that the assistant's `save_digits` cuts (`plugin/pictures/DigitCuts`) and `Text.readDigits` reads with

@@ -273,7 +273,7 @@ public interface Reach {
     }
 
     /**
-     * What {@code readout} shows on {@code frame}: the lines read in its zone, joined by a space, or the number its
+     * What {@code readout} shows on {@code frame}: the lines read in its area, joined by a space, or the number its
      * digits spell there. Empty when nothing is read.
      *
      * @throws TextUnread when its words could not be read: what it shows is not known, never "nothing shows"
@@ -575,7 +575,7 @@ public interface Reach {
         return Placed.meeting(copies, Seen::place, place.side(), anchor.get(), other);
     }
 
-    /** Where an anchor shows on {@code frame}: its picture found, or its words read in their zone. */
+    /** Where an anchor shows on {@code frame}: its picture found, or its words read in their area. */
     private Optional<Rect> anchorOf(ImageTemplate picture, Caption words, BufferedImage frame) {
         if (picture != null) return find(picture, frame);
         return words == null ? Optional.empty() : textOrNone(words, frame);
