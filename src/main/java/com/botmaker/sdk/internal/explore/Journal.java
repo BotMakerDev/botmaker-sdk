@@ -37,7 +37,7 @@ public final class Journal {
 
     static final String FOLDER = "explore";
     public static final String EVENTS = "events.jsonl";
-    static final String QUEUE = "queue.json";
+    public static final String QUEUE = "queue.json";
     static final String COMMAND = "command";
 
     /** Reads what a newer SDK wrote: a field it added is skipped, a constant it added reads as UNKNOWN, else null. */

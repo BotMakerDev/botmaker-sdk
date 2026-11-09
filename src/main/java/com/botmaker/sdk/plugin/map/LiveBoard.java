@@ -46,7 +46,6 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 import javax.imageio.ImageIO;
@@ -531,27 +530,12 @@ final class LiveBoard {
         boxes.getChildren().clear();
         if (on == null || frameWidth == 0) return;
         double scale = view.getFitWidth() / frameWidth;
-        for (Rect box : markerBoxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-marker"));
-        for (Rect box : boxesOf(on).values()) boxes.getChildren().add(drawn(box, scale, "screen-live-box"));
+        for (Rect box : markerBoxesOf(on).values()) {
+            boxes.getChildren().add(FrameBoxes.box(box, scale, "screen-live-marker"));
+        }
+        for (Rect box : boxesOf(on).values()) boxes.getChildren().add(FrameBoxes.box(box, scale, "screen-live-box"));
         // Each readout's area where its anchor is now: it moves and grows with the picture it is measured from.
-        areas.forEach((name, box) -> {
-            boxes.getChildren().add(drawn(box, scale, "screen-live-area"));
-            Label named = new Label(name);
-            named.getStyleClass().add("screen-live-area-name");
-            named.setManaged(false);
-            boxes.getChildren().add(named);
-            named.applyCss();
-            named.autosize();
-            // Above the box, or under it when the box touches the frame's top.
-            double above = box.y() * scale - named.getHeight();
-            named.relocate(box.x() * scale, above >= 0 ? above : (box.y() + box.height()) * scale);
-        });
-    }
-
-    private static Rectangle drawn(Rect box, double scale, String style) {
-        Rectangle drawn = new Rectangle(box.x() * scale, box.y() * scale, box.width() * scale, box.height() * scale);
-        drawn.getStyleClass().add(style);
-        return drawn;
+        FrameBoxes.areas(boxes, areas, scale);
     }
 
     /** Where {@code constant}'s markers are on a live frame, by picture id. */

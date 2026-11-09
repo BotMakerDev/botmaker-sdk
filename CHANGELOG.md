@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **🔭 Explore in 🗺 Screens** (2026-11-09): a view of the rail that starts and watches a run exploring the game.
+  ▶ Keep exploring starts the long run (its ▾ also offers the single pass, *Explore map*) and ■ Stop ends it; neither run
+  is a toolbar button any more. The view shows how long it has run, the screens known and found, the stops fixed and
+  whether it waits on Claude; on the left the game as the run sees it, its readouts' areas boxed, the screen's name
+  and the facts it reads; on the right what the run found, pressed, refused and stopped on, newest first, with the
+  stop it waits on pinned above and the last tool Claude called.
 - **🗺 Screens has a left rail** (2026-11-09): 🗺 Map, 🎯 Goals and 🖼 Pictures, one window. Goals and Manage
   Pictures are no longer toolbar buttons; they are views of the rail, each kept as it was left and re-read when
   shown again. A double click on a Goals row shows the map with that screen's tab open. ✂ Capture Templates left

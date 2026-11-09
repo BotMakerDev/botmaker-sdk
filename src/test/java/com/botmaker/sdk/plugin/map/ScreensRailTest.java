@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 🗺 Screens' rail, headless: it switches the window's view, and Goals' double click comes back to the map. */
 class ScreensRailTest extends ApplicationTest {
@@ -71,9 +72,9 @@ class ScreensRailTest extends ApplicationTest {
         assertEquals(View.MAP, map.viewShown());
         assertSame(map.node(), window.getCenter());
         List<ToggleButton> buttons = railButtons();
-        assertEquals(List.of("Map", "Goals", "Pictures"),
-                buttons.stream().filter(Node::isVisible).map(b -> b.getText().split("\n")[1]).toList(),
-                "Explore waits for its run");
+        assertEquals(List.of("Map", "Goals", "Explore", "Pictures"),
+                buttons.stream().map(b -> b.getText().split("\n")[1]).toList());
+        assertTrue(buttons.stream().allMatch(b -> b.isVisible() && b.isManaged()), "every view offered");
 
         clickOn(button("Goals"));
         assertEquals(View.GOALS, map.viewShown());

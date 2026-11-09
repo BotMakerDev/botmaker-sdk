@@ -501,7 +501,7 @@ public final class ScreenMap {
             case MAP -> root;
             case GOALS -> GoalsView.view(services, this::openScreen, closing -> subscriptions.add(closing::run));
             case PICTURES -> ResourceManagerDialog.view(services, () -> window);
-            case EXPLORE -> new Label("Explore comes with its run.");
+            case EXPLORE -> ExploreView.view(services, () -> graph, closing -> subscriptions.add(closing::run));
         };
     }
 

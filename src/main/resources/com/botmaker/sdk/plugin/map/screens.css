@@ -507,3 +507,33 @@
     -fx-font-size: 0.8em;
     -fx-text-fill: -bm-screen-plain;
 }
+
+/* 🔭 Explore, a view of the rail (2026-11-09). */
+.explore-bar {
+    -fx-border-color: transparent transparent -bm-screen-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.explore-status {
+    -fx-text-overrun: ellipsis;
+}
+
+.explore-heading {
+    -fx-font-weight: bold;
+}
+
+.explore-screen {
+    -fx-font-family: monospace;
+}
+
+.explore-pinned {
+    -fx-background-color: derive(-bm-screen-card, -4%);
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-screen-untried;
+    -fx-border-radius: 8;
+}
+
+.explore-claude {
+    -fx-text-fill: -bm-screen-plain;
+    -fx-font-size: 0.9em;
+}

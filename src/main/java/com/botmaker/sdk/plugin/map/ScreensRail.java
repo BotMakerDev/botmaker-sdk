@@ -65,8 +65,6 @@ final class ScreensRail {
             buttons.put(view, button);
             rail.getChildren().add(button);
         }
-        // The Explore view comes with its run (the screens-rail plan's phase 5).
-        hide(View.EXPLORE);
         group.selectedToggleProperty().addListener((o, was, is) -> {
             // A press on the view shown leaves it shown: one is always.
             if (is == null) {
@@ -97,11 +95,5 @@ final class ScreensRail {
         showing = view;
         buttons.get(view).setSelected(true);
         root.setCenter(node);
-    }
-
-    private void hide(View view) {
-        ToggleButton button = buttons.get(view);
-        button.setVisible(false);
-        button.setManaged(false);
     }
 }

@@ -19,5 +19,7 @@ class SdkRunsTest {
         assertEquals(List.of("Explore map", "Keep exploring"), entries.stream().map(RunEntry::title).toList());
         assertEquals(List.of(ExploreMap.class.getName(), KeepExploring.class.getName()),
                 entries.stream().map(RunEntry::mainClass).toList());
+        assertEquals(List.of(false, false), entries.stream().map(RunEntry::onBar).toList(),
+                "both start from 🗺 Screens ▸ 🔭 Explore");
     }
 }

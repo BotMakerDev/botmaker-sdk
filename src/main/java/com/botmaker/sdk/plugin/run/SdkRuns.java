@@ -21,6 +21,8 @@ public final class SdkRuns implements RunEntryHolder {
 
     @Override
     public List<RunEntry> runs() {
-        return List.of(RunEntry.of(EXPLORE_MAP, ExploreMap::main), RunEntry.of(KEEP_EXPLORING, KeepExploring::main));
+        // Started from 🗺 Screens ▸ 🔭 Explore, not the toolbar (2026-11-09, spec screens-rail goal 9).
+        return List.of(RunEntry.of(EXPLORE_MAP, ExploreMap::main).offBar(),
+                RunEntry.of(KEEP_EXPLORING, KeepExploring::main).offBar());
     }
 }
