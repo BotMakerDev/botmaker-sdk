@@ -5,6 +5,7 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.ApkDownload;
 import com.botmaker.shared.emulator.EmulatorInstances;
+import com.botmaker.shared.emulator.GoogleAccount;
 import com.botmaker.shared.emulator.PlayStoreSetup;
 import com.botmaker.shared.launch.GameInstall;
 import com.botmaker.shared.launch.GameReadiness;
@@ -32,6 +33,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
@@ -39,7 +41,8 @@ import java.util.function.Consumer;
  * The Game dialog's line under the current target: whether it can start ({@link GameReadiness}), and Install and
  * Update through its launcher ({@link GameInstall}). An Android target adds the user's OK to download from APKPure,
  * asked once with apkeep's warning and remembered ({@link ApkDownload#acknowledged()}), and the steps that give its
- * emulator Google Play ({@link PlayStoreSetup}).
+ * emulator Google Play ({@link PlayStoreSetup}), and the one Google account Play's files are downloaded with for every
+ * emulator ({@link GoogleAccount}): only the user signs it in, here.
  */
 final class InstallRow {
 
@@ -53,6 +56,14 @@ final class InstallRow {
     private final Button update = new Button("Update");
     private final CheckBox apkPure = new CheckBox("Download from APKPure");
     private final Button googlePlay = new Button("Get Google Play…");
+    /** The Google account Play's files are downloaded with when the anonymous ones fail (2026-11-10, mockup B). */
+    private final HBox account;
+    private final Label signedInAs = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.OK_TEXT);
+    private final Hyperlink accountAction = new Hyperlink();
+    private final Label accountNote = Styles.on(new Label("Used only when Play's anonymous downloads fail. Use a "
+            + "secondary account."), Styles.SMALL_TEXT, Styles.WARNING_TEXT);
+    /** The sign-in under way, which Cancel interrupts; null when none is. */
+    private Thread signingIn;
     private final VBox row;
     private LaunchSpec spec;
     /** What the user calls {@link #spec}'s game: the name it was picked under, never its spec. */
@@ -79,7 +90,78 @@ final class InstallRow {
         for (Node control : controls.getChildren()) {
             if (control instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
         }
-        row = new VBox(4, state, controls);
+        accountAction.setOnAction(e -> accountClicked());
+        accountNote.setWrapText(true);
+        account = new HBox(6, Styles.on(new Label("Google account:"), Styles.SMALL_TEXT), signedInAs, accountAction,
+                accountNote);
+        account.setAlignment(Pos.CENTER_LEFT);
+        row = new VBox(4, state, controls, account);
+    }
+
+    /** The account line as it stands: signing in, signed in, or not. FX thread. */
+    private void showAccount() {
+        Optional<String> email = GoogleAccount.signedIn();
+        boolean waiting = signingIn != null;
+        signedInAs.setText(waiting ? "Waiting for you to sign in in the browser…"
+                : email.map(who -> "Signed in as " + who + " ·").orElse(""));
+        Styles.pick(signedInAs, waiting ? Styles.MUTED_TEXT : Styles.OK_TEXT, Styles.MUTED_TEXT, Styles.OK_TEXT);
+        accountAction.setText(waiting ? "Cancel" : email.isPresent() ? "Sign out" : "Sign in…");
+        boolean note = !waiting && email.isEmpty();
+        accountNote.setVisible(note);
+        accountNote.setManaged(note);
+    }
+
+    private void accountClicked() {
+        if (signingIn != null) {
+            signingIn.interrupt();
+            return;
+        }
+        if (GoogleAccount.signedIn().isPresent()) {
+            GoogleAccount.signOut();
+            report.say(true, "Signed out of Google on this computer. Google still lists the sign-in under the "
+                    + "account's devices, where you can remove it.");
+            showAccount();
+            refreshSource();
+            return;
+        }
+        if (!confirmSignIn()) return;
+        signingIn = Async.load("google-sign-in", () -> GoogleAccount.signIn(line -> Platform.runLater(() ->
+                report.say(true, line))), result -> {
+            signingIn = null;
+            report.say(result.ok(), result.message());
+            showAccount();
+            refreshSource();
+        }, why -> {
+            signingIn = null;
+            report.say(false, why);
+            showAccount();
+        });
+        showAccount();
+    }
+
+    private boolean confirmSignIn() {
+        ButtonType open = new ButtonType("Open the sign-in", ButtonBar.ButtonData.OK_DONE);
+        Alert alert = services.theme().alert(Alert.AlertType.CONFIRMATION, "", ButtonType.CANCEL, open);
+        Window owner = owner();
+        if (owner != null) alert.initOwner(owner);
+        alert.setTitle("Sign in to Google");
+        alert.setHeaderText("Download Google Play's files with your account");
+        Label text = new Label("BotMaker downloads a game's Google Play files with this account when Aurora's "
+                + "anonymous accounts give none, for every emulator on this computer; no emulator signs in. Use a "
+                + "secondary account: Google may flag an account that downloads for many devices. A Chrome or Edge "
+                + "window opens on Google's sign-in; sign in there and select I agree. The key Google gives stays on "
+                + "this computer.");
+        text.setWrapText(true);
+        text.setMaxWidth(460);
+        alert.getDialogPane().setContent(text);
+        return alert.showAndWait().orElse(ButtonType.CANCEL) == open;
+    }
+
+    /** The "From …" line again, when it shows the source: signing in or out changes it. */
+    private void refreshSource() {
+        if (spec != null && !installed && !busy && state.getText().startsWith("From ")) {
+            state.setText("From " + GameInstall.of(spec, apkPure.isSelected()).source() + ".");
+        }
     }
 
     /** {@code message} with {@code target}'s spec said as {@code game}, its name: shared's messages name the spec. */
@@ -99,10 +181,11 @@ final class InstallRow {
         row.setManaged(installs);
         if (!installs) return;
         boolean android = spec.kind() == LaunchKind.EMULATOR_APP;
-        for (Node own : new Node[]{apkPure, googlePlay}) {
+        for (Node own : new Node[]{apkPure, googlePlay, account}) {
             own.setVisible(android);
             own.setManaged(android);
         }
+        if (android) showAccount();
         apkPure.setSelected(ApkDownload.acknowledged());
         installed = false;
         install.setDisable(busy);

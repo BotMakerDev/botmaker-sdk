@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Sign in to Google once for every emulator**: the Game dialog's install line has a *Google account* line under
+  its buttons for an Android game. *Sign in…* opens Google's sign-in in a Chrome or Edge window; BotMaker then
+  downloads a game's Google Play files with that account when Aurora's anonymous accounts give none, and no
+  emulator signs in. Use a secondary account. *Sign out* forgets it on this computer.
 - setup's `emulator_checks` and `fix` word their answers through shared's `CheckAnswers`, which BotMaker's own
   `device` tool uses too; nothing changes in what they say.
 
