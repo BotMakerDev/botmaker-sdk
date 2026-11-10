@@ -193,6 +193,20 @@ final class SetupTools {
     record UpdateGame() implements Step {
     }
 
+    @Describe("only when the user asks: open a browser window where the user signs in to the Google account Google "
+            + "Play's files are downloaded with, for every emulator; runs on in the background, google_status says how "
+            + "it went; no answer carries the password or the token")
+    record GoogleSignIn() implements Step {
+    }
+
+    @Describe("the Google account signed in (its email only), and how the last sign-in went")
+    record GoogleStatus() implements Step {
+    }
+
+    @Describe("forget the Google account, or stop a sign-in waiting in the browser")
+    record GoogleSignOut() implements Step {
+    }
+
     @Describe("set Sdk.screen(), the size pictures are cut at")
     record SetScreenSize(@Describe("px") int width, @Describe("px; above width for portrait") int height)
             implements Step {
@@ -237,7 +251,8 @@ final class SetupTools {
 
     static final List<AssistantTool<?>> TOOLS = List.of(
             ToolTiming.actions("setup", "Reads or sets where the bot looks, what it launches and its settings; "
-                    + "installs or updates its game; checks and fixes its emulator", Step.class,
+                    + "installs or updates its game; signs in to Google for Play's files; checks and fixes its emulator",
+                    Step.class,
                     SetupTools::setup),
             AssistantTool.named("list_windows")
                     .describedAs("The windows open on the desktop now, each with its class and size, for "
@@ -268,6 +283,9 @@ final class SetupTools {
             case Readiness readiness -> readiness(context);
             case InstallGame install -> install(install.file(), false, context);
             case UpdateGame update -> install(null, true, context);
+            case GoogleSignIn ignored -> AgentReply.text(GoogleSignIns.SHARED.start());
+            case GoogleStatus ignored -> AgentReply.text(GoogleSignIns.SHARED.status());
+            case GoogleSignOut ignored -> AgentReply.text(GoogleSignIns.SHARED.signOut());
             case EmulatorChecks checks -> ChecksTools.checks(context);
             case Fix fix -> ChecksTools.fix(fix.check(), Boolean.TRUE.equals(fix.undo()), context);
             case GameFacts ignored -> FxCall.call(() -> gameFacts(context.services().pluginValues().runParameters()));

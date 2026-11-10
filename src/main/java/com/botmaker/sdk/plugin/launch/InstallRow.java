@@ -101,7 +101,8 @@ final class InstallRow {
     /** The account line as it stands: signing in, signed in, or not. FX thread. */
     private void showAccount() {
         Optional<String> email = GoogleAccount.signedIn();
-        boolean waiting = signingIn != null;
+        // An assistant's sign-in (setup google_sign_in) waits in the same browser, and Cancel stops it too.
+        boolean waiting = signingIn != null || GoogleAccount.signingIn();
         signedInAs.setText(waiting ? "Waiting for you to sign in in the browser…"
                 : email.map(who -> "Signed in as " + who + " ·").orElse(""));
         Styles.pick(signedInAs, waiting ? Styles.MUTED_TEXT : Styles.OK_TEXT, Styles.MUTED_TEXT, Styles.OK_TEXT);
@@ -112,14 +113,15 @@ final class InstallRow {
     }
 
     private void accountClicked() {
-        if (signingIn != null) {
-            signingIn.interrupt();
+        if (signingIn != null || GoogleAccount.signingIn()) {
+            if (signingIn != null) signingIn.interrupt();
+            GoogleAccount.cancelSignIn();
+            showAccount();
             return;
         }
         if (GoogleAccount.signedIn().isPresent()) {
             GoogleAccount.signOut();
-            report.say(true, "Signed out of Google on this computer. Google still lists the sign-in under the "
-                    + "account's devices, where you can remove it.");
+            report.say(true, GoogleAccount.SIGNED_OUT);
             showAccount();
             refreshSource();
             return;

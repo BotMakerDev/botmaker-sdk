@@ -23,6 +23,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   its buttons for an Android game. *Sign in…* opens Google's sign-in in a Chrome or Edge window; BotMaker then
   downloads a game's Google Play files with that account when Aurora's anonymous accounts give none, and no
   emulator signs in. Use a secondary account. *Sign out* forgets it on this computer.
+- An assistant does the same through `setup`: `google_sign_in` opens the browser window for the user to sign in and
+  runs on in the background, `google_status` says which account is signed in and how the last sign-in went, and
+  `google_sign_out` stops a waiting sign-in or forgets the account. No answer carries the password or the token.
+  It and the Game dialog's line share one sign-in at a time: each sees and can cancel the other's.
+- The SDK's assistant tools run when BotMaker's core serves them with no bot open; one that needs the bot says
+  "needs a bot open: open_project".
 - setup's `emulator_checks` and `fix` word their answers through shared's `CheckAnswers`, which BotMaker's own
   `device` tool uses too; nothing changes in what they say.
 

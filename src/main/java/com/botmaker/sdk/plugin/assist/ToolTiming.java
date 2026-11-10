@@ -107,8 +107,14 @@ final class ToolTiming {
         return action.getClass().getSimpleName().replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }
 
-    private static Path projectOf(AgentContext context) {
-        return context == null || context.services() == null ? null : context.services().projectDir();
+    /** The bot's folder, or null: none given, or none open (a core's home plugins refuse it, 2026-11-10). */
+    static Path projectOf(AgentContext context) {
+        if (context == null || context.services() == null) return null;
+        try {
+            return context.services().projectDir();
+        } catch (IllegalStateException noBot) {
+            return null;
+        }
     }
 
     /**

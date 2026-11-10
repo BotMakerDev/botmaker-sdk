@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
@@ -7,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -15,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ToolTimingTest {
@@ -92,6 +96,20 @@ class ToolTimingTest {
     }
 
     record SetFlowMethod() {
+    }
+
+    /** A core's home plugins serve the tools with no bot open: its projectDir refuses, and a tool runs untimed. */
+    @Test
+    void withNoBotOpenAToolRunsAndNoRowIsWritten() {
+        StudioServices noBot = (StudioServices) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{StudioServices.class}, (self, method, args) -> {
+                    throw new IllegalStateException("That needs a bot open");
+                });
+        AgentContext context = (AgentContext) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AgentContext.class}, (self, method, args) ->
+                        method.getName().equals("services") ? noBot : null);
+
+        assertNull(ToolTiming.projectOf(context));
     }
 
     @Test
