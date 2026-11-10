@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.10.0] — 2026-11-10
 
 - **🔭 Explore in 🗺 Screens** (2026-11-09): a view of the rail that starts and watches a run exploring the game.
   ▶ Keep exploring starts the long run (its ▾ also offers the single pass, *Explore map*) and ■ Stop ends it; neither run
@@ -588,6 +588,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   one Studio writes again after an edit may reorder its links once (`.from(…)` goes last, `.panelOf(…)` after
   `.loads(…)`; a card's `.described(…)` and `.on(…)` come before `.goesHome()`; the run's `.notes(…)` before
   `.home(…)`; the settings' `.maxRetryAttempts(…)` first and the others by name). What it does is unchanged.
+
+### Changed
+
+- Built against botmaker-shared 0.8.0 (was 0.6.1).
+- Built against botmaker-session 0.7.0 (was 0.6.1).
+- Built against botmaker-studio-api 0.17.0 (was 0.14.1).
+- Built against botmaker-plugin-toolkit 0.15.0 (was 0.13.1).
+- Built against botmaker-plugin-host 0.12.0.
+- Built against botmaker-plugin-basics 0.9.0 (was 0.8.1).
+- Built against botmaker-java 0.2.0.
 
 ## [1.9.1] — 2026-11-01
 
