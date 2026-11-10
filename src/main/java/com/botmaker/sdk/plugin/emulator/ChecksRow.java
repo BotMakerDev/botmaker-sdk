@@ -7,9 +7,9 @@ import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
-import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.WaydroidPlatform;
 import com.botmaker.shared.emulator.WaydroidResolution;
+import com.botmaker.shared.emulator.checks.CheckAnswers;
 import com.botmaker.shared.emulator.checks.CheckResult;
 import com.botmaker.shared.emulator.checks.CheckState;
 import com.botmaker.shared.emulator.checks.EmulatorCheck;
@@ -17,7 +17,6 @@ import com.botmaker.shared.emulator.checks.EmulatorChecks;
 import com.botmaker.shared.emulator.checks.Fix;
 import com.botmaker.shared.emulator.checks.FixRunner;
 import com.botmaker.shared.emulator.checks.Fixes;
-import com.botmaker.shared.emulator.checks.RootScript;
 import com.botmaker.shared.emulator.checks.WaydroidChecks;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -145,12 +144,6 @@ public final class ChecksRow {
                 words -> starter.start(read.spec(), services, words));
     }
 
-    /** The one runner of {@code instance}'s emulator; {@code null} is the Waydroid not discovered. */
-    public static FixRunner runnerOf(EmulatorInstance instance) {
-        boolean waydroid = instance == null || instance.platformId() == PlatformId.WAYDROID;
-        return FixRunner.of(waydroid ? WaydroidPlatform.INSTANCE_NAME : instance.identity());
-    }
-
     /** Reads the checks off the FX thread; a Fix under way keeps its row until it ends. */
     private void reload() {
         if (spec == null || runningCheck != null) return;
@@ -252,7 +245,7 @@ public final class ChecksRow {
     }
 
     private FixRunner runner() {
-        return runnerOf(instance);
+        return CheckAnswers.runnerOf(instance);
     }
 
     private void run(Fix fix) {
@@ -276,7 +269,7 @@ public final class ChecksRow {
         }
         running = null;
         runningCheck = null;
-        said.setText(ended(fix, progress));
+        said.setText(CheckAnswers.ended(fix, progress));
         showOutput(progress.output());
         reload();
     }
@@ -291,13 +284,6 @@ public final class ChecksRow {
         ClipboardContent content = new ClipboardContent();
         content.putString(text);
         Clipboard.getSystemClipboard().setContent(content);
-    }
-
-    /** What a Fix ended in, for the line under the rows. */
-    public static String ended(Fix fix, FixRunner.Progress end) {
-        String name = fix.check().displayName();
-        if (end.outcome() != RootScript.Outcome.DONE) return name + ": " + end.outcome().displayName() + ".";
-        return end.stillFailing() ? name + ": the fix ran, but the check still fails." : name + ": done.";
     }
 
     private static String mark(CheckState state, boolean running) {

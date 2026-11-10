@@ -17,6 +17,11 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- setup's `emulator_checks` and `fix` word their answers through shared's `CheckAnswers`, which BotMaker's own
+  `device` tool uses too; nothing changes in what they say.
+
 ## [1.10.0] — 2026-11-10
 
 - **🔭 Explore in 🗺 Screens** (2026-11-09): a view of the rail that starts and watches a run exploring the game.

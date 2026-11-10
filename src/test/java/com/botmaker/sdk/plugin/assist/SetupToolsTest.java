@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.shared.emulator.checks.CheckAnswers;
 import com.botmaker.shared.emulator.checks.CheckResult;
 import com.botmaker.shared.emulator.checks.CheckState;
 import com.botmaker.shared.emulator.checks.EmulatorCheck;
@@ -38,7 +39,7 @@ class SetupToolsTest {
 
     @Test
     void theAnswerSaysOfEachCheckWhetherItIsOkAndWhetherFixRepairsIt() {
-        String answer = ChecksTools.answer(List.of(INSTALLED, TRANSLATOR), CheckResult::fixable, FixRunner.of("none"));
+        String answer = CheckAnswers.answer(List.of(INSTALLED, TRANSLATOR), CheckResult::fixable, FixRunner.of("none"));
         assertTrue(answer.contains("arm_translator ok=false fix=yes: libhoudini"), answer);
         assertTrue(answer.contains("waydroid_installed ok=true fix=no"), answer);
         assertTrue(answer.contains("Fix installs libndk."), answer);
@@ -46,7 +47,7 @@ class SetupToolsTest {
 
     @Test
     void aFailureNoFixRepairsSaysWhatTheUserRuns() {
-        String answer = ChecksTools.answer(List.of(BY_HAND), CheckResult::fixable, FixRunner.of("none"));
+        String answer = CheckAnswers.answer(List.of(BY_HAND), CheckResult::fixable, FixRunner.of("none"));
         assertTrue(answer.contains("waydroid_running ok=false fix=no"), answer);
         assertTrue(answer.contains("The user runs: sudo restorecon"), answer);
     }
@@ -94,11 +95,11 @@ class SetupToolsTest {
         // The last report arrives just after running() turns false.
         String answer = "";
         for (int i = 0; i < 200 && !answer.startsWith("Last fix: ARM translator: done."); i++) {
-            answer = ChecksTools.answer(List.of(TRANSLATOR), CheckResult::fixable, runner);
+            answer = CheckAnswers.answer(List.of(TRANSLATOR), CheckResult::fixable, runner);
             Thread.sleep(25);
         }
         assertTrue(answer.startsWith("Last fix: ARM translator: done."), answer);
-        assertFalse(ChecksTools.answer(List.of(TRANSLATOR), CheckResult::fixable, FixRunner.of("another emulator"))
+        assertFalse(CheckAnswers.answer(List.of(TRANSLATOR), CheckResult::fixable, FixRunner.of("another emulator"))
                 .contains("Last fix"), "another emulator's fix is not this one's");
     }
 
