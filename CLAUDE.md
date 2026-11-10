@@ -39,8 +39,7 @@ The architecture is in `docs/architecture/`, one file per section (moved there u
 For large changes, write the plan to a dedicated plan file before starting implementation, so work
 can be resumed if a session is interrupted.
 
-A finished change writes `CHANGELOG.md` under `## [Unreleased]`. `ROADMAP.md` holds open work only: add an
-item when work is left for later, remove it when done; never a dated done-entry.
+A finished change writes `CHANGELOG.md` under `## [Unreleased]`. There is no roadmap file (2026-11-10).
 
 ## Commands
 
