@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run keeps the game in front on every emulator**: while a bot runs, the emulator's own launcher, store, game
+  center or ad in front of the game (LDPlayer's store panel, BlueStacks' game center, MuMu's ads, a stray Home) is
+  put behind it again within seconds, at most every 10 s, on the launch target's instance; Google's sign-in, Play or a
+  browser the game opened is left alone, and a game that no longer runs is the run's recovery's. On BlueStacks and MEmu, whose focus stays empty after a cold boot, the game in front is no longer read as
+  another window, so Discovery no longer stops on it. On MEmu, a capture that turns black, as its first one after its
+  window was minimised or restored, is taken once more.
 - **The Game dialog's checks row covers the Windows emulators**: BlueStacks, LDPlayer, MuMu, MEmu and GameLoop show
   their setup checks, with Fix for ADB and the screen size on LDPlayer and BlueStacks, and Undo for that check's last
   Fix. An instance that is gone says whether no emulator is installed or which are. `setup`'s `emulator_checks` and

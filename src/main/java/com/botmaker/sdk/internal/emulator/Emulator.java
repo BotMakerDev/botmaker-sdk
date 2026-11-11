@@ -12,7 +12,9 @@ import com.botmaker.sdk.internal.observe.SwipeEvent;
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorLauncher;
+import com.botmaker.shared.emulator.PlatformId;
 
+import java.awt.image.BufferedImage;
 import java.util.List;
 
 /**
@@ -57,8 +59,43 @@ public final class Emulator implements CaptureSource {
     @Override
     @Hidden("the CaptureSource half of this type; hidden there and hidden here, since an override "
             + "carries none of the interface's annotations")
-    public java.awt.image.BufferedImage capture() {
-        return Watchdog.saw(device.screencap());
+    public BufferedImage capture() {
+        BufferedImage frame = device.screencap();
+        boolean black = black(frame);
+        // MEmu's alone: a fade through black in any game would otherwise wait each time.
+        if (black && !lastBlack && instance.platformId() == PlatformId.MEMU) {
+            // MEmu's first screencap after its window was minimised or restored was black, the next fine (2026-11-11):
+            // a frame that turns black is taken once more before a bot reads it.
+            try {
+                Thread.sleep(BLACK_AGAIN_MS);
+                frame = device.screencap();
+                black = black(frame);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        lastBlack = black;
+        return Watchdog.saw(frame);
+    }
+
+    /** How long before a frame that turned black is taken again. */
+    static final long BLACK_AGAIN_MS = 300;
+
+    /** Whether the last frame captured was black: one that stays so (a loading screen) is not taken twice each time. */
+    private volatile boolean lastBlack;
+
+    /** Whether a sparse grid of {@code frame}'s pixels, about 17 a side, is all black; false for no frame. */
+    static boolean black(BufferedImage frame) {
+        if (frame == null) return false;
+        int width = frame.getWidth();
+        int height = frame.getHeight();
+        int step = Math.max(1, Math.min(width, height) / 17);
+        for (int y = 0; y < height; y += step) {
+            for (int x = 0; x < width; x += step) {
+                if ((frame.getRGB(x, y) & 0x00FFFFFF) != 0) return false;
+            }
+        }
+        return true;
     }
 
     /** Always {@code (0,0)}: an emulator's captured pixels <em>are</em> its coordinate space. */
@@ -252,6 +289,11 @@ public final class Emulator implements CaptureSource {
     /** The instance name (as shown in the emulator's multi-instance manager). */
     public String name() {
         return instance.name();
+    }
+
+    /** Whether this is the instance a launch target names by {@link EmulatorInstance#reference()}. */
+    boolean is(String reference) {
+        return instance.reference().equals(reference);
     }
 
     /** Closes the underlying ADB connection. After this the emulator can no longer be captured or tapped. */

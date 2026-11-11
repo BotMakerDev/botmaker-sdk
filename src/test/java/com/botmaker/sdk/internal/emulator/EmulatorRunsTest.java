@@ -2,6 +2,8 @@ package com.botmaker.sdk.internal.emulator;
 
 import org.junit.jupiter.api.Test;
 
+import java.awt.image.BufferedImage;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,5 +22,15 @@ class EmulatorRunsTest {
         assertTrue(Emulator.hasActivity(covered, "com.zjcs.android.us"), "a permission dialog over it");
         assertFalse(Emulator.hasActivity(stopped, "com.zjcs.android.us"), "force-stopped: only the launcher");
         assertFalse(Emulator.hasActivity(covered, "com.zjcs.android"), "a package's prefix is not the package");
+    }
+
+    /** What a MEmu capture takes once more: a frame whose sampled pixels are all black. */
+    @Test
+    void aFrameIsBlackWhenEverySampledPixelIs() {
+        BufferedImage frame = new BufferedImage(900, 1600, BufferedImage.TYPE_INT_RGB);
+        assertTrue(Emulator.black(frame));
+        frame.setRGB(0, 0, 0x202020);
+        assertFalse(Emulator.black(frame));
+        assertFalse(Emulator.black(null));
     }
 }

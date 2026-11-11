@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * Wait on "isn't responding", Close app on "keeps stopping", Allow on a permission (2026-11-02), each pressed by its id in the
  * whole tree ({@link SystemDialog#answerIn}), else Back. A crash, or a game
  * that stops answering {@value #HUNG_TIMES} times or for {@value #HUNG_MS} ms, owes a restart, which
- * {@link com.botmaker.sdk.internal.bot.Watchdog#checkpoint()} turns into the run's recovery.
+ * {@link com.botmaker.sdk.internal.bot.Watchdog#checkpoint()} turns into the run's recovery. With no dialog up, an
+ * app of the emulator's own over the game is put behind it again ({@link GameInFront}).
  *
  * <p>Asked at most every {@value #EVERY_MS} ms, from {@link EmulatorSource#capture()} while the run's watchdog is
  * on, on a thread of its own: a capture never waits for {@code dumpsys}.
@@ -105,7 +106,10 @@ public final class SystemDialogs {
     private static void answer(Emulator emu, Supplier<Optional<UiTree>> wholeTree) {
         Optional<Shown> shown = emu.device().systemDialog();
         Act act = COUNT.seen(shown, System.currentTimeMillis());
-        if (act == Act.NOTHING) return;
+        if (act == Act.NOTHING) {
+            GameInFront.keep(emu);
+            return;
+        }
         SystemDialog dialog = shown.get().dialog();
         String said = "Android says " + (shown.get().theApps() ? "the game " : "another app ") + dialog.said();
         // Its button, read off the tree; Back only when the tree cannot be read (it leaves an ANR up).
