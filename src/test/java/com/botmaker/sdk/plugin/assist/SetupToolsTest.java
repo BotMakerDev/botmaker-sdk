@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.shared.emulator.checks.CheckAnswers;
 import com.botmaker.shared.emulator.checks.CheckResult;
@@ -9,12 +10,15 @@ import com.botmaker.shared.emulator.checks.Fix;
 import com.botmaker.shared.emulator.checks.FixRunner;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** setup's {@code emulator_checks} and {@code fix}, over rows and fixes the tests give: nothing asks for a password. */
@@ -110,5 +114,18 @@ class SetupToolsTest {
         assertTrue(ChecksTools.stopping(down).equals("Container and session running fails: The service is not "
                 + "running. setup's fix runs its fix."), ChecksTools.stopping(down));
         assertTrue(ChecksTools.stopping(BY_HAND).contains("sudo restorecon"), ChecksTools.stopping(BY_HAND));
+    }
+
+    /** list_windows with no bot open (2026-11-10): the services refuse a bot's folder, and the desktop is listed. */
+    @Test
+    void withNoBotOpenThereIsNoPrivateDisplayToList() {
+        StudioServices noBot = (StudioServices) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{StudioServices.class}, (self, method, args) -> {
+                    throw new IllegalStateException("That needs a bot open");
+                });
+
+        assertNull(SetupTools.liveDisplay(noBot));
+        assertEquals(Optional.of("That needs a bot open"), SetupTools.noBot(noBot),
+                "set_capture_source refuses with the services' own sentence, not a window it did not find");
     }
 }

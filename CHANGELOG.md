@@ -27,6 +27,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   runs on in the background, `google_status` says which account is signed in and how the last sign-in went, and
   `google_sign_out` stops a waiting sign-in or forgets the account. No answer carries the password or the token.
   It and the Game dialog's line share one sign-in at a time: each sees and can cancel the other's.
+- `list_windows` lists the desktop's windows with no bot open, where it refused for want of a bot.
 - The SDK's assistant tools run when BotMaker's core serves them with no bot open; one that needs the bot says
   "needs a bot open: open_project".
 - setup's `emulator_checks` and `fix` word their answers through shared's `CheckAnswers`, which BotMaker's own

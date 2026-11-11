@@ -474,6 +474,9 @@ final class SetupTools {
 
     static AgentReply setCaptureSource(SetCaptureSource title, AgentContext context) {
         if (title.window() == null || title.window().isBlank()) return AgentReply.refused("Name a window.");
+        // The bot's capture setting is what this writes: with no bot, say so before looking for the window.
+        Optional<String> noBot = context.services() == null ? Optional.empty() : noBot(context.services());
+        if (noBot.isPresent()) return AgentReply.refused(noBot.get());
         PrivateSession display = liveDisplay(context.services());
         // The game's private display first: it holds the game, and the desktop may show a copy of its title.
         Optional<CaptureSource> window = display == null ? CaptureValue.windowTitled(title.window())
@@ -535,9 +538,12 @@ final class SetupTools {
         return lines;
     }
 
-    /** The private display the game runs in, when the settings say one and it is up; null otherwise. */
-    private static PrivateSession liveDisplay(StudioServices services) {
-        if (services == null || services.resourcesDir() == null) return null;
+    /**
+     * The private display the game runs in, when the settings say one and it is up; null otherwise, and with no bot
+     * open, whose services refuse a bot's folder (2026-11-10): the desktop's windows need none.
+     */
+    static PrivateSession liveDisplay(StudioServices services) {
+        if (services == null || noBot(services).isPresent() || services.resourcesDir() == null) return null;
         BotSettings settings = FxCall.call(() -> SettingsValue.current(services));
         if (settings.where() != BotSettings.Where.PRIVATE_DISPLAY) return null;
         try {
@@ -545,6 +551,19 @@ final class SetupTools {
                     BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir())));
         } catch (RuntimeException | LinkageError noDisplay) {
             return null;    // the desktop's windows are still listed
+        }
+    }
+
+    /**
+     * Why there is no bot here, when the services say so: the core's with no bot open refuse a bot's folder with the
+     * sentence the assistant should get ({@code open_project}); empty with a bot open.
+     */
+    static Optional<String> noBot(StudioServices services) {
+        try {
+            services.resourcesDir();
+            return Optional.empty();
+        } catch (IllegalStateException noBot) {
+            return Optional.of(noBot.getMessage());
         }
     }
 
