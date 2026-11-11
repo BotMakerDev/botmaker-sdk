@@ -10,6 +10,7 @@ import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.WaydroidResolution;
 import com.botmaker.shared.emulator.checks.CheckAnswers;
 import com.botmaker.shared.emulator.checks.CheckResult;
+import com.botmaker.shared.emulator.checks.EmulatorCheck;
 import com.botmaker.shared.emulator.checks.EmulatorChecks;
 import com.botmaker.shared.emulator.checks.Fix;
 import com.botmaker.shared.emulator.checks.FixRunner;
@@ -20,7 +21,6 @@ import com.botmaker.shared.launch.LaunchSpec;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * setup's {@code emulator_checks} and {@code fix}: the Game dialog's rows and Fix buttons, for the assistant, in the
@@ -51,7 +51,7 @@ final class ChecksTools {
         if (refused.isPresent()) return refused.get();
         ChecksRow.Read read = ChecksRow.read(spec, size(context.services()));
         Fixes.Context fixes = fixContext(read, context.services());
-        return fix(check, undo, read.results(), result -> Fixes.of(result, fixes), Fixes::undo,
+        return fix(check, undo, read.results(), result -> Fixes.of(result, fixes), named -> Fixes.undo(fixes, named),
                 CheckAnswers.runnerOf(read.instance()));
     }
 
@@ -71,7 +71,7 @@ final class ChecksTools {
 
     /** Picks the fix {@code check} names in {@code results} and starts it. */
     static AgentReply fix(String check, boolean undo, List<CheckResult> results,
-                          Function<CheckResult, Optional<Fix>> fixOf, Supplier<Optional<Fix>> undoFix,
+                          Function<CheckResult, Optional<Fix>> fixOf, Function<EmulatorCheck, Optional<Fix>> undoFix,
                           FixRunner runner) {
         CheckAnswers.Said said = CheckAnswers.fix(check, undo, results, fixOf, undoFix, runner, "emulator_checks");
         return said.refused() ? AgentReply.refused(said.text()) : AgentReply.text(said.text());

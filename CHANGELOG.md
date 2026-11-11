@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Game dialog's checks row covers the Windows emulators**: BlueStacks, LDPlayer, MuMu, MEmu and GameLoop show
+  their setup checks, with Fix for ADB and the screen size on LDPlayer and BlueStacks, and Undo for that check's last
+  Fix. An instance that is gone says whether no emulator is installed or which are. `setup`'s `emulator_checks` and
+  `fix` cover them too, and `fix`'s undo puts back the check it names.
 - **Sign in to Google once for every emulator**: the Game dialog's install line has a *Google account* line under
   its buttons for an Android game. *Sign in…* opens Google's sign-in in a Chrome or Edge window; BotMaker then
   downloads a game's Google Play files with that account when Aurora's anonymous accounts give none, and no

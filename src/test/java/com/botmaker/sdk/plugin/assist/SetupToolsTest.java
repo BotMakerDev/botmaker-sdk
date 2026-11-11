@@ -37,7 +37,7 @@ class SetupToolsTest {
     }
 
     private static AgentReply fix(String check, boolean undo, CheckResult result, Optional<Fix> fix) {
-        return ChecksTools.fix(check, undo, List.of(INSTALLED, result), r -> fix, () -> fix,
+        return ChecksTools.fix(check, undo, List.of(INSTALLED, result), r -> fix, c -> fix,
                 FixRunner.of("setup-tools-test-refused"));
     }
 
@@ -84,13 +84,13 @@ class SetupToolsTest {
         FixRunner runner = FixRunner.of("setup-tools-test-started");
 
         AgentReply started = ChecksTools.fix("arm_translator", false, List.of(TRANSLATOR), r -> Optional.of(fix),
-                Optional::empty, runner);
+                c -> Optional.empty(), runner);
         assertFalse(started.isRefused());
         assertTrue(text(started).contains("emulator_checks says how it went"), text(started));
         assertTrue(runner.running(), "it answered while the fix still runs");
 
         AgentReply second = ChecksTools.fix("arm_translator", false, List.of(TRANSLATOR), r -> Optional.of(fix),
-                Optional::empty, runner);
+                c -> Optional.empty(), runner);
         assertTrue(text(second).contains("already running"), text(second));
 
         release.countDown();

@@ -18,6 +18,7 @@ import com.botmaker.shared.emulator.checks.Fix;
 import com.botmaker.shared.emulator.checks.FixRunner;
 import com.botmaker.shared.emulator.checks.Fixes;
 import com.botmaker.shared.emulator.checks.WaydroidChecks;
+import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.UriLauncher;
@@ -42,8 +43,10 @@ import java.util.function.Consumer;
 
 /**
  * The list of {@link EmulatorChecks} on an emulator, shared by the Game dialog and the Waydroid diagnostics window:
- * a mark, the check's name and what was found per row, Fix on a failure BotMaker repairs, Undo while a translator
- * backup is left, and the commands to copy on a failure the user repairs. Nothing runs until a button is pressed.
+ * a mark, the check's name and what was found per row, Fix on a failure BotMaker repairs, Undo while that Fix's
+ * backup is left (Waydroid's translator, a Windows emulator's settings file), and the commands to copy on a failure
+ * the user repairs. Any product with checks shows here: Waydroid, an AVD, BlueStacks, LDPlayer, MuMu, MEmu and
+ * GameLoop. Nothing runs until a button is pressed.
  */
 public final class ChecksRow {
 
@@ -133,8 +136,9 @@ public final class ChecksRow {
     public static Read read(LaunchSpec asked, WaydroidResolution size) {
         EmulatorInstance found = EmulatorInstances.find(asked.emulatorInstance()).orElse(null);
         // A stopped Waydroid is often not discovered at all: that is a failure to show, not an emulator to skip.
-        List<CheckResult> results = found == null && isWaydroid(asked) ? WaydroidChecks.run(null, size)
-                : EmulatorChecks.run(found, size);
+        List<CheckResult> results = found != null ? EmulatorChecks.run(found, size)
+                : isWaydroid(asked) ? WaydroidChecks.run(null, size)
+                : WindowsEmulatorChecks.notFound(asked.emulatorInstance());
         return new Read(asked, found, size, results);
     }
 
@@ -197,7 +201,7 @@ public final class ChecksRow {
         HBox line = new HBox(8, name, spacer);
         line.setAlignment(Pos.CENTER_LEFT);
         if (fix.isPresent() && !itsFix) line.getChildren().add(button("Fix", () -> run(fix.get())));
-        if (result.undoable() && !itsFix) line.getChildren().add(button("Undo", this::undo));
+        if (result.undoable() && !itsFix) line.getChildren().add(button("Undo", () -> undo(result.check(), context)));
         if (itsFix) line.getChildren().add(button("Cancel", this::cancel));
         VBox row = new VBox(2, line);
         if (itsFix) {
@@ -235,8 +239,8 @@ public final class ChecksRow {
         return button;
     }
 
-    private void undo() {
-        Async.load("emulator-undo", Fixes::undo, fix -> fix.ifPresentOrElse(this::run,
+    private void undo(EmulatorCheck check, Fixes.Context context) {
+        Async.load("emulator-undo", () -> Fixes.undo(context, check), fix -> fix.ifPresentOrElse(this::run,
                 () -> said.setText("No backup is left to restore.")), why -> said.setText(why));
     }
 
