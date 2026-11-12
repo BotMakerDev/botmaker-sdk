@@ -125,6 +125,11 @@ public final class SystemDialogs {
                 + ": restarting it";
     }
 
+    /** Owes a restart for {@code why}, unless one is owed already: the first reason is the one said. */
+    static void owe(String why) {
+        if (restartOwed == null) restartOwed = why;
+    }
+
     /** Why the game must be restarted, once: the next call answers empty until a dialog owes one again. */
     public static Optional<String> takeRestart() {
         String owed = restartOwed;

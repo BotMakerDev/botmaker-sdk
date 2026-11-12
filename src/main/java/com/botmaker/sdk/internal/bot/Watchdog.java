@@ -60,13 +60,7 @@ public final class Watchdog {
      * returns. Safe to call when disabled.
      */
     public static void checkpoint() {
-        Optional<String> dialog = SystemDialogs.takeRestart();
-        if (dialog.isPresent()) {
-            restartNext = true;
-            // The run's recovery restarts the game: a fallback rescuing the run, a warning.
-            Say.warn(dialog.get());
-            throw Say.told(new BotStuckException(dialog.get()));
-        }
+        owedRestart();
         Optional<String> frozen = frozen();
         if (frozen.isPresent()) {
             STILL.clear();
@@ -76,8 +70,22 @@ public final class Watchdog {
     }
 
     /**
+     * Throws {@link BotStuckException} when a restart of the game is owed ({@link SystemDialogs}), and only then: what
+     * a wait checks, where a still picture is no frozen game.
+     */
+    public static void owedRestart() {
+        Optional<String> owed = SystemDialogs.takeRestart();
+        if (owed.isPresent()) {
+            restartNext = true;
+            // The run's recovery restarts the game: a fallback rescuing the run, a warning.
+            Say.warn(owed.get());
+            throw Say.told(new BotStuckException(owed.get()));
+        }
+    }
+
+    /**
      * Whether the recovery must restart the game rather than walk home, once: Android said it crashed or stopped
-     * answering ({@link SystemDialogs}), and no screen of it is there to walk.
+     * answering, or it no longer runs ({@link SystemDialogs}), and no screen of it is there to walk.
      */
     private static volatile boolean restartNext;
 
@@ -86,6 +94,14 @@ public final class Watchdog {
         boolean owed = restartNext;
         restartNext = false;
         return owed;
+    }
+
+    /**
+     * Forgets a restart owed while the game was being restarted: a look between its stop and its start saw it gone,
+     * and the restart that just ended paid it.
+     */
+    public static void restarted() {
+        SystemDialogs.clear();
     }
 
     /** Clears the game's picture (called by the supervisor after a restart). */

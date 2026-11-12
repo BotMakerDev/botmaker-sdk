@@ -1,5 +1,7 @@
 package com.botmaker.sdk.internal.emulator;
 
+import com.botmaker.sdk.internal.bot.BotStuckException;
+import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.emulator.SystemDialogs.Act;
 import com.botmaker.sdk.internal.emulator.SystemDialogs.Count;
 import com.botmaker.shared.emulator.SystemDialog;
@@ -8,11 +10,29 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SystemDialogsTest {
 
     private static final Optional<Shown> HUNG = Optional.of(new Shown(SystemDialog.NOT_RESPONDING, true));
+
+    @Test
+    void anOwedRestartIsSaidOnceAndARestartForgetsOneOwedMeanwhile() {
+        SystemDialogs.clear();
+        SystemDialogs.owe("The game no longer runs, com.ldmnq.launcher3 is in front: restarting it");
+        SystemDialogs.owe("a second reason");
+        BotStuckException stuck = assertThrows(BotStuckException.class, Watchdog::owedRestart);
+        assertEquals("The game no longer runs, com.ldmnq.launcher3 is in front: restarting it", stuck.getMessage());
+        assertTrue(Watchdog.takeRestartNext(), "the recovery restarts rather than walking home");
+        assertDoesNotThrow(Watchdog::owedRestart, "said once");
+
+        SystemDialogs.owe("seen gone between the restart's stop and start");
+        Watchdog.restarted();
+        assertDoesNotThrow(Watchdog::owedRestart);
+    }
 
     @Test
     void aGameThatStopsAnsweringIsWaitedForTwiceThenRestarted() {

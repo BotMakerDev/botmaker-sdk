@@ -24,6 +24,20 @@ class EmulatorRunsTest {
         assertFalse(Emulator.hasActivity(covered, "com.zjcs.android"), "a package's prefix is not the package");
     }
 
+    @Test
+    void anActivityTheDumpOnlyRemembersIsNotInTheStack() {
+        // LDPlayer's Android 14 after a force-stop: the game's task is gone, its rotation history still names it.
+        String stopped = """
+                      * Hist  #0: ActivityRecord{9d34d01 u0 com.ldmnq.launcher3/com.android.launcher3.Launcher t6}
+                    RotationHistory
+                      11-12 01:10:50.523 ROTATION_0 to ROTATION_270
+                        source=ActivityRecord{e4ce533 u0 com.zjcs.android.us/com.joybox.overseas.activity.SdkFirstActivity t14} SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                """;
+        assertFalse(Emulator.hasActivity(stopped, "com.zjcs.android.us"));
+        assertTrue(Emulator.hasActivity("    * Hist  #0: ActivityRecord{80f6db u0 com.zjcs.android.us/com.joybox.overseas"
+                + ".activity.SdkFirstActivity t11}", "com.zjcs.android.us"), "Android 14 writes two spaces after Hist");
+    }
+
     /** What a MEmu capture takes once more: a frame whose sampled pixels are all black. */
     @Test
     void aFrameIsBlackWhenEverySampledPixelIs() {

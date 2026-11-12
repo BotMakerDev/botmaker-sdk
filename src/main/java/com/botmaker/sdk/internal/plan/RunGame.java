@@ -108,6 +108,17 @@ public final class RunGame implements PlanRun.Game {
     }
 
     /**
+     * The field of {@code step}'s screen holding the input its action presses. The step is named by the {@code Do}'s
+     * own field ({@code claim}), the walk presses inputs ({@code collect}): the two differ in every map but one whose
+     * {@code Do} shares its input's name. The step's own field when the screen holds no such input.
+     */
+    static String inputField(ScreenGraph map, Step step) {
+        return Optional.ofNullable(map.screens().get(step.screen()))
+                .flatMap(screen -> screen.fieldOf(step.action().input()))
+                .orElse(step.field());
+    }
+
+    /**
      * Presses {@code step}; when the game then shows no screen of the map, what covers it is cleared by the map's close
      * buttons, so the facts the run reads next are read off a screen it knows.
      */
@@ -116,7 +127,7 @@ public final class RunGame implements PlanRun.Game {
         RunReach reach = new RunReach();
         // Its own record is the run's to write, once the facts it changed are read again.
         ScreenWalk walk = new ScreenWalk(map, reach, ScreenWalk.STEP_MS, null).uncovering();
-        ScreenWalk.Press press = walk.press(step.screen(), step.field(), null);
+        ScreenWalk.Press press = walk.press(step.screen(), inputField(map, step), null);
         if (press.result() != Pressed.Result.DONE) Debug.log(press.why());
         String at = press.at();
         if (at == null) {
@@ -171,6 +182,8 @@ public final class RunGame implements PlanRun.Game {
             long nap = Math.min(left, NAP_MS);
             Wait.milliseconds((int) nap);
             if (Thread.currentThread().isInterrupted()) Bot.stop();
+            // A game that died meanwhile is restarted now, not when the wait ends.
+            Watchdog.owedRestart();
             left -= nap;
         }
     }

@@ -387,6 +387,7 @@ public class Bot {
             cap.restart(Instant.now()).ifPresent(Bot::stop);
             Debug.log("restarting the game");
             startGame.accept(StartMode.RESTART);
+            Watchdog.restarted();
         };
         Runnable recovery = () -> {
             // Each step is announced because a recovery is where a bot spends its most confusing time: without

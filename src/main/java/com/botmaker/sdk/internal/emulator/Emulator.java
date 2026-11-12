@@ -233,9 +233,14 @@ public final class Emulator implements CaptureSource {
         return stack == null || stack.isBlank() || hasActivity(stack, packageName.trim());
     }
 
-    /** Whether {@code dumpsys} lists an activity of {@code packageName} ({@code u0 <package>/<activity>}). */
+    /**
+     * Whether {@code dumpsys}'s task stack holds an activity of {@code packageName}: a {@code Hist #} line naming
+     * {@code u0 <package>/<activity>}. The rest of the dump is not the stack: Android 14's rotation history names an
+     * activity long after its task is gone (LDPlayer, 2026-11-12).
+     */
     static boolean hasActivity(String dumpsys, String packageName) {
-        return dumpsys.contains(" " + packageName + "/");
+        String activity = " " + packageName + "/";
+        return dumpsys.lines().anyMatch(line -> line.contains("Hist ") && line.contains(activity));
     }
 
     /** The package name of the app currently in the foreground, or {@code ""} if none/unknown. */

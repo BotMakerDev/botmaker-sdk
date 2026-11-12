@@ -24,7 +24,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   put behind it again within seconds, at most every 10 s, on the launch target's instance; Google's sign-in, Play or a
   browser the game opened is left alone, and a game that no longer runs is the run's recovery's. On BlueStacks and MEmu, whose focus stays empty after a cold boot, the game in front is no longer read as
   another window, so Discovery no longer stops on it. On MEmu, a capture that turns black, as its first one after its
-  window was minimised or restored, is taken once more.
+  window was minimised or restored, is taken once more. Where monkey cannot start an app (LDPlayer), the game is
+  brought back by its launcher activity, so its running task comes forward instead of staying behind.
+- A plan's step presses its action's input, where it named the action's own field: a `Do` named apart from its input
+  (`waitOnTitle` pressing `idle`) said "not in the map" and pressed nothing.
+- **A game that died during a run is restarted by the run's recovery, within seconds**: force-stopped or crashed with
+  no dialog, with the emulator's own app in front, it owes a restart ("The game no longer runs, … is in front"),
+  counted against the restart cap, and a plan waiting on its goals stops waiting for it. The bring-back no longer
+  starts it itself: on Android 14 (LDPlayer) a stopped game was read as running, from a dump line that only remembers it.
+- `GUARD_WORDS` is claimed by the SDK, so a run no longer says "nothing claims GUARD_WORDS".
 - **The Game dialog's checks row covers the Windows emulators**: BlueStacks, LDPlayer, MuMu, MEmu and GameLoop show
   their setup checks, with Fix for ADB and the screen size on LDPlayer and BlueStacks, and Undo for that check's last
   Fix. An instance that is gone says whether no emulator is installed or which are. `setup`'s `emulator_checks` and

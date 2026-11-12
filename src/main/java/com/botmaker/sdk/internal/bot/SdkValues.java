@@ -518,8 +518,10 @@ public final class SdkValues implements ValueHolder {
         ManagedValues.claim(RUN, InstalledRun::use);
         ManagedValues.claim(SCREEN, BotScreen::use);
         ManagedValues.claim(SHADES, ShadeFit::use);
-        // The launchers and the VM: InstalledGame reads them by their marks, with the parameters beside them.
+        // The launchers and the VM: InstalledGame reads them by their marks, with the parameters beside them; the
+        // guard words, Explore's LivePlay by theirs. Unclaimed, a run said every bot's guardWords() was ignored.
         ManagedValues.claim(LAUNCH_TARGETS, launchers -> { });
         ManagedValues.claim(VM, vm -> { });
+        ManagedValues.claim(GUARD_WORDS, words -> { });
     }
 }

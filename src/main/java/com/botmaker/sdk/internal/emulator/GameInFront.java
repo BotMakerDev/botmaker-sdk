@@ -12,9 +12,10 @@ import java.util.function.Supplier;
 /**
  * Brings the game back in front while a bot runs, when the emulator's own launcher, store, game center or ad covers
  * it ({@link EmulatorOwnApps}): LDPlayer's store panel, BlueStacks' game center, MuMu's ads, a Home pressed by a
- * stray tap. Any other app in front is left alone, and so is a game that no longer runs: its restart is the run's
- * recovery's ({@link SystemDialogs}, the watchdog), not this. Asked by {@link SystemDialogs} on its own thread, when no
- * Android dialog is up, at most once every {@value #AGAIN_MS} ms.
+ * stray tap. Any other app in front is left alone. A game that no longer runs (force-stopped, crashed with no dialog)
+ * is not started here: it owes a restart ({@link SystemDialogs#owe}), which the run's recovery pays, counted against
+ * its restart cap. Asked by {@link SystemDialogs} on its own thread, when no Android dialog is up, at most once every
+ * {@value #AGAIN_MS} ms.
  */
 final class GameInFront {
 
@@ -24,7 +25,10 @@ final class GameInFront {
 
     private GameInFront() {}
 
-    /** Starts the run's game again on {@code emu} when an app of the emulator's own is in front of it. */
+    /**
+     * Brings the run's game back on {@code emu} when an app of the emulator's own is in front of it, or owes its restart
+     * when it no longer runs.
+     */
     static void keep(Emulator emu) {
         if (!(Target.current() instanceof LaunchTarget.EmulatorApp(String game, String instance)) || !emu.is(instance)) {
             return;
@@ -33,9 +37,15 @@ final class GameInFront {
         long asked = ASKED.get();
         if (now - asked < AGAIN_MS) return;
         Optional<String> cover = cover(emu.device().focusedPackage(), game, emu.device()::homePackage);
-        if (cover.isEmpty() || !emu.runs(game) || !ASKED.compareAndSet(asked, now)) return;
+        if (cover.isEmpty() || !ASKED.compareAndSet(asked, now)) return;
+        if (!emu.runs(game)) {
+            SystemDialogs.owe("The game no longer runs, " + cover.get() + " is in front: restarting it");
+            return;
+        }
         Debug.log(cover.get() + ", the emulator's own app, is in front of the game: bringing the game back");
-        emu.device().startApp(game);
+        if (!emu.device().bringToFront(game)) {
+            Debug.error("Android started no activity of " + game + ": it stays behind " + cover.get());
+        }
     }
 
     /**
