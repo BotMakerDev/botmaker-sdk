@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.plugin.types.RunTypes;
+import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.launch.GameCatalog;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.launch.SessionHandoff;
@@ -236,6 +237,11 @@ final class SetupTools {
     record EmulatorChecks() implements Step {
     }
 
+    @Describe("what an emulator instance should be against what it has now; needs no bot")
+    record Configuration(@Describe("the instance's name, as list_emulators gives it") String instance)
+            implements Step {
+    }
+
     @Describe("run a failed check's fix; the user may get a password window")
     record Fix(@Describe("its id in emulator_checks") String check,
                @Describe(value = "true: undo the last fix", optional = true) Boolean undo)
@@ -287,6 +293,7 @@ final class SetupTools {
             case GoogleStatus ignored -> AgentReply.text(GoogleSignIns.SHARED.status());
             case GoogleSignOut ignored -> AgentReply.text(GoogleSignIns.SHARED.signOut());
             case EmulatorChecks checks -> ChecksTools.checks(context);
+            case Configuration configuration -> configuration(configuration, context);
             case Fix fix -> ChecksTools.fix(fix.check(), Boolean.TRUE.equals(fix.undo()), context);
             case GameFacts ignored -> FxCall.call(() -> gameFacts(context.services().pluginValues().runParameters()));
             case Forget forget -> FxCall.call(() -> forget(forget.fact(), context));
@@ -459,6 +466,16 @@ final class SetupTools {
     private static LaunchSpec launchSpec(AgentContext context) {
         String current = FxCall.call(() -> LaunchTargetValue.current(context.services()));
         return current == null ? null : LaunchSpec.parse(current);
+    }
+
+    /** Reads this PC's emulators and the SDK's values of this PC: slow, and never a write. */
+    static AgentReply configuration(Configuration of, AgentContext context) {
+        if (of.instance() == null || of.instance().isBlank()) return AgentReply.refused("Name an instance.");
+        String reference = of.instance().strip();
+        List<EmulatorsModel.InstanceRow> rows = EmulatorsModel.named(
+                EmulatorsModel.Source.live(context.services()), reference);
+        String said = ConfigurationSaid.said(rows, reference);
+        return rows.isEmpty() ? AgentReply.refused(said) : AgentReply.text(said);
     }
 
     /** The capture source, the launch target and every setting, in one answer. */

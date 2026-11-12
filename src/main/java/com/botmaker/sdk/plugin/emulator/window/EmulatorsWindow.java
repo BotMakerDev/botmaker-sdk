@@ -10,7 +10,6 @@ import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
-import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
@@ -262,7 +261,7 @@ public final class EmulatorsWindow {
         reading = true;
         refresh.setDisable(true);
         EmulatorsModel.Snapshot last = snapshot;
-        Async.load("emulators-read", () -> EmulatorsModel.read(new Live(services), last, Instant.now()),
+        Async.load("emulators-read", () -> EmulatorsModel.read(EmulatorsModel.Source.live(services), last, Instant.now()),
                 this::show, failed -> {
                     readEnded();
                     say("This PC's emulators could not be read: " + failed);
@@ -310,29 +309,6 @@ public final class EmulatorsWindow {
         if (readAgain) {
             readAgain = false;
             refresh();
-        }
-    }
-
-    /** This PC, read for real. */
-    private record Live(StudioServices services) implements EmulatorsModel.Source {
-        @Override
-        public Platforms.DiscoveryReport discover() {
-            return Platforms.discoverDetailed();
-        }
-
-        @Override
-        public HostConfig.State configuration() {
-            return HostConfig.load(services);
-        }
-
-        @Override
-        public boolean running(EmulatorInstance instance) {
-            return ApplyHost.live().running(instance);
-        }
-
-        @Override
-        public InstanceFacts facts(EmulatorInstance instance, InstanceFacts last) {
-            return ApplyHost.live().read(instance, last);
         }
     }
 

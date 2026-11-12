@@ -1,11 +1,13 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AndroidState;
+import com.botmaker.shared.emulator.config.ApplyHost;
 import com.botmaker.shared.emulator.config.ConfigDiff;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.ConfigValue;
@@ -48,6 +50,31 @@ public final class EmulatorsModel {
 
         /** What the instance has now; {@code last} is the previous read's, whose Android answer a stopped one keeps. */
         InstanceFacts facts(EmulatorInstance instance, InstanceFacts last);
+
+        /** This PC, read for real. */
+        static Source live(StudioServices services) {
+            return new Source() {
+                @Override
+                public Platforms.DiscoveryReport discover() {
+                    return Platforms.discoverDetailed();
+                }
+
+                @Override
+                public HostConfig.State configuration() {
+                    return HostConfig.load(services);
+                }
+
+                @Override
+                public boolean running(EmulatorInstance instance) {
+                    return ApplyHost.live().running(instance);
+                }
+
+                @Override
+                public InstanceFacts facts(EmulatorInstance instance, InstanceFacts last) {
+                    return ApplyHost.live().read(instance, last);
+                }
+            };
+        }
     }
 
     /** One product, installed or not. */
@@ -149,26 +176,47 @@ public final class EmulatorsModel {
         }
     }
 
+    /**
+     * The one instance {@code reference} names, read alone; several when two emulators have an instance of that name,
+     * none when nothing has. Runs off the UI thread.
+     */
+    public static List<InstanceRow> named(Source source, String reference) {
+        HostConfig.State state = source.configuration();
+        return source.discover().instances().stream().filter(EmulatorsModel::configured)
+                .filter(instance -> instance.reference().equals(reference))
+                .map(instance -> row(source, state, instance, null)).toList();
+    }
+
+    /** A phone on a cable is no emulator's instance: nothing here starts, stops or configures it. */
+    private static boolean configured(EmulatorInstance instance) {
+        return instance.platformId() != PlatformId.UNKNOWN && instance.platformId() != PlatformId.PHYSICAL;
+    }
+
+    private static InstanceRow row(Source source, HostConfig.State state, EmulatorInstance instance,
+                                   InstanceFacts last) {
+        InstanceKey key = InstanceKey.of(instance);
+        Wanted wanted = state.config().wanted(key);
+        boolean running = false;
+        InstanceFacts facts = null;
+        try {
+            running = source.running(instance);
+            facts = source.facts(instance, last);
+        } catch (RuntimeException unread) {
+            // the row says "not read"; one instance that fails to answer hides no other
+        }
+        return new InstanceRow(instance, key, running, wanted, facts,
+                facts == null ? null : ConfigDiff.of(wanted, facts), state.usedBy(key));
+    }
+
     /** Reads this PC; {@code last} gives each stopped instance its Android answer back. Runs off the UI thread. */
     public static Snapshot read(Source source, Snapshot last, Instant now) {
         Platforms.DiscoveryReport report = source.discover();
         HostConfig.State state = source.configuration();
         List<InstanceRow> instances = new ArrayList<>();
         for (EmulatorInstance instance : report.instances()) {
-            // a phone on a cable is no emulator's instance: nothing here starts, stops or configures it
-            if (instance.platformId() == PlatformId.UNKNOWN || instance.platformId() == PlatformId.PHYSICAL) continue;
-            InstanceKey key = InstanceKey.of(instance);
-            Wanted wanted = state.config().wanted(key);
-            boolean running = false;
-            InstanceFacts facts = null;
-            try {
-                running = source.running(instance);
-                facts = source.facts(instance, last.instance(key).map(InstanceRow::facts).orElse(null));
-            } catch (RuntimeException unread) {
-                // the row says "not read"; one instance that fails to answer hides no other
-            }
-            instances.add(new InstanceRow(instance, key, running, wanted, facts,
-                    facts == null ? null : ConfigDiff.of(wanted, facts), state.usedBy(key)));
+            if (!configured(instance)) continue;
+            instances.add(row(source, state, instance,
+                    last.instance(InstanceKey.of(instance)).map(InstanceRow::facts).orElse(null)));
         }
         List<EmulatorRow> emulators = new ArrayList<>();
         for (Platforms.PlatformStatus status : report.statuses()) {

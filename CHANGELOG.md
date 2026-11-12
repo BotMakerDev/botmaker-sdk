@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The assistant reads an instance's configuration** (2026-11-12): `setup`'s `configuration` names one emulator
+  instance and says each wanted setting, account and game with the layer it comes from (its own or its emulator's)
+  against what the instance has now, as the Emulators window shows it, with or without a bot open. It only reads:
+  changing a configuration, Apply and signing in stay the user's, in the window.
 - **📱 Emulators, a window for this computer's emulators and instances** (2026-11-12, spec
   `2026-11-12-emulators-window-design.md`): its toolbar button opens two tabs. *Emulators* lists every product
   BotMaker knows, installed or not, with what its instances start from and *Apply to N*. *Instances* lists every
