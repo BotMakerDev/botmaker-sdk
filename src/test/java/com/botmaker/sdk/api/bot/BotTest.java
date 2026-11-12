@@ -131,6 +131,35 @@ class BotTest {
                 "cold start runs the configured target then goHome, before the first body pass");
     }
 
+    /** A run with no plan looks at the game at the cold start and every pass, and does nothing else. */
+    @Test
+    void aRunWithNoPlanOnlyLooksAtTheGame() {
+        com.botmaker.sdk.internal.launch.Target.set((String) null);
+        AtomicInteger looks = new AtomicInteger();
+        Runnable look = () -> {
+            if (looks.incrementAndGet() == 3) throw new StopLoop();
+        };
+        assertThrows(StopLoop.class, () -> Bot.lifecycle(Bot.watch(look), look, null));
+        assertEquals(3, looks.get(), "the cold start's look, then one per pass");
+    }
+
+    /** A look that fails is looked at again by the recovery, and a second failure restarts the game, then looks. */
+    @Test
+    void aRunWithNoPlanRestartsTheGameItCannotLookAt() {
+        com.botmaker.sdk.internal.launch.Target.set((String) null);
+        StringBuilder order = new StringBuilder();
+        AtomicInteger looks = new AtomicInteger();
+        Runnable look = () -> {
+            int at = looks.incrementAndGet();
+            order.append(at);
+            if (at == 2 || at == 3) throw new IllegalStateException("no frame");
+            if (at == 5) throw new StopLoop();
+        };
+        assertThrows(StopLoop.class, () -> Bot.lifecycle(Bot.watch(look), look, null));
+        // 1 cold start; 2 the pass fails; 3 the recovery's look fails too, so a restart, then 4 its home look; 5 a pass.
+        assertEquals("12345", order.toString());
+    }
+
     @Test
     void theSetupRunsOnceAtTheFirstStartAndARestartSkipsIt() {
         com.botmaker.sdk.internal.launch.Target.set((String) null);

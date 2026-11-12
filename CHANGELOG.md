@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A run with no plan watches the game** (2026-11-12): `Bot.run` with `plan()` at `Plan.NONE`, or a bot with no plan
+  parameter, used to say "No plan was picked" and end. It now launches the game and keeps it up until Stop:
+  it restarts the game when it crashes, hangs or dies, and keeps it in front. It presses nothing: no setup, no popup
+  guard, no screen read. So a bot can be tried on an emulator before it has a plan, with the live game untouched.
 - **A run keeps the game in front on every emulator**: while a bot runs, the emulator's own launcher, store, game
   center or ad in front of the game (LDPlayer's store panel, BlueStacks' game center, MuMu's ads, a stray Home) is
   put behind it again within seconds, at most every 10 s, on the launch target's instance; Google's sign-in, Play or a

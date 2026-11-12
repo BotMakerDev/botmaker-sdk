@@ -84,8 +84,9 @@ public class Bot {
      * <p>What the person running the bot chooses is the bot's own {@code @Param}s, read off {@code values} by their
      * marks ({@code @SdkValue(SdkValue.Id.PLAN)}, {@code DO_SETUP}): which of the {@code Plans} runs, and whether the
      * game is set up first. The plan runs round after round until no goal of it comes due again ({@code PlanRun}). A
-     * bot whose {@code plan} is {@link Plan#NONE}, or that has none, runs nothing; with no {@code doSetup} it skips the
-     * setup. What gets the game back to a known screen is {@code Sdk.run()}'s {@link Run#home}, run at start-up and
+     * bot whose {@code plan} is {@link Plan#NONE}, or that has none, launches the game and watches it until stopped,
+     * restarting it when it dies and pressing nothing, setup and popups included ({@link #watch}); with no
+     * {@code doSetup} it skips the setup. What gets the game back to a known screen is {@code Sdk.run()}'s {@link Run#home}, run at start-up and
      * after anything unexpected; a run with none walks to the map's home screen.
      *
      * <p>Offered in the insert menu inside {@code main} only ({@link EntryPoint}): anywhere else it would start
@@ -106,12 +107,18 @@ public class Bot {
         ScreenMaps.install(values);
         RunFacts.install(values);
         Plan plan = plan(values);
+        RunDetails.start(values);
         if (plan == null) {
-            Debug.error("No plan was picked, or the plan picked has no goals: pick one of the bot's plans in the "
-                    + "Runner. Nothing runs.");
+            // No plan: the game is kept up and watched, nothing pressed (2026-11-12, the user's call), so a bot can be
+            // tried on an emulator before it has a plan, and the live game is never touched.
+            Say.info("No plan was picked: the run keeps the game up, restarting it when it dies, and presses nothing."
+                    + " Pick one of the bot's plans in the Runner to play.");
+            PopupGuard.enabled(false);
+            // Home is wherever the game is: a recovery looks once more, and restarts the game when even that fails.
+            Runnable look = () -> Source.current().capture();
+            lifecycle(watch(look), look, null);
             return;
         }
-        RunDetails.start(values);
         boolean doSetup = InstalledGame.marked(SdkValue.Id.DO_SETUP, values) instanceof Boolean on && on;
         Runnable goHome = () -> {
             Runnable home = InstalledRun.home();
@@ -119,6 +126,23 @@ public class Bot {
         };
         PopupGuard.enabled(true);
         lifecycle(RunGame.body(plan, values), goHome, startUp(doSetup ? InstalledRun.installed().setup() : null));
+    }
+
+    /** How often a run with no plan looks at the game. */
+    static final Duration WATCH_EVERY = Duration.ofSeconds(2);
+
+    /**
+     * The body of a run with no plan: one {@code look} at the game, then a wait. An emulator's look asks Android
+     * whether the game crashed, hangs or is gone, and puts it in front again; a restart that owes throws here, so the
+     * supervisor restarts the game. A still picture is no stuck game here: nothing is pressed that should move it.
+     */
+    static Runnable watch(Runnable look) {
+        return () -> {
+            look.run();
+            Watchdog.owedRestart();
+            Wait.time(WATCH_EVERY);
+            Watchdog.owedRestart();
+        };
     }
 
     /** What a run runs: the {@code plan} parameter; null when the bot has none, or it is {@link Plan#NONE}. */
