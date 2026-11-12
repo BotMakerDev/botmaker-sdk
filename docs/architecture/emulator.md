@@ -30,3 +30,11 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `â€
   operation: shared's `Apply`, then `InstanceChanges` (accounts, games), queued on shared's `EmulatorOperations`,
   which is the process's and outlives the window. A batch's `Passwords` are asked in the window's own dialog and
   cleared when its last operation ends.
+- **A layer's view and the Configurations tab**: `ConfigViews` (no JavaFX) turns one `Target` (an emulator or an
+  instance) into its setting, account and game rows, each with where its value comes from and, for an instance, what
+  it holds now; every change is a pure `EmulatorConfig` â†’ `EmulatorConfig` written through `window.change`. The same
+  class lays out the Configurations grid (a column per layer, the configured instances not found last), `compare` and
+  `copy`. `ConfigView` draws a layer over the tab it was opened from, `ConfigurationsTab` the grid, and
+  `ConfigDialogs` asks a value, an account (a name and a note, never a password) or a game. A value is typed as it is
+  shown (`1080x1920@320`, `4 GB`, `on`), not through the SDK's slot editors: these are not a bot's values. No export
+  or import: a PC's configuration is that PC's (the user's call).

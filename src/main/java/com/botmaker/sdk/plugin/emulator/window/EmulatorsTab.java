@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * The Emulators tab: every product BotMaker knows, installed or not, and beside the one picked what its instances
- * start from, with <i>Apply to N</i> for those that differ. The configuration is changed in an instance's view.
+ * start from, with <i>Apply to N</i> for those that differ. <i>Configure…</i> opens the emulator's own view.
  */
 final class EmulatorsTab {
 
@@ -87,6 +87,11 @@ final class EmulatorsTab {
             side.getChildren().add(line(account.kind().displayName() + " account: " + account.name()));
         }
         for (GameRecord game : layer.games()) side.getChildren().add(line("Game: " + game.label()));
+
+        Button configure = new Button(layer.isEmpty() ? "Configure…" : "Change…");
+        configure.setMinWidth(Region.USE_PREF_SIZE);
+        configure.setOnAction(e -> window.configure(new ConfigViews.Target.Emulator(row.platform())));
+        side.getChildren().add(configure);
 
         int applicable = window.snapshot().applicable(row.platform()).size();
         Button apply = Styles.on(new Button(applicable == 0 ? "Apply" : "Apply to " + applicable),

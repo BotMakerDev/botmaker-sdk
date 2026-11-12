@@ -31,6 +31,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Instances.java` and `Accounts.java` in BotMaker's folder of this PC, never in a bot, read by no run, holding no
   password. A row a newer BotMaker wrote and this one does not understand is kept.
 - **Used by**: each time a bot is opened, it is noted beside the emulator instances its `launchTargets` name.
+- **An instance's or an emulator's configuration, and the Configurations tab**: *Configure…* (an instance's row menu
+  or a double-click, an emulator's side pane) opens its view: each setting's wanted value, where it comes from and,
+  for an instance, what it has now, with *Set here* / *Use emulator's*; its Google, Facebook and mail accounts (the
+  ★ default, a note, Keep for one the instance removed); its games; *Only differences*, and *Apply N changes*. The
+  Configurations tab puts every layer on one grid, filtered by text, section, emulator, tag or *overridden only*;
+  a double-click edits a cell, and it compares two instances and copies one column over another.
 
 - **GameLoop is no longer offered** (2026-11-12): the emulator picker, the checks row and the launch targets no
   longer list it; a launch target naming a GameLoop instance finds no instance.

@@ -80,9 +80,14 @@ public final class EmulatorsWindow {
     private final Button refresh = new Button("Refresh");
     private final Tab emulatorsTab = new Tab("Emulators");
     private final Tab instancesTab = new Tab("Instances");
+    private final Tab configurationsTab = new Tab("Configurations");
+    private final TabPane tabs;
     private final VBox strip = new VBox(4);
     private final EmulatorsTab emulators;
     private final InstancesTab instances;
+    private final ConfigurationsTab configurations;
+    /** The configuration view open over the Emulators or the Instances tab, or null. */
+    private ConfigView open;
     private final Consumer<Operation.Snapshot> listener = snapshot -> Platform.runLater(() -> heard(snapshot));
 
     private EmulatorsModel.Snapshot snapshot = EmulatorsModel.Snapshot.EMPTY;
@@ -107,10 +112,12 @@ public final class EmulatorsWindow {
         this.services = services;
         this.emulators = new EmulatorsTab(this);
         this.instances = new InstancesTab(this);
+        this.configurations = new ConfigurationsTab(this);
 
         emulatorsTab.setContent(emulators.node());
         instancesTab.setContent(instances.node());
-        TabPane tabs = new TabPane(emulatorsTab, instancesTab);
+        configurationsTab.setContent(configurations.node());
+        tabs = new TabPane(emulatorsTab, instancesTab, configurationsTab);
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         refresh.setOnAction(e -> refresh());
@@ -184,7 +191,29 @@ public final class EmulatorsWindow {
         instancesTab.setText("Instances (" + read.instances().size() + ", " + read.running() + " running)");
         emulators.show(read);
         instances.show(read);
+        configurations.show(read);
+        if (open != null) open.show(read);
         readEnded();
+    }
+
+    // ---- a configuration's view ----
+
+    /** Opens a layer's view over its tab: an instance's over Instances, an emulator's over Emulators. */
+    void configure(ConfigViews.Target target) {
+        back();
+        Tab tab = target instanceof ConfigViews.Target.Instance ? instancesTab : emulatorsTab;
+        open = new ConfigView(this, target, this::back);
+        tab.setContent(open.node());
+        tabs.getSelectionModel().select(tab);
+        open.show(snapshot);
+    }
+
+    /** Closes the view open, its tab showing its table again. */
+    private void back() {
+        if (open == null) return;
+        if (open.target() instanceof ConfigViews.Target.Instance) instancesTab.setContent(instances.node());
+        else emulatorsTab.setContent(emulators.node());
+        open = null;
     }
 
     private void readEnded() {
@@ -311,7 +340,7 @@ public final class EmulatorsWindow {
         drawStrip();
     }
 
-    private static Applies applies() {
+    static Applies applies() {
         return new Applies(HostConfig.stateDir().resolve("applies.jsonl"));
     }
 

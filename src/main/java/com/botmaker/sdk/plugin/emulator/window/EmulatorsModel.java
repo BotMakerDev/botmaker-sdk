@@ -9,6 +9,7 @@ import com.botmaker.shared.emulator.config.AndroidState;
 import com.botmaker.shared.emulator.config.ConfigDiff;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.ConfigValue;
+import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.GameRecord;
 import com.botmaker.shared.emulator.config.InstanceFacts;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -116,10 +117,11 @@ public final class EmulatorsModel {
         }
     }
 
-    /** One read of this PC. */
-    public record Snapshot(List<EmulatorRow> emulators, List<InstanceRow> instances, Instant readAt) {
+    /** One read of this PC, and the configuration read with it. */
+    public record Snapshot(List<EmulatorRow> emulators, List<InstanceRow> instances, EmulatorConfig config,
+                           Instant readAt) {
 
-        public static final Snapshot EMPTY = new Snapshot(List.of(), List.of(), Instant.EPOCH);
+        public static final Snapshot EMPTY = new Snapshot(List.of(), List.of(), EmulatorConfig.EMPTY, Instant.EPOCH);
 
         public Snapshot {
             emulators = List.copyOf(emulators);
@@ -177,7 +179,7 @@ public final class EmulatorsModel {
                     (int) own.stream().filter(InstanceRow::running).count(), state.config().emulator(platform),
                     (int) own.stream().filter(InstanceRow::differs).count()));
         }
-        return new Snapshot(emulators, instances, now);
+        return new Snapshot(emulators, instances, state.config(), now);
     }
 
     // ---- columns ----

@@ -23,6 +23,8 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.TableRow;
+import javafx.scene.input.MouseButton;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TableCell;
@@ -118,6 +120,13 @@ final class InstancesTab {
         sorted.comparatorProperty().bind(table.comparatorProperty());
         table.setItems(sorted);
         table.setContextMenu(rowMenu());
+        table.setRowFactory(t -> {
+            TableRow<EmulatorsModel.InstanceRow> one = new TableRow<>();
+            one.setOnMouseClicked(e -> {
+                if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY && !one.isEmpty()) configure();
+            });
+            return one;
+        });
         table.getSelectionModel().getSelectedItems().addListener(
                 (ListChangeListener<EmulatorsModel.InstanceRow>) change -> buttons());
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -278,10 +287,13 @@ final class InstancesTab {
         undo.setOnAction(e -> picked().forEach(window::undo));
         MenuItem tags = new MenuItem("Tags…");
         tags.setOnAction(e -> editTags());
-        ContextMenu menu = new ContextMenu(startOne, stopOne, new SeparatorMenuItem(), applyOne, undo,
-                new SeparatorMenuItem(), tags);
+        MenuItem configure = new MenuItem("Configure…");
+        configure.setOnAction(e -> configure());
+        ContextMenu menu = new ContextMenu(configure, new SeparatorMenuItem(), startOne, stopOne,
+                new SeparatorMenuItem(), applyOne, undo, new SeparatorMenuItem(), tags);
         menu.setOnShowing(e -> {
             List<EmulatorsModel.InstanceRow> picked = picked();
+            configure.setDisable(picked.size() != 1);
             startOne.setDisable(picked.stream().allMatch(EmulatorsModel.InstanceRow::running));
             stopOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::running));
             applyOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::applicable));
@@ -289,6 +301,12 @@ final class InstancesTab {
             tags.setDisable(picked.isEmpty());
         });
         return menu;
+    }
+
+    /** Opens the one row picked's configuration. */
+    private void configure() {
+        List<EmulatorsModel.InstanceRow> picked = picked();
+        if (picked.size() == 1) window.configure(new ConfigViews.Target.Instance(picked.getFirst().key()));
     }
 
     /** The tags of the rows picked, typed with commas between them; every row picked gets what was typed. */
