@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.window;
 import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
+import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.SavedFilters;
@@ -40,7 +41,9 @@ import javafx.scene.layout.VBox;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -56,6 +59,7 @@ final class InstancesTab {
     private static final String ANY_TAG = "Any tag";
 
     private final EmulatorsWindow window;
+    private final ManageActions manage;
     private final TableView<EmulatorsModel.InstanceRow> table = new TableView<>();
     private final ObservableList<EmulatorsModel.InstanceRow> shown = FXCollections.observableArrayList();
     private final TextField text = new TextField();
@@ -74,9 +78,12 @@ final class InstancesTab {
 
     /** Set while the controls are being filled, so filling them does not filter. */
     private boolean filling;
+    /** The instance the picker's Manage… asked for, until its row is read. */
+    private EmulatorInstance focusing;
 
     InstancesTab(EmulatorsWindow window) {
         this.window = window;
+        this.manage = new ManageActions(window);
 
         text.setPromptText("Name");
         account.setPromptText("Account");
@@ -155,6 +162,18 @@ final class InstancesTab {
     void show(EmulatorsModel.Snapshot snapshot) {
         Set<InstanceKey> picked = picked().stream().map(EmulatorsModel.InstanceRow::key).collect(Collectors.toSet());
         EmulatorsModel.Filter filter = filterNow();
+        EmulatorInstance focus = focusing;
+        if (focus != null) {
+            // the picker's Manage… opened the window before its rows were read: its filter and row are set now
+            filter = focusFilter(focus);
+            picked = new HashSet<>();
+            for (EmulatorsModel.InstanceRow row : snapshot.instances()) {
+                if (same(row.instance(), focus)) {
+                    picked.add(row.key());
+                    focusing = null;
+                }
+            }
+        }
         filling = true;
         List<Optional<PlatformId>> emulators = new ArrayList<>();
         emulators.add(Optional.empty());
@@ -289,11 +308,22 @@ final class InstancesTab {
         tags.setOnAction(e -> editTags());
         MenuItem configure = new MenuItem("Configure…");
         configure.setOnAction(e -> configure());
+        MenuItem cloneOne = new MenuItem("Clone…");
+        cloneOne.setOnAction(e -> one().ifPresent(manage::cloneOf));
+        MenuItem renameOne = new MenuItem("Rename…");
+        renameOne.setOnAction(e -> one().ifPresent(manage::rename));
+        MenuItem deleteOne = new MenuItem("Delete…");
+        deleteOne.setOnAction(e -> one().ifPresent(manage::delete));
         ContextMenu menu = new ContextMenu(configure, new SeparatorMenuItem(), startOne, stopOne,
-                new SeparatorMenuItem(), applyOne, undo, new SeparatorMenuItem(), tags);
+                new SeparatorMenuItem(), applyOne, undo, new SeparatorMenuItem(), tags,
+                new SeparatorMenuItem(), cloneOne, renameOne, deleteOne);
         menu.setOnShowing(e -> {
             List<EmulatorsModel.InstanceRow> picked = picked();
             configure.setDisable(picked.size() != 1);
+            boolean managed = picked.size() == 1 && ManageModel.manageable(picked.getFirst().key().platform());
+            cloneOne.setDisable(!managed || picked.getFirst().running());
+            renameOne.setDisable(!managed);
+            deleteOne.setDisable(!managed);
             startOne.setDisable(picked.stream().allMatch(EmulatorsModel.InstanceRow::running));
             stopOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::running));
             applyOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::applicable));
@@ -301,6 +331,36 @@ final class InstancesTab {
             tags.setDisable(picked.isEmpty());
         });
         return menu;
+    }
+
+    /** The one row picked, when one is. */
+    private Optional<EmulatorsModel.InstanceRow> one() {
+        List<EmulatorsModel.InstanceRow> picked = picked();
+        return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
+    }
+
+    /**
+     * Shows {@code instance}: the name filter set to its name and its emulator, the other filters cleared, its row
+     * selected. A window not yet read keeps it until its rows are ({@link #show}).
+     */
+    void focus(EmulatorInstance instance) {
+        if (instance == null) return;
+        focusing = instance;
+        use(focusFilter(instance));
+        shown.stream().filter(row -> same(row.instance(), instance)).findFirst().ifPresent(row -> {
+            focusing = null;
+            table.getSelectionModel().clearSelection();
+            table.getSelectionModel().select(row);
+        });
+    }
+
+    private static EmulatorsModel.Filter focusFilter(EmulatorInstance instance) {
+        return new EmulatorsModel.Filter(instance.name() == null ? "" : instance.name(), instance.platformId(),
+                EmulatorsModel.Running.ANY, "", "", "", false);
+    }
+
+    private static boolean same(EmulatorInstance one, EmulatorInstance other) {
+        return one.platformId() == other.platformId() && Objects.equals(one.reference(), other.reference());
     }
 
     /** Opens the one row picked's configuration. */

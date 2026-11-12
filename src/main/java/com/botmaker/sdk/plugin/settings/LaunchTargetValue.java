@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * The games the bot supports — its {@code launchTargets} parameter ({@link SdkValues#LAUNCH_TARGETS}) in
@@ -122,6 +123,27 @@ public final class LaunchTargetValue {
         }
         if (!staleChoice(chosen(services), spec, adding)) return Optional.empty();
         return ParamSlot.open(services, SdkValues.LAUNCH_TARGET).flatMap(choice -> choice.write(LaunchChoice.of("")));
+    }
+
+    /**
+     * Each launcher spelled again by {@code respell}, in its place, and the runner's pick with it: an emulator instance
+     * renamed. A bot whose list and pick do not change is not written.
+     *
+     * @return empty when written or nothing changed, else why nothing was
+     */
+    public static Optional<String> respell(StudioServices services, UnaryOperator<String> respell) {
+        List<String> was = all(services);
+        List<String> next = collapsed(was.stream().map(respell).toList());
+        if (!next.equals(was)) {
+            Optional<ValueContext> list = ParamSlot.open(services, SdkValues.LAUNCH_TARGETS);
+            if (list.isEmpty()) return Optional.of("Its launch targets could not be opened.");
+            Optional<String> refused = list.get().write(next.stream().map(Launcher::of).toList());
+            if (refused.isPresent()) return refused;
+        }
+        String chosen = chosen(services);
+        String now = chosen.isEmpty() ? chosen : InstalledGame.canonical(respell.apply(chosen));
+        if (now.equals(InstalledGame.canonical(chosen))) return Optional.empty();
+        return ParamSlot.open(services, SdkValues.LAUNCH_TARGET).flatMap(choice -> choice.write(LaunchChoice.of(now)));
     }
 
     /** The bot's list {@code was} with canonical {@code spec} first ({@code adding}) or gone, collapsed. Pure. */

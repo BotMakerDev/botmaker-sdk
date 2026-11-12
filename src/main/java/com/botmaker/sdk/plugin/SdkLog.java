@@ -23,6 +23,11 @@ public final class SdkLog {
         log = PluginLog.STANDARD_ERROR;
     }
 
+    /** Something the plugin changed by itself, said so the user can find it. */
+    public static void info(String message) {
+        log.info(message);
+    }
+
     /** Something the user may want to know went wrong, and the feature carried on. */
     public static void warn(String message) {
         log.warn(message);

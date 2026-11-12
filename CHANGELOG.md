@@ -44,6 +44,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   expects that are stopped are listed with *Start*. Above the cards, what the running instances hold against what
   Windows can still give, and a start that would not fit is asked about first. When an operation needs you (a 2-step
   code, a captcha), the instance's screen opens live: a click taps it there, and text typed below is typed into it.
+- **Clone, Rename and Delete an instance from the Emulators window** (its row menu; LDPlayer, MuMu and MEmu by their
+  consoles, BlueStacks and MSI by opening their own manager). A clone is offered "<name> copy", gets new device IDs
+  and its source's configuration, and its copied Google accounts are signed out on its first start. Delete names the
+  bots seen launching the instance and stops it first; its configuration goes with it. A rename takes the instance's
+  configuration with it and is remembered on this PC: the open bot, and each bot opened later here, is pointed at the
+  new name in its launch targets, its runner's pick and its capture source, one change Undo takes back, said in the
+  plugin's log. A bot opened on another PC keeps the old name. The emulator picker's rows have *Manage…*, which opens
+  the window on that instance.
 
 - **GameLoop is no longer offered** (2026-11-12): the emulator picker, the checks row and the launch targets no
   longer list it; a launch target naming a GameLoop instance finds no instance.

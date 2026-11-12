@@ -16,6 +16,7 @@ import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorInstanceScanner;
 import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -223,6 +224,15 @@ public final class EmulatorPicker {
     /** The mutable widgets of one instance row, so the probe and the start/stop poll can refresh them in place. */
     private record RowUi(Circle dot, Label state, Label clash, Button action, ImageView thumb, VBox apps) {}
 
+    /**
+     * Whether a row offers <i>Manage…</i>: an instance of an emulator the Emulators window manages (its console, or
+     * BlueStacks' own manager). A phone, an Android Studio device and Waydroid are managed elsewhere.
+     */
+    static boolean manageable(EmulatorInstance instance) {
+        if (instance == null || instance.reference() == null || instance.reference().isBlank()) return false;
+        return EmulatorsWindow.manages(instance.platformId());
+    }
+
     /** One instance row: a clickable header (preview + dot + brand + name) plus a lazily-filled installed-apps list. */
     private static VBox buildRow(EmulatorInstance instance, String needs, Dialog<Selection> dialog) {
         ImageView thumb = new ImageView();
@@ -276,6 +286,20 @@ public final class EmulatorPicker {
             // that reaches it — otherwise asking why Waydroid is broken would also select it and close.
             diagnose.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
             header.getChildren().add(diagnose);
+        }
+        if (manageable(instance)) {
+            // Clone, rename, delete and configure live in the Emulators window: the picker closes, picking nothing,
+            // and the window opens on this instance.
+            Button manage = new Button("Manage…");
+            manage.getStyleClass().add("emulator-picker-state");
+            manage.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+            manage.setOnAction(e -> {
+                StudioServices services = host;
+                dialog.setResult(null);
+                dialog.close();
+                if (services != null) Platform.runLater(() -> EmulatorsWindow.open(services, instance));
+            });
+            header.getChildren().add(manage);
         }
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(6, 8, 6, 8));

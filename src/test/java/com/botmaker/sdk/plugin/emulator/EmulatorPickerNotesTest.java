@@ -6,7 +6,9 @@ import com.botmaker.shared.emulator.PlatformId;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What a row says its product needs: only a stopped AVD asks for KVM, and only when the machine lacks it. */
 class EmulatorPickerNotesTest {
@@ -23,6 +25,17 @@ class EmulatorPickerNotesTest {
         assertEquals(NEED, EmulatorPicker.avdNote(avd, NEED));
         assertNull(EmulatorPicker.avdNote(avd, null));
         assertNull(EmulatorPicker.avdNote(waydroid, NEED));
+    }
+
+    /** Manage… is offered on an emulator the Emulators window manages, never on a phone or Waydroid. */
+    @Test
+    void manageOnlyWhereTheWindowManages() {
+        assertTrue(EmulatorPicker.manageable(new EmulatorInstance(PlatformId.LDPLAYER, "Farm", "127.0.0.1", 5555)));
+        assertTrue(EmulatorPicker.manageable(new EmulatorInstance(PlatformId.BLUESTACKS, "Pie64", "127.0.0.1", 5555)));
+        assertFalse(EmulatorPicker.manageable(new EmulatorInstance(PlatformId.WAYDROID, "Waydroid", "192.168.240.112",
+                5555)));
+        assertFalse(EmulatorPicker.manageable(new EmulatorInstance(PlatformId.PHYSICAL, "R58M", "127.0.0.1", 5555)));
+        assertFalse(EmulatorPicker.manageable(null));
     }
 
     /** It is up, so whatever the check says, it needs nothing: the line would contradict the row. */

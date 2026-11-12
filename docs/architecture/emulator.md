@@ -45,3 +45,13 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `�
   in place. `LiveScreenDialog` opens by itself the first time an operation needs the user; its frames, taps and
   typing share one thread and one ADB connection, and typing goes through `AdbDevice.text`, which logs the length
   only. The open bot's run is the contract's `Runs` (stop only: the contract has no *open run*).
+- **Clone, Rename, Delete and the rename hand-off**: `ManageActions` puts shared's `InstanceManager` behind the
+  Instances tab's row menu (`ManageModel`, no JavaFX, has the words and the offered name); a console's work is an
+  operation, BlueStacks' manager is opened. A rename moves the instance's rows (`HostConfig.rename`) and adds a row to
+  the host value `INSTANCE_RENAMES` (old key → new key, chains collapsed, `InstanceRenames.recorded`); a delete drops
+  both (`HostConfig.forget`). A launch target names an instance by its name only, so `InstanceRenames.moves` maps an
+  old name to a new one only while no instance on this PC still has the old name, and only when it leads one way.
+  `UsedBy.remember` applies the map on every bind with a screen, and the window right after a rename:
+  `InstanceRenames.handOff` rewrites `launchTargets`, the runner's `launchTarget` and an `EmulatorSource` capture
+  (its region kept), each a plugin write Undo takes back, and logs it. The picker's *Manage…* opens the window
+  filtered to its row (`EmulatorsWindow.open(services, instance)`).

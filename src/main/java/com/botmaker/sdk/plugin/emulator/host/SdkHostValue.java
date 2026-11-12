@@ -38,6 +38,8 @@ public @interface SdkHostValue {
         INSTANCE_TAGS,
         /** The bots seen launching an instance, remembered each time one is opened. */
         INSTANCE_USED_BY,
+        /** The instances BotMaker renamed, old name to new, so a bot opened later is pointed at the new name. */
+        INSTANCE_RENAMES,
         /** The accounts an emulator's instances, or one instance, should hold: Google, Facebook, mail. */
         ACCOUNTS
     }

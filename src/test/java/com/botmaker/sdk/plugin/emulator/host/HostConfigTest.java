@@ -151,6 +151,20 @@ class HostConfigTest {
     }
 
     @Test
+    void aDeletedInstanceLeavesNoRows() {
+        HostConfig.Rows before = HostConfig.rows(full(), new HostConfig.Rows(HostSettings.none(), HostGames.none(),
+                HostSettings.of(new HostSettings.Setting("ldplayer/LDPlayer-1", "gpu_mode", "vulkan")),
+                HostGames.none(), HostLabels.none(), HostLabels.of(new HostLabels.Label("ldplayer/LDPlayer-1", "Bot"),
+                        new HostLabels.Label("mumu/MuMu-0", "Bot")), HostAccounts.none()));
+        HostConfig.Rows after = HostConfig.dropped(before, FARM);
+        assertTrue(HostConfig.config(after).instance(FARM).isEmpty());
+        assertEquals(full().emulator(PlatformId.LDPLAYER), HostConfig.config(after).emulator(PlatformId.LDPLAYER));
+        assertTrue(after.instanceSettings().list().isEmpty(), "what it does not read goes too");
+        assertEquals(Map.of(OTHER, List.of("Bot")), HostConfig.usedBy(after.usedBy()));
+        assertEquals(before, HostConfig.dropped(before, new InstanceKey(PlatformId.MEMU, "Nobody")));
+    }
+
+    @Test
     void launchTargetsNameInstancesByReference() {
         EmulatorInstance ld = new EmulatorInstance(PlatformId.LDPLAYER, "LDPlayer-1", "127.0.0.1", 5555);
         EmulatorInstance mumu = new EmulatorInstance(PlatformId.MUMU, "MuMu-0", "127.0.0.1", 16384);

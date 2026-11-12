@@ -7,11 +7,13 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.launch.LaunchSpec;
+import javafx.application.Platform;
 
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -26,7 +28,8 @@ public final class UsedBy {
 
     /**
      * Writes the open bot beside the instances its {@code launchTargets} name, and takes it off the others, on a
-     * thread of its own: finding the instances reads this PC's emulators, and the write compiles.
+     * thread of its own: finding the instances reads this PC's emulators, and the write compiles. A target naming an
+     * instance BotMaker renamed is pointed at the new name first ({@link InstanceRenames}), back on the UI thread.
      */
     public static void remember(StudioServices services) {
         Path project = services.projectDir();
@@ -35,8 +38,16 @@ public final class UsedBy {
         List<String> specs = LaunchTargetValue.all(services);
         Thread thread = new Thread(() -> {
             try {
-                List<EmulatorInstance> known = Platforms.recent(Duration.ofMinutes(1));
-                Optional<String> refused = HostConfig.seen(services, bot, targets(specs, known), keys(known));
+                HostLabels renames = HostConfig.renames(services);
+                // a rename a minute old may still be the old name in the last read: read again when one is recorded
+                List<EmulatorInstance> known = renames.list().isEmpty() ? Platforms.recent(Duration.ofMinutes(1))
+                        : Platforms.discoverAll();
+                Map<String, String> moves = InstanceRenames.moves(renames, InstanceRenames.names(known));
+                List<String> launched = InstanceRenames.respelled(specs, moves);
+                if (!moves.isEmpty()) {
+                    Platform.runLater(() -> InstanceRenames.handOff(services, moves).ifPresent(services::status));
+                }
+                Optional<String> refused = HostConfig.seen(services, bot, targets(launched, known), keys(known));
                 refused.ifPresent(why -> SdkLog.warn("The bot was not noted beside its emulator instances: " + why));
             } catch (RuntimeException failed) {
                 SdkLog.warn("The bot was not noted beside its emulator instances: " + failed.getMessage());

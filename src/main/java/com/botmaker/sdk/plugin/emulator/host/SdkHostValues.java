@@ -50,6 +50,13 @@ public final class SdkHostValues implements ValueHolder {
                     .because("These are the bots seen launching each instance. BotMaker writes them when a bot is"
                             + " opened.");
 
+    public static final ManagedMethod<HostLabels> INSTANCE_RENAMES =
+            ManagedValue.method(SdkHostValue.Id.INSTANCE_RENAMES)
+                    .in(SdkHostValue.Holder.INSTANCES)
+                    .holds(HostLabels.class, HostLabels.none())
+                    .because("These are the instances BotMaker renamed, each old name beside its new one. A bot that"
+                            + " still names the old one is pointed at the new one when it is opened.");
+
     public static final ManagedMethod<HostAccounts> ACCOUNTS = ManagedValue.method(SdkHostValue.Id.ACCOUNTS)
             .in(SdkHostValue.Holder.ACCOUNTS)
             .holds(HostAccounts.class, HostAccounts.none())
@@ -60,6 +67,6 @@ public final class SdkHostValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
-                INSTANCE_USED_BY, ACCOUNTS);
+                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS);
     }
 }

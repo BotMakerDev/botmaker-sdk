@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.Applies;
@@ -118,6 +119,18 @@ public final class EmulatorsWindow {
         if (current == null) current = new EmulatorsWindow(services);
         current.stage.show();
         current.stage.toFront();
+    }
+
+    /** Whether this window clones, renames and deletes {@code product}'s instances: the picker's <i>Manage…</i>. */
+    public static boolean manages(PlatformId product) {
+        return ManageModel.manageable(product);
+    }
+
+    /** The emulator picker's <i>Manage…</i>: the window on its Instances tab, filtered to {@code instance}'s name. */
+    public static void open(StudioServices services, EmulatorInstance instance) {
+        open(services);
+        current.tabs.getSelectionModel().select(current.instancesTab);
+        current.instances.focus(instance);
     }
 
     private EmulatorsWindow(StudioServices services) {
@@ -417,7 +430,7 @@ public final class EmulatorsWindow {
         drawStrip();
     }
 
-    private void submit(String title, EmulatorInstance instance, Operation.Body body) {
+    void submit(String title, EmulatorInstance instance, Operation.Body body) {
         Operation operation = OPERATIONS.submit(title, instance, body);
         RUNNING.put(operation.id(), operation);
         drawStrip();

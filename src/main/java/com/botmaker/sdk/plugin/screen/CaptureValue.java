@@ -17,6 +17,7 @@ import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.WindowIdentity;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -136,6 +137,29 @@ public final class CaptureValue {
         }
         point(services, new EmulatorSource(instance));
         return Optional.of(instance);
+    }
+
+    /** The emulator instance capture follows, by name; empty when it follows none. */
+    public static Optional<String> followed(StudioServices services) {
+        CaptureSource now = current(services);
+        return now != null && now.base() instanceof EmulatorSource device ? Optional.ofNullable(device.instanceName())
+                : Optional.empty();
+    }
+
+    /**
+     * Points capture at an instance's new name when it follows one renamed ({@code moves}: old name → new), keeping
+     * the region it is narrowed to. Call it on the JavaFX application thread.
+     *
+     * @return empty when written or nothing changed, else why nothing was
+     */
+    public static Optional<String> renamed(StudioServices services, Map<String, String> moves) {
+        CaptureSource now = current(services);
+        if (now == null || !(now.base() instanceof EmulatorSource device)) return Optional.empty();
+        String renamed = moves.get(device.instanceName());
+        if (renamed == null) return Optional.empty();
+        CaptureSource base = new EmulatorSource(renamed);
+        Rect region = now.subRegion();
+        return write(services, region == null ? base : CaptureSource.region(base, region));
     }
 
     /**

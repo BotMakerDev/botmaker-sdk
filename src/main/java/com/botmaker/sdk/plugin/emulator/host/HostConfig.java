@@ -115,8 +115,32 @@ public final class HostConfig {
     public static Optional<String> rename(StudioServices services, InstanceKey from, InstanceKey to) {
         synchronized (WRITES) {
             Rows before = rows(services);
-            return write(services, before, renamed(before, from, to));
+            Optional<String> refused = write(services, before, renamed(before, from, to));
+            if (refused.isPresent()) return refused;
+            HostLabels renames = renames(services);
+            return write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
+                    InstanceRenames.recorded(renames, from, to));
         }
+    }
+
+    /**
+     * Forgets an instance that was deleted: its rows, the bots seen launching it, and the renames that led to it. A
+     * bot that still names it is told so by its checks ("no instance").
+     */
+    public static Optional<String> forget(StudioServices services, InstanceKey key) {
+        synchronized (WRITES) {
+            Rows before = rows(services);
+            Optional<String> refused = write(services, before, dropped(before, key));
+            if (refused.isPresent()) return refused;
+            HostLabels renames = renames(services);
+            return write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
+                    InstanceRenames.dropped(renames, key));
+        }
+    }
+
+    /** The instances renamed on this PC, each row old key → new key ({@link InstanceRenames}). */
+    public static HostLabels renames(StudioServices services) {
+        return read(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, HostLabels.none());
     }
 
     /** One change at a time in this process: each reads the values, changes them and writes them back. */
@@ -347,6 +371,21 @@ public final class HostConfig {
                 new HostAccounts(moved(rows.accounts().list(), HostAccounts.Account::of, old, now,
                         row -> new HostAccounts.Account(now, row.kind(), row.name(), row.note(), row.removed(),
                                 row.first()))));
+    }
+
+    /** {@code rows} with every row of {@code key} gone. */
+    static Rows dropped(Rows rows, InstanceKey key) {
+        String gone = key.text();
+        return new Rows(rows.emulatorSettings(), rows.emulatorGames(),
+                new HostSettings(without(rows.instanceSettings().list(), HostSettings.Setting::of, gone)),
+                new HostGames(without(rows.instanceGames().list(), HostGames.Game::of, gone)),
+                new HostLabels(without(rows.tags().list(), HostLabels.Label::instance, gone)),
+                new HostLabels(without(rows.usedBy().list(), HostLabels.Label::instance, gone)),
+                new HostAccounts(without(rows.accounts().list(), HostAccounts.Account::of, gone)));
+    }
+
+    private static <T> List<T> without(List<T> rows, Function<T, String> of, String gone) {
+        return rows.stream().filter(row -> !of.apply(row).equals(gone)).toList();
     }
 
     private static <T> List<T> moved(List<T> rows, Function<T, String> of, String old, String now,
