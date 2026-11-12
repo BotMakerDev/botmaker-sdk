@@ -7,16 +7,20 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
+import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ApplyHost;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.EmulatorOperations;
 import com.botmaker.shared.emulator.config.InstanceFacts;
+import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
 import com.botmaker.shared.emulator.google.Passwords;
+import com.botmaker.shared.launch.LaunchSpec;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -81,11 +85,19 @@ public final class EmulatorsWindow {
     private final Tab emulatorsTab = new Tab("Emulators");
     private final Tab instancesTab = new Tab("Instances");
     private final Tab configurationsTab = new Tab("Configurations");
+    private final Tab runningTab = new Tab("Running");
     private final TabPane tabs;
     private final VBox strip = new VBox(4);
     private final EmulatorsTab emulators;
     private final InstancesTab instances;
     private final ConfigurationsTab configurations;
+    private final RunningTab running;
+    /** The operations whose live screen was opened for them once already. */
+    private final Set<String> shownNeedsYou = ConcurrentHashMap.newKeySet();
+    /** The operations waiting on the user now. */
+    private final Set<String> waiting = ConcurrentHashMap.newKeySet();
+    private AutoCloseable botListener;
+    private String botInstance;
     /** The configuration view open over the Emulators or the Instances tab, or null. */
     private ConfigView open;
     private final Consumer<Operation.Snapshot> listener = snapshot -> Platform.runLater(() -> heard(snapshot));
@@ -113,11 +125,13 @@ public final class EmulatorsWindow {
         this.emulators = new EmulatorsTab(this);
         this.instances = new InstancesTab(this);
         this.configurations = new ConfigurationsTab(this);
+        this.running = new RunningTab(this);
 
         emulatorsTab.setContent(emulators.node());
         instancesTab.setContent(instances.node());
         configurationsTab.setContent(configurations.node());
-        tabs = new TabPane(emulatorsTab, instancesTab, configurationsTab);
+        runningTab.setContent(running.node());
+        tabs = new TabPane(emulatorsTab, instancesTab, configurationsTab, runningTab);
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         refresh.setOnAction(e -> refresh());
@@ -138,15 +152,74 @@ public final class EmulatorsWindow {
         root.setBottom(operations);
 
         stage = Modals.window(services, Modals.Frame.modeless("Emulators", 1080, 680, 780, 420), root);
+        tabs.getSelectionModel().selectedItemProperty().addListener((o, was, now) ->
+                running.visible(now == runningTab && stage.isShowing()));
         stage.setOnShown(e -> {
             OPERATIONS.addListener(listener);
+            readBotInstance();
+            botListener = services.runs().onStateChanged(runs -> Platform.runLater(() -> {
+                readBotInstance();
+                running.draw();
+            }));
             drawStrip();
             refresh();
+            running.visible(tabs.getSelectionModel().getSelectedItem() == runningTab);
         });
         stage.setOnHidden(e -> {
             OPERATIONS.removeListener(listener);
+            running.visible(false);
+            try {
+                if (botListener != null) botListener.close();
+            } catch (Exception ignored) {
+                // the host's listener is gone already
+            }
+            botListener = null;
+            // what was heard stops here: an operation that ends while hidden is not heard ending
+            shownNeedsYou.clear();
+            waiting.clear();
             if (current == this) current = null;
         });
+    }
+
+    // ---- the open bot's run ----
+
+    /** The open bot's name while it runs, else null. */
+    String botRunning() {
+        if (!services.runs().isRunning() || services.projectDir() == null
+                || services.projectDir().getFileName() == null) return null;
+        return services.projectDir().getFileName().toString();
+    }
+
+    /** The instance reference the open bot launches on this PC, or null; read as the window shows and as a run starts. */
+    String botInstance() {
+        return botInstance;
+    }
+
+    /** Reads the open bot's launch target again (its values: on the UI thread, once per run-state change). */
+    private void readBotInstance() {
+        try {
+            LaunchSpec spec = LaunchTargetValue.spec(services);
+            botInstance = spec == null ? null : spec.emulatorInstance();
+        } catch (RuntimeException unread) {
+            botInstance = null;
+        }
+    }
+
+    void stopBot() {
+        services.runs().stop();
+    }
+
+    /** The operation waiting on the user at {@code key}, if one is. */
+    Optional<Operation.Snapshot> needsYou(InstanceKey key) {
+        return OPERATIONS.all().stream()
+                .filter(one -> one.state() == Operation.State.NEEDS_YOU && key.equals(one.instance())).findFirst();
+    }
+
+    /** Opens the live screen of the instance {@code one} waits on, when it was read. */
+    private void openScreen(Operation.Snapshot one) {
+        snapshot.instance(one.instance()).ifPresentOrElse(row -> LiveScreenDialog.open(this, row, one.needsYou()),
+                () -> say("The instance " + one.title() + " needs was not read yet: Refresh, then open it from"
+                        + " Running."));
     }
 
     StudioServices services() {
@@ -189,9 +262,11 @@ public final class EmulatorsWindow {
         emulatorsTab.setText("Emulators (" + read.emulators().stream()
                 .filter(EmulatorsModel.EmulatorRow::installed).count() + ")");
         instancesTab.setText("Instances (" + read.instances().size() + ", " + read.running() + " running)");
+        runningTab.setText("Running (" + read.running() + ")");
         emulators.show(read);
         instances.show(read);
         configurations.show(read);
+        running.show(read);
         if (open != null) open.show(read);
         readEnded();
     }
@@ -260,9 +335,17 @@ public final class EmulatorsWindow {
 
     // ---- operations ----
 
+    /** Starts the stopped rows, asking first when Windows would not have the memory for them all. */
     void start(List<EmulatorsModel.InstanceRow> rows) {
-        for (EmulatorsModel.InstanceRow row : rows) {
-            if (row.running()) continue;
+        List<EmulatorsModel.InstanceRow> stopped = rows.stream().filter(row -> !row.running()).toList();
+        Optional<String> tight = RunningModel.Headroom.of(WindowsEmulatorChecks.availableMb(), snapshot)
+                .warning(stopped);
+        if (tight.isPresent()) {
+            Alert ask = alert(Alert.AlertType.CONFIRMATION, tight.get() + "\n\nStart anyway?");
+            ask.setHeaderText("Not enough memory");
+            if (ask.showAndWait().filter(ButtonType.OK::equals).isEmpty()) return;
+        }
+        for (EmulatorsModel.InstanceRow row : stopped) {
             submit("Start " + row.instance().name(), row.instance(),
                     context -> ApplyHost.live().start(row.instance(), context::step));
         }
@@ -432,8 +515,14 @@ public final class EmulatorsWindow {
 
     private void heard(Operation.Snapshot heard) {
         drawStrip();
+        // the cards show "Needs you" while an operation waits: drawn again as it starts and stops waiting
+        boolean waits = heard.state() == Operation.State.NEEDS_YOU;
+        if (waits ? waiting.add(heard.id()) : waiting.remove(heard.id())) running.draw();
+        // the live screen opens by itself the first time an operation waits on the user
+        if (waits && heard.instance() != null && shownNeedsYou.add(heard.id())) openScreen(heard);
         if (heard.state().ended()) {
             RUNNING.remove(heard.id());
+            shownNeedsYou.remove(heard.id());
             refresh();
         }
     }
@@ -476,6 +565,12 @@ public final class EmulatorsWindow {
         step.setMaxWidth(Double.MAX_VALUE);
         HBox row = new HBox(10, title, state, step);
         row.setAlignment(Pos.CENTER_LEFT);
+        if (one.state() == Operation.State.NEEDS_YOU && one.instance() != null) {
+            Button look = new Button("Open its screen");
+            look.setMinWidth(Region.USE_PREF_SIZE);
+            look.setOnAction(e -> openScreen(one));
+            row.getChildren().add(look);
+        }
         if (one.state() == Operation.State.RUNNING) {
             ProgressBar bar = new ProgressBar(one.progress() > 0 ? one.progress() : ProgressBar.INDETERMINATE_PROGRESS);
             bar.setPrefWidth(90);

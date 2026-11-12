@@ -38,3 +38,10 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `â€
   `ConfigDialogs` asks a value, an account (a name and a note, never a password) or a game. A value is typed as it is
   shown (`1080x1920@320`, `4 GB`, `on`), not through the SDK's slot editors: these are not a bot's values. No export
   or import: a PC's configuration is that PC's (the user's call).
+- **The Running tab and the live screen**: `RunningModel` (no JavaFX) groups the running instances and the stopped
+  ones a bot expects, parses Android's `/proc/stat`, `/proc/uptime` and `/proc/meminfo`, weighs starts against
+  `WindowsEmulatorChecks.availableMb()`, and maps a click on a drawn screen to the frame's pixels. `RunningTab` reads
+  each running instance on one thread of its own every two seconds, only while the tab is shown, and updates its card
+  in place. `LiveScreenDialog` opens by itself the first time an operation needs the user; its frames, taps and
+  typing share one thread and one ADB connection, and typing goes through `AdbDevice.text`, which logs the length
+  only. The open bot's run is the contract's `Runs` (stop only: the contract has no *open run*).

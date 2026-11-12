@@ -37,6 +37,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   ★ default, a note, Keep for one the instance removed); its games; *Only differences*, and *Apply N changes*. The
   Configurations tab puts every layer on one grid, filtered by text, section, emulator, tag or *overridden only*;
   a double-click edits a cell, and it compares two instances and copies one column over another.
+- **The Running tab, and an instance's live screen**: every running instance as a card, all together or by
+  emulator (each group with *Stop all*): a small screen taken about every two seconds while the tab is shown, how
+  long Android has been up, ADB's round trip, CPU and memory, the app in front, and the open bot when it runs there
+  (*Stop* ▾ stops the instance or the bot). *Show* brings the instance's window to the front; the instances a bot
+  expects that are stopped are listed with *Start*. Above the cards, what the running instances hold against what
+  Windows can still give, and a start that would not fit is asked about first. When an operation needs you (a 2-step
+  code, a captcha), the instance's screen opens live: a click taps it there, and text typed below is typed into it.
 
 - **GameLoop is no longer offered** (2026-11-12): the emulator picker, the checks row and the launch targets no
   longer list it; a launch target naming a GameLoop instance finds no instance.
