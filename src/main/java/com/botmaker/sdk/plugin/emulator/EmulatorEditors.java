@@ -15,7 +15,7 @@ import java.util.Optional;
 /**
  * The editor for an {@code @EmulatorName} argument — {@code Emulators.use("…")}, {@code named}, {@code launch}
  * and {@code stop} — a pill that opens {@link EmulatorPicker}, so the user chooses a BlueStacks / LDPlayer /
- * MEmu / MuMu / Gameloop instance (or a paired phone) from a list with its brand, a running dot and, for a
+ * MEmu / MuMu instance (or a paired phone) from a list with its brand, a running dot and, for a
  * running instance, its installed apps.
  *
  * <p>The emulator probe, the app cache and the phone-pairing dialog behind it are this plugin's too:

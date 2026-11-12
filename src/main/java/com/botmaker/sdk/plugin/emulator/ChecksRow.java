@@ -45,8 +45,8 @@ import java.util.function.Consumer;
  * The list of {@link EmulatorChecks} on an emulator, shared by the Game dialog and the Waydroid diagnostics window:
  * a mark, the check's name and what was found per row, Fix on a failure BotMaker repairs, Undo while that Fix's
  * backup is left (Waydroid's translator, a Windows emulator's settings file), and the commands to copy on a failure
- * the user repairs. Any product with checks shows here: Waydroid, an AVD, BlueStacks, LDPlayer, MuMu, MEmu and
- * GameLoop. Nothing runs until a button is pressed.
+ * the user repairs. Any product with checks shows here: Waydroid, an AVD, BlueStacks, LDPlayer, MuMu and
+ * MEmu. Nothing runs until a button is pressed.
  */
 public final class ChecksRow {
 

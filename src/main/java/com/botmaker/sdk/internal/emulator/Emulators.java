@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Finds and connects to Android emulators — the entry point to the emulator stack. Discovery reads the
- * installed products' local config (BlueStacks + LDPlayer today; MEmu/MuMu/Gameloop scaffolded) to learn each
+ * installed products' local config (BlueStacks + LDPlayer today; MEmu/MuMu scaffolded) to learn each
  * instance's ADB port, then connects over dadb (pure-JVM ADB — no {@code adb.exe} to install).
  *
  * <p>Typical use:

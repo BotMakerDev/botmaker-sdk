@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The full "pick an emulator" dialog: every configured Android instance across all supported products, each
- * shown with its <em>brand</em> (BlueStacks / LDPlayer / MEmu / MuMu / Gameloop), a running dot, and — for a
+ * shown with its <em>brand</em> (BlueStacks / LDPlayer / MEmu / MuMu), a running dot, and — for a
  * running instance — its installed apps. Selecting an instance row picks the instance; drilling into an app
  * picks {@code (instance, app)} so the caller can point the launch target + capture source at that emulator app
  * (Phase 3 plumbing).

@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **GameLoop is no longer offered** (2026-11-12): the emulator picker, the checks row and the launch targets no
+  longer list it; a launch target naming a GameLoop instance finds no instance.
 - **A run with no plan watches the game** (2026-11-12): `Bot.run` with `plan()` at `Plan.NONE`, or a bot with no plan
   parameter, used to say "No plan was picked" and end. It now launches the game and keeps it up until Stop:
   it restarts the game when it crashes, hangs or dies, and keeps it in front. It presses nothing: no setup, no popup
@@ -37,7 +39,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   counted against the restart cap, and a plan waiting on its goals stops waiting for it. The bring-back no longer
   starts it itself: on Android 14 (LDPlayer) a stopped game was read as running, from a dump line that only remembers it.
 - `GUARD_WORDS` is claimed by the SDK, so a run no longer says "nothing claims GUARD_WORDS".
-- **The Game dialog's checks row covers the Windows emulators**: BlueStacks, LDPlayer, MuMu, MEmu and GameLoop show
+- **The Game dialog's checks row covers the Windows emulators**: BlueStacks, LDPlayer, MuMu and MEmu show
   their setup checks, with Fix for ADB and the screen size on LDPlayer and BlueStacks, and Undo for that check's last
   Fix. An instance that is gone says whether no emulator is installed or which are. `setup`'s `emulator_checks` and
   `fix` cover them too, and `fix`'s undo puts back the check it names.
