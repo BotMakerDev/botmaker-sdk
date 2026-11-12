@@ -19,6 +19,19 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **📱 Emulators, a window for this computer's emulators and instances** (2026-11-12, spec
+  `2026-11-12-emulators-window-design.md`): its toolbar button opens two tabs. *Emulators* lists every product
+  BotMaker knows, installed or not, with what its instances start from and *Apply to N*. *Instances* lists every
+  instance with its state, where it differs from its configuration, its accounts, games, tags and the bots seen
+  launching it; columns are chosen with the table's ☰, rows sort by any column and filter by name, emulator, state,
+  tag, account, game and *differs*, and a filter can be saved. Start, Stop and Apply work on the rows picked; Apply
+  shows every change first, asks before removing an account, and asks each Google password once, in BotMaker's own
+  dialog, kept only until that Apply ends. What BotMaker is doing shows in a strip at the bottom, each with Cancel.
+- **The emulator configuration is the SDK's values of this PC** (`@SdkHostValue`, `plugin.emulator.host`: no bot names them, so they are not `api`): `Emulators.java`,
+  `Instances.java` and `Accounts.java` in BotMaker's folder of this PC, never in a bot, read by no run, holding no
+  password. A row a newer BotMaker wrote and this one does not understand is kept.
+- **Used by**: each time a bot is opened, it is noted beside the emulator instances its `launchTargets` name.
+
 - **GameLoop is no longer offered** (2026-11-12): the emulator picker, the checks row and the launch targets no
   longer list it; a launch target naming a GameLoop instance finds no instance.
 - **A run with no plan watches the game** (2026-11-12): `Bot.run` with `plan()` at `Plan.NONE`, or a bot with no plan

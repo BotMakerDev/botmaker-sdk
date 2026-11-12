@@ -9,6 +9,9 @@ import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
+import com.botmaker.sdk.plugin.emulator.host.UsedBy;
+import com.botmaker.sdk.plugin.types.HostTypes;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
@@ -70,9 +73,10 @@ public final class SdkPlugin extends DeclaredPlugin {
      */
     public SdkPlugin() {
         super(StudioPlugin.declare()
-                .types(SdkTypes.class, RunTypes.class, ScreenTypes.class, PlanTypes.class, CaptureTypes.class, SettingsTypes.class)
+                .types(SdkTypes.class, RunTypes.class, ScreenTypes.class, PlanTypes.class, CaptureTypes.class,
+                        SettingsTypes.class, HostTypes.class)
                 .editors(SdkEditors.class)
-                .values(SdkValues.class)
+                .values(SdkValues.class, SdkHostValues.class)
                 .toolbar(SdkToolbarItems.class)
                 .runOverlay(SdkRunOverlay.class)
                 .overlay(SdkOverlay.class)
@@ -90,7 +94,8 @@ public final class SdkPlugin extends DeclaredPlugin {
     /**
      * The toolbar's game button names what this project launches, so it is told which project that is, and the
      * plugin half's warnings go to its log. A project whose pictures are still at its resources' root is asked about
-     * moving them into the SDK's folder ({@link MoveOffer}). On Windows, the game VMs' shutdown settings are applied
+     * moving them into the SDK's folder ({@link MoveOffer}), and the bot is noted beside the emulator instances it
+     * launches, for the Emulators window ({@link UsedBy}). On Windows, the game VMs' shutdown settings are applied
      * while a project is open.
      *
      * <p>This runs once in each process that hosts the plugin (the core and Studio, since the core's phase 10c): the
@@ -101,6 +106,7 @@ public final class SdkPlugin extends DeclaredPlugin {
         GameButton.bind(services);
         GameReady.bind(services);
         if (!services.hasUi()) return;
+        UsedBy.remember(services);
         MoveOffer.offer(services);
         if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }

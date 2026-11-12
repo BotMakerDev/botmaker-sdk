@@ -37,9 +37,12 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.launch.Game;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
+import com.botmaker.sdk.plugin.emulator.host.SdkHostValue;
+import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
+import com.botmaker.sdk.plugin.types.HostTypes;
 import com.botmaker.sdk.plugin.types.RunTypes;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.plugin.types.SdkTypes;
@@ -200,7 +203,10 @@ class SdkPluginSurfaceTest {
         // One declaration per constant but the deprecated ones, and nothing else.
         long live = Arrays.stream(SdkValue.Id.values()).filter(id -> !deprecated(id)).count();
         assertEquals(live, byId.size());
-        assertEquals(live, plugin.managedValues().size());
+        // ...of the bot's; this PC's are counted the same way, by their own marker.
+        assertEquals(live, plugin.managedValues().stream().filter(value -> !value.onHost()).count());
+        assertEquals(SdkHostValue.Id.values().length,
+                plugin.managedValues().stream().filter(ManagedValue::onHost).count());
     }
 
     private static boolean deprecated(SdkValue.Id id) {
@@ -219,7 +225,7 @@ class SdkPluginSurfaceTest {
     void a_host_can_load_the_plugin_and_every_holder_lists_every_field() {
         PluginTests.assertDeclared(SdkPlugin.class);
         for (Class<?> holder : List.of(SdkTypes.class, RunTypes.class, ScreenTypes.class, CaptureTypes.class,
-                SettingsTypes.class, SdkValues.class, SdkEditors.class, SdkToolbarItems.class, SdkRunOverlay.class,
+                SettingsTypes.class, HostTypes.class, SdkValues.class, SdkHostValues.class, SdkEditors.class, SdkToolbarItems.class, SdkRunOverlay.class,
                 SdkOverlay.class, SdkAssistant.class)) {
             PluginTests.assertListsEveryField(holder);
         }
@@ -302,7 +308,7 @@ class SdkPluginSurfaceTest {
     // second by fresh() or freshCall(). The two tests above are what it became.
 
     /**
-     * The three bar buttons in their one flat order, then the overlay's two. The groups went on 2026-10-28, when
+     * The four bar buttons in their one flat order (📱 Emulators joined on 2026-11-12), then the overlay's two. The groups went on 2026-10-28, when
      * each plugin got a tab of its own on the bar; 📋 Project Setup, 🎯 Capture Source and ⚙ Bot Settings left
      * on 2026-11-09, their values parameters now, and 🎯 Goals, 🖼 Manage Pictures and ✂ Capture Templates the same
      * day, views of 🗺 Screens' rail or opened from it.
@@ -314,18 +320,18 @@ class SdkPluginSurfaceTest {
      * rather than on the main bar, and their subject is the window the HUD is drawn over.
      */
     @Test
-    void the_toolbar_contributes_five_items_in_their_places_and_orders() {
+    void the_toolbar_contributes_six_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("game", "screen-map", "pilot", "point-here", "picture-here"),
+        assertEquals(List.of("game", "emulators", "screen-map", "pilot", "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
         ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, bar, overlay, overlay),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 60, 90, 10, 20),
+        assertEquals(List.of(10, 20, 60, 90, 10, 20),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
+import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
@@ -32,6 +33,7 @@ import java.util.List;
 public final class SdkToolbarItems implements ToolbarHolder {
 
     public static final String GAME_ID = "game";
+    public static final String EMULATORS_ID = "emulators";
     public static final String SCREEN_MAP_ID = "screen-map";
     public static final String PILOT_ID = "pilot";
     public static final String POINT_HERE_ID = "point-here";
@@ -48,6 +50,17 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .enabledWhen(EnabledWhen.PROJECT_OPEN)
             .icon(GameButton::icon)
             .onPress(() -> GameDialog::open);
+
+    /**
+     * This PC's emulators and their instances, the same for every bot, so it needs no project: what each should be,
+     * what it is, and Start, Stop and Apply ({@link EmulatorsWindow}).
+     */
+    public static final ToolbarItem EMULATORS = ToolbarItem.id(EMULATORS_ID).label("📱 Emulators")
+            .tooltip("This computer's Android emulators and their instances — what each should be, where it differs, "
+                    + "and start, stop or apply them")
+            .onBar(20)
+            .enabledWhen(EnabledWhen.ALWAYS)
+            .onPress(() -> EmulatorsWindow::open);
 
     /**
      * What the bot does: the game's screens and the actions on them, and behind its rail the goals and the pictures
@@ -79,7 +92,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onPress(() -> CaptureTemplates::pictureHere);
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
-    public static final List<ToolbarItem> ALL = List.of(GAME, SCREEN_MAP, PILOT, POINT_HERE, PICTURE_HERE);
+    public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, SCREEN_MAP, PILOT, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 
