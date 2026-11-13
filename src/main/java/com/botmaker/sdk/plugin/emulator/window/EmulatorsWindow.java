@@ -19,6 +19,8 @@ import com.botmaker.shared.emulator.config.EmulatorOperations;
 import com.botmaker.shared.emulator.config.InstanceFacts;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
+import com.botmaker.shared.emulator.google.KeyringStore;
+import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.application.Platform;
@@ -72,6 +74,12 @@ public final class EmulatorsWindow {
 
     /** The operations by id, for Cancel: a snapshot is all the queue's listeners hear. */
     private static final Map<String, Operation> RUNNING = new ConcurrentHashMap<>();
+
+    /**
+     * This PC's credential store, for the Google passwords the user asks to remember; one per process, opened on
+     * first use, and {@code available()} false where the PC has none.
+     */
+    private static final PasswordStore STORE = new KeyringStore();
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -370,12 +378,20 @@ public final class EmulatorsWindow {
             say("Nothing to apply: the instances picked are as configured, or were not read.");
             return;
         }
-        Optional<Boolean> removals = confirm(items);
+        // the store can block (opening, or asking to be unlocked): asked off the FX thread, once per account
+        Thread.ofVirtual().name("apply-passwords").start(() -> {
+            Set<String> remembered = ApplyPlan.remembered(items, STORE);
+            Platform.runLater(() -> apply(items, remembered));
+        });
+    }
+
+    private void apply(List<ApplyPlan.Item> items, Set<String> remembered) {
+        Optional<Boolean> removals = confirm(items, remembered);
         if (removals.isEmpty()) return;
         List<ApplyPlan.Item> agreed = ApplyPlan.agreed(items, removals.get());
         if (agreed.isEmpty()) return;
 
-        Passwords passwords = new Passwords(this::password);
+        Passwords passwords = new Passwords(STORE, this::password);
         Set<String> batch = ConcurrentHashMap.newKeySet();
         Consumer<Operation.Snapshot> ended = new Consumer<>() {
             @Override
@@ -421,16 +437,23 @@ public final class EmulatorsWindow {
      * The confirmation: every change, per instance. Empty when the user cancelled; else whether the accounts listed
      * for removal are removed too, which is asked on its own and off until ticked.
      */
-    private Optional<Boolean> confirm(List<ApplyPlan.Item> items) {
+    private Optional<Boolean> confirm(List<ApplyPlan.Item> items, Set<String> remembered) {
         VBox body = new VBox(6);
         for (ApplyPlan.Item item : items) {
             body.getChildren().add(Styles.on(new Label(item.row().instance().name() + " ("
                     + item.row().key().platform().displayName() + ")"), StyleClasses.STRONG_TEXT));
-            for (String line : ApplyPlan.lines(item)) {
+            for (String line : ApplyPlan.lines(item, remembered)) {
                 Label label = new Label("  " + line);
                 label.setWrapText(true);
                 body.getChildren().add(label);
             }
+        }
+        int asked = ApplyPlan.asked(items, remembered);
+        if (asked > 0) {
+            Label note = new Label(EmulatorsModel.count(asked, "password") + " will be asked, each once, when the"
+                    + " first instance that signs its account in comes up.");
+            note.setWrapText(true);
+            body.getChildren().add(Styles.on(note, StyleClasses.DIALOG_HINT));
         }
         CheckBox removals = new CheckBox("Also remove the accounts listed above from their instances");
         boolean removes = items.stream().anyMatch(ApplyPlan.Item::removes);
@@ -458,9 +481,10 @@ public final class EmulatorsWindow {
      */
     private Passwords.Answer password(String email) throws InterruptedException {
         CompletableFuture<Passwords.Answer> answer = new CompletableFuture<>();
+        boolean canRemember = STORE.available(); // here, on the operation's thread: the store can block
         Platform.runLater(() -> {
             try {
-                answer.complete(askPassword(email));
+                answer.complete(askPassword(email, canRemember));
             } catch (RuntimeException failed) {
                 answer.complete(null);
             }
@@ -472,13 +496,20 @@ public final class EmulatorsWindow {
         }
     }
 
-    private Passwords.Answer askPassword(String email) {
+    private Passwords.Answer askPassword(String email, boolean canRemember) {
         PasswordField field = new PasswordField();
-        Label why = new Label("BotMaker types it once on the instance, in Android's own sign-in, and keeps it only"
-                + " until this Apply ends. Skip it to leave this account out.");
+        CheckBox remember = new CheckBox("Remember on this PC");
+        remember.setSelected(true);
+        Label why = new Label(canRemember
+                ? "BotMaker types it on the instance, in Android's own sign-in. Remembered, it is kept in this PC's"
+                + " credential store once the sign-in is done, and typed again without asking; no assistant ever sees"
+                + " it. Skip it to leave this account out."
+                : "BotMaker types it once on the instance, in Android's own sign-in, and keeps it only until this"
+                + " Apply ends: this PC has no credential store to remember it in. Skip it to leave this account out.");
         why.setWrapText(true);
         why.setMaxWidth(420);
         VBox body = new VBox(8, Styles.on(why, StyleClasses.DIALOG_HINT), field);
+        if (canRemember) body.getChildren().add(remember);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(stage.isShowing() ? stage : Modals.owner(services));
@@ -498,7 +529,7 @@ public final class EmulatorsWindow {
             for (int i = 0; i < password.length; i++) password[i] = typed.charAt(i);
         }
         field.clear();
-        return password == null ? null : Passwords.Answer.once(password);
+        return password == null ? null : new Passwords.Answer(password, canRemember && remember.isSelected());
     }
 
     // ---- the operations strip ----

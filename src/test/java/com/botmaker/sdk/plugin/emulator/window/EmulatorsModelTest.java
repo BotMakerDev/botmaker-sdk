@@ -17,6 +17,7 @@ import com.botmaker.shared.emulator.config.InstanceFacts;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
 import com.botmaker.shared.emulator.config.SavedFilters;
+import com.botmaker.shared.emulator.google.PasswordStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -201,8 +202,50 @@ class EmulatorsModelTest {
         assertEquals(List.of("test", "Farm"), items.stream().map(i -> i.row().instance().name()).toList());
         ApplyPlan.Item farm = items.getLast();
         assertEquals(List.of("Screen: " + WIDE.said() + " → " + TALL.said() + " (restarts it)",
-                "Install Sword x Staff"), ApplyPlan.lines(farm));
+                "Install Sword x Staff"), ApplyPlan.lines(farm, Set.of()));
         assertFalse(farm.removes());
         assertEquals(items, ApplyPlan.agreed(items, false));
+    }
+
+    /** A store that remembers the addresses given, and has no password to hand: the lines never ask one. */
+    private record Remembers(Set<String> emails) implements PasswordStore {
+        @Override
+        public boolean available() {
+            return true;
+        }
+
+        @Override
+        public Optional<char[]> read(String email) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean remembered(String email) {
+            return emails.contains(PasswordStore.key(email));
+        }
+
+        @Override
+        public boolean remember(String email, char[] password) {
+            return false;
+        }
+
+        @Override
+        public void forget(String email) {}
+    }
+
+    @Test
+    void aSignInSaysWhetherItsPasswordIsRememberedOrAsked() {
+        List<ApplyPlan.Item> items = ApplyPlan.of(read().instances());
+        ApplyPlan.Item test = items.getFirst();
+        assertEquals(Set.of(), ApplyPlan.remembered(items, PasswordStore.NONE));
+        assertEquals(List.of("Sign in Google account user@example.com · Password asked next", "Install Sword x Staff"),
+                ApplyPlan.lines(test, Set.of()));
+        assertEquals(1, ApplyPlan.asked(items, Set.of()));
+        Set<String> remembered = ApplyPlan.remembered(items, new Remembers(Set.of("user@example.com")));
+        assertEquals(Set.of("user@example.com"), remembered);
+        assertEquals("Sign in Google account user@example.com · Password remembered",
+                ApplyPlan.lines(test, remembered).getFirst());
+        assertEquals(0, ApplyPlan.asked(items, remembered));
+        assertEquals(1, ApplyPlan.asked(List.of(test, test), Set.of()), "one account asked once");
     }
 }

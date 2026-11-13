@@ -8,10 +8,14 @@ import com.botmaker.shared.emulator.config.ConfigDiff;
 import com.botmaker.shared.emulator.config.GameRecord;
 import com.botmaker.shared.emulator.config.Operation;
 import com.botmaker.shared.emulator.google.InstanceChanges;
+import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * What one Apply would do, instance by instance, with no JavaFX: the settings it writes, the Google accounts it signs
@@ -64,9 +68,11 @@ final class ApplyPlan {
 
     /**
      * What the item does, one line each, for the user's eyes only: an account is named here, on their screen, and
-     * nowhere else.
+     * nowhere else. A sign-in says whether its password is remembered on this PC or asked next.
+     *
+     * @param remembered the accounts whose password this PC remembers, by {@link PasswordStore#key}
      */
-    static List<String> lines(Item item) {
+    static List<String> lines(Item item, Set<String> remembered) {
         List<String> lines = new ArrayList<>();
         for (Apply.Change change : item.changes()) {
             lines.add(change.field().displayName() + ": "
@@ -79,12 +85,44 @@ final class ApplyPlan {
             if (!change.account().kind().signedInByBotMaker()) {
                 lines.add(kind + " account " + change.account().name() + ": a record only, nothing is signed "
                         + (remove ? "out" : "in"));
+            } else if (remove) {
+                lines.add("Remove " + kind + " account " + change.account().name());
             } else {
-                lines.add((remove ? "Remove " : "Sign in ") + kind + " account " + change.account().name());
+                lines.add("Sign in " + kind + " account " + change.account().name() + " · Password "
+                        + (remembered.contains(PasswordStore.key(change.account().name())) ? "remembered" : "asked next"));
             }
         }
         for (GameRecord game : item.games()) lines.add("Install " + game.label());
         return lines;
+    }
+
+    /** The accounts the items sign in somewhere, by {@link PasswordStore#key}: the ones a password is needed for. */
+    static Set<String> signIns(List<Item> items) {
+        Set<String> signIns = new LinkedHashSet<>();
+        for (Item item : items) {
+            for (ConfigDiff.AccountChange change : item.accounts()) {
+                if (change.op() == ConfigDiff.AccountChange.Op.REMOVE) continue;
+                if (change.account().kind().signedInByBotMaker()) signIns.add(PasswordStore.key(change.account().name()));
+            }
+        }
+        return signIns;
+    }
+
+    /**
+     * Which of the items' sign-ins {@code store} remembers, each account asked of the store once. The store may block
+     * (a keyring opening, or asking to be unlocked): never on the FX thread.
+     */
+    static Set<String> remembered(List<Item> items, PasswordStore store) {
+        Set<String> remembered = new HashSet<>();
+        for (String key : signIns(items)) if (store.remembered(key)) remembered.add(key);
+        return remembered;
+    }
+
+    /** How many passwords the Apply will ask: one per account it signs in that this PC does not remember. */
+    static int asked(List<Item> items, Set<String> remembered) {
+        Set<String> asked = signIns(items);
+        asked.removeAll(remembered);
+        return asked.size();
     }
 
     /**
