@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **↶ Undo and ↷ Redo in the Emulators and Accounts windows** (2026-11-13), over `hostHistory()`: one step per
+  change either window made (a settings change, a tick, a renamed or forgotten instance), its name in the tooltip.
+  The bot's undo never takes these back. *Undo ticks* stays.
 - **Emulators ▸ Accounts** (2026-11-13): a grid of the book's Google accounts against the instances, filtered by
   emulator or tag. A tick writes the instance's own configuration at once (unticking one its emulator lists marks it
   *removed here*, never touching the emulator's), each cell says *signed in*, *to sign in*, *to sign out*, *not read*

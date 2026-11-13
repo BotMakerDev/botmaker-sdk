@@ -1,6 +1,10 @@
 package com.botmaker.sdk.plugin.emulator.host;
 
 import com.botmaker.java.grammar.ValueGrammar;
+import com.botmaker.plugin.api.Dialogs;
+import com.botmaker.plugin.api.History;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.plugin.SdkPlugin;
@@ -16,6 +20,8 @@ import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -227,5 +233,34 @@ class HostConfigTest {
 
     private static <T> T roundTrip(ComponentType<T> shape, T value) {
         return shape.build(shape.components(value));
+    }
+
+    @Test
+    void oneChangeIsOneStepOfThisPcsUndo() {
+        List<String> steps = new ArrayList<>();
+        History recording = new History() {
+            public boolean canUndo() { return false; }
+            public boolean canRedo() { return false; }
+            public String undoLabel() { return ""; }
+            public String redoLabel() { return ""; }
+            public void undo() {}
+            public void redo() {}
+            public AutoCloseable onChanged(Runnable listener) { return () -> {}; }
+            public void batch(String label, Runnable writes) {
+                steps.add(label);
+                writes.run();
+            }
+        };
+        StudioServices services = new StudioServices() {
+            public Path projectDir() { return null; }
+            public Path resourcesDir() { return null; }
+            public Theme theme() { return null; }
+            public Dialogs dialogs() { return null; }
+            @Override public History hostHistory() { return recording; }
+        };
+        HostConfig.update(services, config -> full());
+        HostConfig.forget(services, FARM);
+        assertEquals(List.of("Change this PC's emulators", "Forget an instance"), steps,
+                "each change's writes are one batch, whatever the host answered");
     }
 }

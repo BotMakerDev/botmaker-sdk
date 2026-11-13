@@ -185,7 +185,8 @@ public final class EmulatorsWindow {
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         status.setWrapText(true);
-        HBox header = new HBox(10, status, gap, readAt, refresh);
+        HostUndo undo = new HostUndo(services, this::refresh);
+        HBox header = new HBox(10, status, gap, readAt, undo.node(), refresh);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(8, 10, 4, 10));
 
@@ -205,6 +206,7 @@ public final class EmulatorsWindow {
         });
         stage.setOnShown(e -> {
             OPERATIONS.addListener(listener);
+            undo.start();
             readBotInstance();
             botListener = services.runs().onStateChanged(runs -> Platform.runLater(() -> {
                 readBotInstance();
@@ -216,6 +218,7 @@ public final class EmulatorsWindow {
         });
         stage.setOnHidden(e -> {
             OPERATIONS.removeListener(listener);
+            undo.stop();
             running.visible(false);
             try {
                 if (botListener != null) botListener.close();

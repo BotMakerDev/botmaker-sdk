@@ -26,7 +26,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -91,11 +93,11 @@ public final class HostConfig {
      * @return empty when written, else why not, in the host's words
      */
     public static Optional<String> update(StudioServices services, UnaryOperator<EmulatorConfig> change) {
-        synchronized (WRITES) {
+        return step(services, "Change this PC's emulators", () -> {
             Rows before = rows(services);
             Rows next = rows(change.apply(config(before)), before);
             return write(services, before, next);
-        }
+        });
     }
 
     /**
@@ -105,12 +107,12 @@ public final class HostConfig {
      */
     public static Optional<String> seen(StudioServices services, String bot, Collection<InstanceKey> targets,
                                         Collection<InstanceKey> known) {
-        synchronized (WRITES) {
+        return step(services, SEEN + bot + " launches",() -> {
             Rows before = rows(services);
             HostLabels next = seen(before.usedBy(), bot, targets, known);
             return write(services, before, new Rows(before.emulatorSettings(), before.emulatorGames(),
                     before.instanceSettings(), before.instanceGames(), before.tags(), next, before.accounts()));
-        }
+        });
     }
 
     /**
@@ -119,14 +121,14 @@ public final class HostConfig {
      * replaced.
      */
     public static Optional<String> rename(StudioServices services, InstanceKey from, InstanceKey to) {
-        synchronized (WRITES) {
+        return step(services, RENAMED,() -> {
             Rows before = rows(services);
             Optional<String> refused = write(services, before, renamed(before, from, to));
             if (refused.isPresent()) return refused;
             HostLabels renames = renames(services);
             return write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
                     InstanceRenames.recorded(renames, from, to));
-        }
+        });
     }
 
     /**
@@ -134,14 +136,14 @@ public final class HostConfig {
      * bot that still names it is told so by its checks ("no instance").
      */
     public static Optional<String> forget(StudioServices services, InstanceKey key) {
-        synchronized (WRITES) {
+        return step(services, FORGOTTEN,() -> {
             Rows before = rows(services);
             Optional<String> refused = write(services, before, dropped(before, key));
             if (refused.isPresent()) return refused;
             HostLabels renames = renames(services);
             return write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
                     InstanceRenames.dropped(renames, key));
-        }
+        });
     }
 
     /** The instances renamed on this PC, each row old key → new key ({@link InstanceRenames}). */
@@ -151,6 +153,31 @@ public final class HostConfig {
 
     /** One change at a time in this process: each reads the values, changes them and writes them back. */
     private static final Object WRITES = new Object();
+
+    private static final String RENAMED = "Rename an instance";
+    private static final String FORGOTTEN = "Forget an instance";
+    private static final String SEEN = "Note the instances ";
+
+    /**
+     * Whether the step {@code label} names followed what happened to an emulator (an instance renamed or deleted, a bot
+     * seen launching one): taking it back would put the values out of step with the emulator, so ↶ stops there.
+     */
+    public static boolean followsTheEmulator(String label) {
+        return label != null && (label.equals(RENAMED) || label.equals(FORGOTTEN) || label.startsWith(SEEN));
+    }
+
+    /**
+     * {@code writes} under {@link #WRITES}, as one step of this PC's undo named {@code label}: one ↶ takes back what one
+     * change did, however many values it wrote.
+     */
+    private static Optional<String> step(StudioServices services, String label, Supplier<Optional<String>> writes) {
+        synchronized (WRITES) {
+            if (services == null) return writes.get();
+            AtomicReference<Optional<String>> written = new AtomicReference<>(Optional.empty());
+            services.hostHistory().batch(label, () -> written.set(writes.get()));
+            return written.get();
+        }
+    }
 
     private static Rows rows(StudioServices services) {
         return new Rows(read(services, SdkHostValues.EMULATOR_SETTINGS, HostSettings.class, HostSettings.none()),

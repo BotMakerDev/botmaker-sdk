@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
+import com.botmaker.sdk.plugin.emulator.window.HostUndo;
 import com.botmaker.shared.emulator.GoogleAccount;
 import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -122,7 +123,8 @@ public final class AccountsWindow {
         });
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
-        HBox bar = new HBox(8, text, kind, gap, add, importButton, export, refresh);
+        HostUndo undo = new HostUndo(services, this::load);
+        HBox bar = new HBox(8, text, kind, gap, add, importButton, export, undo.node(), refresh);
         bar.setAlignment(Pos.CENTER_LEFT);
 
         table.getColumns().setAll(List.of(
@@ -146,8 +148,12 @@ public final class AccountsWindow {
         body.setPadding(new Insets(10));
 
         stage = Modals.window(services, Modals.Frame.modeless("Accounts", 860, 520, 620, 340), new BorderPane(body));
-        stage.setOnShown(e -> load());
+        stage.setOnShown(e -> {
+            undo.start();
+            load();
+        });
         stage.setOnHidden(e -> {
+            undo.stop();
             if (current == this) current = null;
         });
     }
