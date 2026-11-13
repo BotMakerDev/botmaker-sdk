@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.accounts;
+package com.botmaker.sdk.plugin.emulator.accounts;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.StyleClasses;
@@ -190,7 +190,11 @@ public final class AccountsWindow {
     }
 
     /** The book as it is now, with what {@code config} lists added; off the FX thread. */
-    private static List<AccountRecord> known(EmulatorConfig config) {
+    /**
+     * The book as this PC knows it: its file, every configuration's accounts and the PC's own Google account. Reads
+     * files and the credential store, so never on the FX thread.
+     */
+    public static List<AccountRecord> known(EmulatorConfig config) {
         return io(() -> HostConfig.accounts().known(config, GoogleAccount.signedIn()));
     }
 
@@ -332,7 +336,7 @@ public final class AccountsWindow {
                     setGraphic(Styles.on(new Label(row.instancesText()), StyleClasses.MUTED_TEXT));
                 } else {
                     Hyperlink link = new Hyperlink(row.instancesText());
-                    link.setOnAction(e -> EmulatorsWindow.openForAccount(services, row.account().name()));
+                    link.setOnAction(e -> EmulatorsWindow.openForAccount(services, row.account()));
                     setGraphic(link);
                 }
             }

@@ -11,6 +11,7 @@ import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
+import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ApplyHost;
@@ -94,12 +95,14 @@ public final class EmulatorsWindow {
     private final Button refresh = new Button("Refresh");
     private final Tab emulatorsTab = new Tab("Emulators");
     private final Tab instancesTab = new Tab("Instances");
+    private final Tab accountsTab = new Tab("Accounts");
     private final Tab configurationsTab = new Tab("Configurations");
     private final Tab runningTab = new Tab("Running");
     private final TabPane tabs;
     private final VBox strip = new VBox(4);
     private final EmulatorsTab emulators;
     private final InstancesTab instances;
+    private final AccountsTab accounts;
     private final ConfigurationsTab configurations;
     private final RunningTab running;
     /** The operations whose live screen was opened for them once already. */
@@ -143,13 +146,18 @@ public final class EmulatorsWindow {
     }
 
     /**
-     * The Accounts window's <i>N instances</i>: the window on the instances that should hold {@code account}. Phase 6b
-     * moves it to the Accounts tab's grid.
+     * The Accounts window's <i>N instances</i>: a Google account's row of the Accounts tab; a Facebook or mail record,
+     * which the grid does not list, the Instances tab filtered by its name.
      */
-    public static void openForAccount(StudioServices services, String account) {
+    public static void openForAccount(StudioServices services, AccountRecord account) {
         open(services);
-        current.tabs.getSelectionModel().select(current.instancesTab);
-        current.instances.showAccount(account);
+        if (account.kind() == AccountRecord.Kind.GOOGLE) {
+            current.tabs.getSelectionModel().select(current.accountsTab);
+            current.accounts.showAccount(account.key());
+        } else {
+            current.tabs.getSelectionModel().select(current.instancesTab);
+            current.instances.showAccount(account.name());
+        }
     }
 
     /** This PC's credential store, the one the Applies remember passwords in: it can block, so never asked on FX. */
@@ -161,14 +169,16 @@ public final class EmulatorsWindow {
         this.services = services;
         this.emulators = new EmulatorsTab(this);
         this.instances = new InstancesTab(this);
+        this.accounts = new AccountsTab(this);
         this.configurations = new ConfigurationsTab(this);
         this.running = new RunningTab(this);
 
         emulatorsTab.setContent(emulators.node());
         instancesTab.setContent(instances.node());
+        accountsTab.setContent(accounts.node());
         configurationsTab.setContent(configurations.node());
         runningTab.setContent(running.node());
-        tabs = new TabPane(emulatorsTab, instancesTab, configurationsTab, runningTab);
+        tabs = new TabPane(emulatorsTab, instancesTab, accountsTab, configurationsTab, runningTab);
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         refresh.setOnAction(e -> refresh());
@@ -189,8 +199,10 @@ public final class EmulatorsWindow {
         root.setBottom(operations);
 
         stage = Modals.window(services, Modals.Frame.modeless("Emulators", 1080, 680, 780, 420), root);
-        tabs.getSelectionModel().selectedItemProperty().addListener((o, was, now) ->
-                running.visible(now == runningTab && stage.isShowing()));
+        tabs.getSelectionModel().selectedItemProperty().addListener((o, was, now) -> {
+            running.visible(now == runningTab && stage.isShowing());
+            accounts.visible(now == accountsTab);
+        });
         stage.setOnShown(e -> {
             OPERATIONS.addListener(listener);
             readBotInstance();
@@ -302,6 +314,7 @@ public final class EmulatorsWindow {
         runningTab.setText("Running (" + read.running() + ")");
         emulators.show(read);
         instances.show(read);
+        accounts.show(read);
         configurations.show(read);
         running.show(read);
         if (open != null) open.show(read);
@@ -397,7 +410,11 @@ public final class EmulatorsWindow {
      * last operation ends.
      */
     void apply(List<EmulatorsModel.InstanceRow> rows) {
-        List<ApplyPlan.Item> items = ApplyPlan.of(rows);
+        applyItems(ApplyPlan.of(rows));
+    }
+
+    /** {@link #apply(List)} for items already chosen: the Accounts tab's, its sign-ins and sign-outs only. */
+    void applyItems(List<ApplyPlan.Item> items) {
         if (items.isEmpty()) {
             say("Nothing to apply: the instances picked are as configured, or were not read.");
             return;

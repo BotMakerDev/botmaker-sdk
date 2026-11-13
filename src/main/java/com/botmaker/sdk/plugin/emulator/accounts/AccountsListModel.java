@@ -1,4 +1,4 @@
-package com.botmaker.sdk.plugin.accounts;
+package com.botmaker.sdk.plugin.emulator.accounts;
 
 import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;

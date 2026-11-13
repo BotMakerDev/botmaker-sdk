@@ -3,7 +3,7 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
-import com.botmaker.sdk.plugin.accounts.AccountsWindow;
+import com.botmaker.sdk.plugin.emulator.accounts.AccountsWindow;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;

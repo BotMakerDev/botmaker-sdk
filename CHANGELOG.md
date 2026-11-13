@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Emulators ▸ Accounts** (2026-11-13): a grid of the book's Google accounts against the instances, filtered by
+  emulator or tag. A tick writes the instance's own configuration at once (unticking one its emulator lists marks it
+  *removed here*, never touching the emulator's), each cell says *signed in*, *to sign in*, *to sign out*, *not read*
+  or *removed here*, the last row counts each instance's accounts, and *Undo ticks*, *+ Account*, *Manage accounts…*
+  and *Apply…* (the sign-ins and sign-outs of the accounts shown, never a setting or a game) sit above it. The Accounts window's *N instances* opens
+  that account's row; the window's classes moved to `plugin/emulator/accounts/`.
 - **👤 Accounts on the toolbar** (2026-11-13), beside Emulators and needing no bot: every account this PC knows, with
   a filter by text and by kind, its note, how many instances want it (a link to the Emulators window on those
   instances) and whether its Google password is remembered. *Forget password*, *Remember…* (kept in the credential
