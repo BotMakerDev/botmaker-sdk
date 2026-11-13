@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The live screen fits your screen** (2026-11-13): the instance's picture follows the window's size and keeps its
+  shape, and the window opens within the screen it is on, sized to the instance's own portrait or landscape frame once
+  the first frame arrives; a size you chose, or a window you maximized, stays.
 - **The assistant reads an instance's configuration** (2026-11-12): `setup`'s `configuration` names one emulator
   instance and says each wanted setting, account and game with the layer it comes from (its own or its emulator's)
   against what the instance has now, as the Emulators window shows it, with or without a bot open. It only reads:
