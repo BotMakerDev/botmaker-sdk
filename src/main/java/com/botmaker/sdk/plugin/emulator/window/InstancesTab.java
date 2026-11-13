@@ -354,6 +354,12 @@ final class InstancesTab {
         });
     }
 
+    /** The Accounts window's <i>N instances</i>: the instances that should hold {@code account}, the rest cleared. */
+    void showAccount(String account) {
+        focusing = null;
+        use(new EmulatorsModel.Filter("", null, EmulatorsModel.Running.ANY, account, "", "", false));
+    }
+
     private static EmulatorsModel.Filter focusFilter(EmulatorInstance instance) {
         return new EmulatorsModel.Filter(instance.name() == null ? "" : instance.name(), instance.platformId(),
                 EmulatorsModel.Running.ANY, "", "", "", false);

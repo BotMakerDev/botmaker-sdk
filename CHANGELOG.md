@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **👤 Accounts on the toolbar** (2026-11-13), beside Emulators and needing no bot: every account this PC knows, with
+  a filter by text and by kind, its note, how many instances want it (a link to the Emulators window on those
+  instances) and whether its Google password is remembered. *Forget password*, *Remember…* (kept in the credential
+  store, nothing signed in), *Remove* for an account no configuration lists, *+ Account*, and *Import…* / *Export…*
+  of the list, which holds the kind, the name and the note only.
 - **+ Google lists the accounts this PC knows** (2026-11-13): the PC's own first, then those on no instance, then by
   name, each with its note, the instances that want it and whether its password is remembered or asked at Apply;
   *Another account* takes a new email. An account added to a configuration goes into the PC's account book.

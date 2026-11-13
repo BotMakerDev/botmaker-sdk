@@ -142,6 +142,21 @@ public final class EmulatorsWindow {
         current.instances.focus(instance);
     }
 
+    /**
+     * The Accounts window's <i>N instances</i>: the window on the instances that should hold {@code account}. Phase 6b
+     * moves it to the Accounts tab's grid.
+     */
+    public static void openForAccount(StudioServices services, String account) {
+        open(services);
+        current.tabs.getSelectionModel().select(current.instancesTab);
+        current.instances.showAccount(account);
+    }
+
+    /** This PC's credential store, the one the Applies remember passwords in: it can block, so never asked on FX. */
+    public static PasswordStore passwords() {
+        return STORE;
+    }
+
     private EmulatorsWindow(StudioServices services) {
         this.services = services;
         this.emulators = new EmulatorsTab(this);

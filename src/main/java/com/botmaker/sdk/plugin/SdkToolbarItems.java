@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin;
 import com.botmaker.plugin.api.ToolbarHolder;
 import com.botmaker.plugin.api.toolbar.EnabledWhen;
 import com.botmaker.plugin.api.toolbar.ToolbarItem;
+import com.botmaker.sdk.plugin.accounts.AccountsWindow;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
@@ -34,6 +35,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
 
     public static final String GAME_ID = "game";
     public static final String EMULATORS_ID = "emulators";
+    public static final String ACCOUNTS_ID = "accounts";
     public static final String SCREEN_MAP_ID = "screen-map";
     public static final String PILOT_ID = "pilot";
     public static final String POINT_HERE_ID = "point-here";
@@ -61,6 +63,17 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onBar(20)
             .enabledWhen(EnabledWhen.ALWAYS)
             .onPress(() -> EmulatorsWindow::open);
+
+    /**
+     * Every account this PC knows, for every emulator and every bot, so it needs no project either: the book, its
+     * remembered passwords, import and export ({@link AccountsWindow}). Which instance holds which is Emulators'.
+     */
+    public static final ToolbarItem ACCOUNTS = ToolbarItem.id(ACCOUNTS_ID).label("👤 Accounts")
+            .tooltip("The accounts this computer knows for its emulators — their notes, which Google passwords are "
+                    + "remembered, and import or export of the list (never a password)")
+            .onBar(30)
+            .enabledWhen(EnabledWhen.ALWAYS)
+            .onPress(() -> AccountsWindow::open);
 
     /**
      * What the bot does: the game's screens and the actions on them, and behind its rail the goals and the pictures
@@ -92,7 +105,8 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onPress(() -> CaptureTemplates::pictureHere);
 
     /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
-    public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, SCREEN_MAP, PILOT, POINT_HERE, PICTURE_HERE);
+    public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, ACCOUNTS, SCREEN_MAP, PILOT, POINT_HERE,
+            PICTURE_HERE);
 
     private SdkToolbarItems() {}
 
