@@ -1,7 +1,6 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
@@ -66,30 +65,8 @@ public final class CaptureValue {
         return opened.ctx().map(ctx -> ctx.write(source)).orElseGet(() -> Optional.of(opened.refused()));
     }
 
-    /**
-     * The overlay's ⌖ Point bot here press: writes the window the overlay is drawn over into this project's
-     * capture source.
-     *
-     * <p><b>This is the direction the fact travels, and it only travels this way.</b> The host tells the
-     * plugin which window its own HUD is drawn over — something only the host can know — and the plugin
-     * writes it into the bot's own Java. Studio holds no capture source of its own; see
-     * {@code docs/refactor/28-overlay-items.md}.
-     */
-    public static void pointHere(ActionContext context) {
-        StudioServices services = context.services();
-        String title = context.overWindowTitle().orElse(null);
-        if (title == null) {
-            services.status("Nothing to point at — the overlay is not over a window.");
-            return;
-        }
-        Optional<CaptureSource> window = windowTitled(title);
-        if (window.isEmpty()) {
-            services.status("\"" + title + "\" has no window class to find it by — pick it in Parameters ▸ Game ▸ captureSource.");
-            return;
-        }
-        point(services, window.get());
-        services.status("Capture source is now \"" + title + "\".");
-    }
+    // pointHere(ActionContext), the overlay's ⌖ Point bot here, stood here until 2026-11-13: the item is on the bar
+    // now, where no window is under the HUD, and opens the source picker (SdkToolbarItems.POINT_HERE).
 
     /**
      * The open window titled {@code title} as a source, by its class and, when that class is generic, its title

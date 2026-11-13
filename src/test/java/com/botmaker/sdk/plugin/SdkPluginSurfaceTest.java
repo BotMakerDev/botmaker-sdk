@@ -316,8 +316,8 @@ class SdkPluginSurfaceTest {
      * <p>The order values are asserted rather than only the sequence, because the host sorts on them, not on
      * declaration order — so a wrong number here moves a button on a bar this test cannot see.
      *
-     * <p>The last two are {@link ToolbarItem.Place#OVERLAY}: they are drawn on the overlay editor's Actions row
-     * rather than on the main bar, and their subject is the window the HUD is drawn over.
+     * <p>The last two were {@link ToolbarItem.Place#OVERLAY} until 2026-11-13, when the overlay was hidden outside
+     * dev mode; they read after Pilot on the bar now.
      */
     @Test
     void the_toolbar_contributes_seven_items_in_their_places_and_orders() {
@@ -327,11 +327,10 @@ class SdkPluginSurfaceTest {
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
-        ToolbarItem.Place overlay = ToolbarItem.Place.OVERLAY;
-        assertEquals(List.of(bar, bar, bar, bar, bar, overlay, overlay),
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 60, 90, 10, 20),
+        assertEquals(List.of(10, 20, 30, 60, 90, 100, 110),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

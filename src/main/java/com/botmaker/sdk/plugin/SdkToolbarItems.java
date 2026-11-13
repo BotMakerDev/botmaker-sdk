@@ -10,7 +10,7 @@ import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
-import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.source.SourcePicker;
 
 import java.util.List;
 
@@ -92,19 +92,27 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onBar(90)
             .onPress(() -> RemotePilotUi::open);
 
-    /** Drawn on the overlay editor's Actions row; its subject is the window the HUD is drawn over. */
-    public static final ToolbarItem POINT_HERE = ToolbarItem.id(POINT_HERE_ID).label("⌖ Point bot here")
-            .tooltip("Make the window the overlay is drawn over this project's capture source")
-            .inOverlay(10)
-            .onPress(() -> CaptureValue::pointHere);
+    /**
+     * Picks what the bot reads pixels from ({@link SourcePicker}). It was the overlay's <i>⌖ Point bot here</i>,
+     * pointing at the window the HUD was drawn over, until 2026-11-13, when the overlay was hidden outside dev mode;
+     * on the bar there is no such window, so it asks. The id is kept, and with it the button's remembered state.
+     */
+    public static final ToolbarItem POINT_HERE = ToolbarItem.id(POINT_HERE_ID).label("⌖ Point bot at…")
+            .tooltip("Pick the window, emulator or screen this bot reads — the same choice as Parameters ▸ "
+                    + "captureSource")
+            .onBar(100)
+            .onPress(() -> SourcePicker::choose);
 
-    public static final ToolbarItem PICTURE_HERE = ToolbarItem.id(PICTURE_HERE_ID).label("✂ Picture of this")
-            .tooltip("Cut a picture out of the window the overlay is drawn over, whatever the project's "
-                    + "capture target is")
-            .inOverlay(20)
+    /**
+     * Cuts a picture out of what the bot reads. An overlay item, cutting from the window the HUD was over, until
+     * 2026-11-13; on the bar it cuts from the project's capture source.
+     */
+    public static final ToolbarItem PICTURE_HERE = ToolbarItem.id(PICTURE_HERE_ID).label("✂ Cut picture")
+            .tooltip("Cut a picture out of what the bot reads, to find on screen")
+            .onBar(110)
             .onPress(() -> CaptureTemplates::pictureHere);
 
-    /** Every item, the bar's in their reading order, then the overlay's; the host sorts on each item's order. */
+    /** Every item, in the bar's reading order; the host sorts on each item's order. */
     public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, ACCOUNTS, SCREEN_MAP, PILOT, POINT_HERE,
             PICTURE_HERE);
 

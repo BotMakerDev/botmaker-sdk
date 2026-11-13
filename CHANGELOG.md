@@ -17,6 +17,12 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+- **⌖ and ✂ are on the SDK's toolbar tab** (2026-11-13): Studio shows its overlay only in dev mode now, so the two
+  overlay buttons moved to the bar, after 🎮 Pilot. *⌖ Point bot at…* opens the source picker, the same choice as
+  Parameters ▸ captureSource; *✂ Cut picture* cuts a picture out of what the bot reads.
+
 ## [1.10.1] — 2026-11-13
 
 - **The account book is in the SDK's project of this PC** (2026-11-13, host-projects phase 6): `Accounts.java`'s

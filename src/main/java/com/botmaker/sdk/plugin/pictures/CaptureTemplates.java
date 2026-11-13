@@ -122,8 +122,9 @@ public final class CaptureTemplates {
     }
 
     /**
-     * The overlay's ✂ Picture of this press: cuts a picture out of the window the overlay is over, rather than
-     * out of the project's default target.
+     * The ✂ Cut picture press: cuts a picture out of the window the overlay is over, rather than out of the
+     * project's default target, when it is pressed on the overlay. On the bar (since 2026-11-13) no window is
+     * under the HUD, so it cuts from the project's target.
      *
      * <p>What the overlay adds is a target for <em>this</em> session, which makes the tool usable over a
      * window the project has never heard of, including a project that names no target at all. The override
