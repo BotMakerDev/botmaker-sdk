@@ -187,6 +187,21 @@ class ConfigViewsTest {
         assertEquals(AccountState.TO_SIGN_IN, third.state());
     }
 
+    /** Signed in by another of its addresses: the layer that named it names Android's, note and default kept. */
+    @Test
+    void anAccountListedUnderAnotherAddressIsRenamedWhereItIsNamed() {
+        InstanceKey ld = new InstanceKey(PlatformId.LDPLAYER, "LDPlayer");
+        EmulatorConfig config = EmulatorConfig.EMPTY.withEmulator(PlatformId.LDPLAYER, Layer.EMPTY
+                .withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "alias@example.com", "farm"))
+                .withDefaultGoogle("alias@example.com"));
+        EmulatorConfig renamed = ConfigViews.renameAccount(config, ld, "alias@example.com", "main@example.com");
+        Layer emulator = renamed.emulator(PlatformId.LDPLAYER);
+        assertEquals(List.of(new AccountRecord(AccountRecord.Kind.GOOGLE, "main@example.com", "farm")),
+                emulator.accounts());
+        assertEquals("main@example.com", emulator.defaultGoogle());
+        assertEquals(Layer.EMPTY, renamed.instance(ld), "the instance named nothing: nothing added there");
+    }
+
     @Test
     void gamesSayWhatIsInstalledAndWhatTheInstanceRemoved() {
         List<GameRow> rows = ConfigViews.games(FARM_T, config(), farm());

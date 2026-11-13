@@ -396,7 +396,8 @@ public final class EmulatorsWindow {
                             synchronized (batch) {
                                 // waits until the whole batch is queued
                             }
-                            return ApplyPlan.body(item, log, passwords).run(context);
+                            return ApplyPlan.body(item, log, passwords, (typed, listed) -> change(
+                                    c -> ConfigViews.renameAccount(c, item.row().key(), typed, listed))).run(context);
                         });
                 batch.add(operation.id());
                 queued.add(operation);

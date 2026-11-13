@@ -330,6 +330,25 @@ public final class ConfigViews {
     }
 
     /**
+     * Names a Google account by the address Android lists it under, where the instance's layer or its emulator's names
+     * it by another of its addresses ({@code typed}); its note and default stay.
+     */
+    public static EmulatorConfig renameAccount(EmulatorConfig config, InstanceKey key, String typed, String listed) {
+        AccountRecord.Key old = new AccountRecord.Key(AccountRecord.Kind.GOOGLE, typed);
+        EmulatorConfig next = config;
+        for (Target target : List.of(new Target.Emulator(key.platform()), new Target.Instance(key))) {
+            Layer layer = target.layer(next);
+            Optional<AccountRecord> held = layer.accounts().stream().filter(a -> a.key().equals(old)).findFirst();
+            if (held.isEmpty()) continue;
+            Layer renamed = layer.inheritingAccount(old)
+                    .withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, listed, held.get().note()));
+            if (typed.equalsIgnoreCase(layer.defaultGoogle())) renamed = renamed.withDefaultGoogle(listed);
+            next = target.with(next, renamed);
+        }
+        return next;
+    }
+
+    /**
      * Takes the account off the layer. On an instance, one its emulator lists is marked removed, so Apply signs it
      * out; one only the instance listed is simply dropped.
      */

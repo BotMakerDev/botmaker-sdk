@@ -102,7 +102,8 @@ class EmulatorsModelTest {
         assertFalse(snapshot.emulators().getLast().installed());
         assertEquals("Nothing set", snapshot.emulators().getLast().configured());
         assertEquals(2, snapshot.running());
-        assertEquals(List.of("Farm"), names(snapshot.applicable(PlatformId.LDPLAYER)));
+        // Android read on neither: each installs the game unless it is there, and test signs its account in
+        assertEquals(List.of("test", "Farm"), names(snapshot.applicable(PlatformId.LDPLAYER)));
         assertEquals(List.of("farm", "main"), snapshot.tags());
     }
 
@@ -121,14 +122,15 @@ class EmulatorsModelTest {
         assertEquals("Farm", Column.NAME.text(farm));
         assertEquals("LDPlayer", Column.EMULATOR.text(farm));
         assertEquals("Running", Column.STATE.text(farm));
-        assertEquals("1 change to apply", Column.DIFFERS.text(farm));
+        assertEquals("2 changes to apply", Column.DIFFERS.text(farm), "the screen, and the game as Android was not read");
         assertEquals("Sword x Staff", Column.GAMES.text(farm));
         assertEquals("farm, main", Column.TAGS.text(farm));
         assertEquals("SwordXStaff", Column.USED_BY.text(farm));
         assertEquals(WIDE.said(), Column.SCREEN.text(farm));
         InstanceRow test = read().instance(InstanceKey.of(TEST)).orElseThrow();
         assertEquals("Stopped", Column.STATE.text(test));
-        assertEquals("As configured", Column.DIFFERS.text(test));
+        assertEquals("2 changes to apply", Column.DIFFERS.text(test), "stopped: its account and game, unread");
+        assertFalse(test.differs(), "not read: not known to differ");
         assertEquals("user@example.com", Column.ACCOUNTS.text(test));
         for (Column column : Column.values()) assertEquals(column, Column.fromId(column.id()));
         assertEquals(Column.UNKNOWN, Column.fromId("nope"));
@@ -196,9 +198,10 @@ class EmulatorsModelTest {
     @Test
     void applyShowsEveryChangeAndAsksForRemovals() {
         List<ApplyPlan.Item> items = ApplyPlan.of(read().instances());
-        assertEquals(1, items.size(), "only Farm differs in a way Apply changes");
-        ApplyPlan.Item farm = items.getFirst();
-        assertEquals(List.of("Screen: " + WIDE.said() + " → " + TALL.said() + " (restarts it)"), ApplyPlan.lines(farm));
+        assertEquals(List.of("test", "Farm"), items.stream().map(i -> i.row().instance().name()).toList());
+        ApplyPlan.Item farm = items.getLast();
+        assertEquals(List.of("Screen: " + WIDE.said() + " → " + TALL.said() + " (restarts it)",
+                "Install Sword x Staff"), ApplyPlan.lines(farm));
         assertFalse(farm.removes());
         assertEquals(items, ApplyPlan.agreed(items, false));
     }
