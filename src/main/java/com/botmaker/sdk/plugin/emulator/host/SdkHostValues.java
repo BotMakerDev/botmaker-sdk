@@ -60,13 +60,20 @@ public final class SdkHostValues implements ValueHolder {
     public static final ManagedMethod<HostAccounts> ACCOUNTS = ManagedValue.method(SdkHostValue.Id.ACCOUNTS)
             .in(SdkHostValue.Holder.ACCOUNTS)
             .holds(HostAccounts.class, HostAccounts.none())
-            .because("These are the accounts the instances should hold, never a password." + WINDOW);
+            .because("These are the accounts the instances should hold, never a password; each note is the"
+                    + " book's." + WINDOW);
+
+    public static final ManagedMethod<HostKnown> BOOK = ManagedValue.method(SdkHostValue.Id.BOOK)
+            .in(SdkHostValue.Holder.ACCOUNTS)
+            .holds(HostKnown.class, HostKnown.none())
+            .because("These are the accounts this PC knows, for every emulator and every bot, never a password."
+                    + " Change them in the Accounts window.");
 
     private SdkHostValues() {}
 
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
-                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS);
+                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK);
     }
 }

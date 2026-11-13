@@ -41,7 +41,9 @@ public @interface SdkHostValue {
         /** The instances BotMaker renamed, old name to new, so a bot opened later is pointed at the new name. */
         INSTANCE_RENAMES,
         /** The accounts an emulator's instances, or one instance, should hold: Google, Facebook, mail. */
-        ACCOUNTS
+        ACCOUNTS,
+        /** Every account this PC knows, each once with its note: the book the instances' accounts name. */
+        BOOK
     }
 
     /** This PC's classes the values live in: {@code Emulators.java}, {@code Instances.java}, {@code Accounts.java}. */

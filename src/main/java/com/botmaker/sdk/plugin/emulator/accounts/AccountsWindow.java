@@ -6,12 +6,11 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
-import com.botmaker.shared.emulator.GoogleAccount;
-import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -56,7 +55,7 @@ import java.util.function.Function;
 
 /**
  * The Accounts window: every account this PC knows, for every emulator and every bot, with no bot open (board
- * Accounts, spec {@code 2026-11-13-google-accounts-design.md}). It lists {@link AccountBook}, forgets or remembers a
+ * Accounts, spec {@code 2026-11-13-google-accounts-design.md}). It lists {@link HostBook}, forgets or remembers a
  * Google password in this PC's credential store, removes an account no configuration lists, and imports and exports
  * the book (kind, name and note: never a password). Which instance holds which account is the Emulators window's.
  *
@@ -173,14 +172,14 @@ public final class AccountsWindow {
             List<InstanceKey> keys = discovered != null ? discovered
                     : EmulatorsModel.keys(EmulatorsModel.Source.live(services));
             EmulatorConfig config = HostConfig.load(services).config();
-            List<AccountRecord> known = known(config);
+            List<AccountRecord> known = known(services, config);
             boolean available = store.available();
             Set<String> remembered = new HashSet<>();
             if (available) {
                 for (String key : AccountsListModel.keys(known)) if (store.remembered(key)) remembered.add(key);
             }
-            return new Read(keys, known, AccountsListModel.rows(known, AccountBook.onInstances(config, keys),
-                    AccountBook.held(config), remembered), available);
+            return new Read(keys, known, AccountsListModel.rows(known, HostBook.onInstances(config, keys),
+                    HostBook.held(config), remembered), available);
         }, done -> {
             if (read != reads) return;
             instances = done.instances();
@@ -195,13 +194,12 @@ public final class AccountsWindow {
                         boolean storeAvailable) {
     }
 
-    /** The book as it is now, with what {@code config} lists added; off the FX thread. */
     /**
-     * The book as this PC knows it: its file, every configuration's accounts and the PC's own Google account. Reads
-     * files and the credential store, so never on the FX thread.
+     * The book as this PC knows it, with every configuration's accounts added. Reads this PC's values, and on the
+     * book's first use the PC's own Google account, so never on the FX thread.
      */
-    public static List<AccountRecord> known(EmulatorConfig config) {
-        return io(() -> HostConfig.accounts().known(config, GoogleAccount.signedIn()));
+    public static List<AccountRecord> known(StudioServices services, EmulatorConfig config) {
+        return io(() -> HostConfig.accounts(services).known(config));
     }
 
     private void filter() {
@@ -260,14 +258,14 @@ public final class AccountsWindow {
                 + (forget ? " Its remembered password is forgotten too." : ""), "Remove")) return;
         PasswordStore store = EmulatorsWindow.passwords();
         Async.load("accounts-remove", () -> {
-            if (AccountBook.held(HostConfig.load(services).config()).contains(account.key())) return false;
+            if (HostBook.held(HostConfig.load(services).config()).contains(account.key())) return false;
             if (forget) {
                 store.forget(account.name());
                 if (store.remembered(account.name())) {
                     throw new IllegalStateException("this PC's credential store kept its password");
                 }
             }
-            io(() -> HostConfig.accounts().remove(account.key()));
+            io(() -> HostConfig.accounts(services).remove(account.key()));
             return true;
         }, removed -> {
             say(removed ? account.name() + " is removed."
@@ -278,7 +276,7 @@ public final class AccountsWindow {
 
     private void addAccount() {
         newAccount().ifPresent(account -> Async.load("accounts-add",
-                () -> io(() -> HostConfig.accounts().add(account)), after -> {
+                () -> io(() -> HostConfig.accounts(services).add(account)), after -> {
                     say(account.name() + " is added.");
                     load();
                 }, failed -> say("The account was not added: " + failed)));
@@ -289,8 +287,8 @@ public final class AccountsWindow {
         if (source.isEmpty()) return;
         String file = String.valueOf(source.get().getFileName());
         Async.load("accounts-import", () -> {
-            List<AccountRecord> before = known(HostConfig.load(services).config());
-            return AccountsListModel.imported(before, io(() -> HostConfig.accounts().importFrom(source.get())));
+            List<AccountRecord> before = known(services, HostConfig.load(services).config());
+            return AccountsListModel.imported(before, io(() -> HostConfig.accounts(services).importFrom(source.get())));
         }, imported -> {
             say(imported.said(file));
             load();
@@ -304,10 +302,10 @@ public final class AccountsWindow {
         if (target.isEmpty()) return;
         String file = String.valueOf(target.get().getFileName());
         Async.load("accounts-export", () -> {
-            List<AccountRecord> exported = known(HostConfig.load(services).config());
+            List<AccountRecord> exported = known(services, HostConfig.load(services).config());
             if (exported.isEmpty()) return 0;
             io(() -> {
-                AccountBook.export(exported, target.get());
+                HostBook.export(exported, target.get());
                 return null;
             });
             return exported.size();

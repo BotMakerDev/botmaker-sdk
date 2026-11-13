@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The account book is in the SDK's project of this PC** (2026-11-13, host-projects phase 6): `Accounts.java`'s
+  `BOOK` value lists every account this PC knows (kind, name, note; never a password, which only the OS store holds),
+  and `plugin.emulator.host.HostBook` reads and changes it, each change one step of ↶. An instance's account names a
+  book entry and shows the book's note; its row no longer copies it. On first use the `accounts.json` an earlier
+  build kept in the window's `state/` folder is moved in as one commit, *Account book moved in*, notes and unknown
+  kinds kept, then deleted. shared's `AccountBook`, which held it, is gone.
 - **↶ Undo and ↷ Redo in the Emulators and Accounts windows** (2026-11-13), over `hostHistory()`: one step per
   change either window made (a settings change, a tick, a renamed or forgotten instance), its name in the tooltip.
   The bot's undo never takes these back. *Undo ticks* stays.

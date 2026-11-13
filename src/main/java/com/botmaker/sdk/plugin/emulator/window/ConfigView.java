@@ -3,9 +3,9 @@ package com.botmaker.sdk.plugin.emulator.window;
 import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.GoogleAccount;
-import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
@@ -253,13 +253,13 @@ final class ConfigView {
             Optional<String> pc = GoogleAccount.signedIn();
             List<AccountRecord> book;
             try {
-                book = HostConfig.accounts().known(config, pc);
+                book = HostConfig.accounts(window.services()).known(config);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
             Set<String> remembered = store.available()
                     ? ApplyPlan.remembered(GooglePick.keys(book, pc, here), store) : Set.of();
-            return GooglePick.choices(book, AccountBook.onInstances(config, instances), remembered, pc, here);
+            return GooglePick.choices(book, HostBook.onInstances(config, instances), remembered, pc, here);
         }, choices -> ConfigDialogs.google(window, target.title(), choices, here).ifPresent(this::addAccount),
                 failed -> window.say("The account book was not read: " + failed));
     }
@@ -277,7 +277,8 @@ final class ConfigView {
     private void saveAccount(AccountRecord account, boolean asGiven) {
         window.change(c -> ConfigViews.addAccount(target, c, account), () -> Async.load("emulators-account-book", () -> {
             try {
-                return asGiven ? HostConfig.accounts().put(account) : HostConfig.accounts().add(account);
+                HostBook book = HostConfig.accounts(window.services());
+                return asGiven ? book.put(account) : book.add(account);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

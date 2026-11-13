@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
-import com.botmaker.shared.emulator.config.AccountBook;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
@@ -48,14 +48,14 @@ final class GooglePick {
     /**
      * The book's Google accounts not in {@code here}.
      *
-     * @param onInstances which instances each account is wanted on ({@link AccountBook#onInstances})
+     * @param onInstances which instances each account is wanted on ({@link HostBook#onInstances})
      * @param remembered  the accounts this PC remembers the password of, by {@link PasswordStore#key}
      * @param pcGoogle    the PC's own Google account, listed first
      * @param here        the accounts the layer already lists
      */
     static List<Choice> choices(List<AccountRecord> book, Map<AccountRecord.Key, List<InstanceKey>> onInstances,
                                 Set<String> remembered, Optional<String> pcGoogle, Collection<AccountRecord.Key> here) {
-        List<AccountRecord> ordered = new ArrayList<>(AccountBook.sorted(offered(book, pcGoogle, here), onInstances));
+        List<AccountRecord> ordered = new ArrayList<>(HostBook.sorted(offered(book, pcGoogle, here), onInstances));
         pcGoogle.flatMap(pc -> ordered.stream().filter(a -> a.name().equalsIgnoreCase(pc.strip())).findFirst())
                 .ifPresent(pc -> {
                     ordered.remove(pc);
@@ -77,7 +77,7 @@ final class GooglePick {
         List<AccountRecord> google = new ArrayList<>(book.stream()
                 .filter(account -> account.kind() == AccountRecord.Kind.GOOGLE).toList());
         pcGoogle.map(String::strip).filter(pc -> !pc.isEmpty())
-                .map(pc -> new AccountRecord(AccountRecord.Kind.GOOGLE, pc, AccountBook.PC_ACCOUNT_NOTE))
+                .map(pc -> new AccountRecord(AccountRecord.Kind.GOOGLE, pc, HostBook.PC_ACCOUNT_NOTE))
                 .filter(pc -> google.stream().noneMatch(account -> account.key().equals(pc.key())))
                 .ifPresent(google::add);
         return google.stream().filter(account -> !here.contains(account.key())).toList();

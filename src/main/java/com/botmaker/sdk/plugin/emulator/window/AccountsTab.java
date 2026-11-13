@@ -155,7 +155,7 @@ final class AccountsTab {
         stale = false;
         int read = ++reads;
         EmulatorConfig config = window.snapshot().config();
-        Async.load("accounts-grid", () -> AccountsWindow.known(config), known -> {
+        Async.load("accounts-grid", () -> AccountsWindow.known(window.services(), config), known -> {
             if (read != reads) return;
             book = known;
             draw();
@@ -287,7 +287,7 @@ final class AccountsTab {
         }
         Async.load("accounts-add", () -> {
             try {
-                return HostConfig.accounts().add(added);
+                return HostConfig.accounts(window.services()).add(added);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

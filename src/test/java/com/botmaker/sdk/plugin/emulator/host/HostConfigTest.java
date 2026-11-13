@@ -35,6 +35,10 @@ class HostConfigTest {
     private static final InstanceKey FARM = new InstanceKey(PlatformId.LDPLAYER, "LDPlayer-1");
     private static final InstanceKey OTHER = new InstanceKey(PlatformId.MUMU, "MuMu-0");
 
+    /** The book's notes of {@link #full()}'s accounts, which the rows name without them. */
+    private static final Map<AccountRecord.Key, String> NOTES =
+            Map.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "main@example.com"), "the main one");
+
     private static EmulatorConfig full() {
         Layer ld = Layer.EMPTY.with(ConfigField.SCREEN, new ConfigValue.Screen(1080, 1920, 320))
                 .with(ConfigField.ROOT, new ConfigValue.Toggle(false))
@@ -58,7 +62,7 @@ class HostConfigTest {
     void theConfigurationRoundTripsThroughItsRows() {
         EmulatorConfig config = full();
         HostConfig.Rows rows = HostConfig.rows(config, HostConfig.Rows.NONE);
-        assertEquals(config, HostConfig.config(rows));
+        assertEquals(config, HostConfig.config(rows, NOTES));
         assertTrue(rows.emulatorSettings().list().contains(
                 new HostSettings.Setting("ldplayer", "screen", "1080x1920@320")));
         assertTrue(rows.instanceSettings().list().contains(
@@ -101,7 +105,7 @@ class HostConfigTest {
         assertEquals(EmulatorConfig.EMPTY, HostConfig.config(before));
 
         HostConfig.Rows next = HostConfig.rows(full(), before);
-        assertEquals(full(), HostConfig.config(next));
+        assertEquals(full(), HostConfig.config(next, NOTES));
         assertTrue(next.emulatorSettings().list().containsAll(List.of(newerField, newerProduct)));
         assertTrue(next.instanceSettings().list().contains(badValue));
         assertTrue(next.accounts().list().contains(newerKind));
@@ -146,7 +150,7 @@ class HostConfigTest {
                 HostGames.none(), HostLabels.none(), HostLabels.of(new HostLabels.Label("ldplayer/LDPlayer-1", "Bot")),
                 HostAccounts.none()));
         HostConfig.Rows after = HostConfig.renamed(before, FARM, renamed);
-        EmulatorConfig config = HostConfig.config(after);
+        EmulatorConfig config = HostConfig.config(after, NOTES);
         assertEquals(full().instance(FARM), config.instance(renamed));
         assertTrue(config.instance(FARM).isEmpty());
         assertEquals(full().emulator(PlatformId.LDPLAYER), config.emulator(PlatformId.LDPLAYER));
@@ -164,7 +168,8 @@ class HostConfigTest {
                         new HostLabels.Label("mumu/MuMu-0", "Bot")), HostAccounts.none()));
         HostConfig.Rows after = HostConfig.dropped(before, FARM);
         assertTrue(HostConfig.config(after).instance(FARM).isEmpty());
-        assertEquals(full().emulator(PlatformId.LDPLAYER), HostConfig.config(after).emulator(PlatformId.LDPLAYER));
+        assertEquals(full().emulator(PlatformId.LDPLAYER),
+                HostConfig.config(after, NOTES).emulator(PlatformId.LDPLAYER));
         assertTrue(after.instanceSettings().list().isEmpty(), "what it does not read goes too");
         assertEquals(Map.of(OTHER, List.of("Bot")), HostConfig.usedBy(after.usedBy()));
         assertEquals(before, HostConfig.dropped(before, new InstanceKey(PlatformId.MEMU, "Nobody")));
@@ -192,12 +197,17 @@ class HostConfigTest {
         assertEquals(rows.instanceGames().list().getFirst(),
                 roundTrip(HostTypes.GAME, rows.instanceGames().list().getFirst()));
         assertEquals(HostSettings.none(), roundTrip(HostTypes.SETTINGS, HostSettings.none()));
+        HostKnown book = HostKnown.of(new HostKnown.Entry("google", "main@example.com", "the main one"),
+                new HostKnown.Entry("steam", "player", ""));
+        assertEquals(book, roundTrip(HostTypes.KNOWN, book));
+        assertEquals(book.list().getFirst(), roundTrip(HostTypes.KNOWN_ENTRY, book.list().getFirst()));
         SdkPlugin plugin = new SdkPlugin();
         assertTrue(plugin.componentTypes().containsAll(List.of(HostTypes.SETTINGS, HostTypes.SETTING, HostTypes.GAMES,
-                HostTypes.GAME, HostTypes.ACCOUNTS, HostTypes.ACCOUNT, HostTypes.LABELS, HostTypes.LABEL)));
+                HostTypes.GAME, HostTypes.ACCOUNTS, HostTypes.ACCOUNT, HostTypes.LABELS, HostTypes.LABEL,
+                HostTypes.KNOWN, HostTypes.KNOWN_ENTRY)));
         List<ManagedValue<?>> host = List.of(SdkHostValues.EMULATOR_SETTINGS, SdkHostValues.EMULATOR_GAMES,
                 SdkHostValues.INSTANCE_SETTINGS, SdkHostValues.INSTANCE_GAMES, SdkHostValues.INSTANCE_TAGS,
-                SdkHostValues.INSTANCE_USED_BY, SdkHostValues.ACCOUNTS);
+                SdkHostValues.INSTANCE_USED_BY, SdkHostValues.ACCOUNTS, SdkHostValues.BOOK);
         assertTrue(plugin.managedValues().containsAll(host));
         assertTrue(host.stream().allMatch(ManagedValue::onHost));
     }
@@ -207,7 +217,10 @@ class HostConfigTest {
     void theValuesAreJavaTheGrammarWritesAndReads() {
         ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(HostTypes.SETTINGS, HostTypes.SETTING,
                 HostTypes.GAMES, HostTypes.GAME, HostTypes.ACCOUNTS, HostTypes.ACCOUNT, HostTypes.LABELS,
-                HostTypes.LABEL));
+                HostTypes.LABEL, HostTypes.KNOWN, HostTypes.KNOWN_ENTRY));
+        HostKnown book = HostKnown.of(new HostKnown.Entry("google", "main@example.com", "the main one"));
+        assertEquals(book, grammar.read(HostKnown.class,
+                qualified(grammar.write(HostKnown.class, book).orElseThrow().source())).orElseThrow());
         HostSettings settings = HostSettings.of(new HostSettings.Setting("ldplayer", "screen", "1080x1920@320"),
                 new HostSettings.Setting("ldplayer/LDPlayer-1", "locale", "fr-FR"));
         String java = grammar.write(HostSettings.class, settings).orElseThrow().source();
@@ -227,7 +240,7 @@ class HostConfigTest {
 
     /** {@code java} with the host types named in full, as a file names them by its imports. */
     private static String qualified(String java) {
-        return java.replaceAll("\\bHost(Settings|Games|Accounts|Labels)\\b",
+        return java.replaceAll("\\bHost(Settings|Games|Accounts|Labels|Known)\\b",
                 HostSettings.class.getPackageName() + ".Host$1");
     }
 

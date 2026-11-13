@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.window;
 import com.botmaker.plugin.api.History;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -23,8 +24,11 @@ public final class HostUndo {
         static Face undo(History history) {
             if (!history.canUndo()) return new Face("↶ Undo", "Nothing to take back", false);
             String label = history.undoLabel();
-            return HostConfig.followsTheEmulator(label)
-                    ? new Face("↶ Undo", "Cannot take back: " + label + " — it followed the emulator", false)
+            if (HostConfig.followsTheEmulator(label)) {
+                return new Face("↶ Undo", "Cannot take back: " + label + " — it followed the emulator", false);
+            }
+            return HostBook.startedTheBook(label)
+                    ? new Face("↶ Undo", "Cannot take back: " + label + " — it started this PC's account book", false)
                     : new Face("↶ Undo", "Take back: " + label, true);
         }
 

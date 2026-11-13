@@ -1,6 +1,6 @@
 package com.botmaker.sdk.plugin.emulator.accounts;
 
-import com.botmaker.shared.emulator.config.AccountBook;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
@@ -62,8 +62,8 @@ final class AccountsListModel {
     }
 
     /**
-     * @param onInstances which instances want each account ({@link AccountBook#onInstances})
-     * @param held        the accounts some configuration lists ({@link AccountBook#held})
+     * @param onInstances which instances want each account ({@link HostBook#onInstances})
+     * @param held        the accounts some configuration lists ({@link HostBook#held})
      * @param remembered  the keys ({@link PasswordStore#key}) of the passwords this PC keeps
      */
     static List<Row> rows(List<AccountRecord> book, Map<AccountRecord.Key, List<InstanceKey>> onInstances,

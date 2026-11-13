@@ -4,8 +4,8 @@ import com.botmaker.plugin.api.PluginState;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.shared.emulator.GoogleAccount;
 import com.botmaker.shared.emulator.PlatformId;
-import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.ConfigValue;
@@ -74,17 +74,24 @@ public final class HostConfig {
                 .resolve(PluginState.part("botmaker-sdk")).resolve("state");
     }
 
-    /** This PC's account book, for every emulator and every bot: {@code accounts.json} in {@link #stateDir()}. */
-    public static AccountBook accounts() {
-        return new AccountBook(stateDir());
+    /**
+     * This PC's account book, for every emulator and every bot; the first use moves in the {@code accounts.json} an
+     * older SDK kept in {@link #stateDir()}.
+     */
+    public static HostBook accounts(StudioServices services) {
+        return new HostBook(services, stateDir(), GoogleAccount::signedIn);
     }
 
     // ---- through the host ----
 
-    /** The configuration on this PC; empty when nothing was written yet or the host keeps no values of this PC. */
+    /**
+     * The configuration on this PC; empty when nothing was written yet or the host keeps no values of this PC. Each
+     * account an instance lists has the book's note.
+     */
     public static State load(StudioServices services) {
         Rows rows = rows(services);
-        return new State(config(rows), usedBy(rows.usedBy()));
+        HostKnown book = read(services, SdkHostValues.BOOK, HostKnown.class, HostKnown.none());
+        return new State(config(rows, HostBook.notes(book)), usedBy(rows.usedBy()));
     }
 
     /**
@@ -95,7 +102,9 @@ public final class HostConfig {
     public static Optional<String> update(StudioServices services, UnaryOperator<EmulatorConfig> change) {
         return step(services, "Change this PC's emulators", () -> {
             Rows before = rows(services);
-            Rows next = rows(change.apply(config(before)), before);
+            Map<AccountRecord.Key, String> notes = HostBook.notes(
+                    read(services, SdkHostValues.BOOK, HostKnown.class, HostKnown.none()));
+            Rows next = rows(change.apply(config(before, notes)), before, notes);
             return write(services, before, next);
         });
     }
@@ -170,7 +179,7 @@ public final class HostConfig {
      * {@code writes} under {@link #WRITES}, as one step of this PC's undo named {@code label}: one ↶ takes back what one
      * change did, however many values it wrote.
      */
-    private static Optional<String> step(StudioServices services, String label, Supplier<Optional<String>> writes) {
+    static Optional<String> step(StudioServices services, String label, Supplier<Optional<String>> writes) {
         synchronized (WRITES) {
             if (services == null) return writes.get();
             AtomicReference<Optional<String>> written = new AtomicReference<>(Optional.empty());
@@ -189,7 +198,7 @@ public final class HostConfig {
                 read(services, SdkHostValues.ACCOUNTS, HostAccounts.class, HostAccounts.none()));
     }
 
-    private static <T> T read(StudioServices services, ManagedMethod<T> value, Class<T> type, T none) {
+    static <T> T read(StudioServices services, ManagedMethod<T> value, Class<T> type, T none) {
         try {
             return services == null ? none
                     : services.hostValues().open(value).flatMap(ctx -> ctx.value(type)).orElse(none);
@@ -231,9 +240,9 @@ public final class HostConfig {
     /**
      * Writes one value that changed. A value that is there but does not read is left alone, never written over as if
      * it were empty; and the write is read back, since the host says a refusal of its own (a file that would not
-     * compile, a lock, an older version) only in its log.
+     * compile, a lock, an older version) only in its log. A {@code before} of null is a value not written yet.
      */
-    private static <T> Optional<String> write(StudioServices services, ManagedMethod<T> value, Class<T> type,
+    static <T> Optional<String> write(StudioServices services, ManagedMethod<T> value, Class<T> type,
                                               T before, T next) {
         if (next.equals(before)) return Optional.empty();
         String name = value.id().toLowerCase(Locale.ROOT).replace('_', ' ');
@@ -261,8 +270,16 @@ public final class HostConfig {
 
     // ---- rows to the model ----
 
-    /** The layers the rows say; a row this build does not understand says nothing. */
+    /** The layers the rows say, each account with the note its own row has (a row written before the book). */
     static EmulatorConfig config(Rows rows) {
+        return config(rows, Map.of());
+    }
+
+    /**
+     * The layers the rows say; a row this build does not understand says nothing. An account takes the book's note
+     * from {@code notes}; one the book lacks, or holds with no note, keeps its row's, until the book takes it in.
+     */
+    static EmulatorConfig config(Rows rows, Map<AccountRecord.Key, String> notes) {
         Map<String, Layer> layers = new LinkedHashMap<>();
         for (HostSettings.Setting row : concat(rows.emulatorSettings().list(), rows.instanceSettings().list())) {
             ConfigValue value = value(row);
@@ -280,7 +297,9 @@ public final class HostConfig {
         for (HostAccounts.Account row : rows.accounts().list()) {
             if (!understood(row)) continue;
             Layer layer = layers.getOrDefault(row.of(), Layer.EMPTY);
-            AccountRecord account = new AccountRecord(AccountRecord.Kind.fromId(row.kind()), row.name(), row.note());
+            AccountRecord listed = new AccountRecord(AccountRecord.Kind.fromId(row.kind()), row.name(), row.note());
+            String booked = notes.getOrDefault(listed.key(), "");
+            AccountRecord account = booked.isEmpty() ? listed : new AccountRecord(listed.kind(), listed.name(), booked);
             layer = row.removed() ? layer.removingAccount(account.key()) : layer.withAccount(account);
             if (row.first() && !row.removed() && account.kind() == AccountRecord.Kind.GOOGLE) {
                 layer = layer.withDefaultGoogle(account.name());
@@ -318,8 +337,16 @@ public final class HostConfig {
 
     // ---- the model to rows ----
 
-    /** {@code config} as rows, then every row of {@code before} this build does not understand, kept. */
+    /** {@code config} as rows, each account with its note, as no book holds one. */
     static Rows rows(EmulatorConfig config, Rows before) {
+        return rows(config, before, Map.of());
+    }
+
+    /**
+     * {@code config} as rows, then every row of {@code before} this build does not understand, kept. An account names
+     * its book entry: its row carries a note only while the book, {@code notes}, does not hold that note yet.
+     */
+    static Rows rows(EmulatorConfig config, Rows before, Map<AccountRecord.Key, String> notes) {
         List<HostSettings.Setting> emulatorSettings = new ArrayList<>();
         List<HostGames.Game> emulatorGames = new ArrayList<>();
         List<HostSettings.Setting> instanceSettings = new ArrayList<>();
@@ -327,9 +354,9 @@ public final class HostConfig {
         List<HostLabels.Label> tags = new ArrayList<>();
         List<HostAccounts.Account> accounts = new ArrayList<>();
         config.emulators().forEach((platform, layer) ->
-                rows(platform.id(), layer, emulatorSettings, emulatorGames, accounts));
+                rows(platform.id(), layer, notes, emulatorSettings, emulatorGames, accounts));
         config.instances().forEach((key, layer) -> {
-            rows(key.text(), layer, instanceSettings, instanceGames, accounts);
+            rows(key.text(), layer, notes, instanceSettings, instanceGames, accounts);
             layer.tags().forEach(tag -> tags.add(new HostLabels.Label(key.text(), tag)));
         });
         before.emulatorSettings().list().stream().filter(row -> owner(row.of()) == null || value(row) == null)
@@ -345,7 +372,8 @@ public final class HostConfig {
                 before.usedBy(), new HostAccounts(accounts));
     }
 
-    private static void rows(String of, Layer layer, List<HostSettings.Setting> settings, List<HostGames.Game> games,
+    private static void rows(String of, Layer layer, Map<AccountRecord.Key, String> notes,
+                             List<HostSettings.Setting> settings, List<HostGames.Game> games,
                              List<HostAccounts.Account> accounts) {
         layer.fields().forEach((field, value) ->
                 settings.add(new HostSettings.Setting(of, field.id(), value.written())));
@@ -356,8 +384,9 @@ public final class HostConfig {
         for (AccountRecord account : layer.accounts()) {
             boolean isFirst = account.kind() == AccountRecord.Kind.GOOGLE && account.name().equalsIgnoreCase(first);
             firstWritten |= isFirst;
-            accounts.add(new HostAccounts.Account(of, account.kind().id(), account.name(), account.note(), false,
-                    isFirst));
+            // the account names a book entry, which holds its note; the row keeps one the book does not hold yet
+            String note = account.note().equals(notes.getOrDefault(account.key(), "")) ? "" : account.note();
+            accounts.add(new HostAccounts.Account(of, account.kind().id(), account.name(), note, false, isFirst));
         }
         // the first Google account is one the emulator's layer lists: it is listed here too, to carry the mark
         if (!firstWritten) {
