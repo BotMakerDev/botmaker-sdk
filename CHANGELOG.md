@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.10.1] — 2026-11-13
 
 - **The account book is in the SDK's project of this PC** (2026-11-13, host-projects phase 6): `Accounts.java`'s
   `BOOK` value lists every account this PC knows (kind, name, note; never a password, which only the OS store holds),
@@ -130,6 +130,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   "needs a bot open: open_project".
 - setup's `emulator_checks` and `fix` word their answers through shared's `CheckAnswers`, which BotMaker's own
   `device` tool uses too; nothing changes in what they say.
+
+### Changed
+
+- Built against botmaker-shared 0.8.1 (was 0.8.0).
+- Built against botmaker-session 0.7.1 (was 0.7.0).
+- Built against botmaker-studio-api 0.17.1 (was 0.17.0).
+- Built against botmaker-plugin-toolkit 0.15.1 (was 0.15.0).
+- Built against botmaker-plugin-host 0.12.1 (was 0.12.0).
+- Built against botmaker-plugin-basics 0.9.1 (was 0.9.0).
+- Built against botmaker-java 0.2.1 (was 0.2.0).
 
 ## [1.10.0] — 2026-11-10
 
