@@ -80,6 +80,8 @@ public final class EmulatorsWindow {
      * first use, and {@code available()} false where the PC has none.
      */
     private static final PasswordStore STORE = new KeyringStore();
+    /** The Applies signing accounts in, by operation id. */
+    private static final Map<String, Signing> SIGNING = new ConcurrentHashMap<>();
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -288,6 +290,7 @@ public final class EmulatorsWindow {
         configurations.show(read);
         running.show(read);
         if (open != null) open.show(read);
+        LiveScreenDialog.redrawAll();
         readEnded();
     }
 
@@ -396,6 +399,9 @@ public final class EmulatorsWindow {
         Consumer<Operation.Snapshot> ended = new Consumer<>() {
             @Override
             public void accept(Operation.Snapshot heard) {
+                if (heard.state().ended() && SIGNING.remove(heard.id()) != null) {
+                    Platform.runLater(LiveScreenDialog::redrawAll);
+                }
                 if (!heard.state().ended() || !batch.remove(heard.id()) || !batch.isEmpty()) return;
                 passwords.close();
                 OPERATIONS.removeListener(this);
@@ -417,9 +423,14 @@ public final class EmulatorsWindow {
                         });
                 batch.add(operation.id());
                 queued.add(operation);
+                List<String> signsIn = ApplyPlan.signInNames(item);
+                if (!signsIn.isEmpty()) {
+                    SIGNING.put(operation.id(), new Signing(operation.id(), item.row().key(), passwords, signsIn));
+                }
             }
         }
         queued.forEach(operation -> RUNNING.put(operation.id(), operation));
+        LiveScreenDialog.redrawAll();
         drawStrip();
     }
 
@@ -496,16 +507,53 @@ public final class EmulatorsWindow {
         }
     }
 
-    private Passwords.Answer askPassword(String email, boolean canRemember) {
-        PasswordField field = new PasswordField();
-        CheckBox remember = new CheckBox("Remember on this PC");
-        remember.setSelected(true);
-        Label why = new Label(canRemember
+    /**
+     * What an instance's queued or running Apply signs in, for its live screen's Fill panel: the emails, and the batch
+     * a password typed there is handed to. Held in memory while the operation lasts; never a password.
+     */
+    record Signing(String operation, InstanceKey instance, Passwords passwords, List<String> emails) {
+        Signing {
+            emails = List.copyOf(emails);
+        }
+    }
+
+    /**
+     * What the Applies on {@code key} sign in while they run, the earliest queued first: the one running is the first
+     * not ended, as one instance runs one operation at a time.
+     */
+    List<Signing> signing(InstanceKey key) {
+        List<Signing> signing = new ArrayList<>();
+        for (Operation.Snapshot op : OPERATIONS.all()) {
+            Signing one = SIGNING.get(op.id());
+            if (one == null || !key.equals(one.instance())) continue;
+            // an operation cancelled before its batch was queued ended before its entry was put: dropped here
+            if (op.state().ended()) SIGNING.remove(op.id());
+            else signing.add(one);
+        }
+        return signing;
+    }
+
+    /** This PC's credential store: it can block, so never asked on the FX thread. */
+    PasswordStore store() {
+        return STORE;
+    }
+
+    /** The password prompt, on the FX thread: what the user typed, or null when they skipped it. */
+    Passwords.Answer askPassword(String email, boolean canRemember) {
+        return askPassword(email, canRemember, canRemember
                 ? "BotMaker types it on the instance, in Android's own sign-in. Remembered, it is kept in this PC's"
                 + " credential store once the sign-in is done, and typed again without asking; no assistant ever sees"
                 + " it. Skip it to leave this account out."
                 : "BotMaker types it once on the instance, in Android's own sign-in, and keeps it only until this"
                 + " Apply ends: this PC has no credential store to remember it in. Skip it to leave this account out.");
+    }
+
+    /** The password prompt with {@code words} under its header; *Remember on this PC* only when {@code canRemember}. */
+    Passwords.Answer askPassword(String email, boolean canRemember, String words) {
+        PasswordField field = new PasswordField();
+        CheckBox remember = new CheckBox("Remember on this PC");
+        remember.setSelected(true);
+        Label why = new Label(words);
         why.setWrapText(true);
         why.setMaxWidth(420);
         VBox body = new VBox(8, Styles.on(why, StyleClasses.DIALOG_HINT), field);

@@ -99,13 +99,16 @@ final class ApplyPlan {
     /** The accounts the items sign in somewhere, by {@link PasswordStore#key}: the ones a password is needed for. */
     static Set<String> signIns(List<Item> items) {
         Set<String> signIns = new LinkedHashSet<>();
-        for (Item item : items) {
-            for (ConfigDiff.AccountChange change : item.accounts()) {
-                if (change.op() == ConfigDiff.AccountChange.Op.REMOVE) continue;
-                if (change.account().kind().signedInByBotMaker()) signIns.add(PasswordStore.key(change.account().name()));
-            }
-        }
+        for (Item item : items) for (String name : signInNames(item)) signIns.add(PasswordStore.key(name));
         return signIns;
+    }
+
+    /** The accounts {@code item} signs in, by name, in its order: what the live screen's Fill panel lists first. */
+    static List<String> signInNames(Item item) {
+        return item.accounts().stream()
+                .filter(change -> change.op() != ConfigDiff.AccountChange.Op.REMOVE)
+                .filter(change -> change.account().kind().signedInByBotMaker())
+                .map(change -> change.account().name()).toList();
     }
 
     /**
@@ -113,8 +116,13 @@ final class ApplyPlan {
      * (a keyring opening, or asking to be unlocked): never on the FX thread.
      */
     static Set<String> remembered(List<Item> items, PasswordStore store) {
+        return remembered(signIns(items), store);
+    }
+
+    /** Which of {@code keys} {@code store} remembers, each asked once; never on the FX thread. */
+    static Set<String> remembered(Set<String> keys, PasswordStore store) {
         Set<String> remembered = new HashSet<>();
-        for (String key : signIns(items)) if (store.remembered(key)) remembered.add(key);
+        for (String key : keys) if (store.remembered(key)) remembered.add(key);
         return remembered;
     }
 

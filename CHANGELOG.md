@@ -23,6 +23,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   credential store: a remembered Google password is kept in the OS store once its sign-in is done and typed again
   without asking. Apply's confirmation says *Password remembered* or *Password asked next* on each sign-in, and
   counts the passwords it will ask.
+- **The live screen has a Fill panel** (2026-11-13): tap a field on the instance, then *Fill email* or *Fill password*
+  beside it. It lists the account the instance's Apply is signing in first, then the instance's own Google accounts,
+  then its configuration's. *Fill password* types the password this PC remembers, straight from the credential store;
+  *Fill password…* asks it in the password prompt, and an Apply signing that account in remembers it once the sign-in
+  is done, when ticked. Text BotMaker can't type exactly (not plain ASCII, or `%s`) is refused. Below the screen,
+  *Type other text* (a code), Back, Enter and Hide. Each fill says its length only.
 - **The live screen fits your screen** (2026-11-13): the instance's picture follows the window's size and keeps its
   shape, and the window opens within the screen it is on, sized to the instance's own portrait or landscape frame once
   the first frame arrives; a size you chose, or a window you maximized, stays.
