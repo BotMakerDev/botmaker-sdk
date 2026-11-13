@@ -456,8 +456,8 @@ public final class EmulatorsWindow {
      * Asks one account's password, from the operation's thread: typed here and nowhere else, handed to the batch as
      * characters, never kept as text, never logged. Null when the user skips the account.
      */
-    private char[] password(String email) throws InterruptedException {
-        CompletableFuture<char[]> answer = new CompletableFuture<>();
+    private Passwords.Answer password(String email) throws InterruptedException {
+        CompletableFuture<Passwords.Answer> answer = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
                 answer.complete(askPassword(email));
@@ -472,7 +472,7 @@ public final class EmulatorsWindow {
         }
     }
 
-    private char[] askPassword(String email) {
+    private Passwords.Answer askPassword(String email) {
         PasswordField field = new PasswordField();
         Label why = new Label("BotMaker types it once on the instance, in Android's own sign-in, and keeps it only"
                 + " until this Apply ends. Skip it to leave this account out.");
@@ -498,7 +498,7 @@ public final class EmulatorsWindow {
             for (int i = 0; i < password.length; i++) password[i] = typed.charAt(i);
         }
         field.clear();
-        return password;
+        return password == null ? null : Passwords.Answer.once(password);
     }
 
     // ---- the operations strip ----
