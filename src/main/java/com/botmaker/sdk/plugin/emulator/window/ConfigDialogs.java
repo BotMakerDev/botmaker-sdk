@@ -8,16 +8,24 @@ import com.botmaker.shared.emulator.config.ConfigValue;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.GameRecord;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -100,7 +108,7 @@ final class ConfigDialogs {
                                            boolean nameFixed) {
         Dialog<ButtonType> dialog = dialog(window, kind.displayName() + " account",
                 kind.signedInByBotMaker() ? "Apply signs it in on the instances that should hold it. Its password is"
-                        + " asked then, and never kept." : "A record only: BotMaker signs nothing in for it.");
+                        + " asked then, unless this PC remembers it." : "A record only: BotMaker signs nothing in for it.");
         ButtonType save = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
         TextField nameField = new TextField(name == null ? "" : name);
@@ -119,6 +127,90 @@ final class ConfigDialogs {
         Optional<ButtonType> pressed = dialog.showAndWait();
         if (pressed.isEmpty() || pressed.get() != save || !named(kind, nameField.getText())) return Optional.empty();
         return Optional.of(new AccountRecord(kind, nameField.getText(), noteField.getText()));
+    }
+
+    /**
+     * + Google (board A): a radio row per account of the book the layer does not list, the first one picked, then
+     * <i>Another account</i> with its email field, and the note. Answers the account, with the note as given.
+     */
+    static Optional<AccountRecord> google(EmulatorsWindow window, String layer, List<GooglePick.Choice> choices,
+                                          Collection<AccountRecord.Key> here) {
+        Dialog<ButtonType> dialog = dialog(window, "Google account", "Add a Google account to " + layer
+                + ". BotMaker signs the instance in to it at Apply.");
+        ButtonType add = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(add, ButtonType.CANCEL);
+
+        ToggleGroup group = new ToggleGroup();
+        TextField other = new TextField();
+        other.setPromptText("name@gmail.com");
+        other.setPrefColumnCount(24);
+        TextField note = new TextField();
+        note.setPromptText("Optional, e.g. alt for server 12");
+        VBox body = new VBox(8);
+        if (!choices.isEmpty()) body.getChildren().add(Styles.on(new Label("Known on this PC"), StyleClasses.STRONG_TEXT));
+        for (GooglePick.Choice choice : choices) {
+            Label email = Styles.on(new Label(choice.account().name()), StyleClasses.STRONG_TEXT);
+            Label detail = Styles.on(new Label(choice.detail()), StyleClasses.MUTED_TEXT);
+            Label pill = Styles.on(new Label(choice.pill().displayName()),
+                    choice.pill() == GooglePick.Pill.REMEMBERED ? StyleClasses.OK_TEXT : StyleClasses.MUTED_TEXT);
+            Region gap = new Region();
+            HBox.setHgrow(gap, Priority.ALWAYS);
+            HBox graphic = new HBox(12, new VBox(2, email, detail), gap, pill);
+            graphic.setAlignment(Pos.CENTER_LEFT);
+            graphic.setMinWidth(380);
+            RadioButton radio = new RadioButton();
+            radio.setGraphic(graphic);
+            radio.setToggleGroup(group);
+            radio.setUserData(choice.account());
+            radio.selectedProperty().addListener((o, was, now) -> {
+                if (now) note.setText(choice.account().note());
+            });
+            body.getChildren().add(radio);
+        }
+        RadioButton another = new RadioButton("Another account");
+        another.setToggleGroup(group);
+        HBox anotherRow = new HBox(10, another, other);
+        anotherRow.setAlignment(Pos.CENTER_LEFT);
+        other.textProperty().addListener((o, was, now) -> {
+            if (!now.isEmpty()) another.setSelected(true);
+        });
+        group.selectedToggleProperty().addListener((o, was, now) -> {
+            // Leaving a known account for Another takes its note away, never one the user typed.
+            if (now == another && was != null && was.getUserData() instanceof AccountRecord left
+                    && note.getText().equals(left.note())) note.setText("");
+        });
+        Label listed = Styles.on(new Label("This configuration already lists it."), StyleClasses.MUTED_TEXT);
+        listed.setVisible(false);
+        listed.managedProperty().bind(listed.visibleProperty());
+        body.getChildren().addAll(anotherRow, listed, new Label("Note"), note);
+        dialog.getDialogPane().setContent(body);
+
+        Supplier<Optional<String>> picked = () -> {
+            if (group.getSelectedToggle() == null) return Optional.empty();
+            if (group.getSelectedToggle() == another) {
+                String typed = other.getText().strip();
+                boolean already = here.contains(new AccountRecord(AccountRecord.Kind.GOOGLE, typed).key());
+                listed.setVisible(already);
+                return named(AccountRecord.Kind.GOOGLE, typed) && !already ? Optional.of(typed) : Optional.empty();
+            }
+            listed.setVisible(false);
+            return Optional.of(((AccountRecord) group.getSelectedToggle().getUserData()).name());
+        };
+        Node ok = dialog.getDialogPane().lookupButton(add);
+        Runnable check = () -> ok.setDisable(picked.get().isEmpty());
+        group.selectedToggleProperty().addListener((o, was, now) -> check.run());
+        other.textProperty().addListener((o, was, now) -> check.run());
+        if (group.getToggles().size() > 1) {
+            group.getToggles().getFirst().setSelected(true);
+        } else {
+            another.setSelected(true);
+            Platform.runLater(other::requestFocus);
+        }
+        check.run();
+
+        Optional<ButtonType> pressed = dialog.showAndWait();
+        if (pressed.isEmpty() || pressed.get() != add) return Optional.empty();
+        return picked.get().map(name -> new AccountRecord(AccountRecord.Kind.GOOGLE, name, note.getText()));
     }
 
     private static boolean named(AccountRecord.Kind kind, String name) {

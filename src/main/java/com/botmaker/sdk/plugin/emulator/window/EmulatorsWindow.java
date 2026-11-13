@@ -327,8 +327,14 @@ public final class EmulatorsWindow {
 
     /** Changes the configuration off the UI thread, then reads again; a refusal is said in the header. */
     void change(UnaryOperator<EmulatorConfig> change) {
+        change(change, () -> {});
+    }
+
+    /** {@link #change(UnaryOperator)}, then {@code written} on the UI thread once the host wrote it. */
+    void change(UnaryOperator<EmulatorConfig> change, Runnable written) {
         Async.load("emulators-write", () -> HostConfig.update(services, change), refused -> {
             say(refused.orElse(null));
+            if (refused.isEmpty()) written.run();
             refresh();
         }, failed -> say("The configuration was not written: " + failed));
     }

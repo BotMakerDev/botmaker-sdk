@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **+ Google lists the accounts this PC knows** (2026-11-13): the PC's own first, then those on no instance, then by
+  name, each with its note, the instances that want it and whether its password is remembered or asked at Apply;
+  *Another account* takes a new email. An account added to a configuration goes into the PC's account book.
 - The Emulators window's password prompt has *Remember on this PC* (2026-11-13), ticked, hidden where the PC has no
   credential store: a remembered Google password is kept in the OS store once its sign-in is done and typed again
   without asking. Apply's confirmation says *Password remembered* or *Password asked next* on each sign-in, and

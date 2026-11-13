@@ -5,6 +5,7 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.shared.emulator.PlatformId;
+import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.ConfigValue;
@@ -69,6 +70,11 @@ public final class HostConfig {
     public static Path stateDir() {
         return UserDirs.config().resolve("plugins").resolve(PluginState.part("com.github.BotMakerDev"))
                 .resolve(PluginState.part("botmaker-sdk")).resolve("state");
+    }
+
+    /** This PC's account book, for every emulator and every bot: {@code accounts.json} in {@link #stateDir()}. */
+    public static AccountBook accounts() {
+        return new AccountBook(stateDir());
     }
 
     // ---- through the host ----

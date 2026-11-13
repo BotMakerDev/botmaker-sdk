@@ -1,9 +1,14 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.plugin.api.StyleClasses;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.GoogleAccount;
+import com.botmaker.shared.emulator.config.AccountBook;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.InstanceKey;
+import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ConfigField;
@@ -27,6 +32,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -34,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 /**
  * One layer's configuration, drawn over the tab it was opened from: an instance's (each field's wanted value, where it
@@ -224,19 +231,57 @@ final class ConfigView {
                 AccountRecord.Kind.MAIL)) {
             Button add = small("+ " + kind.displayName());
             add.setOnAction(e -> {
-                String offered = kind == AccountRecord.Kind.GOOGLE ? pcAccount(rows) : "";
-                ConfigDialogs.account(window, kind, offered, "", false)
-                        .ifPresent(account -> change(c -> ConfigViews.addAccount(target, c, account)));
+                if (kind == AccountRecord.Kind.GOOGLE) pickGoogle(rows);
+                else ConfigDialogs.account(window, kind, "", "", false).ifPresent(this::addAccount);
             });
             adds.getChildren().add(add);
         }
         return section("Accounts", adds, grid);
     }
 
-    /** The PC's own Google account, offered first when this layer does not list it yet. */
-    private static String pcAccount(List<ConfigViews.AccountRow> rows) {
-        Optional<String> pc = GoogleAccount.signedIn();
-        return pc.filter(email -> rows.stream().noneMatch(r -> r.account().name().equalsIgnoreCase(email))).orElse("");
+    /**
+     * + Google: reads the book and which passwords this PC remembers off the FX thread (the store may block), then
+     * offers the book's accounts this layer does not list, the PC's own first.
+     */
+    private void pickGoogle(List<ConfigViews.AccountRow> rows) {
+        EmulatorConfig config = snapshot.config();
+        List<InstanceKey> instances = snapshot.instances().stream().map(EmulatorsModel.InstanceRow::key).toList();
+        Set<AccountRecord.Key> here = rows.stream().filter(row -> !row.removal()).map(row -> row.account().key())
+                .collect(Collectors.toSet());
+        PasswordStore store = window.store();
+        Async.load("emulators-account-book", () -> {
+            Optional<String> pc = GoogleAccount.signedIn();
+            List<AccountRecord> book;
+            try {
+                book = HostConfig.accounts().known(config, pc);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            Set<String> remembered = store.available()
+                    ? ApplyPlan.remembered(GooglePick.keys(book, pc, here), store) : Set.of();
+            return GooglePick.choices(book, AccountBook.onInstances(config, instances), remembered, pc, here);
+        }, choices -> ConfigDialogs.google(window, target.title(), choices, here).ifPresent(this::addAccount),
+                failed -> window.say("The account book was not read: " + failed));
+    }
+
+    /** Writes the account into this layer, then into the book, a note it has kept unless given one. */
+    private void addAccount(AccountRecord account) {
+        saveAccount(account, false);
+    }
+
+    /** Note…: the layer's account and the book's both take the note as the user left it, empty or not. */
+    private void noteAccount(AccountRecord account) {
+        saveAccount(account, true);
+    }
+
+    private void saveAccount(AccountRecord account, boolean asGiven) {
+        window.change(c -> ConfigViews.addAccount(target, c, account), () -> Async.load("emulators-account-book", () -> {
+            try {
+                return asGiven ? HostConfig.accounts().put(account) : HostConfig.accounts().add(account);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, saved -> {}, failed -> window.say("The account was not added to the account book: " + failed)));
     }
 
     private Node accountActions(ConfigViews.AccountRow one) {
@@ -251,7 +296,7 @@ final class ConfigView {
         if (one.own()) {
             Button note = small("Note…");
             note.setOnAction(e -> ConfigDialogs.account(window, account.kind(), account.name(), account.note(), true)
-                    .ifPresent(edited -> change(c -> ConfigViews.addAccount(target, c, edited))));
+                    .ifPresent(this::noteAccount));
             actions.getChildren().add(note);
         }
         if (account.kind() == AccountRecord.Kind.GOOGLE && !one.isDefault()) {
