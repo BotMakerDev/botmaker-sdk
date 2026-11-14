@@ -4,7 +4,6 @@ import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.accounts.AccountsWindow;
-import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AndroidState;
@@ -20,7 +19,6 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -28,8 +26,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,14 +80,12 @@ final class AccountsTab {
             draw();
         });
 
-        Button add = new Button("+ Account");
-        add.setOnAction(e -> addAccount());
         Button manage = new Button("Manage accounts…");
         manage.setOnAction(e -> AccountsWindow.open(window.services()));
         undo.setOnAction(e -> undoTicks());
         apply.setOnAction(e -> window.applyItems(AccountsGridModel.toApply(columns(), rows())));
 
-        FlowPane bar = new FlowPane(8, 6, emulator, tag, accountFilter, showAll, add, manage, changes, undo, apply);
+        FlowPane bar = new FlowPane(8, 6, emulator, tag, accountFilter, showAll, manage, changes, undo, apply);
         bar.setAlignment(Pos.CENTER_LEFT);
         for (Node node : bar.getChildren()) {
             if (node instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
@@ -200,7 +194,7 @@ final class AccountsTab {
         if (columns.isEmpty() || rows.isEmpty()) {
             String empty = columns.isEmpty() ? "No instance matches: pick another emulator or tag."
                     : account != null ? account.name() + " is not among this PC's Google accounts."
-                    : "No Google account in the book: + Account adds one.";
+                    : "No Google account in the book: Manage accounts… adds one.";
             grid.add(Styles.on(new Label(empty), StyleClasses.MUTED_TEXT), 0, 0);
             return;
         }
@@ -268,30 +262,6 @@ final class AccountsTab {
             undone.keySet().forEach(before::remove);
             undo.setDisable(before.isEmpty());
         });
-    }
-
-    /** Adds a Google account to the book; the tab stays, its new row unticked. */
-    private void addAccount() {
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.initOwner(window.stage());
-        dialog.setTitle("+ Account");
-        dialog.setHeaderText("Add a Google account to this PC's accounts");
-        dialog.getEditor().setPromptText("user@example.com");
-        window.services().theme().apply(dialog);
-        Optional<String> typed = dialog.showAndWait().map(String::strip).filter(text -> !text.isEmpty());
-        if (typed.isEmpty()) return;
-        AccountRecord added = new AccountRecord(AccountRecord.Kind.GOOGLE, typed.get());
-        if (book.stream().anyMatch(known -> known.key().equals(added.key()))) {
-            window.say(added.name() + " is in the accounts already.");
-            return;
-        }
-        Async.load("accounts-add", () -> {
-            try {
-                return HostConfig.accounts(window.services()).add(added);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }, after -> readBook(), failed -> window.say("The account was not added: " + failed));
     }
 
     private static ListCell<Optional<PlatformId>> emulatorCell() {

@@ -22,6 +22,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **⌖ and ✂ are on the SDK's toolbar tab** (2026-11-13): Studio shows its overlay only in dev mode now, so the two
   overlay buttons moved to the bar, after 🎮 Pilot. *⌖ Point bot at…* opens the source picker, the same choice as
   Parameters ▸ captureSource; *✂ Cut picture* cuts a picture out of what the bot reads.
+- **Emulators ▸ Accounts has no + Account** (2026-11-14): accounts are added in the Accounts window, which
+  *Manage accounts…* opens.
 
 ## [1.10.1] — 2026-11-13
 
