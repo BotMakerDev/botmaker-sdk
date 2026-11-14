@@ -13,6 +13,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.Region;
@@ -34,7 +35,7 @@ final class EmulatorsTab {
 
     EmulatorsTab(EmulatorsWindow window) {
         this.window = window;
-        table.getColumns().add(column("Emulator", 150, row -> row.platform().displayName()));
+        table.getColumns().add(badged(column("Emulator", 170, row -> row.platform().displayName())));
         table.getColumns().add(column("On this PC", 260, row -> row.installed()
                 ? row.status().substring(row.status().indexOf(':') + 1).strip() : "Not installed"));
         table.getColumns().add(number("Instances", EmulatorsModel.EmulatorRow::instances));
@@ -75,7 +76,10 @@ final class EmulatorsTab {
             side.getChildren().add(muted("Pick an emulator to see what its instances start from."));
             return;
         }
-        side.getChildren().add(Styles.on(new Label(row.platform().displayName()), StyleClasses.DIALOG_SUBHEADING));
+        Label title = Styles.on(new Label(row.platform().displayName(), Look.badge(row.platform())),
+                StyleClasses.DIALOG_SUBHEADING);
+        title.setGraphicTextGap(8);
+        side.getChildren().add(title);
         Layer layer = row.layer();
         if (layer.isEmpty()) {
             side.getChildren().add(muted("Nothing is set for this emulator: each instance keeps what it has, but"
@@ -124,6 +128,22 @@ final class EmulatorsTab {
         out.setComparator(String.CASE_INSENSITIVE_ORDER);
         out.setPrefWidth(width);
         return out;
+    }
+
+    /** {@code column} with each row's emulator badge before its text. */
+    private static TableColumn<EmulatorsModel.EmulatorRow, String> badged(
+            TableColumn<EmulatorsModel.EmulatorRow, String> column) {
+        column.setCellFactory(c -> new TableCell<>() {
+            @Override
+            protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                EmulatorsModel.EmulatorRow row = empty || getTableRow() == null ? null : getTableRow().getItem();
+                setText(row == null ? null : text);
+                setGraphic(row == null ? null : Look.badge(row.platform()));
+                setGraphicTextGap(8);
+            }
+        });
+        return column;
     }
 
     /** A count, sorted as a number. */

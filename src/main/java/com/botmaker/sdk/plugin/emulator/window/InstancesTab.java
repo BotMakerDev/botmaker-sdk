@@ -112,7 +112,7 @@ final class InstancesTab {
         Button clear = new Button("Clear");
         clear.setOnAction(e -> use(EmulatorsModel.Filter.NONE));
 
-        FlowPane filters = new FlowPane(8, 6, text, emulator, state, tag, account, app, differs, clear, saved);
+        FlowPane filters = new FlowPane(8, 6, emulator, state, tag, account, app, differs, clear, saved);
         filters.setAlignment(Pos.CENTER_LEFT);
         for (Node node : filters.getChildren()) {
             if (node instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
@@ -339,10 +339,9 @@ final class InstancesTab {
         return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
     }
 
-    /** Ctrl+F: the name filter has the focus, its text selected to be typed over. */
-    void focusFilter() {
-        text.requestFocus();
-        text.selectAll();
+    /** The name filter, which the window's Find shows and types into; the tab does not show it itself. */
+    TextField findField() {
+        return text;
     }
 
     /**

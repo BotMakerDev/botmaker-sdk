@@ -105,7 +105,7 @@ final class ConfigurationsTab {
         importButton.setTooltip(new Tooltip("Read a file Export… wrote: each emulator and instance it holds takes its"
                 + " configuration; the others stay"));
         importButton.setOnAction(e -> importConfig());
-        FlowPane bar = new FlowPane(8, 6, text, section, emulator, tag, overridden, compare, copy, export,
+        FlowPane bar = new FlowPane(8, 6, section, emulator, tag, overridden, compare, copy, export,
                 importButton);
         bar.setAlignment(Pos.CENTER_LEFT);
         for (Node node : bar.getChildren()) {
@@ -136,10 +136,9 @@ final class ConfigurationsTab {
         return root;
     }
 
-    /** Ctrl+F: the text filter has the focus, its text selected to be typed over. */
-    void focusFilter() {
-        text.requestFocus();
-        text.selectAll();
+    /** The text filter, which the window's Find shows and types into; the tab does not show it itself. */
+    TextField findField() {
+        return text;
     }
 
     /** Writes the configuration as it is when the export runs, not as this window last read it. */

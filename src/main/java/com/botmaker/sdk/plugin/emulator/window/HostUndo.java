@@ -22,20 +22,20 @@ public final class HostUndo {
     record Face(String text, String tip, boolean enabled) {
 
         static Face undo(History history) {
-            if (!history.canUndo()) return new Face("↶ Undo", "Nothing to take back", false);
+            if (!history.canUndo()) return new Face("↶", "Nothing to take back", false);
             String label = history.undoLabel();
             if (HostConfig.followsTheEmulator(label)) {
-                return new Face("↶ Undo", "Cannot take back: " + label + " — it followed the emulator", false);
+                return new Face("↶", "Cannot take back: " + label + " — it followed the emulator", false);
             }
             return HostBook.startedTheBook(label)
-                    ? new Face("↶ Undo", "Cannot take back: " + label + " — it started this PC's account book", false)
-                    : new Face("↶ Undo", "Take back: " + label, true);
+                    ? new Face("↶", "Cannot take back: " + label + " — it started this PC's account book", false)
+                    : new Face("↶", "Take back: " + label, true);
         }
 
         static Face redo(History history) {
             return history.canRedo()
-                    ? new Face("↷ Redo", "Do again: " + history.redoLabel(), true)
-                    : new Face("↷ Redo", "Nothing to do again", false);
+                    ? new Face("↷", "Do again: " + history.redoLabel(), true)
+                    : new Face("↷", "Nothing to do again", false);
         }
     }
 
@@ -44,8 +44,8 @@ public final class HostUndo {
 
     private final StudioServices services;
     private final Runnable afterStep;
-    private final Button undo = new Button("↶ Undo");
-    private final Button redo = new Button("↷ Redo");
+    private final Button undo = new Button("↶");
+    private final Button redo = new Button("↷");
     private final HBox node = new HBox(4, undo, redo);
     private AutoCloseable listening;
 
@@ -55,6 +55,8 @@ public final class HostUndo {
         this.afterStep = afterStep;
         undo.setDisable(true);
         redo.setDisable(true);
+        undo.getStyleClass().add("em-icon");
+        redo.getStyleClass().add("em-icon");
         undo.setOnAction(e -> step(true));
         redo.setOnAction(e -> step(false));
     }
@@ -115,13 +117,13 @@ public final class HostUndo {
     }
 
     private void apply(Faces faces) {
-        face(undo, faces.undo());
-        face(redo, faces.redo());
+        face(undo, faces.undo(), "Ctrl+Z");
+        face(redo, faces.redo(), "Ctrl+Y");
     }
 
-    private static void face(Button button, Face face) {
+    private static void face(Button button, Face face, String key) {
         button.setText(face.text());
-        button.setTooltip(new Tooltip(face.tip()));
+        button.setTooltip(new Tooltip(face.tip() + " (" + key + ")"));
         button.setDisable(!face.enabled());
     }
 }

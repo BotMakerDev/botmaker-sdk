@@ -39,6 +39,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -93,7 +94,12 @@ public final class EmulatorsWindow {
     private final Stage stage;
     private final Label readAt = Styles.on(new Label("Reading…"), StyleClasses.MUTED_TEXT);
     private final Label status = Styles.on(new Label(), StyleClasses.WARNING_TEXT);
-    private final Button refresh = new Button("Refresh");
+    private final Button refresh = new Button("⟳");
+    /** The header's Find: the shown tab's text filter, or the Instances tab's ({@link #bindFind}). */
+    private final TextField find = new TextField();
+    private TextField findBound;
+    /** Set while Find moves to another tab's filter, so taking that filter's text does not switch tabs. */
+    private boolean binding;
     private final Tab emulatorsTab = new Tab("Emulators");
     private final Tab instancesTab = new Tab("Instances");
     private final Tab accountsTab = new Tab("Accounts");
@@ -183,13 +189,33 @@ public final class EmulatorsWindow {
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         refresh.setOnAction(e -> refresh());
+        refresh.getStyleClass().add("em-icon");
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         status.setWrapText(true);
+        status.getStyleClass().add("em-status");
+        // the status line takes room only while it has something to say
+        status.managedProperty().bind(status.textProperty().isNotEmpty());
+        status.visibleProperty().bind(status.managedProperty());
+        find.getStyleClass().add("em-find");
+        find.setMinWidth(100);
+        HBox.setHgrow(find, Priority.SOMETIMES);
+        readAt.setMinWidth(0);
+        bindFind(tabs.getSelectionModel().getSelectedItem());
+        find.textProperty().addListener((o, was, now) -> {
+            // typed on a tab with no filter of its own: the Instances tab's takes it, as Ctrl+F goes there
+            if (binding || findBound != null || now.isEmpty()) return;
+            // after this keystroke's own change, which a rebinding inside it would cut across
+            Platform.runLater(() -> {
+                tabs.getSelectionModel().select(instancesTab);
+                find.setText(now);
+                find.end();
+            });
+        });
         HostUndo undo = new HostUndo(services, this::refresh);
-        HBox header = new HBox(10, status, gap, readAt, undo.node(), refresh);
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(8, 10, 4, 10));
+        HBox header = new HBox(Look.segmented(tabs), gap, find, readAt, undo.node(), refresh);
+        header.getStyleClass().add("em-header");
+        VBox top = new VBox(header, status);
 
         ScrollPane operations = new ScrollPane(strip);
         operations.setFitToWidth(true);
@@ -197,8 +223,10 @@ public final class EmulatorsWindow {
         strip.setPadding(new Insets(6, 10, 8, 10));
 
         BorderPane root = new BorderPane(tabs);
-        root.setTop(header);
+        root.setTop(top);
         root.setBottom(operations);
+        root.getStyleClass().add(Look.WINDOW);
+        root.getStylesheets().add(Look.SHEET);
 
         stage = Modals.window(services, Modals.Frame.modeless("Emulators", 1080, 680, 780, 420), root);
         refresh.setTooltip(new Tooltip("Read this PC's emulators again (F5)"));
@@ -208,6 +236,7 @@ public final class EmulatorsWindow {
                 WindowKeys.Action.REDO, undo::redo,
                 WindowKeys.Action.FIND, this::find));
         tabs.getSelectionModel().selectedItemProperty().addListener((o, was, now) -> {
+            bindFind(now);
             running.visible(now == runningTab && stage.isShowing());
             accounts.visible(now == accountsTab);
         });
@@ -247,14 +276,37 @@ public final class EmulatorsWindow {
     private void find() {
         if (open != null) return;
         Tab shown = tabs.getSelectionModel().getSelectedItem();
-        if (shown == configurationsTab) {
-            configurations.focusFilter();
-        } else if (shown == accountsTab) {
+        if (shown == accountsTab) {
             accounts.focusFilter();
-        } else {
-            tabs.getSelectionModel().select(instancesTab);
-            instances.focusFilter();
+            return;
         }
+        if (!filters(shown)) tabs.getSelectionModel().select(instancesTab);
+        find.requestFocus();
+        find.selectAll();
+    }
+
+    /** Whether {@code tab} has a text filter of its own, which the header's Find types into. */
+    private boolean filters(Tab tab) {
+        return tab == instancesTab || tab == configurationsTab;
+    }
+
+    /**
+     * Has the header's Find type into {@code shown}'s text filter; the tab's own field stays its filter's source, so
+     * a saved filter or <i>Manage…</i> shows in Find. A tab with none leaves Find empty, and what is typed there goes
+     * to the Instances tab. Off while a configuration's view is open, whose table it would filter unseen.
+     */
+    private void bindFind(Tab shown) {
+        TextField field = shown == configurationsTab ? configurations.findField()
+                : shown == instancesTab ? instances.findField() : null;
+        find.setDisable(open != null && shown != null && shown.getContent() == open.node());
+        if (field == findBound) return;
+        binding = true;
+        if (findBound != null) find.textProperty().unbindBidirectional(findBound.textProperty());
+        findBound = field;
+        if (field == null) find.clear();
+        else find.textProperty().bindBidirectional(field.textProperty());
+        find.setPromptText((shown == configurationsTab ? "Find a field or value" : "Find instances") + " (Ctrl+F)");
+        binding = false;
     }
 
     // ---- the open bot's run ----
@@ -358,6 +410,7 @@ public final class EmulatorsWindow {
         open = new ConfigView(this, target, this::back);
         tab.setContent(open.node());
         tabs.getSelectionModel().select(tab);
+        bindFind(tab);
         open.show(snapshot);
     }
 
@@ -367,6 +420,7 @@ public final class EmulatorsWindow {
         if (open.target() instanceof ConfigViews.Target.Instance) instancesTab.setContent(instances.node());
         else emulatorsTab.setContent(emulators.node());
         open = null;
+        bindFind(tabs.getSelectionModel().getSelectedItem());
     }
 
     private void readEnded() {

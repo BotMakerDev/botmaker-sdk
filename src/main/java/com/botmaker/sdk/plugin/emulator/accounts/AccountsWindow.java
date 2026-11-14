@@ -11,6 +11,7 @@ import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
+import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.sdk.plugin.emulator.window.WindowKeys;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
@@ -123,7 +124,7 @@ public final class AccountsWindow {
         importButton.setOnAction(e -> importBook());
         Button export = new Button("Export…");
         export.setOnAction(e -> exportBook());
-        Button refresh = new Button("Refresh");
+        Button refresh = Styles.on(new Button("⟳"), "em-icon");
         refresh.setTooltip(new Tooltip("Read the accounts and the instances again (F5)"));
         Runnable reread = () -> {
             instances = null;
@@ -156,7 +157,10 @@ public final class AccountsWindow {
         VBox body = new VBox(8, hint, bar, table, status);
         body.setPadding(new Insets(10));
 
-        stage = Modals.window(services, Modals.Frame.modeless("Accounts", 860, 520, 620, 340), new BorderPane(body));
+        BorderPane root = new BorderPane(body);
+        root.getStyleClass().add(Look.WINDOW);
+        root.getStylesheets().add(Look.SHEET);
+        stage = Modals.window(services, Modals.Frame.modeless("Accounts", 860, 520, 620, 340), root);
         WindowKeys.install(stage.getScene(), Map.of(
                 WindowKeys.Action.REFRESH, reread,
                 WindowKeys.Action.UNDO, undo::undo,

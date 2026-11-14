@@ -1,0 +1,186 @@
+/*
+ * The Emulators and Accounts windows' look (Look, spec 2026-11-14-emulators-look-design.md). Every colour resolves a
+ * -bm-* token the host's theme publishes on the scene root, so both windows follow Studio into a dark theme without
+ * this file knowing what the themes are. A state is said by a word as well as a colour: a pill carries its word, a
+ * badge its emulator's name in a tooltip.
+ */
+
+.emulators-window {
+    -em-line: -bm-divider;
+    -em-card: -fx-control-inner-background;
+    -em-quiet: -bm-muted;
+}
+
+/* ---- the header: segmented tabs, Find, the read time, ↶ ↷ ⟳ ---- */
+
+.em-header {
+    -fx-padding: 8 10 6 10;
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+    -fx-border-color: transparent transparent -em-line transparent;
+}
+
+.em-status {
+    -fx-padding: 4 10 4 10;
+}
+
+/* The TabPane keeps the content, keys and selection; its own strip is drawn by the segmented bar. */
+.em-tabs > .tab-header-area {
+    visibility: hidden;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+}
+
+.em-tabs > .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.em-segmented {
+    -fx-spacing: 0;
+    -fx-alignment: center-left;
+}
+
+.em-segmented > .toggle-button {
+    -fx-background-color: -em-line, -em-card;
+    -fx-background-insets: 0, 1 0 1 1;
+    -fx-background-radius: 0;
+    -fx-padding: 4 12 4 12;
+    -fx-text-fill: -fx-text-base-color;
+}
+
+.em-segmented > .toggle-button.em-first {
+    -fx-background-radius: 6 0 0 6;
+}
+
+.em-segmented > .toggle-button.em-last {
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 0 6 6 0;
+}
+
+.em-segmented > .toggle-button:hover {
+    -fx-background-color: -em-line, -bm-band;
+}
+
+.em-segmented > .toggle-button:selected {
+    -fx-background-color: -bm-accent-dark, -bm-accent;
+    -fx-text-fill: -bm-on-accent;
+    -fx-font-weight: bold;
+}
+
+.em-find {
+    -fx-pref-column-count: 16;
+    -fx-background-radius: 6;
+}
+
+.em-icon {
+    -fx-min-width: 30;
+    -fx-pref-width: 30;
+    -fx-padding: 3 0 3 0;
+    -fx-font-size: 1.1em;
+    -fx-alignment: center;
+}
+
+/* ---- the emulator badge: two letters on its platform's hue ---- */
+
+.em-badge {
+    -fx-min-width: 24;
+    -fx-pref-width: 24;
+    -fx-min-height: 20;
+    -fx-alignment: center;
+    -fx-background-radius: 5;
+    -fx-font-size: 0.82em;
+    -fx-font-weight: bold;
+    -fx-background-color: -em-quiet;
+    -fx-text-fill: -fx-control-inner-background;
+}
+
+.em-badge-mumu { -fx-background-color: -bm-fill-vision; -fx-text-fill: -bm-on-fill-vision; }
+.em-badge-ldplayer { -fx-background-color: -bm-fill-game; -fx-text-fill: -bm-on-fill-game; }
+.em-badge-memu { -fx-background-color: -bm-fill-flow; -fx-text-fill: -bm-on-fill-flow; }
+.em-badge-bluestacks { -fx-background-color: -bm-fill-loops; -fx-text-fill: -bm-on-fill-loops; }
+.em-badge-avd { -fx-background-color: -bm-fill-input; -fx-text-fill: -bm-on-fill-input; }
+.em-badge-waydroid { -fx-background-color: -bm-fill-output; -fx-text-fill: -bm-on-fill-output; }
+.em-badge-device { -fx-background-color: -bm-fill-variables; -fx-text-fill: -bm-on-fill-variables; }
+
+/* ---- the state pill: a dot and the word ---- */
+
+.em-pill {
+    -fx-padding: 1 8 1 6;
+    -fx-graphic-text-gap: 5;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-font-size: 0.9em;
+    -em-tone: -em-quiet;
+    /* the band and the text colour each theme already pairs; only the dot takes the tone */
+    -fx-background-color: -bm-band;
+    -fx-border-color: -em-line;
+    -fx-text-fill: -fx-text-base-color;
+}
+
+.em-pill > .em-dot {
+    -fx-min-width: 7;
+    -fx-min-height: 7;
+    -fx-max-width: 7;
+    -fx-max-height: 7;
+    -fx-background-radius: 4;
+    -fx-background-color: -em-tone;
+}
+
+.em-pill-ok { -em-tone: -bm-severity-ok-text; }
+.em-pill-warning { -em-tone: -bm-severity-warning; }
+.em-pill-accent { -em-tone: -bm-accent; }
+.em-pill-danger { -em-tone: -bm-danger; }
+
+.em-pill-outlined {
+    -fx-background-color: transparent;
+    -fx-border-color: -em-quiet;
+}
+
+.em-pill-outlined > .em-dot {
+    -fx-background-color: transparent;
+    -fx-border-color: -em-quiet;
+    -fx-border-radius: 4;
+}
+
+/* ---- the account avatar: an initial on a hue its key keeps ---- */
+
+.em-avatar {
+    -fx-min-width: 22;
+    -fx-pref-width: 22;
+    -fx-min-height: 22;
+    -fx-pref-height: 22;
+    -fx-alignment: center;
+    -fx-background-radius: 11;
+    -fx-font-size: 0.82em;
+    -fx-font-weight: bold;
+}
+
+.em-hue-0 { -fx-background-color: -bm-fill-vision; -fx-text-fill: -bm-on-fill-vision; }
+.em-hue-1 { -fx-background-color: -bm-fill-game; -fx-text-fill: -bm-on-fill-game; }
+.em-hue-2 { -fx-background-color: -bm-fill-flow; -fx-text-fill: -bm-on-fill-flow; }
+.em-hue-3 { -fx-background-color: -bm-fill-loops; -fx-text-fill: -bm-on-fill-loops; }
+.em-hue-4 { -fx-background-color: -bm-fill-input; -fx-text-fill: -bm-on-fill-input; }
+.em-hue-5 { -fx-background-color: -bm-fill-output; -fx-text-fill: -bm-on-fill-output; }
+.em-hue-6 { -fx-background-color: -bm-fill-variables; -fx-text-fill: -bm-on-fill-variables; }
+.em-hue-7 { -fx-background-color: -bm-fill-functions; -fx-text-fill: -bm-on-fill-functions; }
+
+/* ---- the chip and the cap ---- */
+
+.em-chip {
+    -fx-padding: 2 8 2 3;
+    -fx-graphic-text-gap: 6;
+    -fx-background-color: -bm-band;
+    -fx-background-radius: 12;
+    -fx-border-color: -em-line;
+    -fx-border-radius: 12;
+}
+
+.em-cap {
+    -fx-font-size: 0.78em;
+    -fx-font-weight: bold;
+    -fx-text-fill: -em-quiet;
+    -fx-padding: 6 0 2 0;
+}

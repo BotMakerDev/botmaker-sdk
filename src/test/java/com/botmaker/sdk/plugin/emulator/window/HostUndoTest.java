@@ -24,10 +24,10 @@ class HostUndoTest {
     @Test
     void eachButtonNamesItsStepOrIsOff() {
         History both = at(true, true);
-        assertEquals(new HostUndo.Face("↶ Undo", "Take back: Set GREETING", true), HostUndo.Face.undo(both));
-        assertEquals(new HostUndo.Face("↷ Redo", "Do again: Forget an instance", true), HostUndo.Face.redo(both));
-        assertEquals(new HostUndo.Face("↶ Undo", "Nothing to take back", false), HostUndo.Face.undo(History.NONE));
-        assertEquals(new HostUndo.Face("↷ Redo", "Nothing to do again", false), HostUndo.Face.redo(at(true, false)));
+        assertEquals(new HostUndo.Face("↶", "Take back: Set GREETING", true), HostUndo.Face.undo(both));
+        assertEquals(new HostUndo.Face("↷", "Do again: Forget an instance", true), HostUndo.Face.redo(both));
+        assertEquals(new HostUndo.Face("↶", "Nothing to take back", false), HostUndo.Face.undo(History.NONE));
+        assertEquals(new HostUndo.Face("↷", "Nothing to do again", false), HostUndo.Face.redo(at(true, false)));
     }
 
     @Test
