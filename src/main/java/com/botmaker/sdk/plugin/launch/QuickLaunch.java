@@ -14,6 +14,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.internal.emulator.Emulators;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.sdk.plugin.emulator.host.ChooserWatch;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.settings.BackendInstallPrompt;
@@ -201,10 +202,10 @@ public final class QuickLaunch {
             // Waydroid renders at the bot's screen size: its props are set, and the container cycled, before the start.
             screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
             String[] note = new String[1];
-            Launcher.start(spec, message -> {
+            startHere(spec, services, message -> {
                 note[0] = message;
                 Platform.runLater(() -> report.accept(true, message));
-            });
+            }, chooser -> Platform.runLater(() -> report.accept(true, chooser)));
             return note[0];
         }, last -> {
             ended.accept(true);
@@ -310,6 +311,17 @@ public final class QuickLaunch {
     }
 
     /**
+     * Starts {@code spec} on this computer, as each of the host's starts of it does, then, for a game on an instance,
+     * watches for Google's account picker ({@link ChooserWatch}); {@code chooser} hears what that came to. Blocks: off
+     * the FX thread.
+     */
+    public static void startHere(LaunchSpec spec, StudioServices services, Consumer<String> words,
+                                 Consumer<String> chooser) {
+        Launcher.start(spec, words);
+        ChooserWatch.after(spec, services, chooser);
+    }
+
+    /**
      * Starts {@code spec} where ▶ Launch game would, and waits: a Fix's step that needs Waydroid up. Null when it
      * started, else why not. Off the FX thread.
      */
@@ -326,7 +338,7 @@ public final class QuickLaunch {
                 Optional<Size> screen = ScreenSize.read(services);
                 Async.load("fix-start", () -> {
                     screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
-                    Launcher.start(spec, words);
+                    startHere(spec, services, words, services.log()::info);
                     return "";
                 }, done -> ended.complete(null), ended::complete);
             } catch (RuntimeException e) {

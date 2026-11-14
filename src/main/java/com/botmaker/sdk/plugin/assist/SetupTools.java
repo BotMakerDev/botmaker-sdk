@@ -791,7 +791,8 @@ final class SetupTools {
         Optional<Size> screen = FxCall.call(() -> ScreenSize.read(services));
         CompletableFuture<Void> started = CompletableFuture.runAsync(() -> {
             screen.ifPresent(size -> LaunchPreparation.prepare(spec, size.width(), size.height()));
-            Launcher.start(spec);
+            // Google's account picker, should the game open it, answered with the instance's default account
+            QuickLaunch.startHere(spec, services, words -> { }, services.log()::info);
         }, LAUNCHING);
         int wait = launch.seconds() == null ? 0 : Math.min(Math.max(launch.seconds(), 0), MAX_LAUNCH_WAIT);
         long until = System.nanoTime() + Math.max(wait, 2) * 1_000_000_000L;
