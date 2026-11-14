@@ -6,6 +6,7 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
@@ -22,6 +23,7 @@ import com.botmaker.shared.emulator.config.EmulatorOperations;
 import com.botmaker.shared.emulator.config.InstanceFacts;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
+import com.botmaker.shared.emulator.google.AuthenticatorKeys;
 import com.botmaker.shared.emulator.google.Codes;
 import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.KeyringStore;
@@ -94,6 +96,8 @@ public final class EmulatorsWindow {
      * first use, and {@code available()} false where the PC has none.
      */
     private static final PasswordStore STORE = new KeyringStore();
+    /** The authenticator setup keys the user gave BotMaker, in the same store under a service of their own. */
+    private static final AuthenticatorKeys KEYS = new AuthenticatorKeys(new KeyringStore(AuthenticatorKeys.SERVICE));
     /** The Applies signing accounts in, by operation id. */
     private static final Map<String, Signing> SIGNING = new ConcurrentHashMap<>();
     /** The codes the sign-ins wait for, by operation id: one at a time per operation. */
@@ -190,6 +194,11 @@ public final class EmulatorsWindow {
     /** This PC's credential store, the one the Applies remember passwords in: it can block, so never asked on FX. */
     public static PasswordStore passwords() {
         return STORE;
+    }
+
+    /** The authenticator keys the sign-ins make codes from: they can block, so never asked on FX. */
+    public static AuthenticatorKeys authenticatorKeys() {
+        return KEYS;
     }
 
     private EmulatorsWindow(StudioServices services) {
@@ -524,26 +533,31 @@ public final class EmulatorsWindow {
         // book's methods are read there too, once for the batch
         Thread.ofVirtual().name("apply-passwords").start(() -> {
             Set<String> remembered = ApplyPlan.remembered(items, STORE);
-            Function<String, Verification> methods = methods();
-            Platform.runLater(() -> apply(items, remembered, methods));
+            BookSteps steps = bookSteps();
+            Platform.runLater(() -> apply(items, remembered, steps));
         });
+    }
+
+    /** What the account book says of each address's second step: its method, and where its key is kept. */
+    private record BookSteps(Function<String, Verification> methods, Function<String, String> keyedAs) {
     }
 
     /**
      * The second step each address follows, from the account book; when it does not read, every one is handed to the
      * user, and the window says why.
      */
-    private Function<String, Verification> methods() {
+    private BookSteps bookSteps() {
         try {
-            return HostConfig.accounts(services).methods();
+            HostBook book = HostConfig.accounts(services);
+            return new BookSteps(book.methods(), book.keyedAs());
         } catch (IOException | RuntimeException unread) {
             Platform.runLater(() -> say("The account book was not read, so each sign-in's second step is left to you: "
                     + unread.getMessage()));
-            return email -> Verification.ASK;
+            return new BookSteps(email -> Verification.ASK, null);
         }
     }
 
-    private void apply(List<ApplyPlan.Item> items, Set<String> remembered, Function<String, Verification> methods) {
+    private void apply(List<ApplyPlan.Item> items, Set<String> remembered, BookSteps steps) {
         Optional<Boolean> removals = confirm(items, remembered);
         if (removals.isEmpty()) return;
         List<ApplyPlan.Item> agreed = ApplyPlan.agreed(items, removals.get());
@@ -568,7 +582,8 @@ public final class EmulatorsWindow {
             OPERATIONS.addListener(ended);
             for (ApplyPlan.Item item : agreed) {
                 AtomicReference<String> id = new AtomicReference<>();
-                InstanceSignIn.SecondStep second = new InstanceSignIn.SecondStep(methods, codes(id));
+                InstanceSignIn.SecondStep second = new InstanceSignIn.SecondStep(steps.methods(), codes(id), KEYS,
+                        steps.keyedAs());
                 Operation operation = OPERATIONS.submit("Apply to " + item.row().instance().name(),
                         item.row().instance(), context -> {
                             synchronized (batch) {

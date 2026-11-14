@@ -251,7 +251,7 @@ public final class HostBook {
     public Verification defaultVerification() {
         Verification read = Verification.fromId(HostConfig.read(services, SdkHostValues.DEFAULT_VERIFICATION,
                 String.class, Verification.FIRST_DEFAULT.id()));
-        return read.isMethod() ? read : Verification.FIRST_DEFAULT;
+        return Verification.defaults().contains(read) ? read : Verification.FIRST_DEFAULT;
     }
 
     /**
@@ -272,6 +272,22 @@ public final class HostBook {
         List<AccountRecord> google = book.stream().filter(a -> a.kind() == AccountRecord.Kind.GOOGLE).toList();
         return email -> google.stream().filter(account -> account.answersTo(email)).findFirst()
                 .map(AccountRecord::verify).orElse(Verification.DEFAULT).followed(byDefault);
+    }
+
+    /**
+     * The address each typed one's authenticator key is kept under, read once for an Apply: the main address of the
+     * book's Google account it answers to, else itself. Reads the book without starting it.
+     */
+    public Function<String, String> keyedAs() throws IOException {
+        if (services == null) return keyedAs(List.of());
+        return keyedAs(List.copyOf(understood(current().orElse(HostKnown.none()).list()).values()));
+    }
+
+    /** The main address of the Google account in {@code book} an address answers to; an address it lacks, itself. */
+    public static Function<String, String> keyedAs(List<AccountRecord> book) {
+        List<AccountRecord> google = book.stream().filter(a -> a.kind() == AccountRecord.Kind.GOOGLE).toList();
+        return email -> google.stream().filter(account -> account.answersTo(email)).findFirst()
+                .map(AccountRecord::name).orElse(email);
     }
 
     /** Sets the book's default verification, one step of undo; only a method of its own may be the default. */

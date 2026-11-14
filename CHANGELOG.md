@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The authenticator key in the Accounts window** (2026-11-14): a Google account's *Verification* offers
+  *Authenticator (BotMaker holds the key)*; picking it asks the setup key in a masked dialog (*Paste*, *Keep*), and the
+  panel shows *Key held* or *Key missing* with *Set key…*/*Replace key…* and *Forget key*, never the key. An Apply's
+  sign-in types the code the key gives, an alias's found under its account's main address. The header's *Default
+  verification* leaves the method out; an export carries the method and never the key. A key left after switching
+  away shows *Key held, unused* with *Forget key*; removing an account forgets its key first, and a merge moves the
+  absorbed account's key to the one kept.
 - **The Emulators and Accounts windows list LDPlayer alone, for now** (2026-11-14, the user's call): the other
   products are still discovered, started and configured where a bot names one; only the windows leave them out
   (`EmulatorsModel.SHOWN`).

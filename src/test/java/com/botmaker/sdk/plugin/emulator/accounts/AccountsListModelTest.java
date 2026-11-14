@@ -126,8 +126,8 @@ class AccountsListModelTest {
 
     @Test
     void theVerificationChoicesPutTheDefaultFirstAndNameWhatItIs() {
-        assertEquals(List.of(Verification.DEFAULT, Verification.PHONE, Verification.CODE, Verification.BACKUP_CODE,
-                Verification.ASK), AccountsListModel.verificationChoices(Verification.CODE));
+        assertEquals(List.of(Verification.DEFAULT, Verification.PHONE, Verification.CODE, Verification.AUTHENTICATOR,
+                Verification.BACKUP_CODE, Verification.ASK), AccountsListModel.verificationChoices(Verification.CODE));
         assertEquals(Verification.UNKNOWN, AccountsListModel.verificationChoices(Verification.UNKNOWN).getLast(),
                 "a newer BotMaker's shows as it is");
         assertEquals("Default (Phone prompt)", AccountsListModel.said(Verification.DEFAULT, Verification.PHONE));

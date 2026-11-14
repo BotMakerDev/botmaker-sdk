@@ -19,6 +19,7 @@ import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
+import com.botmaker.shared.emulator.google.AuthenticatorKeys;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -47,6 +48,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.Clipboard;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -107,6 +109,8 @@ public final class AccountsWindow {
     private Verification byDefault = Verification.FIRST_DEFAULT;
     private final ComboBox<Verification> defaultPick = new ComboBox<>();
     private Verification shownDefault;
+    /** The Google accounts whose authenticator key this PC holds, as last read: whether held, never the key. */
+    private Set<AccountRecord.Key> keyed = Set.of();
     /** The instances discovered by the first read, kept for the reads after an action; null until then. */
     private Found found;
     /** Counts the reads started: a read that ends after a newer one started is dropped. */
@@ -173,7 +177,7 @@ public final class AccountsWindow {
         HostUndo undo = new HostUndo(services, this::load);
         Label defaultLabel = Styles.on(new Label("Default verification"), StyleClasses.MUTED_TEXT);
         defaultLabel.setMinWidth(Region.USE_PREF_SIZE);
-        defaultPick.getItems().setAll(Verification.methods());
+        defaultPick.getItems().setAll(Verification.defaults());
         defaultPick.setValue(byDefault);
         defaultPick.setButtonCell(verificationCell(null));
         defaultPick.setCellFactory(list -> verificationCell(null));
@@ -282,6 +286,7 @@ public final class AccountsWindow {
         int read = ++reads;
         Found discovered = found;
         PasswordStore store = EmulatorsWindow.passwords();
+        AuthenticatorKeys authenticator = EmulatorsWindow.authenticatorKeys();
         Async.load("accounts-read", () -> {
             EmulatorConfig config = HostConfig.load(services).config();
             EmulatorsModel.Source source = EmulatorsModel.Source.shown(services);
@@ -293,14 +298,22 @@ public final class AccountsWindow {
             if (available) {
                 for (String key : AccountsListModel.keys(known)) if (store.remembered(key)) remembered.add(key);
             }
+            // whether a Google account's key is held, never the key: one left after a switch away stays forgettable
+            Set<AccountRecord.Key> keys = new HashSet<>();
+            for (AccountRecord account : known) {
+                if (account.kind() == AccountRecord.Kind.GOOGLE && authenticator.has(account.name())) {
+                    keys.add(account.key());
+                }
+            }
             return new Read(now, known, AccountsListModel.rows(known, HostBook.onInstances(config, now.keys()),
-                    HostBook.held(config), remembered), available, method);
+                    HostBook.held(config), remembered), available, method, Set.copyOf(keys));
         }, done -> {
             if (read != reads) return;
             found = done.found();
             book = done.book();
             all = done.rows();
             storeAvailable = done.storeAvailable();
+            keyed = done.keyed();
             // set before the pick, which then writes nothing
             byDefault = done.byDefault();
             defaultPick.setValue(byDefault);
@@ -309,7 +322,7 @@ public final class AccountsWindow {
     }
 
     private record Read(Found found, List<AccountRecord> book, List<AccountsListModel.Row> rows,
-                        boolean storeAvailable, Verification byDefault) {
+                        boolean storeAvailable, Verification byDefault, Set<AccountRecord.Key> keyed) {
     }
 
     /**
@@ -425,6 +438,25 @@ public final class AccountsWindow {
                     Look.muted("Other addresses Google signs this account in as."));
             rest.getChildren().addAll(Look.cap("Verification"), verification(account),
                     Look.muted("The second step BotMaker follows when it signs this account in."));
+            boolean held = keyed.contains(account.key());
+            if (account.verify() == Verification.AUTHENTICATOR) {
+                HBox key = new HBox(6, Look.pill(held ? new Look.Pill(Look.Tone.OK, "Key held")
+                        : new Look.Pill(Look.Tone.WARNING, "Key missing")));
+                key.setAlignment(Pos.CENTER_LEFT);
+                key.getChildren().add(button(held ? "Replace key…" : "Set key…", () -> setKey(account)));
+                if (held) key.getChildren().add(button("Forget key", () -> forgetKey(account)));
+                rest.getChildren().addAll(key, Look.muted(held
+                        ? "BotMaker types the code this key gives, with no dialog. The key stays in this PC's"
+                        + " credential store, never shown or exported."
+                        : "Without its key, the code is asked in BotMaker's dialog, as a texted code's is."));
+            } else if (held) {
+                // a key kept from before a switch away: still in the store until the user forgets it
+                HBox key = new HBox(6, Look.pill(new Look.Pill(Look.Tone.WARNING, "Key held, unused")),
+                        button("Forget key", () -> forgetKey(account)));
+                key.setAlignment(Pos.CENTER_LEFT);
+                rest.getChildren().addAll(key, Look.muted("This account no longer follows the authenticator, but this"
+                        + " PC's credential store still holds its key: forget it unless you switch back."));
+            }
         }
 
         rest.getChildren().add(Look.cap("Password"));
@@ -555,10 +587,17 @@ public final class AccountsWindow {
         pick.valueProperty().addListener((o, was, now) -> {
             if (now == null || now == account.verify()) return;
             String name = account.name();
-            Async.load("accounts-verify", () -> io(() -> HostConfig.accounts(services).verify(account.key(), now)),
-                    done -> {
+            AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
+            Async.load("accounts-verify", () -> {
+                        io(() -> HostConfig.accounts(services).verify(account.key(), now));
+                        // asked of the store now, not of the last read: a key kept since then counts
+                        return now == Verification.AUTHENTICATOR && !keys.has(name);
+                    },
+                    needsKey -> {
                         say(name + " follows " + AccountsListModel.said(now, byDefault) + ".");
                         load();
+                        // the method needs its key: asked at once, unless this PC holds one already
+                        if (needsKey) setKey(account);
                     }, failed -> {
                         say("The verification was not saved: " + failed);
                         // the row reads back as it was: the panel is drawn again, so the pick shows the book's
@@ -691,6 +730,88 @@ public final class AccountsWindow {
         }, failed -> say("The password was not remembered: " + failed));
     }
 
+    /** Asks the account's authenticator setup key and keeps it in the store; nothing is signed in. */
+    private void setKey(AccountRecord account) {
+        String name = account.name();
+        char[] key = askKey(name);
+        if (key == null) return;
+        AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
+        Async.load("accounts-key", () -> {
+            try {
+                return keys.put(name, key);
+            } finally {
+                Arrays.fill(key, '\0');
+            }
+        }, put -> {
+            say(switch (put) {
+                case KEPT -> "BotMaker holds the authenticator key of " + name + ": its sign-in types the code.";
+                case NOT_A_KEY -> "That is not a setup key: Google shows one as groups of letters (A–Z) and digits"
+                        + " (2–7). Nothing was kept.";
+                case REFUSED -> "This PC's credential store refused the authenticator key of " + name + ".";
+            });
+            load();
+        }, failed -> say("The authenticator key was not kept: " + failed));
+    }
+
+    /** Forgets the account's authenticator key: its next sign-in asks the code. */
+    private void forgetKey(AccountRecord account) {
+        String name = account.name();
+        if (!confirm("Forget the authenticator key of " + name + "?", "Its next sign-in asks the code in BotMaker's"
+                + " dialog. Google still has the key: to stop it working, remove the authenticator in your Google"
+                + " account.", "Forget")) return;
+        AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
+        Async.load("accounts-forget-key", () -> {
+            keys.forget(name);
+            return keys.has(name);
+        }, still -> {
+            say(still ? "This PC's credential store kept the authenticator key of " + name + "."
+                    : "The authenticator key of " + name + " is forgotten.");
+            load();
+        }, failed -> say("The authenticator key was not forgotten: " + failed));
+    }
+
+    /**
+     * The setup key, typed or pasted here and nowhere else, masked, as characters; null when the user cancelled or
+     * gave nothing. <i>Paste</i> puts the clipboard's text in the field without showing it.
+     */
+    private char[] askKey(String email) {
+        PasswordField field = new PasswordField();
+        field.setPromptText("Setup key");
+        Button paste = new Button("Paste");
+        paste.setOnAction(e -> {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            if (clipboard.hasString()) field.setText(clipboard.getString().strip());
+        });
+        HBox line = new HBox(6, field, paste);
+        HBox.setHgrow(field, Priority.ALWAYS);
+        Label why = Styles.on(new Label("In your Google account: Security ▸ 2-Step Verification ▸ Authenticator ▸ Set up"
+                + " authenticator ▸ Can't scan it?, which shows the key. BotMaker keeps it in this PC's credential"
+                + " store and types the 6-digit code it gives when it signs this account in. It is never shown,"
+                + " exported or seen by an assistant. Whoever holds this PC's credential store holds both steps."),
+                StyleClasses.DIALOG_HINT);
+        why.setWrapText(true);
+        why.setMaxWidth(440);
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Authenticator key");
+        dialog.setHeaderText("The authenticator key of " + email);
+        dialog.getDialogPane().setContent(new VBox(8, why, line));
+        ButtonType keep = new ButtonType("Keep", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(keep, ButtonType.CANCEL);
+        services.theme().apply(dialog);
+        Platform.runLater(field::requestFocus);
+        Optional<ButtonType> pressed = dialog.showAndWait();
+        CharSequence typed = field.getCharacters();
+        char[] key = null;
+        if (pressed.isPresent() && pressed.get() == keep && typed.length() > 0) {
+            key = new char[typed.length()];
+            for (int i = 0; i < key.length; i++) key[i] = typed.charAt(i);
+        }
+        field.clear();
+        return key;
+    }
+
     /**
      * Takes the account out of the book once no configuration lists it, read again when the removal runs: its
      * remembered password is forgotten first, so a store that fails leaves the account listed rather than a password
@@ -699,9 +820,13 @@ public final class AccountsWindow {
     private void remove(AccountsListModel.Row row) {
         AccountRecord account = row.account();
         boolean forget = row.password() == AccountsListModel.Password.REMEMBERED;
+        boolean google = account.kind() == AccountRecord.Kind.GOOGLE;
+        boolean keyHeld = google && keyed.contains(account.key());
         if (!confirm("Remove " + account.name() + " from the accounts?", "No configuration lists it."
-                + (forget ? " Its remembered password is forgotten too." : ""), "Remove")) return;
+                + (forget ? " Its remembered password is forgotten too." : "")
+                + (keyHeld ? " Its authenticator key is forgotten too." : ""), "Remove")) return;
         PasswordStore store = EmulatorsWindow.passwords();
+        AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
         Async.load("accounts-remove", () -> {
             Set<AccountRecord.Key> held = HostBook.held(HostConfig.load(services).config());
             if (account.addresses().stream().anyMatch(a -> held.contains(new AccountRecord.Key(account.kind(), a)))) {
@@ -711,6 +836,13 @@ public final class AccountsWindow {
                 account.addresses().forEach(store::forget);
                 if (account.addresses().stream().anyMatch(store::remembered)) {
                     throw new IllegalStateException("this PC's credential store kept its password");
+                }
+            }
+            // a Google account's key forgotten first too, so a store that fails leaves no key no row offers to forget
+            if (google) {
+                keys.forget(account.name());
+                if (keys.has(account.name())) {
+                    throw new IllegalStateException("this PC's credential store kept its authenticator key");
                 }
             }
             io(() -> HostConfig.accounts(services).remove(account.key()));
@@ -732,6 +864,7 @@ public final class AccountsWindow {
     private void merge(AccountsListModel.Row row, AccountRecord into) {
         AccountRecord from = row.account();
         PasswordStore store = EmulatorsWindow.passwords();
+        AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
         Async.load("accounts-merge-read", () -> {
             char[] kept = password(store, into.addresses());
             char[] absorbed = password(store, from.addresses());
@@ -745,6 +878,11 @@ public final class AccountsWindow {
         }, found -> askMerge(into, from, found).ifPresent(keepAbsorbed -> Async.load("accounts-merge", () -> {
             io(() -> HostConfig.accounts(services).merge(into.key(), from.key()));
             String password = "";
+            // a key is kept under the account's main address: the absorbed one's moves to it, unless it holds one
+            if (from.kind() == AccountRecord.Kind.GOOGLE && !keys.move(from.name(), into.name())) {
+                password = " This PC's credential store refused to move the authenticator key of " + from.name()
+                        + ": forget it there, or set " + into.name() + "'s again.";
+            }
             if (found.differ()) {
                 // the picked password, kept under every address that remembered one, so the account has one password
                 List<String> source = keepAbsorbed ? from.addresses() : into.addresses();

@@ -325,6 +325,20 @@ class HostBookTest {
         assertFalse(Files.readString(exported).toLowerCase().contains("password"));
     }
 
+    /** The authenticator method travels; its key, kept in the credential store only, never does. */
+    @Test
+    void anAuthenticatorAccountExportsItsMethodAndNoKey(@TempDir Path dir) throws IOException {
+        Path exported = dir.resolve("export.json");
+        HostBook.export(List.of(FARM.withVerify(Verification.AUTHENTICATOR)), exported);
+        JsonNode entry = new ObjectMapper().readTree(Files.readString(exported, StandardCharsets.UTF_8))
+                .path("accounts").get(0);
+        Set<String> keys = new HashSet<>();
+        entry.fieldNames().forEachRemaining(keys::add);
+        assertEquals(Set.of("kind", "name", "note", "aliases", "verify"), keys);
+        assertEquals("authenticator", entry.path("verify").asText());
+        assertFalse(Files.readString(exported).toLowerCase().contains("secret"));
+    }
+
     @Test
     void aliasesAndTheVerificationAreWrittenAsTextAndReadBack() throws IOException {
         HostBook book = book(Optional.empty());
@@ -381,6 +395,10 @@ class HostBookTest {
         assertEquals(Verification.PHONE, HostBook.methods(List.of(new AccountRecord(AccountRecord.Kind.FACEBOOK,
                 "farm@example.com").withVerify(Verification.CODE)), Verification.PHONE).apply("farm@example.com"),
                 "only a Google entry answers");
+        Function<String, String> keyedAs = book.keyedAs();
+        assertEquals("farm@example.com", keyedAs.apply("F.ARM@example.com"), "an alias's key is its account's");
+        assertEquals("alt@example.com", keyedAs.apply("alt@example.com"));
+        assertEquals("new@example.com", keyedAs.apply("new@example.com"), "one the book lacks keeps its own");
     }
 
     @Test
