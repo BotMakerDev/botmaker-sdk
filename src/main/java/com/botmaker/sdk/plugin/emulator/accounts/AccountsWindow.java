@@ -30,11 +30,13 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -45,6 +47,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -416,6 +419,8 @@ public final class AccountsWindow {
         }
 
         if (account.kind() == AccountRecord.Kind.GOOGLE) {
+            rest.getChildren().addAll(Look.cap("Aliases"), aliases(account),
+                    Look.muted("Other addresses Google signs this account in as."));
             rest.getChildren().addAll(Look.cap("Verification"), verification(account),
                     Look.muted("The second step BotMaker follows when it signs this account in."));
         }
@@ -446,6 +451,12 @@ public final class AccountsWindow {
             instances.setOnAction(e -> EmulatorsWindow.openForAccount(services, account));
             actions.getChildren().add(instances);
         }
+        AccountsListModel.mergeInto(account, book).ifPresent(into -> {
+            Button merge = button("Merge into " + into.name() + "…", () -> merge(row, into));
+            merge.setTooltip(new Tooltip(into.name() + " lists this address as one of its aliases: make them one"
+                    + " account"));
+            actions.getChildren().add(merge);
+        });
         if (row.removable()) {
             Button remove = button("Remove", () -> remove(row));
             remove.setTooltip(new Tooltip("No configuration lists it, so it can leave the accounts"));
@@ -477,6 +488,58 @@ public final class AccountsWindow {
         noteKey = account.key();
         noteWritten = written;
         return field;
+    }
+
+    /** The account's aliases as chips, each with × to take it off, then a dashed <i>+ Alias</i> chip. */
+    private FlowPane aliases(AccountRecord account) {
+        FlowPane chips = new FlowPane(4, 4);
+        for (String alias : account.aliases()) {
+            Button off = Styles.on(new Button("×"), "em-chip-remove");
+            off.setTooltip(new Tooltip("Take " + alias + " off the aliases"));
+            off.setAccessibleText("Remove the alias " + alias);
+            off.setOnAction(e -> changeAlias(account, alias, false));
+            Label chip = Look.chip(off, alias);
+            chip.setContentDisplay(ContentDisplay.RIGHT);
+            chips.getChildren().add(chip);
+        }
+        Button add = Styles.on(new Button("+ Alias"), "em-chip", "em-chip-add");
+        add.setOnAction(e -> askAlias(account).ifPresent(address -> changeAlias(account, address, true)));
+        chips.getChildren().add(add);
+        return chips;
+    }
+
+    /** The address of one more alias, checked as it is typed; empty when the user cancelled. */
+    private Optional<String> askAlias(AccountRecord account) {
+        TextField address = new TextField();
+        address.setPromptText("user@example.com");
+        Label why = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Accounts");
+        dialog.setHeaderText("Add an alias of " + account.name());
+        dialog.getDialogPane().setContent(new VBox(8, address, why));
+        ButtonType add = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(add, ButtonType.CANCEL);
+        Runnable check = () -> {
+            Optional<String> refused = AccountsListModel.aliasRefused(account, address.getText());
+            why.setText(address.getText().isBlank() ? "" : refused.orElse(""));
+            dialog.getDialogPane().lookupButton(add).setDisable(refused.isPresent());
+        };
+        address.textProperty().addListener((o, was, now) -> check.run());
+        check.run();
+        services.theme().apply(dialog);
+        Platform.runLater(address::requestFocus);
+        return dialog.showAndWait().filter(add::equals).map(pressed -> address.getText().strip());
+    }
+
+    /** Adds or takes off one alias, as one step of this PC's undo. */
+    private void changeAlias(AccountRecord account, String address, boolean on) {
+        Async.load("accounts-alias", () -> io(() -> on ? HostConfig.accounts(services).addAlias(account.key(), address)
+                : HostConfig.accounts(services).removeAlias(account.key(), address)), after -> {
+            say(on ? address + " is an alias of " + account.name() + "."
+                    : address + " is no longer an alias of " + account.name() + ".");
+            load();
+        }, failed -> say("The alias was not " + (on ? "added" : "removed") + ": " + failed));
     }
 
     /** The account's <i>Verification</i>: <i>Default</i> first, naming the book's; a pick is written at once. */
@@ -590,14 +653,16 @@ public final class AccountsWindow {
         });
     }
 
+    /** Forgets the password under every address of the account, so no alias keeps one the row no longer shows. */
     private void forget(AccountsListModel.Row row) {
         String name = row.account().name();
+        List<String> addresses = row.account().addresses();
         if (!confirm("Forget the password of " + name + "?", "The next Apply that signs it in asks it again.",
                 "Forget")) return;
         PasswordStore store = EmulatorsWindow.passwords();
         Async.load("accounts-forget", () -> {
-            store.forget(name);
-            return store.remembered(name);
+            addresses.forEach(store::forget);
+            return addresses.stream().anyMatch(store::remembered);
         }, still -> {
             say(still ? "This PC's credential store kept the password of " + name + "."
                     : "The password of " + name + " is forgotten.");
@@ -636,10 +701,13 @@ public final class AccountsWindow {
                 + (forget ? " Its remembered password is forgotten too." : ""), "Remove")) return;
         PasswordStore store = EmulatorsWindow.passwords();
         Async.load("accounts-remove", () -> {
-            if (HostBook.held(HostConfig.load(services).config()).contains(account.key())) return false;
+            Set<AccountRecord.Key> held = HostBook.held(HostConfig.load(services).config());
+            if (account.addresses().stream().anyMatch(a -> held.contains(new AccountRecord.Key(account.kind(), a)))) {
+                return false;
+            }
             if (forget) {
-                store.forget(account.name());
-                if (store.remembered(account.name())) {
+                account.addresses().forEach(store::forget);
+                if (account.addresses().stream().anyMatch(store::remembered)) {
                     throw new IllegalStateException("this PC's credential store kept its password");
                 }
             }
@@ -650,6 +718,105 @@ public final class AccountsWindow {
                     : "A configuration lists " + account.name() + " now: it stays.");
             load();
         }, failed -> say("The account was not removed: " + failed));
+    }
+
+    /** What a merge found in the store: whether each side has a password, and whether the two differ. No password. */
+    private record Passwords(boolean kept, boolean absorbed, boolean differ) {}
+
+    /**
+     * <i>Merge into A…</i>: the store is read off the FX thread and the two passwords compared there, in BotMaker's
+     * process; the dialog says what moves and, only when both are remembered and differ, asks which to keep.
+     */
+    private void merge(AccountsListModel.Row row, AccountRecord into) {
+        AccountRecord from = row.account();
+        PasswordStore store = EmulatorsWindow.passwords();
+        Async.load("accounts-merge-read", () -> {
+            char[] kept = password(store, into.addresses());
+            char[] absorbed = password(store, from.addresses());
+            try {
+                return new Passwords(kept != null, absorbed != null,
+                        AccountsListModel.asksWhichPassword(kept, absorbed));
+            } finally {
+                if (kept != null) Arrays.fill(kept, '\0');
+                if (absorbed != null) Arrays.fill(absorbed, '\0');
+            }
+        }, found -> askMerge(into, from, found).ifPresent(keepAbsorbed -> Async.load("accounts-merge", () -> {
+            io(() -> HostConfig.accounts(services).merge(into.key(), from.key()));
+            String password = "";
+            if (found.differ()) {
+                // the picked password, kept under every address that remembered one, so the account has one password
+                List<String> source = keepAbsorbed ? from.addresses() : into.addresses();
+                List<String> target = keepAbsorbed ? into.addresses() : from.addresses();
+                // the book is merged already: a password left behind is said, never reported as no merge
+                char[] chosen = password(store, source);
+                if (chosen == null) {
+                    password = " The password picked was no longer in this PC's credential store: the two addresses"
+                            + " keep their own.";
+                } else {
+                    try {
+                        for (String address : target) {
+                            if (store.remembered(address) && !store.remember(address, chosen)) {
+                                password = " This PC's credential store refused the password picked: the two"
+                                        + " addresses keep their own.";
+                            }
+                        }
+                    } finally {
+                        Arrays.fill(chosen, '\0');
+                    }
+                }
+            }
+            return password;
+        }, password -> {
+            say(from.name() + " is merged into " + into.name() + "." + password);
+            picked = into.key();
+            load();
+        }, failed -> {
+            say("The accounts were not merged: " + failed);
+            load();
+        })), failed -> say("The passwords were not read: " + failed));
+    }
+
+    /** The first password the store keeps under one of {@code addresses}, a fresh array the caller clears; or null. */
+    private static char[] password(PasswordStore store, List<String> addresses) {
+        for (String address : addresses) {
+            Optional<char[]> one = store.read(address);
+            if (one.isPresent()) return one.get();
+        }
+        return null;
+    }
+
+    /**
+     * The merge's dialog: what moves, and the password question when {@code found} differ. Empty when the user
+     * cancelled, else whether the absorbed account's password is the one kept.
+     */
+    private Optional<Boolean> askMerge(AccountRecord into, AccountRecord from, Passwords found) {
+        Label moves = Look.line(from.name() + " becomes an alias of " + into.name()
+                + (from.aliases().isEmpty() ? "" : ", with its own aliases")
+                + (from.note().isEmpty() ? "" : "; its note is added to " + into.name() + "'s")
+                + ". The instances that list it keep it under this address, which " + into.name()
+                + " answers to, so nothing is signed in again.");
+        moves.setMaxWidth(440);
+        VBox content = new VBox(8, moves);
+        ToggleGroup which = new ToggleGroup();
+        RadioButton keepInto = new RadioButton("Keep the password of " + into.name());
+        RadioButton keepFrom = new RadioButton("Keep the password of " + from.name());
+        if (found.differ()) {
+            keepInto.setToggleGroup(which);
+            keepFrom.setToggleGroup(which);
+            keepInto.setSelected(true);
+            content.getChildren().addAll(Look.muted("The two remembered passwords differ."), keepInto, keepFrom);
+        } else if (found.kept() && found.absorbed()) {
+            content.getChildren().add(Look.muted("Both remembered passwords are the same."));
+        }
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Accounts");
+        dialog.setHeaderText("Merge " + from.name() + " into " + into.name() + "?");
+        dialog.getDialogPane().setContent(content);
+        ButtonType merge = new ButtonType("Merge", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(merge, ButtonType.CANCEL);
+        services.theme().apply(dialog);
+        return dialog.showAndWait().filter(merge::equals).map(pressed -> found.differ() && keepFrom.isSelected());
     }
 
     private void addAccount() {
@@ -771,6 +938,13 @@ public final class AccountsWindow {
                 String.CASE_INSENSITIVE_ORDER), row -> {
             AccountRecord account = row.account();
             Label name = new Label(account.name());
+            String tag = AccountsListModel.aliasTag(account);
+            if (!tag.isEmpty()) {
+                Label aliases = Styles.on(new Label(tag), "em-alias-tag");
+                aliases.setTooltip(new Tooltip(AccountsListModel.aliasWords(account)));
+                name.setGraphic(aliases);
+                name.setContentDisplay(ContentDisplay.RIGHT);
+            }
             Node words = account.kind() == AccountRecord.Kind.GOOGLE ? name
                     : new VBox(0, name, Look.muted(account.kind().displayName()));
             HBox out = new HBox(8, Look.avatar(account.name(), account.key().name()), words);

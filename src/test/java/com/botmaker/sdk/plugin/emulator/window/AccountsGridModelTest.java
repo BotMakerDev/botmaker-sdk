@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -210,5 +211,45 @@ class AccountsGridModelTest {
         assertEquals(List.of(FARM), AccountsGridModel.undo(listed,
                 Map.of(new AccountsGridModel.Ticked(LD_KEY, FARM.key()), CONFIG.instance(LD_KEY)))
                 .instance(LD_KEY).accounts(), "an account the instance listed is listed again");
+    }
+
+    @Test
+    void anAccountIsItsCellThroughAnyOfItsAddressesAndATickWritesTheOneNamed() {
+        AccountRecord main = MAIN.withAlias("m.two@example.com");
+        AccountRecord.Key alias = new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "m.two@example.com");
+        EmulatorConfig config = CONFIG.withInstance(MUMU_KEY,
+                Layer.EMPTY.withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "M.Two@example.com")));
+        EmulatorsModel.InstanceRow mumu = row(config, MUMU, Set.of("m.two@example.com"));
+        assertEquals(AccountsGridModel.Cell.SIGNED_IN, AccountsGridModel.cell(config, mumu, main));
+        assertEquals(alias, AccountsGridModel.named(config, MUMU_KEY, main, Optional.of(Set.of())));
+
+        EmulatorConfig off = AccountsGridModel.tick(config, MUMU_KEY, main, false, Optional.of(Set.of("m.two@example.com")));
+        assertEquals(Set.of(alias), off.instance(MUMU_KEY).removedAccounts(), "signed out by the address it holds");
+
+        // signed in by its alias though no layer lists it: a tick lists the alias, so Apply signs nothing in again
+        EmulatorConfig unlisted = CONFIG;
+        assertEquals(AccountsGridModel.Cell.UNLISTED,
+                AccountsGridModel.cell(unlisted, row(unlisted, MUMU, Set.of("m.two@example.com")), main));
+        EmulatorConfig on = AccountsGridModel.tick(unlisted, MUMU_KEY, main, true, Optional.of(Set.of("m.two@example.com")));
+        assertEquals(List.of(alias), on.instance(MUMU_KEY).accounts().stream().map(AccountRecord::key).toList());
+
+        EmulatorsModel.InstanceRow toSign = row(config, MUMU, Set.of());
+        assertEquals(1, AccountsGridModel.applyCount(AccountsGridModel.toApply(List.of(toSign), List.of(main))),
+                "the alias's sign-in is the shown account's");
+    }
+
+    @Test
+    void anAccountHeldThroughTwoOfItsAddressesIsSaidShared() {
+        AccountRecord main = MAIN.withAlias("m.two@example.com");
+        EmulatorConfig config = CONFIG.withInstance(MUMU_KEY,
+                Layer.EMPTY.withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "m.two@example.com")));
+        List<HostBook.Shared> shared = HostBook.shared(config, List.of(LD_KEY, MUMU_KEY), List.of(main, FARM));
+        assertTrue(AccountsGridModel.shared(shared, main, MUMU_KEY).isPresent());
+        assertTrue(AccountsGridModel.shared(shared, main, null).isPresent());
+        assertTrue(AccountsGridModel.shared(shared, FARM, LD_KEY).isEmpty());
+        assertEquals("Shared: 2 instances hold it through 2 of its addresses, and Google sees one account signed in"
+                + " on each", AccountsGridModel.sharedWords(shared.getFirst()));
+        assertTrue(HostBook.shared(CONFIG, List.of(LD_KEY, MUMU_KEY), List.of(main)).isEmpty(),
+                "one address: nothing hidden");
     }
 }

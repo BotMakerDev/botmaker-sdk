@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -93,6 +94,9 @@ final class AccountsListModel {
     }
 
     /**
+     * A row per account, each through any of its addresses: the instances that want it by an alias count, a
+     * password remembered under an alias is remembered, and an alias a configuration lists keeps it in the book.
+     *
      * @param onInstances which instances want each account ({@link HostBook#onInstances})
      * @param held        the accounts some configuration lists ({@link HostBook#held})
      * @param remembered  the keys ({@link PasswordStore#key}) of the passwords this PC keeps
@@ -102,12 +106,60 @@ final class AccountsListModel {
         return book.stream()
                 .sorted(Comparator.comparing(AccountRecord::name, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(account -> account.kind().ordinal()))
-                .map(account -> new Row(account, onInstances.getOrDefault(account.key(), List.of()),
-                        !account.kind().signedInByBotMaker() ? Password.NONE
-                                : remembered.contains(PasswordStore.key(account.name())) ? Password.REMEMBERED
-                                : Password.ASKED,
-                        !held.contains(account.key())))
+                .map(account -> {
+                    List<AccountRecord.Key> keys = keys(account);
+                    List<InstanceKey> on = keys.stream().flatMap(key -> onInstances.getOrDefault(key, List.of())
+                            .stream()).distinct().toList();
+                    return new Row(account, on, !account.kind().signedInByBotMaker() ? Password.NONE
+                            : remembered(account, remembered) ? Password.REMEMBERED : Password.ASKED,
+                            keys.stream().noneMatch(held::contains));
+                })
                 .toList();
+    }
+
+    /** The account's key under each of its addresses, its own first. */
+    private static List<AccountRecord.Key> keys(AccountRecord account) {
+        return account.addresses().stream().map(address -> new AccountRecord.Key(account.kind(), address)).toList();
+    }
+
+    /** Whether the store keeps a password under any of the account's addresses. */
+    static boolean remembered(AccountRecord account, Set<String> remembered) {
+        return PasswordStore.rememberedAny(account.addresses(), remembered);
+    }
+
+    /** The list's small tag beside a name: "+2" for two aliases, empty for none. */
+    static String aliasTag(AccountRecord account) {
+        return account.aliases().isEmpty() ? "" : "+" + account.aliases().size();
+    }
+
+    /**
+     * <i>Merge into A…</i>: the other entry of the book, of the account's kind, that has its address as an alias;
+     * empty when none has.
+     */
+    static Optional<AccountRecord> mergeInto(AccountRecord account, List<AccountRecord> book) {
+        return book.stream().filter(other -> other.kind() == account.kind() && !other.key().equals(account.key()))
+                .filter(other -> other.aliases().contains(account.key().name())).findFirst();
+    }
+
+    /**
+     * Whether a merge asks which password to keep: both accounts have one remembered and they differ. Compared here,
+     * in BotMaker's process; the dialog says only that they differ.
+     */
+    static boolean asksWhichPassword(char[] kept, char[] absorbed) {
+        return kept != null && absorbed != null && !Arrays.equals(kept, absorbed);
+    }
+
+    /** Why {@code typed} cannot be one more alias of {@code account}, or empty when it can. */
+    static Optional<String> aliasRefused(AccountRecord account, String typed) {
+        String address = typed == null ? "" : typed.strip();
+        if (!EMAIL.matcher(address).matches()) return Optional.of("An alias is an email address.");
+        if (account.answersTo(address)) return Optional.of(account.name() + " answers to it already.");
+        return Optional.empty();
+    }
+
+    /** The "+2" tag's tooltip: every alias, one a line. */
+    static String aliasWords(AccountRecord account) {
+        return "Also signs in as:\n" + String.join("\n", account.aliases());
     }
 
     /**
@@ -135,10 +187,10 @@ final class AccountsListModel {
         return Arrays.stream(AccountRecord.Kind.values()).filter(one -> one != AccountRecord.Kind.UNKNOWN).toList();
     }
 
-    /** The keys the store is asked about: the accounts BotMaker signs in. */
+    /** The keys the store is asked about: every address of the accounts BotMaker signs in. */
     static Set<String> keys(List<AccountRecord> book) {
         return book.stream().filter(account -> account.kind().signedInByBotMaker())
-                .map(account -> PasswordStore.key(account.name())).collect(Collectors.toSet());
+                .flatMap(account -> account.addresses().stream()).map(PasswordStore::key).collect(Collectors.toSet());
     }
 
     /** What an import did: the accounts it added, and the ones whose empty note it filled. */
@@ -231,13 +283,14 @@ final class AccountsListModel {
     }
 
     /**
-     * The rows whose name or note holds {@code text}, case aside, of {@code kind} (null for any).
+     * The rows whose name, an alias or the note holds {@code text}, case aside, of {@code kind} (null for any).
      */
     static List<Row> filtered(List<Row> rows, String text, AccountRecord.Kind kind) {
         String words = text == null ? "" : text.strip().toLowerCase(Locale.ROOT);
         return rows.stream()
                 .filter(row -> kind == null || row.account().kind() == kind)
-                .filter(row -> words.isEmpty() || row.account().name().toLowerCase(Locale.ROOT).contains(words)
+                .filter(row -> words.isEmpty()
+                        || row.account().addresses().stream().anyMatch(a -> a.toLowerCase(Locale.ROOT).contains(words))
                         || row.account().note().toLowerCase(Locale.ROOT).contains(words))
                 .toList();
     }

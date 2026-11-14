@@ -280,6 +280,44 @@
     -fx-border-radius: 12;
 }
 
+/* an account held through two of its addresses: one Google account signed in twice */
+.em-glyph.em-shared {
+    -fx-border-color: -bm-severity-warning;
+    -fx-border-width: 2;
+}
+
+.em-warning-text {
+    -fx-text-fill: -bm-severity-warning;
+}
+
+/* the dashed chip that adds one more */
+.em-chip.em-chip-add {
+    -fx-padding: 2 8 2 8;
+    -fx-background-color: transparent;
+    -fx-border-style: segments(3, 2);
+    -fx-text-fill: -em-quiet;
+    -fx-cursor: hand;
+}
+
+.button.em-chip-remove {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-padding: 0 0 0 4;
+    -fx-text-fill: -em-quiet;
+    -fx-cursor: hand;
+}
+
+.button.em-chip-remove:hover {
+    -fx-text-fill: -bm-severity-error;
+}
+
+/* "+2" beside a name: the account's aliases */
+.em-alias-tag {
+    -fx-font-size: 0.85em;
+    -fx-text-fill: -em-quiet;
+}
+
 .em-cap {
     -fx-font-size: 0.78em;
     -fx-font-weight: bold;

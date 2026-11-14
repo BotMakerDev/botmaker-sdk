@@ -78,15 +78,16 @@ public final class HostBook {
 
     /**
      * The book, in the order accounts were added, with what {@code config} lists that it lacks added to it, and an
-     * empty note filled from a configuration's (one written before the book held notes). Writes only when it added or
-     * filled something.
+     * empty note filled from a configuration's (one written before the book held notes). An address an entry has as
+     * an alias is that entry's, never one of its own. Writes only when it added or filled something.
      */
     public List<AccountRecord> known(EmulatorConfig config) throws IOException {
         List<AccountRecord> layered = layered(config);
         Consumer<Map<AccountRecord.Key, AccountRecord>> fill = book -> layered.forEach(account -> {
             AccountRecord was = book.get(account.key());
-            if (was == null) book.put(account.key(), account);
-            else if (was.note().isEmpty() && !account.note().isEmpty()) book.put(account.key(), was.withNote(account.note()));
+            if (was == null) {
+                if (aliasHolder(book, account.key(), account.key().name()).isEmpty()) book.put(account.key(), account);
+            } else if (was.note().isEmpty() && !account.note().isEmpty()) book.put(account.key(), was.withNote(account.note()));
         });
         Map<AccountRecord.Key, AccountRecord> book = new LinkedHashMap<>();
         if (services != null) {
@@ -166,6 +167,39 @@ public final class HostBook {
         return after;
     }
 
+    /**
+     * <i>Record as an alias of A</i>, after a sign-in by {@code of} that Android lists as {@code address}: the address
+     * becomes one of {@code of}'s aliases, as one step. When the book lists it as its own entry (an instance's
+     * configuration named it after the sign-in), that entry is folded into {@code of}, as {@link #merge} does; the
+     * instances keep naming the address Android lists, which {@code of} answers to. {@code of} may be one of an
+     * entry's aliases: the sign-in named the address an instance lists.
+     */
+    public List<AccountRecord> recordAlias(AccountRecord.Key of, String address) throws IOException {
+        if (address == null || address.isBlank()) throw new IOException("An alias is an address.");
+        String wanted = address.strip().toLowerCase(Locale.ROOT);
+        AccountRecord.Key own = new AccountRecord.Key(of.kind(), wanted);
+        AtomicReference<String> refused = new AtomicReference<>();
+        List<AccountRecord> after = change("Record " + wanted + " as an alias of " + of.name(), book -> {
+            Optional<AccountRecord> found = Optional.ofNullable(book.get(of)).or(() -> book.values().stream()
+                    .filter(one -> one.kind() == of.kind() && one.answersTo(of.name())).findFirst());
+            if (found.isEmpty()) {
+                refused.set(of.name() + " is not in this PC's account book.");
+                return;
+            }
+            AccountRecord account = found.get();
+            if (account.answersTo(wanted)) return;
+            Optional<AccountRecord> holder = aliasHolder(book, account.key(), wanted);
+            if (holder.isPresent()) {
+                refused.set(address.strip() + " is an alias of " + holder.get().name() + " already.");
+                return;
+            }
+            AccountRecord entry = book.remove(own);
+            book.put(account.key(), entry == null ? account.withAlias(wanted) : merged(account, entry));
+        });
+        if (refused.get() != null) throw new IOException(refused.get());
+        return after;
+    }
+
     /** Another entry of {@code key}'s kind that has {@code address} among its aliases. */
     private static Optional<AccountRecord> aliasHolder(Map<AccountRecord.Key, AccountRecord> book,
                                                        AccountRecord.Key key, String address) {
@@ -181,9 +215,10 @@ public final class HostBook {
 
     /**
      * Makes {@code absorbed} one account with {@code kept}, as one step: its main address and aliases become
-     * {@code kept}'s aliases, its note is added to {@code kept}'s, its verification is taken when {@code kept}
-     * follows the default, and the instances that listed it list {@code kept} instead. Passwords are not the book's:
-     * the caller keeps the one the user picked in the OS store.
+     * {@code kept}'s aliases, its note is added to {@code kept}'s, and its verification is taken when {@code kept}
+     * follows the default. The instances that listed it keep its address, the one Android lists them under, which
+     * {@code kept} now answers to: renaming them would have Apply sign the account in a second time. Passwords are
+     * not the book's: the caller keeps the one the user picked in the OS store.
      */
     public List<AccountRecord> merge(AccountRecord.Key kept, AccountRecord.Key absorbed) throws IOException {
         if (kept.equals(absorbed)) throw new IOException("An account is not merged into itself.");
@@ -197,11 +232,6 @@ public final class HostBook {
             AccountRecord absorbedNow = book.remove(absorbed);
             if (keptNow != null && absorbedNow != null) book.put(kept, merged(keptNow, absorbedNow));
             else if (absorbedNow != null) book.put(absorbed, absorbedNow);
-        }, () -> {
-            HostAccounts before = HostConfig.read(services, SdkHostValues.ACCOUNTS, HostAccounts.class,
-                    HostAccounts.none());
-            return HostConfig.write(services, SdkHostValues.ACCOUNTS, HostAccounts.class, before,
-                    moved(before, from, into));
         });
     }
 
@@ -215,26 +245,6 @@ public final class HostBook {
         Verification verify = into.verify() == Verification.DEFAULT && from.verify().isMethod() ? from.verify()
                 : into.verify();
         return new AccountRecord(into.kind(), into.name(), note, aliases, verify);
-    }
-
-    /**
-     * The instances' rows with {@code from} named {@code into}; a row that would then be listed twice is kept once,
-     * first in the game's chooser when either was.
-     */
-    private static HostAccounts moved(HostAccounts rows, AccountRecord from, AccountRecord into) {
-        Map<String, HostAccounts.Account> out = new LinkedHashMap<>();
-        for (HostAccounts.Account row : rows.list()) {
-            boolean named = AccountRecord.Kind.fromId(row.kind()) == from.kind()
-                    && from.key().equals(new AccountRecord.Key(from.kind(), row.name()));
-            HostAccounts.Account next = named
-                    ? new HostAccounts.Account(row.of(), row.kind(), into.name(), row.note(), row.removed(), row.first())
-                    : row;
-            String identity = next.of() + "\n" + next.kind() + "\n" + next.name().toLowerCase(Locale.ROOT)
-                    + "\n" + next.removed();
-            out.merge(identity, next, (was, again) -> again.first() && !was.first()
-                    ? new HostAccounts.Account(was.of(), was.kind(), was.name(), was.note(), was.removed(), true) : was);
-        }
-        return new HostAccounts(List.copyOf(out.values()));
     }
 
     /** The verification the book's accounts follow unless one picks its own; Phone prompt until the user sets one. */
@@ -395,18 +405,13 @@ public final class HostBook {
 
     // ---- the value ----
 
-    private List<AccountRecord> change(String label, Consumer<Map<AccountRecord.Key, AccountRecord>> edit)
-            throws IOException {
-        return change(label, edit, Optional::empty);
-    }
-
     /**
      * Starts the book when it is not there yet, then reads it, lets {@code edit} change it and writes it back as one
-     * step {@code label}, with {@code also}'s writes in the same step; nothing is written when the edit changed
-     * nothing. An entry of a kind this build does not know is kept after the others.
+     * step {@code label}; nothing is written when the edit changed nothing. An entry of a kind this build does not
+     * know is kept after the others.
      */
-    private List<AccountRecord> change(String label, Consumer<Map<AccountRecord.Key, AccountRecord>> edit,
-                                       Supplier<Optional<String>> also) throws IOException {
+    private List<AccountRecord> change(String label, Consumer<Map<AccountRecord.Key, AccountRecord>> edit)
+            throws IOException {
         if (services == null) throw new IOException("BotMaker keeps no values of this PC here.");
         start();
         AtomicReference<List<AccountRecord>> after = new AtomicReference<>();
@@ -422,9 +427,6 @@ public final class HostBook {
             Map<AccountRecord.Key, AccountRecord> book = understood(before.list());
             edit.accept(book);
             after.set(List.copyOf(book.values()));
-            // the other writes first: refused, the book is left as it was and names nothing they lack
-            Optional<String> others = also.get();
-            if (others.isPresent()) return others;
             return HostConfig.write(services, SdkHostValues.BOOK, HostKnown.class, before, written(book, before));
         });
         if (unread.get() != null) throw unread.get();

@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.accounts.AccountsWindow;
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AndroidState;
@@ -75,6 +76,8 @@ final class AccountsTab {
     private final Map<AccountsGridModel.Ticked, Layer> before = new LinkedHashMap<>();
 
     private Book book = Book.NONE;
+    /** The book's accounts held through two of their addresses, over every instance; renewed by each draw. */
+    private List<HostBook.Shared> shared = List.of();
     private AccountRecord.Key account;
     /** The account the inspector shows, picked by a click on its name or one of its cells. */
     private AccountRecord.Key picked;
@@ -213,7 +216,7 @@ final class AccountsTab {
             if (!store.available()) return new Book(known, Set.of(), Set.of(), false);
             Set<String> keys = new HashSet<>();
             known.stream().filter(one -> one.kind().signedInByBotMaker())
-                    .forEach(one -> keys.add(PasswordStore.key(one.name())));
+                    .forEach(one -> one.addresses().forEach(address -> keys.add(PasswordStore.key(address))));
             Set<String> ask = new HashSet<>(keys);
             ask.removeAll(last.asked());
             Set<String> remembered = new HashSet<>(last.remembered());
@@ -262,6 +265,8 @@ final class AccountsTab {
         undo.setDisable(before.isEmpty());
         spread.setDisable(columns.isEmpty() || rows.isEmpty());
         if (picked != null && rows.stream().noneMatch(one -> one.key().equals(picked))) picked = null;
+        shared = HostBook.shared(config, window.snapshot().instances().stream().map(EmulatorsModel.InstanceRow::key)
+                .toList(), book.accounts());
         inspect(config, columns, rows, AccountsGridModel.pending(items));
 
         Node focused = root == null || root.getScene() == null ? null : root.getScene().getFocusOwner();
@@ -346,6 +351,11 @@ final class AccountsTab {
             words += "\n" + column.key().platform().displayName() + "'s configuration lists it;"
                     + " unticking removes it on this instance only.";
         }
+        Optional<HostBook.Shared> twice = AccountsGridModel.shared(shared, one, column.key());
+        if (twice.isPresent()) {
+            box.getStyleClass().add("em-shared");
+            words += "\n" + AccountsGridModel.sharedWords(twice.get()) + ".";
+        }
         box.setTooltip(new Tooltip(words));
         box.setAccessibleText(words);
         AccountsGridModel.Ticked at = new AccountsGridModel.Ticked(column.key(), one.key());
@@ -383,6 +393,9 @@ final class AccountsTab {
             out.add(heading(shown.name(), Look.avatar(shown.name(), shown.key().name())));
             out.add(muted(password(shown)));
             out.add(shown.note().isEmpty() ? muted("No note") : line(shown.note()));
+            if (!shown.aliases().isEmpty()) out.add(muted("Also " + String.join(", ", shown.aliases())));
+            AccountsGridModel.shared(shared, shown, null).ifPresent(twice -> out.add(
+                    Styles.on(line(AccountsGridModel.sharedWords(twice) + "."), "em-warning-text")));
             out.add(Look.cap("Ticked on"));
             List<AccountsGridModel.On> on = AccountsGridModel.tickedOn(config, columns, shown);
             if (on.isEmpty()) {
@@ -408,7 +421,7 @@ final class AccountsTab {
     private String password(AccountRecord account) {
         if (!account.kind().signedInByBotMaker()) return "No password: a record only";
         if (!book.storeAvailable()) return "No credential store on this PC: its password is asked at each Apply";
-        return book.remembered().contains(PasswordStore.key(account.name())) ? "Password remembered on this PC"
+        return PasswordStore.rememberedAny(account.addresses(), book.remembered()) ? "Password remembered on this PC"
                 : "Password asked at the first Apply";
     }
 
@@ -417,11 +430,13 @@ final class AccountsTab {
         InstanceKey key = column.key();
         Optional<Set<String>> held = column.android().flatMap(AndroidState::googleAccounts);
         AtomicReference<Layer> was = new AtomicReference<>();
+        AtomicReference<AccountRecord.Key> named = new AtomicReference<>();
         window.change(config -> {
             was.set(config.instance(key));
+            named.set(AccountsGridModel.named(config, key, one, held));
             return AccountsGridModel.tick(config, key, one, on, held);
         }, () -> {
-            before.putIfAbsent(new AccountsGridModel.Ticked(key, one.key()), was.get());
+            before.putIfAbsent(new AccountsGridModel.Ticked(key, named.get()), was.get());
             undo.setDisable(false);
         });
     }
@@ -480,8 +495,10 @@ final class AccountsTab {
         Map<AccountsGridModel.Ticked, Layer> was = new LinkedHashMap<>();
         window.change(config -> {
             for (AccountsGridModel.Change one : ticks) {
-                was.putIfAbsent(new AccountsGridModel.Ticked(one.column().key(), one.account().key()),
-                        config.instance(one.column().key()));
+                InstanceKey key = one.column().key();
+                AccountRecord.Key named = AccountsGridModel.named(config, key, one.account(),
+                        one.column().android().flatMap(AndroidState::googleAccounts));
+                was.putIfAbsent(new AccountsGridModel.Ticked(key, named), config.instance(key));
             }
             return AccountsGridModel.tick(config, ticks);
         }, () -> {

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -132,5 +133,46 @@ class AccountsListModelTest {
         assertEquals("Default (Phone prompt)", AccountsListModel.said(Verification.DEFAULT, Verification.PHONE));
         assertEquals("Default (Backup code)", AccountsListModel.said(Verification.DEFAULT, Verification.BACKUP_CODE));
         assertEquals("Ask me", AccountsListModel.said(Verification.ASK, Verification.PHONE));
+    }
+
+    @Test
+    void anAccountIsCountedFoundAndKeptThroughAnyOfItsAliases() {
+        AccountRecord farm = FARM.withAliases(List.of("f.one@example.com", "f.two@example.com"));
+        AccountsListModel.Row row = AccountsListModel.rows(List.of(farm),
+                Map.of(farm.key(), List.of(MUMU), new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "F.One@example.com"),
+                        List.of(MEMU, MUMU)),
+                Set.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "f.two@example.com")),
+                Set.of("f.one@example.com")).getFirst();
+        assertEquals(List.of(MUMU, MEMU), row.on(), "MuMu-0 counted once, by either address");
+        assertEquals(AccountsListModel.Password.REMEMBERED, row.password(), "remembered under an alias");
+        assertFalse(row.removable(), "a configuration lists one of its aliases");
+        assertEquals("+2", AccountsListModel.aliasTag(farm));
+        assertEquals("", AccountsListModel.aliasTag(FARM));
+        assertEquals(List.of(row), AccountsListModel.filtered(List.of(row), "F.TWO", null), "Find reads the aliases");
+        assertEquals(Set.of("farm@example.com", "f.one@example.com", "f.two@example.com"),
+                AccountsListModel.keys(List.of(farm)));
+    }
+
+    @Test
+    void anEntryAnotherHasAsAnAliasIsOfferedTheMergeAndOnlyDifferentPasswordsAreAsked() {
+        AccountRecord main = MAIN.withAlias("farm@example.com");
+        assertEquals(Optional.of(main), AccountsListModel.mergeInto(FARM, List.of(main, FARM, FB)));
+        assertTrue(AccountsListModel.mergeInto(main, List.of(main, FARM)).isEmpty());
+        assertTrue(AccountsListModel.mergeInto(FARM, List.of(MAIN, FARM)).isEmpty());
+
+        assertTrue(AccountsListModel.asksWhichPassword("one".toCharArray(), "two".toCharArray()));
+        assertFalse(AccountsListModel.asksWhichPassword("same".toCharArray(), "same".toCharArray()));
+        assertFalse(AccountsListModel.asksWhichPassword("one".toCharArray(), null), "only one remembered");
+        assertFalse(AccountsListModel.asksWhichPassword(null, null));
+    }
+
+    @Test
+    void anAliasIsANewEmailAddressOfTheAccount() {
+        AccountRecord main = MAIN.withAlias("m.two@example.com");
+        assertTrue(AccountsListModel.aliasRefused(main, " new@example.com ").isEmpty());
+        assertEquals(Optional.of("An alias is an email address."), AccountsListModel.aliasRefused(main, "not one"));
+        assertEquals(Optional.of("Main@example.com answers to it already."),
+                AccountsListModel.aliasRefused(main, "M.TWO@example.com"));
+        assertEquals("Also signs in as:\nm.two@example.com", AccountsListModel.aliasWords(main));
     }
 }

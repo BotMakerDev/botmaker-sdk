@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
+import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AndroidState;
@@ -15,10 +16,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * What the Emulators window's Accounts tab draws, with no JavaFX (board Grid, spec
@@ -113,22 +115,57 @@ final class AccountsGridModel {
                 .toList();
     }
 
-    /** The cell of {@code account} on {@code row}'s instance, from the configuration and Android's last answer. */
+    /**
+     * The cell of {@code account} on {@code row}'s instance, from the configuration and Android's last answer; a
+     * layer or Android naming any of the account's addresses names the account.
+     */
     static Cell cell(EmulatorConfig config, EmulatorsModel.InstanceRow row, AccountRecord account) {
-        AccountRecord.Key key = account.key();
         Wanted wanted = config.wanted(row.key());
         Optional<Set<String>> held = row.android().flatMap(AndroidState::googleAccounts);
-        boolean holds = held.isPresent() && held.get().contains(key.name());
-        if (wanted.accounts().stream().map(Sourced::value).anyMatch(a -> a.key().equals(key))) {
+        boolean holds = held.isPresent() && holds(held.get(), account);
+        if (wanted.accounts().stream().map(Sourced::value).anyMatch(a -> answers(account, a.key()))) {
             return held.isEmpty() ? Cell.NOT_READ : holds ? Cell.SIGNED_IN : Cell.TO_SIGN_IN;
         }
-        if (wanted.removedAccounts().contains(key)) return holds ? Cell.TO_SIGN_OUT : Cell.REMOVED_HERE;
+        if (wanted.removedAccounts().stream().anyMatch(k -> answers(account, k))) {
+            return holds ? Cell.TO_SIGN_OUT : Cell.REMOVED_HERE;
+        }
         return holds ? Cell.UNLISTED : Cell.NONE;
     }
 
-    /** Whether the instance's emulator lists the account, so the instance has it unless it removes it. */
+    /** Whether {@code key} is one of {@code account}'s addresses, of its kind. */
+    private static boolean answers(AccountRecord account, AccountRecord.Key key) {
+        return key.kind() == account.kind() && account.answersTo(key.name());
+    }
+
+    /** Whether Android's list, lower case, holds any of the account's addresses. */
+    private static boolean holds(Set<String> held, AccountRecord account) {
+        return account.addresses().stream().map(a -> a.toLowerCase(Locale.ROOT)).anyMatch(held::contains);
+    }
+
+    /**
+     * Whether the instance's emulator lists the account by any of its addresses, so the instance has it unless it
+     * removes it.
+     */
     static boolean inherited(EmulatorConfig config, InstanceKey key, AccountRecord account) {
-        return config.emulator(key.platform()).accounts().stream().anyMatch(a -> a.key().equals(account.key()));
+        return config.emulator(key.platform()).accounts().stream().anyMatch(a -> answers(account, a.key()));
+    }
+
+    /**
+     * The address a tick of {@code account} on the instance writes: the one its layers name it by (the instance's own,
+     * then its emulator's), else the one Android holds it under, else its main one. Writing another would have Apply
+     * sign it in a second time.
+     */
+    static AccountRecord.Key named(EmulatorConfig config, InstanceKey key, AccountRecord account,
+                                   Optional<Set<String>> held) {
+        Layer own = config.instance(key);
+        Layer emulator = config.emulator(key.platform());
+        return Stream.of(own.accounts().stream().map(AccountRecord::key), own.removedAccounts().stream(),
+                        emulator.accounts().stream().map(AccountRecord::key))
+                .flatMap(keys -> keys).filter(k -> answers(account, k)).findFirst()
+                .or(() -> held.flatMap(names -> account.addresses().stream()
+                                .filter(a -> names.contains(a.toLowerCase(Locale.ROOT))).findFirst())
+                        .map(address -> new AccountRecord.Key(account.kind(), address)))
+                .orElse(account.key());
     }
 
     /**
@@ -146,12 +183,15 @@ final class AccountsGridModel {
                                Optional<Set<String>> held) {
         Layer own = config.instance(key);
         boolean fromEmulator = inherited(config, key, account);
+        AccountRecord.Key named = named(config, key, account, held);
         Layer next;
         if (on) {
-            next = fromEmulator ? own.inheritingAccount(account.key()) : own.withAccount(account);
+            next = fromEmulator ? own.inheritingAccount(named)
+                    : own.withAccount(named.equals(account.key()) ? account
+                    : new AccountRecord(account.kind(), named.name()));
         } else {
-            boolean mayHold = held.isEmpty() || held.get().contains(account.key().name());
-            next = fromEmulator || mayHold ? own.removingAccount(account.key()) : own.inheritingAccount(account.key());
+            boolean mayHold = held.isEmpty() || holds(held.get(), account);
+            next = fromEmulator || mayHold ? own.removingAccount(named) : own.inheritingAccount(named);
         }
         return config.withInstance(key, next);
     }
@@ -227,12 +267,11 @@ final class AccountsGridModel {
      * which the Instances tab's Apply runs.
      */
     static List<ApplyPlan.Item> toApply(List<EmulatorsModel.InstanceRow> columns, List<AccountRecord> shown) {
-        Set<AccountRecord.Key> keys = shown.stream().map(AccountRecord::key).collect(Collectors.toSet());
         List<ApplyPlan.Item> items = new ArrayList<>();
         for (EmulatorsModel.InstanceRow row : columns) {
             if (row.diff() == null) continue;
             List<ConfigDiff.AccountChange> accounts = row.diff().accounts().stream()
-                    .filter(change -> keys.contains(change.account().key())).toList();
+                    .filter(change -> shown.stream().anyMatch(one -> answers(one, change.account().key()))).toList();
             if (!accounts.isEmpty()) items.add(new ApplyPlan.Item(row, List.of(), accounts, List.of()));
         }
         return items;
@@ -311,7 +350,23 @@ final class AccountsGridModel {
         return out;
     }
 
-    /** One cell ticked: an account on an instance. */
+    /**
+     * Whether {@code account} is shared on {@code instance}: it holds the account through one address while another
+     * instance holds it through another ({@link HostBook#shared}).
+     */
+    static Optional<HostBook.Shared> shared(List<HostBook.Shared> shared, AccountRecord account, InstanceKey instance) {
+        return shared.stream().filter(one -> one.account().key().equals(account.key()))
+                .filter(one -> instance == null || one.through().containsKey(instance)).findFirst();
+    }
+
+    /** The warning a shared account's cell and inspector give: how many instances, through which addresses. */
+    static String sharedWords(HostBook.Shared shared) {
+        long addresses = shared.through().values().stream().map(a -> a.toLowerCase(Locale.ROOT)).distinct().count();
+        return "Shared: " + EmulatorsModel.count(shared.through().size(), "instance") + " hold it through "
+                + addresses + " of its addresses, and Google sees one account signed in on each";
+    }
+
+    /** One cell ticked: an account, by the address the tick wrote ({@link #named}), on an instance. */
     record Ticked(InstanceKey instance, AccountRecord.Key account) {}
 
     /**

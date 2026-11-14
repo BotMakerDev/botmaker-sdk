@@ -411,28 +411,56 @@ class HostBookTest {
     }
 
     @Test
-    void aMergeMovesTheAddressesTheNoteAndTheInstancesInOneStep() throws IOException {
+    void aMergeMovesTheAddressesTheNoteAndTheVerificationInOneStepAndLeavesTheInstances() throws IOException {
         AccountRecord one = new AccountRecord(AccountRecord.Kind.GOOGLE, "p.one@example.com", "the alt", List.of(),
                 Verification.CODE);
         HostBook book = book(Optional.empty());
         book.addAll(List.of(FARM.withAlias("f@example.com"), one));
-        host.values.put(SdkHostValues.ACCOUNTS.id(), HostAccounts.of(
+        HostAccounts rows = HostAccounts.of(
                 new HostAccounts.Account(MUMU.text(), "google", "P.One@example.com", "", false, true),
-                new HostAccounts.Account(LD1.text(), "google", "farm@example.com", "", false, false),
-                new HostAccounts.Account(LD1.text(), "google", "p.one@example.com", "", false, true)));
+                new HostAccounts.Account(LD1.text(), "google", "farm@example.com", "", false, false));
+        host.values.put(SdkHostValues.ACCOUNTS.id(), rows);
         int steps = host.steps.size();
 
         List<AccountRecord> after = book.merge(FARM.key(), one.key());
 
-        assertEquals(List.of(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "farm · the alt",
-                List.of("f@example.com", "p.one@example.com"), Verification.CODE)), after);
-        assertEquals(List.of(new HostAccounts.Account(MUMU.text(), "google", "farm@example.com", "", false, true),
-                new HostAccounts.Account(LD1.text(), "google", "farm@example.com", "", false, true)),
-                ((HostAccounts) host.values.get(SdkHostValues.ACCOUNTS.id())).list(),
-                "MuMu-0 holds farm now; LD-1, holding both, holds it once, first in the chooser as p.one was");
+        AccountRecord merged = new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "farm · the alt",
+                List.of("f@example.com", "p.one@example.com"), Verification.CODE);
+        assertEquals(List.of(merged), after);
+        assertEquals(rows, host.values.get(SdkHostValues.ACCOUNTS.id()),
+                "MuMu-0 keeps the address Android lists it under, which farm answers to now");
+        assertEquals(List.of(merged), book.known(EmulatorConfig.EMPTY.withInstance(MUMU, Layer.EMPTY.withAccount(
+                new AccountRecord(AccountRecord.Kind.GOOGLE, "P.One@example.com")))),
+                "an instance naming an alias adds no entry of its own");
         assertEquals(steps + 1, host.steps.size(), "one step of undo");
         assertThrows(IOException.class, () -> book.merge(FARM.key(), FARM.key()));
         assertThrows(IOException.class, () -> book.merge(FARM.key(), FB.key()));
+    }
+
+    @Test
+    void recordingTheAddressAndroidListsFoldsItsOwnEntryIntoTheAccountTyped() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        // the sign-in renamed MuMu-0's account to the address Android lists, and the next read noted it
+        AccountRecord listed = new AccountRecord(AccountRecord.Kind.GOOGLE, "Listed@example.com", "farm");
+        EmulatorConfig config = EmulatorConfig.EMPTY.withInstance(MUMU, Layer.EMPTY.withAccount(listed));
+        assertEquals(List.of("farm@example.com", "Listed@example.com"), names(book.known(config)));
+        int steps = host.steps.size();
+
+        List<AccountRecord> after = book.recordAlias(FARM.key(), "Listed@example.com");
+
+        assertEquals(List.of(FARM.withAlias("listed@example.com")), after, "one entry, its note kept once");
+        assertEquals(steps + 1, host.steps.size());
+        assertEquals(after, book.known(config));
+        assertEquals(after, book.recordAlias(FARM.key(), "listed@example.com"), "recorded twice is recorded once");
+        book.add(ALT);
+        assertThrows(IOException.class, () -> book.recordAlias(ALT.key(), "listed@example.com"),
+                "farm has it as an alias already");
+        AccountRecord.Key byAlias = new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "Listed@example.com");
+        assertEquals(FARM.withAlias("listed@example.com").withAlias("third@example.com"),
+                book.recordAlias(byAlias, "Third@example.com").stream()
+                        .filter(one -> one.key().equals(FARM.key())).findFirst().orElseThrow(),
+                "a sign-in by an alias records on the entry that answers to it");
     }
 
     @Test

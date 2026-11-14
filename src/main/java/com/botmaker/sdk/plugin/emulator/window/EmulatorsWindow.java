@@ -53,6 +53,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -96,6 +97,8 @@ public final class EmulatorsWindow {
     private static final Map<String, Signing> SIGNING = new ConcurrentHashMap<>();
     /** The codes the sign-ins wait for, by operation id: one at a time per operation. */
     private static final Map<String, CodeAsk> CODES = new ConcurrentHashMap<>();
+    /** The alias findings recorded, by operation id and address: their button is gone. Cleared with the strip. */
+    private static final Set<String> RECORDED = ConcurrentHashMap.newKeySet();
     /** How often a code's wait looks whether its operation was cancelled. */
     private static final long CODE_WAIT_MS = 500;
 
@@ -849,6 +852,7 @@ public final class EmulatorsWindow {
             Button clear = new Button("Clear finished");
             clear.setOnAction(e -> {
                 OPERATIONS.clearEnded();
+                RECORDED.clear();
                 drawStrip();
             });
             strip.getChildren().add(clear);
@@ -880,6 +884,18 @@ public final class EmulatorsWindow {
             look.setOnAction(e -> openScreen(one));
             row.getChildren().add(look);
         }
+        if (one.state().ended()) {
+            for (Operation.Finding finding : one.findings()) {
+                if (!(finding instanceof Operation.Finding.Alias alias)) continue;
+                if (RECORDED.contains(one.id() + " " + alias.address())) continue;
+                Button record = new Button("Record as an alias of " + alias.of() + "…");
+                record.setMinWidth(Region.USE_PREF_SIZE);
+                record.setTooltip(new Tooltip("Android lists the account signed in as " + alias.address()
+                        + ": the same Google account"));
+                record.setOnAction(e -> recordAlias(one.id(), alias));
+                row.getChildren().add(record);
+            }
+        }
         if (one.state() == Operation.State.RUNNING) row.getChildren().add(Look.progress(one.progress()));
         if (!one.state().ended()) {
             Button cancel = new Button("Cancel");
@@ -892,6 +908,31 @@ public final class EmulatorsWindow {
             row.getChildren().add(cancel);
         }
         return row;
+    }
+
+    /**
+     * <i>Record as an alias of A…</i>: the address Android listed after a sign-in by A becomes one of A's aliases in
+     * the book, as one step of this PC's undo; its own entry, when the book has one, is folded into A.
+     */
+    private void recordAlias(String operation, Operation.Finding.Alias alias) {
+        Alert ask = alert(Alert.AlertType.CONFIRMATION, alias.of() + " signed in, and Android lists it as "
+                + alias.address() + ". Record that address as an alias of " + alias.of() + "? BotMaker then knows"
+                + " them as one account.");
+        ask.setHeaderText("Record an alias");
+        if (ask.showAndWait().filter(ButtonType.OK::equals).isEmpty()) return;
+        Async.load("record-alias", () -> {
+            try {
+                return HostConfig.accounts(services).recordAlias(
+                        new AccountRecord.Key(AccountRecord.Kind.GOOGLE, alias.of()), alias.address());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, after -> {
+            RECORDED.add(operation + " " + alias.address());
+            say(alias.address() + " is an alias of " + alias.of() + ".");
+            drawStrip();
+            refresh();
+        }, failed -> say("The alias was not recorded: " + failed));
     }
 
     /** A plain question owned by the window, themed as it is. */
