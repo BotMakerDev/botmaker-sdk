@@ -136,6 +136,41 @@ class AccountsGridModelTest {
     }
 
     @Test
+    void aRowOrAColumnTicksOnlyTheCellsNotAlreadySo() {
+        List<EmulatorsModel.InstanceRow> columns = List.of(row(CONFIG, LD, Set.of()), row(CONFIG, MUMU, Set.of()));
+        List<AccountsGridModel.Change> main = AccountsGridModel.row(CONFIG, columns, MAIN, true);
+        assertEquals(List.of(MUMU_KEY), main.stream().map(c -> c.column().key()).toList(), "LDPlayer lists it");
+        EmulatorConfig everywhere = AccountsGridModel.tick(CONFIG, main);
+        assertEquals(List.of(MAIN), everywhere.instance(MUMU_KEY).accounts());
+
+        List<AccountsGridModel.Change> off = AccountsGridModel.column(CONFIG, columns.getFirst(),
+                List.of(ALT, FARM, MAIN), false);
+        assertEquals(List.of(FARM, MAIN), off.stream().map(AccountsGridModel.Change::account).toList());
+        EmulatorConfig none = AccountsGridModel.tick(CONFIG, off);
+        assertEquals(0, AccountsGridModel.count(none, LD_KEY));
+    }
+
+    @Test
+    void oneAccountPerInstanceKeepsWhatAColumnHasAndGivesTheOthersTheNextFreeOne() {
+        EmulatorInstance third = new EmulatorInstance(PlatformId.MUMU, "MuMu-1", "127.0.0.1", 16416);
+        EmulatorInstance fourth = new EmulatorInstance(PlatformId.MUMU, "MuMu-2", "127.0.0.1", 16448);
+        // Farm holds Main (its emulator's) and Farm: it keeps Farm, the first in row order, and Main goes free.
+        List<EmulatorsModel.InstanceRow> columns = List.of(row(CONFIG, LD, Set.of()), row(CONFIG, MUMU, Set.of()),
+                row(CONFIG, third, Set.of()), row(CONFIG, fourth, Set.of()));
+        List<AccountRecord> rows = List.of(ALT, FARM, MAIN);
+        EmulatorConfig spread = AccountsGridModel.tick(CONFIG, AccountsGridModel.spread(CONFIG, columns, rows));
+
+        assertEquals(1, AccountsGridModel.count(spread, LD_KEY));
+        assertEquals(List.of(FARM), spread.instance(LD_KEY).accounts());
+        assertEquals(Set.of(MAIN.key()), spread.instance(LD_KEY).removedAccounts(), "its emulator's, removed here");
+        assertEquals(List.of(ALT), spread.instance(MUMU_KEY).accounts());
+        assertEquals(List.of(MAIN), spread.instance(InstanceKey.of(third)).accounts());
+        assertTrue(spread.instance(InstanceKey.of(fourth)).isEmpty(), "no account left: left as it was");
+        assertTrue(AccountsGridModel.spread(spread, List.of(row(spread, LD, Set.of()), row(spread, MUMU, Set.of()),
+                row(spread, third, Set.of())), rows).isEmpty(), "spread already: nothing to change");
+    }
+
+    @Test
     void undoPutsBackOnlyTheTickedCellsAccount() {
         EmulatorConfig ticked = AccountsGridModel.tick(CONFIG, LD_KEY, MAIN, false, Optional.of(Set.of()));
         EmulatorConfig meanwhile = ticked.withInstance(LD_KEY, ticked.instance(LD_KEY).withAccount(FB)

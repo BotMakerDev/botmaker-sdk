@@ -110,6 +110,12 @@ public final class HostBook {
         });
     }
 
+    /** <i>Paste list…</i>: adds the accounts the book lacks as one change, one step of undo; a listed one is left. */
+    public List<AccountRecord> addAll(List<AccountRecord> accounts) throws IOException {
+        return change("Add " + accounts.size() + (accounts.size() == 1 ? " account" : " accounts"),
+                book -> accounts.forEach(account -> book.putIfAbsent(account.key(), account)));
+    }
+
     /** Sets the account as given, its note too, empty or not: the user's own edit of it. */
     public List<AccountRecord> put(AccountRecord account) throws IOException {
         return change("Change an account's note", book -> book.put(account.key(), account));

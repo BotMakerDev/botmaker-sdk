@@ -73,4 +73,31 @@ class AccountsListModelTest {
                 .map(AccountsListModel.Row::account).toList());
         assertEquals(3, AccountsListModel.filtered(rows(), "", null).size());
     }
+
+    @Test
+    void aPastedListAddsEachNewEmailOnceAndSaysWhatItLeft() {
+        AccountsListModel.Pasted pasted = AccountsListModel.pasted(
+                "new@example.com, MAIN@example.com\n  other@example.com;new@example.com\nnot-an-email\n"
+                        + "main@example.com\n\n",
+                AccountRecord.Kind.GOOGLE, List.of(MAIN, FARM, FB));
+
+        assertEquals(List.of("new@example.com", "other@example.com"),
+                pasted.added().stream().map(AccountRecord::name).toList());
+        assertEquals(1, pasted.known(), "Main, pasted twice, is one account listed already");
+        assertEquals(List.of("not-an-email"), pasted.skipped());
+        assertEquals("2 accounts added, 1 listed already, 1 not an email address.", pasted.said("added"));
+        assertEquals("No account to add.", AccountsListModel.pasted("", AccountRecord.Kind.GOOGLE, List.of())
+                .said("to add"));
+    }
+
+    @Test
+    void aPastedListOfRecordsTakesAnyWordAndOnlyItsKindsBook() {
+        AccountsListModel.Pasted pasted = AccountsListModel.pasted("A Player\n  another player \nfarm@example.com",
+                AccountRecord.Kind.FACEBOOK, List.of(MAIN, FARM, FB));
+        // a name keeps its spaces; FB's "a player" is listed already, and Google's farm is another kind
+        assertEquals(List.of("another player", "farm@example.com"),
+                pasted.added().stream().map(AccountRecord::name).toList());
+        assertEquals(1, pasted.known());
+        assertTrue(pasted.skipped().isEmpty());
+    }
 }

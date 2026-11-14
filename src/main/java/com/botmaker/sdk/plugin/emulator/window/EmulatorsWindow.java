@@ -39,6 +39,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -200,6 +201,12 @@ public final class EmulatorsWindow {
         root.setBottom(operations);
 
         stage = Modals.window(services, Modals.Frame.modeless("Emulators", 1080, 680, 780, 420), root);
+        refresh.setTooltip(new Tooltip("Read this PC's emulators again (F5)"));
+        WindowKeys.install(stage.getScene(), Map.of(
+                WindowKeys.Action.REFRESH, this::refresh,
+                WindowKeys.Action.UNDO, undo::undo,
+                WindowKeys.Action.REDO, undo::redo,
+                WindowKeys.Action.FIND, this::find));
         tabs.getSelectionModel().selectedItemProperty().addListener((o, was, now) -> {
             running.visible(now == runningTab && stage.isShowing());
             accounts.visible(now == accountsTab);
@@ -231,6 +238,23 @@ public final class EmulatorsWindow {
             waiting.clear();
             if (current == this) current = null;
         });
+    }
+
+    /**
+     * Ctrl+F: the filter of the tab shown; a tab with none goes to the Instances tab's. An open configuration's view
+     * stays open, with what is typed in it.
+     */
+    private void find() {
+        if (open != null) return;
+        Tab shown = tabs.getSelectionModel().getSelectedItem();
+        if (shown == configurationsTab) {
+            configurations.focusFilter();
+        } else if (shown == accountsTab) {
+            accounts.focusFilter();
+        } else {
+            tabs.getSelectionModel().select(instancesTab);
+            instances.focusFilter();
+        }
     }
 
     // ---- the open bot's run ----

@@ -12,6 +12,8 @@ import com.botmaker.shared.emulator.config.Wanted;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -152,6 +154,66 @@ final class AccountsGridModel {
             next = fromEmulator || mayHold ? own.removingAccount(account.key()) : own.inheritingAccount(account.key());
         }
         return config.withInstance(key, next);
+    }
+
+    /** One cell to tick or untick, as a row's, a column's or <i>One account per instance</i>'s shortcut asks. */
+    record Change(EmulatorsModel.InstanceRow column, AccountRecord account, boolean on) {}
+
+    /** {@code account} ticked or unticked on every column shown; cells already so are left out. */
+    static List<Change> row(EmulatorConfig config, List<EmulatorsModel.InstanceRow> columns, AccountRecord account,
+                            boolean on) {
+        return columns.stream().filter(column -> cell(config, column, account).ticked() != on)
+                .map(column -> new Change(column, account, on)).toList();
+    }
+
+    /** Every account shown ticked or unticked on {@code column}; cells already so are left out. */
+    static List<Change> column(EmulatorConfig config, EmulatorsModel.InstanceRow column, List<AccountRecord> rows,
+                               boolean on) {
+        return rows.stream().filter(account -> cell(config, column, account).ticked() != on)
+                .map(account -> new Change(column, account, on)).toList();
+    }
+
+    /**
+     * <i>One account per instance</i>: each column shown gets one account shown, no two the same, the rest of the shown
+     * accounts unticked on it. A column that already has an account no column before it took keeps it, so as few
+     * sign-ins as can be are asked; the others get the next free account in row order. Columns past the last free
+     * account are left as they are.
+     */
+    static List<Change> spread(EmulatorConfig config, List<EmulatorsModel.InstanceRow> columns,
+                               List<AccountRecord> rows) {
+        Map<InstanceKey, AccountRecord> paired = new LinkedHashMap<>();
+        Set<AccountRecord.Key> taken = new HashSet<>();
+        for (EmulatorsModel.InstanceRow column : columns) {
+            rows.stream().filter(account -> cell(config, column, account).ticked())
+                    .filter(account -> !taken.contains(account.key())).findFirst().ifPresent(kept -> {
+                        paired.put(column.key(), kept);
+                        taken.add(kept.key());
+                    });
+        }
+        List<AccountRecord> free = new ArrayList<>(rows.stream().filter(a -> !taken.contains(a.key())).toList());
+        for (EmulatorsModel.InstanceRow column : columns) {
+            if (!paired.containsKey(column.key()) && !free.isEmpty()) paired.put(column.key(), free.removeFirst());
+        }
+        List<Change> out = new ArrayList<>();
+        for (EmulatorsModel.InstanceRow column : columns) {
+            AccountRecord mine = paired.get(column.key());
+            if (mine == null) continue;
+            for (AccountRecord account : rows) {
+                boolean on = account.key().equals(mine.key());
+                if (cell(config, column, account).ticked() != on) out.add(new Change(column, account, on));
+            }
+        }
+        return out;
+    }
+
+    /** The configuration with each change ticked in turn ({@link #tick}). */
+    static EmulatorConfig tick(EmulatorConfig config, List<Change> changes) {
+        EmulatorConfig out = config;
+        for (Change change : changes) {
+            out = tick(out, change.column().key(), change.account(), change.on(),
+                    change.column().android().flatMap(AndroidState::googleAccounts));
+        }
+        return out;
     }
 
     /** How many Google accounts the instance should hold: the count row. */

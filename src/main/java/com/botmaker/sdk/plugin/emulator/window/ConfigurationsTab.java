@@ -1,7 +1,10 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.plugin.api.StyleClasses;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.host.ConfigFile;
+import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -9,6 +12,7 @@ import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -25,6 +29,7 @@ import javafx.scene.control.TablePosition;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -32,12 +37,16 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * The Configurations tab: every layer on one grid, rows the fields and columns each emulator's configuration and
@@ -88,7 +97,16 @@ final class ConfigurationsTab {
         compare.setOnAction(e -> compare());
         Button copy = new Button("Copy column to…");
         copy.setOnAction(e -> copy(pickedColumn()));
-        FlowPane bar = new FlowPane(8, 6, text, section, emulator, tag, overridden, compare, copy);
+        Button export = new Button("Export…");
+        export.setTooltip(new Tooltip("Save this PC's configuration as a file for another PC: settings, games, tags"
+                + " and listed accounts, with no password"));
+        export.setOnAction(e -> exportConfig());
+        Button importButton = new Button("Import…");
+        importButton.setTooltip(new Tooltip("Read a file Export… wrote: each emulator and instance it holds takes its"
+                + " configuration; the others stay"));
+        importButton.setOnAction(e -> importConfig());
+        FlowPane bar = new FlowPane(8, 6, text, section, emulator, tag, overridden, compare, copy, export,
+                importButton);
         bar.setAlignment(Pos.CENTER_LEFT);
         for (Node node : bar.getChildren()) {
             if (node instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
@@ -116,6 +134,66 @@ final class ConfigurationsTab {
 
     Node node() {
         return root;
+    }
+
+    /** Ctrl+F: the text filter has the focus, its text selected to be typed over. */
+    void focusFilter() {
+        text.requestFocus();
+        text.selectAll();
+    }
+
+    /** Writes the configuration as it is when the export runs, not as this window last read it. */
+    private void exportConfig() {
+        Optional<Path> target = window.services().dialogs()
+                .saveFile("Export the emulators' configuration", null, "emulators" + ConfigFile.EXTENSION,
+                        ConfigFile.EXTENSION).path();
+        if (target.isEmpty()) return;
+        String file = String.valueOf(target.get().getFileName());
+        Async.load("emulators-export", () -> {
+            try {
+                ConfigFile.write(HostConfig.load(window.services()).config(), target.get());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e.getMessage(), e);
+            }
+            return file;
+        }, written -> window.say("The configuration is exported to " + written + ", with no password."),
+                failed -> window.say("The configuration was not exported: " + failed));
+    }
+
+    /** Reads the file, asks before its layers replace this PC's, then writes them as one change. */
+    private void importConfig() {
+        Optional<Path> source = window.services().dialogs()
+                .chooseFile("Import an emulators' configuration", null, ConfigFile.EXTENSION).path();
+        if (source.isEmpty()) return;
+        String file = String.valueOf(source.get().getFileName());
+        Async.load("emulators-import-read", () -> {
+            try {
+                return ConfigFile.read(source.get());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e.getMessage(), e);
+            }
+        }, all -> {
+            ConfigFile.Read read = all.on(window.snapshot().instances().stream()
+                    .map(EmulatorsModel.InstanceRow::key).collect(Collectors.toSet()));
+            int elsewhere = all.instances().size() - read.instances().size();
+            String missing = elsewhere == 0 ? "" : " " + elsewhere + (elsewhere == 1 ? " instance" : " instances")
+                    + " of the file " + (elsewhere == 1 ? "is" : "are") + " not on this PC and left out.";
+            if (read.isEmpty()) {
+                window.say(file + " holds no configuration for this PC." + missing);
+                return;
+            }
+            ButtonType replace = new ButtonType("Import", ButtonBar.ButtonData.OK_DONE);
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "The file holds " + read.holds() + " of this PC,"
+                    + " matched by name: each takes the file's configuration in place of its own, accounts too, and"
+                    + " the others stay." + missing + " ↶ Undo takes it back. Nothing is applied to an instance until"
+                    + " you Apply.", replace, ButtonType.CANCEL);
+            alert.initOwner(window.stage());
+            alert.setTitle("Emulators");
+            alert.setHeaderText("Import " + file + "?");
+            window.services().theme().apply(alert);
+            if (alert.showAndWait().filter(replace::equals).isEmpty()) return;
+            window.change(read::over, () -> window.say(read.said(file)));
+        }, failed -> window.say(file + " was not read: " + failed));
     }
 
     void show(EmulatorsModel.Snapshot snapshot) {

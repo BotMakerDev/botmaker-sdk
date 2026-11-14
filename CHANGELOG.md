@@ -24,6 +24,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Parameters ▸ captureSource; *✂ Cut picture* cuts a picture out of what the bot reads.
 - **Emulators ▸ Accounts has no + Account** (2026-11-14): accounts are added in the Accounts window, which
   *Manage accounts…* opens.
+- **Shortcuts in the Emulators and Accounts windows** (2026-11-14):
+  - *One account per instance* on the Accounts tab gives each instance shown its own account. An instance that
+    has one keeps it.
+  - Right-click an account's name to tick or untick it on every instance shown.
+  - Right-click an instance's header to tick or untick every account on it, or to *Apply* only that instance.
+  - *Undo ticks* takes these back with the hand ticks, as it does for those.
+  - Configurations ▸ *Export…* / *Import…* moves this PC's configuration to another PC as a file: settings,
+    games, tags and listed accounts, never a password. An import replaces the layers of the emulators and of the
+    instances of this PC the file names, matched by name; the others stay, and ↶ Undo takes it back.
+  - The Accounts window's *Paste list…* adds many accounts from a list of emails, as one change.
+  - Keys: F5 reads again, Ctrl+Z / Ctrl+Y undo and redo this PC's last change (a text field keeps its own),
+    and Ctrl+F goes to the filter.
 
 ## [1.10.1] — 2026-11-13
 

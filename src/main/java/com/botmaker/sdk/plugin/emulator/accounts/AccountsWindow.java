@@ -11,6 +11,7 @@ import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
+import com.botmaker.sdk.plugin.emulator.window.WindowKeys;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -33,7 +34,9 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -49,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -111,19 +115,25 @@ public final class AccountsWindow {
 
         Button add = new Button("+ Account");
         add.setOnAction(e -> addAccount());
+        Button paste = new Button("Paste list…");
+        paste.setTooltip(new Tooltip("Add many accounts at once from a list of emails, one per line or separated by"
+                + " commas"));
+        paste.setOnAction(e -> pasteList());
         Button importButton = new Button("Import…");
         importButton.setOnAction(e -> importBook());
         Button export = new Button("Export…");
         export.setOnAction(e -> exportBook());
         Button refresh = new Button("Refresh");
-        refresh.setOnAction(e -> {
+        refresh.setTooltip(new Tooltip("Read the accounts and the instances again (F5)"));
+        Runnable reread = () -> {
             instances = null;
             load();
-        });
+        };
+        refresh.setOnAction(e -> reread.run());
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         HostUndo undo = new HostUndo(services, this::load);
-        HBox bar = new HBox(8, text, kind, gap, add, importButton, export, undo.node(), refresh);
+        HBox bar = new HBox(8, text, kind, gap, add, paste, importButton, export, undo.node(), refresh);
         bar.setAlignment(Pos.CENTER_LEFT);
 
         table.getColumns().setAll(List.of(
@@ -147,6 +157,14 @@ public final class AccountsWindow {
         body.setPadding(new Insets(10));
 
         stage = Modals.window(services, Modals.Frame.modeless("Accounts", 860, 520, 620, 340), new BorderPane(body));
+        WindowKeys.install(stage.getScene(), Map.of(
+                WindowKeys.Action.REFRESH, reread,
+                WindowKeys.Action.UNDO, undo::undo,
+                WindowKeys.Action.REDO, undo::redo,
+                WindowKeys.Action.FIND, () -> {
+                    text.requestFocus();
+                    text.selectAll();
+                }));
         stage.setOnShown(e -> {
             undo.start();
             load();
@@ -280,6 +298,49 @@ public final class AccountsWindow {
                     say(account.name() + " is added.");
                     load();
                 }, failed -> say("The account was not added: " + failed)));
+    }
+
+    /** Adds every new account of a pasted list, of the kind picked, as one change; no password is asked here. */
+    private void pasteList() {
+        ComboBox<AccountRecord.Kind> kindPick = new ComboBox<>();
+        kindPick.getItems().setAll(kinds());
+        kindPick.setValue(AccountRecord.Kind.GOOGLE);
+        kindPick.setButtonCell(plainKindCell());
+        kindPick.setCellFactory(list -> plainKindCell());
+        TextArea list = new TextArea();
+        list.setPromptText("user1@example.com\nuser2@example.com");
+        list.setPrefRowCount(10);
+        list.setPrefColumnCount(36);
+        Label preview = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
+        preview.setWrapText(true);
+        Label hint = Styles.on(new Label("One per line, or separated by commas. Passwords are asked at the first Apply"
+                + " that signs one in, or remembered with Remember… here."), StyleClasses.DIALOG_HINT);
+        hint.setWrapText(true);
+        hint.setMaxWidth(420);
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("Accounts");
+        dialog.setHeaderText("Add accounts from a list");
+        dialog.getDialogPane().setContent(new VBox(8, hint, new HBox(8, new Label("Kind"), kindPick), list, preview));
+        ButtonType add = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(add, ButtonType.CANCEL);
+        Runnable check = () -> {
+            AccountsListModel.Pasted pasted = AccountsListModel.pasted(list.getText(), kindPick.getValue(), book);
+            preview.setText(list.getText().isBlank() ? "" : pasted.said("to add"));
+            dialog.getDialogPane().lookupButton(add).setDisable(pasted.added().isEmpty());
+        };
+        list.textProperty().addListener((o, was, now) -> check.run());
+        kindPick.valueProperty().addListener((o, was, now) -> check.run());
+        check.run();
+        services.theme().apply(dialog);
+        Platform.runLater(list::requestFocus);
+        if (dialog.showAndWait().filter(add::equals).isEmpty()) return;
+        AccountsListModel.Pasted pasted = AccountsListModel.pasted(list.getText(), kindPick.getValue(), book);
+        Async.load("accounts-paste", () -> io(() -> HostConfig.accounts(services).addAll(pasted.added())), after -> {
+            say(pasted.said("added"));
+            load();
+        }, failed -> say("The accounts were not added: " + failed));
     }
 
     private void importBook() {

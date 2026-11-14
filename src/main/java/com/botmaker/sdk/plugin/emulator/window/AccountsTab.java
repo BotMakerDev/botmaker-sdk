@@ -16,9 +16,12 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -33,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * The Accounts tab (board Grid): a row per Google account of the book, a column per instance, a tick per cell that
@@ -49,6 +53,7 @@ final class AccountsTab {
     private final Label accountFilter = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
     private final Button showAll = new Button("Show every account");
     private final Label changes = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
+    private final Button spread = new Button("One account per instance");
     private final Button undo = new Button("Undo ticks");
     private final Button apply = new Button("Apply…");
     private final GridPane grid = new GridPane();
@@ -82,10 +87,15 @@ final class AccountsTab {
 
         Button manage = new Button("Manage accounts…");
         manage.setOnAction(e -> AccountsWindow.open(window.services()));
+        spread.setTooltip(new Tooltip("Give each instance shown one account shown, no two the same. An instance "
+                + "that has one keeps it; the rest of the shown accounts are unticked on it."));
+        spread.setOnAction(e -> tickAll(AccountsGridModel.spread(window.snapshot().config(), columns(), rows()),
+                "every instance shown already has one account of its own"));
         undo.setOnAction(e -> undoTicks());
         apply.setOnAction(e -> window.applyItems(AccountsGridModel.toApply(columns(), rows())));
 
-        FlowPane bar = new FlowPane(8, 6, emulator, tag, accountFilter, showAll, manage, changes, undo, apply);
+        FlowPane bar = new FlowPane(8, 6, emulator, tag, accountFilter, showAll, manage, spread, changes, undo,
+                apply);
         bar.setAlignment(Pos.CENTER_LEFT);
         for (Node node : bar.getChildren()) {
             if (node instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
@@ -189,6 +199,7 @@ final class AccountsTab {
                 + " to apply");
         apply.setDisable(count == 0);
         undo.setDisable(before.isEmpty());
+        spread.setDisable(columns.isEmpty() || rows.isEmpty());
 
         grid.getChildren().clear();
         if (columns.isEmpty() || rows.isEmpty()) {
@@ -205,12 +216,16 @@ final class AccountsTab {
             Label product = Styles.on(new Label(column.key().platform().displayName()
                     + (column.running() ? " · running" : " · stopped")),
                     StyleClasses.MUTED_TEXT, StyleClasses.SMALL_TEXT);
-            grid.add(new VBox(1, name, product), c + 1, 0);
+            VBox header = new VBox(1, name, product);
+            menu(header, () -> columnMenu(window.snapshot().config(), column, rows));
+            grid.add(header, c + 1, 0);
         }
         for (int r = 0; r < rows.size(); r++) {
             AccountRecord one = rows.get(r);
             Label name = new Label(one.name());
-            if (!one.note().isEmpty()) name.setTooltip(new Tooltip(one.note()));
+            name.setTooltip(new Tooltip((one.note().isEmpty() ? "" : one.note() + "\n")
+                    + "Right-click: tick or untick it on every instance shown"));
+            menu(name, () -> rowMenu(window.snapshot().config(), columns, one));
             grid.add(name, 0, r + 1);
             for (int c = 0; c < columns.size(); c++) {
                 grid.add(cell(config, columns.get(c), one), c + 1, r + 1);
@@ -251,6 +266,70 @@ final class AccountsTab {
             return AccountsGridModel.tick(config, key, one, on, held);
         }, () -> {
             before.putIfAbsent(new AccountsGridModel.Ticked(key, one.key()), was.get());
+            undo.setDisable(false);
+        });
+    }
+
+    private ContextMenu rowMenu(EmulatorConfig config, List<EmulatorsModel.InstanceRow> columns, AccountRecord one) {
+        MenuItem on = new MenuItem("Tick on every instance shown");
+        on.setOnAction(e -> tickAll(AccountsGridModel.row(config, columns, one, true),
+                one.name() + " is ticked on every instance shown already"));
+        MenuItem off = new MenuItem("Untick on every instance shown");
+        off.setOnAction(e -> tickAll(AccountsGridModel.row(config, columns, one, false),
+                one.name() + " is ticked on no instance shown"));
+        return new ContextMenu(on, off);
+    }
+
+    private ContextMenu columnMenu(EmulatorConfig config, EmulatorsModel.InstanceRow column,
+                                   List<AccountRecord> rows) {
+        String name = column.instance().name();
+        MenuItem on = new MenuItem("Tick every account shown");
+        on.setOnAction(e -> tickAll(AccountsGridModel.column(config, column, rows, true),
+                "every account shown is ticked on " + name + " already"));
+        MenuItem off = new MenuItem("Untick every account shown");
+        off.setOnAction(e -> tickAll(AccountsGridModel.column(config, column, rows, false),
+                "no account shown is ticked on " + name));
+        List<ApplyPlan.Item> items = AccountsGridModel.toApply(List.of(column), rows);
+        MenuItem applyOne = new MenuItem("Apply " + name + "…");
+        applyOne.setDisable(items.isEmpty());
+        applyOne.setOnAction(e -> window.applyItems(items));
+        return new ContextMenu(on, off, new SeparatorMenuItem(), applyOne);
+    }
+
+    /**
+     * Right-click on {@code node} shows the menu {@code menu} builds then, from the configuration as it is: a label or a
+     * box, which has no context menu of its own, and no menu built for a draw nobody right-clicks.
+     */
+    private static void menu(Node node, Supplier<ContextMenu> menu) {
+        node.setOnContextMenuRequested(e -> {
+            menu.get().show(node, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
+    }
+
+    /** Ctrl+F: the emulator filter has the focus, the tab's first filter. */
+    void focusFilter() {
+        emulator.requestFocus();
+    }
+
+    /**
+     * Writes several ticks as one change of this PC's configuration, each cell's layer before its first tick kept for
+     * <i>Undo ticks</i> once the write landed; {@code nothing} is said when there is nothing to tick.
+     */
+    private void tickAll(List<AccountsGridModel.Change> ticks, String nothing) {
+        if (ticks.isEmpty()) {
+            window.say("Nothing to change: " + nothing + ".");
+            return;
+        }
+        Map<AccountsGridModel.Ticked, Layer> was = new LinkedHashMap<>();
+        window.change(config -> {
+            for (AccountsGridModel.Change one : ticks) {
+                was.putIfAbsent(new AccountsGridModel.Ticked(one.column().key(), one.account().key()),
+                        config.instance(one.column().key()));
+            }
+            return AccountsGridModel.tick(config, ticks);
+        }, () -> {
+            was.forEach(before::putIfAbsent);
             undo.setDisable(false);
         });
     }

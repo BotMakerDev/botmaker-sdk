@@ -63,6 +63,16 @@ public final class HostUndo {
         return node;
     }
 
+    /** ↶, as its key asks: nothing while there is nothing to undo. */
+    public void undo() {
+        if (!undo.isDisabled()) step(true);
+    }
+
+    /** ↷, as its key asks: nothing while there is nothing to redo. */
+    public void redo() {
+        if (!redo.isDisabled()) step(false);
+    }
+
     /** Follows the history while the window shows; {@link #stop} when it hides. */
     public void start() {
         stop();

@@ -5,11 +5,14 @@ import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -111,6 +114,50 @@ final class AccountsListModel {
         }
         return new Imported(added, notes);
     }
+
+    /**
+     * <i>Paste list…</i>: what a pasted list holds, split on line breaks, tabs, commas and semicolons; a name keeps its
+     * spaces.
+     *
+     * @param added   the new accounts of {@code kind}, in the list's order, each once, none the book has already
+     * @param known   the words the book has already, of that kind, case aside
+     * @param skipped the words that are not an email address, when {@code kind} is Google
+     */
+    record Pasted(List<AccountRecord> added, int known, List<String> skipped) {
+
+        /** {@code done} is the verb's tense: "to add" before the dialog's Add, "added" after it. */
+        String said(String done) {
+            String words = added.isEmpty() ? "No account " + done
+                    : added.size() + (added.size() == 1 ? " account " : " accounts ") + done;
+            if (known > 0) words += ", " + known + " listed already";
+            if (!skipped.isEmpty()) words += ", " + skipped.size() + " not an email address";
+            return words + ".";
+        }
+    }
+
+    static Pasted pasted(String text, AccountRecord.Kind kind, List<AccountRecord> book) {
+        Set<String> have = book.stream().filter(account -> account.kind() == kind)
+                .map(account -> account.name().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toCollection(HashSet::new));
+        Set<String> booked = new HashSet<>(have);
+        Set<String> counted = new HashSet<>();
+        List<AccountRecord> added = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        for (String part : (text == null ? "" : text).split("[\\r\\n\\t,;]+")) {
+            String word = part.strip();
+            if (word.isEmpty()) continue;
+            if (kind == AccountRecord.Kind.GOOGLE && !EMAIL.matcher(word).matches()) {
+                skipped.add(word);
+            } else if (booked.contains(word.toLowerCase(Locale.ROOT))) {
+                counted.add(word.toLowerCase(Locale.ROOT));
+            } else if (have.add(word.toLowerCase(Locale.ROOT))) {
+                added.add(new AccountRecord(kind, word, ""));
+            }
+        }
+        return new Pasted(List.copyOf(added), counted.size(), List.copyOf(skipped));
+    }
+
+    private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
 
     /**
      * The rows whose name or note holds {@code text}, case aside, of {@code kind} (null for any).

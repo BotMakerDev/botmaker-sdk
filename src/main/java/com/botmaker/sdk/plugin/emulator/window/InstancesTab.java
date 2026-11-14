@@ -339,6 +339,12 @@ final class InstancesTab {
         return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
     }
 
+    /** Ctrl+F: the name filter has the focus, its text selected to be typed over. */
+    void focusFilter() {
+        text.requestFocus();
+        text.selectAll();
+    }
+
     /**
      * Shows {@code instance}: the name filter set to its name and its emulator, the other filters cleared, its row
      * selected. A window not yet read keeps it until its rows are ({@link #show}).

@@ -156,6 +156,21 @@ class HostBookTest {
     }
 
     @Test
+    void aPastedListIsOneStepAndKeepsTheNotesOfTheAccountsListedAlready() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "kept"));
+        int steps = host.steps.size();
+
+        List<AccountRecord> after = book.addAll(List.of(new AccountRecord(AccountRecord.Kind.GOOGLE, "FARM@example.com"),
+                new AccountRecord(AccountRecord.Kind.GOOGLE, "new@example.com"),
+                new AccountRecord(AccountRecord.Kind.GOOGLE, "other@example.com")));
+
+        assertEquals(List.of("farm@example.com", "new@example.com", "other@example.com"), names(after));
+        assertEquals("kept", after.getFirst().note());
+        assertEquals(steps + 1, host.steps.size(), "one step of undo for the whole list");
+    }
+
+    @Test
     void thePcsAccountIsInEvenWhenAnAddStartedTheBookAndAReadThatAddsNothingWritesNothing() throws IOException {
         HostBook book = book(PC);
         book.add(FB);
