@@ -114,6 +114,21 @@ class HostConfigTest {
         assertEquals(before.usedBy(), next.usedBy(), "a configuration change leaves the bots seen alone");
     }
 
+    /** An instance's BotMaker ID ({@link HostIds}) is no setting: kept by a change, moved by a rename, dropped by a forget. */
+    @Test
+    void anInstancesIdFollowsItsInstance() {
+        HostSettings.Setting id = new HostSettings.Setting(FARM.text(), HostIds.FIELD, "abc");
+        HostConfig.Rows before = new HostConfig.Rows(HostSettings.none(), HostGames.none(), HostSettings.of(id),
+                HostGames.none(), HostLabels.none(), HostLabels.none(), HostAccounts.none());
+        assertEquals(EmulatorConfig.EMPTY, HostConfig.config(before));
+        assertTrue(HostConfig.rows(full(), before).instanceSettings().list().contains(id));
+        InstanceKey renamed = new InstanceKey(PlatformId.LDPLAYER, "Farm");
+        assertEquals(List.of(new HostSettings.Setting(renamed.text(), HostIds.FIELD, "abc")),
+                HostConfig.renamed(before, FARM, renamed).instanceSettings().list());
+        assertEquals(List.of(), HostConfig.dropped(before, FARM).instanceSettings().list());
+        assertTrue(HostConfig.followsTheEmulator("Give an instance its BotMaker ID"));
+    }
+
     @Test
     void anEmulatorOnlyFieldOnAnInstanceIsNotRead() {
         HostConfig.Rows rows = new HostConfig.Rows(HostSettings.none(), HostGames.none(),

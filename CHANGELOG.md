@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Each instance's BotMaker ID is kept in `Instances.java`** (2026-11-14): an `instance.id` row of its settings
+  (`HostIds`), given the first time BotMaker connects to it, moved on a rename and dropped on a forget; ↶ stops at it.
+  A bot's emulator and the core's `device` tool connect through shared's check, so another instance answering on the
+  address is refused rather than driven.
 - **⌖ and ✂ are on the SDK's toolbar tab** (2026-11-13): Studio shows its overlay only in dev mode now, so the two
   overlay buttons moved to the bar, after 🎮 Pilot. *⌖ Point bot at…* opens the source picker, the same choice as
   Parameters ▸ captureSource; *✂ Cut picture* cuts a picture out of what the bot reads.

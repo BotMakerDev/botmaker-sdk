@@ -176,10 +176,10 @@ public final class Emulators {
         // under LDPlayer's name. Same answer as the picker's (EmulatorLiveness).
         if (!EmulatorLiveness.running(instance)) return Optional.empty();
         try {
-            AdbDevice device = AdbDevice.connect(instance.adb());
+            AdbDevice device = AdbDevice.connect(instance);
             return Optional.of(new Emulator(device, instance));
         } catch (Exception e) {
-            // instance configured but not running / ADB port closed — skip it
+            // instance configured but not running / ADB port closed / another instance answering — skip it
             return Optional.empty();
         }
     }

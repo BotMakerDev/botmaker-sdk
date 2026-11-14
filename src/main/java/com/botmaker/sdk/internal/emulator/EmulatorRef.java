@@ -71,7 +71,7 @@ public final class EmulatorRef {
      * @throws RuntimeException if the connection can't be established
      */
     public Emulator connect() {
-        return new Emulator(AdbDevice.connect(instance.adb()), instance);
+        return new Emulator(AdbDevice.connect(instance), instance);
     }
 
     @Override

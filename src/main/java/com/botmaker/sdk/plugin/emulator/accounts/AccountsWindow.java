@@ -8,6 +8,7 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
+import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
@@ -137,6 +138,7 @@ public final class AccountsWindow {
 
     public static void open(StudioServices services) {
         if (current != null && current.services != services) current.stage.close();
+        HostIds.bind(services);
         if (current == null) current = new AccountsWindow(services);
         current.stage.show();
         current.stage.toFront();

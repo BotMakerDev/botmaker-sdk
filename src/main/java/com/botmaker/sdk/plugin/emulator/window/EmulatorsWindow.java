@@ -7,6 +7,7 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
+import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
@@ -153,6 +154,7 @@ public final class EmulatorsWindow {
         if (current != null && current.services != services) {
             current.stage.close();
         }
+        HostIds.bind(services);
         if (current == null) current = new EmulatorsWindow(services);
         current.stage.show();
         current.stage.toFront();

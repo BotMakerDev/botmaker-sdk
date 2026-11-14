@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
 import com.botmaker.sdk.plugin.emulator.host.UsedBy;
 import com.botmaker.sdk.plugin.types.HostTypes;
@@ -105,6 +106,7 @@ public final class SdkPlugin extends DeclaredPlugin {
         SdkLog.bind(services);
         GameButton.bind(services);
         GameReady.bind(services);
+        HostIds.bind(services);
         if (!services.hasUi()) return;
         UsedBy.remember(services);
         MoveOffer.offer(services);

@@ -155,6 +155,26 @@ public final class HostConfig {
         });
     }
 
+    /** The instances' settings rows as written, with those this build does not understand ({@link HostIds}). */
+    static HostSettings instanceRows(StudioServices services) {
+        return read(services, SdkHostValues.INSTANCE_SETTINGS, HostSettings.class, HostSettings.none());
+    }
+
+    /**
+     * Sets {@code row} in the instances' settings, replacing the row of its instance and field: a step ↶ stops at, as
+     * it follows the emulator (an ID file written on the instance).
+     */
+    static Optional<String> instanceRow(StudioServices services, HostSettings.Setting row) {
+        return step(services, IDENTIFIED, () -> {
+            HostSettings before = instanceRows(services);
+            List<HostSettings.Setting> next = new ArrayList<>(before.list().stream()
+                    .filter(one -> !(one.of().equals(row.of()) && one.field().equals(row.field()))).toList());
+            next.add(row);
+            return write(services, SdkHostValues.INSTANCE_SETTINGS, HostSettings.class, before,
+                    new HostSettings(next));
+        });
+    }
+
     /** The instances renamed on this PC, each row old key → new key ({@link InstanceRenames}). */
     public static HostLabels renames(StudioServices services) {
         return read(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, HostLabels.none());
@@ -166,13 +186,15 @@ public final class HostConfig {
     private static final String RENAMED = "Rename an instance";
     private static final String FORGOTTEN = "Forget an instance";
     private static final String SEEN = "Note the instances ";
+    private static final String IDENTIFIED = "Give an instance its BotMaker ID";
 
     /**
      * Whether the step {@code label} names followed what happened to an emulator (an instance renamed or deleted, a bot
      * seen launching one): taking it back would put the values out of step with the emulator, so ↶ stops there.
      */
     public static boolean followsTheEmulator(String label) {
-        return label != null && (label.equals(RENAMED) || label.equals(FORGOTTEN) || label.startsWith(SEEN));
+        return label != null && (label.equals(RENAMED) || label.equals(FORGOTTEN) || label.equals(IDENTIFIED)
+                || label.startsWith(SEEN));
     }
 
     /**
