@@ -8,6 +8,7 @@ import com.botmaker.shared.emulator.config.ConfigDiff;
 import com.botmaker.shared.emulator.config.GameRecord;
 import com.botmaker.shared.emulator.config.Operation;
 import com.botmaker.shared.emulator.google.InstanceChanges;
+import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
 
@@ -139,9 +140,11 @@ final class ApplyPlan {
      *
      * @param log       where the settings written are logged for Undo
      * @param passwords the batch's, asked once per account and cleared by the window when the batch ends
+     * @param second    the second step of each sign-in: the account's method, and the code dialog
      * @param listedAs  told of an account Android lists under another of its addresses, for the configuration
      */
-    static Operation.Body body(Item item, Applies log, Passwords passwords, InstanceChanges.ListedAs listedAs) {
+    static Operation.Body body(Item item, Applies log, Passwords passwords, InstanceSignIn.SecondStep second,
+                               InstanceChanges.ListedAs listedAs) {
         EmulatorInstance instance = item.row().instance();
         return context -> {
             List<String> problems = new ArrayList<>();
@@ -154,7 +157,7 @@ final class ApplyPlan {
             if (context.cancelled()) return "Cancelled.";
             if (!item.accounts().isEmpty() || !item.games().isEmpty()) {
                 String rest = new InstanceChanges(InstanceChanges.Host.live())
-                        .run(instance, item.accounts(), item.games(), passwords, listedAs, context);
+                        .run(instance, item.accounts(), item.games(), passwords, second, listedAs, context);
                 if (rest != null) problems.add(rest);
             }
             return problems.isEmpty() ? null : String.join(" ", problems);

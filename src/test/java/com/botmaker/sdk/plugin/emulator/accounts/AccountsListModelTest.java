@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.accounts;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import org.junit.jupiter.api.Test;
 
@@ -120,5 +121,16 @@ class AccountsListModelTest {
                 pasted.added().stream().map(AccountRecord::name).toList());
         assertEquals(1, pasted.known());
         assertTrue(pasted.skipped().isEmpty());
+    }
+
+    @Test
+    void theVerificationChoicesPutTheDefaultFirstAndNameWhatItIs() {
+        assertEquals(List.of(Verification.DEFAULT, Verification.PHONE, Verification.CODE, Verification.BACKUP_CODE,
+                Verification.ASK), AccountsListModel.verificationChoices(Verification.CODE));
+        assertEquals(Verification.UNKNOWN, AccountsListModel.verificationChoices(Verification.UNKNOWN).getLast(),
+                "a newer BotMaker's shows as it is");
+        assertEquals("Default (Phone prompt)", AccountsListModel.said(Verification.DEFAULT, Verification.PHONE));
+        assertEquals("Default (Backup code)", AccountsListModel.said(Verification.DEFAULT, Verification.BACKUP_CODE));
+        assertEquals("Ask me", AccountsListModel.said(Verification.ASK, Verification.PHONE));
     }
 }

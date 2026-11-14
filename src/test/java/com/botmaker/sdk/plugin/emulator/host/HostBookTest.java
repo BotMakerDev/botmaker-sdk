@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -358,6 +359,28 @@ class HostBookTest {
 
         book.put(new AccountRecord(AccountRecord.Kind.GOOGLE, "alt@example.com", "noted"));
         assertEquals("security-key", ((HostKnown) host.values.get(SdkHostValues.BOOK.id())).list().getLast().verify());
+    }
+
+    @Test
+    void eachAddressFollowsItsEntrysMethodThroughAnyAliasElseTheDefault() throws IOException {
+        HostBook book = book(Optional.empty());
+        assertEquals(Verification.PHONE, book.methods().apply("farm@example.com"), "no book yet: the first default");
+        assertTrue(host.values.isEmpty(), "reading the methods starts no book");
+
+        book.addAll(List.of(FARM, ALT));
+        book.addAlias(FARM.key(), "f.arm@example.com");
+        book.verify(FARM.key(), Verification.CODE);
+        book.defaultVerification(Verification.BACKUP_CODE);
+        Function<String, Verification> methods = book.methods();
+        assertEquals(Verification.CODE, methods.apply("farm@example.com"));
+        assertEquals(Verification.CODE, methods.apply("f.arm@example.com"), "by its alias");
+        assertEquals(Verification.BACKUP_CODE, methods.apply("alt@example.com"), "Default follows the book's");
+        assertEquals(Verification.BACKUP_CODE, methods.apply("new@example.com"), "one the book lacks too");
+        assertEquals(Verification.ASK, HostBook.methods(List.of(ALT.withVerify(Verification.UNKNOWN)),
+                Verification.PHONE).apply("alt@example.com"), "a newer BotMaker's is asked");
+        assertEquals(Verification.PHONE, HostBook.methods(List.of(new AccountRecord(AccountRecord.Kind.FACEBOOK,
+                "farm@example.com").withVerify(Verification.CODE)), Verification.PHONE).apply("farm@example.com"),
+                "only a Google entry answers");
     }
 
     @Test

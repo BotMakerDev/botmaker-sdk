@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.accounts;
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
 
@@ -210,6 +211,24 @@ final class AccountsListModel {
     }
 
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+
+    /**
+     * The detail panel's <i>Verification</i> choices: <i>Default</i> first, then the methods, and the account's own
+     * when a newer BotMaker wrote it, so it shows as it is until the user picks another.
+     */
+    static List<Verification> verificationChoices(Verification current) {
+        List<Verification> choices = new ArrayList<>();
+        choices.add(Verification.DEFAULT);
+        choices.addAll(Verification.methods());
+        if (current != null && !choices.contains(current)) choices.add(current);
+        return choices;
+    }
+
+    /** How a choice reads: <i>Default</i> names the book's default, "Default (Phone prompt)". */
+    static String said(Verification method, Verification byDefault) {
+        return method == Verification.DEFAULT ? method.displayName() + " (" + byDefault.displayName() + ")"
+                : method.displayName();
+    }
 
     /**
      * The rows whose name or note holds {@code text}, case aside, of {@code kind} (null for any).

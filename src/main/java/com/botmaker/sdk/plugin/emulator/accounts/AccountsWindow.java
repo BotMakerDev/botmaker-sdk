@@ -15,6 +15,7 @@ import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.sdk.plugin.emulator.window.WindowKeys;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
@@ -71,9 +72,10 @@ import java.util.stream.Collectors;
 /**
  * The Accounts window: every account this PC knows, for every emulator and every bot, with no bot open (board
  * Accounts, spec {@code 2026-11-13-google-accounts-design.md}; its look, spec {@code 2026-11-14-emulators-look-design.md}).
- * It lists {@link HostBook} beside a detail panel for the account picked: its note, edited in place; its password,
- * forgotten or remembered in this PC's credential store; the instances that want it, each with its state; and Remove
- * for an account no configuration lists. It imports and exports the book (kind, name and note: never a password).
+ * It lists {@link HostBook} beside a detail panel for the account picked: its note, edited in place; a Google account's
+ * verification, <i>Default</i> or a method of its own, the default picked in the header; its password, forgotten or
+ * remembered in this PC's credential store; the instances that want it, each with its state; and Remove for an
+ * account no configuration lists. It imports and exports the book (never a password).
  * Which instance holds which account is the Emulators window's.
  *
  * <p>A password typed into <i>Remember…</i> goes from the field to the store as characters and is cleared; it is
@@ -97,6 +99,10 @@ public final class AccountsWindow {
     private List<AccountsListModel.Row> all = List.of();
     private List<AccountRecord> book = List.of();
     private boolean storeAvailable;
+    /** The book's default verification, as last read. */
+    private Verification byDefault = Verification.FIRST_DEFAULT;
+    private final ComboBox<Verification> defaultPick = new ComboBox<>();
+    private Verification shownDefault;
     /** The instances discovered by the first read, kept for the reads after an action; null until then. */
     private Found found;
     /** Counts the reads started: a read that ends after a newer one started is dropped. */
@@ -160,7 +166,18 @@ public final class AccountsWindow {
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         HostUndo undo = new HostUndo(services, this::load);
-        HBox bar = new HBox(8, text, kindBar(), gap, add, paste, importButton, export, undo.node(), refresh);
+        Label defaultLabel = Styles.on(new Label("Default verification"), StyleClasses.MUTED_TEXT);
+        defaultLabel.setMinWidth(Region.USE_PREF_SIZE);
+        defaultPick.getItems().setAll(Verification.methods());
+        defaultPick.setValue(byDefault);
+        defaultPick.setButtonCell(verificationCell(null));
+        defaultPick.setCellFactory(list -> verificationCell(null));
+        defaultPick.setTooltip(new Tooltip("The second step a Google account's sign-in follows unless it picks its own"));
+        defaultPick.valueProperty().addListener((o, was, now) -> {
+            if (now != null && now != byDefault) writeDefault(now);
+        });
+        HBox bar = new HBox(8, text, kindBar(), gap, defaultLabel, defaultPick, add, paste, importButton, export,
+                undo.node(), refresh);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.getStyleClass().add("em-header");
 
@@ -265,25 +282,29 @@ public final class AccountsWindow {
             EmulatorsModel.Source source = EmulatorsModel.Source.live(services);
             Found now = states(discovered != null ? discovered : found(source), source, config);
             List<AccountRecord> known = known(services, config);
+            Verification method = HostConfig.accounts(services).defaultVerification();
             boolean available = store.available();
             Set<String> remembered = new HashSet<>();
             if (available) {
                 for (String key : AccountsListModel.keys(known)) if (store.remembered(key)) remembered.add(key);
             }
             return new Read(now, known, AccountsListModel.rows(known, HostBook.onInstances(config, now.keys()),
-                    HostBook.held(config), remembered), available);
+                    HostBook.held(config), remembered), available, method);
         }, done -> {
             if (read != reads) return;
             found = done.found();
             book = done.book();
             all = done.rows();
             storeAvailable = done.storeAvailable();
+            // set before the pick, which then writes nothing
+            byDefault = done.byDefault();
+            defaultPick.setValue(byDefault);
             filter();
         }, failed -> say("The accounts were not read: " + failed));
     }
 
     private record Read(Found found, List<AccountRecord> book, List<AccountsListModel.Row> rows,
-                        boolean storeAvailable) {
+                        boolean storeAvailable, Verification byDefault) {
     }
 
     /**
@@ -365,10 +386,14 @@ public final class AccountsWindow {
      * what they typed.
      */
     private void detail(AccountsListModel.Row row) {
-        if (row != null && row.equals(shown) && storeAvailable == shownStore && found == shownFound) return;
+        if (row != null && row.equals(shown) && storeAvailable == shownStore && found == shownFound
+                && byDefault == shownDefault) {
+            return;
+        }
         shown = row;
         shownStore = storeAvailable;
         shownFound = found;
+        shownDefault = byDefault;
         top.getChildren().clear();
         rest.getChildren().clear();
         if (row == null) {
@@ -388,6 +413,11 @@ public final class AccountsWindow {
             if (!noteField.isFocused()) noteField.setText(account.note());
         } else {
             notes.getChildren().setAll(Look.cap("Note"), note(account));
+        }
+
+        if (account.kind() == AccountRecord.Kind.GOOGLE) {
+            rest.getChildren().addAll(Look.cap("Verification"), verification(account),
+                    Look.muted("The second step BotMaker follows when it signs this account in."));
         }
 
         rest.getChildren().add(Look.cap("Password"));
@@ -447,6 +477,60 @@ public final class AccountsWindow {
         noteKey = account.key();
         noteWritten = written;
         return field;
+    }
+
+    /** The account's <i>Verification</i>: <i>Default</i> first, naming the book's; a pick is written at once. */
+    private ComboBox<Verification> verification(AccountRecord account) {
+        ComboBox<Verification> pick = new ComboBox<>();
+        pick.getItems().setAll(AccountsListModel.verificationChoices(account.verify()));
+        pick.setValue(account.verify());
+        pick.setButtonCell(verificationCell(byDefault));
+        pick.setCellFactory(list -> verificationCell(byDefault));
+        pick.setMaxWidth(Double.MAX_VALUE);
+        pick.valueProperty().addListener((o, was, now) -> {
+            if (now == null || now == account.verify()) return;
+            String name = account.name();
+            Async.load("accounts-verify", () -> io(() -> HostConfig.accounts(services).verify(account.key(), now)),
+                    done -> {
+                        say(name + " follows " + AccountsListModel.said(now, byDefault) + ".");
+                        load();
+                    }, failed -> {
+                        say("The verification was not saved: " + failed);
+                        // the row reads back as it was: the panel is drawn again, so the pick shows the book's
+                        shown = null;
+                        load();
+                    });
+        });
+        return pick;
+    }
+
+    /** <i>Default verification</i> in the header: one step of this PC's undo. */
+    private void writeDefault(Verification method) {
+        Async.load("accounts-default-verification", () -> {
+            io(() -> {
+                HostConfig.accounts(services).defaultVerification(method);
+                return null;
+            });
+            return method;
+        }, done -> {
+            say("Accounts on Default follow " + done.displayName() + ".");
+            load();
+        }, failed -> {
+            say("The default verification was not saved: " + failed);
+            load();
+        });
+    }
+
+    /** A verification as the pickers show it; {@code byDefault} names what Default is, null where none is listed. */
+    private static ListCell<Verification> verificationCell(Verification byDefault) {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(Verification item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null
+                        : byDefault == null ? item.displayName() : AccountsListModel.said(item, byDefault));
+            }
+        };
     }
 
     /** {@code key}'s chip with its state pill; a link to it in the Emulators window when discovery found it. */

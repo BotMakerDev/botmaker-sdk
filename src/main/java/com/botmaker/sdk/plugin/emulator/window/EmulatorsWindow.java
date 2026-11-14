@@ -12,6 +12,7 @@ import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ApplyHost;
@@ -20,11 +21,14 @@ import com.botmaker.shared.emulator.config.EmulatorOperations;
 import com.botmaker.shared.emulator.config.InstanceFacts;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
+import com.botmaker.shared.emulator.google.Codes;
+import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.KeyringStore;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -45,8 +49,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -58,7 +64,11 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
@@ -84,6 +94,10 @@ public final class EmulatorsWindow {
     private static final PasswordStore STORE = new KeyringStore();
     /** The Applies signing accounts in, by operation id. */
     private static final Map<String, Signing> SIGNING = new ConcurrentHashMap<>();
+    /** The codes the sign-ins wait for, by operation id: one at a time per operation. */
+    private static final Map<String, CodeAsk> CODES = new ConcurrentHashMap<>();
+    /** How often a code's wait looks whether its operation was cancelled. */
+    private static final long CODE_WAIT_MS = 500;
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -113,6 +127,8 @@ public final class EmulatorsWindow {
     private final RunningTab running;
     /** The operations whose live screen was opened for them once already. */
     private final Set<String> shownNeedsYou = ConcurrentHashMap.newKeySet();
+    /** The codes whose dialog is open now: one dialog per code asked. */
+    private final Set<CodeAsk> codeOpen = ConcurrentHashMap.newKeySet();
     /** The operations waiting on the user now. */
     private final Set<String> waiting = ConcurrentHashMap.newKeySet();
     private AutoCloseable botListener;
@@ -499,14 +515,30 @@ public final class EmulatorsWindow {
             say("Nothing to apply: the instances picked are as configured, or were not read.");
             return;
         }
-        // the store can block (opening, or asking to be unlocked): asked off the FX thread, once per account
+        // the store can block (opening, or asking to be unlocked): asked off the FX thread, once per account; the
+        // book's methods are read there too, once for the batch
         Thread.ofVirtual().name("apply-passwords").start(() -> {
             Set<String> remembered = ApplyPlan.remembered(items, STORE);
-            Platform.runLater(() -> apply(items, remembered));
+            Function<String, Verification> methods = methods();
+            Platform.runLater(() -> apply(items, remembered, methods));
         });
     }
 
-    private void apply(List<ApplyPlan.Item> items, Set<String> remembered) {
+    /**
+     * The second step each address follows, from the account book; when it does not read, every one is handed to the
+     * user, and the window says why.
+     */
+    private Function<String, Verification> methods() {
+        try {
+            return HostConfig.accounts(services).methods();
+        } catch (IOException | RuntimeException unread) {
+            Platform.runLater(() -> say("The account book was not read, so each sign-in's second step is left to you: "
+                    + unread.getMessage()));
+            return email -> Verification.ASK;
+        }
+    }
+
+    private void apply(List<ApplyPlan.Item> items, Set<String> remembered, Function<String, Verification> methods) {
         Optional<Boolean> removals = confirm(items, remembered);
         if (removals.isEmpty()) return;
         List<ApplyPlan.Item> agreed = ApplyPlan.agreed(items, removals.get());
@@ -526,28 +558,30 @@ public final class EmulatorsWindow {
             }
         };
         Applies log = applies();
-        List<Operation> queued = new ArrayList<>();
         // every id is in the batch before any operation can end, so the passwords are cleared exactly once
         synchronized (batch) {
             OPERATIONS.addListener(ended);
             for (ApplyPlan.Item item : agreed) {
+                AtomicReference<String> id = new AtomicReference<>();
+                InstanceSignIn.SecondStep second = new InstanceSignIn.SecondStep(methods, codes(id));
                 Operation operation = OPERATIONS.submit("Apply to " + item.row().instance().name(),
                         item.row().instance(), context -> {
                             synchronized (batch) {
                                 // waits until the whole batch is queued
                             }
-                            return ApplyPlan.body(item, log, passwords, (typed, listed) -> change(
+                            return ApplyPlan.body(item, log, passwords, second, (typed, listed) -> change(
                                     c -> ConfigViews.renameAccount(c, item.row().key(), typed, listed))).run(context);
                         });
+                id.set(operation.id());
+                // in the batch's lock, so a code asked finds its operation to see whether it was cancelled
+                RUNNING.put(operation.id(), operation);
                 batch.add(operation.id());
-                queued.add(operation);
                 List<String> signsIn = ApplyPlan.signInNames(item);
                 if (!signsIn.isEmpty()) {
                     SIGNING.put(operation.id(), new Signing(operation.id(), item.row().key(), passwords, signsIn));
                 }
             }
         }
-        queued.forEach(operation -> RUNNING.put(operation.id(), operation));
         LiveScreenDialog.redrawAll();
         drawStrip();
     }
@@ -622,6 +656,91 @@ public final class EmulatorsWindow {
             return answer.get();
         } catch (ExecutionException failed) {
             return null;
+        }
+    }
+
+    /**
+     * The code dialog for the operation {@code operation} names once it is queued: each ask waits, on the operation's
+     * thread, for the dialog's answer, and gives up (null, nothing typed) when the operation is cancelled. The dialog
+     * opens by itself for each try; the strip's <i>Type the code…</i> opens it again once closed.
+     */
+    private Codes codes(AtomicReference<String> operation) {
+        return (email, method, attempt) -> {
+            CodeAsk ask = new CodeAsk(operation.get(), email, method, attempt);
+            CODES.put(ask.operation(), ask);
+            Platform.runLater(() -> {
+                drawStrip();
+                askCode(ask);
+            });
+            try {
+                while (true) {
+                    try {
+                        return ask.answer().get(CODE_WAIT_MS, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException waiting) {
+                        Operation running = RUNNING.get(ask.operation());
+                        if (running == null || running.cancelled()) return null;
+                    }
+                }
+            } catch (ExecutionException failed) {
+                return null;
+            } finally {
+                // a code typed after this is zeroed by the ask itself
+                ask.answer(null);
+                CODES.remove(ask.operation(), ask);
+                Platform.runLater(this::drawStrip);
+            }
+        };
+    }
+
+    /**
+     * The code dialog, on the FX thread: one masked field under the method's words, cleared once its characters are
+     * handed over. It is modeless, so the strip and the live screen stay usable; <i>Show the screen</i> opens the live
+     * screen and keeps the dialog. Closed, it answers: the code, or nothing, leaving the screen to the user. A code
+     * the sign-in stops waiting for (the operation cancelled) closes it.
+     */
+    private void askCode(CodeAsk ask) {
+        if (ask.answer().isDone() || !codeOpen.add(ask)) return;
+        try {
+            PasswordField field = new PasswordField();
+            Label words = new Label(ask.words());
+            words.setWrapText(true);
+            words.setMaxWidth(420);
+            Label hint = Styles.on(new Label(ask.hint()), StyleClasses.DIALOG_HINT);
+            hint.setWrapText(true);
+            hint.setMaxWidth(420);
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.initOwner(stage.isShowing() ? stage : Modals.owner(services));
+            dialog.initModality(Modality.NONE);
+            dialog.setTitle("Google verification");
+            dialog.setHeaderText(ask.header());
+            dialog.getDialogPane().setContent(new VBox(8, words, field, hint));
+            ButtonType type = new ButtonType("Type it", ButtonBar.ButtonData.OK_DONE);
+            ButtonType screen = new ButtonType("Show the screen", ButtonBar.ButtonData.LEFT);
+            ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+            dialog.getDialogPane().getButtonTypes().addAll(screen, type, cancel);
+            dialog.getDialogPane().lookupButton(type).disableProperty().bind(field.textProperty().isEmpty());
+            // the live screen beside the dialog, which stays open
+            dialog.getDialogPane().lookupButton(screen).addEventFilter(ActionEvent.ACTION, e -> {
+                e.consume();
+                OPERATIONS.all().stream().filter(one -> one.id().equals(ask.operation())).findFirst()
+                        .ifPresent(this::openScreen);
+            });
+            ask.answer().whenComplete((answered, failed) -> Platform.runLater(() -> {
+                if (dialog.isShowing()) dialog.close();
+            }));
+            services.theme().apply(dialog);
+            Platform.runLater(field::requestFocus);
+            Optional<ButtonType> pressed = dialog.showAndWait();
+            CharSequence typed = field.getCharacters();
+            char[] code = null;
+            if (pressed.isPresent() && pressed.get() == type && typed.length() > 0) {
+                code = new char[typed.length()];
+                for (int i = 0; i < code.length; i++) code[i] = typed.charAt(i);
+            }
+            field.clear();
+            ask.answer(code);
+        } finally {
+            codeOpen.remove(ask);
         }
     }
 
@@ -748,6 +867,13 @@ public final class EmulatorsWindow {
         step.setMaxWidth(Double.MAX_VALUE);
         HBox row = new HBox(10, state, title, step);
         row.setAlignment(Pos.CENTER_LEFT);
+        CodeAsk code = one.state() == Operation.State.NEEDS_YOU ? CODES.get(one.id()) : null;
+        if (code != null) {
+            Button type = new Button("Type the code…");
+            type.setMinWidth(Region.USE_PREF_SIZE);
+            type.setOnAction(e -> askCode(code));
+            row.getChildren().add(type);
+        }
         if (one.state() == Operation.State.NEEDS_YOU && one.instance() != null) {
             Button look = new Button("Open its screen");
             look.setMinWidth(Region.USE_PREF_SIZE);

@@ -244,6 +244,26 @@ public final class HostBook {
         return read.isMethod() ? read : Verification.FIRST_DEFAULT;
     }
 
+    /**
+     * The method each address's sign-in follows, read once for an Apply: the book's entry it answers to, else the
+     * default. Reads the book without starting it.
+     */
+    public Function<String, Verification> methods() throws IOException {
+        Verification byDefault = defaultVerification();
+        if (services == null) return methods(List.of(), byDefault);
+        return methods(List.copyOf(understood(current().orElse(HostKnown.none()).list()).values()), byDefault);
+    }
+
+    /**
+     * The method of the Google account in {@code book} that an address answers to, through any of its addresses,
+     * followed through {@code byDefault}; an address the book lacks follows the default.
+     */
+    public static Function<String, Verification> methods(List<AccountRecord> book, Verification byDefault) {
+        List<AccountRecord> google = book.stream().filter(a -> a.kind() == AccountRecord.Kind.GOOGLE).toList();
+        return email -> google.stream().filter(account -> account.answersTo(email)).findFirst()
+                .map(AccountRecord::verify).orElse(Verification.DEFAULT).followed(byDefault);
+    }
+
     /** Sets the book's default verification, one step of undo; only a method of its own may be the default. */
     public void defaultVerification(Verification method) throws IOException {
         if (method == null || !method.isMethod()) throw new IOException("The default is one of the methods.");
