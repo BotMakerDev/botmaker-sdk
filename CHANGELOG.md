@@ -47,6 +47,20 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - The Accounts window's *Paste list…* adds many accounts from a list of emails, as one change.
   - Keys: F5 reads again, Ctrl+Z / Ctrl+Y undo and redo this PC's last change (a text field keeps its own),
     and Ctrl+F goes to the filter.
+- **Google's second step during an Apply** (2026-11-14): each Google account has a *Verification* in the Accounts
+  window (phone prompt, code, backup code, ask, or *Default*, set in the header). A sign-in follows it: a phone
+  prompt is waited for, and a code is asked in a dialog over the operations strip, one masked field cleared once
+  typed and never stored (*Type the code…* on the *Needs you* row reopens it).
+- **Google's account chooser** (2026-11-14): when the host starts a game (▶ Launch, a Fix, `launch_game`), the
+  instance's default Google account is picked in the game's account picker, by any of its addresses. It never
+  adds an account, and a bot's run leaves the picker to the user.
+- **Aliases** (2026-11-14): a Google account can answer to several addresses.
+  - The Accounts window lists them as chips with *+ Alias*; the list shows "+N" and Find matches them.
+  - An entry another account has as an alias offers *Merge into…*, which asks which password to keep only when
+    the two remembered ones differ.
+  - A finished sign-in whose address Android lists differently offers *Record as an alias of…* on the strip.
+  - The Accounts grid counts an account under any of its addresses, and warns when two instances hold it through
+    different ones.
 
 ## [1.10.1] — 2026-11-13
 
