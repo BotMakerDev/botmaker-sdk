@@ -1,5 +1,7 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
+import com.botmaker.plugin.api.StyleClasses;
+import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.Operation;
 import javafx.scene.Node;
@@ -152,6 +154,34 @@ public final class Look {
         Label chip = new Label(name, lead);
         chip.getStyleClass().add("em-chip");
         return chip;
+    }
+
+    /** A state dot alone, as a grid's column header shows it: the pill's tone, its word in the tooltip. */
+    public static Region dot(Pill pill) {
+        Region dot = new Region();
+        dot.getStyleClass().addAll("em-state-dot", pill.tone().styleClass());
+        Tooltip.install(dot, new Tooltip(pill.word()));
+        return dot;
+    }
+
+    /** An inspector's heading: {@code lead} (a badge or an avatar), then the words. */
+    static Label heading(String words, Node lead) {
+        Label title = Styles.on(new Label(words, lead), StyleClasses.DIALOG_SUBHEADING);
+        title.setGraphicTextGap(8);
+        title.setWrapText(true);
+        return title;
+    }
+
+    /** A line of words that wraps. */
+    static Label line(String words) {
+        Label label = new Label(words);
+        label.setWrapText(true);
+        return label;
+    }
+
+    /** A muted line of words that wraps. */
+    static Label muted(String words) {
+        return Styles.on(line(words), StyleClasses.MUTED_TEXT);
     }
 
     /** A small upper-case heading over an inspector's section. */

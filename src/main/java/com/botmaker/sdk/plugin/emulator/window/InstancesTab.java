@@ -54,6 +54,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.botmaker.sdk.plugin.emulator.window.Look.heading;
+import static com.botmaker.sdk.plugin.emulator.window.Look.line;
+import static com.botmaker.sdk.plugin.emulator.window.Look.muted;
+
 /**
  * The Instances tab: every instance as a row folded under its emulator, with the columns the user chose (the table's
  * own ☰ button), the filters (the window's Find is their words), saved filters, and on the right the inspector of
@@ -638,23 +642,6 @@ final class InstancesTab {
         row.setPadding(new Insets(8, 0, 0, 0));
         for (Button button : buttons) button.setMinWidth(Region.USE_PREF_SIZE);
         return row;
-    }
-
-    private static Label heading(String words, Node badge) {
-        Label title = Styles.on(new Label(words, badge), StyleClasses.DIALOG_SUBHEADING);
-        title.setGraphicTextGap(8);
-        title.setWrapText(true);
-        return title;
-    }
-
-    private static Label line(String words) {
-        Label label = new Label(words);
-        label.setWrapText(true);
-        return label;
-    }
-
-    private static Label muted(String words) {
-        return Styles.on(line(words), StyleClasses.MUTED_TEXT);
     }
 
     // ---- the columns ----

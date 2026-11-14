@@ -129,10 +129,35 @@ class AccountsGridModelTest {
         assertEquals(List.of(LD_KEY), all.stream().map(item -> item.row().key()).toList(), "MuMu differs in a"
                 + " setting only, which this tab does not apply");
         assertTrue(all.getFirst().changes().isEmpty() && all.getFirst().games().isEmpty());
-        assertEquals(2, AccountsGridModel.changes(all), "Main signed out, Farm signed in");
+        assertEquals(2, AccountsGridModel.applyCount(all), "Main signed out, Farm signed in");
+        assertEquals(new AccountsGridModel.Pending(1, 1, 1), AccountsGridModel.pending(all));
+        assertEquals("1 sign-in, 1 sign-out across 1 instance", AccountsGridModel.pending(all).said());
 
         List<ApplyPlan.Item> mainOnly = AccountsGridModel.toApply(rows, List.of(MAIN));
-        assertEquals(1, AccountsGridModel.changes(mainOnly), "Farm's row is not shown: its sign-in waits");
+        assertEquals(1, AccountsGridModel.applyCount(mainOnly), "Farm's row is not shown: its sign-in waits");
+        assertEquals("Nothing to apply", AccountsGridModel.pending(List.of()).said());
+    }
+
+    @Test
+    void eachCellHasAGlyphAndWordsAndTheInspectorSaysWhereAnAccountIsTicked() {
+        for (AccountsGridModel.Cell cell : AccountsGridModel.Cell.values()) {
+            assertFalse(AccountsGridModel.glyph(cell).words().isEmpty(), cell + " says something");
+            assertEquals(cell == AccountsGridModel.Cell.NONE || cell == AccountsGridModel.Cell.UNKNOWN,
+                    AccountsGridModel.glyph(cell).mark().isEmpty(), cell + "'s mark");
+        }
+        assertEquals("em-glyph-to-sign-in", AccountsGridModel.styleClass(AccountsGridModel.Cell.TO_SIGN_IN));
+
+        EmulatorsModel.InstanceRow ld = row(CONFIG, LD, Set.of("main@example.com"));
+        EmulatorsModel.InstanceRow mumu = row(CONFIG, MUMU, Set.of());
+        assertEquals(List.of(new AccountsGridModel.On(ld, AccountsGridModel.Cell.SIGNED_IN)),
+                AccountsGridModel.tickedOn(CONFIG, List.of(ld, mumu), MAIN), "LDPlayer's layer lists Main");
+        List<AccountsGridModel.On> farm = AccountsGridModel.tickedOn(CONFIG, List.of(ld, mumu), FARM);
+        assertEquals(List.of(new AccountsGridModel.On(ld, AccountsGridModel.Cell.TO_SIGN_IN)), farm);
+        assertEquals(" · at Apply", farm.getFirst().mark(), "Farm is still to sign in on Farm");
+        assertEquals(" · not read", AccountsGridModel.tickedOn(CONFIG, List.of(row(CONFIG, LD, null)), MAIN)
+                .getFirst().mark());
+        assertEquals("", AccountsGridModel.tickedOn(CONFIG, List.of(ld), MAIN).getFirst().mark());
+        assertEquals(List.of(), AccountsGridModel.tickedOn(CONFIG, List.of(ld, mumu), ALT));
     }
 
     @Test

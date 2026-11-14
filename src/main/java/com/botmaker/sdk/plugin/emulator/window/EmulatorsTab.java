@@ -22,6 +22,9 @@ import javafx.scene.layout.VBox;
 import java.util.Comparator;
 import java.util.function.Function;
 
+import static com.botmaker.sdk.plugin.emulator.window.Look.line;
+import static com.botmaker.sdk.plugin.emulator.window.Look.muted;
+
 /**
  * The Emulators tab: every product BotMaker knows, installed or not, and beside the one picked what its instances
  * start from, with <i>Apply to N</i> for those that differ. <i>Configure…</i> opens the emulator's own view.
@@ -109,16 +112,6 @@ final class EmulatorsTab {
                         + " not read yet.")
                 : EmulatorsModel.count(applicable, "instance") + " of this emulator "
                         + (applicable == 1 ? "differs" : "differ") + " from the configuration."));
-    }
-
-    private static Label line(String words) {
-        Label label = new Label(words);
-        label.setWrapText(true);
-        return label;
-    }
-
-    private static Label muted(String words) {
-        return Styles.on(line(words), StyleClasses.MUTED_TEXT);
     }
 
     private static TableColumn<EmulatorsModel.EmulatorRow, String> column(

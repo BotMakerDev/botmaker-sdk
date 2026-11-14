@@ -9,6 +9,8 @@
     -em-line: -bm-divider;
     -em-card: -fx-control-inner-background;
     -em-quiet: -bm-muted;
+    /* a pill's or a dot's colour, set by its em-pill-* class */
+    -em-tone: -em-quiet;
 }
 
 /* ---- the header: segmented tabs, Find, the read time, ↶ ↷ ⟳ ---- */
@@ -182,6 +184,89 @@
 
 .em-inspector-pane > .viewport {
     -fx-background-color: transparent;
+}
+
+/* ---- the Accounts tab: a column header's state dot, the glyph cells, the picked account ---- */
+
+.em-state-dot {
+    -fx-min-width: 8;
+    -fx-min-height: 8;
+    -fx-max-width: 8;
+    -fx-max-height: 8;
+    -fx-background-radius: 4;
+    /* no -em-tone here: it would undo the em-pill-* class set beside it */
+    -fx-background-color: -em-tone;
+}
+
+.em-state-dot.em-pill-outlined {
+    -fx-background-color: transparent;
+    -fx-border-color: -em-quiet;
+    -fx-border-radius: 4;
+}
+
+.em-glyph {
+    -fx-min-width: 22;
+    -fx-min-height: 22;
+    -fx-pref-width: 22;
+    -fx-pref-height: 22;
+    -fx-max-width: 22;
+    -fx-max-height: 22;
+    -fx-padding: 0;
+    -fx-alignment: center;
+    -fx-font-weight: bold;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5;
+    -fx-border-color: -em-line;
+    -fx-border-radius: 5;
+    -fx-text-fill: -em-quiet;
+}
+
+.button.em-glyph {
+    -fx-cursor: hand;
+}
+
+.button.em-glyph:hover {
+    -fx-border-color: -bm-accent;
+}
+
+.button.em-glyph:focused {
+    -fx-border-color: -bm-accent;
+    -fx-border-width: 2;
+}
+
+/* two classes each, so a theme's .button:focused never outranks a cell's state */
+.em-glyph.em-glyph-signed-in {
+    -fx-background-color: -bm-accent;
+    -fx-border-color: -bm-accent;
+    -fx-text-fill: -bm-on-accent;
+}
+
+.em-glyph.em-glyph-to-sign-in {
+    -fx-border-color: -bm-accent;
+    -fx-border-style: segments(3, 2);
+    -fx-text-fill: -bm-accent;
+}
+
+.em-glyph.em-glyph-not-read {
+    -fx-border-color: -em-quiet;
+}
+
+.em-glyph.em-glyph-to-sign-out, .em-glyph.em-glyph-removed-here {
+    -fx-border-color: -bm-severity-warning;
+    -fx-border-style: segments(3, 2);
+    -fx-text-fill: -bm-severity-warning;
+}
+
+.em-account {
+    -fx-padding: 2 6 2 2;
+    -fx-background-radius: 12;
+    -fx-cursor: hand;
+}
+
+.em-account.em-picked {
+    -fx-background-color: -bm-band;
+    -fx-font-weight: bold;
 }
 
 /* ---- the chip and the cap ---- */

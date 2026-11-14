@@ -238,9 +238,77 @@ final class AccountsGridModel {
         return items;
     }
 
-    /** How many sign-ins and sign-outs the tab's Apply would run. */
-    static int changes(List<ApplyPlan.Item> items) {
+    /** How many sign-ins and sign-outs the tab's Apply would run: its button's N. */
+    static int applyCount(List<ApplyPlan.Item> items) {
         return items.stream().mapToInt(item -> item.accounts().size()).sum();
+    }
+
+    /** What the tab's Apply would run, counted for the inspector. */
+    record Pending(int signIns, int signOuts, int instances) {
+
+        String said() {
+            if (signIns + signOuts == 0) return "Nothing to apply";
+            return EmulatorsModel.count(signIns, "sign-in") + ", " + EmulatorsModel.count(signOuts, "sign-out")
+                    + " across " + EmulatorsModel.count(instances, "instance");
+        }
+    }
+
+    /** The sign-ins, sign-outs and instances of the tab's Apply ({@link #toApply}). */
+    static Pending pending(List<ApplyPlan.Item> items) {
+        int in = 0;
+        int out = 0;
+        for (ApplyPlan.Item item : items) {
+            for (ConfigDiff.AccountChange change : item.accounts()) {
+                if (change.op() == ConfigDiff.AccountChange.Op.ADD) in++;
+                else out++;
+            }
+        }
+        return new Pending(in, out, items.size());
+    }
+
+    /** How a cell is drawn: its mark and the words its tooltip and the legend give. */
+    record Glyph(String mark, String words) {}
+
+    /** {@code cell}'s glyph; its style class is {@link #styleClass}. */
+    static Glyph glyph(Cell cell) {
+        return switch (cell) {
+            case SIGNED_IN -> new Glyph("✓", "Wanted and signed in");
+            case TO_SIGN_IN -> new Glyph("+", "Wanted; Apply signs it in");
+            case NOT_READ -> new Glyph("✓", "Wanted; the instance was not read");
+            case TO_SIGN_OUT -> new Glyph("−", "Apply signs it out");
+            case REMOVED_HERE -> new Glyph("−", "Removed here, on this instance only; Apply signs it out if it is"
+                    + " there");
+            case UNLISTED -> new Glyph("●", "Signed in, not listed: Apply leaves it");
+            case NONE, UNKNOWN -> new Glyph("", "Not on it");
+        };
+    }
+
+    /** The sheet's class for {@code cell}'s glyph. */
+    static String styleClass(Cell cell) {
+        return "em-glyph-" + cell.id().replace('_', '-');
+    }
+
+    /** One instance an account is ticked on, and what is still to know or do there. */
+    record On(EmulatorsModel.InstanceRow column, Cell cell) {
+
+        /** The chip's words after the instance's name: Apply signs it in, or the instance was not read. */
+        String mark() {
+            return switch (cell) {
+                case TO_SIGN_IN -> " · at Apply";
+                case NOT_READ -> " · not read";
+                default -> "";
+            };
+        }
+    }
+
+    /** The columns shown on which {@code account} is ticked: the account inspector's <i>Ticked on</i>. */
+    static List<On> tickedOn(EmulatorConfig config, List<EmulatorsModel.InstanceRow> columns, AccountRecord account) {
+        List<On> out = new ArrayList<>();
+        for (EmulatorsModel.InstanceRow column : columns) {
+            Cell cell = cell(config, column, account);
+            if (cell.ticked()) out.add(new On(column, cell));
+        }
+        return out;
     }
 
     /** One cell ticked: an account on an instance. */
