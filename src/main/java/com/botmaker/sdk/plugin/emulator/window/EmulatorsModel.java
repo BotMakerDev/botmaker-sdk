@@ -75,7 +75,45 @@ public final class EmulatorsModel {
                 }
             };
         }
+
+        /**
+         * This PC as the Emulators and Accounts windows show it: only the {@link #SHOWN} products. The rest is still
+         * read, started and configured where a bot names it; the windows just don't list it.
+         */
+        static Source shown(StudioServices services) {
+            Source live = live(services);
+            return new Source() {
+                @Override
+                public Platforms.DiscoveryReport discover() {
+                    Platforms.DiscoveryReport all = live.discover();
+                    return new Platforms.DiscoveryReport(
+                            all.instances().stream().filter(i -> SHOWN.contains(i.platformId())).toList(),
+                            all.statuses().stream().filter(s -> SHOWN.contains(s.platformId())).toList());
+                }
+
+                @Override
+                public HostConfig.State configuration() {
+                    return live.configuration();
+                }
+
+                @Override
+                public boolean running(EmulatorInstance instance) {
+                    return live.running(instance);
+                }
+
+                @Override
+                public InstanceFacts facts(EmulatorInstance instance, InstanceFacts last) {
+                    return live.facts(instance, last);
+                }
+            };
+        }
     }
+
+    /**
+     * The products the windows list (2026-11-14, the user's call): LDPlayer alone, the one that numbers its instances'
+     * ports itself and whose console makes and copies them. The code for the others stays.
+     */
+    public static final Set<PlatformId> SHOWN = Set.of(PlatformId.LDPLAYER);
 
     /** One product, installed or not. */
     public record EmulatorRow(PlatformId platform, boolean installed, String status, int instances, int running,

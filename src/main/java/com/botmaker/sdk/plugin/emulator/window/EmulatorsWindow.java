@@ -397,7 +397,7 @@ public final class EmulatorsWindow {
         reading = true;
         refresh.setDisable(true);
         EmulatorsModel.Snapshot last = snapshot;
-        Async.load("emulators-read", () -> EmulatorsModel.read(EmulatorsModel.Source.live(services), last, Instant.now()),
+        Async.load("emulators-read", () -> EmulatorsModel.read(EmulatorsModel.Source.shown(services), last, Instant.now()),
                 this::show, failed -> {
                     readEnded();
                     say("This PC's emulators could not be read: " + failed);

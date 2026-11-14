@@ -284,7 +284,7 @@ public final class AccountsWindow {
         PasswordStore store = EmulatorsWindow.passwords();
         Async.load("accounts-read", () -> {
             EmulatorConfig config = HostConfig.load(services).config();
-            EmulatorsModel.Source source = EmulatorsModel.Source.live(services);
+            EmulatorsModel.Source source = EmulatorsModel.Source.shown(services);
             Found now = states(discovered != null ? discovered : found(source), source, config);
             List<AccountRecord> known = known(services, config);
             Verification method = HostConfig.accounts(services).defaultVerification();

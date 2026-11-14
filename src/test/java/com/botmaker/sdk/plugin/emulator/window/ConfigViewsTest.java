@@ -370,4 +370,25 @@ class ConfigViewsTest {
         assertTrue(ConfigViews.accountName(AccountRecord.Kind.FACEBOOK, "main alt"));
         assertFalse(ConfigViews.accountName(AccountRecord.Kind.FACEBOOK, " "));
     }
+
+    @Test
+    void aPortStaysItsInstancesOwnThroughACopyAndIsNoEmulatorsSetting() {
+        ConfigValue farmPort = new ConfigValue.Count(5565);
+        ConfigValue altPort = new ConfigValue.Count(5567);
+        EmulatorConfig config = EmulatorConfig.EMPTY
+                .withInstance(FARM_KEY, Layer.EMPTY.with(ConfigField.ADB_PORT, farmPort)
+                        .with(ConfigField.FPS, new ConfigValue.Count(30)))
+                .withInstance(ALT_KEY, Layer.EMPTY.with(ConfigField.ADB_PORT, altPort));
+        Target alt = new Target.Instance(ALT_KEY);
+
+        Layer copied = ConfigViews.copy(config, FARM_T, alt).instance(ALT_KEY);
+        assertEquals(altPort, copied.fields().get(ConfigField.ADB_PORT), "the target keeps its own port");
+        assertEquals(new ConfigValue.Count(30), copied.fields().get(ConfigField.FPS));
+
+        EmulatorConfig toEmulator = ConfigViews.copy(config, FARM_T, LD);
+        assertFalse(toEmulator.emulator(PlatformId.LDPLAYER).fields().containsKey(ConfigField.ADB_PORT));
+        assertTrue(ConfigViews.compare(config, FARM_KEY, ALT_KEY).stream()
+                .noneMatch(d -> d.what().equals(ConfigField.ADB_PORT.displayName())), "ports differ by design");
+        assertTrue(ConfigViews.settings(LD, config, null).stream().noneMatch(r -> r.field() == ConfigField.ADB_PORT));
+    }
 }

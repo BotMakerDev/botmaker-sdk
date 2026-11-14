@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.EmulatorState;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.SavedFilters;
@@ -415,9 +416,11 @@ final class InstancesTab {
         renameOne.setOnAction(e -> one().ifPresent(manage::rename));
         MenuItem deleteOne = new MenuItem("Delete…");
         deleteOne.setOnAction(e -> one().ifPresent(manage::delete));
+        MenuItem markOne = new MenuItem("Mark as itself");
+        markOne.setOnAction(e -> one().ifPresent(manage::mark));
         ContextMenu menu = new ContextMenu(configure, new SeparatorMenuItem(), startOne, stopOne,
                 new SeparatorMenuItem(), applyOne, undo, new SeparatorMenuItem(), tags,
-                new SeparatorMenuItem(), cloneOne, renameOne, deleteOne);
+                new SeparatorMenuItem(), cloneOne, renameOne, deleteOne, markOne);
         menu.setOnShowing(e -> {
             List<EmulatorsModel.InstanceRow> picked = picked();
             configure.setDisable(picked.size() != 1);
@@ -425,6 +428,9 @@ final class InstancesTab {
             cloneOne.setDisable(!managed || picked.getFirst().running());
             renameOne.setDisable(!managed);
             deleteOne.setDisable(!managed);
+            // a clone answering with its original's ID shows a clash, not running: its product's word decides
+            markOne.setDisable(picked.size() != 1
+                    || picked.getFirst().instance().state() != EmulatorState.RUNNING);
             startOne.setDisable(picked.stream().allMatch(EmulatorsModel.InstanceRow::running));
             stopOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::running));
             applyOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::applicable));

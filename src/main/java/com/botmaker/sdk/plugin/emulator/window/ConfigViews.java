@@ -248,6 +248,7 @@ public final class ConfigViews {
                 out.add(new SettingRow(field, wanted, layer.fields().containsKey(field), now,
                         wanted.isEmpty() || state == null ? null : state.status()));
             } else {
+                if (field.instanceOnly()) continue;
                 Optional<ConfigValue> own = Optional.ofNullable(layer.fields().get(field));
                 out.add(new SettingRow(field, own, own.isPresent(), Optional.empty(), null));
             }
@@ -673,7 +674,8 @@ public final class ConfigViews {
         Wanted b = config.wanted(second);
         List<Difference> out = new ArrayList<>();
         for (ConfigField field : ConfigField.values()) {
-            if (field == ConfigField.UNKNOWN || field.emulatorOnly()) continue;
+            // a port differs by design, and a copy keeps it
+            if (field == ConfigField.UNKNOWN || field.emulatorOnly() || field.instanceOnly()) continue;
             String one = a.field(field).map(s -> s.value().said()).orElse(NONE);
             String two = b.field(field).map(s -> s.value().said()).orElse(NONE);
             if (!one.equals(two)) out.add(new Difference(field.displayName(), one, two));
@@ -711,20 +713,27 @@ public final class ConfigViews {
     public static EmulatorConfig copy(EmulatorConfig config, Target from, Target to) {
         if (from.equals(to)) throw new IllegalArgumentException("a column is copied to another one");
         if (from instanceof Target.Instance && to instanceof Target.Instance && from.platform() == to.platform()) {
-            Layer source = from.layer(config);
-            return to.with(config, new Layer(source.fields(), source.accounts(), source.removedAccounts(),
+            // a port is its instance's own: the copy keeps the target's
+            Layer source = EmulatorConfig.copyable(from.layer(config));
+            Map<ConfigField, ConfigValue> fields = new EnumMap<>(ConfigField.class);
+            fields.putAll(source.fields());
+            to.layer(config).fields().forEach((field, value) -> {
+                if (field.instanceOnly()) fields.put(field, value);
+            });
+            return to.with(config, new Layer(fields, source.accounts(), source.removedAccounts(),
                     source.defaultGoogle(), source.games(), source.removedGames(), to.layer(config).tags()));
         }
         Layer whole = whole(config, from);
         Map<ConfigField, ConfigValue> fields = new EnumMap<>(ConfigField.class);
         whole.fields().forEach((field, value) -> {
+            if (field.instanceOnly()) return;
             if (to instanceof Target.Emulator || !field.emulatorOnly()) fields.put(field, value);
         });
-        if (to instanceof Target.Emulator && from instanceof Target.Instance) {
-            to.layer(config).fields().forEach((field, value) -> {
-                if (field.emulatorOnly()) fields.put(field, value);
-            });
-        }
+        to.layer(config).fields().forEach((field, value) -> {
+            boolean kept = to instanceof Target.Emulator ? field.emulatorOnly() && from instanceof Target.Instance
+                    : field.instanceOnly();
+            if (kept) fields.put(field, value);
+        });
         List<String> tags = to instanceof Target.Instance ? to.layer(config).tags() : List.of();
         return to.with(config, new Layer(fields, whole.accounts(), Set.of(), whole.defaultGoogle(), whole.games(),
                 Set.of(), tags));

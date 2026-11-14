@@ -4,7 +4,9 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.host.InstanceRenames;
+import com.botmaker.shared.emulator.EmulatorIdentity;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
 import com.botmaker.shared.emulator.manage.InstanceManager;
@@ -51,6 +53,19 @@ final class ManageActions {
                     console.clone(row.instance(), name.get(), InstanceManager.AccountRemoval.SIGN_OUT,
                             InstanceManager.Prepare.NOTHING, clone -> copied(services, source, clone)));
         });
+    }
+
+    /**
+     * Gives the running instance a new BotMaker ID ({@link EmulatorIdentity#mark}): a clone that carries its
+     * original's ID file, or an instance that was reset, answers as itself again.
+     */
+    void mark(EmulatorsModel.InstanceRow row) {
+        EmulatorInstance instance = row.instance();
+        window.say("Marking " + instance.name() + "…");
+        Async.load("emulators-mark", () -> EmulatorIdentity.mark(instance), refused -> {
+            window.say(refused.orElse(instance.name() + " is marked as itself."));
+            window.refresh();
+        }, failed -> window.say(instance.name() + " could not be marked: " + failed));
     }
 
     void rename(EmulatorsModel.InstanceRow row) {
@@ -140,7 +155,9 @@ final class ManageActions {
         } catch (IllegalArgumentException unnamed) {
             return;
         }
-        HostConfig.update(services, config -> config.withInstance(key, config.instance(source)))
+        // the clone's port is its own: its product gave it one
+        HostConfig.update(services, config -> config.withInstance(key,
+                        EmulatorConfig.copyable(config.instance(source))))
                 .ifPresent(why -> said("The clone's configuration was not copied: " + why));
     }
 

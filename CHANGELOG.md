@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Emulators and Accounts windows list LDPlayer alone, for now** (2026-11-14, the user's call): the other
+  products are still discovered, started and configured where a bot names one; only the windows leave them out
+  (`EmulatorsModel.SHOWN`).
+- **An instance's ADB port is its own** (2026-11-14): the *ADB port* setting shows on an instance only, a copy between
+  instances or a clone keeps the target's, and Compare leaves it out. An instance's row menu gets *Mark as itself*,
+  which gives a running instance a new BotMaker ID: for a clone that carries its original's ID file and is shown as
+  answering for it.
 - **Each instance's BotMaker ID is kept in `Instances.java`** (2026-11-14): an `instance.id` row of its settings
   (`HostIds`), given the first time BotMaker connects to it, moved on a rename and dropped on a forget; ↶ stops at it.
   A bot's emulator and the core's `device` tool connect through shared's check, so another instance answering on the

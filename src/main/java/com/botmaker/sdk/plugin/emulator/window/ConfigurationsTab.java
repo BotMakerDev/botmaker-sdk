@@ -8,6 +8,7 @@ import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.InstanceKey;
+import com.botmaker.shared.emulator.config.ProductSettings;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -305,6 +306,14 @@ final class ConfigurationsTab {
         boolean instance = target instanceof ConfigViews.Target.Instance;
         if (instance && field.emulatorOnly()) {
             window.say(field.displayName() + " is set on the emulator, not on an instance.");
+            return;
+        }
+        if (!instance && field.instanceOnly()) {
+            window.say(field.displayName() + " is each instance's own, not the emulator's.");
+            return;
+        }
+        if (field.instanceOnly() && !ProductSettings.of(target.platform()).applies(field)) {
+            window.say(target.platform().displayName() + " numbers its instances' ADB ports itself: each keeps its own.");
             return;
         }
         ConfigDialogs.editField(window, target, field);
