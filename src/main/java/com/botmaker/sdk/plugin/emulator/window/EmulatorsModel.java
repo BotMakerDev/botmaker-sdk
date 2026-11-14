@@ -188,9 +188,8 @@ public final class EmulatorsModel {
     }
 
     /** The instances a configuration applies to, read without asking any of them anything. Runs off the UI thread. */
-    public static List<InstanceKey> keys(Source source) {
-        return source.discover().instances().stream().filter(EmulatorsModel::configured).map(InstanceKey::of)
-                .distinct().toList();
+    public static List<EmulatorInstance> instances(Source source) {
+        return source.discover().instances().stream().filter(EmulatorsModel::configured).toList();
     }
 
     /** A phone on a cable is no emulator's instance: nothing here starts, stops or configures it. */

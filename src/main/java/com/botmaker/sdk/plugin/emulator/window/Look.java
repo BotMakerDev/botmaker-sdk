@@ -165,7 +165,7 @@ public final class Look {
     }
 
     /** An inspector's heading: {@code lead} (a badge or an avatar), then the words. */
-    static Label heading(String words, Node lead) {
+    public static Label heading(String words, Node lead) {
         Label title = Styles.on(new Label(words, lead), StyleClasses.DIALOG_SUBHEADING);
         title.setGraphicTextGap(8);
         title.setWrapText(true);
@@ -173,14 +173,14 @@ public final class Look {
     }
 
     /** A line of words that wraps. */
-    static Label line(String words) {
+    public static Label line(String words) {
         Label label = new Label(words);
         label.setWrapText(true);
         return label;
     }
 
     /** A muted line of words that wraps. */
-    static Label muted(String words) {
+    public static Label muted(String words) {
         return Styles.on(line(words), StyleClasses.MUTED_TEXT);
     }
 

@@ -1,11 +1,13 @@
 package com.botmaker.sdk.plugin.emulator.accounts;
 
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
+import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.google.PasswordStore;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -26,29 +28,53 @@ final class AccountsListModel {
 
     /** What this PC keeps of an account's password. */
     enum Password {
-        REMEMBERED("Remembered"),
-        ASKED("Asked at Apply"),
+        REMEMBERED("Remembered", Look.Tone.OK, "Remembered on this PC: the next Apply that signs it in types it"),
+        ASKED("Asked", Look.Tone.MUTED, "Not remembered: the first Apply that signs it in asks it"),
         /** A kind BotMaker signs nothing in for: a record, with no password at all. */
-        NONE("—");
+        NONE("None", Look.Tone.OUTLINED, "No password: a record only, BotMaker signs nothing in for it");
 
         private final String displayName;
+        private final Look.Tone tone;
+        private final String words;
 
-        Password(String displayName) {
+        Password(String displayName, Look.Tone tone, String words) {
             this.displayName = displayName;
+            this.tone = tone;
+            this.words = words;
         }
 
         String displayName() {
             return displayName;
+        }
+
+        /** The list's pill: the short word on the state's colour; {@link #words} goes in its tooltip. */
+        Look.Pill pill() {
+            return new Look.Pill(tone, displayName);
+        }
+
+        /** What the state means, said whole. */
+        String words(boolean storeAvailable) {
+            return this == ASKED && !storeAvailable
+                    ? "No credential store on this PC: its password is asked at each Apply" : words;
         }
     }
 
     /**
      * One account.
      *
-     * @param instances how many instances its configurations want it on
+     * @param on        the instances its configurations want it on
      * @param removable no configuration lists it, so taking it out of the book drops nothing a layer names
      */
-    record Row(AccountRecord account, int instances, Password password, boolean removable) {
+    record Row(AccountRecord account, List<InstanceKey> on, Password password, boolean removable) {
+
+        Row {
+            on = List.copyOf(on);
+        }
+
+        /** How many instances want it. */
+        int instances() {
+            return on.size();
+        }
 
         boolean canForget() {
             return password == Password.REMEMBERED;
@@ -60,6 +86,7 @@ final class AccountsListModel {
         }
 
         String instancesText() {
+            int instances = instances();
             return instances == 0 ? "None" : instances == 1 ? "1 instance" : instances + " instances";
         }
     }
@@ -74,12 +101,37 @@ final class AccountsListModel {
         return book.stream()
                 .sorted(Comparator.comparing(AccountRecord::name, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(account -> account.kind().ordinal()))
-                .map(account -> new Row(account, onInstances.getOrDefault(account.key(), List.of()).size(),
+                .map(account -> new Row(account, onInstances.getOrDefault(account.key(), List.of()),
                         !account.kind().signedInByBotMaker() ? Password.NONE
                                 : remembered.contains(PasswordStore.key(account.name())) ? Password.REMEMBERED
                                 : Password.ASKED,
                         !held.contains(account.key())))
                 .toList();
+    }
+
+    /**
+     * One segment of the kind filter: a kind, or null for every kind, and how many accounts of the book it holds.
+     */
+    record KindCount(AccountRecord.Kind kind, int count) {
+
+        String said() {
+            return (kind == null ? "All" : kind.displayName()) + " " + count;
+        }
+    }
+
+    /** The kind filter's segments: All first, then each kind an account can be, a kind with none at 0. */
+    static List<KindCount> counts(List<Row> rows) {
+        List<KindCount> out = new ArrayList<>();
+        out.add(new KindCount(null, rows.size()));
+        for (AccountRecord.Kind kind : kinds()) {
+            out.add(new KindCount(kind, (int) rows.stream().filter(row -> row.account().kind() == kind).count()));
+        }
+        return out;
+    }
+
+    /** The kinds an account can be: every one but UNKNOWN. */
+    static List<AccountRecord.Kind> kinds() {
+        return Arrays.stream(AccountRecord.Kind.values()).filter(one -> one != AccountRecord.Kind.UNKNOWN).toList();
     }
 
     /** The keys the store is asked about: the accounts BotMaker signs in. */

@@ -183,6 +183,15 @@ public final class HostBook {
         return held;
     }
 
+    /**
+     * The note a configuration lists {@code key} with, empty when none gives one: {@link #known} fills an empty book
+     * note from it, so a note cleared in the book comes back while a configuration keeps it.
+     */
+    public static String listedNote(EmulatorConfig config, AccountRecord.Key key) {
+        return layered(config).stream().filter(account -> account.key().equals(key)).map(AccountRecord::note)
+                .filter(note -> !note.isEmpty()).findFirst().orElse("");
+    }
+
     /** Each account's note by its key, as the book has it; what the instances' accounts show. */
     static Map<AccountRecord.Key, String> notes(HostKnown book) {
         Map<AccountRecord.Key, String> notes = new LinkedHashMap<>();

@@ -13,6 +13,7 @@ import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.sdk.plugin.emulator.window.WindowKeys;
+import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -22,6 +23,7 @@ import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
@@ -32,11 +34,14 @@ import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -51,18 +56,25 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * The Accounts window: every account this PC knows, for every emulator and every bot, with no bot open (board
- * Accounts, spec {@code 2026-11-13-google-accounts-design.md}). It lists {@link HostBook}, forgets or remembers a
- * Google password in this PC's credential store, removes an account no configuration lists, and imports and exports
- * the book (kind, name and note: never a password). Which instance holds which account is the Emulators window's.
+ * Accounts, spec {@code 2026-11-13-google-accounts-design.md}; its look, spec {@code 2026-11-14-emulators-look-design.md}).
+ * It lists {@link HostBook} beside a detail panel for the account picked: its note, edited in place; its password,
+ * forgotten or remembered in this PC's credential store; the instances that want it, each with its state; and Remove
+ * for an account no configuration lists. It imports and exports the book (kind, name and note: never a password).
+ * Which instance holds which account is the Emulators window's.
  *
  * <p>A password typed into <i>Remember…</i> goes from the field to the store as characters and is cleared; it is
  * never text, never logged. Emails are shown to the user only.
@@ -76,16 +88,38 @@ public final class AccountsWindow {
     private final StudioServices services;
     private final Stage stage;
     private final TextField text = new TextField();
-    private final ComboBox<Optional<AccountRecord.Kind>> kind = new ComboBox<>();
+    /** The kind filter's segments, in {@link AccountsListModel#counts} order: All, then each kind. */
+    private final List<ToggleButton> segments = new ArrayList<>();
     private final Label status = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
     private final TableView<AccountsListModel.Row> table = new TableView<>();
+    private final VBox side = new VBox(6);
+    private AccountRecord.Kind kind;
     private List<AccountsListModel.Row> all = List.of();
     private List<AccountRecord> book = List.of();
     private boolean storeAvailable;
     /** The instances discovered by the first read, kept for the reads after an action; null until then. */
-    private List<InstanceKey> instances;
+    private Found found;
     /** Counts the reads started: a read that ends after a newer one started is dropped. */
     private int reads;
+    /** The account picked, kept across a read that rebuilds the list. */
+    private AccountRecord.Key picked;
+    private boolean refilling;
+    /** The row the panel shows, so a read that changed nothing of it leaves the panel, and a note being typed, alone. */
+    private AccountsListModel.Row shown;
+    private boolean shownStore;
+    private Found shownFound;
+    /** The panel's parts: the heading, the note (kept while the same account is shown), the rest. */
+    private final VBox top = new VBox(6);
+    private final VBox notes = new VBox(6);
+    private final VBox rest = new VBox(6);
+    /** The note's field and its account, kept across reads so one never undoes what is being typed. */
+    private TextField noteField;
+    private AccountRecord.Key noteKey;
+    /** The note as last written or read for {@link #noteKey}: a commit writes only what differs from it. */
+    private String[] noteWritten;
+    /** The notes waiting to be written, one per account, written one at a time so the last typed is the one kept. */
+    private final Map<AccountRecord.Key, AccountRecord> notesPending = new LinkedHashMap<>();
+    private boolean noteWriting;
 
     /** The toolbar's press: shows the window, the one already open when there is one. */
     public static void open(ActionContext context) {
@@ -102,17 +136,9 @@ public final class AccountsWindow {
     private AccountsWindow(StudioServices services) {
         this.services = services;
 
-        text.setPromptText("Filter");
-        text.setPrefColumnCount(16);
+        text.setPromptText("Find");
+        text.getStyleClass().add("em-find");
         text.textProperty().addListener((o, was, now) -> filter());
-        List<Optional<AccountRecord.Kind>> kinds = new ArrayList<>();
-        kinds.add(Optional.empty());
-        for (AccountRecord.Kind one : kinds()) kinds.add(Optional.of(one));
-        kind.getItems().setAll(kinds);
-        kind.setValue(Optional.empty());
-        kind.setButtonCell(kindCell());
-        kind.setCellFactory(list -> kindCell());
-        kind.valueProperty().addListener((o, was, now) -> filter());
 
         Button add = new Button("+ Account");
         add.setOnAction(e -> addAccount());
@@ -125,42 +151,58 @@ public final class AccountsWindow {
         Button export = new Button("Export…");
         export.setOnAction(e -> exportBook());
         Button refresh = Styles.on(new Button("⟳"), "em-icon");
-        refresh.setTooltip(new Tooltip("Read the accounts and the instances again (F5)"));
+        refresh.setTooltip(new Tooltip("Read the accounts, the instances and their states again (F5)"));
         Runnable reread = () -> {
-            instances = null;
+            found = null;
             load();
         };
         refresh.setOnAction(e -> reread.run());
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         HostUndo undo = new HostUndo(services, this::load);
-        HBox bar = new HBox(8, text, kind, gap, add, paste, importButton, export, undo.node(), refresh);
+        HBox bar = new HBox(8, text, kindBar(), gap, add, paste, importButton, export, undo.node(), refresh);
         bar.setAlignment(Pos.CENTER_LEFT);
+        bar.getStyleClass().add("em-header");
 
-        table.getColumns().setAll(List.of(
-                column("Account", 240, row -> row.account().name()),
-                column("Kind", 90, row -> row.account().kind().displayName()),
-                column("Note", 180, row -> row.account().note()),
-                instancesColumn(),
-                column("Password", 120, row -> row.password().displayName()),
-                actionsColumn()));
+        table.getColumns().setAll(List.of(accountColumn(), column("Note", 200, row -> row.account().note()),
+                passwordColumn(), instancesColumn()));
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("No account. + Account adds one, or an account set in an emulator's"
                 + " configuration shows here."));
-        VBox.setVgrow(table, Priority.ALWAYS);
+        table.getSelectionModel().selectedItemProperty().addListener((o, was, now) -> {
+            // the list refilled drops and restores the selection itself: the panel follows only the end of it
+            if (refilling) return;
+            // null too when the user deselects, so a later read leaves it so
+            picked = now == null ? null : now.account().key();
+            detail(now);
+        });
+
+        side.setPadding(new Insets(10));
+        side.getChildren().setAll(top, notes, rest);
+        ScrollPane panel = new ScrollPane(side);
+        panel.setFitToWidth(true);
+        panel.setPrefWidth(300);
+        panel.setMinWidth(260);
+        panel.getStyleClass().add("em-inspector-pane");
+        BorderPane list = new BorderPane(table);
+        list.setRight(panel);
+        VBox.setVgrow(list, Priority.ALWAYS);
 
         Label hint = Styles.on(new Label("The accounts this PC knows, for every emulator and every bot. Passwords stay"
                 + " in this PC's credential store; an export holds the kind, the name and the note only."),
                 StyleClasses.DIALOG_HINT);
         hint.setWrapText(true);
         status.setWrapText(true);
-        VBox body = new VBox(8, hint, bar, table, status);
-        body.setPadding(new Insets(10));
+        status.managedProperty().bind(status.textProperty().isNotEmpty());
+        status.visibleProperty().bind(status.managedProperty());
+        VBox body = new VBox(8, bar, hint, list, status);
+        body.setPadding(new Insets(0, 10, 10, 10));
+        detail(null);
 
         BorderPane root = new BorderPane(body);
         root.getStyleClass().add(Look.WINDOW);
         root.getStylesheets().add(Look.SHEET);
-        stage = Modals.window(services, Modals.Frame.modeless("Accounts", 860, 520, 620, 340), root);
+        stage = Modals.window(services, Modals.Frame.modeless("Accounts", 960, 540, 700, 360), root);
         WindowKeys.install(stage.getScene(), Map.of(
                 WindowKeys.Action.REFRESH, reread,
                 WindowKeys.Action.UNDO, undo::undo,
@@ -179,32 +221,60 @@ public final class AccountsWindow {
         });
     }
 
+    /** All N, Google N, Facebook N, Mail N: one pressed at a time, its count renewed by each read. */
+    private HBox kindBar() {
+        ToggleGroup group = new ToggleGroup();
+        HBox bar = new HBox();
+        bar.getStyleClass().add("em-segmented");
+        for (AccountsListModel.KindCount segment : AccountsListModel.counts(List.of())) {
+            ToggleButton one = new ToggleButton(segment.said());
+            one.setUserData(segment.kind());
+            one.setToggleGroup(group);
+            one.setMinWidth(Region.USE_PREF_SIZE);
+            segments.add(one);
+            bar.getChildren().add(one);
+        }
+        segments.getFirst().getStyleClass().add("em-first");
+        segments.getLast().getStyleClass().add("em-last");
+        segments.getFirst().setSelected(true);
+        group.selectedToggleProperty().addListener((o, was, now) -> {
+            if (now == null) {
+                // pressing the segment that is down leaves it down: one kind, or All, is always picked
+                was.setSelected(true);
+                return;
+            }
+            kind = (AccountRecord.Kind) now.getUserData();
+            filter();
+        });
+        return bar;
+    }
+
     // ---- reading ----
 
     /**
      * Reads the book, the configurations and which passwords this PC keeps, off the FX thread: the store can block,
-     * and discovery names the instances an emulator's layer reaches. Discovery runs on the first read and on Refresh;
-     * a read that a newer one overtook is dropped.
+     * and discovery names the instances an emulator's layer reaches. Discovery, and each wanted instance's state, run
+     * on the first read and on Refresh; a read that a newer one overtook is dropped.
      */
     private void load() {
         int read = ++reads;
-        List<InstanceKey> discovered = instances;
+        Found discovered = found;
         PasswordStore store = EmulatorsWindow.passwords();
         Async.load("accounts-read", () -> {
-            List<InstanceKey> keys = discovered != null ? discovered
-                    : EmulatorsModel.keys(EmulatorsModel.Source.live(services));
             EmulatorConfig config = HostConfig.load(services).config();
+            EmulatorsModel.Source source = EmulatorsModel.Source.live(services);
+            Found now = states(discovered != null ? discovered : found(source), source, config);
             List<AccountRecord> known = known(services, config);
             boolean available = store.available();
             Set<String> remembered = new HashSet<>();
             if (available) {
                 for (String key : AccountsListModel.keys(known)) if (store.remembered(key)) remembered.add(key);
             }
-            return new Read(keys, known, AccountsListModel.rows(known, HostBook.onInstances(config, keys),
+            return new Read(now, known, AccountsListModel.rows(known, HostBook.onInstances(config, now.keys()),
                     HostBook.held(config), remembered), available);
         }, done -> {
             if (read != reads) return;
-            instances = done.instances();
+            found = done.found();
             book = done.book();
             all = done.rows();
             storeAvailable = done.storeAvailable();
@@ -212,8 +282,50 @@ public final class AccountsWindow {
         }, failed -> say("The accounts were not read: " + failed));
     }
 
-    private record Read(List<InstanceKey> instances, List<AccountRecord> book, List<AccountsListModel.Row> rows,
+    private record Read(Found found, List<AccountRecord> book, List<AccountsListModel.Row> rows,
                         boolean storeAvailable) {
+    }
+
+    /**
+     * What discovery found: the instances' keys, each key's instance (to open it in the Emulators window), and the
+     * state of each instance some account is wanted on, as of this read.
+     */
+    private record Found(List<InstanceKey> keys, Map<InstanceKey, EmulatorInstance> instances,
+                         Map<InstanceKey, Look.Pill> states) {
+    }
+
+    /** Discovers this PC's instances, asking none of them anything yet. Off the FX thread. */
+    private static Found found(EmulatorsModel.Source source) {
+        Map<InstanceKey, EmulatorInstance> instances = new LinkedHashMap<>();
+        for (EmulatorInstance instance : EmulatorsModel.instances(source)) {
+            instances.putIfAbsent(InstanceKey.of(instance), instance);
+        }
+        return new Found(List.copyOf(instances.keySet()), Map.copyOf(instances), Map.of());
+    }
+
+    /**
+     * {@code found} with a state for each instance an account is wanted on that has none yet: all of them after a
+     * discovery, then only those an account came to be wanted on since. The instances are asked at once. Off FX.
+     */
+    private static Found states(Found found, EmulatorsModel.Source source, EmulatorConfig config) {
+        Set<InstanceKey> wanted = new HashSet<>();
+        HostBook.onInstances(config, found.keys()).values().forEach(wanted::addAll);
+        List<InstanceKey> ask = found.keys().stream()
+                .filter(key -> wanted.contains(key) && !found.states().containsKey(key)).toList();
+        if (ask.isEmpty()) return found;
+        Map<InstanceKey, Look.Pill> states = new HashMap<>(found.states());
+        states.putAll(ask.parallelStream().collect(Collectors.toMap(key -> key,
+                key -> state(source, found.instances().get(key)))));
+        return new Found(found.keys(), found.instances(), Map.copyOf(states));
+    }
+
+    private static Look.Pill state(EmulatorsModel.Source source, EmulatorInstance instance) {
+        try {
+            return Look.pill(source.running(instance), true);
+        } catch (RuntimeException unread) {
+            // its chip says "not read"; one instance that fails to answer hides no other
+            return Look.pill(false, false);
+        }
     }
 
     /**
@@ -224,15 +336,175 @@ public final class AccountsWindow {
         return io(() -> HostConfig.accounts(services).known(config));
     }
 
+    /** Lists the rows the Find text and the kind keep, the account picked still picked, and renews the counts. */
     private void filter() {
-        table.getItems().setAll(AccountsListModel.filtered(all, text.getText(), kind.getValue().orElse(null)));
+        List<AccountsListModel.KindCount> counts = AccountsListModel.counts(all);
+        for (int i = 0; i < segments.size(); i++) segments.get(i).setText(counts.get(i).said());
+        AccountRecord.Key keep = picked;
+        refilling = true;
+        try {
+            table.getItems().setAll(AccountsListModel.filtered(all, text.getText(), kind));
+            table.getItems().stream().filter(row -> row.account().key().equals(keep)).findFirst()
+                    .ifPresentOrElse(table.getSelectionModel()::select, table.getSelectionModel()::clearSelection);
+        } finally {
+            refilling = false;
+        }
+        // an account the Find text or the kind hides stays picked, and is shown again when they let it be
+        detail(table.getSelectionModel().getSelectedItem());
     }
 
     private void say(String words) {
         status.setText(words == null ? "" : words);
     }
 
+    // ---- the detail panel ----
+
+    /**
+     * The panel for {@code row}, or a hint for none; left as it is when the row, the store and the states are as it
+     * shows them. The note's field stays while the account does, so a read that lands while the user types keeps
+     * what they typed.
+     */
+    private void detail(AccountsListModel.Row row) {
+        if (row != null && row.equals(shown) && storeAvailable == shownStore && found == shownFound) return;
+        shown = row;
+        shownStore = storeAvailable;
+        shownFound = found;
+        top.getChildren().clear();
+        rest.getChildren().clear();
+        if (row == null) {
+            notes.getChildren().clear();
+            noteField = null;
+            noteKey = null;
+            top.getChildren().add(Look.muted("Pick an account to see its note, its password and the instances that"
+                    + " want it."));
+            return;
+        }
+        AccountRecord account = row.account();
+        top.getChildren().addAll(Look.heading(account.name(), Look.avatar(account.name(), account.key().name())),
+                Look.muted(account.kind().displayName() + " account"));
+
+        if (account.key().equals(noteKey)) {
+            noteWritten[0] = account.note();
+            if (!noteField.isFocused()) noteField.setText(account.note());
+        } else {
+            notes.getChildren().setAll(Look.cap("Note"), note(account));
+        }
+
+        rest.getChildren().add(Look.cap("Password"));
+        Label pill = Look.pill(row.password().pill());
+        HBox password = new HBox(6, pill);
+        password.setAlignment(Pos.CENTER_LEFT);
+        if (row.canForget()) password.getChildren().add(button("Forget", () -> forget(row)));
+        if (row.canRemember(storeAvailable)) password.getChildren().add(button("Remember…", () -> remember(row)));
+        rest.getChildren().addAll(password, Look.muted(row.password().words(storeAvailable)));
+
+        rest.getChildren().add(Look.cap("On instances"));
+        if (row.on().isEmpty()) {
+            rest.getChildren().add(Look.muted("No configuration wants it on an instance."));
+        }
+        for (InstanceKey key : row.on()) rest.getChildren().add(instanceChip(key));
+
+        VBox actions = new VBox(6);
+        actions.setPadding(new Insets(8, 0, 0, 0));
+        if (account.kind() == AccountRecord.Kind.GOOGLE) {
+            Hyperlink grid = new Hyperlink("Show in grid →");
+            grid.setTooltip(new Tooltip("The Emulators window's Accounts tab, on this account's row"));
+            grid.setOnAction(e -> EmulatorsWindow.openForAccount(services, account));
+            actions.getChildren().add(grid);
+        } else if (!row.on().isEmpty()) {
+            Hyperlink instances = new Hyperlink("Show its instances →");
+            instances.setOnAction(e -> EmulatorsWindow.openForAccount(services, account));
+            actions.getChildren().add(instances);
+        }
+        if (row.removable()) {
+            Button remove = button("Remove", () -> remove(row));
+            remove.setTooltip(new Tooltip("No configuration lists it, so it can leave the accounts"));
+            actions.getChildren().add(remove);
+        }
+        rest.getChildren().add(actions);
+    }
+
+    /**
+     * The note, edited in place: written when Enter is pressed or the focus moves to another control, if it changed;
+     * the window alone losing the focus (another window, a dialog) writes nothing.
+     */
+    private TextField note(AccountRecord account) {
+        TextField field = new TextField(account.note());
+        field.setPromptText("No note");
+        String[] written = {account.note()};
+        Runnable commit = () -> {
+            String typed = field.getText().strip();
+            if (typed.equals(written[0])) return;
+            written[0] = typed;
+            writeNote(new AccountRecord(account.kind(), account.name(), typed));
+        };
+        field.setOnAction(e -> commit.run());
+        field.focusedProperty().addListener((o, was, now) -> {
+            // still the scene's focus owner: only the window lost the focus
+            if (!now && (field.getScene() == null || field.getScene().getFocusOwner() != field)) commit.run();
+        });
+        noteField = field;
+        noteKey = account.key();
+        noteWritten = written;
+        return field;
+    }
+
+    /** {@code key}'s chip with its state pill; a link to it in the Emulators window when discovery found it. */
+    private Node instanceChip(InstanceKey key) {
+        EmulatorInstance instance = found == null ? null : found.instances().get(key);
+        Look.Pill state = instance == null ? new Look.Pill(Look.Tone.OUTLINED, "Not found")
+                : Objects.requireNonNullElse(found.states().get(key), Look.pill(false, false));
+        HBox line = new HBox(6, Look.chip(Look.badge(key.platform()), key.reference()), Look.pill(state));
+        line.setAlignment(Pos.CENTER_LEFT);
+        if (instance == null) {
+            Tooltip.install(line, new Tooltip("The last read found no instance " + key.reference() + " on this PC"));
+            return line;
+        }
+        Hyperlink open = new Hyperlink(null, line);
+        open.setTooltip(new Tooltip("Open " + key.reference() + " in the Emulators window"));
+        open.setOnAction(e -> EmulatorsWindow.open(services, instance));
+        return open;
+    }
+
     // ---- the actions ----
+
+    /** Queues the note as typed, empty or not; the notes are written one at a time, each account's last one. */
+    private void writeNote(AccountRecord changed) {
+        notesPending.remove(changed.key());
+        notesPending.put(changed.key(), changed);
+        if (!noteWriting) nextNote();
+    }
+
+    /**
+     * Writes the oldest note waiting. An empty note is refused while a configuration lists the account with one:
+     * reading the book fills an empty note from it, so the clear would not last.
+     */
+    private void nextNote() {
+        if (notesPending.isEmpty()) {
+            noteWriting = false;
+            return;
+        }
+        noteWriting = true;
+        AccountRecord changed = notesPending.remove(notesPending.keySet().iterator().next());
+        String name = changed.name();
+        Async.load("accounts-note", () -> {
+            String listed = changed.note().isEmpty()
+                    ? HostBook.listedNote(HostConfig.load(services).config(), changed.key()) : "";
+            if (listed.isEmpty()) io(() -> HostConfig.accounts(services).put(changed));
+            return listed;
+        }, listed -> {
+            say(!listed.isEmpty() ? "The note of " + name + " stays: an emulator's configuration lists it with the"
+                    + " note \"" + listed + "\". Change it there to clear it."
+                    : changed.note().isEmpty() ? "The note of " + name + " is cleared."
+                    : "The note of " + name + " is saved.");
+            nextNote();
+            load();
+        }, failed -> {
+            say("The note was not saved: " + failed);
+            nextNote();
+            load();
+        });
+    }
 
     private void forget(AccountsListModel.Row row) {
         String name = row.account().name();
@@ -300,6 +572,7 @@ public final class AccountsWindow {
         newAccount().ifPresent(account -> Async.load("accounts-add",
                 () -> io(() -> HostConfig.accounts(services).add(account)), after -> {
                     say(account.name() + " is added.");
+                    picked = account.key();
                     load();
                 }, failed -> say("The account was not added: " + failed)));
     }
@@ -307,7 +580,7 @@ public final class AccountsWindow {
     /** Adds every new account of a pasted list, of the kind picked, as one change; no password is asked here. */
     private void pasteList() {
         ComboBox<AccountRecord.Kind> kindPick = new ComboBox<>();
-        kindPick.getItems().setAll(kinds());
+        kindPick.getItems().setAll(AccountsListModel.kinds());
         kindPick.setValue(AccountRecord.Kind.GOOGLE);
         kindPick.setButtonCell(plainKindCell());
         kindPick.setCellFactory(list -> plainKindCell());
@@ -379,7 +652,7 @@ public final class AccountsWindow {
                 failed -> say("The accounts were not exported: " + failed));
     }
 
-    // ---- the table ----
+    // ---- the list ----
 
     private static TableColumn<AccountsListModel.Row, String> column(String title, double width,
                                                                     Function<AccountsListModel.Row, String> value) {
@@ -389,75 +662,57 @@ public final class AccountsWindow {
         return column;
     }
 
-    /** <i>N instances</i>: a link to the Emulators window on the instances that want the account. */
-    private TableColumn<AccountsListModel.Row, AccountsListModel.Row> instancesColumn() {
-        TableColumn<AccountsListModel.Row, AccountsListModel.Row> column = new TableColumn<>("On instances");
-        column.setPrefWidth(110);
+    /** A column whose cells draw the whole row, by {@code draw}; sorted by {@code order}. */
+    private static TableColumn<AccountsListModel.Row, AccountsListModel.Row> drawn(
+            String title, double width, Comparator<AccountsListModel.Row> order,
+            Function<AccountsListModel.Row, Node> draw) {
+        TableColumn<AccountsListModel.Row, AccountsListModel.Row> column = new TableColumn<>(title);
+        column.setPrefWidth(width);
         column.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
+        column.setComparator(order);
         column.setCellFactory(c -> new TableCell<>() {
             @Override
             protected void updateItem(AccountsListModel.Row row, boolean empty) {
                 super.updateItem(row, empty);
                 setText(null);
-                if (empty || row == null) {
-                    setGraphic(null);
-                } else if (row.instances() == 0) {
-                    setGraphic(Styles.on(new Label(row.instancesText()), StyleClasses.MUTED_TEXT));
-                } else {
-                    Hyperlink link = new Hyperlink(row.instancesText());
-                    link.setOnAction(e -> EmulatorsWindow.openForAccount(services, row.account()));
-                    setGraphic(link);
-                }
+                setGraphic(empty || row == null ? null : draw.apply(row));
             }
         });
         return column;
     }
 
-    private TableColumn<AccountsListModel.Row, AccountsListModel.Row> actionsColumn() {
-        TableColumn<AccountsListModel.Row, AccountsListModel.Row> column = new TableColumn<>("");
-        column.setPrefWidth(220);
-        column.setSortable(false);
-        column.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
-        column.setCellFactory(c -> new TableCell<>() {
-            @Override
-            protected void updateItem(AccountsListModel.Row row, boolean empty) {
-                super.updateItem(row, empty);
-                setText(null);
-                if (empty || row == null) {
-                    setGraphic(null);
-                    return;
-                }
-                HBox buttons = new HBox(6);
-                buttons.setAlignment(Pos.CENTER_LEFT);
-                if (row.canForget()) buttons.getChildren().add(button("Forget password", () -> forget(row)));
-                if (row.canRemember(storeAvailable)) {
-                    buttons.getChildren().add(button("Remember…", () -> remember(row)));
-                }
-                if (row.removable()) buttons.getChildren().add(button("Remove", () -> remove(row)));
-                setGraphic(buttons);
-            }
+    /** The avatar and the name; a Facebook or mail record says its kind under the name. */
+    private static TableColumn<AccountsListModel.Row, AccountsListModel.Row> accountColumn() {
+        return drawn("Account", 260, Comparator.comparing(row -> row.account().name(),
+                String.CASE_INSENSITIVE_ORDER), row -> {
+            AccountRecord account = row.account();
+            Label name = new Label(account.name());
+            Node words = account.kind() == AccountRecord.Kind.GOOGLE ? name
+                    : new VBox(0, name, Look.muted(account.kind().displayName()));
+            HBox out = new HBox(8, Look.avatar(account.name(), account.key().name()), words);
+            out.setAlignment(Pos.CENTER_LEFT);
+            return out;
         });
-        return column;
+    }
+
+    /** The password's pill, its whole words in the tooltip. */
+    private TableColumn<AccountsListModel.Row, AccountsListModel.Row> passwordColumn() {
+        return drawn("Password", 110, Comparator.comparing(AccountsListModel.Row::password), row -> {
+            Label pill = Look.pill(row.password().pill());
+            pill.setTooltip(new Tooltip(row.password().words(storeAvailable)));
+            return pill;
+        });
+    }
+
+    private static TableColumn<AccountsListModel.Row, AccountsListModel.Row> instancesColumn() {
+        return drawn("Instances", 100, Comparator.comparingInt(AccountsListModel.Row::instances), row ->
+                row.instances() == 0 ? Look.muted(row.instancesText()) : new Label(row.instancesText()));
     }
 
     private static Button button(String label, Runnable action) {
         Button button = new Button(label);
         button.setOnAction(e -> action.run());
         return button;
-    }
-
-    private static ListCell<Optional<AccountRecord.Kind>> kindCell() {
-        return new ListCell<>() {
-            @Override
-            protected void updateItem(Optional<AccountRecord.Kind> item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.map(AccountRecord.Kind::displayName).orElse("Any kind"));
-            }
-        };
-    }
-
-    private static List<AccountRecord.Kind> kinds() {
-        return Arrays.stream(AccountRecord.Kind.values()).filter(one -> one != AccountRecord.Kind.UNKNOWN).toList();
     }
 
     // ---- dialogs ----
@@ -505,8 +760,8 @@ public final class AccountsWindow {
     /** + Account: a kind, a name or an email, and a note. Empty when the user cancelled. */
     private Optional<AccountRecord> newAccount() {
         ComboBox<AccountRecord.Kind> kindPick = new ComboBox<>();
-        kindPick.getItems().setAll(kinds());
-        kindPick.setValue(AccountRecord.Kind.GOOGLE);
+        kindPick.getItems().setAll(AccountsListModel.kinds());
+        kindPick.setValue(kind == null ? AccountRecord.Kind.GOOGLE : kind);
         kindPick.setButtonCell(plainKindCell());
         kindPick.setCellFactory(list -> plainKindCell());
         TextField name = new TextField();

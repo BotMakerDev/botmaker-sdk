@@ -284,6 +284,14 @@ class HostBookTest {
     }
 
     @Test
+    void theListedNoteIsTheNoteALayerGivesAnAccountEmptyForNone() {
+        EmulatorConfig config = EmulatorConfig.EMPTY.withInstance(LD1, Layer.EMPTY.withAccount(FARM).withAccount(ALT));
+        assertEquals("farm", HostBook.listedNote(config, FARM.key()));
+        assertEquals("", HostBook.listedNote(config, ALT.key()), "listed with no note");
+        assertEquals("", HostBook.listedNote(config, FB.key()), "not listed");
+    }
+
+    @Test
     void anImportAddsWhatIsMissingAndKeepsANoteTheBookHas(@TempDir Path dir) throws IOException {
         Path exported = dir.resolve("accounts-export.json");
         HostBook.export(List.of(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "from the other PC"),

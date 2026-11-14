@@ -1,5 +1,6 @@
 package com.botmaker.sdk.plugin.emulator.accounts;
 
+import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -46,6 +47,26 @@ class AccountsListModelTest {
         assertFalse(rows.get(1).canRemember(false), "no store: nothing to remember it in");
         assertFalse(rows.get(0).canRemember(true), "a Facebook record has no password");
         assertEquals(Set.of("main@example.com", "farm@example.com"), AccountsListModel.keys(List.of(MAIN, FARM, FB)));
+    }
+
+    @Test
+    void theKindFilterCountsEveryKindWithAllFirstAndAnEmptyKindAtZero() {
+        List<AccountsListModel.KindCount> counts = AccountsListModel.counts(rows());
+        assertEquals(List.of("All 3", "Google 2", "Facebook 1", "Mail 0"),
+                counts.stream().map(AccountsListModel.KindCount::said).toList());
+        assertEquals(List.of("All 0", "Google 0", "Facebook 0", "Mail 0"),
+                AccountsListModel.counts(List.of()).stream().map(AccountsListModel.KindCount::said).toList());
+    }
+
+    @Test
+    void eachRowKnowsTheInstancesThatWantItAndItsPasswordPillAndWords() {
+        List<AccountsListModel.Row> rows = rows();
+        assertEquals(List.of(MUMU, MEMU), rows.get(2).on());
+        assertEquals(new Look.Pill(Look.Tone.OK, "Remembered"), rows.get(2).password().pill());
+        assertEquals(new Look.Pill(Look.Tone.MUTED, "Asked"), rows.get(1).password().pill());
+        assertEquals(new Look.Pill(Look.Tone.OUTLINED, "None"), rows.get(0).password().pill());
+        assertTrue(rows.get(1).password().words(true).contains("first Apply"));
+        assertTrue(rows.get(1).password().words(false).startsWith("No credential store"));
     }
 
     @Test
