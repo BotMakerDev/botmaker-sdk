@@ -167,6 +167,23 @@
 .em-hue-6 { -fx-background-color: -bm-fill-variables; -fx-text-fill: -bm-on-fill-variables; }
 .em-hue-7 { -fx-background-color: -bm-fill-functions; -fx-text-fill: -bm-on-fill-functions; }
 
+/* ---- the Instances tab: an emulator's group line, the inspector beside the table ---- */
+
+.tree-table-row-cell.em-group {
+    -fx-font-weight: bold;
+}
+
+.em-inspector-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-color: transparent transparent transparent -em-line;
+}
+
+.em-inspector-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
 /* ---- the chip and the cap ---- */
 
 .em-chip {

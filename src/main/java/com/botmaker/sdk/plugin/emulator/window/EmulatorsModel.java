@@ -241,13 +241,13 @@ public final class EmulatorsModel {
     /** The Instances tab's columns: what each shows for a row, and how it sorts. */
     public enum Column {
         NAME("name", "Instance", true),
-        EMULATOR("emulator", "Emulator", true),
+        EMULATOR("emulator", "Emulator", false),
         STATE("state", "State", true),
-        DIFFERS("differs", "Configuration", true),
         ACCOUNTS("accounts", "Accounts", true),
         GAMES("games", "Games", true),
+        DIFFERS("differs", "Configuration", true),
         TAGS("tags", "Tags", true),
-        USED_BY("used_by", "Used by bots", true),
+        USED_BY("used_by", "Used by bots", false),
         ANDROID("android", "Android", false),
         SCREEN("screen", "Screen", false),
         MEMORY("memory", "Memory", false),
@@ -367,10 +367,12 @@ public final class EmulatorsModel {
     /**
      * The Instances tab's filter; every part narrows, and an empty part keeps everything.
      *
-     * @param text     words found in the instance's name, case aside
+     * @param text     words found, case aside, in the instance's name, an account it should hold, a game it should
+     *                 have (its label or package) or a tag: what the window's Find types
      * @param emulator the product, or null for any
-     * @param account  words found in an account it should hold
-     * @param app      words found in a game it should have, its label or its package
+     * @param account  words found in an account it should hold, only there: set by a saved filter or the Accounts
+     *                 window's <i>N instances</i>, shown by the tab as a part the user removes
+     * @param app      words found in a game it should have, its label or its package; as {@code account}
      * @param tag      a tag it carries, exactly, case aside
      * @param differs  only the instances that differ from their configuration
      */
@@ -389,7 +391,11 @@ public final class EmulatorsModel {
         }
 
         public boolean keeps(InstanceRow row) {
-            if (!contains(row.instance().name(), text)) return false;
+            if (!text.isEmpty() && !contains(row.instance().name(), text)
+                    && row.accounts().stream().noneMatch(name -> contains(name, text))
+                    && row.wanted().games().stream().map(Sourced::value)
+                            .noneMatch(game -> contains(game.label(), text) || contains(game.packageName(), text))
+                    && row.tags().stream().noneMatch(one -> contains(one, text))) return false;
             if (emulator != null && row.key().platform() != emulator) return false;
             if (state == Running.RUNNING && !row.running() || state == Running.STOPPED && row.running()) return false;
             if (!account.isEmpty() && row.accounts().stream().noneMatch(name -> contains(name, account))) return false;
@@ -435,6 +441,31 @@ public final class EmulatorsModel {
 
     public static List<InstanceRow> filtered(List<InstanceRow> rows, Filter filter) {
         return rows.stream().filter(filter::keeps).toList();
+    }
+
+    // ---- groups ----
+
+    /** One emulator's instances, as the Instances tab folds them under it. */
+    public record Group(PlatformId platform, List<InstanceRow> rows) {
+
+        public Group {
+            rows = List.copyOf(rows);
+        }
+
+        public int running() {
+            return (int) rows.stream().filter(InstanceRow::running).count();
+        }
+    }
+
+    /** {@code rows} by emulator, the emulators by name and each one's instances by name. */
+    public static List<Group> byEmulator(List<InstanceRow> rows) {
+        Map<PlatformId, List<InstanceRow>> by = new LinkedHashMap<>();
+        for (InstanceRow row : sorted(rows, Column.NAME, true)) {
+            by.computeIfAbsent(row.key().platform(), platform -> new ArrayList<>()).add(row);
+        }
+        return by.entrySet().stream().map(one -> new Group(one.getKey(), one.getValue()))
+                .sorted(Comparator.comparing(group -> group.platform().displayName(), String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     // ---- tags ----

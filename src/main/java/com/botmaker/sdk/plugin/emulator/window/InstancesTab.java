@@ -8,10 +8,7 @@ import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.SavedFilters;
 import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
-import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -24,23 +21,31 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.TableRow;
-import javafx.scene.input.MouseButton;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeTableCell;
+import javafx.scene.control.TreeTableColumn;
+import javafx.scene.control.TreeTableRow;
+import javafx.scene.control.TreeTableView;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -50,47 +55,61 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The Instances tab: every instance as a row, with the columns the user chose (the table's own ☰ button), the filters,
- * saved filters, and Start, Stop and Apply for the rows picked. The order and the filtering are the model's
- * ({@link EmulatorsModel.Column#order}, {@link EmulatorsModel.Filter}); this draws them.
+ * The Instances tab: every instance as a row folded under its emulator, with the columns the user chose (the table's
+ * own ☰ button), the filters (the window's Find is their words), saved filters, and on the right the inspector of
+ * the rows picked, which holds Start, Stop and Apply. The order and the filtering are the model's
+ * ({@link EmulatorsModel.Column#order}, {@link EmulatorsModel.Filter}); what the inspector says is
+ * {@link InspectorModel}'s; this draws them.
  */
 final class InstancesTab {
 
     private static final String ANY_TAG = "Any tag";
+    /** The inspector's width (spec). */
+    private static final double INSPECTOR = 280;
+    /** How many accounts a row shows before "+N". */
+    private static final int AVATARS = 2;
+
+    /** A line of the tree: an emulator's group, or one of its instances. */
+    private sealed interface Line {}
+
+    private record GroupLine(EmulatorsModel.Group group) implements Line {}
+
+    private record RowLine(EmulatorsModel.InstanceRow row) implements Line {}
 
     private final EmulatorsWindow window;
     private final ManageActions manage;
-    private final TableView<EmulatorsModel.InstanceRow> table = new TableView<>();
-    private final ObservableList<EmulatorsModel.InstanceRow> shown = FXCollections.observableArrayList();
+    private final TreeTableView<Line> table = new TreeTableView<>(new TreeItem<>());
     private final TextField text = new TextField();
     private final ComboBox<Optional<PlatformId>> emulator = new ComboBox<>();
     private final ComboBox<EmulatorsModel.Running> state = new ComboBox<>();
     private final ComboBox<String> tag = new ComboBox<>();
-    private final TextField account = new TextField();
-    private final TextField app = new TextField();
     private final CheckBox differs = new CheckBox("Differs from its configuration");
     private final MenuButton saved = new MenuButton("Saved filters");
     private final Label count = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
-    private final Button start = new Button("Start");
-    private final Button stop = new Button("Stop");
-    private final Button apply = new Button("Apply");
+    private final ToggleButton toggle = new ToggleButton();
+    private final VBox inspector = new VBox(6);
+    private final ScrollPane inspectorPane = new ScrollPane(inspector);
     private final VBox root;
+    /** The groups folded by the user, kept over each read. */
+    private final Set<PlatformId> folded = new HashSet<>();
 
     /** Set while the controls are being filled, so filling them does not filter. */
     private boolean filling;
     /** The instance the picker's Manage… asked for, until its row is read. */
     private EmulatorInstance focusing;
+    /**
+     * The words found in an account only, and in a game only: set by a saved filter or the Accounts window, each
+     * shown in {@link #parts} as a chip its ✕ removes. Find's words match everywhere instead.
+     */
+    private String accountPart = "";
+    private String appPart = "";
+    private final HBox parts = new HBox(6);
 
     InstancesTab(EmulatorsWindow window) {
         this.window = window;
         this.manage = new ManageActions(window);
 
-        text.setPromptText("Name");
-        account.setPromptText("Account");
-        app.setPromptText("Game");
-        text.setPrefColumnCount(10);
-        account.setPrefColumnCount(10);
-        app.setPrefColumnCount(10);
+        text.setPromptText("Name, account, game or tag");
         emulator.setCellFactory(list -> emulatorCell());
         emulator.setButtonCell(emulatorCell());
         state.getItems().setAll(EmulatorsModel.Running.values());
@@ -103,8 +122,6 @@ final class InstancesTab {
         emulator.setValue(Optional.empty());
 
         text.textProperty().addListener((o, was, now) -> filter());
-        account.textProperty().addListener((o, was, now) -> filter());
-        app.textProperty().addListener((o, was, now) -> filter());
         emulator.valueProperty().addListener((o, was, now) -> filter());
         state.valueProperty().addListener((o, was, now) -> filter());
         tag.valueProperty().addListener((o, was, now) -> filter());
@@ -112,46 +129,63 @@ final class InstancesTab {
         Button clear = new Button("Clear");
         clear.setOnAction(e -> use(EmulatorsModel.Filter.NONE));
 
-        FlowPane filters = new FlowPane(8, 6, emulator, state, tag, account, app, differs, clear, saved);
+        toggle.getStyleClass().add("em-icon");
+        toggle.setSelected(!Files.exists(hiddenMark()));
+        toggle.selectedProperty().addListener((o, was, now) -> {
+            inspectorShown(now);
+            remember(now);
+        });
+        parts.setAlignment(Pos.CENTER_LEFT);
+        FlowPane filters = new FlowPane(8, 6, emulator, state, tag, differs, parts, clear, saved);
         filters.setAlignment(Pos.CENTER_LEFT);
         for (Node node : filters.getChildren()) {
             if (node instanceof Region region) region.setMinWidth(Region.USE_PREF_SIZE);
         }
+        count.setMinWidth(Region.USE_PREF_SIZE);
+        HBox.setHgrow(filters, Priority.ALWAYS);
+        HBox bar = new HBox(8, filters, count, toggle);
+        bar.setAlignment(Pos.TOP_LEFT);
 
         for (EmulatorsModel.Column column : EmulatorsModel.Column.offered()) table.getColumns().add(column(column));
+        table.setShowRoot(false);
         table.setTableMenuButtonVisible(true);
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         table.setPlaceholder(new Label("No instance matches. Clear the filters, or create an instance in an"
                 + " emulator's own manager."));
-        SortedList<EmulatorsModel.InstanceRow> sorted = new SortedList<>(shown);
-        sorted.comparatorProperty().bind(table.comparatorProperty());
-        table.setItems(sorted);
         table.setContextMenu(rowMenu());
         table.setRowFactory(t -> {
-            TableRow<EmulatorsModel.InstanceRow> one = new TableRow<>();
+            TreeTableRow<Line> one = new TreeTableRow<>() {
+                @Override
+                protected void updateItem(Line line, boolean empty) {
+                    super.updateItem(line, empty);
+                    getStyleClass().remove("em-group");
+                    if (!empty && line instanceof GroupLine) getStyleClass().add("em-group");
+                }
+            };
             one.setOnMouseClicked(e -> {
-                if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY && !one.isEmpty()) configure();
+                if (e.getClickCount() == 2 && e.getButton() == MouseButton.PRIMARY
+                        && one.getItem() instanceof RowLine) configure();
             });
             return one;
         });
-        table.getSelectionModel().getSelectedItems().addListener(
-                (ListChangeListener<EmulatorsModel.InstanceRow>) change -> buttons());
-        VBox.setVgrow(table, Priority.ALWAYS);
+        table.getSelectionModel().getSelectedItems().addListener((ListChangeListener<TreeItem<Line>>) change -> inspect());
+        HBox.setHgrow(table, Priority.ALWAYS);
 
-        start.setOnAction(e -> window.start(picked()));
-        stop.setOnAction(e -> window.stop(picked()));
-        apply.setOnAction(e -> window.apply(picked()));
-        Styles.on(apply, StyleClasses.PRIMARY_BUTTON);
-        Region gap = new Region();
-        HBox.setHgrow(gap, Priority.ALWAYS);
-        HBox actions = new HBox(8, count, gap, start, stop, apply);
-        actions.setAlignment(Pos.CENTER_LEFT);
-        for (Button button : List.of(start, stop, apply)) button.setMinWidth(Region.USE_PREF_SIZE);
+        inspector.getStyleClass().add("em-inspector");
+        inspector.setPadding(new Insets(10));
+        inspectorPane.setFitToWidth(true);
+        inspectorPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        inspectorPane.setPrefWidth(INSPECTOR);
+        inspectorPane.setMinWidth(INSPECTOR);
+        inspectorPane.getStyleClass().add("em-inspector-pane");
+        HBox body = new HBox(table, inspectorPane);
+        VBox.setVgrow(body, Priority.ALWAYS);
 
-        root = new VBox(8, filters, table, actions);
+        root = new VBox(8, bar, body);
         root.setPadding(new Insets(10));
         savedMenu();
-        buttons();
+        inspectorShown(toggle.isSelected());
+        inspect();
     }
 
     Node node() {
@@ -160,9 +194,9 @@ final class InstancesTab {
 
     /** Draws a new read: the same filter, and the rows picked before picked again. */
     void show(EmulatorsModel.Snapshot snapshot) {
-        Set<InstanceKey> picked = picked().stream().map(EmulatorsModel.InstanceRow::key).collect(Collectors.toSet());
         EmulatorsModel.Filter filter = filterNow();
         EmulatorInstance focus = focusing;
+        Set<InstanceKey> picked = null;
         if (focus != null) {
             // the picker's Manage… opened the window before its rows were read: its filter and row are set now
             filter = focusFilter(focus);
@@ -185,43 +219,101 @@ final class InstancesTab {
         List<String> tags = new ArrayList<>(List.of(ANY_TAG));
         tags.addAll(snapshot.tags());
         tag.getItems().setAll(tags);
-        tag.setValue(tags.stream().filter(filter.tag()::equalsIgnoreCase).findFirst().orElse(ANY_TAG));
+        String wantedTag = filter.tag();
+        tag.setValue(tags.stream().filter(wantedTag::equalsIgnoreCase).findFirst().orElse(ANY_TAG));
+        if (focus != null) text.setText(filter.text());
         filling = false;
-        filter();
-        table.getSelectionModel().clearSelection();
-        for (EmulatorsModel.InstanceRow row : table.getItems()) {
-            if (picked.contains(row.key())) table.getSelectionModel().select(row);
-        }
-        buttons();
+        draw(picked);
     }
 
     // ---- filters ----
 
     private EmulatorsModel.Filter filterNow() {
         return new EmulatorsModel.Filter(text.getText(), emulator.getValue() == null ? null
-                : emulator.getValue().orElse(null), state.getValue(), account.getText(), app.getText(),
+                : emulator.getValue().orElse(null), state.getValue(), accountPart, appPart,
                 tag.getValue() == null || ANY_TAG.equals(tag.getValue()) ? "" : tag.getValue(), differs.isSelected());
     }
 
     private void filter() {
-        if (filling) return;
-        List<EmulatorsModel.InstanceRow> all = window.snapshot().instances();
-        List<EmulatorsModel.InstanceRow> kept = EmulatorsModel.filtered(all, filterNow());
-        shown.setAll(kept);
-        count.setText(kept.size() == all.size() ? EmulatorsModel.count(all.size(), "instance")
-                : kept.size() + " of " + EmulatorsModel.count(all.size(), "instance"));
+        if (!filling) draw(null);
     }
 
-    private void use(EmulatorsModel.Filter filter) {
+    /**
+     * Fills the tree with the rows the filter keeps, grouped by emulator, and picks {@code picked} again, or the rows
+     * picked before when null.
+     */
+    private void draw(Set<InstanceKey> picked) {
+        Set<InstanceKey> again = picked != null ? picked
+                : picked().stream().map(EmulatorsModel.InstanceRow::key).collect(Collectors.toSet());
+        Set<PlatformId> groupsPicked = pickedGroups().stream().map(EmulatorsModel.Group::platform)
+                .collect(Collectors.toSet());
+        List<EmulatorsModel.InstanceRow> all = window.snapshot().instances();
+        List<EmulatorsModel.InstanceRow> kept = EmulatorsModel.filtered(all, filterNow());
+        count.setText(kept.size() == all.size() ? EmulatorsModel.count(all.size(), "instance")
+                : kept.size() + " of " + EmulatorsModel.count(all.size(), "instance"));
+
         filling = true;
-        text.setText(filter.text());
-        account.setText(filter.account());
-        app.setText(filter.app());
-        emulator.setValue(emulator.getItems().contains(Optional.ofNullable(filter.emulator()))
-                ? Optional.ofNullable(filter.emulator()) : Optional.empty());
-        state.setValue(filter.state());
-        tag.setValue(tag.getItems().stream().filter(filter.tag()::equalsIgnoreCase).findFirst().orElse(ANY_TAG));
-        differs.setSelected(filter.differs());
+        List<TreeItem<Line>> groups = new ArrayList<>();
+        for (EmulatorsModel.Group group : EmulatorsModel.byEmulator(kept)) {
+            TreeItem<Line> item = new TreeItem<>(new GroupLine(group));
+            for (EmulatorsModel.InstanceRow row : group.rows()) item.getChildren().add(new TreeItem<>(new RowLine(row)));
+            item.setExpanded(!folded.contains(group.platform()));
+            item.expandedProperty().addListener((o, was, now) -> {
+                if (now) folded.remove(group.platform());
+                else folded.add(group.platform());
+            });
+            groups.add(item);
+        }
+        table.getSelectionModel().clearSelection();
+        table.getRoot().getChildren().setAll(groups);
+        table.sort();
+        for (TreeItem<Line> group : groups) {
+            if (group.getValue() instanceof GroupLine(EmulatorsModel.Group one)
+                    && groupsPicked.contains(one.platform())) {
+                table.getSelectionModel().select(group);
+            }
+            for (TreeItem<Line> item : group.getChildren()) {
+                if (item.getValue() instanceof RowLine(EmulatorsModel.InstanceRow row) && again.contains(row.key())) {
+                    group.setExpanded(true);
+                    table.getSelectionModel().select(item);
+                }
+            }
+        }
+        filling = false;
+        inspect();
+    }
+
+    /** The account and game parts as chips, each removed by its ✕. */
+    private void drawParts() {
+        parts.getChildren().clear();
+        if (!accountPart.isEmpty()) parts.getChildren().add(part("Account: " + accountPart, () -> accountPart = ""));
+        if (!appPart.isEmpty()) parts.getChildren().add(part("Game: " + appPart, () -> appPart = ""));
+    }
+
+    private Button part(String words, Runnable remove) {
+        Button chip = new Button(words + "  ✕");
+        chip.getStyleClass().add("em-chip");
+        chip.setMinWidth(Region.USE_PREF_SIZE);
+        chip.setTooltip(new Tooltip("Remove this part of the filter"));
+        chip.setOnAction(e -> {
+            remove.run();
+            drawParts();
+            filter();
+        });
+        return chip;
+    }
+
+    private void use(EmulatorsModel.Filter shown) {
+        filling = true;
+        accountPart = shown.account();
+        appPart = shown.app();
+        drawParts();
+        text.setText(shown.text());
+        emulator.setValue(emulator.getItems().contains(Optional.ofNullable(shown.emulator()))
+                ? Optional.ofNullable(shown.emulator()) : Optional.empty());
+        state.setValue(shown.state());
+        tag.setValue(tag.getItems().stream().filter(shown.tag()::equalsIgnoreCase).findFirst().orElse(ANY_TAG));
+        differs.setSelected(shown.differs());
         filling = false;
         filter();
     }
@@ -282,17 +374,22 @@ final class InstancesTab {
 
     // ---- rows ----
 
+    /** The instances picked; a group's line picked picks none. */
     private List<EmulatorsModel.InstanceRow> picked() {
-        return List.copyOf(table.getSelectionModel().getSelectedItems());
+        List<EmulatorsModel.InstanceRow> rows = new ArrayList<>();
+        for (TreeItem<Line> item : table.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() instanceof RowLine(EmulatorsModel.InstanceRow row)) rows.add(row);
+        }
+        return rows;
     }
 
-    private void buttons() {
-        List<EmulatorsModel.InstanceRow> picked = picked();
-        start.setDisable(picked.stream().allMatch(EmulatorsModel.InstanceRow::running));
-        stop.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::running));
-        long applicable = picked.stream().filter(EmulatorsModel.InstanceRow::applicable).count();
-        apply.setDisable(applicable == 0);
-        apply.setText(applicable == 0 ? "Apply" : "Apply to " + applicable);
+    /** The groups whose own line is picked. */
+    private List<EmulatorsModel.Group> pickedGroups() {
+        List<EmulatorsModel.Group> groups = new ArrayList<>();
+        for (TreeItem<Line> item : table.getSelectionModel().getSelectedItems()) {
+            if (item != null && item.getValue() instanceof GroupLine(EmulatorsModel.Group group)) groups.add(group);
+        }
+        return groups;
     }
 
     private ContextMenu rowMenu() {
@@ -339,24 +436,34 @@ final class InstancesTab {
         return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
     }
 
-    /** The name filter, which the window's Find shows and types into; the tab does not show it itself. */
+    /** The filter's words, which the window's Find shows and types into; the tab does not show them itself. */
     TextField findField() {
         return text;
     }
 
     /**
-     * Shows {@code instance}: the name filter set to its name and its emulator, the other filters cleared, its row
-     * selected. A window not yet read keeps it until its rows are ({@link #show}).
+     * Shows {@code instance}: the words set to its name and the emulator to its own, the other filters cleared, its
+     * row selected. A window not yet read keeps it until its rows are ({@link #show}).
      */
     void focus(EmulatorInstance instance) {
         if (instance == null) return;
         focusing = instance;
         use(focusFilter(instance));
-        shown.stream().filter(row -> same(row.instance(), instance)).findFirst().ifPresent(row -> {
+        if (picked().stream().anyMatch(row -> same(row.instance(), instance))) {
             focusing = null;
-            table.getSelectionModel().clearSelection();
-            table.getSelectionModel().select(row);
-        });
+            return;
+        }
+        for (TreeItem<Line> group : table.getRoot().getChildren()) {
+            for (TreeItem<Line> item : group.getChildren()) {
+                if (item.getValue() instanceof RowLine(EmulatorsModel.InstanceRow row) && same(row.instance(), instance)) {
+                    focusing = null;
+                    group.setExpanded(true);
+                    table.getSelectionModel().clearSelection();
+                    table.getSelectionModel().select(item);
+                    return;
+                }
+            }
+        }
     }
 
     /** The Accounts window's <i>N instances</i>: the instances that should hold {@code account}, the rest cleared. */
@@ -401,31 +508,235 @@ final class InstancesTab {
         });
     }
 
-    private TableColumn<EmulatorsModel.InstanceRow, EmulatorsModel.InstanceRow> column(EmulatorsModel.Column column) {
-        TableColumn<EmulatorsModel.InstanceRow, EmulatorsModel.InstanceRow> out =
-                new TableColumn<>(column.displayName());
-        out.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
-        out.setComparator(column.order());
+    // ---- the inspector ----
+
+    private static Path hiddenMark() {
+        return HostConfig.stateDir().resolve("instances-inspector-hidden");
+    }
+
+    /** Shows or hides the inspector. */
+    private void inspectorShown(boolean shown) {
+        inspectorPane.setVisible(shown);
+        inspectorPane.setManaged(shown);
+        toggle.setText(shown ? "⟩" : "⟨");
+        toggle.setTooltip(new Tooltip(shown ? "Hide the inspector" : "Show the inspector"));
+    }
+
+    /** Remembers on this PC whether the inspector shows, as the user turns it. */
+    private static void remember(boolean shown) {
+        try {
+            if (shown) Files.deleteIfExists(hiddenMark());
+            else if (!Files.exists(hiddenMark())) {
+                Files.createDirectories(hiddenMark().getParent());
+                Files.createFile(hiddenMark());
+            }
+        } catch (IOException unsaved) {
+            // the inspector still hides; only the next window forgets it
+        }
+    }
+
+    /** Draws the inspector for what is picked: one instance, several, a group's line, or nothing. */
+    void inspect() {
+        if (filling) return;
+        inspector.getChildren().clear();
+        List<EmulatorsModel.InstanceRow> picked = picked();
+        if (picked.size() == 1) {
+            one(picked.getFirst());
+        } else if (picked.size() > 1) {
+            several(Styles.on(new Label(InspectorModel.several(picked).title()), StyleClasses.DIALOG_SUBHEADING),
+                    picked);
+        } else if (pickedGroups().size() == 1) {
+            EmulatorsModel.Group group = pickedGroups().getFirst();
+            several(heading(group.platform().displayName(), Look.badge(group.platform())), group.rows());
+        } else if (pickedGroups().size() > 1) {
+            List<EmulatorsModel.InstanceRow> rows = pickedGroups().stream()
+                    .flatMap(group -> group.rows().stream()).toList();
+            several(Styles.on(new Label(EmulatorsModel.count(pickedGroups().size(), "emulator")),
+                    StyleClasses.DIALOG_SUBHEADING), rows);
+        } else {
+            for (TreeItem<Line> item : table.getRoot().getChildren()) {
+                if (!(item.getValue() instanceof GroupLine(EmulatorsModel.Group group))) continue;
+                InspectorModel.Several counted = InspectorModel.several(group.rows());
+                inspector.getChildren().addAll(heading(group.platform().displayName(), Look.badge(group.platform())),
+                        line(counted.title() + ": " + counted.states()));
+            }
+            inspector.getChildren().add(muted("Pick an instance to see it, or several to start, stop or apply them"
+                    + " together."));
+        }
+    }
+
+    private void one(EmulatorsModel.InstanceRow row) {
+        Label title = heading(row.instance().name(), Look.badge(row.key().platform()));
+        HBox pills = new HBox(6, Look.pill(Look.pill(row.running(), row.facts() != null)));
+        if (row.differs()) pills.getChildren().add(Look.pill(new Look.Pill(Look.Tone.WARNING, "Differs")));
+        inspector.getChildren().addAll(title, muted(row.key().platform().displayName()), pills);
+
+        inspector.getChildren().add(Look.cap("Accounts"));
+        if (row.accounts().isEmpty()) {
+            inspector.getChildren().add(muted("None listed."));
+        } else {
+            FlowPane chips = new FlowPane(6, 6);
+            for (String name : row.accounts()) chips.getChildren().add(Look.chip(Look.avatar(name, name), name));
+            inspector.getChildren().add(chips);
+        }
+
+        inspector.getChildren().add(Look.cap("What Apply changes"));
+        List<String> changes = InspectorModel.applyLines(row);
+        if (row.diff() == null) inspector.getChildren().add(muted("Not read: refresh once it answers."));
+        else if (changes.isEmpty()) inspector.getChildren().add(muted("Nothing: it is as configured."));
+        else for (String change : changes) inspector.getChildren().add(line(change));
+
+        inspector.getChildren().add(Look.cap("Device"));
+        GridPane device = new GridPane();
+        device.setHgap(10);
+        device.setVgap(2);
+        int at = 0;
+        for (InspectorModel.Fact fact : InspectorModel.device(row)) {
+            device.addRow(at++, Styles.on(new Label(fact.label()), StyleClasses.MUTED_TEXT), line(fact.value()));
+        }
+        inspector.getChildren().add(device);
+
+        Button startStop = new Button(row.running() ? "Stop" : "Start");
+        startStop.setOnAction(e -> {
+            if (row.running()) window.stop(List.of(row));
+            else window.start(List.of(row));
+        });
+        Button configure = new Button("Configure…");
+        configure.setOnAction(e -> window.configure(new ConfigViews.Target.Instance(row.key())));
+        Button apply = Styles.on(new Button("Apply"), StyleClasses.PRIMARY_BUTTON);
+        apply.setDisable(!row.applicable());
+        apply.setOnAction(e -> window.apply(List.of(row)));
+        FlowPane buttons = buttons(startStop, configure, apply);
+        window.needsYou(row.key()).ifPresent(waiting -> {
+            Button look = new Button("Open its screen");
+            look.setMinWidth(Region.USE_PREF_SIZE);
+            look.setOnAction(e -> window.openScreen(waiting));
+            buttons.getChildren().add(look);
+        });
+        inspector.getChildren().add(buttons);
+    }
+
+    /** Several instances, or a group's: their count and states, and Start, Stop and Apply to all of them. */
+    private void several(Label title, List<EmulatorsModel.InstanceRow> rows) {
+        InspectorModel.Several counted = InspectorModel.several(rows);
+        inspector.getChildren().addAll(title, line(counted.title()), muted(counted.states()));
+        Button start = new Button("Start");
+        start.setDisable(rows.stream().allMatch(EmulatorsModel.InstanceRow::running));
+        start.setOnAction(e -> window.start(rows));
+        Button stop = new Button("Stop");
+        stop.setDisable(rows.stream().noneMatch(EmulatorsModel.InstanceRow::running));
+        stop.setOnAction(e -> window.stop(rows));
+        Button apply = Styles.on(new Button(counted.applicable() == 0 ? "Apply" : "Apply to " + counted.applicable()),
+                StyleClasses.PRIMARY_BUTTON);
+        apply.setDisable(counted.applicable() == 0);
+        apply.setOnAction(e -> window.apply(rows));
+        inspector.getChildren().add(buttons(start, stop, apply));
+    }
+
+    private static FlowPane buttons(Button... buttons) {
+        FlowPane row = new FlowPane(6, 6, buttons);
+        row.setPadding(new Insets(8, 0, 0, 0));
+        for (Button button : buttons) button.setMinWidth(Region.USE_PREF_SIZE);
+        return row;
+    }
+
+    private static Label heading(String words, Node badge) {
+        Label title = Styles.on(new Label(words, badge), StyleClasses.DIALOG_SUBHEADING);
+        title.setGraphicTextGap(8);
+        title.setWrapText(true);
+        return title;
+    }
+
+    private static Label line(String words) {
+        Label label = new Label(words);
+        label.setWrapText(true);
+        return label;
+    }
+
+    private static Label muted(String words) {
+        return Styles.on(line(words), StyleClasses.MUTED_TEXT);
+    }
+
+    // ---- the columns ----
+
+    private TreeTableColumn<Line, Line> column(EmulatorsModel.Column column) {
+        TreeTableColumn<Line, Line> out = new TreeTableColumn<>(column.displayName());
+        out.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().getValue()));
+        Comparator<EmulatorsModel.InstanceRow> rows = column.order();
+        out.setComparator((a, b) -> a instanceof RowLine(EmulatorsModel.InstanceRow x)
+                && b instanceof RowLine(EmulatorsModel.InstanceRow y) ? rows.compare(x, y)
+                : String.CASE_INSENSITIVE_ORDER.compare(groupName(a), groupName(b)));
         out.setVisible(column.shownAtFirst());
-        out.setPrefWidth(column == EmulatorsModel.Column.DIFFERS || column == EmulatorsModel.Column.ACCOUNTS ? 170 : 120);
-        out.setCellFactory(made -> new TableCell<>() {
+        out.setPrefWidth(switch (column) {
+            case NAME -> 200;
+            case ACCOUNTS -> 220;
+            case DIFFERS -> 140;
+            case STATE -> 100;
+            default -> 120;
+        });
+        out.setCellFactory(made -> new TreeTableCell<>() {
             @Override
-            protected void updateItem(EmulatorsModel.InstanceRow row, boolean empty) {
-                super.updateItem(row, empty);
-                getStyleClass().removeAll(StyleClasses.OK_TEXT, StyleClasses.WARNING_TEXT, StyleClasses.MUTED_TEXT);
-                if (empty || row == null) {
-                    setText(null);
-                    return;
-                }
-                setText(column.text(row));
-                if (column == EmulatorsModel.Column.STATE) {
-                    getStyleClass().add(row.running() ? StyleClasses.OK_TEXT : StyleClasses.MUTED_TEXT);
-                } else if (column == EmulatorsModel.Column.DIFFERS && row.differs()) {
-                    getStyleClass().add(StyleClasses.WARNING_TEXT);
+            protected void updateItem(Line line, boolean empty) {
+                super.updateItem(line, empty);
+                setText(null);
+                setGraphic(null);
+                setTooltip(null);
+                if (empty || line == null) return;
+                switch (line) {
+                    case GroupLine(EmulatorsModel.Group group) -> {
+                        if (column != EmulatorsModel.Column.NAME) return;
+                        setText(group.platform().displayName() + " · " + group.rows().size() + " · "
+                                + group.running() + " running");
+                        setGraphic(Look.badge(group.platform()));
+                        setGraphicTextGap(8);
+                    }
+                    case RowLine(EmulatorsModel.InstanceRow row) -> cell(this, column, row);
                 }
             }
         });
         return out;
+    }
+
+    private static String groupName(Line line) {
+        return switch (line) {
+            case GroupLine(EmulatorsModel.Group group) -> group.platform().displayName();
+            case RowLine(EmulatorsModel.InstanceRow row) -> row.key().platform().displayName();
+        };
+    }
+
+    /** What an instance's cell shows in {@code column}: a pill, avatars, or the column's words. */
+    private static void cell(TreeTableCell<Line, Line> cell, EmulatorsModel.Column column,
+                             EmulatorsModel.InstanceRow row) {
+        switch (column) {
+            case STATE -> cell.setGraphic(Look.pill(Look.pill(row.running(), row.facts() != null)));
+            case DIFFERS -> {
+                if (row.differs()) {
+                    cell.setGraphic(Look.pill(new Look.Pill(Look.Tone.WARNING, "Differs")));
+                    cell.setTooltip(new Tooltip(column.text(row)));
+                } else if (row.applicable()) {
+                    cell.setGraphic(Styles.on(new Label(column.text(row)), StyleClasses.MUTED_TEXT));
+                }
+            }
+            case ACCOUNTS -> {
+                List<String> names = row.accounts();
+                if (names.isEmpty()) return;
+                HBox shown = new HBox(8);
+                shown.setAlignment(Pos.CENTER_LEFT);
+                for (String name : names.subList(0, Math.min(AVATARS, names.size()))) {
+                    Label one = new Label(name, Look.avatar(name, name));
+                    one.setGraphicTextGap(4);
+                    one.setMinWidth(0);
+                    shown.getChildren().add(one);
+                }
+                if (names.size() > AVATARS) {
+                    shown.getChildren().add(Styles.on(new Label("+" + (names.size() - AVATARS)),
+                            StyleClasses.MUTED_TEXT));
+                }
+                cell.setGraphic(shown);
+                cell.setTooltip(new Tooltip(String.join("\n", names)));
+            }
+            default -> cell.setText(column.text(row));
+        }
     }
 
     private static ListCell<Optional<PlatformId>> emulatorCell() {

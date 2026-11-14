@@ -171,6 +171,30 @@ class EmulatorsModelTest {
                 Filter.of(Map.of("tag", "farm", "state", "stopped")))), "the parts narrow together");
     }
 
+    @Test
+    void findsWordsInTheNameAnAccountAGameOrATag() {
+        List<InstanceRow> rows = read().instances();
+        assertEquals(List.of("test"), names(EmulatorsModel.filtered(rows, filter("text", "USER@"))), "an account");
+        assertEquals(List.of("test", "Farm"), names(EmulatorsModel.filtered(rows, filter("text", "sword"))), "a game");
+        assertEquals(List.of("test", "Farm"), names(EmulatorsModel.filtered(rows, filter("text", "zjcs"))),
+                "a game's package");
+        assertEquals(List.of("Farm"), names(EmulatorsModel.filtered(rows, filter("text", "mai"))), "part of a tag");
+        assertEquals(List.of("MuMu-0"), names(EmulatorsModel.filtered(rows, filter("text", "mumu"))), "the name");
+    }
+
+    @Test
+    void groupsByEmulatorEachByName() {
+        List<EmulatorsModel.Group> groups = EmulatorsModel.byEmulator(read().instances());
+        assertEquals(List.of(PlatformId.LDPLAYER, PlatformId.MUMU),
+                groups.stream().map(EmulatorsModel.Group::platform).toList(), "by the emulator's name");
+        assertEquals(List.of("Farm", "test"), names(groups.getFirst().rows()));
+        assertEquals(1, groups.getFirst().running());
+        assertEquals(List.of(), EmulatorsModel.byEmulator(List.of()));
+        assertEquals(List.of(PlatformId.MUMU), EmulatorsModel.byEmulator(EmulatorsModel.filtered(read().instances(),
+                filter("emulator", "mumu"))).stream().map(EmulatorsModel.Group::platform).toList(),
+                "an emulator with no row kept has no group");
+    }
+
     private static Filter filter(String key, String value) {
         return Filter.of(Map.of(key, value));
     }

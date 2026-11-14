@@ -344,7 +344,7 @@ public final class EmulatorsWindow {
     }
 
     /** Opens the live screen of the instance {@code one} waits on, when it was read. */
-    private void openScreen(Operation.Snapshot one) {
+    void openScreen(Operation.Snapshot one) {
         snapshot.instance(one.instance()).ifPresentOrElse(row -> LiveScreenDialog.open(this, row, one.needsYou()),
                 () -> say("The instance " + one.title() + " needs was not read yet: Refresh, then open it from"
                         + " Running."));
@@ -705,7 +705,10 @@ public final class EmulatorsWindow {
         drawStrip();
         // the cards show "Needs you" while an operation waits: drawn again as it starts and stops waiting
         boolean waits = heard.state() == Operation.State.NEEDS_YOU;
-        if (waits ? waiting.add(heard.id()) : waiting.remove(heard.id())) running.draw();
+        if (waits ? waiting.add(heard.id()) : waiting.remove(heard.id())) {
+            running.draw();
+            instances.inspect();
+        }
         // the live screen opens by itself the first time an operation waits on the user
         if (waits && heard.instance() != null && shownNeedsYou.add(heard.id())) openScreen(heard);
         if (heard.state().ended()) {

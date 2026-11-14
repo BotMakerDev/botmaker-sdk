@@ -171,7 +171,9 @@ public final class Look {
         HBox bar = new HBox();
         bar.getStyleClass().add("em-segmented");
         for (Tab tab : tabs.getTabs()) {
-            ToggleButton one = new ToggleButton(tab.getText());
+            ToggleButton one = new ToggleButton();
+            // the window renames its tabs with their counts after each read
+            one.textProperty().bind(tab.textProperty());
             one.setUserData(tab);
             one.setToggleGroup(group);
             one.setMinWidth(Region.USE_PREF_SIZE);
