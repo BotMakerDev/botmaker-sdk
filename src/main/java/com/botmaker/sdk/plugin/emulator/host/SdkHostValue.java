@@ -43,7 +43,9 @@ public @interface SdkHostValue {
         /** The accounts an emulator's instances, or one instance, should hold: Google, Facebook, mail. */
         ACCOUNTS,
         /** Every account this PC knows, each once with its note: the book the instances' accounts name. */
-        BOOK
+        BOOK,
+        /** The second step a Google sign-in follows for an account that picks none of its own. */
+        DEFAULT_VERIFICATION
     }
 
     /** This PC's classes the values live in: {@code Emulators.java}, {@code Instances.java}, {@code Accounts.java}. */

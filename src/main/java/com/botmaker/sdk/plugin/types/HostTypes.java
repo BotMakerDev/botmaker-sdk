@@ -29,7 +29,8 @@ public final class HostTypes implements TypeHolder {
 
     @Override
     public List<ComponentType<?>> components() {
-        return List.of(SETTINGS, SETTING, GAMES, GAME, ACCOUNTS, ACCOUNT, LABELS, LABEL, KNOWN, KNOWN_ENTRY);
+        return List.of(SETTINGS, SETTING, GAMES, GAME, ACCOUNTS, ACCOUNT, LABELS, LABEL, KNOWN, KNOWN_PLAIN,
+                KNOWN_ENTRY);
     }
 
     public static final DeclaredCall<HostSettings> SETTINGS = ComponentType.part(HostSettings.class)
@@ -59,6 +60,14 @@ public final class HostTypes implements TypeHolder {
     public static final DeclaredCall<HostKnown> KNOWN = ComponentType.part(HostKnown.class)
             .writtenAsEach(HostKnown::of, HostKnown::list);
 
+    /**
+     * {@code new HostKnown.Entry(kind, name, note)}: an entry with no alias and the default verification, the form a
+     * book written before 2026-11-14 holds, so it still reads. The host writes it whenever it rebuilds the entry.
+     */
+    public static final DeclaredCall<HostKnown.Entry> KNOWN_PLAIN = ComponentType.part(HostKnown.Entry.class)
+            .writtenAs(HostKnown.Entry::new, HostKnown.Entry::kind, HostKnown.Entry::name, HostKnown.Entry::note);
+
+    /** An entry with its aliases or its own verification. */
     public static final DeclaredCall<HostKnown.Entry> KNOWN_ENTRY = ComponentType.part(HostKnown.Entry.class)
             .writtenAsRecord();
 }

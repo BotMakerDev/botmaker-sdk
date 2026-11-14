@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.host;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Sourced;
@@ -22,19 +23,22 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Every account this PC knows, for every emulator and every bot: the {@link SdkHostValues#BOOK} value of the SDK's
  * project of this PC (spec {@code 2026-11-13-host-projects-design.md}). The Accounts window lists it, and an instance's
- * configuration picks from it and names its entries. An entry is kind, name and note, never a password, which only the
- * OS credential store holds. Each change is one step of this PC's undo.
+ * configuration picks from it and names its entries. An entry is kind, name, note, aliases and the verification its
+ * sign-in follows, never a password, which only the OS credential store holds. Each change is one step of this PC's
+ * undo.
  *
  * <p>The book is started on its first use: from the {@code accounts.json} an older SDK kept in the window's
  * {@code state/} folder, as one commit "Account book moved in", after which that file is deleted; else with the PC's
@@ -81,7 +85,8 @@ public final class HostBook {
         List<AccountRecord> layered = layered(config);
         Consumer<Map<AccountRecord.Key, AccountRecord>> fill = book -> layered.forEach(account -> {
             AccountRecord was = book.get(account.key());
-            if (was == null || was.note().isEmpty() && !account.note().isEmpty()) book.put(account.key(), account);
+            if (was == null) book.put(account.key(), account);
+            else if (was.note().isEmpty() && !account.note().isEmpty()) book.put(account.key(), was.withNote(account.note()));
         });
         Map<AccountRecord.Key, AccountRecord> book = new LinkedHashMap<>();
         if (services != null) {
@@ -106,7 +111,8 @@ public final class HostBook {
     public List<AccountRecord> add(AccountRecord account) throws IOException {
         return change("Add an account", book -> {
             AccountRecord was = book.get(account.key());
-            book.put(account.key(), was == null || !account.note().isEmpty() ? account : was);
+            book.put(account.key(), was == null ? account
+                    : account.note().isEmpty() ? was : was.withNote(account.note()));
         });
     }
 
@@ -116,9 +122,15 @@ public final class HostBook {
                 book -> accounts.forEach(account -> book.putIfAbsent(account.key(), account)));
     }
 
-    /** Sets the account as given, its note too, empty or not: the user's own edit of it. */
+    /**
+     * Sets the account's note as given, empty or not: the user's own edit of it. Its aliases and verification stay
+     * the book's; an account the book lacks is added as given.
+     */
     public List<AccountRecord> put(AccountRecord account) throws IOException {
-        return change("Change an account's note", book -> book.put(account.key(), account));
+        return change("Change an account's note", book -> {
+            AccountRecord was = book.get(account.key());
+            book.put(account.key(), was == null ? account : was.withNote(account.note()));
+        });
     }
 
     /** Takes the account out of the book; the caller offers it only for one no configuration lists. */
@@ -126,21 +138,180 @@ public final class HostBook {
         return change("Remove an account", book -> book.remove(key));
     }
 
+    /** Sets the verification the account's sign-in follows; {@link Verification#DEFAULT} follows the book's. */
+    public List<AccountRecord> verify(AccountRecord.Key key, Verification method) throws IOException {
+        return change("Change an account's verification", book -> book.computeIfPresent(key,
+                (k, account) -> account.withVerify(method)));
+    }
+
     /**
-     * Adds the accounts of a file {@link #export} wrote that the book lacks; an account it has keeps its note, unless
-     * that note is empty. Answers the book after.
+     * Records {@code address} as one of the account's aliases. Refused when another entry has it as an alias already;
+     * an address that is another entry's main one is taken, and that entry is then offered {@link #merge}.
+     */
+    public List<AccountRecord> addAlias(AccountRecord.Key key, String address) throws IOException {
+        if (address == null || address.isBlank()) throw new IOException("An alias is an address.");
+        String wanted = address.strip().toLowerCase(Locale.ROOT);
+        AtomicReference<String> refused = new AtomicReference<>();
+        List<AccountRecord> after = change("Record an alias", book -> {
+            AccountRecord account = book.get(key);
+            if (account == null) {
+                refused.set(key.name() + " is not in this PC's account book.");
+                return;
+            }
+            Optional<AccountRecord> holder = aliasHolder(book, key, wanted);
+            if (holder.isPresent()) refused.set(address.strip() + " is an alias of " + holder.get().name() + " already.");
+            else book.put(key, account.withAlias(wanted));
+        });
+        if (refused.get() != null) throw new IOException(refused.get());
+        return after;
+    }
+
+    /** Another entry of {@code key}'s kind that has {@code address} among its aliases. */
+    private static Optional<AccountRecord> aliasHolder(Map<AccountRecord.Key, AccountRecord> book,
+                                                       AccountRecord.Key key, String address) {
+        return book.values().stream().filter(other -> !other.key().equals(key) && other.kind() == key.kind())
+                .filter(other -> other.aliases().contains(address)).findFirst();
+    }
+
+    /** Takes {@code address} off the account's aliases. */
+    public List<AccountRecord> removeAlias(AccountRecord.Key key, String address) throws IOException {
+        return change("Remove an alias", book -> book.computeIfPresent(key,
+                (k, account) -> account.withoutAlias(address)));
+    }
+
+    /**
+     * Makes {@code absorbed} one account with {@code kept}, as one step: its main address and aliases become
+     * {@code kept}'s aliases, its note is added to {@code kept}'s, its verification is taken when {@code kept}
+     * follows the default, and the instances that listed it list {@code kept} instead. Passwords are not the book's:
+     * the caller keeps the one the user picked in the OS store.
+     */
+    public List<AccountRecord> merge(AccountRecord.Key kept, AccountRecord.Key absorbed) throws IOException {
+        if (kept.equals(absorbed)) throw new IOException("An account is not merged into itself.");
+        Map<AccountRecord.Key, AccountRecord> now = understood(currentOrStarted().list());
+        AccountRecord into = now.get(kept);
+        AccountRecord from = now.get(absorbed);
+        if (into == null || from == null) throw new IOException("Both accounts must be in this PC's account book.");
+        if (into.kind() != from.kind()) throw new IOException("Only two accounts of one kind are merged.");
+        return change("Merge " + from.name() + " into " + into.name(), book -> {
+            AccountRecord keptNow = book.get(kept);
+            AccountRecord absorbedNow = book.remove(absorbed);
+            if (keptNow != null && absorbedNow != null) book.put(kept, merged(keptNow, absorbedNow));
+            else if (absorbedNow != null) book.put(absorbed, absorbedNow);
+        }, () -> {
+            HostAccounts before = HostConfig.read(services, SdkHostValues.ACCOUNTS, HostAccounts.class,
+                    HostAccounts.none());
+            return HostConfig.write(services, SdkHostValues.ACCOUNTS, HostAccounts.class, before,
+                    moved(before, from, into));
+        });
+    }
+
+    /** {@code into} with {@code from}'s addresses, note and verification, as {@link #merge} writes it. */
+    static AccountRecord merged(AccountRecord into, AccountRecord from) {
+        List<String> aliases = new ArrayList<>(into.aliases());
+        aliases.addAll(from.addresses());
+        String note = into.note().isEmpty() ? from.note()
+                : from.note().isEmpty() || from.note().equals(into.note()) ? into.note()
+                : into.note() + " · " + from.note();
+        Verification verify = into.verify() == Verification.DEFAULT && from.verify().isMethod() ? from.verify()
+                : into.verify();
+        return new AccountRecord(into.kind(), into.name(), note, aliases, verify);
+    }
+
+    /**
+     * The instances' rows with {@code from} named {@code into}; a row that would then be listed twice is kept once,
+     * first in the game's chooser when either was.
+     */
+    private static HostAccounts moved(HostAccounts rows, AccountRecord from, AccountRecord into) {
+        Map<String, HostAccounts.Account> out = new LinkedHashMap<>();
+        for (HostAccounts.Account row : rows.list()) {
+            boolean named = AccountRecord.Kind.fromId(row.kind()) == from.kind()
+                    && from.key().equals(new AccountRecord.Key(from.kind(), row.name()));
+            HostAccounts.Account next = named
+                    ? new HostAccounts.Account(row.of(), row.kind(), into.name(), row.note(), row.removed(), row.first())
+                    : row;
+            String identity = next.of() + "\n" + next.kind() + "\n" + next.name().toLowerCase(Locale.ROOT)
+                    + "\n" + next.removed();
+            out.merge(identity, next, (was, again) -> again.first() && !was.first()
+                    ? new HostAccounts.Account(was.of(), was.kind(), was.name(), was.note(), was.removed(), true) : was);
+        }
+        return new HostAccounts(List.copyOf(out.values()));
+    }
+
+    /** The verification the book's accounts follow unless one picks its own; Phone prompt until the user sets one. */
+    public Verification defaultVerification() {
+        Verification read = Verification.fromId(HostConfig.read(services, SdkHostValues.DEFAULT_VERIFICATION,
+                String.class, Verification.FIRST_DEFAULT.id()));
+        return read.isMethod() ? read : Verification.FIRST_DEFAULT;
+    }
+
+    /** Sets the book's default verification, one step of undo; only a method of its own may be the default. */
+    public void defaultVerification(Verification method) throws IOException {
+        if (method == null || !method.isMethod()) throw new IOException("The default is one of the methods.");
+        if (services == null) throw new IOException("BotMaker keeps no values of this PC here.");
+        Optional<String> refused = HostConfig.step(services, "Change the default verification", () -> {
+            String before = HostConfig.read(services, SdkHostValues.DEFAULT_VERIFICATION, String.class, null);
+            return HostConfig.write(services, SdkHostValues.DEFAULT_VERIFICATION, String.class, before, method.id());
+        });
+        if (refused.isPresent()) throw new IOException(refused.get());
+    }
+
+    /**
+     * Two or more instances holding one of {@code book}'s accounts through two or more of its addresses: Google sees
+     * one account signed in twice. Instances wanting it by a single address are not listed, as nothing is hidden.
+     */
+    public static List<Shared> shared(EmulatorConfig config, Collection<InstanceKey> instances,
+                                      List<AccountRecord> book) {
+        List<Shared> out = new ArrayList<>();
+        for (AccountRecord account : book) {
+            if (account.aliases().isEmpty()) continue;
+            Map<InstanceKey, String> through = new LinkedHashMap<>();
+            for (InstanceKey instance : instances) {
+                for (Sourced<AccountRecord> wanted : config.wanted(instance).accounts()) {
+                    AccountRecord held = wanted.value();
+                    if (held.kind() == account.kind() && account.answersTo(held.name())) {
+                        through.putIfAbsent(instance, held.name());
+                    }
+                }
+            }
+            long addresses = through.values().stream().map(a -> a.toLowerCase(Locale.ROOT)).distinct().count();
+            if (through.size() > 1 && addresses > 1) out.add(new Shared(account, Map.copyOf(through)));
+        }
+        return out;
+    }
+
+    /**
+     * An account of the book held by several instances through different addresses.
+     *
+     * @param through each instance, by the address it holds the account through
+     */
+    public record Shared(AccountRecord account, Map<InstanceKey, String> through) {}
+
+    /**
+     * Adds the accounts of a file {@link #export} wrote that the book lacks. An account it has keeps its note unless
+     * that note is empty, gains the file's aliases, and takes the file's verification when it follows the default.
+     * Answers the book after.
      */
     public List<AccountRecord> importFrom(Path source) throws IOException {
         Map<AccountRecord.Key, AccountRecord> given = understood(entries(readJson(source)));
         return change("Import accounts", book -> given.forEach((key, account) -> {
             AccountRecord was = book.get(key);
-            if (was == null || was.note().isEmpty() && !account.note().isEmpty()) book.put(key, account);
+            List<String> free = account.aliases().stream()
+                    .filter(alias -> aliasHolder(book, key, alias).isEmpty()).toList();
+            if (was == null) {
+                book.put(key, account.withAliases(free));
+                return;
+            }
+            List<String> aliases = new ArrayList<>(was.aliases());
+            aliases.addAll(free);
+            book.put(key, new AccountRecord(was.kind(), was.name(), was.note().isEmpty() ? account.note() : was.note(),
+                    aliases, was.verify() == Verification.DEFAULT ? account.verify() : was.verify()));
         }));
     }
 
     /**
-     * Writes {@code accounts} to {@code target} for another PC: {@code kind}, {@code name} and {@code note} per account,
-     * and nothing else, so no password or instance ever leaves this PC this way.
+     * Writes {@code accounts} to {@code target} for another PC: {@code kind}, {@code name}, {@code note},
+     * {@code aliases} and {@code verify} per account, and nothing else, so no password or instance ever leaves this
+     * PC this way.
      */
     public static void export(List<AccountRecord> accounts, Path target) throws IOException {
         ObjectNode root = JSON.createObjectNode();
@@ -151,6 +322,9 @@ public final class HostBook {
             entry.put("kind", account.kind().id());
             entry.put("name", account.name());
             entry.put("note", account.note());
+            ArrayNode aliases = entry.putArray("aliases");
+            account.aliases().forEach(aliases::add);
+            entry.put("verify", account.verify().id());
         }
         Files.writeString(target, JSON.writeValueAsString(root), StandardCharsets.UTF_8);
     }
@@ -201,13 +375,18 @@ public final class HostBook {
 
     // ---- the value ----
 
-    /**
-     * Starts the book when it is not there yet, then reads it, lets {@code edit} change it and writes it back as one
-     * step {@code label}; nothing is written when the edit changed nothing. An entry of a kind this build does not know
-     * is kept after the others.
-     */
     private List<AccountRecord> change(String label, Consumer<Map<AccountRecord.Key, AccountRecord>> edit)
             throws IOException {
+        return change(label, edit, Optional::empty);
+    }
+
+    /**
+     * Starts the book when it is not there yet, then reads it, lets {@code edit} change it and writes it back as one
+     * step {@code label}, with {@code also}'s writes in the same step; nothing is written when the edit changed
+     * nothing. An entry of a kind this build does not know is kept after the others.
+     */
+    private List<AccountRecord> change(String label, Consumer<Map<AccountRecord.Key, AccountRecord>> edit,
+                                       Supplier<Optional<String>> also) throws IOException {
         if (services == null) throw new IOException("BotMaker keeps no values of this PC here.");
         start();
         AtomicReference<List<AccountRecord>> after = new AtomicReference<>();
@@ -223,11 +402,20 @@ public final class HostBook {
             Map<AccountRecord.Key, AccountRecord> book = understood(before.list());
             edit.accept(book);
             after.set(List.copyOf(book.values()));
+            // the other writes first: refused, the book is left as it was and names nothing they lack
+            Optional<String> others = also.get();
+            if (others.isPresent()) return others;
             return HostConfig.write(services, SdkHostValues.BOOK, HostKnown.class, before, written(book, before));
         });
         if (unread.get() != null) throw unread.get();
         if (refused.isPresent()) throw new IOException(refused.get());
         return after.get();
+    }
+
+    private HostKnown currentOrStarted() throws IOException {
+        if (services == null) throw new IOException("BotMaker keeps no values of this PC here.");
+        start();
+        return current().orElse(HostKnown.none());
     }
 
     /**
@@ -263,7 +451,7 @@ public final class HostBook {
                 pcGoogle.get().filter(email -> !email.isBlank())
                         .map(email -> new AccountRecord(AccountRecord.Kind.GOOGLE, email, PC_ACCOUNT_NOTE))
                         .filter(pc -> !understood(entries).containsKey(pc.key()))
-                        .ifPresent(pc -> entries.add(entry(pc)));
+                        .ifPresent(pc -> entries.add(entry(pc, "")));
             }
             Optional<String> written = HostConfig.write(services, SdkHostValues.BOOK, HostKnown.class, null,
                     new HostKnown(entries));
@@ -298,23 +486,38 @@ public final class HostBook {
         return book;
     }
 
-    /** {@code book} as rows, then every row of {@code before} this build does not understand, kept. */
+    /**
+     * {@code book} as rows, then every row of {@code before} this build does not understand, kept. A verification a
+     * newer BotMaker wrote is kept as it was written.
+     */
     private static HostKnown written(Map<AccountRecord.Key, AccountRecord> book, HostKnown before) {
+        Map<AccountRecord.Key, String> verifies = new LinkedHashMap<>();
+        for (HostKnown.Entry row : before.list()) {
+            AccountRecord account = record(row);
+            if (account != null) verifies.putIfAbsent(account.key(), row.verify());
+        }
         List<HostKnown.Entry> out = new ArrayList<>();
-        book.values().forEach(account -> out.add(entry(account)));
+        book.values().forEach(account -> out.add(entry(account, verifies.getOrDefault(account.key(), ""))));
         before.list().stream().filter(row -> record(row) == null).forEach(out::add);
         return new HostKnown(out);
     }
 
-    private static HostKnown.Entry entry(AccountRecord account) {
-        return new HostKnown.Entry(account.kind().id(), account.name(), account.note());
+    /** The account as a row; {@code writtenVerify} is kept for a verification this build does not know. */
+    private static HostKnown.Entry entry(AccountRecord account, String writtenVerify) {
+        String verify = switch (account.verify()) {
+            case DEFAULT -> "";
+            case UNKNOWN -> writtenVerify;
+            default -> account.verify().id();
+        };
+        return new HostKnown.Entry(account.kind().id(), account.name(), account.note(),
+                String.join(" ", account.aliases()), verify);
     }
 
     /** The row as an account, or null for one of a kind this build does not know or with no name. */
     private static AccountRecord record(HostKnown.Entry row) {
         AccountRecord.Kind kind = AccountRecord.Kind.fromId(row.kind());
         return kind == AccountRecord.Kind.UNKNOWN || row.name().isBlank() ? null
-                : new AccountRecord(kind, row.name(), row.note());
+                : new AccountRecord(kind, row.name(), row.note(), row.aliasList(), Verification.fromId(row.verify()));
     }
 
     private static Map<AccountRecord.Key, AccountRecord> understood(List<HostKnown.Entry> rows) {
@@ -337,10 +540,17 @@ public final class HostBook {
 
     /** Every entry with a name, a kind this build does not know included. */
     private static List<HostKnown.Entry> entries(ObjectNode root) {
+        Function<JsonNode, String> aliases = entry -> {
+            List<String> out = new ArrayList<>();
+            entry.path("aliases").forEach(alias -> out.add(alias.asText("")));
+            return String.join(" ", out);
+        };
         List<HostKnown.Entry> out = new ArrayList<>();
         for (JsonNode entry : root.path("accounts")) {
+            String verify = Verification.fromId(entry.path("verify").asText("")) == Verification.DEFAULT ? ""
+                    : entry.path("verify").asText("");
             HostKnown.Entry row = new HostKnown.Entry(entry.path("kind").asText(""), entry.path("name").asText(""),
-                    entry.path("note").asText(""));
+                    entry.path("note").asText(""), aliases.apply(entry), verify);
             if (!row.name().isBlank()) out.add(row);
         }
         return out;

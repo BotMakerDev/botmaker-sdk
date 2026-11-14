@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.host;
 import com.botmaker.plugin.api.ValueHolder;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.shared.emulator.config.AccountRecord;
 
 import java.util.List;
 
@@ -69,11 +70,19 @@ public final class SdkHostValues implements ValueHolder {
             .because("These are the accounts this PC knows, for every emulator and every bot, never a password."
                     + " Change them in the Accounts window.");
 
+    /** A {@code Verification}'s id: what the book's accounts follow unless one picks its own. */
+    public static final ManagedMethod<String> DEFAULT_VERIFICATION =
+            ManagedValue.method(SdkHostValue.Id.DEFAULT_VERIFICATION)
+                    .in(SdkHostValue.Holder.ACCOUNTS)
+                    .holds(String.class, AccountRecord.Verification.FIRST_DEFAULT.id())
+                    .because("This is the second step a Google sign-in follows for an account that picks none of its"
+                            + " own: phone, code, backup-code or ask. Change it in the Accounts window.");
+
     private SdkHostValues() {}
 
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
-                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK);
+                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION);
     }
 }

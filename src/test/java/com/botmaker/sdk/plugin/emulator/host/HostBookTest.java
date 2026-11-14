@@ -10,6 +10,7 @@ import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
+import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
@@ -305,9 +306,9 @@ class HostBookTest {
     }
 
     @Test
-    void theExportHoldsKindNameAndNoteOnly(@TempDir Path dir) throws IOException {
+    void theExportHoldsKindNameNoteAliasesAndVerificationOnly(@TempDir Path dir) throws IOException {
         Path exported = dir.resolve("export.json");
-        HostBook.export(List.of(FARM, FB), exported);
+        HostBook.export(List.of(FARM.withAlias("f@example.com").withVerify(Verification.CODE), FB), exported);
         JsonNode root = new ObjectMapper().readTree(Files.readString(exported, StandardCharsets.UTF_8));
         Set<String> top = new HashSet<>();
         root.fieldNames().forEachRemaining(top::add);
@@ -316,8 +317,127 @@ class HostBookTest {
         for (JsonNode entry : root.path("accounts")) {
             Set<String> keys = new HashSet<>();
             entry.fieldNames().forEachRemaining(keys::add);
-            assertEquals(Set.of("kind", "name", "note"), keys);
+            assertEquals(Set.of("kind", "name", "note", "aliases", "verify"), keys);
         }
+        assertEquals("f@example.com", root.path("accounts").get(0).path("aliases").get(0).asText());
+        assertEquals("code", root.path("accounts").get(0).path("verify").asText());
         assertFalse(Files.readString(exported).toLowerCase().contains("password"));
+    }
+
+    @Test
+    void aliasesAndTheVerificationAreWrittenAsTextAndReadBack() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        book.addAlias(FARM.key(), "F.Arm@example.com");
+        book.verify(FARM.key(), Verification.BACKUP_CODE);
+        HostKnown written = (HostKnown) host.values.get(SdkHostValues.BOOK.id());
+        assertEquals(new HostKnown.Entry("google", "farm@example.com", "farm", "f.arm@example.com", "backup-code"),
+                written.list().getFirst());
+
+        AccountRecord read = book.known(EmulatorConfig.EMPTY).getFirst();
+        assertEquals(List.of("f.arm@example.com"), read.aliases());
+        assertEquals(Verification.BACKUP_CODE, read.verify());
+
+        book.put(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "renoted"));
+        book.add(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "again"));
+        book.known(EmulatorConfig.EMPTY.withInstance(LD1, Layer.EMPTY.withAccount(FARM)));
+        AccountRecord after = book.known(EmulatorConfig.EMPTY).getFirst();
+        assertEquals("again", after.note());
+        assertEquals(List.of("f.arm@example.com"), after.aliases(), "a note's edit keeps the aliases");
+        assertEquals(Verification.BACKUP_CODE, after.verify(), "and the verification");
+    }
+
+    @Test
+    void anEntryWrittenBeforeAliasesReadsWithNoneAndAVerificationOfANewerBotMakerIsKept() throws IOException {
+        host.values.put(SdkHostValues.BOOK.id(), HostKnown.of(new HostKnown.Entry("google", "farm@example.com", "farm"),
+                new HostKnown.Entry("google", "alt@example.com", "", "", "security-key")));
+        HostBook book = book(Optional.empty());
+        List<AccountRecord> known = book.known(EmulatorConfig.EMPTY);
+        assertEquals(FARM, known.getFirst());
+        assertEquals(Verification.UNKNOWN, known.getLast().verify());
+
+        book.put(new AccountRecord(AccountRecord.Kind.GOOGLE, "alt@example.com", "noted"));
+        assertEquals("security-key", ((HostKnown) host.values.get(SdkHostValues.BOOK.id())).list().getLast().verify());
+    }
+
+    @Test
+    void anAddressAnotherEntryHasAsAnAliasIsRefused() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.addAll(List.of(FARM, ALT));
+        book.addAlias(FARM.key(), "shared@example.com");
+        IOException refused = assertThrows(IOException.class, () -> book.addAlias(ALT.key(), "SHARED@example.com"));
+        assertTrue(refused.getMessage().contains("farm@example.com"), refused.getMessage());
+        assertEquals(List.of("alt@example.com"), book.addAlias(FARM.key(), "alt@example.com").getFirst().aliases()
+                .subList(1, 2), "another entry's main address is taken; merging it is offered");
+        assertEquals(List.of("alt@example.com"), book.removeAlias(FARM.key(), "shared@example.com").getFirst()
+                .aliases());
+    }
+
+    @Test
+    void theDefaultVerificationIsThePhonePromptUntilSetAndOneStep() throws IOException {
+        HostBook book = book(Optional.empty());
+        assertEquals(Verification.PHONE, book.defaultVerification());
+        book.defaultVerification(Verification.CODE);
+        assertEquals(Verification.CODE, book.defaultVerification());
+        assertEquals("code", host.values.get(SdkHostValues.DEFAULT_VERIFICATION.id()));
+        assertEquals("Change the default verification", host.steps.getLast());
+        assertThrows(IOException.class, () -> book.defaultVerification(Verification.DEFAULT));
+
+        host.values.put(SdkHostValues.DEFAULT_VERIFICATION.id(), "security-key");
+        assertEquals(Verification.PHONE, book.defaultVerification(), "an unknown default reads as the first");
+    }
+
+    @Test
+    void aMergeMovesTheAddressesTheNoteAndTheInstancesInOneStep() throws IOException {
+        AccountRecord one = new AccountRecord(AccountRecord.Kind.GOOGLE, "p.one@example.com", "the alt", List.of(),
+                Verification.CODE);
+        HostBook book = book(Optional.empty());
+        book.addAll(List.of(FARM.withAlias("f@example.com"), one));
+        host.values.put(SdkHostValues.ACCOUNTS.id(), HostAccounts.of(
+                new HostAccounts.Account(MUMU.text(), "google", "P.One@example.com", "", false, true),
+                new HostAccounts.Account(LD1.text(), "google", "farm@example.com", "", false, false),
+                new HostAccounts.Account(LD1.text(), "google", "p.one@example.com", "", false, true)));
+        int steps = host.steps.size();
+
+        List<AccountRecord> after = book.merge(FARM.key(), one.key());
+
+        assertEquals(List.of(new AccountRecord(AccountRecord.Kind.GOOGLE, "farm@example.com", "farm · the alt",
+                List.of("f@example.com", "p.one@example.com"), Verification.CODE)), after);
+        assertEquals(List.of(new HostAccounts.Account(MUMU.text(), "google", "farm@example.com", "", false, true),
+                new HostAccounts.Account(LD1.text(), "google", "farm@example.com", "", false, true)),
+                ((HostAccounts) host.values.get(SdkHostValues.ACCOUNTS.id())).list(),
+                "MuMu-0 holds farm now; LD-1, holding both, holds it once, first in the chooser as p.one was");
+        assertEquals(steps + 1, host.steps.size(), "one step of undo");
+        assertThrows(IOException.class, () -> book.merge(FARM.key(), FARM.key()));
+        assertThrows(IOException.class, () -> book.merge(FARM.key(), FB.key()));
+    }
+
+    @Test
+    void sharedListsTheInstancesHoldingOneAccountThroughTwoOfItsAddresses() {
+        AccountRecord farm = FARM.withAlias("f@example.com");
+        EmulatorConfig config = EmulatorConfig.EMPTY
+                .withInstance(LD0, Layer.EMPTY.withAccount(FARM))
+                .withInstance(LD1, Layer.EMPTY.withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "F@example.com")))
+                .withInstance(MUMU, Layer.EMPTY.withAccount(FARM).withAccount(ALT));
+        List<HostBook.Shared> shared = HostBook.shared(config, List.of(LD0, LD1, MUMU), List.of(farm, ALT));
+        assertEquals(1, shared.size());
+        assertEquals(farm, shared.getFirst().account());
+        assertEquals(Map.of(LD0, "farm@example.com", LD1, "F@example.com", MUMU, "farm@example.com"),
+                shared.getFirst().through());
+
+        assertEquals(List.of(), HostBook.shared(config, List.of(LD0, MUMU), List.of(farm, ALT)),
+                "two instances on one address are not hidden from each other");
+    }
+
+    @Test
+    void anImportMergesTheAliasesOfAnEntryItHolds(@TempDir Path dir) throws IOException {
+        Path exported = dir.resolve("accounts-export.json");
+        HostBook.export(List.of(FARM.withAlias("b@example.com").withVerify(Verification.ASK)), exported);
+        HostBook book = book(Optional.empty());
+        book.add(FARM.withAlias("a@example.com"));
+        AccountRecord after = book.importFrom(exported).getFirst();
+        assertEquals(List.of("a@example.com", "b@example.com"), after.aliases());
+        assertEquals(Verification.ASK, after.verify(), "the file's verification over the default");
+        assertEquals("farm", after.note());
     }
 }
