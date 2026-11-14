@@ -22,6 +22,17 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **⌖ and ✂ are on the SDK's toolbar tab** (2026-11-13): Studio shows its overlay only in dev mode now, so the two
   overlay buttons moved to the bar, after 🎮 Pilot. *⌖ Point bot at…* opens the source picker, the same choice as
   Parameters ▸ captureSource; *✂ Cut picture* cuts a picture out of what the bot reads.
+- **A new look for the Emulators and Accounts windows** (2026-11-14), in Studio's light and dark themes alike:
+  - One header bar: the tabs as a segmented control, Find, when it was last read, ↶ ↷ ⟳. Each emulator has a
+    two-letter badge, each account an avatar, each state a pill with a dot and a word.
+  - **Instances** are grouped by emulator, and Find searches name, account, game and tag. An inspector beside the
+    list holds Start, Stop and Apply for one instance, several or a group.
+  - **Accounts** (the grid) draws each cell as a glyph with a legend, its headers with badges and state dots;
+    *Apply N changes…* says what it does, and an account's inspector shows its password, note and instances.
+  - **The Accounts window** is a list and a detail panel: filter by kind with counts, edit a note in place,
+    Remember… or Forget a password, open an instance from its chip.
+  - **Running** cards and the operations strip show state pills (a stopped instance a bot expects says
+    *Expected*), and a running operation a thin bar, filled while its step says how far it is. **Configurations** draws an instance's overridden values in the accent, no longer in bold.
 - **Emulators ▸ Accounts has no + Account** (2026-11-14): accounts are added in the Accounts window, which
   *Manage accounts…* opens.
 - **Shortcuts in the Emulators and Accounts windows** (2026-11-14):

@@ -35,7 +35,6 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -740,21 +739,14 @@ public final class EmulatorsWindow {
     private HBox row(Operation.Snapshot one) {
         Label title = Styles.on(new Label(one.title()), StyleClasses.STRONG_TEXT);
         title.setMinWidth(Region.USE_PREF_SIZE);
-        Label state = new Label(one.state().displayName());
-        state.setMinWidth(Region.USE_PREF_SIZE);
-        Styles.on(state, switch (one.state()) {
-            case DONE -> StyleClasses.OK_TEXT;
-            case FAILED -> StyleClasses.ERROR_TEXT;
-            case NEEDS_YOU -> StyleClasses.WARNING_TEXT;
-            default -> StyleClasses.MUTED_TEXT;
-        });
+        Label state = Look.pill(Look.pill(one.state()));
         String words = one.state() == Operation.State.NEEDS_YOU && one.needsYou() != null ? one.needsYou()
                 : one.state().ended() && one.outcome() != null ? one.outcome() : one.step();
         Label step = new Label(words == null ? "" : words);
         step.setWrapText(true);
         HBox.setHgrow(step, Priority.ALWAYS);
         step.setMaxWidth(Double.MAX_VALUE);
-        HBox row = new HBox(10, title, state, step);
+        HBox row = new HBox(10, state, title, step);
         row.setAlignment(Pos.CENTER_LEFT);
         if (one.state() == Operation.State.NEEDS_YOU && one.instance() != null) {
             Button look = new Button("Open its screen");
@@ -762,12 +754,7 @@ public final class EmulatorsWindow {
             look.setOnAction(e -> openScreen(one));
             row.getChildren().add(look);
         }
-        if (one.state() == Operation.State.RUNNING) {
-            ProgressBar bar = new ProgressBar(one.progress() > 0 ? one.progress() : ProgressBar.INDETERMINATE_PROGRESS);
-            bar.setPrefWidth(90);
-            bar.setMinWidth(90);
-            row.getChildren().add(bar);
-        }
+        if (one.state() == Operation.State.RUNNING) row.getChildren().add(Look.progress(one.progress()));
         if (!one.state().ended()) {
             Button cancel = new Button("Cancel");
             cancel.setMinWidth(Region.USE_PREF_SIZE);

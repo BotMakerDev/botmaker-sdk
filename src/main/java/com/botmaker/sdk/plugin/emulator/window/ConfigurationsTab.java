@@ -263,13 +263,13 @@ final class ConfigurationsTab {
             @Override
             protected void updateItem(ConfigViews.Cell item, boolean empty) {
                 super.updateItem(item, empty);
-                getStyleClass().removeAll(StyleClasses.STRONG_TEXT, StyleClasses.MUTED_TEXT);
+                getStyleClass().removeAll(Look.OWN, StyleClasses.MUTED_TEXT);
                 if (empty || item == null) {
                     setText(null);
                     return;
                 }
                 setText(item.text());
-                if (item.own() && !emulatorColumn) getStyleClass().add(StyleClasses.STRONG_TEXT);
+                if (item.own() && !emulatorColumn) getStyleClass().add(Look.OWN);
                 else if (item.placeholder()) getStyleClass().add(StyleClasses.MUTED_TEXT);
             }
         };

@@ -286,3 +286,31 @@
     -fx-text-fill: -em-quiet;
     -fx-padding: 6 0 2 0;
 }
+
+/* ---- Configurations: an instance's value overridden from its emulator's ---- */
+
+.table-cell.em-own {
+    -fx-text-fill: -bm-accent;
+}
+
+/* on a selection the accent would vanish into the bar: the text colour modena ladders off the cell's background,
+   which holds whether the table has focus or not */
+.table-row-cell:selected > .table-cell.em-own,
+.table-cell.em-own:selected {
+    -fx-text-fill: -fx-text-background-color;
+}
+
+/* ---- the Running strip: a thin bar, filled while a step says how far it is, else moving ---- */
+
+.em-progress > .track {
+    -fx-background-insets: 0;
+    -fx-background-radius: 2;
+    -fx-padding: 0;
+}
+
+.em-progress > .bar {
+    -fx-background-color: -bm-accent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 2;
+    -fx-padding: 2;
+}

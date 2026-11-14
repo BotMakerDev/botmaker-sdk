@@ -286,8 +286,16 @@ final class RunningTab {
             node.setPrefWidth(THUMB_WIDTH + 16);
             node.setMaxWidth(THUMB_WIDTH + 16);
             Label name = Styles.on(new Label(row.instance().name()), StyleClasses.STRONG_TEXT);
+            name.setGraphic(Look.badge(row.key().platform()));
+            name.setGraphicTextGap(6);
+            Optional<Operation.Snapshot> needs = card.expected() ? Optional.empty() : window.needsYou(row.key());
+            Label state = Look.pill(needs.isPresent() ? Look.pill(Operation.State.NEEDS_YOU)
+                    : card.expected() ? new Look.Pill(Look.Tone.WARNING, "Expected")
+                    : Look.pill(true, true));
             Label product = Styles.on(new Label(row.key().platform().displayName()), StyleClasses.MUTED_TEXT);
-            node.getChildren().addAll(name, product);
+            HBox stateLine = new HBox(6, state, product);
+            stateLine.setAlignment(Pos.CENTER_LEFT);
+            node.getChildren().addAll(name, stateLine);
 
             if (card.expected()) {
                 Label line = Styles.on(new Label(card.expectedLine()), StyleClasses.WARNING_TEXT);
@@ -309,7 +317,6 @@ final class RunningTab {
             }
             node.getChildren().addAll(uptime, adb, load, front);
 
-            Optional<Operation.Snapshot> needs = window.needsYou(row.key());
             needs.ifPresent(op -> {
                 Label line = Styles.on(new Label("Needs you: " + (op.needsYou() == null ? op.title() : op.needsYou())),
                         StyleClasses.WARNING_TEXT);

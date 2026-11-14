@@ -6,6 +6,7 @@ import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.Operation;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleButton;
@@ -31,6 +32,9 @@ public final class Look {
 
     /** The style class on each window's root, under which the sheet's own tokens are set. */
     public static final String WINDOW = "emulators-window";
+
+    /** The style class of a Configurations cell whose instance overrides its emulator's value: drawn in the accent. */
+    public static final String OWN = "em-own";
 
     /** The avatar hues the sheet names ({@code em-hue-0} …). */
     static final int HUES = 8;
@@ -129,6 +133,15 @@ public final class Look {
         badge.setTooltip(new Tooltip(known.displayName()));
         badge.setMinWidth(Region.USE_PREF_SIZE);
         return badge;
+    }
+
+    /** A running operation's thin bar: filled to {@code progress} when its step says how far it is, else moving. */
+    public static ProgressBar progress(double progress) {
+        ProgressBar bar = new ProgressBar(progress > 0 ? progress : ProgressBar.INDETERMINATE_PROGRESS);
+        bar.getStyleClass().add("em-progress");
+        bar.setPrefWidth(90);
+        bar.setMinWidth(90);
+        return bar;
     }
 
     /** A pill: a dot and the word. */
