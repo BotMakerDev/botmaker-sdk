@@ -13,6 +13,8 @@ import com.botmaker.shared.emulator.config.Applies;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ConfigField;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
+import com.botmaker.shared.emulator.config.LightProfile;
+import com.botmaker.shared.emulator.config.ProductSettings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -58,6 +60,7 @@ final class ConfigView {
     private final TextField field = new TextField();
     private final CheckBox onlyDifferences = new CheckBox("Only differences");
     private final Button apply = Styles.on(new Button("Apply"), StyleClasses.PRIMARY_BUTTON);
+    private final Button light = new Button("Light profile");
     private final VBox content = new VBox(16);
     private final VBox side = new VBox(14);
     private final BorderPane root = new BorderPane();
@@ -80,9 +83,17 @@ final class ConfigView {
         onlyDifferences.selectedProperty().addListener((o, was, now) -> draw());
         onlyDifferences.setMinWidth(Region.USE_PREF_SIZE);
         apply.setMinWidth(Region.USE_PREF_SIZE);
+        light.setMinWidth(Region.USE_PREF_SIZE);
+        light.setTooltip(new Tooltip(LightProfile.MEMORY_MB + " MB of memory, " + LightProfile.CORES + " CPU cores and "
+                + LightProfile.FRAMES + " frames a second, the screen kept: several instances then run together"
+                + " within this PC's memory. Each is a change Apply makes and Undo takes back."));
+        light.setOnAction(e -> change(c -> ConfigViews.light(target, c)));
+        // a product that takes none of the profile's fields has no profile to set
+        light.setVisible(!LightProfile.fields(ProductSettings.of(target.platform())).isEmpty());
+        light.managedProperty().bind(light.visibleProperty());
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
-        HBox top = new HBox(10, backLink, title, state, gap, field);
+        HBox top = new HBox(10, backLink, title, state, gap, field, light);
         if (instance) top.getChildren().addAll(onlyDifferences, apply);
         top.setAlignment(Pos.CENTER_LEFT);
         top.setPadding(new Insets(8, 10, 8, 10));
@@ -129,6 +140,9 @@ final class ConfigView {
         ConfigViews.ViewFilter filter = new ConfigViews.ViewFilter(field.getText(), onlyDifferences.isSelected());
         boolean instance = target instanceof ConfigViews.Target.Instance;
 
+        boolean isLight = ConfigViews.isLight(target, config);
+        light.setText(isLight ? "Light profile ✓" : "Light profile");
+        light.setDisable(isLight);
         state.getStyleClass().removeAll(StyleClasses.OK_TEXT, StyleClasses.MUTED_TEXT);
         if (instance) {
             state.setText(row == null ? "not found on this PC" : row.running() ? "● running" : "stopped");

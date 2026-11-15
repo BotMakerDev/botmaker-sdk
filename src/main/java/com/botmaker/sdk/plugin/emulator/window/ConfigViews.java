@@ -9,6 +9,8 @@ import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.GameRecord;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
+import com.botmaker.shared.emulator.config.LightProfile;
+import com.botmaker.shared.emulator.config.ProductSettings;
 import com.botmaker.shared.emulator.config.Sourced;
 import com.botmaker.shared.emulator.config.Wanted;
 
@@ -323,6 +325,24 @@ public final class ConfigViews {
     /** Drops the layer's own value: an instance's falls back to its emulator's, an emulator's to none. */
     public static EmulatorConfig clear(Target target, EmulatorConfig config, ConfigField field) {
         return target.with(config, target.layer(config).without(field));
+    }
+
+    /**
+     * Sets the light profile's fields on the layer ({@link LightProfile}; the screen kept), each a change Apply
+     * makes and undo takes back. The product's fields only: one it cannot apply is not set.
+     */
+    public static EmulatorConfig light(Target target, EmulatorConfig config) {
+        return target.with(config, LightProfile.onto(target.layer(config), ProductSettings.of(target.platform())));
+    }
+
+    /** Whether the layer, or for an instance its emulator's under it, already wants the whole light profile. */
+    public static boolean isLight(Target target, EmulatorConfig config) {
+        Map<ConfigField, ConfigValue> wanted = new EnumMap<>(ConfigField.class);
+        switch (target) {
+            case Target.Emulator e -> wanted.putAll(config.emulator(e.platform()).fields());
+            case Target.Instance i -> config.wanted(i.key()).fields().forEach((f, v) -> wanted.put(f, v.value()));
+        }
+        return LightProfile.in(wanted, ProductSettings.of(target.platform()));
     }
 
     /** Adds the account, or changes its note. */

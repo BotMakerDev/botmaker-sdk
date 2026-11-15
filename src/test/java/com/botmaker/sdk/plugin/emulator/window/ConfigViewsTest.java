@@ -372,6 +372,27 @@ class ConfigViewsTest {
     }
 
     @Test
+    void theLightProfileSetsItsFieldsKeepsTheScreenAndIsInheritedByAnInstance() {
+        EmulatorConfig config = EmulatorConfig.EMPTY.withEmulator(PlatformId.LDPLAYER, Layer.EMPTY
+                .with(ConfigField.SCREEN, TALL).with(ConfigField.MEMORY, new ConfigValue.Megabytes(4096)));
+        assertFalse(ConfigViews.isLight(LD, config));
+        assertFalse(ConfigViews.isLight(FARM_T, config));
+
+        EmulatorConfig light = ConfigViews.light(LD, config);
+        Map<ConfigField, ConfigValue> fields = light.emulator(PlatformId.LDPLAYER).fields();
+        assertEquals(new ConfigValue.Megabytes(2048), fields.get(ConfigField.MEMORY));
+        assertEquals(new ConfigValue.Count(2), fields.get(ConfigField.CPU_CORES));
+        assertEquals(new ConfigValue.Count(30), fields.get(ConfigField.FPS));
+        assertEquals(TALL, fields.get(ConfigField.SCREEN), "the game's screen is kept");
+        assertTrue(ConfigViews.isLight(LD, light));
+        assertTrue(ConfigViews.isLight(FARM_T, light), "an instance inherits its emulator's profile");
+
+        EmulatorConfig heavier = ConfigViews.set(FARM_T, light, ConfigField.FPS, new ConfigValue.Count(60));
+        assertFalse(ConfigViews.isLight(FARM_T, heavier), "an instance's own 60 fps is not the profile");
+        assertTrue(ConfigViews.isLight(FARM_T, ConfigViews.light(FARM_T, heavier)));
+    }
+
+    @Test
     void aPortStaysItsInstancesOwnThroughACopyAndIsNoEmulatorsSetting() {
         ConfigValue farmPort = new ConfigValue.Count(5565);
         ConfigValue altPort = new ConfigValue.Count(5567);

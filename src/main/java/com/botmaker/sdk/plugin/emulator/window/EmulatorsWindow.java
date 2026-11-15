@@ -491,7 +491,7 @@ public final class EmulatorsWindow {
         }
         for (EmulatorsModel.InstanceRow row : stopped) {
             submit("Start " + row.instance().name(), row.instance(),
-                    context -> ApplyHost.live().start(row.instance(), context::step));
+                    context -> ApplyHost.live().start(row.instance(), context));
         }
     }
 

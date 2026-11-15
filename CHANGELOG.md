@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The light profile and the RAM budget** (2026-11-15): a configuration view's *Light profile* button, on an emulator
+  or an instance, sets 2048 MB of memory, 2 CPU cores and 30 fps, keeping the screen. Apply writes them and undo takes
+  them back; the button reads *Light profile ✓* once the layer, or its emulator's, wants it all. Every start (Apply,
+  Start, the account changes) now waits for this PC's memory and says so in the operation's step ("Waiting for
+  memory: …"); Cancel stops the wait.
 - **The authenticator key in the Accounts window** (2026-11-14): a Google account's *Verification* offers
   *Authenticator (BotMaker holds the key)*; picking it asks the setup key in a masked dialog (*Paste*, *Keep*), and the
   panel shows *Key held* or *Key missing* with *Set key…*/*Replace key…* and *Forget key*, never the key. An Apply's
