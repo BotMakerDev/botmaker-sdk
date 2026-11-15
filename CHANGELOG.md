@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The sign-in's host** (2026-11-15, `plugin.emulator.signin.SignInHost`): the side a sign-in run's `SignIn` calls
+  reach, bound to one instance, one account and one operation, on a loopback port with a fresh token. It types the
+  address, the password the batch holds, or a code (made from the account's authenticator key, three windows at most,
+  else asked in BotMaker's prompt, three tries) where the run's field is, a code typed over a refused one; it answers
+  `signedIn` from Android's accounts and passes `needsYou` to the operation. No answer carries a value. It closes when
+  the operation is cancelled. Nothing opens it yet.
 - **`SignIn`, a sign-in run's door to its host** (2026-11-15, `api.signin`): a bot the host starts as a Google
   sign-in reads its `SignIn.request()` (an opaque id and the account's second-step method) and asks the host to type
   into a field it names (`typeEmail`, `typePassword`, `typeCode`), to say whether the account is on the device
