@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **`SignIn`, a sign-in run's door to its host** (2026-11-15, `api.signin`): a bot the host starts as a Google
+  sign-in reads its `SignIn.request()` (an opaque id and the account's second-step method) and asks the host to type
+  into a field it names (`typeEmail`, `typePassword`, `typeCode`), to say whether the account is on the device
+  (`signedIn`) or to ask the user (`needsYou`). The host types each value itself; the run hears only typed or refused
+  with why, and a field more than one node matches is refused, never typed into. Any other run has no request, and
+  every call refuses. Blocks under *Sign-in* in the palette.
 - **The Instances tab, readable** (2026-11-15): each row of the Emulators window's Instances tab names itself for
   a screen reader and Studio's `ui` tool: the instance, its emulator, whether it runs, its accounts and its
   configuration's state; an emulator's row says how many instances it has and how many run. A live test,
