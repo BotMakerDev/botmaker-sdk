@@ -14,8 +14,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Which nodes of a tree an {@link Element} finds: those of which every clue it names holds (after Maestro's
@@ -29,6 +31,11 @@ import java.util.Set;
  *   <li>{@code holding}: of nested nodes holding the words, the row a person taps: a holder inside a tappable
  *       holder is the row's wrapper, and of the rest only the innermost, never the list and the window around
  *       them.</li>
+ *   <li>{@code containing}: the node's own text or label holds the words, case, any spaces and the typographic
+ *       apostrophe aside; of the node, the tappable one just around it when there is one a few levels up and no
+ *       taller than a row, and of nested ones the outermost.</li>
+ *   <li>{@code field} / {@code password}: a field ({@link #isField}) Android does not mark a password's / any node
+ *       it marks one.</li>
  *   <li>{@code inside}: the node sits, at any depth, in a node its container finds.</li>
  *   <li>{@code below}: for each node its neighbour finds, the nearest node under it that overlaps it across; of
  *       two as near, the smaller.</li>
@@ -80,10 +87,12 @@ public final class ElementMatch {
             List<UiNode> known = found.get(element);
             if (known != null) return known;
             List<UiNode> hits = new ArrayList<>();
+            String wanted = element.containing() == null ? null : loose(element.containing().text());
             for (UiNode node : nodes) {
-                if (owns(element, node)) hits.add(node);
+                if (owns(element, node) && (wanted == null || containsLoose(node, wanted))) hits.add(node);
             }
             if (element.holding() != null) hits = tapped(hits);
+            if (element.containing() != null) hits = rows(hits);
             if (element.inside() != null) hits = inside(hits, matches(element.inside()));
             if (element.below() != null) hits = below(hits, matches(element.below()));
             if (element.index() != null) {
@@ -94,12 +103,48 @@ public final class ElementMatch {
             return result;
         }
 
-        /** Whether the clues about the node itself hold: id, label, text and holding. */
+        /** Whether the clues about the node itself hold, but the words it contains: id, label, text, holding, field. */
         private static boolean owns(Element element, UiNode node) {
             return (element.id() == null || idMatches(element.id(), node))
                     && (element.label() == null || same(node.label(), element.label()))
                     && (element.text() == null || same(node.text(), element.text()))
-                    && (element.holding() == null || holds(node, element.holding()));
+                    && (element.holding() == null || holds(node, element.holding()))
+                    && (!element.isField() || isField(node) && !node.has(Trait.PASSWORD))
+                    && (!element.isPassword() || node.has(Trait.PASSWORD));
+        }
+
+        /** Whether {@code node}'s own text or label holds {@code wanted}, already {@link #loose}. */
+        private static boolean containsLoose(UiNode node, String wanted) {
+            return !wanted.isEmpty() && (!node.text().isEmpty() && loose(node.text()).contains(wanted)
+                    || !node.label().isEmpty() && loose(node.label()).contains(wanted));
+        }
+
+        /**
+         * Each words' node as a person taps it: the tappable node just around it, a few levels up and no taller than a
+         * row, else the words themselves. A tap on a list row's words alone left Google's list where it was
+         * (2026-11-14).
+         */
+        private List<UiNode> rows(List<UiNode> hits) {
+            List<UiNode> rows = new ArrayList<>();
+            Set<UiNode> kept = identitySet(List.of());
+            for (UiNode hit : hits) {
+                UiNode row = hit;
+                UiNode at = hit;
+                for (int up = 0; up < 4 && at != null; up++) {
+                    if (at.has(Trait.CLICKABLE)) {
+                        if (at.bounds().height <= hit.bounds().height * 4) row = at;
+                        break;
+                    }
+                    at = parents.get(at);
+                }
+                if (kept.add(row)) rows.add(row);
+            }
+            // A node and its child that both say the words (a label and its text) are one row: the outermost.
+            rows.removeIf(row -> {
+                for (UiNode up = parents.get(row); up != null; up = parents.get(up)) if (kept.contains(up)) return true;
+                return false;
+            });
+            return rows;
         }
 
         private static boolean holds(UiNode node, Words words) {
@@ -193,6 +238,28 @@ public final class ElementMatch {
 
     private static boolean same(String said, Words words) {
         return !said.isEmpty() && LineMatch.sameText(said, words.text());
+    }
+
+    /** Whether {@code said} holds {@code words}, case, inner spaces and the typographic apostrophe aside. */
+    static boolean contains(String said, Words words) {
+        String wanted = loose(words.text());
+        return !said.isEmpty() && !wanted.isEmpty() && loose(said).contains(wanted);
+    }
+
+    /**
+     * Whether {@code node} is a field one types into, whatever Android or Compose calls it: an {@code EditText}, an
+     * {@code AutoCompleteTextView}, a {@code TextField}; a password's too.
+     */
+    public static boolean isField(UiNode node) {
+        String type = node.className();
+        return type.endsWith("EditText") || type.endsWith("TextField") || type.endsWith("AutoCompleteTextView");
+    }
+
+    /** Spaces of any kind, a web page's no-break ones too. */
+    private static final Pattern SPACES = Pattern.compile("[\\s\\u00A0\\u2007\\u202F]+");
+
+    private static String loose(String text) {
+        return SPACES.matcher(text.replace('’', '\'')).replaceAll(" ").strip().toLowerCase(Locale.ROOT);
     }
 
     /** Where {@code node} is on the frame its tree was read for: the screen's pixels, as a frame's. */

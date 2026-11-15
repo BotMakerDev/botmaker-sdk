@@ -1799,8 +1799,7 @@ final class MapTools {
 
     /** The screen an element opens, named from its words ({@code "Battery"}), else from its field. */
     static String nameOf(Button element, String field) {
-        Words words = element.element().text() != null ? element.element().text()
-                : element.element().label() != null ? element.element().label() : element.element().holding();
+        Words words = element.element().words();
         String said = words == null ? "" : words.text().strip();
         return said.isEmpty() || !isName(said) ? nameFrom(field, "") : Character.toUpperCase(said.charAt(0))
                 + said.substring(1);

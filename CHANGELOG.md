@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **An element by the words it contains, or by the field it is** (2026-11-15, `api.screens.Element`):
+  `Element.byContaining(words)` (and `.containing(words)`) finds the node whose text or label holds the words, case,
+  spaces and apostrophes aside (`Couldn’t` is `couldn't`), or the tappable row just around them; `textField()` and
+  `passwordField()` (and `.field()`, `.password()`) find a field by what Android states of it. For a page whose
+  sentences change around the words that tell it, and whose ids reach the tree on some devices only.
+- **`ScreenCheck.which(Screens.class, treeXml)`**, for a bot's own tests: which of its screens a captured tree shows,
+  by the elements that tell each, as a run tells them.
+
 - **The sign-in's host** (2026-11-15, `plugin.emulator.signin.SignInHost`): the side a sign-in run's `SignIn` calls
   reach, bound to one instance, one account and one operation, on a loopback port with a fresh token. It types the
   address, the password the batch holds, or a code (made from the account's authenticator key, three windows at most,

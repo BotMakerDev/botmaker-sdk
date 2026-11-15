@@ -181,7 +181,8 @@ public final class SdkTypes implements TypeHolder {
             .when(element -> element.id() == null && element.label() == null && element.text() != null);
 
     /**
-     * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)} or {@code byHolding(…)}.
+     * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)}, {@code byHolding(…)},
+     * {@code byContaining(…)}, {@code textField()} or {@code passwordField()}.
      * Every factory rebuilds an element with every clue, so a {@code when} says which first clue it is written by.
      */
     public static final List<DeclaredCall<Element>> ELEMENT_BY_OTHER_CLUES = List.of(
@@ -190,7 +191,19 @@ public final class SdkTypes implements TypeHolder {
             ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byLabel)
                     .when(element -> element.id() == null && element.label() != null),
             ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byHolding)
-                    .when(element -> element.id() == null && element.label() == null && element.text() == null));
+                    .when(element -> element.id() == null && element.label() == null && element.text() == null
+                            && element.holding() != null),
+            ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byContaining)
+                    .when(element -> noWords(element) && element.containing() != null),
+            ComponentType.part(Element.class).<Element>writtenAs(Element::textField)
+                    .when(element -> noWords(element) && element.containing() == null && element.isField()),
+            ComponentType.part(Element.class).<Element>writtenAs(Element::passwordField)
+                    .when(element -> noWords(element) && element.containing() == null && element.isPassword()));
+
+    /** Whether {@code element} has no id, label, text or holding: a first clue past those writes it. */
+    private static boolean noWords(Element element) {
+        return element.id() == null && element.label() == null && element.text() == null && element.holding() == null;
+    }
 
     /**
      * A point on the screen. Its editor asks the host for this declaration ({@code ValueContext.declared}),

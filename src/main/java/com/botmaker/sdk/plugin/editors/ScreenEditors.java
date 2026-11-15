@@ -301,8 +301,9 @@ public final class ScreenEditors {
 
     /** An element as a person reads it: its words, never its id. */
     static String said(Element element) {
-        Words words = element.text() != null ? element.text()
-                : element.label() != null ? element.label() : element.holding();
-        return words == null ? "Element" : "Element \"" + words.text() + "\"";
+        Words words = element.words();
+        if (words != null) return "Element \"" + words.text() + "\"";
+        if (element.isField()) return "Element: a text field";
+        return element.isPassword() ? "Element: a password field" : "Element";
     }
 }

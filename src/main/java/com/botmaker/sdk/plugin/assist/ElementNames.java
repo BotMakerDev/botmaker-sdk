@@ -84,8 +84,9 @@ public final class ElementNames {
         if (element == null) return null;
         Function<Words, Words> constant = words -> words == null ? null : texts.apply(words.text());
         return new Element(element.id(), constant.apply(element.label()), constant.apply(element.text()),
-                constant.apply(element.holding()), inTexts(element.inside(), texts),
-                inTexts(element.below(), texts), element.index(), element.shot());
+                constant.apply(element.holding()), constant.apply(element.containing()), element.isField(),
+                element.isPassword(), inTexts(element.inside(), texts), inTexts(element.below(), texts),
+                element.index(), element.shot());
     }
 
     private static int indexOf(List<UiNode> nodes, UiNode node) {
@@ -207,7 +208,7 @@ public final class ElementNames {
     }
 
     private static boolean hasWords(Element element) {
-        return element.label() != null || element.text() != null || element.holding() != null;
+        return element.words() != null;
     }
 
     /** A container a name may say an input is inside: a list that scrolls, or a view with an id. */

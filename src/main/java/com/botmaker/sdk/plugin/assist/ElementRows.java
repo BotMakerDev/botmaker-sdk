@@ -128,6 +128,9 @@ public final class ElementRows {
         if (element.label() != null) clues.add("its label" + quoted(element.label(), words));
         if (element.text() != null) clues.add("its text" + quoted(element.text(), words));
         if (element.holding() != null) clues.add("the text" + quoted(element.holding(), words) + " in it");
+        if (element.containing() != null) clues.add("the words" + quoted(element.containing(), words) + " in its text");
+        if (element.isField()) clues.add("a text field");
+        if (element.isPassword()) clues.add("a password field");
         if (element.inside() != null) clues.add("inside " + anchor(element.inside()));
         if (element.below() != null) clues.add("below " + anchor(element.below()));
         if (element.index() != null) clues.add("number " + (element.index() + 1) + " of those");
@@ -149,9 +152,10 @@ public final class ElementRows {
     }
 
     private static String anchor(Element element) {
-        Words words = element.text() != null ? element.text() : element.label() != null ? element.label()
-                : element.holding();
-        return words != null ? "\"" + words.text() + "\"" : "the view of its id";
+        Words words = element.words();
+        if (words != null) return "\"" + words.text() + "\"";
+        if (element.id() != null) return "the view of its id";
+        return element.isPassword() ? "the password field" : "the text field";
     }
 
     /** 0 for an input, 1 for a text or an icon nobody presses, 2 for a list. */

@@ -136,10 +136,12 @@ public final class ElementSaves {
         Rectangle cut = shots.get(element);
         Element inside = element.inside() == null ? null : resolve(element.inside(), shots, known, added, words);
         Element below = element.below() == null ? null : resolve(element.below(), shots, known, added, words);
-        Element clues = new Element(element.id(), element.label(), element.text(), element.holding(), inside, below,
-                element.index(), null);
+        Element clues = new Element(element.id(), element.label(), element.text(), element.holding(),
+                element.containing(), element.isField(), element.isPassword(), inside, below, element.index(), null);
         for (Element held : known.values()) if (sameClues(held, clues)) return held;
-        for (Words said : new Words[] {clues.label(), clues.text(), clues.holding()}) if (said != null) words.add(said);
+        for (Words said : new Words[] {clues.label(), clues.text(), clues.holding(), clues.containing()}) {
+            if (said != null) words.add(said);
+        }
         String name = constantName(clues, known.keySet());
         Element saved = cut == null ? clues : clues.shot(FOLDER + "/" + name.toLowerCase(Locale.ROOT) + ".png");
         known.put(name, saved);
@@ -154,9 +156,9 @@ public final class ElementSaves {
 
     /** A constant's name for {@code element}, none of {@code taken}: from its words, else its id. */
     static String constantName(Element element, Set<String> taken) {
-        Words words = element.text() != null ? element.text() : element.label() != null ? element.label()
-                : element.holding();
-        String base = words != null ? words.text() : element.id() != null ? element.id() : "element";
+        Words words = element.words();
+        String base = words != null ? words.text() : element.id() != null ? element.id()
+                : element.isPassword() ? "password" : element.isField() ? "field" : "element";
         String name = ScreenEdits.textName(base, taken);
         // textName's own fallback, for words of no letters or starting with a digit, is a text's: an element's is
         // named the same way, its taken names checked again.
