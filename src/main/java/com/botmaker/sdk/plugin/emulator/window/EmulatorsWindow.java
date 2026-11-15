@@ -29,6 +29,7 @@ import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.KeyringStore;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
+import com.botmaker.shared.emulator.google.SignInDriver;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -589,8 +590,9 @@ public final class EmulatorsWindow {
                             synchronized (batch) {
                                 // waits until the whole batch is queued
                             }
-                            return ApplyPlan.body(item, log, passwords, second, (typed, listed) -> change(
-                                    c -> ConfigViews.renameAccount(c, item.row().key(), typed, listed))).run(context);
+                            return ApplyPlan.body(item, log, passwords, second, SignInDriver.SCREENS,
+                                    (typed, listed) -> change(c -> ConfigViews.renameAccount(c, item.row().key(),
+                                            typed, listed))).run(context);
                         });
                 id.set(operation.id());
                 // in the batch's lock, so a code asked finds its operation to see whether it was cancelled

@@ -11,6 +11,7 @@ import com.botmaker.shared.emulator.google.InstanceChanges;
 import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Passwords;
+import com.botmaker.shared.emulator.google.SignInDriver;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -141,10 +142,11 @@ final class ApplyPlan {
      * @param log       where the settings written are logged for Undo
      * @param passwords the batch's, asked once per account and cleared by the window when the batch ends
      * @param second    the second step of each sign-in: the account's method, and the code dialog
+     * @param driver    who drives each sign-in on the instance
      * @param listedAs  told of an account Android lists under another of its addresses, for the configuration
      */
     static Operation.Body body(Item item, Applies log, Passwords passwords, InstanceSignIn.SecondStep second,
-                               InstanceChanges.ListedAs listedAs) {
+                               SignInDriver driver, InstanceChanges.ListedAs listedAs) {
         EmulatorInstance instance = item.row().instance();
         return context -> {
             List<String> problems = new ArrayList<>();
@@ -156,7 +158,7 @@ final class ApplyPlan {
             }
             if (context.cancelled()) return "Cancelled.";
             if (!item.accounts().isEmpty() || !item.games().isEmpty()) {
-                String rest = new InstanceChanges(InstanceChanges.Host.live())
+                String rest = new InstanceChanges(InstanceChanges.Host.live(), driver)
                         .run(instance, item.accounts(), item.games(), passwords, second, listedAs, context);
                 if (rest != null) problems.add(rest);
             }

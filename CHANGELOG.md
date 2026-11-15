@@ -25,6 +25,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   else asked in BotMaker's prompt, three tries) where the run's field is, a code typed over a refused one; it answers
   `signedIn` from Android's accounts and passes `needsYou` to the operation. No answer carries a value. It closes when
   the operation is cancelled. Nothing opens it yet.
+- **Apply names who drives its sign-ins** (2026-11-15): the Emulators window's Apply hands `InstanceChanges` shared's
+  `SignInDriver.SCREENS`, the sign-in as it was, where the sign-in bot's driver will go.
 - **`SignIn`, a sign-in run's door to its host** (2026-11-15, `api.signin`): a bot the host starts as a Google
   sign-in reads its `SignIn.request()` (an opaque id and the account's second-step method) and asks the host to type
   into a field it names (`typeEmail`, `typePassword`, `typeCode`), to say whether the account is on the device
