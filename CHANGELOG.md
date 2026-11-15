@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Google sign-in can run as a bot** (2026-11-15, `plugin.emulator.signin.BotSignInDriver`): a `SignInDriver`
+  that opens Android's add-account page, starts the sign-in bot through `sideRuns()` on the one instance
+  (`-Dbotmaker.capture.emulator`, which wins over a bot's capture source), and reads its end off its `SignInHost`:
+  signed in as the device says, else what the run said Google refused (`SignIn.refused(Refusal)`, new), timed out
+  after 5 minutes of its own or 15 of the user's, or cancelled, the run stopped and Home pressed. Apply does not use
+  it yet; the bot's folder comes with the catalog's sign-in bot.
+
 - **An element by the words it contains, or by the field it is** (2026-11-15, `api.screens.Element`):
   `Element.byContaining(words)` (and `.containing(words)`) finds the node whose text or label holds the words, case,
   spaces and apostrophes aside (`Couldn’t` is `couldn't`), or the tappable row just around them; `textField()` and

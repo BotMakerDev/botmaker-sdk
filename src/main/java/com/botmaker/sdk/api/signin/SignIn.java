@@ -70,6 +70,14 @@ public final class SignIn {
         SignInClient.ofRun().ifPresent(client -> client.needsYou(kind));
     }
 
+    /**
+     * Tells the host why Google ended the sign-in, so the account is dealt with as that end asks (a refused password
+     * is not typed again); then stop the run with {@code why}'s words.
+     */
+    public static void refused(Refusal why) {
+        SignInClient.ofRun().ifPresent(client -> client.refused(why));
+    }
+
     private static Typed type(SignInClient.Value value, Element field) {
         Optional<SignInClient> client = SignInClient.ofRun();
         if (client.isEmpty()) return Typed.refused("this run is not a sign-in");

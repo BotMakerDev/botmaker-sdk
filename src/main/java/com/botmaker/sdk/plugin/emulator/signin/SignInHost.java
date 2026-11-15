@@ -1,6 +1,7 @@
 package com.botmaker.sdk.plugin.emulator.signin;
 
 import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.shared.emulator.config.AccountRecord.Verification;
@@ -78,6 +79,13 @@ public final class SignInHost implements AutoCloseable {
     /** Whether the last call asked the user, so the next one says they are done; read by {@link #close()} too. */
     private volatile boolean waitingForYou;
     private boolean codeTyped;
+    /** What the run said Google refused, read by the driver once the run ended. */
+    private volatile Refusal refusal;
+    private volatile boolean passwordTyped;
+    /** Whether Google went past the password: it asked a second step after it was typed. */
+    private volatile boolean passwordAccepted;
+    /** Whether a value had signs {@code input text} cannot type. */
+    private volatile boolean cannotType;
     private int keyTries;
     private long keyWindow;
     private int codeTries;
@@ -146,6 +154,29 @@ public final class SignInHost implements AutoCloseable {
     public boolean signedIn() {
         Set<String> now = device.accounts();
         return now != null && (now.contains(email) || now.stream().anyMatch(account -> !before.contains(account)));
+    }
+
+    /** Why the run said Google ended the sign-in; empty when it said nothing. */
+    public Optional<Refusal> refusal() {
+        return Optional.ofNullable(refusal);
+    }
+
+    /**
+     * Whether Google took the password short of signing in: it asked a second step after it was typed. Whether the
+     * account ended signed in is {@link #signedIn()}'s, read once by the caller.
+     */
+    public boolean passwordAccepted() {
+        return passwordAccepted;
+    }
+
+    /** Whether the run asked the user and has not called since: the user's time, not the run's. */
+    public boolean waitingForYou() {
+        return waitingForYou;
+    }
+
+    /** Whether a value the run asked for had signs BotMaker cannot type. */
+    public boolean cannotType() {
+        return cannotType;
     }
 
     @Override
@@ -236,11 +267,17 @@ public final class SignInHost implements AutoCloseable {
             case SIGNED_IN -> ok().put("signedIn", signedIn());
             case NEEDS_YOU -> {
                 NeedsYou kind = NeedsYou.fromId(message.path("kind").asText(""));
+                // Google asks a second step only of a password it took
+                if (passwordTyped && (kind == NeedsYou.PHONE || kind == NeedsYou.CODE)) passwordAccepted = true;
                 context.needsYou(kind.displayName());
                 waitingForYou = true;
                 yield ok();
             }
             case TYPE -> type(SignInClient.Value.fromId(message.path("value").asText("")), message.path("field"));
+            case REFUSED -> {
+                refusal = Refusal.fromId(message.path("why").asText(""));
+                yield ok();
+            }
             case UNKNOWN -> refused("not a sign-in call");
         };
     }
@@ -260,9 +297,14 @@ public final class SignInHost implements AutoCloseable {
             case PASSWORD -> {
                 if (password == null || password.length == 0) yield refused("no password is given for this account");
                 context.step("Typing the password…");
-                yield typed(at, password, false, false);
+                ObjectNode answer = typed(at, password, false, false);
+                if (answer.path("ok").asBoolean()) passwordTyped = true;
+                yield answer;
             }
-            case CODE -> code(at);
+            case CODE -> {
+                if (passwordTyped) passwordAccepted = true;
+                yield code(at);
+            }
             case UNKNOWN -> refused("not a value BotMaker types");
         };
     }
@@ -343,6 +385,7 @@ public final class SignInHost implements AutoCloseable {
     private ObjectNode typed(Rectangle at, char[] text, boolean clear, boolean isCode) {
         try {
             if (!InstanceSignIn.typeable(text)) {
+                cannotType = true;
                 return refused("BotMaker types only plain letters, digits and signs (ASCII): sign in by hand");
             }
             device.tap(at);

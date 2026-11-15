@@ -2,6 +2,7 @@ package com.botmaker.sdk.internal.signin;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.api.signin.SignIn;
 import com.botmaker.sdk.api.signin.Typed;
@@ -61,7 +62,7 @@ public final class SignInClient {
 
     /** What a call asks; its id is the message's {@code op}. */
     public enum Op {
-        REQUEST("request"), TYPE("type"), SIGNED_IN("signed-in"), NEEDS_YOU("needs-you"), UNKNOWN("unknown");
+        REQUEST("request"), TYPE("type"), SIGNED_IN("signed-in"), NEEDS_YOU("needs-you"), REFUSED("refused"), UNKNOWN("unknown");
 
         private final String id;
 
@@ -131,6 +132,10 @@ public final class SignInClient {
 
     public void needsYou(NeedsYou kind) {
         call(message(Op.NEEDS_YOU).put("kind", kind.id()), ANSWER_WAIT);
+    }
+
+    public void refused(Refusal why) {
+        call(message(Op.REFUSED).put("why", why.id()), ANSWER_WAIT);
     }
 
     private ObjectNode message(Op op) {

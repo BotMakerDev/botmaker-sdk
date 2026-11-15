@@ -33,6 +33,12 @@ public final class InstalledGame {
     /** The system property naming what a bot started by hand launches, in the launch spec grammar. */
     public static final String LAUNCH_TARGET = "botmaker.launch.target";
 
+    /**
+     * The system property naming the emulator instance a run reads and acts on ({@code EmulatorInstance.reference()}),
+     * over the bot's capture source: a host that starts a bot for one instance (the Google sign-in) gives it.
+     */
+    public static final String CAPTURE_EMULATOR = "botmaker.capture.emulator";
+
     private static volatile List<String> launchTargets = List.of();
     private static volatile String launchChoice = "";
     private static volatile String vm = "";
@@ -47,6 +53,11 @@ public final class InstalledGame {
      */
     public static void install(Class<?>... values) {
         settings(values);
+        String instance = System.getProperty(CAPTURE_EMULATOR);
+        if (instance != null && !instance.isBlank()) {
+            Source.set(CaptureSource.emulator(instance.strip()));
+            return;
+        }
         Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
                 && !(source instanceof CurrentSource) ? source : null);
     }
