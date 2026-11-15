@@ -32,8 +32,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   that opens Android's add-account page, starts the sign-in bot through `sideRuns()` on the one instance
   (`-Dbotmaker.capture.emulator`, which wins over a bot's capture source), and reads its end off its `SignInHost`:
   signed in as the device says, else what the run said Google refused (`SignIn.refused(Refusal)`, new), timed out
-  after 5 minutes of its own or 15 of the user's, or cancelled, the run stopped and Home pressed. Apply does not use
-  it yet; the bot's folder comes with the catalog's sign-in bot.
+  after 5 minutes of its own or 15 of the user's, or cancelled, the run stopped and Home pressed.
+- **Apply signs in through the sign-in bot** (2026-11-15, `plugin.emulator.signin.SignInBots`): the Emulators
+  window's Apply runs `BotSignInDriver` for each account, in place of the old screen-by-screen sign-in. The bot is the
+  host's catalog copy of `BotMakerDev/botmaker-google-sign-in` (`SideRuns.catalogCopy`), or, on a developer's
+  computer, the checkout `BOTMAKER_DEV_SIGNIN_BOT` names. With neither, the account's sign-in fails and says why.
 
 - **An element by the words it contains, or by the field it is** (2026-11-15, `api.screens.Element`):
   `Element.byContaining(words)` (and `.containing(words)`) finds the node whose text or label holds the words, case,

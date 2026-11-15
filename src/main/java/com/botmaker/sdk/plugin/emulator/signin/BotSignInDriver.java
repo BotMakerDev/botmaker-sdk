@@ -38,20 +38,31 @@ public final class BotSignInDriver implements SignInDriver {
     static final int KEY_HOME = 3;
     private static final Duration POLL = Duration.ofMillis(500);
 
+    /** Where the sign-in bot is, asked at each sign-in ({@link SignInBots}). */
+    @FunctionalInterface
+    public interface BotFolder {
+        /**
+         * The sign-in bot's folder, a project or an unpacked {@code .bmk}.
+         *
+         * @throws IOException when BotMaker has none to run, saying why
+         */
+        Path get() throws IOException;
+    }
+
     private final Supplier<SideRuns> runs;
-    private final Supplier<Optional<Path>> bot;
+    private final BotFolder bot;
     private final LongSupplier clock;
     private final Duration poll;
 
     /**
      * @param runs where the sign-in bot is started, asked at each sign-in ({@code StudioServices::sideRuns})
-     * @param bot  the sign-in bot's folder, a project or an unpacked {@code .bmk}; empty when BotMaker has none
+     * @param bot  where the sign-in bot's folder is
      */
-    public BotSignInDriver(Supplier<SideRuns> runs, Supplier<Optional<Path>> bot) {
+    public BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot) {
         this(runs, bot, System::currentTimeMillis, POLL);
     }
 
-    BotSignInDriver(Supplier<SideRuns> runs, Supplier<Optional<Path>> bot, LongSupplier clock, Duration poll) {
+    BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot, LongSupplier clock, Duration poll) {
         this.runs = runs;
         this.bot = bot;
         this.clock = clock;
@@ -61,9 +72,12 @@ public final class BotSignInDriver implements SignInDriver {
     @Override
     public Attempt signIn(EmulatorInstance instance, AccountDevice device, String email, char[] password,
                           InstanceSignIn.SecondStep second, Operation.Context context) throws Exception {
-        Optional<Path> folder = bot.get();
-        if (folder.isEmpty()) {
-            return new Attempt(new Result(End.FAILED, "BotMaker has no Google sign-in bot to run."), false);
+        Path folder;
+        try {
+            folder = bot.get();
+        } catch (IOException e) {
+            return new Attempt(new Result(End.FAILED, "BotMaker has no Google sign-in bot to run: " + e.getMessage()),
+                    false);
         }
         try (SignInHost host = SignInHost.open(device, email, password, second, context)) {
             context.step("Opening Android's page for adding a Google account…");
@@ -71,7 +85,7 @@ public final class BotSignInDriver implements SignInDriver {
             try {
                 SideRun run;
                 try {
-                    run = runs.get().start(folder.get(), Map.of(InstalledGame.CAPTURE_EMULATOR, instance.reference()),
+                    run = runs.get().start(folder, Map.of(InstalledGame.CAPTURE_EMULATOR, instance.reference()),
                             host.environment());
                 } catch (IOException e) {
                     return new Attempt(new Result(End.FAILED, "The sign-in bot didn't start: " + e.getMessage()),

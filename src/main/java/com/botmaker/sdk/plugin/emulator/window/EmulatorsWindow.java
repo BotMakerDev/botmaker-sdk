@@ -9,6 +9,8 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
+import com.botmaker.sdk.plugin.emulator.signin.BotSignInDriver;
+import com.botmaker.sdk.plugin.emulator.signin.SignInBots;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
@@ -578,6 +580,8 @@ public final class EmulatorsWindow {
             }
         };
         Applies log = applies();
+        // the Google sign-in bot, run once per account, its folder asked again each time
+        SignInDriver signIns = new BotSignInDriver(services::sideRuns, SignInBots.of(services::sideRuns));
         // every id is in the batch before any operation can end, so the passwords are cleared exactly once
         synchronized (batch) {
             OPERATIONS.addListener(ended);
@@ -590,7 +594,7 @@ public final class EmulatorsWindow {
                             synchronized (batch) {
                                 // waits until the whole batch is queued
                             }
-                            return ApplyPlan.body(item, log, passwords, second, SignInDriver.SCREENS,
+                            return ApplyPlan.body(item, log, passwords, second, signIns,
                                     (typed, listed) -> change(c -> ConfigViews.renameAccount(c, item.row().key(),
                                             typed, listed))).run(context);
                         });

@@ -172,11 +172,14 @@ class BotSignInDriverTest {
     @Test
     void noBotStartsNothing() throws Exception {
         FakeRuns runs = new FakeRuns(client -> { });
-        BotSignInDriver driver = new BotSignInDriver(() -> runs, Optional::empty, clock::get, Duration.ZERO);
+        BotSignInDriver driver = new BotSignInDriver(() -> runs, () -> {
+            throw new IOException("offline, and none was got before");
+        }, clock::get, Duration.ZERO);
 
         Attempt attempt = driver.signIn(INSTANCE, device, EMAIL, PASSWORD, ASK, context);
 
         assertEquals(End.FAILED, attempt.result().end());
+        assertTrue(attempt.result().words().contains("offline, and none was got before"), attempt.result().words());
         assertNull(runs.started);
     }
 
@@ -185,7 +188,7 @@ class BotSignInDriverTest {
         SideRuns refusing = (bot, properties, environment) -> {
             throw new IOException("javac: 2 errors");
         };
-        BotSignInDriver driver = new BotSignInDriver(() -> refusing, () -> Optional.of(BOT), clock::get, Duration.ZERO);
+        BotSignInDriver driver = new BotSignInDriver(() -> refusing, () -> BOT, clock::get, Duration.ZERO);
 
         Attempt attempt = driver.signIn(INSTANCE, device, EMAIL, PASSWORD, ASK, context);
 
@@ -194,7 +197,7 @@ class BotSignInDriverTest {
     }
 
     private BotSignInDriver driver(FakeRuns runs) {
-        return new BotSignInDriver(() -> runs, () -> Optional.of(BOT), clock::get, Duration.ZERO);
+        return new BotSignInDriver(() -> runs, () -> BOT, clock::get, Duration.ZERO);
     }
 
     /** One run: its body plays the bot's calls on the first look, then it ends (or runs on until stopped). */
