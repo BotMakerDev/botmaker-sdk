@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Paced Google sign-ins** (2026-11-15): Apply's sign-ins are now one at a time from this PC, 5 to 10 minutes apart
+  and at most 8 a day. Each instance is readied first (its identity checked, its clock, time zone and region set,
+  three minutes after boot), and the operation says what it waits for. Delete, Make, Clone and Rename carry an
+  instance's kept sign-in identity with it.
 - **Make two of each** (2026-11-15): the Instances tab's button makes, for each emulator shown, the instances it lacks
   up to two, one operation each. Each is new, with its own device IDs, the light profile wanted in its configuration
   and written, and its BotMaker ID, and is left stopped. BlueStacks and MSI open their own manager instead.

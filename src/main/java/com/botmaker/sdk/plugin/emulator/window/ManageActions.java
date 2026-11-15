@@ -11,6 +11,7 @@ import com.botmaker.shared.emulator.config.ApplyHost;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
+import com.botmaker.shared.emulator.google.SignInReady;
 import com.botmaker.shared.emulator.manage.InstanceManager;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
@@ -101,6 +102,7 @@ final class ManageActions {
                 if (failed == null) {
                     HostConfig.forget(services, key).ifPresent(why -> said("It is deleted, but BotMaker could not forget"
                             + " all of its configuration: " + why));
+                    forgetIdentity(key);
                 }
                 return failed;
             });
@@ -149,6 +151,8 @@ final class ManageActions {
         } catch (IllegalArgumentException unnamed) {
             return;
         }
+        // a deleted instance's name taken again: its next sign-in is a first one
+        forgetIdentity(key);
         HostConfig.update(services, config -> ConfigViews.light(new ConfigViews.Target.Instance(key), config))
                 .ifPresent(why -> said(made.name() + "'s light profile was not kept in its configuration: " + why));
     }
@@ -206,6 +210,8 @@ final class ManageActions {
         } catch (IllegalArgumentException unnamed) {
             return;
         }
+        // a clone has new device IDs: its first sign-in keeps its own identity
+        forgetIdentity(key);
         // the clone's port is its own: its product gave it one
         HostConfig.update(services, config -> config.withInstance(key,
                         EmulatorConfig.copyable(config.instance(source))))
@@ -223,6 +229,7 @@ final class ManageActions {
         } catch (IllegalArgumentException unnamed) {
             return;
         }
+        Optional.ofNullable(SignInReady.renamed(from, to)).ifPresent(this::said);
         Optional<String> refused = HostConfig.rename(services, from, to);
         if (refused.isPresent()) {
             said("It is renamed, but BotMaker could not move its configuration or note the rename for its bots: "
@@ -234,6 +241,11 @@ final class ManageActions {
         Map<String, String> moves = InstanceRenames.moves(HostConfig.renames(services), known);
         if (services.projectDir() == null || moves.isEmpty()) return;
         Platform.runLater(() -> InstanceRenames.handOff(services, moves).ifPresent(window::say));
+    }
+
+    /** The Google sign-in identity kept for {@code key} is forgotten ({@link SignInReady#forget}). */
+    private void forgetIdentity(InstanceKey key) {
+        Optional.ofNullable(SignInReady.forget(key)).ifPresent(this::said);
     }
 
     private void said(String words) {
