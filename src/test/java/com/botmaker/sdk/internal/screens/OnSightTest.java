@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.DoneStores;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -138,7 +139,7 @@ class OnSightTest {
     }
 
     private DoneRecords records(Path dir) {
-        return new DoneRecords(dir.resolve("done.json"), clock);
+        return DoneStores.at(dir.resolve("done.json"), clock);
     }
 
     @Test

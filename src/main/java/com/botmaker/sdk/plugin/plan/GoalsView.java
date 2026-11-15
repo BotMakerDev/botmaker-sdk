@@ -12,7 +12,9 @@ import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.plan.DoneKey;
 import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.HostDone;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.PlanValues;
 import com.botmaker.sdk.internal.plan.StudioPlan;
@@ -21,6 +23,8 @@ import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.sdk.plugin.assist.MapAudit;
 import com.botmaker.sdk.plugin.assist.ScreenEdits;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Card;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Mark;
 import com.botmaker.sdk.plugin.plan.GoalsViewModel.Route;
@@ -248,8 +252,11 @@ public final class GoalsView {
             // Timed in the game server's zone, as a run is, so a daily's reset reads the same here.
             Clock clock = Clock.system(InstalledGame.zone(values.open(SdkValues.GAME_ZONE)
                     .flatMap(ctx -> ctx.value(ZoneId.class)).orElse(null)));
-            DoneRecords records = services.stateDir().map(dir -> DoneRecords.in(dir, clock))
-                    .orElseGet(() -> new DoneRecords(null, clock));
+            // What the runs did on the instance the bot reads, in the game it launches: the rows a run would read.
+            HostDone kept = services.hostValues().open(DoneRecords.VALUE).flatMap(ctx -> ctx.value(HostDone.class))
+                    .orElse(null);
+            DoneRecords records = DoneRecords.shown(kept, CaptureValue.followed(services).orElse("").strip(),
+                    DoneKey.game(LaunchTargetValue.current(services)), clock);
             List<String> names = List.copyOf(plans.keySet());
             try {
                 PlanModel model = new PlanModel(plan.plan(), plan.map(), records, null);

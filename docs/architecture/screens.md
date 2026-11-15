@@ -118,7 +118,8 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 - **`Do.press(input)`** is what achieves something on a screen, a `public final` field beside the input it presses
   (2026-11-06, spec `2026-11-06-goals-planner-design.md`). It is no `ScreenPart`: `MapScreen.actions` holds it, read only
   off a run's classes, so Studio's map reads none yet and leaves the field as written. `DoneRecords` keeps when each was
-  last done and whether its check held, in the SDK's state folder (`done.json`, keyed `<constant>.<field>`), and
+  last done and whether its check held, in the SDK's values of this PC (`Runs.java`'s `DONE`, rows keyed by instance, game and `<constant>.<field>`,
+  2026-11-15; until then the state folder's `done.json`), and
   `Readiness` says from that and its traits whether it may be done; an unknown never holds one back. A run's
   `Navigate.to` walks `.doing(DoneRecords.run())`: on each screen it comes to, what is `.onSight()` and ready is pressed
   if it shows now, nothing waited for, and the walk looks again. The assistant's walks and ExploreMap do none.

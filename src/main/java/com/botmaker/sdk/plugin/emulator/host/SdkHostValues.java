@@ -3,6 +3,7 @@ package com.botmaker.sdk.plugin.emulator.host;
 import com.botmaker.plugin.api.ValueHolder;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedValue;
+import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.shared.emulator.config.AccountRecord;
 
 import java.util.List;
@@ -11,7 +12,8 @@ import java.util.List;
  * The SDK's values of this PC: what each emulator and each instance should be (spec
  * {@code 2026-11-12-emulators-window-design.md}, amended: the configuration is the SDK's host data). The host keeps
  * them as Java in its folder of this PC, {@code Emulators.java}, {@code Instances.java} and {@code Accounts.java}; no
- * bot holds them and no run reads them. {@link HostConfig} turns them into shared's model and back.
+ * bot holds them and no run reads them. {@link HostConfig} turns them into shared's model and back. Beside them,
+ * {@link DoneRecords#VALUE} in {@code Runs.java}, the one a run writes (2026-11-15).
  */
 public final class SdkHostValues implements ValueHolder {
 
@@ -83,6 +85,6 @@ public final class SdkHostValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
-                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION);
+                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION, DoneRecords.VALUE);
     }
 }

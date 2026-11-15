@@ -4,6 +4,7 @@ import com.botmaker.plugin.api.TypeHolder;
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.PluginType;
+import com.botmaker.sdk.internal.plan.HostDone;
 import com.botmaker.sdk.plugin.emulator.host.HostAccounts;
 import com.botmaker.sdk.plugin.emulator.host.HostGames;
 import com.botmaker.sdk.plugin.emulator.host.HostKnown;
@@ -30,8 +31,15 @@ public final class HostTypes implements TypeHolder {
     @Override
     public List<ComponentType<?>> components() {
         return List.of(SETTINGS, SETTING, GAMES, GAME, ACCOUNTS, ACCOUNT, LABELS, LABEL, KNOWN, KNOWN_PLAIN,
-                KNOWN_ENTRY);
+                KNOWN_ENTRY, DONE, DONE_ROW);
     }
+
+    /** What the runs did, which a run writes ({@code DoneRecords}). */
+    public static final DeclaredCall<HostDone> DONE = ComponentType.part(HostDone.class)
+            .writtenAsEach(HostDone::of, HostDone::list);
+
+    public static final DeclaredCall<HostDone.Row> DONE_ROW = ComponentType.part(HostDone.Row.class)
+            .writtenAsRecord();
 
     public static final DeclaredCall<HostSettings> SETTINGS = ComponentType.part(HostSettings.class)
             .writtenAsEach(HostSettings::of, HostSettings::list);

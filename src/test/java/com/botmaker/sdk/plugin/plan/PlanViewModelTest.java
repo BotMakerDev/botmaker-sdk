@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.DoneStores;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.StudioPlan;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -65,11 +66,11 @@ class PlanViewModelTest {
         Plan plan = Plan.of(Plan.tier(BotConstants.goal("GOLD"), BotConstants.goal("FULL")),
                 Plan.tier(BotConstants.goal("GUILD")));
         Path file = dir.resolve("done.json");
-        new DoneRecords(file, Clock.fixed(NOON.minus(Duration.ofMinutes(10)), ZoneOffset.UTC))
+        DoneStores.at(file, Clock.fixed(NOON.minus(Duration.ofMinutes(10)), ZoneOffset.UTC))
                 .done(DoneRecords.key("SHOP", "selling"), true);
 
         StudioPlan studio = StudioPlan.of(plan, goals, ScreenGraph.of(screens));
-        DoneRecords records = new DoneRecords(file, Clock.fixed(NOON, ZoneOffset.UTC));
+        DoneRecords records = DoneStores.at(file, Clock.fixed(NOON, ZoneOffset.UTC));
         GoalsViewModel goalsView = GoalsViewModel.of(new PlanModel(studio.plan(), studio.map(), records, "HOME"),
                 studio);
         PlanViewModel view = PlanViewModel.of(goalsView, ZoneOffset.UTC);

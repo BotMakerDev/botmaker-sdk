@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.DoneStores;
 import com.botmaker.sdk.internal.plan.PlanModel;
 import com.botmaker.sdk.internal.plan.Round;
 import com.botmaker.sdk.internal.plan.StudioPlan;
@@ -92,7 +93,7 @@ class GoalsViewModelTest {
 
     private GoalsViewModel view(Plan plan, Map<String, Goal> goals, Map<String, Map<String, Do>> actions) {
         StudioPlan studio = StudioPlan.of(plan, goals, map(actions));
-        DoneRecords records = new DoneRecords(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC));
+        DoneRecords records = DoneStores.at(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC));
         return GoalsViewModel.of(new PlanModel(studio.plan(), studio.map(), records, "HOME"), studio);
     }
 

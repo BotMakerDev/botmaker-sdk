@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.plan.DoneRecords;
+import com.botmaker.sdk.internal.plan.DoneStores;
 import com.botmaker.sdk.internal.plan.Readiness;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
@@ -65,7 +66,7 @@ class GoalTest {
     private static final ScreenGraph MAP = ScreenGraph.ofScreens(Map.of("HOME", HOME));
 
     private DoneRecords at(Instant now) {
-        return new DoneRecords(folder.resolve("done.json"), Clock.fixed(now, ZoneOffset.UTC));
+        return DoneStores.at(folder.resolve("done.json"), Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private Answer met(Goal.Done goal, Duration after) {
@@ -157,20 +158,20 @@ class GoalTest {
         Goal.Done gameZone = Goal.done(() -> HOME.claim).since(Reset.daily(LocalTime.of(5, 0)));
         Path file = folder.resolve("done.json");
 
-        new DoneRecords(file, Clock.fixed(beforeReset, ZoneOffset.UTC)).done(KEY, true);
-        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(beforeReset.plusSeconds(30),
+        DoneStores.at(file, Clock.fixed(beforeReset, ZoneOffset.UTC)).done(KEY, true);
+        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, DoneStores.at(file, Clock.fixed(beforeReset.plusSeconds(30),
                 ZoneOffset.UTC))), "the same game day");
-        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset, ZoneOffset.UTC))),
+        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, DoneStores.at(file, Clock.fixed(afterReset, ZoneOffset.UTC))),
                 "pressed before 05:00 in Tokyo: the new day wants it again");
-        assertEquals(Answer.NO, Readiness.met(gameZone, MAP, new DoneRecords(file, Clock.fixed(afterReset, tokyo))),
+        assertEquals(Answer.NO, Readiness.met(gameZone, MAP, DoneStores.at(file, Clock.fixed(afterReset, tokyo))),
                 "no zone of its own: the run's clock, in the game's zone, says the same");
-        assertEquals(Answer.YES, Readiness.met(gameZone, MAP, new DoneRecords(file, Clock.fixed(afterReset,
+        assertEquals(Answer.YES, Readiness.met(gameZone, MAP, DoneStores.at(file, Clock.fixed(afterReset,
                 ZoneOffset.UTC))), "read in UTC the reset is 05:00Z, still to come: what the game zone fixes");
 
-        new DoneRecords(file, Clock.fixed(afterReset, ZoneOffset.UTC)).done(KEY, true);
-        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset.plus(
+        DoneStores.at(file, Clock.fixed(afterReset, ZoneOffset.UTC)).done(KEY, true);
+        assertEquals(Answer.YES, Readiness.met(ownZone, MAP, DoneStores.at(file, Clock.fixed(afterReset.plus(
                 Duration.ofHours(23)), ZoneOffset.UTC))), "05:01 counts until the next 05:00");
-        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, new DoneRecords(file, Clock.fixed(afterReset.plus(
+        assertEquals(Answer.NO, Readiness.met(ownZone, MAP, DoneStores.at(file, Clock.fixed(afterReset.plus(
                 Duration.ofHours(24)), ZoneOffset.UTC))));
     }
 

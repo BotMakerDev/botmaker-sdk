@@ -98,11 +98,11 @@ class PlannerTest {
 
     /** Records {@code key} done {@code ago} before noon. */
     private void done(String key, Duration ago, boolean held) {
-        new DoneRecords(dir.resolve("done.json"), Clock.fixed(NOON.minus(ago), ZoneOffset.UTC)).done(key, held);
+        DoneStores.at(dir.resolve("done.json"), Clock.fixed(NOON.minus(ago), ZoneOffset.UTC)).done(key, held);
     }
 
     private DoneRecords records() {
-        return new DoneRecords(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC));
+        return DoneStores.at(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC));
     }
 
     private PlanModel model(Plan plan, String at) {
@@ -379,7 +379,7 @@ class PlannerTest {
         screens.put("HOME", screen(Setup.named("HOME").start(), "HOME", Map.of("shop", click("shop"))));
         screens.put("SHOP", screen(Setup.named("SHOP").from(ref("HOME", "shop")).fromWhen(() -> false), "SHOP", Map.of()));
         PlanModel model = new PlanModel(Plan.of(Plan.tier(goal)), ScreenGraph.of(screens),
-                new DoneRecords(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC)), "HOME");
+                DoneStores.at(dir.resolve("done.json"), Clock.fixed(NOON, ZoneOffset.UTC)), "HOME");
 
         assertEquals(new Why.Blocked(Block.NO_WAY_THERE), why(Planner.round(model), "SHOP.sell"));
     }

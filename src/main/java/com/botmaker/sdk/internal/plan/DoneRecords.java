@@ -1,42 +1,45 @@
 package com.botmaker.sdk.internal.plan;
 
-import com.botmaker.plugin.api.PluginState;
+import com.botmaker.plugin.api.managed.RunHostValues;
+import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.screens.Conditions;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * When each {@code Do} was last done and whether its check held, keyed {@code <Screen constant>.<field>}: run data, in
- * the SDK's state folder of the bot ({@link PluginState}), so never versioned or published. A missing or unreadable file
- * is no record yet, and a file that cannot be written leaves the run's own memory of it: neither ends a run.
+ * When each {@code Do} was last done and whether its check held, keyed {@code <Screen constant>.<field>}: what runs
+ * learned of a game, kept in the SDK's values of this PC ({@link #VALUE}, 2026-11-15), one set per instance and game
+ * ({@link DoneKey}), so every bot that plays a game on an instance reads the same dailies, and two runs on two
+ * instances never mix theirs. Never in a bot, versioned or published. Nothing kept is no record yet, and a value
+ * that cannot be written leaves the run's own memory of it: neither ends a run.
  */
 public final class DoneRecords {
 
     /** The SDK's coordinate, which names its state folder. */
     public static final String GROUP = "com.github.BotMakerDev";
     public static final String ARTIFACT = "botmaker-sdk";
-    /** The file in that folder. */
-    static final String FILE = "done.json";
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    /** Every instance's records, in {@code Runs.java} of the SDK's folder of this PC. */
+    public static final ManagedMethod<HostDone> VALUE = ManagedValue.method(SdkRunValue.Id.DONE)
+            .in(SdkRunValue.Holder.RUNS)
+            .holds(HostDone.class, HostDone.none())
+            .because("These are when each action was last done in a game on an instance, and whether it held."
+                    + " The bots' runs write them.");
 
     /**
      * An action's last time.
@@ -47,11 +50,18 @@ public final class DoneRecords {
      */
     public record Done(Instant at, boolean held, int fails) {}
 
+    /** Where records are kept: read once, written whole on each change. */
+    public interface Store {
+        Map<String, Done> read();
+
+        void write(Map<String, Done> all);
+    }
+
     private static final class Run {
-        // Read on a run's first walk; only a Do done writes it. Timed in the game server's zone, which a reset with
-        // none of its own is read in.
-        static final DoneRecords RECORDS = new DoneRecords(PluginState
-                .folder(Path.of(System.getProperty("user.dir", ".")), GROUP, ARTIFACT).resolve(FILE), new GameClock());
+        // Read on a run's first walk, after the bot's parameters put its capture on its instance; only a Do done
+        // writes it. Timed in the game server's zone, which a reset with none of its own is read in.
+        static final DoneRecords RECORDS = new DoneRecords(
+                new HostStore(DoneKey.runInstance(), DoneKey.runGame()), new GameClock());
     }
 
     /**
@@ -76,17 +86,17 @@ public final class DoneRecords {
         }
     }
 
-    private final Path file;
+    private final Store store;
     private final Clock clock;
     private final Map<String, Done> done;
     /** What is being done now, which a walk under it leaves alone. */
     private final Set<Do> doing = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    /** The records in {@code file}, each new one timed by {@code clock}. */
-    public DoneRecords(Path file, Clock clock) {
-        this.file = file;
+    /** The records {@code store} keeps, each new one timed by {@code clock}. */
+    public DoneRecords(Store store, Clock clock) {
+        this.store = store;
         this.clock = clock;
-        this.done = read(file);
+        this.done = new LinkedHashMap<>(store == null ? Map.of() : store.read());
     }
 
     /** The running bot's. */
@@ -94,9 +104,20 @@ public final class DoneRecords {
         return Run.RECORDS;
     }
 
-    /** The records kept in the SDK's state folder {@code folder}, as Studio reads a bot's; timed by {@code clock}. */
-    public static DoneRecords in(Path folder, Clock clock) {
-        return new DoneRecords(folder.resolve(FILE), clock);
+    /** {@code instance}'s records of {@code game} in {@code kept}, as Studio reads them; written nowhere. */
+    public static DoneRecords shown(HostDone kept, String instance, String game, Clock clock) {
+        Map<String, Done> read = rows(kept, instance, game);
+        return new DoneRecords(new Store() {
+            @Override
+            public Map<String, Done> read() {
+                return read;
+            }
+
+            @Override
+            public void write(Map<String, Done> all) {
+                // Studio shows them; only a run records.
+            }
+        }, clock);
     }
 
     /** No records, kept nowhere: what a check that only reads the map plans with. */
@@ -114,16 +135,16 @@ public final class DoneRecords {
         return Optional.ofNullable(done.get(key));
     }
 
-    /** Records {@code key} done now, its check having {@code held} or not, and keeps it in the file. */
+    /** Records {@code key} done now, its check having {@code held} or not, and keeps it. */
     public void done(String key, boolean held) {
         done(key, held, clock.instant());
     }
 
-    /** Records {@code key} done {@code at}, its check having {@code held} or not, and keeps it in the file. */
+    /** Records {@code key} done {@code at}, its check having {@code held} or not, and keeps it. */
     public synchronized void done(String key, boolean held, Instant at) {
         int fails = held ? 0 : last(key).map(Done::fails).orElse(0) + 1;
         done.put(key, new Done(at, held, fails));
-        write();
+        if (store != null) store.write(Map.copyOf(done));
     }
 
     /**
@@ -154,45 +175,56 @@ public final class DoneRecords {
         return clock;
     }
 
-    private static Map<String, Done> read(Path file) {
+    /** {@code instance}'s records of {@code game} in {@code kept}; a row whose time does not read is skipped. */
+    static Map<String, Done> rows(HostDone kept, String instance, String game) {
         Map<String, Done> read = new LinkedHashMap<>();
-        if (file == null || !Files.isRegularFile(file)) return read;
-        try {
-            JSON.readTree(file.toFile()).properties().forEach(e -> done(e.getValue()).ifPresent(d -> read.put(e.getKey(), d)));
-        } catch (IOException unreadable) {
-            System.err.println("The done-records in " + file + " cannot be read, and start over: " + unreadable);
+        if (kept == null) return read;
+        for (HostDone.Row row : kept.list()) {
+            if (!row.of(instance, game) || row.action().isEmpty()) continue;
+            try {
+                read.put(row.action(), new Done(Instant.parse(row.at()), row.held(), row.fails()));
+            } catch (DateTimeException unreadable) {
+                // Not a record: as if never done.
+            }
         }
         return read;
     }
 
-    /** One record of the file; empty when it is no such thing. */
-    private static Optional<Done> done(JsonNode node) {
-        try {
-            return Optional.of(new Done(Instant.parse(node.path("at").asText()), node.path("held").asBoolean(),
-                    node.path("fails").asInt()));
-        } catch (DateTimeException unreadable) {
-            return Optional.empty();
-        }
+    /** {@code kept} with {@code instance}'s rows of {@code game} replaced by {@code all}; every other row as it was. */
+    static HostDone replaced(HostDone kept, String instance, String game, Map<String, Done> all) {
+        List<HostDone.Row> rows = new ArrayList<>();
+        if (kept != null) kept.list().stream().filter(row -> !row.of(instance, game)).forEach(rows::add);
+        all.forEach((action, d) -> rows.add(new HostDone.Row(instance, game, action, d.at().toString(), d.held(),
+                d.fails())));
+        return new HostDone(rows);
     }
 
-    private void write() {
-        if (file == null) return;
-        ObjectNode all = JSON.createObjectNode();
-        done.forEach((key, d) -> all.putObject(key).put("at", d.at().toString()).put("held", d.held())
-                .put("fails", d.fails()));
-        Path written = null;
-        try {
-            Files.createDirectories(file.getParent());
-            written = Files.createTempFile(file.getParent(), FILE, ".tmp");
-            JSON.writerWithDefaultPrettyPrinter().writeValue(written.toFile(), all);
-            Files.move(written, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException unwritable) {
-            System.err.println("The done-records could not be written to " + file + ": " + unwritable);
-            try {
-                if (written != null) Files.deleteIfExists(written);
-            } catch (IOException stays) {
-                System.err.println("Left behind: " + written + ": " + stays);
-            }
+    /**
+     * A run's records, in the SDK's values of this PC ({@link RunHostValues}): read whole, and each write puts back
+     * only this instance's rows of this game, over what another run may have written since.
+     */
+    static final class HostStore implements Store {
+
+        private final String instance;
+        private final String game;
+        /** Whether a refused write was said already, so a run says it once. */
+        private final AtomicBoolean said = new AtomicBoolean();
+
+        HostStore(String instance, String game) {
+            this.instance = instance;
+            this.game = game;
+        }
+
+        @Override
+        public Map<String, Done> read() {
+            return rows(RunHostValues.read(VALUE).orElse(null), instance, game);
+        }
+
+        @Override
+        public synchronized void write(Map<String, Done> all) {
+            RunHostValues.update(VALUE, kept -> replaced(kept, instance, game, all)).ifPresent(why -> {
+                if (!said.getAndSet(true)) System.err.println("What this run did is not kept on this PC: " + why);
+            });
         }
     }
 }

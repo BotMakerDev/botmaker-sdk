@@ -220,7 +220,7 @@ class PlanRunTest {
     }
 
     private DoneRecords records() {
-        return new DoneRecords(dir.resolve("done.json"), clock);
+        return DoneStores.at(dir.resolve("done.json"), clock);
     }
 
     private PlanRun run(Plan plan, FakeGame game, DoneRecords records) {

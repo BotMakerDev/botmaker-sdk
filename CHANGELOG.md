@@ -19,6 +19,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **What the runs did is kept on this PC, per instance and game** (2026-11-15): `DoneRecords` moved from the bot's
+  state folder's `done.json` into the SDK's values of this PC (`Runs.java`, `DONE`), one row per instance, game and
+  action, so several runs on several instances keep their own and a run on another bot of the same game reads them.
+  The Plan tab's Goals view reads the rows of the instance and game it follows. An old `done.json` is not read: the
+  first run starts with nothing done.
+
 - **The Emulators window holds the instance it works on** (2026-11-15, `plugin.emulator.window.InstanceHolds`):
   Apply (its Google sign-in included), clone, rename and delete hold the instance from bots' runs while they work, so
   several runs started meanwhile are dealt other instances; on an instance a live run plays on, the operation ends at
