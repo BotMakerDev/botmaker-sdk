@@ -607,7 +607,15 @@ public final class EmulatorsWindow {
     }
 
     void submit(String title, EmulatorInstance instance, Operation.Body body) {
-        Operation operation = OPERATIONS.submit(title, instance, body);
+        running(OPERATIONS.submit(title, instance, body));
+    }
+
+    /** Queues the making of an instance that doesn't exist yet, {@code key}, on its product's lane. */
+    void submit(String title, InstanceKey key, Operation.Body body) {
+        running(OPERATIONS.submit(title, key, body));
+    }
+
+    private void running(Operation operation) {
         RUNNING.put(operation.id(), operation);
         drawStrip();
     }

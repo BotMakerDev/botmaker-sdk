@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Make two of each** (2026-11-15): the Instances tab's button makes, for each emulator shown, the instances it lacks
+  up to two, one operation each. Each is new, with its own device IDs, the light profile wanted in its configuration
+  and written, and its BotMaker ID, and is left stopped. BlueStacks and MSI open their own manager instead.
 - **The light profile and the RAM budget** (2026-11-15): a configuration view's *Light profile* button, on an emulator
   or an instance, sets 2048 MB of memory, 2 CPU cores and 30 fps, keeping the screen. Apply writes them and undo takes
   them back; the button reads *Light profile ✓* once the layer, or its emulator's, wants it all. Every start (Apply,

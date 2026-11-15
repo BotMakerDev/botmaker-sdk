@@ -6,6 +6,8 @@ import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.host.InstanceRenames;
 import com.botmaker.shared.emulator.EmulatorIdentity;
 import com.botmaker.shared.emulator.EmulatorInstance;
+import com.botmaker.shared.emulator.PlatformId;
+import com.botmaker.shared.emulator.config.ApplyHost;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
@@ -106,11 +108,60 @@ final class ManageActions {
     }
 
     /**
-     * Runs {@code then} with the instance's console, found off the UI thread; BlueStacks' and MSI's manager is opened
+     * Instances ▸ Make two of each: for each product the window shows, the instances it lacks up to two, each made
+     * fresh by its console ({@link InstanceManager.Console#make}) with the light profile wanted and written, and its
+     * BotMaker ID given on a held first start. One operation per instance, queued on the product's lane.
+     */
+    void twoOfEach() {
+        for (PlatformId product : EmulatorsModel.SHOWN) {
+            List<EmulatorInstance> have = window.snapshot().instances().stream()
+                    .map(EmulatorsModel.InstanceRow::instance).filter(i -> i.platformId() == product).toList();
+            withConsole(product, console -> {
+                List<String> names = InstanceManager.Console.missingNames(product, have, EACH);
+                if (names.isEmpty()) {
+                    window.say(product.displayName() + " has " + have.size() + " instances already.");
+                    return;
+                }
+                StudioServices services = window.services();
+                InstanceManager.Prepare written = InstanceManager.Prepare.light(ApplyHost.live(),
+                        EmulatorsWindow.applies());
+                // wanted only once the instance is made and named, just before it is written
+                InstanceManager.Prepare light = (made, context) -> {
+                    lightWanted(services, made);
+                    return written.run(made, context);
+                };
+                for (String name : names) {
+                    window.submit("Make " + name, new InstanceKey(product, name),
+                            console.make(name, EACH, light, made -> {}));
+                }
+            });
+        }
+    }
+
+    /** How many instances each product gets: one Google account each (the user's call, 2026-11-14). */
+    private static final int EACH = 2;
+
+    /** A made instance wants the light profile, which {@link InstanceManager.Prepare#light} writes. On its operation. */
+    private void lightWanted(StudioServices services, EmulatorInstance made) {
+        InstanceKey key;
+        try {
+            key = InstanceKey.of(made);
+        } catch (IllegalArgumentException unnamed) {
+            return;
+        }
+        HostConfig.update(services, config -> ConfigViews.light(new ConfigViews.Target.Instance(key), config))
+                .ifPresent(why -> said(made.name() + "'s light profile was not kept in its configuration: " + why));
+    }
+
+    private void withConsole(EmulatorsModel.InstanceRow row, Consumer<InstanceManager.Console> then) {
+        withConsole(row.key().platform(), then);
+    }
+
+    /**
+     * Runs {@code then} with the product's console, found off the UI thread; BlueStacks' and MSI's manager is opened
      * instead, and a product with neither says so.
      */
-    private void withConsole(EmulatorsModel.InstanceRow row, Consumer<InstanceManager.Console> then) {
-        var product = row.key().platform();
+    private void withConsole(PlatformId product, Consumer<InstanceManager.Console> then) {
         Async.load("emulators-manager", () -> Optional.ofNullable(InstanceManager.forProduct(product)), found -> {
             if (found.isEmpty()) {
                 window.say(product.displayName() + " offers BotMaker no way to manage its instances.");

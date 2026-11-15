@@ -148,15 +148,19 @@ final class InstancesTab {
         }
         count.setMinWidth(Region.USE_PREF_SIZE);
         HBox.setHgrow(filters, Priority.ALWAYS);
-        HBox bar = new HBox(8, filters, count, toggle);
+        Button twoOfEach = new Button("Make two of each");
+        twoOfEach.setMinWidth(Region.USE_PREF_SIZE);
+        twoOfEach.setTooltip(new Tooltip("Makes the instances each emulator lacks up to two, one Google account each:"
+                + " each is new, with its own device IDs, the light profile and its BotMaker ID, and is left stopped."));
+        twoOfEach.setOnAction(e -> manage.twoOfEach());
+        HBox bar = new HBox(8, filters, count, twoOfEach, toggle);
         bar.setAlignment(Pos.TOP_LEFT);
 
         for (EmulatorsModel.Column column : EmulatorsModel.Column.offered()) table.getColumns().add(column(column));
         table.setShowRoot(false);
         table.setTableMenuButtonVisible(true);
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        table.setPlaceholder(new Label("No instance matches. Clear the filters, or create an instance in an"
-                + " emulator's own manager."));
+        table.setPlaceholder(new Label("No instance matches. Clear the filters, or press Make two of each."));
         table.setContextMenu(rowMenu());
         table.setRowFactory(t -> {
             TreeTableRow<Line> one = new TreeTableRow<>() {
