@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Emulators window holds the instance it works on** (2026-11-15, `plugin.emulator.window.InstanceHolds`):
+  Apply (its Google sign-in included), clone, rename and delete hold the instance from bots' runs while they work, so
+  several runs started meanwhile are dealt other instances; on an instance a live run plays on, the operation ends at
+  once, naming the run.
+- **A run launches the game on the instance it was dealt** (2026-11-15, `InstalledGame.launchedOn`): an emulator
+  app's launch target (`emu-app:pkg@LDPlayer-1`) is launched and restarted on the instance `instance()` moved the
+  capture onto, not the author's.
+
 - **Each of several runs gets its own emulator instance** (2026-11-15, `api.capture.Instance`,
   `plugin.emulator.SdkPools`): a new parameter `Instance instance()`, shown while the capture source is an emulator,
   picked from this PC's instances; an emulator capture reads its instance from it, a region kept. The SDK's pool deals

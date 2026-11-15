@@ -594,9 +594,10 @@ public final class EmulatorsWindow {
                             synchronized (batch) {
                                 // waits until the whole batch is queued
                             }
-                            return ApplyPlan.body(item, log, passwords, second, signIns,
-                                    (typed, listed) -> change(c -> ConfigViews.renameAccount(c, item.row().key(),
-                                            typed, listed))).run(context);
+                            return InstanceHolds.holding(services.liveRuns(), item.row().instance(),
+                                    ApplyPlan.body(item, log, passwords, second, signIns,
+                                            (typed, listed) -> change(c -> ConfigViews.renameAccount(c,
+                                                    item.row().key(), typed, listed)))).run(context);
                         });
                 id.set(operation.id());
                 // in the batch's lock, so a code asked finds its operation to see whether it was cancelled
@@ -612,8 +613,9 @@ public final class EmulatorsWindow {
         drawStrip();
     }
 
+    /** Queues work on an existing instance, {@code instance}, held from bots' runs while it works. */
     void submit(String title, EmulatorInstance instance, Operation.Body body) {
-        running(OPERATIONS.submit(title, instance, body));
+        running(OPERATIONS.submit(title, instance, InstanceHolds.holding(services.liveRuns(), instance, body)));
     }
 
     /** Queues the making of an instance that doesn't exist yet, {@code key}, on its product's lane. */

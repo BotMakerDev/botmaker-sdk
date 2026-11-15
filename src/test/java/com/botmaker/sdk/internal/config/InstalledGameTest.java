@@ -44,6 +44,16 @@ class InstalledGameTest {
         assertSame(own, InstalledGame.onInstance(own, Instance.named("")), "an instance naming none changes nothing");
     }
 
+    @Test
+    void anEmulatorAppIsLaunchedOnTheInstanceTheRunWasDealt() {
+        assertEquals("emu-app:com.example.game@LDPlayer-3",
+                InstalledGame.launchedOn("emu-app:com.example.game@LDPlayer-1", "LDPlayer-3"));
+        assertEquals("steam:570", InstalledGame.launchedOn("steam:570", "LDPlayer-3"), "no emulator app's: as it is");
+        assertEquals("emu-app:com.example.game@LDPlayer-1",
+                InstalledGame.launchedOn("emu-app:com.example.game@LDPlayer-1", ""), "no instance dealt");
+        assertNull(InstalledGame.launchedOn(null, "LDPlayer-3"));
+    }
+
     /** A bot's {@code Sdk}: the methods are found by mark, whatever they are called. */
     public static final class Sdk {
         @SdkValue(SdkValue.Id.LAUNCH_TARGETS)

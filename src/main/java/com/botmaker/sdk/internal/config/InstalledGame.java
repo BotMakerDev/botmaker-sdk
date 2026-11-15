@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 
@@ -46,6 +47,8 @@ public final class InstalledGame {
     private static volatile String launchChoice = "";
     private static volatile String vm = "";
     private static volatile ZoneId gameZone = ZoneId.systemDefault();
+    /** The instance {@code instance()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
+    private static volatile String playsOn = "";
 
     private InstalledGame() {}
 
@@ -58,12 +61,17 @@ public final class InstalledGame {
         settings(values);
         String instance = System.getProperty(CAPTURE_EMULATOR);
         if (instance != null && !instance.isBlank()) {
+            playsOn = "";
             Source.set(CaptureSource.emulator(instance.strip()));
             return;
         }
         CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
                 && !(source instanceof CurrentSource) ? source : null;
-        Source.set(onInstance(capture, marked(SdkValue.Id.INSTANCE, values)));
+        Object dealt = marked(SdkValue.Id.INSTANCE, values);
+        CaptureSource moved = onInstance(capture, dealt);
+        // The game is launched and restarted where the run plays: the dealt instance, not the author's.
+        playsOn = moved != capture && dealt instanceof Instance named ? named.name() : "";
+        Source.set(moved);
     }
 
     /**
@@ -128,12 +136,26 @@ public final class InstalledGame {
 
     /**
      * The launch spec a run starts, or {@code null} for none — {@code internal.launch.Target} parses it: a
-     * {@code -D}{@value #LAUNCH_TARGET} given by hand, else {@link #pick}.
+     * {@code -D}{@value #LAUNCH_TARGET} given by hand, else {@link #pick}, an emulator app's on the instance the run
+     * plays on ({@link #launchedOn}).
      */
     public static String launchTarget() {
         String spec = System.getProperty(LAUNCH_TARGET);
         if (spec != null && !spec.isBlank()) return spec.trim();
-        return pick(launchTargets, launchChoice, Os.current());
+        return launchedOn(pick(launchTargets, launchChoice, Os.current()), playsOn);
+    }
+
+    /**
+     * {@code spec} launching its emulator app on {@code instance} when it is an emulator app's and {@code instance}
+     * names one; else {@code spec} as it is. Several runs are each dealt an instance, and each launches the game there.
+     */
+    public static String launchedOn(String spec, String instance) {
+        if (spec == null || instance == null || instance.isBlank()) return spec;
+        LaunchSpec parsed = LaunchSpec.parse(spec);
+        if (parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP || instance.equals(parsed.emulatorInstance())) {
+            return spec;
+        }
+        return LaunchKind.EMULATOR_APP.id() + ":" + parsed.emulatorPackage() + "@" + instance;
     }
 
     /**
