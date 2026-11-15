@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The sample bot has a `@Pools` group** (2026-11-15, `samplebot.params.bot.FarmPools`): its account parameter is
+  dealt one per run when several run at once; `SampleBotCompileTest` keeps it compiling.
 - **The Emulators window's password prompt says a remembered password is kept at once** (2026-11-15): in this PC's
   credential store from the moment it is typed, until Google says it is wrong (shared's `Passwords`); so does the
   live screen's *Fill password…*.
