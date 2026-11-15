@@ -195,6 +195,18 @@ class EmulatorsModelTest {
                 "an emulator with no row kept has no group");
     }
 
+    @Test
+    void eachRowSaysItselfInWordsForTheUiTool() {
+        List<EmulatorsModel.Group> groups = EmulatorsModel.byEmulator(read().instances());
+        assertEquals("LDPlayer · 2 instances · 1 running", groups.getFirst().said());
+        InstanceRow test = read().instance(InstanceKey.of(TEST)).orElseThrow();
+        String said = test.said();
+        assertTrue(said.startsWith("Instance test (LDPlayer): stopped · 1 account user@example.com · "), said);
+        assertTrue(said.endsWith(Column.DIFFERS.text(test)), said);
+        assertEquals("Instance MuMu-0 (MuMu Player): not read · no account · Not read",
+                read().instance(InstanceKey.of(MUMU)).orElseThrow().said());
+    }
+
     private static Filter filter(String key, String value) {
         return Filter.of(Map.of(key, value));
     }

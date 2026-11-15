@@ -173,6 +173,16 @@ public final class EmulatorsModel {
             return wanted.games().stream().map(Sourced::value).map(GameRecord::label).toList();
         }
 
+        /** Its row in words, for a screen reader and Studio's {@code ui} tool: name, emulator, state, accounts. */
+        public String said() {
+            List<String> names = accounts();
+            return "Instance " + instance.name() + " (" + key.platform().displayName() + "): "
+                    + (facts == null ? "not read" : running ? "running" : "stopped")
+                    + " · " + (names.isEmpty() ? "no account" : count(names.size(), "account") + " "
+                    + String.join(", ", names))
+                    + " · " + Column.DIFFERS.text(this);
+        }
+
         Optional<AndroidState> android() {
             return facts == null ? Optional.empty() : facts.android();
         }
@@ -491,6 +501,11 @@ public final class EmulatorsModel {
 
         public int running() {
             return (int) rows.stream().filter(InstanceRow::running).count();
+        }
+
+        /** Its heading in words, for a screen reader and Studio's {@code ui} tool. */
+        public String said() {
+            return platform.displayName() + " · " + count(rows.size(), "instance") + " · " + running() + " running";
         }
     }
 

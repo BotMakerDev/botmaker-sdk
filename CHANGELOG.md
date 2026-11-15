@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Instances tab, readable** (2026-11-15): each row of the Emulators window's Instances tab names itself for
+  a screen reader and Studio's `ui` tool: the instance, its emulator, whether it runs, its accounts and its
+  configuration's state; an emulator's row says how many instances it has and how many run. A live test,
+  `EndToEndLiveTest`, makes two instances of each emulator shown and signs each into one account, paced, when
+  `BOTMAKER_LIVE_GOOGLE` lists the accounts.
 - **Paced Google sign-ins** (2026-11-15): Apply's sign-ins are now one at a time from this PC, 5 to 10 minutes apart
   and at most 8 a day. Each instance is readied first (its identity checked, its clock, time zone and region set,
   three minutes after boot), and the operation says what it waits for. Delete, Make, Clone and Rename carry an

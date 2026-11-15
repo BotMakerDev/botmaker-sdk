@@ -74,12 +74,37 @@ final class InstancesTab {
     /** How many accounts a row shows before "+N". */
     private static final int AVATARS = 2;
 
-    /** A line of the tree: an emulator's group, or one of its instances. */
-    private sealed interface Line {}
+    /**
+     * A line of the tree: an emulator's group, or one of its instances. Its {@code toString} is its words, which
+     * Studio's {@code ui} tool reads off the model.
+     */
+    private sealed interface Line {
+        String said();
+    }
 
-    private record GroupLine(EmulatorsModel.Group group) implements Line {}
+    private record GroupLine(EmulatorsModel.Group group) implements Line {
+        @Override
+        public String said() {
+            return group.said();
+        }
 
-    private record RowLine(EmulatorsModel.InstanceRow row) implements Line {}
+        @Override
+        public String toString() {
+            return said();
+        }
+    }
+
+    private record RowLine(EmulatorsModel.InstanceRow row) implements Line {
+        @Override
+        public String said() {
+            return row.said();
+        }
+
+        @Override
+        public String toString() {
+            return said();
+        }
+    }
 
     private final EmulatorsWindow window;
     private final ManageActions manage;
@@ -169,6 +194,7 @@ final class InstancesTab {
                     super.updateItem(line, empty);
                     getStyleClass().remove("em-group");
                     if (!empty && line instanceof GroupLine) getStyleClass().add("em-group");
+                    setAccessibleText(empty || line == null ? null : line.said());
                 }
             };
             one.setOnMouseClicked(e -> {
