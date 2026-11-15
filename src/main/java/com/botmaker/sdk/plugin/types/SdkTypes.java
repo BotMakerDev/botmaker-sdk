@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -35,6 +36,7 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
+import com.botmaker.sdk.plugin.editors.InstanceEditors;
 import com.botmaker.sdk.plugin.editors.LauncherEditors;
 import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
@@ -86,7 +88,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
                 KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                GAME_VM, STATE);
+                GAME_VM, INSTANCE, STATE);
     }
 
     @Override
@@ -346,6 +348,16 @@ public final class SdkTypes implements TypeHolder {
             .editor(() -> VmEditors::vm)
             .preview(() -> VmEditors::preview)
             .writtenAs(GameVm::of);
+
+    /**
+     * The emulator instance a run plays on, {@code Instance.named("LDPlayer-3")} (2026-11-15). A fresh one names none,
+     * so the capture source's own name is used.
+     */
+    public static final DeclaredCallType<Instance> INSTANCE = PluginType.value(Instance.class)
+            .fresh(() -> Instance.named(""))
+            .editor(() -> InstanceEditors::instance)
+            .preview(() -> InstanceEditors::preview)
+            .writtenAs(Instance::named);
 
     /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person

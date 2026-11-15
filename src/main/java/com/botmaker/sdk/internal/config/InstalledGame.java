@@ -6,7 +6,10 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -58,8 +61,23 @@ public final class InstalledGame {
             Source.set(CaptureSource.emulator(instance.strip()));
             return;
         }
-        Source.set(marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
-                && !(source instanceof CurrentSource) ? source : null);
+        CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
+                && !(source instanceof CurrentSource) ? source : null;
+        Source.set(onInstance(capture, marked(SdkValue.Id.INSTANCE, values)));
+    }
+
+    /**
+     * {@code capture} on the instance {@code instance} names, when the capture is an emulator's (a region of it kept);
+     * else {@code capture} as it is. Several runs at once are each dealt an instance into the bot's {@code instance()},
+     * so this is what keeps two of them off one emulator. Studio's own views look where the run plays through it too.
+     */
+    public static CaptureSource onInstance(CaptureSource capture, Object instance) {
+        if (!(instance instanceof Instance named) || !named.isNamed() || !SdkValues.onEmulator(capture)) {
+            return capture;
+        }
+        CaptureSource moved = CaptureSource.emulator(named.name());
+        Rect region = capture.subRegion();
+        return region == null ? moved : moved.region(region);
     }
 
     /**

@@ -157,7 +157,7 @@ public final class SourcePicker {
     /** As {@link #choose(ActionContext)}, for a window of this plugin's own. */
     public static void choose(StudioServices services) {
         new SourcePicker(services, Modals.owner(services), false)
-                .preselect(CaptureValue.current(services))
+                .preselect(CaptureValue.written(services))
                 .showAndWait()
                 .ifPresent(selection -> {
                     if (!(selection instanceof Selection.Concrete concrete)) return;

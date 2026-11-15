@@ -70,6 +70,11 @@ public @interface SdkValue {
         RUN,
         /** Where pixels are read from: the game's window — the {@code CaptureSource} parameter {@code captureSource}. */
         CAPTURE,
+        /**
+         * The emulator instance a run plays on, while the capture source is an emulator — the {@code Instance}
+         * parameter {@code instance}, which several runs at once are each dealt one of.
+         */
+        INSTANCE,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,
         /** The groups 🗺 Screens ▸ 🖼 Pictures files pictures under — a class of {@code PictureTag} constants. */

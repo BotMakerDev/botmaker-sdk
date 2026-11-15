@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Each of several runs gets its own emulator instance** (2026-11-15, `api.capture.Instance`,
+  `plugin.emulator.SdkPools`): a new parameter `Instance instance()`, shown while the capture source is an emulator,
+  picked from this PC's instances; an emulator capture reads its instance from it, a region kept. The SDK's pool deals
+  each run one of this PC's instances into it, and when too few are free offers *Create N instances* (as many as this
+  PC's memory holds), which opens the Emulators window.
 - **The sample bot has a `@Pools` group** (2026-11-15, `samplebot.params.bot.FarmPools`): its account parameter is
   dealt one per run when several run at once; `SampleBotCompileTest` keeps it compiling.
 - **The Emulators window's password prompt says a remembered password is kept at once** (2026-11-15): in this PC's

@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.emulator.SdkPools;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
 import com.botmaker.sdk.plugin.emulator.host.UsedBy;
@@ -89,7 +90,8 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .onProjectClosing(SdkPlugin::closing)
                 .onBotRun(SdkRun::started)
                 .reportViews(SdkReportViews.class)
-                .runs(SdkRuns.class));
+                .runs(SdkRuns.class)
+                .pools(SdkPools.class));
     }
 
     /**

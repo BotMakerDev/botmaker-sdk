@@ -103,7 +103,8 @@ public final class InstanceRenames {
     }
 
     /**
-     * Points the open bot at the new names: its launch targets, the runner's pick and the capture source, each a
+     * Points the open bot at the new names: its launch targets, the runner's pick, the capture source and the
+     * instance it plays on ({@code instance()}), each a
      * write of its own that Undo takes back. Call it on the JavaFX application thread.
      *
      * @return what was changed, for the log and the status line; empty when the bot named no old instance
@@ -121,9 +122,11 @@ public final class InstanceRenames {
             if (instance != null && moves.containsKey(instance)) named.put(instance, moves.get(instance));
         }
         CaptureValue.followed(services).filter(moves::containsKey).ifPresent(old -> named.put(old, moves.get(old)));
+        CaptureValue.instanceNamed(services).filter(moves::containsKey).ifPresent(old -> named.put(old, moves.get(old)));
         if (named.isEmpty()) return Optional.empty();
         Optional<String> refused = LaunchTargetValue.respell(services, spec -> respelled(spec, moves));
         if (refused.isEmpty()) refused = CaptureValue.renamed(services, moves);
+        if (refused.isEmpty()) refused = CaptureValue.instanceRenamed(services, moves);
         List<String> pairs = new ArrayList<>();
         named.forEach((old, renamed) -> pairs.add(old + " → " + renamed));
         String said = refused.map(why -> "The bot still names a renamed emulator instance (" + String.join(", ", pairs)

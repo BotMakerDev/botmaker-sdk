@@ -5,7 +5,10 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -14,11 +17,32 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The game half of a bot's {@code Sdk} parameters, read by their marks, and the launcher a system picks. */
 class InstalledGameTest {
+
+    @Test
+    void anEmulatorCaptureMovesToTheInstanceItWasDealtAndKeepsItsRegion() {
+        CaptureSource moved = InstalledGame.onInstance(CaptureSource.emulator("LDPlayer-1"),
+                Instance.named("LDPlayer-3"));
+        assertEquals("LDPlayer-3", assertInstanceOf(EmulatorSource.class, moved).instanceName());
+
+        Rect top = new Rect(0, 0, 100, 40);
+        CaptureSource region = InstalledGame.onInstance(CaptureSource.emulator("LDPlayer-1").region(top),
+                Instance.named("LDPlayer-3"));
+        assertEquals("LDPlayer-3", assertInstanceOf(EmulatorSource.class, region.base()).instanceName());
+        assertEquals(top, region.subRegion());
+
+        CaptureSource window = CaptureSource.window("game.exe", "");
+        assertSame(window, InstalledGame.onInstance(window, Instance.named("LDPlayer-3")),
+                "a capture that is no emulator's keeps its source");
+        CaptureSource own = CaptureSource.emulator("LDPlayer-1");
+        assertSame(own, InstalledGame.onInstance(own, Instance.named("")), "an instance naming none changes nothing");
+    }
 
     /** A bot's {@code Sdk}: the methods are found by mark, whatever they are called. */
     public static final class Sdk {

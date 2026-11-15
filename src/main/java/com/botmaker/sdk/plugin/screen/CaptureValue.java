@@ -1,10 +1,13 @@
 package com.botmaker.sdk.plugin.screen;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.plugin.params.ParamSlot;
@@ -45,13 +48,28 @@ public final class CaptureValue {
      * Read on every call rather than held: a source changed in another window has to take effect at once.
      */
     public static CaptureSource current(StudioServices services) {
-        return ParamSlot.open(services, SdkValues.CAPTURE).flatMap(ctx -> {
+        CaptureSource written = written(services);
+        return SdkValues.onEmulator(written) ? InstalledGame.onInstance(written, read(services, SdkValues.INSTANCE,
+                Instance.class).orElse(null)) : written;
+    }
+
+    /**
+     * The capture source as the bot writes it, before {@code instance()} moves an emulator's onto the instance it
+     * names: what a rewrite of the parameter starts from, and what the source picker preselects.
+     */
+    public static CaptureSource written(StudioServices services) {
+        return read(services, SdkValues.CAPTURE, CaptureSource.class)
+                .filter(source -> !(source instanceof CurrentSource)).orElse(null);
+    }
+
+    private static <T> Optional<T> read(StudioServices services, ManagedParam<T> parameter, Class<T> type) {
+        return ParamSlot.open(services, parameter).flatMap(ctx -> {
             try {
-                return ctx.value(CaptureSource.class);
+                return ctx.value(type);
             } catch (RuntimeException unreadable) {
                 return Optional.empty();
             }
-        }).filter(source -> !(source instanceof CurrentSource)).orElse(null);
+        });
     }
 
     /**
@@ -108,7 +126,7 @@ public final class CaptureValue {
         }
         String instance = spec.emulatorInstance();
         // Already that device, maybe narrowed to a region of it: kept as written.
-        CaptureSource now = current(services);
+        CaptureSource now = written(services);
         if (now != null && now.base() instanceof EmulatorSource already && already.instanceName().equals(instance)) {
             return Optional.of(instance);
         }
@@ -118,7 +136,7 @@ public final class CaptureValue {
 
     /** The emulator instance capture follows, by name; empty when it follows none. */
     public static Optional<String> followed(StudioServices services) {
-        CaptureSource now = current(services);
+        CaptureSource now = written(services);
         return now != null && now.base() instanceof EmulatorSource device ? Optional.ofNullable(device.instanceName())
                 : Optional.empty();
     }
@@ -130,13 +148,31 @@ public final class CaptureValue {
      * @return empty when written or nothing changed, else why nothing was
      */
     public static Optional<String> renamed(StudioServices services, Map<String, String> moves) {
-        CaptureSource now = current(services);
+        CaptureSource now = written(services);
         if (now == null || !(now.base() instanceof EmulatorSource device)) return Optional.empty();
         String renamed = moves.get(device.instanceName());
         if (renamed == null) return Optional.empty();
         CaptureSource base = new EmulatorSource(renamed);
         Rect region = now.subRegion();
         return write(services, region == null ? base : CaptureSource.region(base, region));
+    }
+
+    /** The instance the bot's {@code instance()} names, when it names one. */
+    public static Optional<String> instanceNamed(StudioServices services) {
+        return read(services, SdkValues.INSTANCE, Instance.class).filter(Instance::isNamed).map(Instance::name);
+    }
+
+    /**
+     * Points the bot's {@code instance()} at an instance's new name when it names one renamed ({@code moves}: old
+     * name → new). Call it on the JavaFX application thread.
+     *
+     * @return empty when written or nothing changed, else why nothing was
+     */
+    public static Optional<String> instanceRenamed(StudioServices services, Map<String, String> moves) {
+        String renamed = instanceNamed(services).map(moves::get).orElse(null);
+        if (renamed == null) return Optional.empty();
+        return ParamSlot.open(services, SdkValues.INSTANCE).map(ctx -> ctx.write(Instance.named(renamed)))
+                .orElse(Optional.empty());
     }
 
     /**
