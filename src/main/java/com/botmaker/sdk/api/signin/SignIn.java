@@ -5,6 +5,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.RunReach;
+import com.botmaker.sdk.internal.screens.UnknownPages;
 import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.shared.emulator.tree.UiNode;
 
@@ -65,8 +66,12 @@ public final class SignIn {
         return SignInClient.ofRun().map(SignInClient::signedIn).orElse(false);
     }
 
-    /** Asks the user, through the host, for what only they can do; it returns at once, the run reading on. */
+    /**
+     * Asks the user, through the host, for what only they can do; it returns at once, the run reading on. Before a
+     * {@link NeedsYou#LOOK} the page is saved, masked, in the run's report, so the bot's author can map it.
+     */
     public static void needsYou(NeedsYou kind) {
+        if (kind == NeedsYou.LOOK) UnknownPages.now();
         SignInClient.ofRun().ifPresent(client -> client.needsYou(kind));
     }
 

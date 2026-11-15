@@ -502,6 +502,7 @@ public final class ScreenMap {
             case GOALS -> GoalsView.view(services, this::openScreen, closing -> subscriptions.add(closing::run));
             case PICTURES -> ResourceManagerDialog.view(services, () -> window);
             case EXPLORE -> ExploreView.view(services, () -> graph, closing -> subscriptions.add(closing::run));
+            case UNKNOWN -> UnknownPagesView.view(services);
         };
     }
 

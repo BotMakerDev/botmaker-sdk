@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A page no screen matched is saved, masked, in the run's folder** (2026-11-15, `internal.screens.UnknownPages`,
+  `PageUnknown`): once a plan run on an instance has been lost for 10 s (`Navigate.where()` empty, a gap of more
+  than 10 s between looks starting the count again; a map walk's own lookups are not counted), or at once before
+  `SignIn.needsYou(LOOK)`, its tree is saved as `page-unknown-NN.json` beside the run's log (ten a run at most),
+  with the status and navigation bars dropped, fields empty and every text holding an `@` or a digit cut to its
+  length, and an info line of the log names the file. Once per stretch lost. 🗺 Screens' rail gains ❔ *Unknown*
+  (`plugin.map.UnknownPagesView`): the pages the bot's last ten runs saved, newest run first, the one picked as an
+  outline of its tree (class, id, text, label, field, place). All of it is the SDK's: the run log's format and Studio
+  know nothing of it.
 - **The Google sign-in can run as a bot** (2026-11-15, `plugin.emulator.signin.BotSignInDriver`): a `SignInDriver`
   that opens Android's add-account page, starts the sign-in bot through `sideRuns()` on the one instance
   (`-Dbotmaker.capture.emulator`, which wins over a bot's capture source), and reads its end off its `SignInHost`:

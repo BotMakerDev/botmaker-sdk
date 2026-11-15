@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenValues;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.sdk.internal.screens.UnknownPages;
 import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.DigitReader;
 
@@ -312,6 +313,7 @@ public final class Navigate {
         ScreenGraph map = ScreenMaps.installed();
         Optional<String> here = new ScreenWalk(map, new RunReach(), ScreenWalk.STEP_MS, null).where(ScreenMaps.lastSeen());
         here.ifPresent(constant -> tell(map, constant));
+        UnknownPages.seen(here.isPresent());
         return here.flatMap(map::instance);
     }
 
