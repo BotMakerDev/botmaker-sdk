@@ -123,6 +123,8 @@ public final class PlanRun {
     private Unproven unproven;
     /** The due time the run last said it idles until; null when it is not idling. */
     private Instant idling;
+    /** The screen the last round that only waited was on; null when it was on none. */
+    private String idleAt;
     /** Whether the last round did a step of the plan, rather than wait or end. */
     private boolean acted;
     /** The action last put after another on arrival, with nothing pressed since; null otherwise. */
@@ -196,11 +198,13 @@ public final class PlanRun {
         if (progressed == null) progressed();
         prove();
         String at = game.where().orElse(null);
+        if (idling != null && at != null && !at.equals(idleAt)) movedWhileIdle(at);
         PlanModel model = model(at);
         progressSeen(model, at);
         Round round = Planner.round(model);
         acted = !round.doing().isEmpty();
         if (round.doing().isEmpty()) {
+            idleAt = at;
             Instant from = records.clock().instant();
             Optional<End> end = idleOrEnd(model, round);
             // Waiting toward a due time is not acting: the clock leaves it out, and goes on where it was.
@@ -585,6 +589,17 @@ public final class PlanRun {
         if (lastPress == null) return;
         Duration since = Duration.between(lastPress, records.clock().instant());
         if (since.compareTo(PRESS_GAP) < 0) game.idle(PRESS_GAP.minus(since));
+    }
+
+    /**
+     * The game went to {@code at} while the run only waited: someone else moved it (the user on the screen, the game
+     * itself), so what was left be is chosen again now rather than once its {@link #HELD_OFF} is over.
+     */
+    private void movedWhileIdle(String at) {
+        fruitless = null;
+        if (heldOff.isEmpty()) return;
+        heldOff.clear();
+        say("The game went to " + map.shown(at) + " while the run waited: what was left be is chosen again.", null, null);
     }
 
     private void holdOff(Step step) {

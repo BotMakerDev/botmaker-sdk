@@ -813,8 +813,8 @@ public final class EmulatorsWindow {
     Passwords.Answer askPassword(String email, boolean canRemember) {
         return askPassword(email, canRemember, canRemember
                 ? "BotMaker types it on the instance, in Android's own sign-in. Remembered, it is kept in this PC's"
-                + " credential store once the sign-in is done, and typed again without asking; no assistant ever sees"
-                + " it. Skip it to leave this account out."
+                + " credential store from now on and typed again without asking, until Google says it is wrong; no"
+                + " assistant ever sees it. Skip it to leave this account out."
                 : "BotMaker types it once on the instance, in Android's own sign-in, and keeps it only until this"
                 + " Apply ends: this PC has no credential store to remember it in. Skip it to leave this account out.");
     }

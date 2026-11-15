@@ -335,7 +335,7 @@ final class LiveScreenDialog {
 
     /**
      * Asks {@code email}'s password in the prompt, then types it. When the instance's Apply is signing that account in,
-     * the batch gets it too, in place of the one it had, and remembers it once the sign-in is done if the user ticked
+     * the batch gets it too, in place of the one it had, and remembers it at once if the user ticked
      * *Remember on this PC*; untouched, a password the Apply's prompt was told to remember would be kept instead.
      */
     private void fillAsked(String email) {
@@ -346,7 +346,7 @@ final class LiveScreenDialog {
         boolean remembers = canRemember && signing.isPresent();
         Passwords.Answer answer = window.askPassword(email, remembers, remembers
                 ? "BotMaker types it into the field you tapped. Remembered, it is kept in this PC's credential store"
-                + " once this sign-in is done; no assistant ever sees it."
+                + " from now on, until Google says it is wrong; no assistant ever sees it."
                 : "BotMaker types it into the field you tapped, once, and keeps nothing; no assistant ever sees it.");
         if (answer == null) return;
         char[] password = answer.password();

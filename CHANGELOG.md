@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Emulators window's password prompt says a remembered password is kept at once** (2026-11-15): in this PC's
+  credential store from the moment it is typed, until Google says it is wrong (shared's `Passwords`); so does the
+  live screen's *Fill password…*.
+- **A plan run chooses again what it left be once the game moves while it waits** (2026-11-15,
+  `internal.plan.PlanRun`): an action held off for 5 min after three presses that met nothing is free again as soon
+  as an idle round finds the game on another screen (the user answered on the screen, the game moved itself), and
+  the run says so. A walk or press of the run's own frees nothing. Found live: a Google sign-in idled out its hold on
+  a list the user had already answered, and the host's 5-minute limit ended it.
 - **A page no screen matched is saved, masked, in the run's folder** (2026-11-15, `internal.screens.UnknownPages`,
   `PageUnknown`): once a plan run on an instance has been lost for 10 s (`Navigate.where()` empty, a gap of more
   than 10 s between looks starting the count again; a map walk's own lookups are not counted), or at once before

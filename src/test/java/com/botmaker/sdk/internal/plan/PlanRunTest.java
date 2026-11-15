@@ -480,6 +480,29 @@ class PlanRunTest {
         assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled, "it waits out the hold instead, looking again meanwhile");
     }
 
+    /** The user moved the game on while the run waited out a hold: the hold was about a page no longer up. */
+    @Test
+    void whatWasLeftBeIsChosenAgainOnceTheGameMovesWhileTheRunWaits() {
+        Goal never = metWhen(new AtomicBoolean());
+        on("HOME", "tap", Do.press(click("tap")).serves(never));
+        // A screen with nothing to do, and no way from it to HOME.
+        on("OTHER", "look", Do.press(click("look")).serves(metWhen(new AtomicBoolean(true))));
+        FakeGame game = new FakeGame();
+        PlanRun run = run(Plan.of(Plan.tier(never)), game, records());
+        for (int i = 0; i < PlanRun.REPEATS; i++) run.round();
+        run.round();
+        run.round();
+        assertEquals(PlanRun.REPEATS, game.did.size(), "left be: it waits");
+        assertTrue(game.said.stream().noneMatch(line -> line.contains("while the run waited")), String.join("\n", game.said));
+
+        game.at = "OTHER";
+        run.round();
+        assertTrue(game.said.contains("The game went to OTHER while the run waited: what was left be is chosen again."),
+                String.join("\n", game.said));
+        assertEquals("press HOME.tap", game.did.getLast(), "chosen again at once, not once the hold is over");
+        assertEquals(PlanRun.REPEATS + 1, game.did.stream().filter("press HOME.tap"::equals).count(), game.did.toString());
+    }
+
     @Test
     void aPressThatMeetsNothingIsLeftBeAfterThreeInARow() {
         Goal never = metWhen(new AtomicBoolean());
