@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
 package com.botmaker.sdk.internal.config.fixture.params.g.a;
 
 import com.botmaker.plugin.api.params.Param;

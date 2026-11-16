@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
 package com.botmaker.sdk.plugin.map;
 
 /** How 🗺 Screens lays its map out: the Layout ▾ picker's six modes (spec 2026-11-09 goal 5). */
