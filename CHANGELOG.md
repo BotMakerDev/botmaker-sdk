@@ -17,6 +17,13 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Changed
+
+- Licensed under PolyForm Noncommercial 1.0.0, copyright LiQiyeDev: free for any noncommercial use, commercial use
+  needs a license from LiQiyeDev. Releases up to v1.11.0 stay CC0 1.0.
+
 ## [1.11.0] — 2026-11-16
 
 - **What the runs did is kept on this PC, per instance and game** (2026-11-15): `DoneRecords` moved from the bot's
