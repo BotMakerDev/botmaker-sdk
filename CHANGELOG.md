@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.11.0] — 2026-11-16
 
 - **What the runs did is kept on this PC, per instance and game** (2026-11-15): `DoneRecords` moved from the bot's
   state folder's `done.json` into the SDK's values of this PC (`Runs.java`, `DONE`), one row per instance, game and
@@ -166,6 +166,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   - A finished sign-in whose address Android lists differently offers *Record as an alias of…* on the strip.
   - The Accounts grid counts an account under any of its addresses, and warns when two instances hold it through
     different ones.
+
+### Changed
+
+- Built against botmaker-shared 0.9.0 (was 0.8.1).
+- Built against botmaker-session 0.8.0 (was 0.7.1).
+- Built against botmaker-studio-api 0.18.0 (was 0.17.1).
+- Built against botmaker-plugin-toolkit 0.16.0 (was 0.15.1).
+- Built against botmaker-plugin-host 0.13.0 (was 0.12.1).
+- Built against botmaker-plugin-basics 0.10.0 (was 0.9.1).
+- Built against botmaker-java 0.3.0 (was 0.2.1).
 
 ## [1.10.1] — 2026-11-13
 
