@@ -193,7 +193,6 @@ public final class SignInHost implements AutoCloseable {
             }
             // one call at a time: a second connection waits for the first, never answered beside it
             try (Socket socket = server.accept()) {
-                socket.setSoTimeout((int) DoorLines.READ_WAIT.toMillis());
                 Optional<String> line = DoorLines.line(socket);
                 DoorLines.answer(socket, line.isEmpty() ? refused("no message") : answer(line.get()));
             } catch (SocketTimeoutException quiet) {

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -49,16 +50,29 @@ public final class DoorLines {
         return MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8), given.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** The connection's one line, {@link #MAX_LINE} bytes at most: none for a longer one, or one never ended. */
+    /**
+     * The connection's one line, {@link #MAX_LINE} bytes at most, sent whole within {@link #READ_WAIT}: none for a
+     * longer one, one never ended, or one still coming when the wait is over. The wait is the line's, not each read's,
+     * so a caller trickling a byte at a time holds the door no longer than one quiet caller.
+     */
     public static Optional<String> line(Socket socket) throws IOException {
+        return line(socket, READ_WAIT);
+    }
+
+    static Optional<String> line(Socket socket, Duration wait) throws IOException {
+        long deadline = System.nanoTime() + wait.toNanos();
         ByteArrayOutputStream line = new ByteArrayOutputStream();
         InputStream in = new BufferedInputStream(socket.getInputStream());
-        for (int b = in.read(); b != -1; b = in.read()) {
+        while (true) {
+            long left = Duration.ofNanos(deadline - System.nanoTime()).toMillis();
+            if (left <= 0) throw new SocketTimeoutException("the line took longer than " + wait.toMillis() + " ms");
+            socket.setSoTimeout((int) left);
+            int b = in.read();
+            if (b == -1) return Optional.empty();
             if (b == '\n') return Optional.of(line.toString(StandardCharsets.UTF_8));
             if (line.size() >= MAX_LINE) return Optional.empty();
             line.write(b);
         }
-        return Optional.empty();
     }
 
     /** Writes {@code answer} as the connection's one line back. */

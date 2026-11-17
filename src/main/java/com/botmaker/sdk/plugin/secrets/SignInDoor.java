@@ -192,7 +192,6 @@ public final class SignInDoor implements AutoCloseable {
         while (!server.isClosed()) {
             // one call at a time: two runs never type at once
             try (Socket socket = server.accept()) {
-                socket.setSoTimeout((int) DoorLines.READ_WAIT.toMillis());
                 Optional<String> line = DoorLines.line(socket);
                 DoorLines.answer(socket, line.isEmpty() ? DoorLines.refused("no message") : answer(line.get()));
             } catch (IOException gone) {
