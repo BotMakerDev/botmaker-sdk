@@ -91,7 +91,8 @@ final class ApplyPlan {
                 lines.add(kind + " account " + change.account().name() + ": a record only, nothing is signed "
                         + (remove ? "out" : "in"));
             } else if (remove) {
-                lines.add("Remove " + kind + " account " + change.account().name());
+                lines.add("Remove " + kind + " account " + change.account().name()
+                        + item.row().diff().signOutCondition());
             } else {
                 lines.add("Sign in " + kind + " account " + change.account().name() + " · Password "
                         + (remembered.contains(PasswordStore.key(change.account().name())) ? "remembered" : "asked next"));

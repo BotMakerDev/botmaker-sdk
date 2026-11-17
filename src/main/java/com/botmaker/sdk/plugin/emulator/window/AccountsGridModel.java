@@ -285,13 +285,20 @@ final class AccountsGridModel {
         return items.stream().mapToInt(item -> item.accounts().size()).sum();
     }
 
-    /** What the tab's Apply would run, counted for the inspector. */
-    record Pending(int signIns, int signOuts, int instances) {
+    /**
+     * What the tab's Apply would run, counted for the inspector.
+     *
+     * @param ifOn the sign-outs on an instance not read, each done only if the account is on it
+     */
+    record Pending(int signIns, int signOuts, int ifOn, int instances) {
 
         String said() {
             if (signIns + signOuts == 0) return "Nothing to apply";
+            String maybe = ifOn == 0 ? ""
+                    : ifOn == signOuts ? (signOuts == 1 ? " if it is on it" : " each if it is on it")
+                    : " (" + ifOn + " if it is on it)";
             return EmulatorsModel.count(signIns, "sign-in") + ", " + EmulatorsModel.count(signOuts, "sign-out")
-                    + " across " + EmulatorsModel.count(instances, "instance");
+                    + maybe + " across " + EmulatorsModel.count(instances, "instance");
         }
     }
 
@@ -299,13 +306,17 @@ final class AccountsGridModel {
     static Pending pending(List<ApplyPlan.Item> items) {
         int in = 0;
         int out = 0;
+        int ifOn = 0;
         for (ApplyPlan.Item item : items) {
             for (ConfigDiff.AccountChange change : item.accounts()) {
                 if (change.op() == ConfigDiff.AccountChange.Op.ADD) in++;
-                else out++;
+                else if (change.signsOut()) {
+                    out++;
+                    if (!item.row().diff().accountsRead()) ifOn++;
+                }
             }
         }
-        return new Pending(in, out, items.size());
+        return new Pending(in, out, ifOn, items.size());
     }
 
     /** How a cell is drawn: its mark and the words its tooltip and the legend give. */

@@ -134,8 +134,12 @@ class AccountsGridModelTest {
                 + " setting only, which this tab does not apply");
         assertTrue(all.getFirst().changes().isEmpty() && all.getFirst().games().isEmpty());
         assertEquals(2, AccountsGridModel.applyCount(all), "Main signed out, Farm signed in");
-        assertEquals(new AccountsGridModel.Pending(1, 1, 1), AccountsGridModel.pending(all));
+        assertEquals(new AccountsGridModel.Pending(1, 1, 0, 1), AccountsGridModel.pending(all));
         assertEquals("1 sign-in, 1 sign-out across 1 instance", AccountsGridModel.pending(all).said());
+        assertEquals("0 sign-ins, 1 sign-out if it is on it across 1 instance",
+                new AccountsGridModel.Pending(0, 1, 1, 1).said());
+        assertEquals("1 sign-in, 3 sign-outs (2 if it is on it) across 2 instances",
+                new AccountsGridModel.Pending(1, 3, 2, 2).said());
 
         List<ApplyPlan.Item> mainOnly = AccountsGridModel.toApply(rows, List.of(MAIN));
         assertEquals(1, AccountsGridModel.applyCount(mainOnly), "Farm's row is not shown: its sign-in waits");

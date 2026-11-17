@@ -35,8 +35,9 @@ final class InspectorModel {
         }
         for (ConfigDiff.AccountChange change : diff.accounts()) {
             if (!change.account().kind().signedInByBotMaker()) continue;
-            lines.add((change.op() == ConfigDiff.AccountChange.Op.REMOVE ? "− sign out " : "+ sign in ")
-                    + change.account().name());
+            boolean remove = change.op() == ConfigDiff.AccountChange.Op.REMOVE;
+            lines.add((remove ? "− sign out " : "+ sign in ") + change.account().name()
+                    + (remove ? diff.signOutCondition() : ""));
         }
         for (GameRecord game : diff.missingGames()) lines.add("+ install " + game.label());
         return lines;

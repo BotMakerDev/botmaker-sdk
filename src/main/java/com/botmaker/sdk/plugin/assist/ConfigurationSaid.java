@@ -68,7 +68,7 @@ final class ConfigurationSaid {
         if (!removals.isEmpty()) {
             lines.add("Accounts its configuration says to sign out:");
             removals.forEach(change -> lines.add("• " + change.account().kind().displayName() + " "
-                    + change.account().name() + " — signed in"));
+                    + change.account().name() + (diff.accountsRead() ? " — signed in" : " —" + diff.signOutCondition())));
         }
         // with no facts, whether it runs was not read either
         boolean stopped = row.facts() != null && !row.running();

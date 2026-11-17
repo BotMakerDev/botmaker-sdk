@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- Emulators window: an account marked "−" on a stopped instance is signed out by Apply. The Apply dialog, the
+  inspector's pending line and the Accounts tab's count say "if it is on it" for such a sign-out.
 - Every file states its license and copyright by REUSE (`REUSE.toml`, `LICENSES/`), every Java source starts with
   its SPDX header (the sample bot and other test resources excepted), and the `reuse` workflow checks both on each
   push.
