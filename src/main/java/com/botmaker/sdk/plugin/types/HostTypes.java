@@ -12,6 +12,7 @@ import com.botmaker.sdk.plugin.emulator.host.HostAccounts;
 import com.botmaker.sdk.plugin.emulator.host.HostGames;
 import com.botmaker.sdk.plugin.emulator.host.HostKnown;
 import com.botmaker.sdk.plugin.emulator.host.HostLabels;
+import com.botmaker.sdk.plugin.emulator.host.HostSecrets;
 import com.botmaker.sdk.plugin.emulator.host.HostSettings;
 
 import java.util.List;
@@ -34,8 +35,15 @@ public final class HostTypes implements TypeHolder {
     @Override
     public List<ComponentType<?>> components() {
         return List.of(SETTINGS, SETTING, GAMES, GAME, ACCOUNTS, ACCOUNT, LABELS, LABEL, KNOWN, KNOWN_PLAIN,
-                KNOWN_ENTRY, DONE, DONE_ROW);
+                KNOWN_ENTRY, SECRETS, SECRET, DONE, DONE_ROW);
     }
+
+    /** The secrets this PC keeps, by name and kind ({@code KeptSecrets}). */
+    public static final DeclaredCall<HostSecrets> SECRETS = ComponentType.part(HostSecrets.class)
+            .writtenAsEach(HostSecrets::of, HostSecrets::list);
+
+    public static final DeclaredCall<HostSecrets.Kept> SECRET = ComponentType.part(HostSecrets.Kept.class)
+            .writtenAsRecord();
 
     /** What the runs did, which a run writes ({@code DoneRecords}). */
     public static final DeclaredCall<HostDone> DONE = ComponentType.part(HostDone.class)

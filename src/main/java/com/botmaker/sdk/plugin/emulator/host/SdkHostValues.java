@@ -83,11 +83,17 @@ public final class SdkHostValues implements ValueHolder {
                     .because("This is the second step a Google sign-in follows for an account that picks none of its"
                             + " own: phone, code, backup-code or ask. Change it in the Accounts window.");
 
+    public static final ManagedMethod<HostSecrets> SECRETS = ManagedValue.method(SdkHostValue.Id.SECRETS)
+            .in(SdkHostValue.Holder.SECRETS)
+            .holds(HostSecrets.class, HostSecrets.none())
+            .because("These are the secrets this PC keeps, by name and kind, never a value: only this PC's"
+                    + " credential store holds that. Add one from a secret's picker.");
+
     private SdkHostValues() {}
 
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
-                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION, DoneRecords.VALUE);
+                INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION, SECRETS, DoneRecords.VALUE);
     }
 }

@@ -21,10 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
-- `GoogleAccount` (`api.signin`), a parameter's type: `GoogleAccount.of("a@gmail.com")` names one account of this PC's
-  account book, and a pool deals one to each of several runs. Its pill lists the book's Google accounts, each with its
-  second step and a warning when no password is kept, and *Add account…* puts a new one in the book with its password,
-  second step and authenticator key in the credential store. No instance is touched: signing in is a bot's work.
+- `Secret` (`api.secrets`), a parameter's type for any bot: `Secret.of("farm password")` names a secret this PC
+  keeps, never its value, and a pool deals one to each of several runs (inside a record with what goes with it). Its
+  pill lists the secrets this PC keeps, each with its kind (password, or an authenticator whose current code is
+  typed) and a warning when this PC's credential store lacks its value; *Add secret…* keeps a new one: its value in
+  the credential store, its name and kind in `Secrets.java` among the SDK's values of this PC.
 
 ### Changed
 

@@ -18,6 +18,7 @@ import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
 import com.botmaker.shared.tools.UserDirs;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -83,6 +84,24 @@ public final class HostConfig {
      */
     public static HostBook accounts(StudioServices services) {
         return new HostBook(services, stateDir(), GoogleAccount::signedIn);
+    }
+
+    /** The secrets this PC keeps ({@link SdkHostValues#SECRETS}): names and kinds, no value; none when unread. */
+    public static HostSecrets secrets(StudioServices services) {
+        return read(services, SdkHostValues.SECRETS, HostSecrets.class, HostSecrets.none());
+    }
+
+    /**
+     * Changes the secrets this PC keeps by {@code edit}, read and written under one lock so two adds never lose one;
+     * one step of this PC's undo named {@code label}.
+     */
+    public static void changeSecrets(StudioServices services, String label, UnaryOperator<HostSecrets> edit)
+            throws IOException {
+        Optional<String> refused = step(services, label, () -> {
+            HostSecrets before = secrets(services);
+            return write(services, SdkHostValues.SECRETS, HostSecrets.class, before, edit.apply(before));
+        });
+        if (refused.isPresent()) throw new IOException(refused.get());
     }
 
     // ---- through the host ----

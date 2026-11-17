@@ -147,7 +147,7 @@ class PluginLayersTest {
             list.filter(Files::isDirectory).forEach(p -> packages.add(p.getFileName().toString()));
         }
         assertEquals(new TreeSet<>(Set.of("bot", "capture", "console", "geometry", "input", "params", "plan",
-                "random", "screens", "signin", "sound", "text", "time", "vision")), packages);
+                "random", "screens", "secrets", "signin", "sound", "text", "time", "vision")), packages);
     }
 
     /** Rule 4: no public {@code api} member takes, returns or exposes an {@code internal} type. */

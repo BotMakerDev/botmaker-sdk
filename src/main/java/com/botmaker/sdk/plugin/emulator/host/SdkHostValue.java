@@ -48,13 +48,19 @@ public @interface SdkHostValue {
         /** Every account this PC knows, each once with its note: the book the instances' accounts name. */
         BOOK,
         /** The second step a Google sign-in follows for an account that picks none of its own. */
-        DEFAULT_VERIFICATION
+        DEFAULT_VERIFICATION,
+        /** The secrets this PC keeps, by name and kind, never a value (2026-11-17). */
+        SECRETS
     }
 
-    /** This PC's classes the values live in: {@code Emulators.java}, {@code Instances.java}, {@code Accounts.java}. */
+    /**
+     * This PC's classes the values live in: {@code Emulators.java}, {@code Instances.java}, {@code Accounts.java},
+     * {@code Secrets.java}.
+     */
     enum Holder implements HostHolder {
         EMULATORS,
         INSTANCES,
-        ACCOUNTS
+        ACCOUNTS,
+        SECRETS
     }
 }
