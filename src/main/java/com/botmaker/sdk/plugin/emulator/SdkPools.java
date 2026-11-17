@@ -12,7 +12,9 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.shared.emulator.config.InstanceKey;
-import com.botmaker.shared.emulator.config.RamBudget;
+import com.botmaker.shared.emulator.config.InstanceMemory;
+import com.botmaker.shared.emulator.config.LightProfile;
+import com.botmaker.shared.host.MemoryBudget;
 
 import java.util.List;
 import java.util.TreeSet;
@@ -28,7 +30,7 @@ public final class SdkPools implements PoolHolder {
     /** The bot's {@code instance()}, dealt from this PC's instances. */
     public static final PluginPool<Instance> INSTANCES = PluginPool.fills(SdkValues.INSTANCE)
             .from(SdkPools::instances)
-            .offering((shortfall, services) -> offers(shortfall.missing(), RamBudget.live().room(0)));
+            .offering((shortfall, services) -> offers(shortfall.missing(), room()));
 
     @Override
     public List<PluginPool<?>> pools() {
@@ -63,6 +65,12 @@ public final class SdkPools implements PoolHolder {
         String title = "Create " + creatable + (creatable == 1 ? " instance" : " instances")
                 + (creatable < missing ? " (this PC's memory holds no more)" : "");
         return List.of(PoolOffer.of(title, SdkPools::create));
+    }
+
+    /** How many more instances the offer makes, light ones, this PC can commit now. */
+    private static int room() {
+        MemoryBudget budget = MemoryBudget.live();
+        return budget.room(InstanceMemory.need("A light instance", LightProfile.MEMORY_MB, budget));
     }
 
     /** The offer's click: the window links JavaFX, so a headless host that only lists the offer never loads it. */

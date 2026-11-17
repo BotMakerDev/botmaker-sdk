@@ -59,7 +59,7 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `�
   `../docs/superpowers/specs/2026-11-14-end-to-end-instances-design.md`): the windows show LDPlayer alone
   (`EmulatorsModel.SHOWN`; the rest is still discovered and driven where a bot names it). *Make two of each* runs
   shared's `Console.make` with `Prepare.light` for each product shown; Apply's sign-ins go through shared's
-  `SignInPace` and `SignInReady`, and every start through `RamBudget` (shared's `emulator.md` § Addresses, § Making
+  `SignInPace` and `SignInReady`, and every start through `MemoryBudget` (shared's `emulator.md` § Addresses, § Making
   instances, § Pacing). Each Instances row says itself (`InstanceRow.said`, `Group.said`) as its accessible text, so a
   screen reader and Studio's `ui` tool read the tree table by rows. `EndToEndLiveTest` drives the whole path live when
   `BOTMAKER_LIVE_GOOGLE` lists the accounts.
