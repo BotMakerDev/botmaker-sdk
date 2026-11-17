@@ -65,7 +65,7 @@ final class MapEdits {
     private static final String FROM = "the screen the way in leaves";
     private static final String METHOD = "Firestone::eventOn; blank, no fact: always";
     private static final String FACT = "or a fact: Progress::gold";
-    private static final String TEST = "the fact's: at_least, at_most, is, is_true";
+    private static final String TEST = "the fact's: at_least, at_most, is, is_true, is_set";
     private static final String VALUE = "what test compares to: 5";
 
     /**
@@ -763,10 +763,14 @@ final class MapEdits {
         if (hold != null && now instanceof Hotkey h) now = h.combo(h.combo().held(hold));
         if (drags && now instanceof Button b) now = dragged(context, b, edit, drop);
         if (typed && now instanceof Button b) {
-            Words text = edit.types() == null ? b.types() : edit.types().isBlank() ? null : Words.of(edit.types());
-            return said(ScreenEdits.setField(context.services(), screen, field, b.typing(new Typing(text,
-                    edit.submits() == null ? b.isSubmitting() : edit.submits(),
-                    edit.clears() == null ? b.isClearing() : edit.clears()))));
+            boolean submits = edit.submits() == null ? b.isSubmitting() : edit.submits();
+            boolean clears = edit.clears() == null ? b.isClearing() : edit.clears();
+            // A field typing a parameter keeps it unless a text is given in its place.
+            Typing typing = edit.types() == null && b.typedParameter() != null
+                    ? b.typing().with(submits, clears)
+                    : new Typing(edit.types() == null ? b.types() : edit.types().isBlank() ? null
+                            : Words.of(edit.types()), submits, clears);
+            return said(ScreenEdits.setField(context.services(), screen, field, b.typing(typing)));
         }
         return said(ScreenEdits.setInput(context.services(), screen, field, now));
     }

@@ -71,7 +71,9 @@ public final class RunFacts {
      * installed map that feed them; read as screens are seen.
      */
     public static void install(Class<?>... holders) {
-        use(ParamGroups.allBeside(holders), RunFacts::readNow);
+        List<Class<?>> groups = ParamGroups.allBeside(holders);
+        RunParams.groups(groups);
+        use(groups, RunFacts::readNow);
     }
 
     /** Uses the facts among {@code groups}, fed by the installed map's readouts and read by {@code reader}. Tests too. */

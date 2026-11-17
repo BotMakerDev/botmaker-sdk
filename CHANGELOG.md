@@ -26,6 +26,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   pill lists the secrets this PC keeps, each with its kind (password, or an authenticator whose current code is
   typed) and a warning when this PC's credential store lacks its value; *Add secret…* keeps a new one: its value in
   the credential store, its name and kind in `Secrets.java` among the SDK's values of this PC.
+- A field types a parameter: `Button.typesParameter(Login::email)` types the value this run was dealt, and
+  `Button.typesSecret(Login::password)` has BotMaker type the named secret, the run never holding its value. A field
+  with no value dealt is not pressed: the walk ends NOT_NOW and Discovery leaves its way untried.
+- A parameter's part by its record's method: `Login::email` reads the email of the bot's one `Login` parameter; none
+  or two parameters of that record are refused with words, and a part is never set alone.
+- `Params.when(Login::code).isSet()`, a condition holding while a parameter's value is not blank.
 
 ### Changed
 

@@ -1,5 +1,6 @@
 package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 
+import samplebot.Login;
 import samplebot.SampleBot;
 import samplebot.params.bot.Progress;
 
@@ -40,6 +41,9 @@ public final class Screens {
                 .looks(List.of(Look.of(Pictures.COLLECT_BADGE, States.Presses.BADGE)));
         public final Button battle = Button.of(Pictures.BATTLE).tried().free().gesture(Gesture.DOUBLE).marking();
         public final Button search = Button.of(Pictures.SEARCH).types(Texts.GUILD).free().clearing().submitting();
+        public final Button email = Button.of(Pictures.SEARCH).typesParameter(Login::email).free().submitting();
+        public final Button password = Button.of(Pictures.SEARCH).typesSecret(Login::password).free().submitting()
+                .when(Params.when(Login::password).isSet());
         public final Button avatar = Button.beside(Pictures.GOLD_ICON, -1.5, 0).free().hold(Duration.ofMillis(900));
         public final Custom solve = Custom.of(SampleBot::solvePuzzle).free().occasional();
         public final Do claim = Do.press(collect).serves(Goals.CLAIMED_TODAY).first()

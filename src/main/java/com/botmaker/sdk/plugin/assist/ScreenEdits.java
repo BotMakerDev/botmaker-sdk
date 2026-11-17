@@ -1318,7 +1318,7 @@ public final class ScreenEdits {
             return notMethod.map(Given::refused).orElseGet(() -> new Given(ScreenTypes.condition(method), null));
         }
         if (!ScreenTypes.isMethod(fact)) return Given.refused("\"" + fact.strip() + "\" is no fact (Progress::gold).");
-        if (test == null) return Given.refused("Give the fact's test: at_least, at_most, is or is_true.");
+        if (test == null) return Given.refused("Give the fact's test: at_least, at_most, is, is_true or is_set.");
         String named = fact.strip();
         String group = named.substring(0, named.indexOf("::"));
         String name = named.substring(named.indexOf("::") + 2);
@@ -1329,10 +1329,12 @@ public final class ScreenEdits {
         String wanted = switch (test) {
             case AT_LEAST, AT_MOST -> "int";
             case IS_TRUE -> "boolean";
-            case IS -> type;
+            case IS, IS_SET -> type;
         };
         if (!wanted.equals(type)) return Given.refused(named + " is a " + type + "; that test needs a " + wanted + ".");
-        if (test == ParamCheck.Test.IS_TRUE) return new Given(ScreenTypes.test(named, test, null), null);
+        if (test == ParamCheck.Test.IS_TRUE || test == ParamCheck.Test.IS_SET) {
+            return new Given(ScreenTypes.test(named, test, null), null);
+        }
         if (value == null) return Given.refused("Give the value " + named + " is tested against.");
         Object read = switch (type) {
             case "int" -> integer(value.strip());

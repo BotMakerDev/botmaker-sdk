@@ -27,7 +27,7 @@ import java.util.Optional;
 public record ParamCheck(Params.When<?> when, Test test, Object value, boolean byNeed) implements Condition {
 
     /** How a parameter's value is tested: one per link of {@code Params.When}. */
-    public enum Test { AT_LEAST, AT_MOST, IS, IS_TRUE }
+    public enum Test { AT_LEAST, AT_MOST, IS, IS_TRUE, IS_SET }
 
     public ParamCheck {
         Objects.requireNonNull(when, "when");
@@ -46,12 +46,15 @@ public record ParamCheck(Params.When<?> when, Test test, Object value, boolean b
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private boolean holds() {
+        // Set or not is answered even of no value: a blank one, a login not dealt, is a no, not an unknown.
+        if (test == Test.IS_SET) return known().filter(value -> !String.valueOf(value).isBlank()).isPresent();
         Object known = known().orElseThrow(() -> new IllegalStateException("the parameter has no value"));
         return switch (test) {
             case AT_LEAST -> ((Comparable) known).compareTo(value) >= 0;
             case AT_MOST -> ((Comparable) known).compareTo(value) <= 0;
             case IS -> known.equals(value);
             case IS_TRUE -> (Boolean) known;
+            case IS_SET -> true;
         };
     }
 

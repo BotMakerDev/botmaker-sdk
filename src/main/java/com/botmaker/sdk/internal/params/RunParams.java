@@ -22,12 +22,15 @@ import java.io.Serializable;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +62,9 @@ public final class RunParams {
     private static final long REWRITE_AFTER_MS = 60_000;
 
     private static final Map<Class<?>, Method> REFERENCES = new ConcurrentHashMap<>();
+    /** The record parts found, by their reference's class: {@code Login::email}. */
+    private static final Map<Class<?>, Part> PARTS = new ConcurrentHashMap<>();
+    private static volatile List<Class<?>> groups = List.of();
     private static final Map<Method, Held> SET = new HashMap<>();
     /** What this run forgot: what it was compiled with no longer counts. */
     private static final Set<Method> FORGOTTEN = new HashSet<>();
@@ -132,6 +138,13 @@ public final class RunParams {
 
     /** What this run set for the parameter {@code reference} names, else what {@code method} answers on its group. */
     public static <G, T> T get(Serializable reference, Function<G, T> method) {
+        Optional<Part> part = partOf(reference);
+        if (part.isPresent()) {
+            Object whole = whole(part.get().parameter());
+            @SuppressWarnings("unchecked")
+            Function<Object, T> accessor = (Function<Object, T>) (Function<?, T>) method;
+            return whole == null ? null : accessor.apply(whole);
+        }
         Method parameter = parameterOf(reference);
         synchronized (RunParams.class) {
             Held held = SET.get(parameter);
@@ -154,6 +167,7 @@ public final class RunParams {
 
     /** The value of the parameter {@code reference} names, if it is known; see {@code Params.known}. */
     public static <G, T> Optional<T> known(Serializable reference, Function<G, T> method) {
+        if (partOf(reference).isPresent()) return Optional.ofNullable(get(reference, method));
         Method parameter = parameterOf(reference);
         if (!RunFacts.isFactsGroup(parameter.getDeclaringClass())) {
             return Optional.ofNullable(get(reference, method));
@@ -240,22 +254,114 @@ public final class RunParams {
     }
 
     private static Method resolve(Serializable reference) {
+        Method method = named(reference);
+        Class<?> group = method.getDeclaringClass();
+        if (isPart(method)) {
+            throw new IllegalArgumentException(group.getSimpleName() + "::" + method.getName() + " is a part of a "
+                    + group.getSimpleName() + " parameter: set or forget the whole parameter.");
+        }
+        if (!group.isAnnotationPresent(Param.class)) {
+            throw new IllegalArgumentException(group.getName() + "." + method.getName() + " is not a parameter: "
+                    + group.getName() + " is not marked @Param. Name a parameter by its method reference.");
+        }
+        return method;
+    }
+
+    /** The method {@code reference} is written as, a method reference. */
+    private static Method named(Serializable reference) {
         try {
             Method replace = reference.getClass().getDeclaredMethod("writeReplace");
             replace.setAccessible(true);
             SerializedLambda form = (SerializedLambda) replace.invoke(reference);
             String owner = form.getImplClass().replace('/', '.');
             Class<?> group = Class.forName(owner, false, reference.getClass().getClassLoader());
-            Method method = group.getDeclaredMethod(form.getImplMethodName());
-            if (!group.isAnnotationPresent(Param.class)) {
-                throw new IllegalArgumentException(owner + "." + form.getImplMethodName() + " is not a parameter: "
-                        + owner + " is not marked @Param. Name a parameter by its method reference.");
-            }
-            return method;
+            return group.getDeclaredMethod(form.getImplMethodName());
         } catch (ReflectiveOperationException | ClassCastException notAReference) {
             throw new IllegalArgumentException("Name a parameter by its method reference, Progress::level.",
                     notAReference);
         }
+    }
+
+    /**
+     * A part of a record parameter (2026-11-17, spec {@code 2026-11-17-google-sign-in-map-design.md} §2):
+     * {@code Login::email} names the email of the bot's one parameter of type {@code Login}.
+     *
+     * @param parameter the bot's one parameter of the record's type, {@code SignInParams.login}
+     * @param accessor  the record's accessor, {@code Login.email}
+     */
+    public record Part(Method parameter, Method accessor) {}
+
+    /** Whether {@code method} is an accessor of a record's component, not a method of a {@code @Param} group. */
+    private static boolean isPart(Method method) {
+        Class<?> owner = method.getDeclaringClass();
+        if (!owner.isRecord() || owner.isAnnotationPresent(Param.class)) return false;
+        return Arrays.stream(owner.getRecordComponents()).anyMatch(part -> part.getName().equals(method.getName()));
+    }
+
+    /**
+     * The part {@code reference} names, when it names a record's component; empty for a parameter.
+     *
+     * @throws IllegalArgumentException when the bot has no parameter of the record's type, or several
+     */
+    public static Optional<Part> partOf(Serializable reference) {
+        Objects.requireNonNull(reference, "parameter");
+        Part known = PARTS.get(reference.getClass());
+        if (known != null) return Optional.of(known);
+        if (REFERENCES.containsKey(reference.getClass())) return Optional.empty();
+        Method method = named(reference);
+        if (!isPart(method)) return Optional.empty();
+        Class<?> record = method.getDeclaringClass();
+        List<Method> holding = groups.stream()
+                .filter(group -> group.isAnnotationPresent(Param.class))
+                .flatMap(group -> Arrays.stream(group.getDeclaredMethods()))
+                .filter(each -> each.getReturnType() == record && each.getParameterCount() == 0
+                        && !Modifier.isStatic(each.getModifiers()) && !each.isSynthetic())
+                .toList();
+        String said = record.getSimpleName() + "::" + method.getName() + " names a part of a " + record.getSimpleName();
+        if (holding.isEmpty()) {
+            throw new IllegalArgumentException(said + ", and the bot has no parameter of that type: give a @Param"
+                    + " group one, " + record.getSimpleName() + " " + lowerFirst(record.getSimpleName()) + "().");
+        }
+        if (holding.size() > 1) {
+            throw new IllegalArgumentException(said + ", and the bot has " + holding.size() + " parameters of that"
+                    + " type (" + String.join(", ", holding.stream().map(RunParams::name).toList())
+                    + "): a part names its record's one parameter.");
+        }
+        Part part = new Part(holding.getFirst(), method);
+        PARTS.put(reference.getClass(), part);
+        return Optional.of(part);
+    }
+
+    /**
+     * The parameter groups a record's part is looked for in: the bot's, which {@code RunFacts.install} gives, or a
+     * test's. Forgets the parts found among the last ones.
+     */
+    public static void groups(List<Class<?>> all) {
+        groups = List.copyOf(all);
+        PARTS.clear();
+    }
+
+    /** The whole value of {@code parameter}: what this run set, else what its method answers. */
+    private static Object whole(Method parameter) {
+        synchronized (RunParams.class) {
+            Held held = SET.get(parameter);
+            if (held != null) return held.value();
+        }
+        try {
+            Constructor<?> made = parameter.getDeclaringClass().getDeclaredConstructor();
+            made.setAccessible(true);
+            parameter.setAccessible(true);
+            return parameter.invoke(made.newInstance());
+        } catch (InvocationTargetException thrown) {
+            if (thrown.getCause() instanceof RuntimeException failed) throw failed;
+            throw new IllegalStateException(name(parameter) + " cannot be read: " + thrown.getCause(), thrown);
+        } catch (ReflectiveOperationException unmade) {
+            throw new IllegalStateException(name(parameter) + " cannot be read: " + unmade.getMessage(), unmade);
+        }
+    }
+
+    private static String lowerFirst(String name) {
+        return name.isEmpty() ? name : Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
     private static void write(Method parameter, Held value) throws IOException {
@@ -335,6 +441,7 @@ public final class RunParams {
      */
     public static synchronized void newGeneration(ClassLoader loader) {
         REFERENCES.clear();
+        PARTS.clear();
         Map<Method, Held> set = new HashMap<>();
         SET.forEach((parameter, held) -> again(parameter, loader).ifPresent(now -> movedValue(held, parameter, loader)
                 .ifPresent(moved -> set.put(now, moved))));

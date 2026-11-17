@@ -83,7 +83,7 @@ public final class ScreenTypes implements TypeHolder {
                 MARK_ELEMENT_SHAPE, TEXT_BUTTON_SHAPE, STRIP_SHAPE,
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE, WHEN_SHAPE, AT_LEAST_SHAPE,
-                AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE, CONDITION_OF_SHAPE, CONDITION_ALL_SHAPE, CONDITION_ANY_SHAPE,
+                AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE, IS_SET_SHAPE, CONDITION_OF_SHAPE, CONDITION_ALL_SHAPE, CONDITION_ANY_SHAPE,
                 CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE);
     }
 
@@ -119,7 +119,15 @@ public final class ScreenTypes implements TypeHolder {
                 readout -> factOf(readout).isEmpty() ? null : factOf(readout));
         static final Held<Input, String> INPUT_SPENDS = Held.as(String.class,
                 input -> spentOf(input).isEmpty() ? null : spentOf(input));
+        static final Held<Button, String> TYPES_PARAMETER = typedOf(false);
+        static final Held<Button, String> TYPES_SECRET = typedOf(true);
         static final Held<Custom, String> CUSTOM_METHOD = Held.as(String.class, ScreenTypes::methodOf);
+
+        /** The parameter a field types, a secret's when {@code secret}, as its method reference's text; else null. */
+        private static Held<Button, String> typedOf(boolean secret) {
+            return Held.as(String.class, button -> button.isSecret() == secret
+                    && button.typedParameter() instanceof NamedParameter(String source) ? source : null);
+        }
         static final Held<Condition.Of, Object> OF_METHOD = Held.as(Object.class, of -> held(of.method()));
     }
 
@@ -201,6 +209,8 @@ public final class ScreenTypes implements TypeHolder {
         return button
                 .<BooleanSupplier>with(Button::when, Parts.INPUT_WHEN.part(ScreenTypes::condition))
                 .<Params.Of>with(Button::spends, Parts.INPUT_SPENDS.part(ScreenTypes::fact))
+                .<Params.Of>with(Button::typesParameter, Parts.TYPES_PARAMETER.part(ScreenTypes::fact))
+                .<Params.Of>with(Button::typesSecret, Parts.TYPES_SECRET.part(ScreenTypes::fact))
                 .flag(Button::repeated, ScreenTypes::repeatedWritten)
                 .<Gesture>with(Button::gesture, ScreenTypes::gestureWritten)
                 .<ImageTemplate>with(Button::dragsOnto, ScreenTypes::dropPicture)
@@ -433,6 +443,10 @@ public final class ScreenTypes implements TypeHolder {
     public static final DeclaredCall<ParamCheck> IS_TRUE_SHAPE = ComponentType.part(ParamCheck.class)
             .<Params.When, Condition>writtenAs(Params.When::isTrue, ParamCheck::when);
 
+    /** {@code <when>.isSet()}. */
+    public static final DeclaredCall<ParamCheck> IS_SET_SHAPE = ComponentType.part(ParamCheck.class)
+            .<Params.When, Condition>writtenAs(Params.When::isSet, ParamCheck::when);
+
     /** {@code Condition.of(Firestone::eventOn)}: a bot method asked, its reference crossing as the text it is written as. */
     public static final DeclaredCall<Condition.Of> CONDITION_OF_SHAPE = ComponentType.part(Condition.Of.class)
             .<BooleanSupplier, Condition>writtenAs(Condition::of, Parts.OF_METHOD.part(ScreenTypes::condition));
@@ -495,7 +509,7 @@ public final class ScreenTypes implements TypeHolder {
 
     /** {@code fact}, a parameter's method reference ({@code Progress::gold}), tested by {@code test} against {@code value}. */
     public static ParamCheck test(String fact, ParamCheck.Test test, Object value) {
-        return new ParamCheck(Params.when(parameter(fact)), test, test == ParamCheck.Test.IS_TRUE ? null : value);
+        return new ParamCheck(Params.when(parameter(fact)), test, test == ParamCheck.Test.IS_TRUE || test == ParamCheck.Test.IS_SET ? null : value);
     }
 
     /** The parameter a {@code Params.when(…)} names, as its method reference's text. */
@@ -550,6 +564,7 @@ public final class ScreenTypes implements TypeHolder {
             case AT_MOST -> fact + " at most " + value;
             case IS -> fact + " is " + (value instanceof String text ? "\"" + text + "\"" : value);
             case IS_TRUE -> fact + " is true";
+            case IS_SET -> fact + " is set";
         };
     }
 

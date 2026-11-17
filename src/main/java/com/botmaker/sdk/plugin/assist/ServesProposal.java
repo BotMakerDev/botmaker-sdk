@@ -112,6 +112,7 @@ public final class ServesProposal {
             case AT_MOST -> ((Comparable) known).compareTo(check.value()) <= 0;
             case IS -> known.equals(check.value());
             case IS_TRUE -> (Boolean) known;
+            case IS_SET -> !String.valueOf(known).isBlank();
         };
         return holds ? Answer.YES : Answer.NO;
     }
@@ -123,7 +124,7 @@ public final class ServesProposal {
                 case Integer ignored -> Integer.valueOf(text.replace(",", ""));
                 case Long ignored -> Long.valueOf(text.replace(",", ""));
                 case String ignored -> text;
-                case null -> test == ParamCheck.Test.IS_TRUE && (text.equalsIgnoreCase("true")
+                case null -> test == ParamCheck.Test.IS_SET ? text : test == ParamCheck.Test.IS_TRUE && (text.equalsIgnoreCase("true")
                         || text.equalsIgnoreCase("false")) ? Boolean.valueOf(text) : null;
                 default -> null;
             };

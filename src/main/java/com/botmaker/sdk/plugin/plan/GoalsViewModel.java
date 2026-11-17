@@ -220,6 +220,7 @@ public final class GoalsViewModel {
                 case AT_MOST -> name + " ≤ " + param.value();
                 case IS -> name + " = " + param.value();
                 case IS_TRUE -> name;
+                case IS_SET -> name + " set";
             };
         }
         String source = ScreenTypes.sourceOf(check);

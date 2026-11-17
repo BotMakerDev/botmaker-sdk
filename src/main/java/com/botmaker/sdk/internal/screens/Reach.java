@@ -340,9 +340,13 @@ public interface Reach {
      * {@code button} pressed at {@code place}, where it was found on {@code frame}, by its gesture; a text field's text
      * typed after, once the field has taken the click; a drag moved from there to its drop on {@code frame}. A field
      * whose body gives its text types nothing here: {@code ScreenWalk.press} hands it the body's text as {@link
-     * Button#types}. False when a drag's drop is not on {@code frame}, and nothing was done.
+     * Button#types}. A field typing a parameter is pressed by {@link ParamTyping}. False when a drag's drop is not on
+     * {@code frame}, or a field's parameter was not typed.
      */
     default boolean press(Button button, Rect place, BufferedImage frame) {
+        if (ParamTyping.typesParameter(button)) {
+            return ParamTyping.press(this, button, place, ParamTyping.door()).isTyped();
+        }
         if (button.isDrag()) {
             Optional<Point> drop = dropOn(button, frame);
             if (drop.isEmpty()) return false;

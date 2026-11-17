@@ -561,7 +561,7 @@ final class InputInspector {
         // What was last written from here: Enter, then the box losing focus as the panel redraws, write once.
         Typing[] written = {button.typing()};
         Runnable write = () -> {
-            Typing now = typingOf(isField.isSelected(), text.getText(), submits.isSelected(), clears.isSelected());
+            Typing now = typingOf(button.typing(), isField.isSelected(), text.getText(), submits.isSelected(), clears.isSelected());
             if (!Objects.equals(now, written[0])) {
                 written[0] = now;
                 panel.wrote(ScreenEdits.setTyping(services, constant, field, now));
@@ -577,10 +577,15 @@ final class InputInspector {
         return line(isField, text, clears, submits);
     }
 
-    /** What the text field editor writes: none when it is no field, the body's text when its text is blank. */
-    static Typing typingOf(boolean field, String text, boolean submits, boolean clears) {
+    /**
+     * What the text field editor writes over {@code was}: none when it is no field, the parameter {@code was} types
+     * while its text is blank, else the body's text when its text is blank.
+     */
+    static Typing typingOf(Typing was, boolean field, String text, boolean submits, boolean clears) {
         if (!field) return null;
-        return new Typing(text == null || text.isBlank() ? null : Words.of(text), submits, clears);
+        boolean blank = text == null || text.isBlank();
+        if (blank && was != null && was.parameter() != null) return was.with(submits, clears);
+        return new Typing(blank ? null : Words.of(text), submits, clears);
     }
 
     // --- a button's drag ---

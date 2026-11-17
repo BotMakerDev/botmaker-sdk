@@ -24,9 +24,12 @@ import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.params.RecordPartTest;
+import com.botmaker.sdk.internal.params.RunParams;
 import com.botmaker.runlog.api.Level;
 import org.junit.jupiter.api.Test;
 
@@ -907,6 +910,41 @@ class ScreenWalkTest {
         assertEquals(Pressed.Result.DONE, typed.result(), typed.toString());
         assertEquals("RESULTS", typed.at());
         assertEquals(List.of("click search", "type Dragons"), game.done);
+    }
+
+    /**
+     * A field typing a parameter types the value this run was dealt, walked through like a field of its own text; with
+     * none it is not pressed, NOT_NOW, and Discovery leaves its way untried (2026-11-17).
+     */
+    @Test
+    void parameterFieldWithoutValueStaysUntried() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("HOME", with(screens.get("HOME"),
+                click("email").typesParameter(RecordPartTest.Login::email).submitting()));
+        screens.put("NEXT", screen(named("Next", "next_title", "HOME", "email")));
+        Game game = new Game("HOME", ScreenGraph.of(screens));
+        game.leads.put("HOME type farm@example.com", "NEXT");
+        RunParams.groups(List.of(RecordPartTest.SignInParams.class));
+        try {
+            ScreenWalk walk = new ScreenWalk(game.map, game, STEP_MS, null);
+            ScreenWalk.Press none = walk.press("HOME", "email", null);
+            assertEquals(Pressed.Result.NOT_NOW, none.result(), none.toString());
+            assertTrue(none.why().contains(ParamTyping.NO_VALUE), none.why());
+            ScreenGraph.Edge typing = game.map.edges().stream().filter(e -> "email".equals(e.input()))
+                    .findFirst().orElseThrow();
+            assertFalse(new LiveMoves(game.map, game, () -> {}).open(typing), "untried, never failed");
+            assertEquals(List.of(), game.done);
+
+            RecordPartTest.SignInParams.dealt = new RecordPartTest.Login("farm@example.com", Secret.of("p"), Secret.of(""));
+            assertTrue(new LiveMoves(game.map, game, () -> {}).open(typing));
+            ScreenWalk.Press typed = walk.press("HOME", "email", null);
+            assertEquals(Pressed.Result.DONE, typed.result(), typed.toString());
+            assertEquals("NEXT", typed.at());
+            assertEquals(List.of("click email", "type farm@example.com"), game.done);
+        } finally {
+            RecordPartTest.SignInParams.dealt = null;
+            RunParams.groups(List.of());
+        }
     }
 
     /** A field with a text of its own is walked through like a button, typing its text on the way. */

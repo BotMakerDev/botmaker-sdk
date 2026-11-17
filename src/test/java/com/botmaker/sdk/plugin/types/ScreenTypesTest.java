@@ -47,6 +47,7 @@ import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.java.grammar.JavaValue;
 import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.sdk.api.params.Params;
+import com.botmaker.sdk.api.secrets.Secret;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -225,6 +226,36 @@ class ScreenTypesTest {
         assertFalse(old.isField());
         Button cycling = Button.cycling(List.of(picture("x1"), picture("x10"))).types(Words.of("a"));
         assertEquals(cycling, roundTrip(ScreenTypes.BUTTON_CYCLING_SHAPE, cycling), "no link is lost to a cycle");
+    }
+
+    /**
+     * A field typing a parameter is written by its parameter's method reference, a value's or a secret's, its traits
+     * in any order; one source, the last given (2026-11-17).
+     */
+    @Test
+    void aFieldTypingAParameterIsWrittenByItsReference() {
+        Button email = Button.of(picture("email")).typesParameter(ScreenTypes.fact("Login::email")).submitting();
+        Button password = Button.of(picture("password")).submitting().typesSecret(secret("Login::password"));
+        assertEquals(email, roundTrip(ScreenTypes.BUTTON_SHAPE, email));
+        assertEquals(password, roundTrip(ScreenTypes.BUTTON_SHAPE, password));
+        assertEquals("Login::email", link(email, "typesParameter"));
+        assertNull(link(email, "typesSecret"));
+        assertEquals("Login::password", link(password, "typesSecret"));
+        assertNull(link(password, "typesParameter"));
+        assertTrue(email.isSubmitting() && password.isSubmitting(), "submitting kept whichever comes first");
+        assertTrue(password.isSecret());
+        assertFalse(email.isTyped() || password.isTyped(), "a parameter is walked through, not the body's");
+
+        Button worded = Button.of(picture("email")).types(Words.of("a")).typesParameter(ScreenTypes.fact("Login::email"));
+        assertNull(worded.types(), "the parameter takes the text's place");
+        Button back = worded.types(Words.of("a"));
+        assertNull(back.typedParameter(), "and a text the parameter's");
+        assertFalse(back.isSecret());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Params.Of<Object, Secret> secret(String reference) {
+        return (Params.Of<Object, Secret>) (Params.Of<?, ?>) ScreenTypes.fact(reference);
     }
 
     /**
@@ -424,8 +455,9 @@ class ScreenTypesTest {
     @Test
     void aTestOfAParameterIsWrittenAndReadAsItsChain() {
         ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(ScreenTypes.WHEN_SHAPE, ScreenTypes.AT_LEAST_SHAPE,
-                ScreenTypes.AT_MOST_SHAPE, ScreenTypes.IS_SHAPE, ScreenTypes.IS_TRUE_SHAPE));
+                ScreenTypes.AT_MOST_SHAPE, ScreenTypes.IS_SHAPE, ScreenTypes.IS_TRUE_SHAPE, ScreenTypes.IS_SET_SHAPE));
         Map<String, ParamCheck> each = Map.of(
+                "Params.when(Login::code).isSet()", ScreenTypes.test("Login::code", ParamCheck.Test.IS_SET, "ignored"),
                 "Params.when(Progress::gold).atLeast(5)", ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_LEAST, 5),
                 "Params.when(Progress::gold).atMost(-2)", ScreenTypes.test("Progress::gold", ParamCheck.Test.AT_MOST, -2),
                 "Params.when(Progress::name).is(\"a \\\"b\\\"\")",

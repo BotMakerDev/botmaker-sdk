@@ -122,6 +122,14 @@ public final class Params {
             return new ParamCheck(this, ParamCheck.Test.IS_TRUE, null);
         }
 
+        /**
+         * Holds when the parameter has a value that is not blank as text: a login dealt, {@code
+         * Params.when(Login::code).isSet()}; no when it is null or blank (2026-11-17).
+         */
+        public Condition isSet() {
+            return new ParamCheck(this, ParamCheck.Test.IS_SET, null);
+        }
+
         @Override
         public boolean equals(Object other) {
             return other instanceof When<?> when && parameter.equals(when.parameter);

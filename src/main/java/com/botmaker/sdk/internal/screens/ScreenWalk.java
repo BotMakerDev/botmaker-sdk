@@ -18,6 +18,7 @@ import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.Tree;
+import com.botmaker.sdk.api.signin.Typed;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.plan.DoneRecords;
@@ -598,6 +599,11 @@ public final class ScreenWalk {
             return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " types the text its body gives: "
                     + "Navigate.type it.");
         }
+        Optional<String> unready = typed == null && input instanceof Button b && ParamTyping.typesParameter(b)
+                ? ParamTyping.unready(b) : Optional.empty();
+        if (unready.isPresent()) {
+            return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " types a parameter: " + unready.get() + ".");
+        }
         Input acted = typed == null ? input : ((Button) input).types(typed);
         if (input.locked() != null) return new Press(Pressed.Result.NOT_NOW, constant, 0, name + " is locked.");
         if (input.never() != null) {
@@ -659,7 +665,13 @@ public final class ScreenWalk {
                         blocking = seen.get().state();
                         break;
                     }
-                    if (!reach.press((Button) acted, seen.get().place(), frame.get())) {
+                    if (acted instanceof Button typesIn && ParamTyping.typesParameter(typesIn)) {
+                        Typed typedIn = ParamTyping.press(reach, typesIn, seen.get().place(), ParamTyping.door());
+                        if (!typedIn.isTyped()) {
+                            return new Press(Pressed.Result.NOT_NOW, constant, times, name + " typed nothing: "
+                                    + typedIn.why() + ".");
+                        }
+                    } else if (!reach.press((Button) acted, seen.get().place(), frame.get())) {
                         walked = noDrop(button, constant);
                         break;
                     }
@@ -700,7 +712,8 @@ public final class ScreenWalk {
                     // A field that keeps what it holds is never typed twice: its text would be there twice. Nor is a
                     // drag done twice: what it moved is gone from where it was, and another may sit there now. Nor the
                     // bot's own code: no one knows what a second run of it spends.
-                    boolean retypes = acted instanceof Button typing && typing.types() != null && !typing.isClearing();
+                    boolean retypes = acted instanceof Button typing && !typing.isClearing()
+                            && (typing.types() != null || typing.typedParameter() != null);
                     boolean redrags = acted instanceof Button dragging && dragging.isDrag();
                     if (retried || retypes || redrags || acted instanceof Custom) {
                         return new Press(Pressed.Result.LEFT, constant, times, name + " left the game on "

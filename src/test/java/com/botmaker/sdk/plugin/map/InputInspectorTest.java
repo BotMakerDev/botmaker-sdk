@@ -20,6 +20,7 @@ import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.params.RecordPartTest;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.plugin.map.InputInspector.Result;
@@ -139,9 +140,15 @@ class InputInspectorTest {
     /** The text field editor writes no typing when unticked, and the body's text when its box is blank. */
     @Test
     void aFieldsTextIsItsOwnOrTheBodys() {
-        assertNull(InputInspector.typingOf(false, "Dragons", true, true), "unticked: only clicked");
-        assertEquals(new Typing(Words.of("Dragons"), true, false), InputInspector.typingOf(true, "Dragons", true, false));
-        assertEquals(new Typing(null, false, true), InputInspector.typingOf(true, "  ", false, true));
+        assertNull(InputInspector.typingOf(null, false, "Dragons", true, true), "unticked: only clicked");
+        assertEquals(new Typing(Words.of("Dragons"), true, false),
+                InputInspector.typingOf(null, true, "Dragons", true, false));
+        assertEquals(new Typing(null, false, true), InputInspector.typingOf(null, true, "  ", false, true));
+        Typing secret = Button.of(new ImageTemplate("images/password.png"))
+                .typesSecret(RecordPartTest.Login::password).typing();
+        assertEquals(secret.with(true, true), InputInspector.typingOf(secret, true, "", true, true),
+                "a field typing a parameter keeps it while no text is given");
+        assertEquals(new Typing(Words.of("x"), false, false), InputInspector.typingOf(secret, true, "x", false, false));
         assertEquals("types \"Dragons\", then Enter",
                 ScreenCards.fieldTrait(MapFixtures.click("search").types(Words.of("Dragons")).submitting()));
         assertEquals("types the body's text", ScreenCards.fieldTrait(MapFixtures.click("search").typed()));

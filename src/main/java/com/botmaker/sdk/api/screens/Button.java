@@ -6,6 +6,7 @@ package com.botmaker.sdk.api.screens;
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.params.Params;
+import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 
@@ -34,7 +35,10 @@ import java.util.function.BooleanSupplier;
  *
  * <p>A text field is a button that {@link #types} once clicked: one of the bot's {@code Texts}
  * ({@code .types(Texts.GUILD)}), which a walk types on its way through, or the text a body gives
- * ({@link #typed()}, {@code Navigate.type}), which no walk goes through (2026-10-22).
+ * ({@link #typed()}, {@code Navigate.type}), which no walk goes through (2026-10-22). A field may type a parameter's value
+ * as this run reads it ({@link #typesParameter}, {@code .typesParameter(Login::email)}), or a {@link Secret} a parameter
+ * names, which BotMaker types and the run never holds ({@link #typesSecret}, {@code .typesSecret(Login::password)}). With
+ * no value dealt, such a field is not pressed (2026-11-17).
  *
  * <p>A button that is dragged is pressed, moved onto a picture ({@link #dragsOnto}) or into an area ({@link
  * #dragsInto}), and let go, in place of its gesture: a card onto its slot, a slider to its end, a swipe on a phone. A
@@ -349,10 +353,27 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return typing(new Typing(null, isSubmitting(), isClearing()));
     }
 
+    /**
+     * This button, a text field: clicked, then {@code parameter}'s value typed as this run reads it, as text,
+     * {@code .typesParameter(Login::email)}. With no value dealt it is not pressed (2026-11-17).
+     */
+    public <G> Button typesParameter(Params.Of<G, ?> parameter) {
+        return typing(new Typing(null, parameter, false, isSubmitting(), isClearing()));
+    }
+
+    /**
+     * This button, a field of a secret: clicked, then the {@link Secret} {@code secret} names typed by BotMaker from this
+     * PC's credential store, {@code .typesSecret(Login::password)}; the run never holds it. With no secret dealt it is
+     * not pressed (2026-11-17).
+     */
+    public <G> Button typesSecret(Params.Of<G, Secret> secret) {
+        return typing(new Typing(null, secret, true, isSubmitting(), isClearing()));
+    }
+
     /** This button, a text field Enter is pressed in once its text is typed. */
     @Link
     public Button submitting() {
-        return typing(new Typing(types(), true, isClearing()));
+        return typing(typing == null ? new Typing(null, true, false) : typing.with(true, typing.clears()));
     }
 
     /** Was {@link #submitting()}, named as its reader {@link #isSubmitting()} is. */
@@ -364,7 +385,7 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     /** This button, a text field emptied before its text is typed. */
     @Link
     public Button clearing() {
-        return typing(new Typing(types(), isSubmitting(), true));
+        return typing(typing == null ? new Typing(null, false, true) : typing.with(typing.submits(), true));
     }
 
     /** Was {@link #clearing()}, named as its reader {@link #isClearing()} is. */
@@ -438,7 +459,17 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
 
     /** Whether it is a text field whose text only a body gives ({@link #typed()}): no walk goes through it. */
     public boolean isTyped() {
-        return typing != null && typing.text() == null;
+        return typing != null && typing.text() == null && typing.parameter() == null;
+    }
+
+    /** The parameter whose value it types ({@link #typesParameter}, {@link #typesSecret}); null when it types none. */
+    public Params.Of<?, ?> typedParameter() {
+        return typing == null ? null : typing.parameter();
+    }
+
+    /** Whether its parameter is a {@link Secret} BotMaker types, never the run ({@link #typesSecret}). */
+    public boolean isSecret() {
+        return typing != null && typing.secret();
     }
 
     /** Was {@link #isTyped()}, named as its link {@link #typed()} is. */
