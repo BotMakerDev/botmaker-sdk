@@ -37,7 +37,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   kept, an authenticator's current code. It refuses, with words, a secret this PC doesn't keep, an instance not
   running here, and a password into a focused field that isn't a password field; no answer or log line holds a
   value. A way through a secret field no door would type is
-  left untried, and a refused field ends the walk NOT_NOW, not as a missing or greyed-out button.
+  left untried, and a refused field ends the walk NOT_NOW, not as a missing or greyed-out button. A connection is
+  given 10 s in all to send its line, so one trickling a byte at a time holds the door no longer than a quiet one.
+- A screen's marks for what the bot cannot answer: `Setup.needsYou(NeedsYou.PHONE)` tells BotMaker once and waits,
+  pressing nothing and never counted stuck, until the game shows another screen; `Setup.refuses(Refusal.WRONG_PASSWORD)`
+  tells BotMaker and stops the run with the reason's words. Both are acted on before a plan weighs its goals.
+- `Accounts.signedIn(Login::email)`, a condition for a goal: whether the run's emulator instance holds that Google
+  account, as the sign-in door reads it off the device; unknown when no door, instance or address is there.
+
+### Deprecated
+
+- `SignIn.typeEmail`, `typePassword`, `typeCode`, `signedIn()`, `needsYou` and `refused`: a screen map's
+  `typesParameter`, `typesSecret`, `needsYou`, `refuses` and `Accounts.signedIn` do it. They go in the next release.
 
 ### Changed
 

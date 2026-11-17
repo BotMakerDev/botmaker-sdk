@@ -6,6 +6,7 @@ package com.botmaker.sdk.internal.signin;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.api.signin.SignIn;
 import com.botmaker.sdk.api.signin.Typed;
@@ -115,6 +116,21 @@ class SignInClientTest {
         client.needsYou(NeedsYou.CAPTCHA);
         assertEquals("needs-you", heard.get(1).path("op").asText());
         assertEquals("captcha", heard.get(1).path("kind").asText());
+    }
+
+    /** A mark of the map is told to the door with the run's instance, and only the kind's or reason's id. */
+    @Test
+    void marksAreToldWithTheInstance() throws IOException {
+        host(message -> "{\"ok\":true}");
+        SignInClient client = new SignInClient(server.getLocalPort(), TOKEN);
+        client.needsYou(NeedsYou.PHONE, "waydroid");
+        client.refused(Refusal.WRONG_PASSWORD, "waydroid");
+        assertEquals("needs-you", heard.get(0).path("op").asText());
+        assertEquals("phone", heard.get(0).path("kind").asText());
+        assertEquals("waydroid", heard.get(0).path("instance").asText());
+        assertEquals("refused", heard.get(1).path("op").asText());
+        assertEquals("wrong-password", heard.get(1).path("why").asText());
+        assertEquals("waydroid", heard.get(1).path("instance").asText());
     }
 
     @Test

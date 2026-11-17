@@ -10,6 +10,8 @@ import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.ParamGroups;
@@ -20,6 +22,8 @@ import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
 import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.sdk.internal.screens.UnknownPages;
+import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.sdk.internal.trace.Say;
 
 import java.lang.reflect.Field;
@@ -199,5 +203,19 @@ public final class RunGame implements PlanRun.Game {
     @Override
     public void checkpoint() {
         Watchdog.checkpoint();
+    }
+
+    /** Told through this PC's sign-in door, naming the instance; a run no door serves tells nobody. */
+    @Override
+    public void needsYou(NeedsYou kind) {
+        if (kind == NeedsYou.LOOK) UnknownPages.now();
+        SignInClient.instance().ifPresent(instance ->
+                SignInClient.door().ifPresent(door -> door.needsYou(kind, instance)));
+    }
+
+    @Override
+    public void refused(Refusal why) {
+        SignInClient.instance().ifPresent(instance ->
+                SignInClient.door().ifPresent(door -> door.refused(why, instance)));
     }
 }

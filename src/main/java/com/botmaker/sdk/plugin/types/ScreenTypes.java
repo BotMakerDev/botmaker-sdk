@@ -43,12 +43,14 @@ import com.botmaker.sdk.api.screens.Strip;
 import com.botmaker.sdk.api.screens.TextButton;
 import com.botmaker.sdk.api.screens.Tree;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.signin.Accounts;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.screens.NamedMethod;
+import com.botmaker.sdk.internal.signin.SignedInCheck;
 
 import java.time.Duration;
 import java.util.List;
@@ -84,7 +86,7 @@ public final class ScreenTypes implements TypeHolder {
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE, WHEN_SHAPE, AT_LEAST_SHAPE,
                 AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE, IS_SET_SHAPE, CONDITION_OF_SHAPE, CONDITION_ALL_SHAPE, CONDITION_ANY_SHAPE,
-                CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE);
+                CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE, SIGNED_IN_SHAPE);
     }
 
     /**
@@ -115,6 +117,8 @@ public final class ScreenTypes implements TypeHolder {
         static final Held<ScreenVariant, Object> VARIANT_WHEN = Held.as(Object.class, v -> held(v.when()));
         static final Held<Params.When, String> WHEN_PARAMETER = Held.as(String.class,
                 when -> when.parameter() instanceof NamedParameter(String source) ? source : "");
+        static final Held<SignedInCheck, String> SIGNED_IN_EMAIL = Held.as(String.class,
+                check -> check.email() instanceof NamedParameter(String source) ? source : "");
         static final Held<Readout, String> READOUT_FACT = Held.as(String.class,
                 readout -> factOf(readout).isEmpty() ? null : factOf(readout));
         static final Held<Input, String> INPUT_SPENDS = Held.as(String.class,
@@ -446,6 +450,10 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code <when>.isSet()}. */
     public static final DeclaredCall<ParamCheck> IS_SET_SHAPE = ComponentType.part(ParamCheck.class)
             .<Params.When, Condition>writtenAs(Params.When::isSet, ParamCheck::when);
+
+    /** {@code Accounts.signedIn(Login::email)}: the parameter, as the method reference it is written as. */
+    public static final DeclaredCall<SignedInCheck> SIGNED_IN_SHAPE = ComponentType.part(SignedInCheck.class)
+            .<Params.Of, Condition>writtenAs(Accounts::signedIn, Parts.SIGNED_IN_EMAIL.part(ScreenTypes::parameter));
 
     /** {@code Condition.of(Firestone::eventOn)}: a bot method asked, its reference crossing as the text it is written as. */
     public static final DeclaredCall<Condition.Of> CONDITION_OF_SHAPE = ComponentType.part(Condition.Of.class)

@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.internal.signin;
 
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.NeedsYou;
@@ -10,6 +11,7 @@ import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.api.signin.SignIn;
 import com.botmaker.sdk.api.signin.Typed;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.shared.tools.UserDirs;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -186,12 +188,42 @@ public final class SignInClient {
                 .map(answer -> answer.path("signedIn").asBoolean()).orElse(false);
     }
 
+    /**
+     * Whether Android on {@code instance} holds the account {@code email}, as the door reads it; empty when the door
+     * does not answer or cannot say.
+     */
+    public Optional<Boolean> signedIn(String email, String instance) {
+        return call(message(Op.SIGNED_IN).put("email", email).put("instance", instance), ANSWER_WAIT)
+                .filter(SignInClient::ok).filter(answer -> answer.path("signedIn").isBoolean())
+                .map(answer -> answer.path("signedIn").asBoolean());
+    }
+
     public void needsYou(NeedsYou kind) {
         call(message(Op.NEEDS_YOU).put("kind", kind.id()), ANSWER_WAIT);
     }
 
+    /** Tells the door the run on {@code instance} waits for the user to do {@code kind}. */
+    public void needsYou(NeedsYou kind, String instance) {
+        call(message(Op.NEEDS_YOU).put("kind", kind.id()).put("instance", instance), ANSWER_WAIT);
+    }
+
     public void refused(Refusal why) {
         call(message(Op.REFUSED).put("why", why.id()), ANSWER_WAIT);
+    }
+
+    /** Tells the door the sign-in on {@code instance} ended for {@code why}. */
+    public void refused(Refusal why, String instance) {
+        call(message(Op.REFUSED).put("why", why.id()).put("instance", instance), ANSWER_WAIT);
+    }
+
+    /** The emulator instance this run reads, by the name its capture source holds; empty for none. */
+    public static Optional<String> instance() {
+        try {
+            return Source.current().base() instanceof EmulatorSource emulator && !emulator.instanceName().isBlank()
+                    ? Optional.of(emulator.instanceName()) : Optional.empty();
+        } catch (RuntimeException noSource) {
+            return Optional.empty();
+        }
     }
 
     private ObjectNode message(Op op) {

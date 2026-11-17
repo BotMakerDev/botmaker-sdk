@@ -48,6 +48,10 @@ import com.botmaker.java.grammar.JavaValue;
 import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.secrets.Secret;
+import com.botmaker.sdk.api.signin.Accounts;
+import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
+import com.botmaker.sdk.internal.signin.SignedInCheck;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -109,6 +113,10 @@ class ScreenTypesTest {
         Setup moved = campaign().at(new Point(420, -36));
         assertEquals(moved, roundTrip(ScreenTypes.SETUP_SHAPE, moved), "where its card was moved to goes with it");
         assertNull(roundTrip(ScreenTypes.SETUP_SHAPE, campaign()).at(), "a card never moved has no corner");
+        Setup phone = campaign().needsYou(NeedsYou.PHONE);
+        assertEquals(phone, roundTrip(ScreenTypes.SETUP_SHAPE, phone), "a screen that needs the user says so");
+        Setup wrong = campaign().refuses(Refusal.WRONG_PASSWORD);
+        assertEquals(wrong, roundTrip(ScreenTypes.SETUP_SHAPE, wrong), "a screen that ends the run says why");
         Setup told = campaign().markers(marks("window_title", "campaign_tab")).absent(marks("gems"));
         assertEquals(told, roundTrip(ScreenTypes.SETUP_SHAPE, told), "a set of markers and an absent picture go with it");
     }
@@ -472,6 +480,19 @@ class ScreenTypesTest {
             String qualified = Params.class.getPackageName() + "." + java;
             assertEquals(check, grammar.read(ParamCheck.class, qualified).orElseThrow(() -> new AssertionError(qualified)));
         });
+    }
+
+    /** {@code Accounts.signedIn(Login::email)} is written by its parameter's method reference and read back equal. */
+    @Test
+    void aSignedInCheckIsWrittenAndRead() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(ScreenTypes.SIGNED_IN_SHAPE));
+        SignedInCheck check = new SignedInCheck(new ScreenTypes.NamedParameter("Login::email"));
+        assertEquals(check, roundTrip(ScreenTypes.SIGNED_IN_SHAPE, check));
+        JavaValue written = grammar.write(BooleanSupplier.class, check).orElseThrow();
+        assertEquals("Accounts.signedIn(Login::email)", written.source());
+        assertTrue(written.imports().contains(Accounts.class.getName()), "the host imports Accounts");
+        String qualified = Accounts.class.getPackageName() + "." + written.source();
+        assertEquals(check, grammar.read(SignedInCheck.class, qualified).orElseThrow(() -> new AssertionError(qualified)));
     }
 
     /** An input's composed condition, a Need or several joined, comes apart and goes back whole, and is written. */

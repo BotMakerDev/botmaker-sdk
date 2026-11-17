@@ -3,6 +3,8 @@ package samplebot.plugins.com_github_botmakerdev.botmaker_sdk;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Need;
 import com.botmaker.sdk.api.plan.Reset;
+import com.botmaker.sdk.api.signin.Accounts;
+import samplebot.Login;
 import samplebot.SampleBot;
 import samplebot.params.bot.Progress;
 
@@ -25,6 +27,7 @@ public final class Goals {
             .since(Reset.daily(LocalTime.of(5, 0)).in(ZoneId.of("Europe/Paris")));
     public static final Goal GLANCED_LATELY = Goal.done(() -> Screens.HOME.glance).within(Duration.ofHours(4));
     public static final Goal SOLVED = Goal.done(() -> Screens.HOME.solved);
+    public static final Goal SIGNED_IN = Goal.of(Accounts.signedIn(Login::email));
 
     private Goals() {}
 }

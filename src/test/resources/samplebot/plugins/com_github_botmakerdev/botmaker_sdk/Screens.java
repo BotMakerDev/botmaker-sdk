@@ -22,6 +22,8 @@ import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.TextButton;
+import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.text.DigitSet;
 
 import java.time.Duration;
@@ -105,10 +107,26 @@ public final class Screens {
         }
     }
 
+    public static final class CheckPhone extends Screen {
+        @Override
+        public Setup setup() {
+            return Setup.named("Check your phone").from(HOME.email).needsYou(NeedsYou.PHONE);
+        }
+    }
+
+    public static final class WrongPassword extends Screen {
+        @Override
+        public Setup setup() {
+            return Setup.named("Wrong password").from(HOME.password).refuses(Refusal.WRONG_PASSWORD);
+        }
+    }
+
     public static final Home HOME = new Home();
     public static final Shop SHOP = new Shop();
     public static final Items ITEMS = new Items();
     public static final Settings SETTINGS = new Settings();
+    public static final CheckPhone CHECK_PHONE = new CheckPhone();
+    public static final WrongPassword WRONG_PASSWORD = new WrongPassword();
 
     private Screens() {}
 }

@@ -3,16 +3,21 @@
 
 package com.botmaker.sdk.internal.plan;
 
+import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.plan.Round.Considered;
 import com.botmaker.sdk.internal.plan.Round.Step;
 import com.botmaker.sdk.internal.plan.Round.Why;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.trace.Say;
 
@@ -56,6 +61,9 @@ public final class PlanRun {
      * does on sight done, so a goal that falls back unmet is seen before the next one comes due.
      */
     static final Duration IDLE_LOOK = Duration.ofSeconds(30);
+
+    /** How often a screen that needs the user is looked at again, to go on once it is gone. */
+    static final Duration NEEDS_YOU_LOOK = Duration.ofSeconds(2);
 
     /** Why a run of a plan ended. */
     public enum End {
@@ -105,6 +113,12 @@ public final class PlanRun {
 
         /** Throws the run's stuck exception when Android owes a restart of the game or the game is frozen. */
         void checkpoint();
+
+        /** Tells BotMaker the game shows a screen only the user can answer, {@code kind}: once per arrival. */
+        void needsYou(NeedsYou kind);
+
+        /** Tells BotMaker the game ended the run short of its goal, for {@code why}. */
+        void refused(Refusal why);
     }
 
     private final Plan plan;
@@ -132,6 +146,8 @@ public final class PlanRun {
     private boolean acted;
     /** The action last put after another on arrival, with nothing pressed since; null otherwise. */
     private Do deferred;
+    /** The screen that needs the user the run last told BotMaker of, while the game still shows it; null for none. */
+    private String toldNeedsYou;
     /** How long the run may act with no progress before it is stuck. */
     private final Duration stuckAfter;
     /**
@@ -201,6 +217,7 @@ public final class PlanRun {
         if (progressed == null) progressed();
         prove();
         String at = game.where().orElse(null);
+        if (marked(at)) return Optional.empty();
         if (idling != null && at != null && !at.equals(idleAt)) movedWhileIdle(at);
         PlanModel model = model(at);
         progressSeen(model, at);
@@ -220,6 +237,37 @@ public final class PlanRun {
         if (!goneToRead(model, round, next)) doStep(model, round, next);
         checkpoint(round, next);
         return Optional.empty();
+    }
+
+    /**
+     * Acts on the marks of the screen {@code at}, before any goal is weighed: a screen that {@link Setup#refuses}
+     * is told once and stops the run with its words; one that {@link Setup#needsYou} is told once per arrival and
+     * waited on, {@link #NEEDS_YOU_LOOK} at a time, pressing nothing, until another screen shows. The wait is not
+     * acting, so the progress clock leaves it out. True when the round waited.
+     */
+    private boolean marked(String at) {
+        Setup setup = at == null ? null : map.screen(at).map(MapScreen::setup).orElse(null);
+        if (setup != null && setup.refuses() != null) {
+            Refusal why = setup.refuses();
+            say(map.shown(at) + " ends the run: " + why.displayName(), null, null);
+            game.refused(why);
+            Bot.stop(why.displayName());
+        }
+        if (setup == null || setup.needsYou() == null) {
+            // A frame that shows no screen (a shade pulled down, a transition) is no new arrival.
+            if (at != null) toldNeedsYou = null;
+            return false;
+        }
+        if (!at.equals(toldNeedsYou)) {
+            toldNeedsYou = at;
+            say(map.shown(at) + " needs you: " + setup.needsYou().displayName(), null, null);
+            game.needsYou(setup.needsYou());
+        }
+        Instant from = records.clock().instant();
+        game.idle(NEEDS_YOU_LOOK);
+        progressed = progressed.plus(Duration.between(from, records.clock().instant()));
+        acted = false;
+        return true;
     }
 
     /**

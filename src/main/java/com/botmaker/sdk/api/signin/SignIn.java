@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.api.signin;
 
+import com.botmaker.plugin.api.meta.Migrate;
 import com.botmaker.plugin.api.palette.Palette;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Element;
@@ -31,6 +32,10 @@ import java.util.Optional;
 @Palette(category = "signin", categoryLabel = "Sign-in", icon = "🔑")
 public final class SignIn {
 
+    /** Why the typing and telling calls go (2026-11-17): a screen map says each now, and BotMaker types the secrets. */
+    private static final String MAPPED = "a screen map's typesParameter, typesSecret, needsYou, refuses and "
+            + "Accounts.signedIn do it";
+
     private SignIn() {}
 
     /**
@@ -47,11 +52,15 @@ public final class SignIn {
     }
 
     /** Asks the host to tap {@code field} and type the account's address. */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static Typed typeEmail(Element field) {
         return type(SignInClient.Value.EMAIL, field);
     }
 
     /** Asks the host to tap {@code field} and type the account's password. */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static Typed typePassword(Element field) {
         return type(SignInClient.Value.PASSWORD, field);
     }
@@ -60,11 +69,15 @@ public final class SignIn {
      * Asks the host to tap {@code field} and type the second step's code: made from the key it holds, or asked of the
      * user in BotMaker's prompt. It waits while the user types it.
      */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static Typed typeCode(Element field) {
         return type(SignInClient.Value.CODE, field);
     }
 
     /** Whether the host sees the request's account on the device; {@code false} when it cannot say. */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static boolean signedIn() {
         return SignInClient.ofRun().map(SignInClient::signedIn).orElse(false);
     }
@@ -73,6 +86,8 @@ public final class SignIn {
      * Asks the user, through the host, for what only they can do; it returns at once, the run reading on. Before a
      * {@link NeedsYou#LOOK} the page is saved, masked, in the run's report, so the bot's author can map it.
      */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static void needsYou(NeedsYou kind) {
         if (kind == NeedsYou.LOOK) UnknownPages.now();
         SignInClient.ofRun().ifPresent(client -> client.needsYou(kind));
@@ -82,6 +97,8 @@ public final class SignIn {
      * Tells the host why Google ended the sign-in, so the account is dealt with as that end asks (a refused password
      * is not typed again); then stop the run with {@code why}'s words.
      */
+    @Deprecated(forRemoval = true)
+    @Migrate.Dropped(MAPPED)
     public static void refused(Refusal why) {
         SignInClient.ofRun().ifPresent(client -> client.refused(why));
     }

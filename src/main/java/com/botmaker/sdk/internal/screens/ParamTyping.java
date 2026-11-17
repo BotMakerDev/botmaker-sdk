@@ -3,14 +3,12 @@
 
 package com.botmaker.sdk.internal.screens;
 
-import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.Typed;
-import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.signin.SignInClient;
 
 import java.util.Optional;
@@ -51,7 +49,7 @@ public final class ParamTyping {
                     return Typed.refused("nothing types this run's secrets: start it from BotMaker, which keeps \""
                             + secret.name() + "\"");
                 }
-                Optional<String> instance = instance();
+                Optional<String> instance = SignInClient.instance();
                 if (instance.isEmpty()) {
                     return Typed.refused("\"" + secret.name() + "\" is typed only into an emulator instance, and this "
                             + "run reads none");
@@ -61,19 +59,9 @@ public final class ParamTyping {
 
             @Override
             public boolean ready() {
-                return instance().isPresent() && SignInClient.door().isPresent();
+                return SignInClient.instance().isPresent() && SignInClient.door().isPresent();
             }
         };
-    }
-
-    /** The emulator instance this run reads, by the name or reference its capture source holds; empty for none. */
-    private static Optional<String> instance() {
-        try {
-            return Source.current().base() instanceof EmulatorSource emulator && !emulator.instanceName().isBlank()
-                    ? Optional.of(emulator.instanceName()) : Optional.empty();
-        } catch (RuntimeException noSource) {
-            return Optional.empty();
-        }
     }
 
     /**

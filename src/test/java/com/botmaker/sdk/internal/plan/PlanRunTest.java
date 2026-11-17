@@ -13,6 +13,8 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.api.screens.Retry;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.signin.NeedsYou;
+import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.internal.bot.BotStuckException;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Hero;
 import com.botmaker.sdk.internal.plan.PlanRun.End;
@@ -57,6 +59,8 @@ class PlanRunTest {
     Path dir;
 
     private final Map<String, Map<String, Do>> placed = new LinkedHashMap<>();
+    /** Screens with a mark, each added to {@link #map()} as it is: a needs-you or a refusing one. */
+    private final Map<String, Setup> marked = new LinkedHashMap<>();
     private final MovingClock clock = new MovingClock(NOON);
 
     /** A clock the fake game moves on as it waits. */
@@ -91,6 +95,8 @@ class PlanRunTest {
         String at = "HOME";
         final List<String> did = new ArrayList<>();
         final List<String> said = new ArrayList<>();
+        /** What the run told BotMaker of a marked screen. */
+        final List<String> told = new ArrayList<>();
         final Map<String, Pressed.Result> results = new HashMap<>();
         final Map<String, Runnable> effects = new HashMap<>();
         final Map<Method, List<String>> feeds = new HashMap<>();
@@ -186,6 +192,16 @@ class PlanRunTest {
             said.add(line);
         }
 
+        @Override
+        public void needsYou(NeedsYou kind) {
+            told.add("needs-you " + kind.id());
+        }
+
+        @Override
+        public void refused(Refusal why) {
+            told.add("refused " + why.id());
+        }
+
         private void tick() {
             clock.now = clock.now.plusSeconds(1);
         }
@@ -212,6 +228,7 @@ class PlanRunTest {
         screens.put("HOME", screen(Setup.named("HOME").start(), "HOME", Map.of("shop", click("shop"), "arena", click("arena"))));
         screens.put("SHOP", screen(Setup.named("SHOP").from(ref("HOME", "shop")), "SHOP", Map.of()));
         screens.put("ARENA", screen(Setup.named("ARENA").from(ref("HOME", "arena")), "ARENA", Map.of()));
+        marked.forEach((constant, setup) -> screens.put(constant, screen(setup, constant, Map.of())));
         return ScreenGraph.of(screens);
     }
 
@@ -806,5 +823,53 @@ class PlanRunTest {
         assertEquals(Optional.empty(), run.round(), "planned again: the tap waits for its hour");
         assertEquals(List.of("press HOME.tap"), game.did);
         assertEquals(List.of(PlanRun.IDLE_LOOK), game.idled);
+    }
+
+    /** A screen that refuses stops the run with its words, told once, before any goal is weighed. */
+    @Test
+    void aRefusingScreenStopsTheRunWithItsWords() {
+        marked.put("WRONG", Setup.named("Wrong password").refuses(Refusal.WRONG_PASSWORD));
+        AtomicBoolean rich = new AtomicBoolean();
+        on("HOME", "sell", Do.press(click("sell")).serves(metWhen(rich)));
+        FakeGame game = new FakeGame();
+        game.at = "WRONG";
+
+        assertThrows(RuntimeException.class, () -> run(Plan.of(Plan.tier(metWhen(rich))), game, records()).round());
+        assertEquals(List.of("refused wrong-password"), game.told);
+        assertEquals(List.of(), game.did, "nothing walked or pressed");
+        assertTrue(game.said.getFirst().endsWith(Refusal.WRONG_PASSWORD.displayName()), game.said.getFirst());
+    }
+
+    /**
+     * A screen that needs the user is told once per arrival and waited on, pressing nothing and never stuck, however
+     * long it stays; once another screen shows, the run goes on.
+     */
+    @Test
+    void aScreenThatNeedsYouIsToldOnceAndWaitedOn() {
+        marked.put("PHONE", Setup.named("Check your phone").needsYou(NeedsYou.PHONE));
+        AtomicBoolean rich = new AtomicBoolean();
+        Goal gold = metWhen(rich);
+        on("HOME", "sell", Do.press(click("sell")).serves(gold));
+        FakeGame game = new FakeGame();
+        game.at = "PHONE";
+        PlanRun run = new PlanRun(Plan.of(Plan.tier(gold)), map(), records(), game, goal -> "GOAL",
+                Duration.ofMinutes(1));
+
+        for (int i = 0; i < 100; i++) assertEquals(Optional.empty(), run.round(), "waits on the screen");
+        assertEquals(List.of(), game.did, "nothing pressed while it shows");
+        game.at = null;
+        run.round();
+        game.at = "PHONE";
+        game.did.clear();
+        run.round();
+        assertEquals(List.of("needs-you phone"), game.told, "told once, not once a look nor after a blank frame");
+
+        game.at = "HOME";
+        run.round();
+        assertEquals(List.of("press HOME.sell"), game.did, "goes on once another screen shows");
+
+        game.at = "PHONE";
+        run.round();
+        assertEquals(List.of("needs-you phone", "needs-you phone"), game.told, "told again on a new arrival");
     }
 }
