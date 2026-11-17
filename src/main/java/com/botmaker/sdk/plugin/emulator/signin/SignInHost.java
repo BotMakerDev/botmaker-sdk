@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.emulator.signin;
 import com.botmaker.sdk.api.signin.NeedsYou;
 import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
+import com.botmaker.sdk.internal.signin.DoorLines;
 import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.shared.emulator.config.AccountRecord.Verification;
 import com.botmaker.shared.emulator.config.Operation;
@@ -13,24 +14,16 @@ import com.botmaker.shared.emulator.google.AccountDevice;
 import com.botmaker.shared.emulator.google.InstanceSignIn;
 import com.botmaker.shared.emulator.google.Totp;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.awt.Rectangle;
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -50,10 +43,6 @@ import java.util.function.LongSupplier;
  */
 public final class SignInHost implements AutoCloseable {
 
-    /** How long a connection may take to send its line. */
-    private static final Duration READ_WAIT = Duration.ofSeconds(10);
-    /** A call's line is a few hundred bytes: a longer one is refused unread, not buffered. */
-    private static final int MAX_LINE = 4096;
     /** How often the serving thread looks whether the operation was cancelled. */
     private static final Duration CANCEL_POLL = Duration.ofMillis(500);
     /** The codes an authenticator key gives before the code is asked: this window's, the one before, the next. */
@@ -62,8 +51,6 @@ public final class SignInHost implements AutoCloseable {
     private static final int KEY_MOVE_END = 123;
     /** How many characters a refused code's field is cleared of: a backup code with its spaces, and some. */
     private static final int CLEARED = 16;
-    private static final ObjectMapper JSON = new ObjectMapper();
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final AccountDevice device;
     private final String email;
@@ -73,8 +60,7 @@ public final class SignInHost implements AutoCloseable {
     private final Operation.Context context;
     private final LongSupplier clock;
     private final String id = UUID.randomUUID().toString();
-    private final byte[] token;
-    private final String tokenText;
+    private final String tokenText = DoorLines.token();
     private final Set<String> before;
     private final ServerSocket server;
     private final Thread serving;
@@ -103,10 +89,6 @@ public final class SignInHost implements AutoCloseable {
         this.method = chosen == null ? Verification.ASK : chosen.followed(Verification.ASK);
         this.context = context;
         this.clock = clock;
-        byte[] random = new byte[32];
-        RANDOM.nextBytes(random);
-        this.tokenText = HexFormat.of().formatHex(random);
-        this.token = tokenText.getBytes(StandardCharsets.UTF_8);
         Set<String> held = device.accounts();
         this.before = held == null ? Set.of() : Set.copyOf(held);
         this.server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
@@ -211,12 +193,9 @@ public final class SignInHost implements AutoCloseable {
             }
             // one call at a time: a second connection waits for the first, never answered beside it
             try (Socket socket = server.accept()) {
-                socket.setSoTimeout((int) READ_WAIT.toMillis());
-                Optional<String> line = line(socket);
-                ObjectNode answer = line.isEmpty() ? refused("no message") : answer(line.get());
-                socket.getOutputStream().write((JSON.writeValueAsString(answer) + "\n")
-                        .getBytes(StandardCharsets.UTF_8));
-                socket.getOutputStream().flush();
+                socket.setSoTimeout((int) DoorLines.READ_WAIT.toMillis());
+                Optional<String> line = DoorLines.line(socket);
+                DoorLines.answer(socket, line.isEmpty() ? refused("no message") : answer(line.get()));
             } catch (SocketTimeoutException quiet) {
                 // no call this while: look at the cancel again
             } catch (InterruptedException e) {
@@ -227,18 +206,6 @@ public final class SignInHost implements AutoCloseable {
                 // the run went away mid-call, or the host closed
             }
         }
-    }
-
-    /** The connection's one line, {@link #MAX_LINE} bytes at most: none for a longer one, or one never ended. */
-    private static Optional<String> line(Socket socket) throws IOException {
-        ByteArrayOutputStream line = new ByteArrayOutputStream();
-        InputStream in = new BufferedInputStream(socket.getInputStream());
-        for (int b = in.read(); b != -1; b = in.read()) {
-            if (b == '\n') return Optional.of(line.toString(StandardCharsets.UTF_8));
-            if (line.size() >= MAX_LINE) return Optional.empty();
-            line.write(b);
-        }
-        return Optional.empty();
     }
 
     private ObjectNode answer(String line) throws InterruptedException {
@@ -254,11 +221,11 @@ public final class SignInHost implements AutoCloseable {
     private ObjectNode answered(String line) throws InterruptedException {
         JsonNode message;
         try {
-            message = JSON.readTree(line);
+            message = DoorLines.JSON.readTree(line);
         } catch (IOException notJson) {
             return refused("not a message");
         }
-        if (!tokenMatches(message.path("token").asText(""))) return refused("wrong token");
+        if (!DoorLines.tokenMatches(tokenText, message.path("token").asText(""))) return refused("wrong token");
         if (context.cancelled()) return refused("the sign-in was cancelled");
         SignInClient.Op op = SignInClient.Op.fromId(message.path("op").asText(""));
         if (op != SignInClient.Op.NEEDS_YOU && waitingForYou) {
@@ -286,12 +253,9 @@ public final class SignInHost implements AutoCloseable {
     }
 
     private ObjectNode type(SignInClient.Value value, JsonNode field) throws InterruptedException {
-        if (!field.path("width").isInt() || !field.path("height").isInt() || field.path("width").asInt() <= 0
-                || field.path("height").asInt() <= 0) {
-            return refused("the field has no place");
-        }
-        Rectangle at = new Rectangle(field.path("x").asInt(), field.path("y").asInt(), field.path("width").asInt(),
-                field.path("height").asInt());
+        Optional<Rectangle> place = DoorLines.place(field);
+        if (place.isEmpty()) return refused("the field has no place");
+        Rectangle at = place.get();
         return switch (value) {
             case EMAIL -> {
                 context.step("Typing the email…");
@@ -413,10 +377,6 @@ public final class SignInHost implements AutoCloseable {
         return kept == null || kept.isBlank() ? email : kept;
     }
 
-    private boolean tokenMatches(String given) {
-        return MessageDigest.isEqual(token, given.getBytes(StandardCharsets.UTF_8));
-    }
-
     private static SecondStep stepOf(Verification method) {
         return switch (method) {
             case PHONE -> SecondStep.PHONE;
@@ -429,10 +389,10 @@ public final class SignInHost implements AutoCloseable {
     }
 
     private static ObjectNode ok() {
-        return JSON.createObjectNode().put("ok", true);
+        return DoorLines.ok();
     }
 
     private static ObjectNode refused(String why) {
-        return JSON.createObjectNode().put("ok", false).put("why", why);
+        return DoorLines.refused(why);
     }
 }

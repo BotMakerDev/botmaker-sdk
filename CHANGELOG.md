@@ -32,6 +32,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - A parameter's part by its record's method: `Login::email` reads the email of the bot's one `Login` parameter; none
   or two parameters of that record are refused with words, and a part is never set alone.
 - `Params.when(Login::code).isSet()`, a condition holding while a parameter's value is not blank.
+- The sign-in door: the SDK plugin opens one loopback door per process, until it exits, found by any run through
+  `signin-door.json` in the cache folder (owner-only), and types a `typesSecret` field's secret on the run's emulator instance — a password as
+  kept, an authenticator's current code. It refuses, with words, a secret this PC doesn't keep, an instance not
+  running here, and a password into a focused field that isn't a password field; no answer or log line holds a
+  value. A way through a secret field no door would type is
+  left untried, and a refused field ends the walk NOT_NOW, not as a missing or greyed-out button.
 
 ### Changed
 

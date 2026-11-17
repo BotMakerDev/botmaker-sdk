@@ -4,11 +4,13 @@
 package com.botmaker.sdk.internal.signin;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.NeedsYou;
 import com.botmaker.sdk.api.signin.Refusal;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.api.signin.SignIn;
 import com.botmaker.sdk.api.signin.Typed;
+import com.botmaker.shared.tools.UserDirs;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -21,6 +23,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
@@ -35,6 +39,8 @@ public final class SignInClient {
 
     public static final String PORT_VARIABLE = "BOTMAKER_SIGNIN_PORT";
     public static final String TOKEN_VARIABLE = "BOTMAKER_SIGNIN_TOKEN";
+    /** The door file's name in this PC's cache folder ({@link #doorFile()}). */
+    public static final String DOOR_FILE = "signin-door.json";
 
     /** A user's code is typed in BotMaker's prompt while the call waits; the host gives up long before this. */
     private static final Duration CODE_WAIT = Duration.ofMinutes(20);
@@ -96,6 +102,36 @@ public final class SignInClient {
         return of(System::getenv);
     }
 
+    /** Where this PC's core says how to reach its sign-in door: {@code port} and {@code token}, readable by its owner only. */
+    public static Path doorFile() {
+        return UserDirs.cache().resolve(DOOR_FILE);
+    }
+
+    /**
+     * The door that types this run's secrets: this PC's, by {@link #doorFile()}, even for a run a sign-in host started,
+     * which types only its own account's values; none without one, so a call refuses at once rather than wait on
+     * nobody.
+     */
+    public static Optional<SignInClient> door() {
+        return door(doorFile());
+    }
+
+    /** The client {@code doorFile} names; none when it is missing, unreadable or names no port. */
+    static Optional<SignInClient> door(Path doorFile) {
+        try {
+            if (!Files.isRegularFile(doorFile)) return Optional.empty();
+            JsonNode door = JSON.readTree(doorFile.toFile());
+            String token = door.path("token").asText("");
+            return of(name -> switch (name) {
+                case PORT_VARIABLE -> door.path("port").asText("");
+                case TOKEN_VARIABLE -> token;
+                default -> null;
+            });
+        } catch (IOException | RuntimeException unread) {
+            return Optional.empty();
+        }
+    }
+
     /** The client {@code environment} names; none without both variables or with a port that is not one. */
     static Optional<SignInClient> of(UnaryOperator<String> environment) {
         String port = environment.apply(PORT_VARIABLE);
@@ -120,9 +156,26 @@ public final class SignInClient {
     /** Asks the host to tap the middle of {@code field} and type {@code value}. */
     public Typed type(Value value, Rect field) {
         ObjectNode message = message(Op.TYPE).put("value", value.id());
+        return typed(placed(message, field), value == Value.CODE ? CODE_WAIT : ANSWER_WAIT);
+    }
+
+    /**
+     * Asks the door to tap the middle of {@code field} on {@code instance} and type what {@code secret} names, as its
+     * kind says: a password as kept, an authenticator's current code. Only the secret's name goes out.
+     */
+    public Typed type(Secret secret, Rect field, String instance) {
+        ObjectNode message = message(Op.TYPE).put("secret", secret.name()).put("instance", instance);
+        return typed(placed(message, field), ANSWER_WAIT);
+    }
+
+    private static ObjectNode placed(ObjectNode message, Rect field) {
         message.putObject("field").put("x", field.x()).put("y", field.y())
                 .put("width", field.width()).put("height", field.height());
-        return call(message, value == Value.CODE ? CODE_WAIT : ANSWER_WAIT)
+        return message;
+    }
+
+    private Typed typed(ObjectNode message, Duration wait) {
+        return call(message, wait)
                 .map(answer -> ok(answer) ? Typed.typed() : Typed.refused(answer.path("why").asText("")
                         .isBlank() ? "the sign-in's host refused, saying no why" : answer.path("why").asText()))
                 .orElseGet(() -> Typed.refused("the sign-in's host does not answer"));

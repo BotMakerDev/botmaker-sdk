@@ -343,6 +343,13 @@ public final class ScreenWalk {
      */
     public Result take(ScreenGraph.Edge edge) {
         try {
+            // A field typing a parameter with no value, or a secret no door would type, is a closed way, not a map
+            // naming a picture the game no longer shows; told before anything is looked at or closed.
+            if (edge.via() instanceof Button field && ParamTyping.typesParameter(field)
+                    && !ParamTyping.typeable(field)) {
+                return new Result(Outcome.NOT_NOW, edge.from(), List.of(), edge.label() + " types nothing now: "
+                        + ParamTyping.unready(field).orElse("no door types its secret") + ".");
+            }
             Optional<BufferedImage> frame = closePopups(reach.look());
             if (frame.isEmpty()) return new Result(Outcome.STUCK, null, List.of(), "The game shows no frame.");
             if (!perform(edge, frame.get())) {
@@ -682,6 +689,13 @@ public final class ScreenWalk {
                     // absent one; one that shows pressable, a drag whose drop is not there.
                     Optional<Reach.Seen> seen = input instanceof Button button
                             ? reach.seen(button, strip, p, frame.get()) : Optional.empty();
+                    // A field typing a parameter that shows pressable but was refused (no value, no door, a secret
+                    // the door would not type) is not a greyed-out button: it is not now, saying so.
+                    if (seen.isPresent() && !seen.get().state().blocks() && acted instanceof Button refused
+                            && ParamTyping.typesParameter(refused)) {
+                        return new Press(Pressed.Result.NOT_NOW, constant, times, name + " typed nothing: "
+                                + ParamTyping.unready(refused).orElse("its field or its secret was refused") + ".");
+                    }
                     if (seen.isPresent() && !seen.get().state().blocks() && input instanceof Button dragged
                             && dragged.isDrag() && reach.dropOn(dragged, frame.get()).isEmpty()) {
                         walked = noDrop(dragged, constant);

@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.signin;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.NeedsYou;
 import com.botmaker.sdk.api.signin.SecondStep;
 import com.botmaker.sdk.api.signin.SignIn;
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,6 +22,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -153,5 +158,46 @@ class SignInClientTest {
                 Integer.toString(server.getLocalPort()), SignInClient.TOKEN_VARIABLE, TOKEN)::get);
         assertEquals(Optional.of(new SignIn.Request("r2", SecondStep.AUTHENTICATOR)),
                 client.flatMap(SignInClient::request));
+    }
+
+    @Test
+    void theDoorIsNamedByItsFile(@TempDir Path dir) throws IOException {
+        host(message -> "{\"ok\":true,\"id\":\"" + message.path("token").asText() + "\"}");
+        Path doorFile = dir.resolve(SignInClient.DOOR_FILE);
+        Files.writeString(doorFile, "{\"port\":" + server.getLocalPort() + ",\"token\":\"" + TOKEN + "\"}");
+        assertEquals(Optional.of(TOKEN), SignInClient.door(doorFile).flatMap(SignInClient::request)
+                .map(SignIn.Request::id));
+        assertEquals(Optional.empty(), SignInClient.door(dir.resolve("none.json")));
+        Files.writeString(doorFile, "not json");
+        assertEquals(Optional.empty(), SignInClient.door(doorFile));
+        Files.writeString(doorFile, "{\"port\":0,\"token\":\"" + TOKEN + "\"}");
+        assertEquals(Optional.empty(), SignInClient.door(doorFile));
+    }
+
+    @Test
+    void aSecretGoesOutByItsNameAndInstanceOnly() throws IOException {
+        host(message -> "{\"ok\":true}");
+        Typed typed = new SignInClient(server.getLocalPort(), TOKEN)
+                .type(Secret.of("Farm Password"), new Rect(10, 20, 300, 40), "farm-1");
+        assertTrue(typed.isTyped());
+        JsonNode message = heard.getFirst();
+        assertEquals("Farm Password", message.path("secret").asText());
+        assertEquals("farm-1", message.path("instance").asText());
+        assertTrue(message.path("value").isMissingNode());
+    }
+
+    @Test
+    void aStaleDoorFileRefusesAtOnce(@TempDir Path dir) throws IOException {
+        int port;
+        try (ServerSocket gone = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            port = gone.getLocalPort();
+        }
+        Path doorFile = dir.resolve(SignInClient.DOOR_FILE);
+        Files.writeString(doorFile, "{\"port\":" + port + ",\"token\":\"" + TOKEN + "\"}");
+        long start = System.nanoTime();
+        Typed typed = SignInClient.door(doorFile).orElseThrow()
+                .type(Secret.of("farm password"), new Rect(0, 0, 1, 1), "farm-1");
+        assertFalse(typed.isTyped());
+        assertTrue(Duration.ofNanos(System.nanoTime() - start).toSeconds() < 5, "refused at once");
     }
 }

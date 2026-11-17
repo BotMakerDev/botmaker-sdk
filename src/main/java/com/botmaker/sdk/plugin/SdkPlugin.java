@@ -16,6 +16,7 @@ import com.botmaker.sdk.plugin.emulator.SdkPools;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
 import com.botmaker.sdk.plugin.emulator.host.UsedBy;
+import com.botmaker.sdk.plugin.secrets.SignInDoor;
 import com.botmaker.sdk.plugin.types.HostTypes;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
@@ -112,6 +113,8 @@ public final class SdkPlugin extends DeclaredPlugin {
         GameButton.bind(services);
         GameReady.bind(services);
         HostIds.bind(services);
+        // the door every run of this PC types its secrets through, open until the process exits
+        SignInDoor.serve(services);
         if (!services.hasUi()) return;
         UsedBy.remember(services);
         MoveOffer.offer(services);

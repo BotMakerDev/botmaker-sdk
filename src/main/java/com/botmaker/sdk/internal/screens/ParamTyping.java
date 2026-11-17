@@ -3,12 +3,15 @@
 
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.params.Params;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.Typed;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.signin.SignInClient;
 
 import java.util.Optional;
 
@@ -26,14 +29,59 @@ public final class ParamTyping {
     @FunctionalInterface
     public interface Door {
         Typed type(Secret secret, Rect field);
+
+        /** Whether a secret handed now could be typed at all: false when nothing would answer. */
+        default boolean ready() {
+            return true;
+        }
     }
 
     private ParamTyping() {}
 
-    /** The door of this run's host. None yet: the sign-in door takes its place (plan phase 4). */
+    /**
+     * This run's door: {@link SignInClient#door()}, asked to type on the emulator instance the run reads. Refuses, at
+     * once and saying why, a run no door serves or one reading no instance.
+     */
     public static Door door() {
-        return (secret, field) -> Typed.refused("nothing types this run's secrets: start it from BotMaker, which keeps \""
-                + secret.name() + "\"");
+        return new Door() {
+            @Override
+            public Typed type(Secret secret, Rect field) {
+                Optional<SignInClient> client = SignInClient.door();
+                if (client.isEmpty()) {
+                    return Typed.refused("nothing types this run's secrets: start it from BotMaker, which keeps \""
+                            + secret.name() + "\"");
+                }
+                Optional<String> instance = instance();
+                if (instance.isEmpty()) {
+                    return Typed.refused("\"" + secret.name() + "\" is typed only into an emulator instance, and this "
+                            + "run reads none");
+                }
+                return client.get().type(secret, field, instance.get());
+            }
+
+            @Override
+            public boolean ready() {
+                return instance().isPresent() && SignInClient.door().isPresent();
+            }
+        };
+    }
+
+    /** The emulator instance this run reads, by the name or reference its capture source holds; empty for none. */
+    private static Optional<String> instance() {
+        try {
+            return Source.current().base() instanceof EmulatorSource emulator && !emulator.instanceName().isBlank()
+                    ? Optional.of(emulator.instanceName()) : Optional.empty();
+        } catch (RuntimeException noSource) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Whether {@code button}, a field typing a parameter, could be typed now: a value dealt, and a secret's door
+     * ready. A way through a field that could not is left untried.
+     */
+    public static boolean typeable(Button button) {
+        return dealt(button).isPresent() && (!button.isSecret() || door().ready());
     }
 
     /** Whether {@code button} types a parameter, its value or the secret it names. */
