@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- `GoogleAccount` (`api.signin`), a parameter's type: `GoogleAccount.of("a@gmail.com")` names one account of this PC's
+  account book, and a pool deals one to each of several runs. Its pill lists the book's Google accounts, each with its
+  second step and a warning when no password is kept, and *Add account…* puts a new one in the book with its password,
+  second step and authenticator key in the credential store. No instance is touched: signing in is a bot's work.
+
 ### Changed
 
 - Run claims: the offer to create more instances counts this PC's room by what it can commit (shared's

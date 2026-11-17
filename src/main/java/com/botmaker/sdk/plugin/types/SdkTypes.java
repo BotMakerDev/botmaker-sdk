@@ -25,6 +25,7 @@ import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.State;
+import com.botmaker.sdk.api.signin.GoogleAccount;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.text.OcrOptions;
@@ -38,6 +39,7 @@ import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
+import com.botmaker.sdk.plugin.editors.GoogleAccountEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
 import com.botmaker.sdk.plugin.editors.InstanceEditors;
 import com.botmaker.sdk.plugin.editors.LauncherEditors;
@@ -91,7 +93,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
                 KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                GAME_VM, INSTANCE, STATE);
+                GAME_VM, INSTANCE, GOOGLE_ACCOUNT, STATE);
     }
 
     @Override
@@ -361,6 +363,16 @@ public final class SdkTypes implements TypeHolder {
             .editor(() -> InstanceEditors::instance)
             .preview(() -> InstanceEditors::preview)
             .writtenAs(Instance::named);
+
+    /**
+     * A Google account of this PC's book, {@code GoogleAccount.of("a@gmail.com")} (2026-11-17): picked from the book,
+     * or added to it. A fresh one names none.
+     */
+    public static final DeclaredCallType<GoogleAccount> GOOGLE_ACCOUNT = PluginType.value(GoogleAccount.class)
+            .fresh(() -> GoogleAccount.of(""))
+            .editor(() -> GoogleAccountEditors::account)
+            .preview(() -> GoogleAccountEditors::preview)
+            .writtenAs(GoogleAccount::of);
 
     /**
      * {@code precision.tolerance(d)}, {@code .minArea(n)} and {@code .minCount(n)}: the chains a person
