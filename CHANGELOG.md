@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- *Keep exploring* takes `minutes` and `maxScreens`, and *Explore map* `minutes`, all optional, when the assistant
+  (`run_bot` with `entry` and `args`) or the shell starts it: Keep exploring ends once either is spent (`minutes`
+  wins over `botmaker.explore.hours`), and Explore map's walk gets that time instead of 30 min. Started from 🗺
+  Screens ▸ 🔭 Explore, they take none, as before.
+
 - `Secret` (`api.secrets`), a parameter's type for any bot: `Secret.of("farm password")` names a secret this PC
   keeps, never its value, and a pool deals one to each of several runs (inside a record with what goes with it). Its
   pill lists the secrets this PC keeps, each with its kind (password, or an authenticator whose current code is

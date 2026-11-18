@@ -49,9 +49,10 @@ public final class LivePlay implements ExploreLoop.Play {
 
     /**
      * Explores the game with the bot's classes as {@code first} loads them, the game already up, until stopped or
-     * past {@link #HOURS}: each resume compiles the bot in {@code project} as the next generation and plays it.
+     * past {@code budget}, whose minutes win over {@link #HOURS}: each resume compiles the bot in {@code project} as
+     * the next generation and plays it.
      */
-    public static ExploreLoop.End explore(Generation first, Path project, Runnable restart) {
+    public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget) {
         Plan plan = first.plan();
         LivePlay play = new LivePlay(ScreenMaps.installed(), plan == null ? null : RunGame.rounds(plan, first.holders()),
                 restart);
@@ -68,7 +69,8 @@ public final class LivePlay implements ExploreLoop.Play {
                     new ExploreLoop.Reload.Reloaded(current.get().number(), ScreenMaps.installed(), null, errors);
         };
         return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), Journal.of(project),
-                ExploreLoop.Settings.DEFAULT.within(hours()), System::currentTimeMillis).run();
+                ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
+                        .upTo(budget.screens()), System::currentTimeMillis).run();
     }
 
     /** The guards with the author's words of {@code generation}'s bot. */

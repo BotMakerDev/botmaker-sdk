@@ -80,7 +80,7 @@ public final class ExploreLoop {
     public enum End {
         /** The plugin side asked it to stop. */
         STOPPED("stopped", "Stopped"),
-        /** Its budget ({@link Settings#hours}) ran out. */
+        /** Its budget ({@link Settings#hours}, {@link Settings#maxScreens}) ran out. */
         BUDGET("budget", "Budget spent"),
         /** It threw: the bot crashed, or the run was stopped from Studio. Only the journal says it. */
         BROKE("broke", "Crashed or stopped from Studio"),
@@ -115,18 +115,23 @@ public final class ExploreLoop {
 
     /**
      * How long a stop waits before it is parked, how long with no press is stuck, how many plan rounds with no new
-     * screen before a walk to an untried input, one press's time, the whole run's (null: no end), and how often a
-     * paused run looks for a command.
+     * screen before a walk to an untried input, one press's time, the whole run's (null: no end), how often a
+     * paused run looks for a command, and the screens it is on before it ends, each counted once (0: no end).
      */
     public record Settings(Duration parkAfter, Duration stuckAfter, int planRoundsWithoutNew, Duration edge,
-                           Duration hours, Duration poll) {
+                           Duration hours, Duration poll, int maxScreens) {
 
         public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15), 5,
-                Duration.ofSeconds(30), null, Duration.ofSeconds(1));
+                Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0);
 
         /** These settings with a budget of {@code hours}; null for none. */
         public Settings within(Duration hours) {
-            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll);
+            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, maxScreens);
+        }
+
+        /** These settings ending once the run has been on {@code screens} screens; 0 for no end. */
+        public Settings upTo(int screens) {
+            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, screens);
         }
     }
 
@@ -272,9 +277,10 @@ public final class ExploreLoop {
         }
     }
 
-    /** Whether the run's budget is spent; never, without one. */
+    /** Whether the run's budget, of time or of screens, is spent; never, without one. */
     private boolean spent() {
-        return settings.hours() != null && nowMs.getAsLong() - began >= settings.hours().toMillis();
+        return settings.hours() != null && nowMs.getAsLong() - began >= settings.hours().toMillis()
+                || settings.maxScreens() > 0 && seen.size() >= settings.maxScreens();
     }
 
     /** One round; false when a command, or the budget, ended the run while it was paused. */

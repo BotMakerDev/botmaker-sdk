@@ -4,8 +4,11 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Hidden;
+import com.botmaker.plugin.api.run.RunArguments;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.time.Wait;
+import com.botmaker.sdk.internal.explore.ExploreBudget;
+import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Generation;
 import com.botmaker.sdk.internal.explore.LivePlay;
 import com.botmaker.sdk.internal.trace.Say;
@@ -30,6 +33,13 @@ public final class KeepExploring {
      */
     @Hidden("Studio's Keep exploring run")
     public static void main(String[] args) {
+        ExploreBudget budget;
+        try {
+            budget = RunArguments.read(ExploreBudget.class);
+        } catch (IllegalArgumentException e) {
+            Debug.error("Keep exploring cannot read its arguments: " + e.getMessage());
+            return;
+        }
         Generation first;
         try {
             first = Generation.first(List.of(args));
@@ -37,11 +47,11 @@ public final class KeepExploring {
             Debug.error("Keep exploring cannot load the bot's classes: " + e);
             return;
         }
-        Bot.trial(() -> explore(first), first.holders());
+        Bot.trial(() -> explore(first, budget), first.holders());
     }
 
-    /** Starts the game as a run's cold start does, then explores until stopped. */
-    private static void explore(Generation first) {
+    /** Starts the game as a run's cold start does, then explores until stopped or past {@code budget}. */
+    private static void explore(Generation first, ExploreBudget budget) {
         first.install();
         Bot.launchConfiguredTarget(Bot.StartMode.COLD);
         AtomicInteger restarts = new AtomicInteger();
@@ -50,7 +60,8 @@ public final class KeepExploring {
             Wait.time(Bot.backOff(restarts.incrementAndGet()));
             Bot.launchConfiguredTarget(Bot.StartMode.RESTART);
         };
-        LivePlay.explore(first, Path.of(System.getProperty("user.dir", ".")), restart);
-        Say.info("Keep exploring ended.");
+        ExploreLoop.End end = LivePlay.explore(first, Path.of(System.getProperty("user.dir", ".")), restart, budget);
+        Say.info(end == ExploreLoop.End.BUDGET ? "Keep exploring ended: its budget is spent."
+                : "Keep exploring ended.");
     }
 }

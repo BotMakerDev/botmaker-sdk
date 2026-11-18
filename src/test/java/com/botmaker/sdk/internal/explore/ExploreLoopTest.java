@@ -174,6 +174,20 @@ class ExploreLoopTest {
         assertTrue(game.taken.containsAll(List.of("A.b→B", "A.d→D")), game.taken.toString());
     }
 
+    /** {@code maxScreens} ends the run once it has been on that many screens, long before its time is spent. */
+    @Test
+    void aScreenBudgetEndsTheRun() {
+        Game game = new Game();
+
+        ExploreLoop.End end = new ExploreLoop(map(), game, same(map()), Guards.with(List.of()), journal(),
+                ExploreLoop.Settings.DEFAULT.within(Duration.ofHours(5)).upTo(2), () -> game.nowMs).run();
+
+        assertEquals(ExploreLoop.End.BUDGET, end);
+        assertEquals(List.of("A", "B"), events(ExploreEvent.NewScreen.class).stream()
+                .map(ExploreEvent.NewScreen::screen).toList());
+        assertTrue(game.nowMs < Duration.ofMinutes(5).toMillis(), "ended by screens, not time: " + game.nowMs);
+    }
+
     @Test
     void untaggedMapGivesOneBatchStop() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();

@@ -7,6 +7,8 @@ import com.botmaker.plugin.api.RunEntryHolder;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.api.bot.ExploreMap;
 import com.botmaker.sdk.api.bot.KeepExploring;
+import com.botmaker.sdk.internal.explore.ExploreBudget;
+import com.botmaker.sdk.internal.screens.MapCheckBudget;
 
 import java.util.List;
 
@@ -25,7 +27,8 @@ public final class SdkRuns implements RunEntryHolder {
     @Override
     public List<RunEntry> runs() {
         // Started from 🗺 Screens ▸ 🔭 Explore, not the toolbar (2026-11-09, spec screens-rail goal 9).
-        return List.of(RunEntry.of(EXPLORE_MAP, ExploreMap::main).offBar(),
-                RunEntry.of(KEEP_EXPLORING, KeepExploring::main).offBar());
+        // Each takes its budget, all optional, so the window's start with none still runs (web discovery phase 4).
+        return List.of(RunEntry.of(EXPLORE_MAP, ExploreMap::main).takes(MapCheckBudget.class).offBar(),
+                RunEntry.of(KEEP_EXPLORING, KeepExploring::main).takes(ExploreBudget.class).offBar());
     }
 }
