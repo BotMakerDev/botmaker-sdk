@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- What a screen's tree settles, ready for *Keep exploring* to answer its own stops (web discovery 6a, not wired
+  yet): `internal/explore/tree` finds a page's or an app's inputs as a tester does (role and name, id, text, index),
+  tells a website's overlay (an open dialog, a menu, the selected tab), guesses a route's `{slug}` from sibling pages
+  of one template, judges a press's effect (goes to, opens, changes, shows an error, nothing, fails, leaves the
+  site) and types the answer: a screen, an input with its verdict, a way or a note.
 - *Keep exploring* takes `minutes` and `maxScreens`, and *Explore map* `minutes`, all optional, when the assistant
   (`run_bot` with `entry` and `args`) or the shell starts it: Keep exploring ends once either is spent (`minutes`
   wins over `botmaker.explore.hours`), and Explore map's walk gets that time instead of 30 min. Started from 🗺
