@@ -25,6 +25,7 @@ import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
+import com.botmaker.sdk.internal.web.WebSource;
 
 import java.awt.image.BufferedImage;
 import java.time.Duration;
@@ -65,6 +66,18 @@ public final class RunReach implements Reach {
     public Optional<ElementMatch.Matcher> treeOn(BufferedImage frame) {
         if (!(Source.current().base() instanceof ReadableSource source)) return Optional.empty();
         return trees.on(frame, source::tree);
+    }
+
+    @Override
+    public Optional<String> path() {
+        return WebSource.of(Source.current()).flatMap(WebSource::path);
+    }
+
+    @Override
+    public boolean openPath(String path) {
+        Optional<WebSource> web = WebSource.of(Source.current());
+        web.ifPresent(source -> source.openPath(path));
+        return web.isPresent();
     }
 
     /** The run ends, {@code why} its error: retrying cannot change what the bot says. */
@@ -260,13 +273,19 @@ public final class RunReach implements Reach {
     @Override
     public void press(Point at, Gesture gesture, Duration hold) {
         CaptureSource source = Source.current();
-        boolean emulator = source.base() instanceof EmulatorSource;
+        // A website is pressed as an emulator is tapped: its node, through the guard, with no mouse of the desktop.
+        boolean emulator = !onDesktop(source);
         // Stamped when let go: a hold's press shows after it as a click's does.
         try {
             pressAs(source, emulator, at, gesture, hold);
         } finally {
             ShadeFit.moved(new ShadeFit.Pointer(at, nowMs(), gesture != Gesture.HOVER, !emulator));
         }
+    }
+
+    /** Whether {@code source}'s input is the desktop's mouse and keyboard: neither an emulator's nor a website's. */
+    private static boolean onDesktop(CaptureSource source) {
+        return !(source.base() instanceof EmulatorSource) && !(source.base() instanceof WebSource);
     }
 
     private void pressAs(CaptureSource source, boolean emulator, Point at, Gesture gesture, Duration hold) {
@@ -305,6 +324,10 @@ public final class RunReach implements Reach {
 
     @Override
     public void keys(Combo combo) {
+        if (Source.current().base() instanceof WebSource web) {
+            web.keys(combo);
+            return;
+        }
         Keyboard.combo(Source.current(), combo.hold().isZero() ? combo.held(KEY_HOLD) : combo);
     }
 
@@ -321,6 +344,10 @@ public final class RunReach implements Reach {
             if (submits) emulator.key(EmulatorSource.KEYCODE_ENTER);
             return;
         }
+        if (source.base() instanceof WebSource web) {
+            web.type(text, clears, submits);
+            return;
+        }
         if (clears) Keyboard.combo(source, Combo.of(Key.CTRL, Key.A).held(KEY_HOLD));
         Keyboard.type(source, text);
         if (submits) Keyboard.combo(source, Combo.of(Key.ENTER).held(KEY_HOLD));
@@ -331,14 +358,14 @@ public final class RunReach implements Reach {
         CaptureSource source = Source.current();
         source.scroll(onScreen(source, at), notches);
         // The cursor rests where it scrolled; nothing there was pressed.
-        ShadeFit.moved(new ShadeFit.Pointer(at, nowMs(), false, !(source.base() instanceof EmulatorSource)));
+        ShadeFit.moved(new ShadeFit.Pointer(at, nowMs(), false, onDesktop(source)));
     }
 
     @Override
     public void drag(Point from, Point to, Duration time) {
         CaptureSource source = Source.current();
         source.drag(onScreen(source, from), onScreen(source, to), time.toMillis());
-        ShadeFit.moved(new ShadeFit.Pointer(to, nowMs(), false, !(source.base() instanceof EmulatorSource)));
+        ShadeFit.moved(new ShadeFit.Pointer(to, nowMs(), false, onDesktop(source)));
     }
 
     /** The run's own verdict: every capture and input of the run counts, the walk's and the bot's. */

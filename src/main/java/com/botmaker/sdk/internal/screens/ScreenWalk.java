@@ -381,6 +381,7 @@ public final class ScreenWalk {
         Set<ScreenGraph.Edge> strayed = new HashSet<>();    // done, and the game showed another screen
         Set<ScreenGraph.Edge> retried = new HashSet<>();    // done once already, its screen not shown
         Map<String, Integer> visits = new HashMap<>();      // times the walk came onto each screen
+        Set<String> opened = new HashSet<>();               // website screens whose example was opened
         String at = near;
         String told = null;        // the screen the walk last said it is on
         String unmarked = null;    // a screen reached that has no marker to tell it by
@@ -462,7 +463,13 @@ public final class ScreenWalk {
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
                             known.and(edge -> open(edge, from, seen, false)))
                     .or(() -> graph.pathTo(from, target, known.and(edge -> open(edge, from, seen, true))));
-            if (path.isEmpty()) return blocked(at, target, missed, strayed, walked);
+            if (path.isEmpty()) {
+                // On a website a page is opened by its address: the target's example, else one of a screen it is
+                // reached from, then the rest walked. Each once, so a page that shows another screen is not looped.
+                Optional<String> page = examplePage(target, known, opened);
+                if (page.isPresent() && reach.openPath(page.get())) continue;
+                return blocked(at, target, missed, strayed, walked);
+            }
             ScreenGraph.Edge next = path.get().getFirst();
             if (!perform(next, seen)) {
                 missed.add(next);    // another way, or why none
@@ -901,6 +908,25 @@ public final class ScreenWalk {
     /** Whether {@code edge} goes through a text field whose text only a body gives: no walk types it. */
     private static boolean typedByBody(ScreenGraph.Edge edge) {
         return edge.via() instanceof Button button && button.isTyped();
+    }
+
+    /**
+     * The example page to open to reach {@code target} on a website: its own first example, else the first of a screen
+     * the map leads from to {@code target} by {@code known} ways; each screen's once, kept in {@code opened}. Empty
+     * when none is left, or no screen of the map has one.
+     */
+    private Optional<String> examplePage(String target, Predicate<ScreenGraph.Edge> known, Set<String> opened) {
+        List<String> order = new ArrayList<>();
+        order.add(target);
+        for (String screen : graph.screens().keySet()) if (!screen.equals(target)) order.add(screen);
+        for (String screen : order) {
+            List<String> examples = graph.screen(screen).map(s -> s.setup().examples()).orElse(List.of());
+            if (examples.isEmpty() || opened.contains(screen)) continue;
+            if (!screen.equals(target) && graph.pathTo(screen, target, known).isEmpty()) continue;
+            opened.add(screen);
+            return Optional.of(examples.getFirst());
+        }
+        return Optional.empty();
     }
 
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */

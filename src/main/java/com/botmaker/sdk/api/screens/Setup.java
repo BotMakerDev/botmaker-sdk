@@ -84,12 +84,18 @@ import java.util.function.BooleanSupplier;
  * @param needsYou what only the user can do on this screen, a run telling BotMaker once and waiting until another
  *                 screen shows ({@link #needsYou(NeedsYou)}); null for a screen the bot answers itself
  * @param refuses  why reaching this screen ends the run short of its goal ({@link #refuses(Refusal)}); null for none
+ * @param route    a website's page: the path pattern it is at, {@code "/case-studies/{slug}"}; null for a screen of
+ *                 no website (2026-11-18, spec {@code 2026-11-18-web-discovery-design.md})
+ * @param examples paths its route was seen at, at most {@value #EXAMPLES}; a walk opens the first to reach it
  */
 public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate> absent, List<Caption> texts,
                     List<Element> elements, Way from, List<Way> alsoFrom, Input back, List<ScreenVariant> variants,
                     boolean isPopup, boolean isStart, Duration loads, Screen panelOf, String notes, Reached reached,
                     List<String> owes, Point at, boolean isTab, Duration takes, String shot, NeedsYou needsYou,
-                    Refusal refuses) {
+                    Refusal refuses, String route, List<String> examples) {
+
+    /** How many of its route's pages a screen keeps ({@link #examples}). */
+    public static final int EXAMPLES = 3;
 
     /**
      * How long a start screen or a transition is given to load the screen after it, unless it says: past it, the game
@@ -111,18 +117,30 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
         notes = notes == null || notes.isBlank() ? null : notes;
         owes = owes == null ? List.of() : List.copyOf(owes);
         shot = shot == null || shot.isBlank() ? null : shot;
+        route = route == null || route.isBlank() ? null : route.strip();
+        examples = examples == null ? List.of() : List.copyOf(examples.subList(0, Math.min(EXAMPLES, examples.size())));
+    }
+
+    /** A screen of a game or an app: no route nor example page, which only a website's screen has. */
+    public Setup(String name, List<ImageTemplate> markers, List<ImageTemplate> absent, List<Caption> texts,
+                 List<Element> elements, Way from, List<Way> alsoFrom, Input back, List<ScreenVariant> variants,
+                 boolean isPopup, boolean isStart, Duration loads, Screen panelOf, String notes, Reached reached,
+                 List<String> owes, Point at, boolean isTab, Duration takes, String shot, NeedsYou needsYou,
+                 Refusal refuses) {
+        this(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart, loads, panelOf,
+                notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, null, List.of());
     }
 
     /** A screen called {@code name}, nothing known of it yet. */
     public static Setup named(String name) {
         return new Setup(name, List.of(), List.of(), List.of(), List.of(), null, List.of(), null, List.of(), false,
-                false, null, null, null, null, List.of(), null, false, null, null, null, null);
+                false, null, null, null, null, List.of(), null, false, null, null, null, null, null, List.of());
     }
 
     /** This screen, the game showing it as {@code name}. */
     public Setup name(String name) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -134,7 +152,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Migrate.Dropped(MOVED)
     public Setup markers(List<ImageTemplate> markers) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, told apart by {@code absent}: none of them shows while the game shows it. Parts are {@code .absent()} now. */
@@ -143,7 +161,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Migrate.Dropped(MOVED)
     public Setup absent(List<ImageTemplate> absent) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -155,7 +173,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Migrate.Dropped(MOVED)
     public Setup texts(List<Caption> texts) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -168,7 +186,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Migrate.Dropped(MOVED)
     public Setup elements(List<Element> elements) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, made known through {@code via}, an input of another screen: {@code HOME.market}. */
@@ -184,7 +202,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     /** This screen, made known by {@code way}; null for none. */
     public Setup fromWay(Way way) {
         return new Setup(name, markers, absent, texts, elements, way, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, its way in going through the copy of a repeated button {@code pick} names. */
@@ -216,54 +234,54 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup alsoFrom(List<Way> ways) {
         return new Setup(name, markers, absent, texts, elements, from, ways, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, left by {@code back}: {@code MARKET.close}. */
     @Link
     public Setup back(Input back) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, looking as each of {@code variants} at times. */
     @Link
     public Setup variants(List<ScreenVariant> variants) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, opening on its own: a reward, a level up, an offer. It is no start screen or panel then. */
     @Link
     public Setup popup() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, true, false, loads,
-                null, notes, reached, owes, at, false, takes, shot, needsYou, refuses);
+                null, notes, reached, owes, at, false, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, a screen of the tree again: opened by an input, not on its own. */
     public Setup notPopup() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, false, isStart, loads,
-                panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, the one the game opens on: its loading screen, with no way in. It is no popup or panel then. */
     @Link
     public Setup start() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, false, true, loads,
-                null, notes, reached, owes, at, false, takes, shot, needsYou, refuses);
+                null, notes, reached, owes, at, false, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, no start screen any more. */
     public Setup notStart() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, false, loads,
-                panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, giving the screen after it {@code loads} to show; null for {@link #LOADS}. */
     @Link
     public Setup loads(Duration loads) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** How long the screen after it may take to show: its {@link #loads}, else {@link #LOADS}. */
@@ -279,7 +297,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     public Setup panelOf(Screen screen) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants,
                 screen == null && isPopup, screen == null && isStart, loads, screen, notes, reached, owes, at, isTab,
-                takes, shot, needsYou, refuses);
+                takes, shot, needsYou, refuses, route, examples);
     }
 
     /** Whether it is a panel of another screen ({@link #panelOf}). */
@@ -291,28 +309,28 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup notes(String notes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, automated as far as {@code reached}; null while it is not surveyed. */
     @Link
     public Setup reached(Reached reached) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, still owing {@code owes}. */
     @Link
     public Setup owes(List<String> owes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, its card on 🗺 Screens' map with its top-left corner at {@code at}; null: where the layout puts it. */
     @Link
     public Setup at(Point at) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -322,13 +340,13 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup tab() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, false, false, loads,
-                panelOf, notes, reached, owes, at, true, takes, shot, needsYou, refuses);
+                panelOf, notes, reached, owes, at, true, takes, shot, needsYou, refuses, route, examples);
     }
 
     /** This screen, no tab any more: told by its own markers only. */
     public Setup notTab() {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, false, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, false, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -338,7 +356,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup takes(Duration takes) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -348,7 +366,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup shot(String shot) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, examples);
     }
 
     /**
@@ -359,7 +377,7 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup needsYou(NeedsYou kind) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, kind, refuses);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, kind, refuses, route, examples);
     }
 
     /**
@@ -369,12 +387,33 @@ public record Setup(String name, List<ImageTemplate> markers, List<ImageTemplate
     @Link
     public Setup refuses(Refusal why) {
         return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
-                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, why);
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, why, route, examples);
+    }
+
+    /**
+     * This screen, a website's page whose path is {@code pattern}: {@code "/case-studies/{slug}"}, each {@code {name}}
+     * one segment of any text. On a website a screen is told by its route and its marking parts together; elsewhere a
+     * route tells nothing. A trailing {@code /} and the query are ignored.
+     */
+    @Link
+    public Setup route(String pattern) {
+        return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, pattern, examples);
+    }
+
+    /**
+     * This screen, its route's pages seen: {@code List.of("/case-studies/alpha")}, at most {@value #EXAMPLES}, the
+     * first the one a walk opens to reach it.
+     */
+    @Link
+    public Setup examples(List<String> paths) {
+        return new Setup(name, markers, absent, texts, elements, from, alsoFrom, back, variants, isPopup, isStart,
+                loads, panelOf, notes, reached, owes, at, isTab, takes, shot, needsYou, refuses, route, paths);
     }
 
     /** Whether it has a marker to tell it by: a picture, words, or, for a tab, its button picked. */
     public boolean hasMarker() {
-        return !markers.isEmpty() || !texts.isEmpty() || !elements.isEmpty() || isTab;
+        return !markers.isEmpty() || !texts.isEmpty() || !elements.isEmpty() || isTab || route != null;
     }
 
     /** Its first marker, the picture that stands for it on a card or a button; null when it has none. */

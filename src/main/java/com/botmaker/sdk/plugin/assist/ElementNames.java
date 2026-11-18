@@ -89,7 +89,7 @@ public final class ElementNames {
         return new Element(element.id(), constant.apply(element.label()), constant.apply(element.text()),
                 constant.apply(element.holding()), constant.apply(element.containing()), element.isField(),
                 element.isPassword(), inTexts(element.inside(), texts), inTexts(element.below(), texts),
-                element.index(), element.shot());
+                element.index(), element.shot(), element.role());
     }
 
     private static int indexOf(List<UiNode> nodes, UiNode node) {

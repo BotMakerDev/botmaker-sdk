@@ -450,6 +450,22 @@ public interface Reach {
     }
 
     /**
+     * The path a website's page is at now, {@code "/case-studies/alpha"}, what a screen's route is matched against;
+     * empty for a target that is no website.
+     */
+    default Optional<String> path() {
+        return Optional.empty();
+    }
+
+    /**
+     * Opens {@code path} on the website, a screen's example: how a walk reaches a page of a route with no way in it
+     * knows. False, opening nothing, for a target that is no website.
+     */
+    default boolean openPath(String path) {
+        return false;
+    }
+
+    /**
      * The tree of the app as {@code frame} shows it, ready to find elements in: read once for that frame, so every
      * element a look names is found in one read, and never in a tree read for another frame. Empty when it could not
      * be read, and for a target that {@link #readsTrees reads none}.

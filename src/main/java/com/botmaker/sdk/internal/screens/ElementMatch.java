@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.ocr.LineMatch;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
+import com.botmaker.shared.web.WebTree;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -106,9 +107,13 @@ public final class ElementMatch {
             return result;
         }
 
-        /** Whether the clues about the node itself hold, but the words it contains: id, label, text, holding, field. */
+        /**
+         * Whether the clues about the node itself hold, but the words it contains: role, id, label, text, holding,
+         * field. A role holds only of a website's node, whose class is its role ({@link WebTree#asUiTree}).
+         */
         private static boolean owns(Element element, UiNode node) {
-            return (element.id() == null || idMatches(element.id(), node))
+            return (element.role() == null || node.className().equals(WebTree.CLASS_PREFIX + element.role().id()))
+                    && (element.id() == null || idMatches(element.id(), node))
                     && (element.label() == null || same(node.label(), element.label()))
                     && (element.text() == null || same(node.text(), element.text()))
                     && (element.holding() == null || holds(node, element.holding()))
@@ -251,11 +256,13 @@ public final class ElementMatch {
 
     /**
      * Whether {@code node} is a field one types into, whatever Android or Compose calls it: an {@code EditText}, an
-     * {@code AutoCompleteTextView}, a {@code TextField}; a password's too.
+     * {@code AutoCompleteTextView}, a {@code TextField}; a password's too. On a website, a node whose role one types
+     * into: a text box, a search box, a combo box or a number field.
      */
     public static boolean isField(UiNode node) {
         String type = node.className();
-        return type.endsWith("EditText") || type.endsWith("TextField") || type.endsWith("AutoCompleteTextView");
+        return type.endsWith("EditText") || type.endsWith("TextField") || type.endsWith("AutoCompleteTextView")
+                || WebTree.roleOf(type).map(WebTree::field).orElse(false);
     }
 
     /** Spaces of any kind, a web page's no-break ones too. */

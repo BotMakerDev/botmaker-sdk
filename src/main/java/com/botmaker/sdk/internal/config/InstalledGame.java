@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.web.WebSource;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -66,6 +67,13 @@ public final class InstalledGame {
         if (instance != null && !instance.isBlank()) {
             playsOn = "";
             Source.set(CaptureSource.emulator(instance.strip()));
+            return;
+        }
+        LaunchSpec target = LaunchSpec.parse(launchTarget());
+        if (target != null && target.kind() == LaunchKind.WEB) {
+            // A website is seen and acted on in the run's own browser, whatever the bot captures otherwise.
+            playsOn = "";
+            Source.set(WebSource.over(target.token()));
             return;
         }
         CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source

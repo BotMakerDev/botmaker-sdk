@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.ButtonState;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.text.DigitSet;
@@ -188,15 +189,18 @@ public final class SdkTypes implements TypeHolder {
             .when(element -> element.id() == null && element.label() == null && element.text() != null);
 
     /**
-     * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, {@code byLabel(…)}, {@code byHolding(…)},
+     * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, a website's {@code byRole(…)}, {@code byLabel(…)},
+     * {@code byHolding(…)},
      * {@code byContaining(…)}, {@code textField()} or {@code passwordField()}.
      * Every factory rebuilds an element with every clue, so a {@code when} says which first clue it is written by.
      */
     public static final List<DeclaredCall<Element>> ELEMENT_BY_OTHER_CLUES = List.of(
             ComponentType.part(Element.class).<String, Element>writtenAs(Element::byId)
                     .when(element -> element.id() != null),
+            ComponentType.part(Element.class).<Role, Words, Element>writtenAs(Element::byRole)
+                    .when(element -> element.id() == null && element.label() != null && element.role() != null),
             ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byLabel)
-                    .when(element -> element.id() == null && element.label() != null),
+                    .when(element -> element.id() == null && element.label() != null && element.role() == null),
             ComponentType.part(Element.class).<Words, Element>writtenAs(Element::byHolding)
                     .when(element -> element.id() == null && element.label() == null && element.text() == null
                             && element.holding() != null),

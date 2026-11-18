@@ -140,7 +140,7 @@ public final class ElementSaves {
         Element inside = element.inside() == null ? null : resolve(element.inside(), shots, known, added, words);
         Element below = element.below() == null ? null : resolve(element.below(), shots, known, added, words);
         Element clues = new Element(element.id(), element.label(), element.text(), element.holding(),
-                element.containing(), element.isField(), element.isPassword(), inside, below, element.index(), null);
+                element.containing(), element.isField(), element.isPassword(), inside, below, element.index(), null, element.role());
         for (Element held : known.values()) if (sameClues(held, clues)) return held;
         for (Words said : new Words[] {clues.label(), clues.text(), clues.holding(), clues.containing()}) {
             if (said != null) words.add(said);

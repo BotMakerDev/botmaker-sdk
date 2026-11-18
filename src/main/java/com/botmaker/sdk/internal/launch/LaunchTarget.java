@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.internal.web.WebSource;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
@@ -156,6 +157,7 @@ public sealed interface LaunchTarget {
             case CLI -> new Cli(parsed.token());
             case EXE -> new Exe(parsed.token());
             case EMULATOR_APP -> emulatorApp(parsed);
+            case WEB -> new Web(parsed.token());
             // A kind this build doesn't model isn't launchable, so it is no target at all — the caller's
             // "no target" fallback is the honest answer, not a target that silently does nothing.
             case UNKNOWN -> null;
@@ -259,6 +261,39 @@ public sealed interface LaunchTarget {
         @Override
         public LaunchSpec launchSpec() {
             return new LaunchSpec(LaunchKind.EXE, path);
+        }
+    }
+
+    /**
+     * A website at {@code url}, opened in BotMaker's own Chromium under the read-only guard: the run's capture source
+     * is its {@link WebSource} ({@code InstalledGame.install}), which this starts, asks and restarts. No launcher
+     * opens it, and nothing outside the run's browser is asked whether it runs.
+     */
+    record Web(String url) implements LaunchTarget {
+        @Override
+        public LaunchSpec launchSpec() {
+            return new LaunchSpec(LaunchKind.WEB, url);
+        }
+
+        @Override
+        public void start() {
+            source().open();
+        }
+
+        @Override
+        public boolean isRunning() {
+            return source().isOpen();
+        }
+
+        @Override
+        public void restart() {
+            source().open();
+        }
+
+        /** The run's source when it is this website's, else the one {@link WebSource#over} keeps for it. */
+        private WebSource source() {
+            return WebSource.of(Source.current()).filter(web -> web.url().equals(url))
+                    .orElseGet(() -> WebSource.over(url));
         }
     }
 

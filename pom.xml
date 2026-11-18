@@ -89,6 +89,9 @@
         <tess4j.version>5.19.0</tess4j.version>
         <bytedeco.tesseract.version>5.5.3-1.5.14</bytedeco.tesseract.version>
         <bytedeco.leptonica.version>1.87.0-1.5.14</bytedeco.leptonica.version>
+        <!-- Tests tagged @Tag("slow") start a real browser (internal/web): left out by default, run by
+             -Dgroups=slow -Dsurefire.excludedGroups= -->
+        <surefire.excludedGroups>slow</surefire.excludedGroups>
     </properties>
 
     <repositories>

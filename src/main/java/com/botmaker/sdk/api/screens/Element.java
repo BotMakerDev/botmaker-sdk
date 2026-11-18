@@ -18,6 +18,10 @@ import com.botmaker.sdk.api.text.Words;
  * one it is right {@link #below}, and last its {@link #index} among what the other clues find. 🗺 Screens names a
  * picked input with the fewest clues that find only it.
  *
+ * <p>A website's page states what each of its parts is, reliably: its {@link #role}, the clue a website's element is
+ * found by first, with its label, the name a screen reader says ({@link #byRole}, 2026-11-18). There an element's id is
+ * its {@code data-testid}, else its DOM id.
+ *
  * <p>Words are the bot's {@code Texts}, matched whatever their case and the spaces or marks at their ends, as a
  * {@link Caption}'s are, but letter for letter: the tree states its text, nothing is misread. {@link #containing} is
  * the one clue that matches part of a text, for a page whose sentences change around the words that tell it. Where it
@@ -27,7 +31,8 @@ import com.botmaker.sdk.api.text.Words;
  * first one.
  *
  * @param id         its resource id, without the app's own package ({@code "title"} for {@code android:id/title}); the
- *                   full id ({@code "com.lib:id/chip"}) for one of another package; null when not a clue
+ *                   full id ({@code "com.lib:id/chip"}) for one of another package; on a website its test id, else its
+ *                   DOM id; null when not a clue
  * @param label      what a screen reader says for it, an icon's description; null when not a clue
  * @param text       its own text; null when not a clue
  * @param holding    a text one of its descendants shows: the row that holds the word; null when not a clue
@@ -40,20 +45,28 @@ import com.botmaker.sdk.api.text.Words;
  * @param index      which of what the other clues find, in the tree's order, from 0; null when it is the one found
  * @param shot       a small picture of it, cut when it was picked, that Studio shows; a run never matches it; null for
  *                   none
+ * @param role       what a website's element is; null when not a clue, and for every element of an app
  */
 public record Element(String id, Words label, Words text, Words holding, Words containing, boolean isField,
-                      boolean isPassword, Element inside, Element below, Integer index, String shot) {
+                      boolean isPassword, Element inside, Element below, Integer index, String shot, Role role) {
 
     public Element {
         if (id != null && id.isBlank()) id = null;
+        if (role == Role.UNKNOWN) role = null;
         if (id == null && label == null && text == null && holding == null && containing == null && !isField
-                && !isPassword) {
-            throw new IllegalArgumentException("An element needs an id, a label, words or a field to be found by");
+                && !isPassword && role == null) {
+            throw new IllegalArgumentException("An element needs an id, a label, words, a role or a field to be found by");
         }
         if (isField && isPassword) {
             throw new IllegalArgumentException("An element is a text field or a password's, not both");
         }
         if (index != null && index < 0) throw new IllegalArgumentException("An element's index starts at 0");
+    }
+
+    /** An element of an app, found by the clues it names: no role, which only a website states. */
+    public Element(String id, Words label, Words text, Words holding, Words containing, boolean isField,
+                   boolean isPassword, Element inside, Element below, Integer index, String shot) {
+        this(id, label, text, holding, containing, isField, isPassword, inside, below, index, shot, null);
     }
 
     /** The element whose resource id is {@code id}. */
@@ -64,6 +77,15 @@ public record Element(String id, Words label, Words text, Words holding, Words c
     /** The element a screen reader calls {@code label}: an icon with no text. */
     public static Element byLabel(Words label) {
         return new Element(null, required(label, "label"), null, null, null, false, false, null, null, null, null);
+    }
+
+    /**
+     * A website's element of the role {@code role} that a screen reader calls {@code label}: {@code Element.byRole(
+     * Role.LINK, Texts.CASE_STUDIES)}, how a page's part is found first.
+     */
+    public static Element byRole(Role role, Words label) {
+        return new Element(null, required(label, "label"), null, null, null, false, false, null, null, null, null,
+                required(role, "role"));
     }
 
     /** The element whose own text is {@code text}. */
@@ -96,47 +118,47 @@ public record Element(String id, Words label, Words text, Words holding, Words c
     @Link
     public Element id(String id) {
         return new Element(requiredId(id), label, text, holding, containing, isField, isPassword, inside, below,
-                index, shot);
+                index, shot, role);
     }
 
     /** This element, called {@code label} too. */
     @Link
     public Element label(Words label) {
         return new Element(id, required(label, "label"), text, holding, containing, isField, isPassword, inside,
-                below, index, shot);
+                below, index, shot, role);
     }
 
     /** This element, showing {@code text} too. */
     @Link
     public Element text(Words text) {
         return new Element(id, label, required(text, "text"), holding, containing, isField, isPassword, inside,
-                below, index, shot);
+                below, index, shot, role);
     }
 
     /** This element, holding {@code holding} too. */
     @Link
     public Element holding(Words holding) {
         return new Element(id, label, text, required(holding, "holding"), containing, isField, isPassword, inside,
-                below, index, shot);
+                below, index, shot, role);
     }
 
     /** This element, its own text or label holding {@code containing} too. */
     @Link
     public Element containing(Words containing) {
         return new Element(id, label, text, holding, required(containing, "containing"), isField, isPassword,
-                inside, below, index, shot);
+                inside, below, index, shot, role);
     }
 
     /** This element, a text field Android does not mark a password's. */
     @Link
     public Element field() {
-        return new Element(id, label, text, holding, containing, true, false, inside, below, index, shot);
+        return new Element(id, label, text, holding, containing, true, false, inside, below, index, shot, role);
     }
 
     /** This element, a field Android marks a password's. */
     @Link
     public Element password() {
-        return new Element(id, label, text, holding, containing, false, true, inside, below, index, shot);
+        return new Element(id, label, text, holding, containing, false, true, inside, below, index, shot, role);
     }
 
     /**
@@ -146,39 +168,49 @@ public record Element(String id, Words label, Words text, Words holding, Words c
     @Link
     public Element inside(Element container) {
         return new Element(id, label, text, holding, containing, isField, isPassword, required(container, "inside"),
-                below, index, shot);
+                below, index, shot, role);
     }
 
     /** This element, the nearest one under {@code neighbour}, declared above this one. */
     @Link
     public Element below(Element neighbour) {
         return new Element(id, label, text, holding, containing, isField, isPassword, inside,
-                required(neighbour, "below"), index, shot);
+                required(neighbour, "below"), index, shot, role);
     }
 
     /** This element, the {@code index}-th, from 0, of what its other clues find: it breaks when the list changes. */
     @Link
     public Element index(int index) {
-        return new Element(id, label, text, holding, containing, isField, isPassword, inside, below, index, shot);
+        return new Element(id, label, text, holding, containing, isField, isPassword, inside, below, index, shot,
+                role);
     }
 
     /** This element, shown in Studio as the picture at {@code path}. */
     @Link
     public Element shot(String path) {
-        return new Element(id, label, text, holding, containing, isField, isPassword, inside, below, index, path);
+        return new Element(id, label, text, holding, containing, isField, isPassword, inside, below, index, path,
+                role);
+    }
+
+    /** This element, a website's of the role {@code role} too. */
+    @Link
+    public Element role(Role role) {
+        return new Element(id, label, text, holding, containing, isField, isPassword, inside, below, index, shot,
+                required(role, "role"));
     }
 
     /**
-     * What a window or a tool calls it: its words in quotes ({@code … "x" …} when it contains them), else its id; the
-     * field it is; then where it is. Two elements that find differently are shown differently.
+     * What a window or a tool calls it: its role, then its words in quotes ({@code … "x" …} when it contains them),
+     * else its id; the field it is; then where it is. Two elements that find differently are shown differently.
      */
     public String shown() {
         Words words = words();
         String kind = isPassword ? "password field" : isField ? "text field" : null;
         boolean contained = text == null && label == null && holding == null;
-        String said = words != null ? (contained ? "… \""+ words.text() + "\" …" : "\"" + words.text() + "\"")
+        String said = words != null ? (contained ? "… \"" + words.text() + "\" …" : "\"" + words.text() + "\"")
                 : id;
         String shown = said == null ? kind == null ? "element" : kind : kind == null ? said : said + " " + kind;
+        if (role != null) shown = role.id() + " " + shown;
         if (inside != null) shown += " inside " + inside.shown();
         if (below != null) shown += " below " + below.shown();
         return index == null ? shown : shown + " #" + index;

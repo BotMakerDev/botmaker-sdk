@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -47,10 +48,18 @@ import java.util.function.Predicate;
  * @param either         groups of pictures, one of each showing: a marking button's looks
  * @param absentTexts    words none of which may be read, each in its area
  * @param absentElements elements the screen's tree may not hold
+ * @param route          a website's page: the path pattern the page is at ({@link Routes}); null for none
  */
 public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, List<Caption> texts,
                       List<Element> elements, List<Element> picked, List<List<ImageTemplate>> either,
-                      List<Caption> absentTexts, List<Element> absentElements) {
+                      List<Caption> absentTexts, List<Element> absentElements, String route) {
+
+    /** Every kind of marker, at no route: a screen of no website. */
+    public Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, List<Caption> texts,
+                   List<Element> elements, List<Element> picked, List<List<ImageTemplate>> either,
+                   List<Caption> absentTexts, List<Element> absentElements) {
+        this(shown, absent, texts, elements, picked, either, absentTexts, absentElements, null);
+    }
 
     public Markers {
         shown = shown == null ? List.of() : List.copyOf(shown);
@@ -62,6 +71,7 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
                 .toList();
         absentTexts = absentTexts == null ? List.of() : List.copyOf(absentTexts);
         absentElements = absentElements == null ? List.of() : List.copyOf(absentElements);
+        route = route == null || route.isBlank() ? null : route;
     }
 
     /** Pictures, words and elements, some picked; nothing in groups, nothing but pictures absent. */
@@ -136,8 +146,10 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         final List<List<ImageTemplate>> either = new ArrayList<>();
         final List<Caption> absentTexts = new ArrayList<>();
         final List<Element> absentElements = new ArrayList<>();
+        final String route;
 
         Sets(MapScreen screen) {
+            route = screen.setup().route();
             // The setup's own lists: the screen's accessors are this merge.
             shown = new ArrayList<>(screen.setup().markers());
             absent = new ArrayList<>(screen.setup().absent());
@@ -170,23 +182,24 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         }
 
         Markers markers() {
-            return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements);
+            return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements, route);
         }
     }
 
     /** This set with {@code shown} and {@code absent} as its pictures, the rest as it is. */
     public Markers withPictures(List<ImageTemplate> shown, List<ImageTemplate> absent) {
-        return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements);
+        return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements, route);
     }
 
     /** This set with {@code texts} as its words, the rest as it is. */
     public Markers withTexts(List<Caption> texts) {
-        return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements);
+        return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements, route);
     }
 
-    /** Whether anything tells it: at least one marker, a picture, words or an element. */
+    /** Whether anything tells it: at least one marker, a picture, words, an element or a website's route. */
     public boolean any() {
-        return !shown.isEmpty() || !texts.isEmpty() || !elements.isEmpty() || !picked.isEmpty() || !either.isEmpty();
+        return !shown.isEmpty() || !texts.isEmpty() || !elements.isEmpty() || !picked.isEmpty() || !either.isEmpty()
+                || route != null;
     }
 
     /** How many things tell it, each picture, group, words and element once: of two sets shown, the larger wins. */
@@ -204,6 +217,7 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         texts.forEach(words -> keys.add(words.said()));
         elements.forEach(element -> keys.add(ElementMatch.named(element)));
         picked.forEach(element -> keys.add(ElementMatch.named(element) + " picked"));
+        if (route != null) keys.add("route " + route);
         return keys;
     }
 
@@ -228,7 +242,8 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         return ids(shown).equals(ids(other.shown)) && ids(absent).equals(ids(other.absent))
                 && either.stream().map(Markers::ids).toList().equals(other.either.stream().map(Markers::ids).toList())
                 && texts.equals(other.texts) && elements.equals(other.elements) && picked.equals(other.picked)
-                && absentTexts.equals(other.absentTexts) && absentElements.equals(other.absentElements);
+                && absentTexts.equals(other.absentTexts) && absentElements.equals(other.absentElements)
+                && Objects.equals(route, other.route);
     }
 
     private static List<String> ids(List<ImageTemplate> pictures) {
@@ -253,10 +268,11 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
     /**
      * Whether the frame {@code found} and {@code read} answer for shows it: every marker found, a picture of each group,
      * no absent picture found, every one of its words read and none of its absent words. Its elements need the
-     * screen's tree, which only {@link #on(Reach, BufferedImage)} reads: a set with elements is never on here.
+     * screen's tree, which only {@link #on(Reach, BufferedImage)} reads: a set with elements is never on here, nor one
+     * with a route, which only the page says.
      */
     public boolean on(Predicate<ImageTemplate> found, Predicate<Caption> read) {
-        return any() && elements.isEmpty() && picked.isEmpty() && absentElements.isEmpty()
+        return any() && elements.isEmpty() && picked.isEmpty() && absentElements.isEmpty() && route == null
                 && shown.stream().allMatch(found) && either.stream().allMatch(group -> group.stream().anyMatch(found))
                 && absent.stream().noneMatch(found) && texts.stream().allMatch(read)
                 && absentTexts.stream().noneMatch(read);
@@ -306,7 +322,10 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
         Predicate<Element> held = element -> inTree.computeIfAbsent(element, e -> !reach.elements(e, frame).isEmpty());
         Predicate<Caption> said = words -> read.computeIfAbsent(words, w -> reach.shows(w, frame)) == Answer.YES;
         Predicate<Caption> away = words -> read.computeIfAbsent(words, w -> reach.shows(w, frame)) == Answer.NO;
+        // A website's page says where it is: asked once, for every set with a route.
+        Optional<String> path = sets.stream().anyMatch(set -> set.route != null) ? reach.path() : Optional.empty();
         return sets.stream().map(set -> set.any()
+                && (set.route == null || path.filter(at -> Routes.matches(set.route, at)).isPresent())
                 && set.shown.stream().allMatch(found)
                 && set.either.stream().allMatch(group -> group.stream().anyMatch(found))
                 && set.absent.stream().noneMatch(p -> anywhere.getOrDefault(p.id(), false))

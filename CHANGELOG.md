@@ -44,6 +44,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   tells BotMaker and stops the run with the reason's words. Both are acted on before a plan weighs its goals.
 - `Accounts.signedIn(Login::email)`, a condition for a goal: whether the run's emulator instance holds that Google
   account, as the sign-in door reads it off the device; unknown when no door, instance or address is there.
+- A website as a launch target, `web:<url>` (web discovery phase 3). The run opens it in BotMaker's own headless
+  Chromium, under the read-only guard: it never leaves the site, never writes, follows `robots.txt`, and keeps a
+  pace and a budget. A cookie banner is refused, and a banner that cannot be refused stops the run. A screen map
+  walks a site as it walks a game: a screen is a page, `Setup.route("/case-studies/{slug}")` tells it by its
+  address, and `Setup.examples(…)` keeps up to 3 pages a walk opens by address when no mapped way leads there.
+  `Element.byRole(Role.LINK, Words.of("Pricing"))` finds an element by its accessible role. A press on a website
+  that the guard refuses is said and not done; a drag that moves and a key with a modifier are not done on a
+  website.
 
 ### Deprecated
 
