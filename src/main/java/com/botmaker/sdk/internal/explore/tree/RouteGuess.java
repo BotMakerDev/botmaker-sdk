@@ -111,7 +111,7 @@ public final class RouteGuess {
     }
 
     /** {@code path} without its query, fragment and trailing {@code /}; {@code /} for the site's root. */
-    static String bare(String path) {
+    public static String bare(String path) {
         String bare = path == null ? "" : path.strip();
         // A single-page app's hash route (/#/pricing) is its path; any other fragment is a place on the page.
         int hash = bare.indexOf('#');

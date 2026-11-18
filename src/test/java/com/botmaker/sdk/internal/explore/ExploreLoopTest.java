@@ -3,15 +3,25 @@
 
 package com.botmaker.sdk.internal.explore;
 
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.explore.tree.Effect;
+import com.botmaker.sdk.internal.explore.tree.Locator;
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.shared.emulator.tree.Trait;
+import com.botmaker.shared.emulator.tree.UiNode;
+import com.botmaker.shared.emulator.tree.UiTree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.awt.Rectangle;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,10 +30,12 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
@@ -56,6 +68,25 @@ class ExploreLoopTest {
         Function<Edge, Took> arrival = edge -> new Took(Arrival.AT_TARGET, edge.to());
         Runnable onIdle = () -> {};
         final List<String> taken = new ArrayList<>();
+        /** The screen's tree, null for a game with none. */
+        Effect.State state;
+        final List<String> pressed = new ArrayList<>();
+
+        @Override
+        public Optional<Effect.State> state() {
+            return Optional.ofNullable(state);
+        }
+
+        @Override
+        public Optional<String> refusal(Locator.Located input) {
+            return "Buy now".equals(input.locator().name()) ? Optional.of("a buy") : Optional.empty();
+        }
+
+        @Override
+        public Optional<String> press(String screen, String field, long withinMs) {
+            pressed.add(screen + "." + field);
+            return Optional.ofNullable(at);
+        }
 
         @Override
         public ExploreLoop.Look look(String screen) {
@@ -158,6 +189,64 @@ class ExploreLoopTest {
         assertEquals("A.b→B", stopped.stop().place(), "where it came from");
         assertTrue(stopped.stop().lastPresses().contains("A: b"), stopped.stop().lastPresses().toString());
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody answered in 10 min");
+    }
+
+    private static final Rectangle BOX = new Rectangle(0, 0, 100, 20);
+
+    private static UiTree page(UiNode... parts) {
+        return new UiTree(List.of(new UiNode("", "", "", "web:RootWebArea", "", BOX, Set.of(), List.of(parts))));
+    }
+
+    private static UiNode web(String role, String name, Set<Trait> traits) {
+        return new UiNode("", name, name, "web:" + role, "", BOX, traits, List.of());
+    }
+
+    /** A page no screen matches is settled off its tree: a new screen with its inputs, the guard's verdict on each. */
+    @Test
+    void anUnknownPageIsSettledFromItsTree() {
+        Game game = new Game();
+        game.at = null;
+        game.state = Effect.State.of(page(web("heading", "Pricing plans", Set.of()),
+                web("button", "Buy now", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/pricing");
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        ExploreEvent.Settled settled = events(ExploreEvent.Settled.class).getFirst();
+        ExploreEvent.Stopped stopped = stops().getFirst();
+        assertEquals(settled.stopId(), stopped.stop().id(), "the stop it settled");
+        assertEquals(StopKind.UNKNOWN_SCREEN, stopped.stop().kind());
+        TreeAnswer.NewScreen screen = (TreeAnswer.NewScreen) settled.answers().getFirst();
+        assertEquals("PricingPlans", screen.name());
+        assertEquals("/pricing", screen.route());
+        List<TreeAnswer.NewInput> inputs = settled.answers().stream().filter(TreeAnswer.NewInput.class::isInstance)
+                .map(TreeAnswer.NewInput.class::cast).toList();
+        assertEquals(2, inputs.size(), inputs.toString());
+        assertEquals("a buy", inputs.getFirst().never());
+        assertEquals(null, inputs.get(1).never(), "a link is free");
+        assertTrue(JournalView.of(journal()).settled(stopped.stop()), "the plugin side's, not Claude's");
+        assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody wrote it in 10 min");
+    }
+
+    /** An input that is no way is pressed once; what it did goes with the next settled stop as a note. */
+    @Test
+    void aFreeInputIsPressedAndNoted() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))),
+                "/");
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of("A.toggle"), game.pressed, "pressed once");
+        ExploreEvent.Settled settled = events(ExploreEvent.Settled.class).getFirst();
+        assertEquals(List.of(new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees")),
+                settled.answers());
+        assertEquals(StopKind.SETTLED, stops().getFirst().stop().kind());
     }
 
     @Test
@@ -367,5 +456,20 @@ class ExploreLoopTest {
         journal.command("resume guard-1 ignore");
         assertEquals(Optional.of(new Journal.Command.Resume("guard-1", true)), journal.takeCommand());
         assertEquals(Optional.empty(), journal.takeCommand(), "read once");
+    }
+
+    /** What a run settled reads back whole, each kind of answer, for the plugin side in another process. */
+    @Test
+    void settledAnswersReadBack() {
+        Locator buy = new Locator(Role.BUTTON, "Buy now", null, null, null);
+        ExploreEvent.Settled settled = new ExploreEvent.Settled("unknown_screen-1", List.of(
+                new TreeAnswer.NewScreen("Pricing", "/pricing", List.of("/pricing"), List.of(buy), null),
+                new TreeAnswer.NewRoute("CASE", "/case/{slug}", List.of("/case/a", "/case/b")),
+                new TreeAnswer.NewInput("Pricing", "buyNow", buy, "a buy"),
+                new TreeAnswer.NewWay("A", "b", "Pricing"),
+                new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees")), 7);
+        journal().append(settled);
+
+        assertEquals(List.of(settled), journal().events());
     }
 }

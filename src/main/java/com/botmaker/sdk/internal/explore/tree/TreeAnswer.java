@@ -8,6 +8,8 @@ import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.Role;
 import com.botmaker.shared.web.WebTree;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import javax.lang.model.SourceVersion;
 import java.util.ArrayList;
@@ -21,8 +23,16 @@ import java.util.function.Function;
 /**
  * A stop of <em>Keep exploring</em> that a screen's tree settles, answered by the run itself (web discovery spec §2):
  * typed, so the side that applies it writes the bot's Java by its edits, as Claude's fixes are written. Each answer
- * names what it adds by the names the bot will give it.
+ * names what it adds by the names the bot will give it. It crosses the run's journal as JSON, tagged by its
+ * {@code answer}.
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "answer")
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = TreeAnswer.NewScreen.class, name = "new_screen"),
+        @JsonSubTypes.Type(value = TreeAnswer.NewRoute.class, name = "new_route"),
+        @JsonSubTypes.Type(value = TreeAnswer.NewInput.class, name = "new_input"),
+        @JsonSubTypes.Type(value = TreeAnswer.NewWay.class, name = "new_way"),
+        @JsonSubTypes.Type(value = TreeAnswer.InputNote.class, name = "input_note")})
 public sealed interface TreeAnswer {
 
     /**
@@ -35,6 +45,16 @@ public sealed interface TreeAnswer {
             examples = examples == null ? List.of() : List.copyOf(examples);
             markers = markers == null ? List.of() : List.copyOf(markers);
             overlay = overlay == null ? Overlay.NONE : overlay;
+        }
+    }
+
+    /**
+     * {@code screen}'s route widened to {@code route}, with {@code examples}: a sibling page of the one it was made
+     * for showed the same skeleton ({@link RouteGuess#of}).
+     */
+    record NewRoute(String screen, String route, List<String> examples) implements TreeAnswer {
+        public NewRoute {
+            examples = examples == null ? List.of() : List.copyOf(examples);
         }
     }
 
@@ -70,14 +90,14 @@ public sealed interface TreeAnswer {
      * refuses it, or empty when it is free.
      */
     static List<NewInput> inputs(String screen, UiTree tree, Set<Locator> known, Set<String> taken,
-                                 Function<Locator, Optional<String>> refusal) {
+                                 Function<Locator.Located, Optional<String>> refusal) {
         List<NewInput> inputs = new ArrayList<>();
         Set<String> names = new HashSet<>(taken);
         for (Locator.Located located : Locator.inputs(tree)) {
             if (known.contains(located.locator())) continue;
             String field = unique(fieldName(said(located.locator())), names);
             names.add(field);
-            inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located.locator()).orElse(null)));
+            inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located).orElse(null)));
         }
         return List.copyOf(inputs);
     }

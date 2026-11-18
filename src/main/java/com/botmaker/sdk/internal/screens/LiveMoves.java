@@ -84,8 +84,22 @@ public final class LiveMoves implements MapWalk.Moves {
         return arrived(edge, took.at(), took.why());
     }
 
+    /**
+     * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: the screen of
+     * the map the game shows then, empty for none.
+     */
+    public Optional<String> press(String screen, String field, long withinMs) {
+        ScreenWalk.Press press = walk().by(reach.nowMs() + withinMs).press(screen, field, null);
+        if (press.at() == null) ScreenMaps.lost();
+        else ScreenMaps.seen(press.at());
+        return Optional.ofNullable(press.at());
+    }
+
     /** Long enough for a game's first loader the map lacks ("Initializing…") to end. */
     static final long FIRST_SCREEN_MS = 60_000;
+
+    /** A website's page loads before it is looked at: one no screen matches past this is a page the map lacks. */
+    static final long FIRST_PAGE_MS = 5_000;
 
     /** Why the last {@link #where()} found nothing; null after one that found a screen. */
     private String lost;
@@ -93,11 +107,12 @@ public final class LiveMoves implements MapWalk.Moves {
     /** Why the game shows no screen: frozen by the run's own verdict ({@link Reach#frozen()}), else unseen or unmapped. */
     @Override
     public Optional<String> where() {
-        Optional<String> at = walk().whereWithin(FIRST_SCREEN_MS);
+        long within = reach.path().isPresent() ? FIRST_PAGE_MS : FIRST_SCREEN_MS;
+        Optional<String> at = walk().whereWithin(within);
         at.ifPresentOrElse(ScreenMaps::seen, ScreenMaps::lost);
         lost = at.isPresent() ? null : reach.frozen().orElseGet(() -> reach.look().isEmpty()
                 ? "nothing of the game can be seen"
-                : "the game shows no screen of the map for " + FIRST_SCREEN_MS / 1000 + " s");
+                : "the game shows no screen of the map for " + within / 1000 + " s");
         return at;
     }
 

@@ -3,6 +3,8 @@
 
 package com.botmaker.sdk.internal.explore;
 
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -76,6 +78,25 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
             if (closes) return true;
         }
         return false;
+    }
+
+    /**
+     * What the run settled the stop {@code stopId} with itself ({@link ExploreEvent.Settled}): the plugin side's to
+     * write, never Claude's to fix; empty for a stop Claude is waited on for. The latest run's only: ids start again
+     * with each run.
+     */
+    public List<TreeAnswer> answers(String stopId) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Settled settled && settled.stopId().equals(stopId)) {
+                return settled.answers();
+            }
+        }
+        return List.of();
+    }
+
+    /** Whether {@code stop} is one the run settled itself, for the plugin side to write. */
+    public boolean settled(Stop stop) {
+        return !answers(stop.id()).isEmpty();
     }
 
     /** The parked stop {@code stopId}, if the queue holds it. */

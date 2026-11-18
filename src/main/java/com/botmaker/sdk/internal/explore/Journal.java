@@ -133,6 +133,11 @@ public final class Journal {
         write(COMMAND, () -> command);
     }
 
+    /** Whether a command is written and the run has not taken it yet. */
+    public boolean commandWaiting() {
+        return Files.exists(folder.resolve(COMMAND));
+    }
+
     /** The command waiting, read and deleted; empty when there is none, or it does not read. */
     public Optional<Command> takeCommand() {
         Path file = folder.resolve(COMMAND);

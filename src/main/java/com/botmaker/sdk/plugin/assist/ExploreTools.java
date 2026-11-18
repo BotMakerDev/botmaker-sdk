@@ -127,7 +127,8 @@ final class ExploreTools {
     private static Optional<AgentReply> answer(JournalView view) {
         List<String> screens = view.newScreensSinceWait();
         String found = screens.isEmpty() ? "" : "\nNew screens since the last wait: " + String.join(", ", screens) + ".";
-        if (view.open().isPresent()) {
+        // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude.
+        if (view.open().isPresent() && !view.settled(view.open().get())) {
             return Optional.of(AgentReply.text("The run waits on this stop:\n" + whole(view.open().get()) + found));
         }
         if (view.ended().isPresent()) {

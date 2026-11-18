@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- *Keep exploring* answers its own stops on a game with a tree (a website, an emulator): a page no screen matches
+  is written into the bot as a new screen, with its marking parts and its inputs, each refused by the guard marked
+  never; a sibling page of one template widens its screen's route; an input that is no way is pressed once and what
+  it did becomes a note on its screen, or a way when it opens a page or a dialog. The run hands these to the plugin
+  as a *Settled* stop, which the open project writes in one undo step and resumes, so Claude is waited on only for
+  what the tree cannot say. A website's first page is waited on 5 s, not 60.
 - What a screen's tree settles, ready for *Keep exploring* to answer its own stops (web discovery 6a, not wired
   yet): `internal/explore/tree` finds a page's or an app's inputs as a tester does (role and name, id, text, index),
   tells a website's overlay (an open dialog, a menu, the selected tab), guesses a route's `{slug}` from sibling pages

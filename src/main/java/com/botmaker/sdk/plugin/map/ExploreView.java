@@ -397,7 +397,8 @@ final class ExploreView {
         java.time.Duration ran = read.ranFor(until);
         String took = String.format("%d:%02d:%02d", ran.toHours(), ran.toMinutesPart(), ran.toSecondsPart());
         String state = read.ended().map(end -> "ended: " + end.displayName())
-                .orElse(!live ? "ended" : read.open().isPresent() ? "⏸ waiting on Claude" : "running");
+                .orElse(!live ? "ended" : read.open().filter(read::settled).isPresent() ? "✎ writing what the page settled"
+                        : read.open().isPresent() ? "⏸ waiting on Claude" : "running");
         return took + " · " + screensKnown + " screens known (+" + fresh + " new) · "
                 + read.count(ExploreEvent.Fixed.class) + " stops fixed · " + state;
     }
@@ -417,6 +418,8 @@ final class ExploreView {
             case ExploreEvent.Began e -> "▶ Began";
             case ExploreEvent.Ended e -> "■ Ended: " + (e.end() == null ? "unknown" : e.end().displayName());
             case ExploreEvent.Claude e -> null;
+            case ExploreEvent.Settled e -> "✎ " + e.stopId() + ": the page settles " + e.answers().size()
+                    + (e.answers().size() == 1 ? " change" : " changes");
             case ExploreEvent.NewScreen e -> "✚ " + e.screen()
                     + (e.from() == null ? ", where it began" : ", from " + e.from() + " by " + e.by());
             case ExploreEvent.Tried e -> "→ " + e.screen() + "." + e.by()

@@ -4,6 +4,9 @@
 package com.botmaker.sdk.internal.explore;
 
 import com.botmaker.sdk.api.bot.SdkValue;
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
@@ -11,6 +14,12 @@ import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.emulator.ReadableSource;
+import com.botmaker.sdk.internal.explore.tree.Effect;
+import com.botmaker.sdk.internal.explore.tree.Locator;
+import com.botmaker.sdk.internal.web.WebSource;
+import com.botmaker.shared.emulator.tree.UiTree;
+import com.botmaker.shared.web.Guard;
 import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.plan.RunGame;
 import com.botmaker.sdk.internal.screens.LiveMoves;
@@ -25,6 +34,7 @@ import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.trace.Say;
 
 import javax.imageio.ImageIO;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -223,5 +233,40 @@ public final class LivePlay implements ExploreLoop.Play {
     @Override
     public void restart() {
         moves.restart();
+    }
+
+    /**
+     * The capture's tree, a website's with its path and console errors; an app's with no place, its activity unread.
+     * Empty for a game window, which has no tree.
+     */
+    @Override
+    public Optional<Effect.State> state() {
+        CaptureSource source = Source.current();
+        if (source == null || !(source.base() instanceof ReadableSource readable)) return Optional.empty();
+        Optional<WebSource> web = WebSource.of(source);
+        // A website's read leaves the tree its last look took for the walk's own next read.
+        Optional<UiTree> tree = web.isPresent() ? Optional.of(web.get().treeNow()) : readable.tree();
+        if (tree.isEmpty()) return Optional.empty();
+        String place = web.flatMap(WebSource::path).orElse("");
+        List<String> errors = web.map(WebSource::consoleErrors).orElse(List.of());
+        return Optional.of(new Effect.State(tree.get(), place, List.of(), errors));
+    }
+
+    @Override
+    public List<Guard.Stopped> stopped() {
+        return WebSource.of(Source.current()).map(WebSource::stopped).orElse(List.of());
+    }
+
+    /** A website's guard, asked of the input's centre; an app's inputs are all free. */
+    @Override
+    public Optional<String> refusal(Locator.Located input) {
+        Rectangle box = input.node().bounds();
+        Point centre = new Point(box.x + box.width / 2, box.y + box.height / 2);
+        return WebSource.of(Source.current()).flatMap(web -> web.refusal(centre));
+    }
+
+    @Override
+    public Optional<String> press(String screen, String field, long withinMs) {
+        return moves.press(screen, field, withinMs);
     }
 }

@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
+import com.botmaker.sdk.plugin.assist.TreeAnswerWatch;
 import com.botmaker.sdk.plugin.emulator.SdkPools;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
 import com.botmaker.sdk.plugin.emulator.host.SdkHostValues;
@@ -115,6 +116,8 @@ public final class SdkPlugin extends DeclaredPlugin {
         HostIds.bind(services);
         // the door every run of this PC types its secrets through, open until the process exits
         SignInDoor.serve(services);
+        // what Keep exploring settles off a screen's tree, written once, by the process holding the journal's lock
+        TreeAnswerWatch.start(services);
         if (!services.hasUi()) return;
         UsedBy.remember(services);
         MoveOffer.offer(services);
@@ -131,6 +134,7 @@ public final class SdkPlugin extends DeclaredPlugin {
         GameButton.unbind();
         GameReady.unbind();
         VmKeeper.stop();
+        TreeAnswerWatch.stop();
         ScreenMap.letGoAll();
         SdkLog.unbind();
     }

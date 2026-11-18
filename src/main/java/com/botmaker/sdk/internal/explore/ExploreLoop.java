@@ -5,18 +5,29 @@ package com.botmaker.sdk.internal.explore;
 
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Answer;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.bot.InstalledRun;
+import com.botmaker.sdk.internal.explore.tree.Effect;
+import com.botmaker.sdk.internal.explore.tree.Locator;
+import com.botmaker.sdk.internal.explore.tree.Overlay;
+import com.botmaker.sdk.internal.explore.tree.RouteGuess;
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.Conditions;
+import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.shared.web.Guard;
 import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -174,6 +185,32 @@ public final class ExploreLoop {
 
         /** Says {@code event} in the run's log. */
         default void say(ExploreEvent event) {}
+
+        /**
+         * The screen's tree as it reads now, with its place: a website's path, an app's activity. Empty for a game
+         * with no tree, whose stops are all Claude's.
+         */
+        default Optional<Effect.State> state() {
+            return Optional.empty();
+        }
+
+        /** What the guard stopped since the last call: exits, writes, pages robots.txt keeps out. */
+        default List<Guard.Stopped> stopped() {
+            return List.of();
+        }
+
+        /** Why the guard would refuse pressing {@code input}, as the tree read it; empty when it is free. */
+        default Optional<String> refusal(Locator.Located input) {
+            return Optional.empty();
+        }
+
+        /**
+         * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: the
+         * screen of the map the game shows then, empty for none.
+         */
+        default Optional<String> press(String screen, String field, long withinMs) {
+            return Optional.empty();
+        }
     }
 
     /** Compiles the bot again and installs it: what came of it. */
@@ -231,6 +268,13 @@ public final class ExploreLoop {
     private int generation;
     /** Whether the map's verdicts are looked at at the next round's start: at the start and after a reload. */
     private boolean verdictsDue = true;
+    /** Whether the game reads a tree, so the run settles what it shows itself; true once a read did. */
+    private boolean readsTrees;
+    /** A website's page each screen was first met on, by screen: a sibling page of the same skeleton widens its route. */
+    private final Map<String, RouteGuess.Page> pages = new LinkedHashMap<>();
+    /** What presses of inputs that are no way did, not yet handed on: they go with the next settled stop. */
+    private final List<TreeAnswer> notes = new ArrayList<>();
+    private int settledNotes;
 
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
@@ -317,6 +361,9 @@ public final class ExploreLoop {
 
     private boolean play() {
         Optional<String> where = play.where();
+        // A page the tree reads is added by the run itself; a frame alone is Claude's to cut.
+        Optional<Effect.State> unknown = where.isEmpty() && readsTrees() ? play.state() : Optional.empty();
+        if (unknown.isPresent()) return settleUnknown(unknown.get(), null) != Paused.END;
         if (where.isEmpty()) {
             String place = lastEdge == null ? "unknown" : lastEdge;
             Paused paused = stop(StopKind.UNKNOWN_SCREEN, null, place, play.look(null),
@@ -332,6 +379,7 @@ public final class ExploreLoop {
         if (seen.add(screen)) {
             planRounds = 0;
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
+            if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
         }
         Look look = play.look(screen);
         Optional<Stop.Text> value = missingFact(screen, look);
@@ -344,6 +392,14 @@ public final class ExploreLoop {
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
         Optional<Edge> untried = untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
+        if (readsTrees()) {
+            Optional<String> input = untriedInput(screen);
+            if (input.isPresent()) return pressInput(screen, input.get());
+            if (!notes.isEmpty()) {
+                return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
+                        "what pressing " + notes.size() + " inputs did, read off the page") != Paused.END;
+            }
+        }
         if (planRounds < settings.planRoundsWithoutNew()) {
             planRounds++;
             if (play.planRound()) {
@@ -429,6 +485,137 @@ public final class ExploreLoop {
         lastPress = nowMs.getAsLong();
         presses.addLast(what);
         while (presses.size() > Stop.PRESSES) presses.removeFirst();
+    }
+
+    /** Whether the game reads a tree: kept once it did, asked again while it has not (a first read may fail). */
+    private boolean readsTrees() {
+        if (!readsTrees) readsTrees = play.state().isPresent();
+        return readsTrees;
+    }
+
+    /** Keeps the website's page {@code screen} was first met on, for a sibling page to widen its route; none in an app. */
+    private void page(String screen, Effect.State state) {
+        if (!state.place().startsWith("/") || !Overlay.of(state.tree()).none()) return;
+        pages.putIfAbsent(screen, new RouteGuess.Page(RouteGuess.bare(state.place()), RouteGuess.skeleton(state.tree())));
+    }
+
+    /**
+     * The first input of {@code screen} that is no way, free, found in its tree, never pressed: an input no note
+     * says anything of yet. One the bot's code presses ({@code Custom}) or one found by a picture is Claude's.
+     */
+    private Optional<String> untriedInput(String screen) {
+        MapScreen on = map.screen(screen).orElse(null);
+        if (on == null) return Optional.empty();
+        Set<String> ways = new HashSet<>();
+        for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            String field = input.getKey();
+            if (!(input.getValue() instanceof Button button) || button.element() == null) continue;
+            if (!(button.verdict() instanceof Verdict.Free) || button.isTried() || button.isInfo()) continue;
+            String key = screen + "." + field;
+            if (ways.contains(field) || tried.contains(key) || avoided(key)) continue;
+            return Optional.of(field);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Presses {@code field} of {@code screen}, an input that is no way, and judges what it did off the tree before and
+     * after: a way to a screen the bot has is settled at once, a page or an overlay it has not is added with its way,
+     * and anything else is a note handed on with the next settled stop.
+     */
+    private boolean pressInput(String screen, String field) {
+        String key = screen + "." + field;
+        tried.add(key);
+        // What the guard stopped before this press is not its doing.
+        play.stopped();
+        Effect.State before = play.state().orElse(Effect.State.of(null, ""));
+        pressed(screen + ": " + field);
+        lastEdge = null;
+        Optional<String> at = play.press(screen, field, settings.edge().toMillis());
+        Effect.State after = play.state().orElse(Effect.State.of(null, ""));
+        Effect effect = Effect.judge(before, after, play.stopped());
+        String to = at.orElse(null);
+        Arrival arrival = to == null ? Arrival.UNKNOWN : to.equals(screen) ? Arrival.UNCHANGED : Arrival.AT_TARGET;
+        emit(new ExploreEvent.Tried(screen, field, Mode.UNTRIED, arrival, nowMs.getAsLong()));
+        if (effect.way() && to != null && !to.equals(screen)) {
+            from = screen;
+            by = field;
+            return settle(StopKind.SETTLED, screen, key, List.of(new TreeAnswer.NewWay(screen, field, to)),
+                    field + " leads to " + map.shown(to)) != Paused.END;
+        }
+        // An overlay over the same page, or a page no screen matches: a screen to add, reached by this input.
+        if (effect instanceof Effect.Opens || effect instanceof Effect.Navigates && to == null) {
+            from = screen;
+            by = field;
+            return settleUnknown(after, new InputName(screen, field)) != Paused.END;
+        }
+        notes.add(new TreeAnswer.InputNote(screen, field, effect.line()));
+        return true;
+    }
+
+    /**
+     * Settles a screen the map lacks off its tree: a sibling page of one met before widens that screen's route, else a
+     * new screen with its inputs, each with the guard's verdict; reached by {@code by}'s press (null: not by a press
+     * of this run). Parked, the game is brought back as for an unknown screen Claude never took up.
+     */
+    private Paused settleUnknown(Effect.State state, InputName by) {
+        String path = state.place().startsWith("/") ? RouteGuess.bare(state.place()) : null;
+        List<TreeAnswer> answers = new ArrayList<>();
+        String screen = widened(state, path, answers).orElse(null);
+        if (screen == null) {
+            Set<String> taken = new HashSet<>();
+            for (String constant : map.screens().keySet()) taken.add(map.shown(constant));
+            TreeAnswer.NewScreen made = TreeAnswer.screen(state.tree(), path, path == null ? List.of() : List.of(path),
+                    taken);
+            answers.add(made);
+            answers.addAll(TreeAnswer.inputs(made.name(), state.tree(), Set.of(), Set.of(), play::refusal));
+            screen = made.name();
+        }
+        // A press that brought a sibling page of its own screen (a next page) widened its route: no way to itself.
+        if (by != null && !by.screen().equals(screen)) answers.add(new TreeAnswer.NewWay(by.screen(), by.field(), screen));
+        String place = "page " + (path != null ? path + Overlay.of(state.tree()).line() : by != null
+                ? by.screen() + "." + by.field() : "unknown");
+        Paused paused = settle(StopKind.UNKNOWN_SCREEN, null, place, answers, "no screen of the map matches the page: "
+                + screen + " is written from its tree");
+        if (paused == Paused.PARKED || paused == null) {
+            if (!play.recover()) play.restart();
+        }
+        return paused;
+    }
+
+    /**
+     * The screen whose route {@code path}'s page widens, its new route added to {@code answers}: a page met before of
+     * the same skeleton, its path differing in one segment. Empty in an app, over an overlay, or with none alike.
+     */
+    private Optional<String> widened(Effect.State state, String path, List<TreeAnswer> answers) {
+        if (path == null || !Overlay.of(state.tree()).none()) return Optional.empty();
+        RouteGuess.Page page = new RouteGuess.Page(path, RouteGuess.skeleton(state.tree()));
+        for (Map.Entry<String, RouteGuess.Page> met : pages.entrySet()) {
+            Optional<RouteGuess.Route> route = RouteGuess.of(List.of(met.getValue(), page));
+            if (route.isEmpty()) continue;
+            answers.add(new TreeAnswer.NewRoute(met.getKey(), route.get().pattern(), route.get().examples()));
+            return Optional.of(met.getKey());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Stops on what the run settled itself, {@code answers} and the notes not yet handed on, for the plugin side to
+     * write and resume: the {@link ExploreEvent.Settled} first, then the stop, waited on and parked as any. The same
+     * place settled again right after its resume did not take: it is Claude's then, as a plain stop.
+     */
+    private Paused settle(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
+        if (parked.containsKey(parkedKey(kind, place))) return null;
+        if (resumed != null && resumed.kind() == kind && resumed.place().equals(place)) {
+            return stop(kind, screen, place, Look.NOTHING, missing + "; what the tree settled was written and did not "
+                    + "take", false);
+        }
+        List<TreeAnswer> all = new ArrayList<>(answers);
+        all.addAll(notes);
+        notes.clear();
+        emit(new ExploreEvent.Settled(kind.id() + "-" + (stops + 1), all, nowMs.getAsLong()));
+        return stop(kind, screen, place, Look.NOTHING, missing, false);
     }
 
     /** Whether nothing in the bot says when {@code edge} leads: no way condition, no lock, no look it needs. */

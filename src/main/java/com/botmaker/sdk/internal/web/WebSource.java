@@ -16,6 +16,7 @@ import com.botmaker.shared.web.Budget;
 import com.botmaker.shared.web.Chromium;
 import com.botmaker.shared.web.ChromiumInstall;
 import com.botmaker.shared.web.Consent;
+import com.botmaker.shared.web.ConsoleMessage;
 import com.botmaker.shared.web.Guard;
 import com.botmaker.shared.web.Pace;
 import com.botmaker.shared.web.Presses;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -98,6 +100,8 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     private boolean loadedLast;
     /** The tree the last frame's look read, for {@link #tree} to hand on once instead of reading it again. */
     private WebTree looked;
+    /** What the guard stopped since {@link #stopped()} was last asked. */
+    private final List<Guard.Stopped> stoppedSince = new ArrayList<>();
 
     public WebSource(String url, Options options) {
         this.url = url;
@@ -278,6 +282,38 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         }
     }
 
+    /**
+     * The page's tree read now, for judging a press: the tree the last look read is left for {@link #tree} to hand on.
+     */
+    public synchronized UiTree treeNow() {
+        return page().tree().asUiTree();
+    }
+
+    /** What the guard stopped since the last call: each said in the run's log already, handed on once. */
+    public synchronized List<Guard.Stopped> stopped() {
+        if (guard != null) sayStopped();
+        List<Guard.Stopped> since = List.copyOf(stoppedSince);
+        stoppedSince.clear();
+        return since;
+    }
+
+    /** The page's console errors since the last call; none before the browser is up. */
+    public synchronized List<String> consoleErrors() {
+        if (page == null) return List.of();
+        return page.console().stream().filter(m -> m.level() == ConsoleMessage.Level.ERROR).map(ConsoleMessage::text)
+                .toList();
+    }
+
+    /**
+     * Why the guard would refuse a press at {@code at}, read off the page without pressing: a submit, a buy. Empty
+     * for a press it lets through, or with no node there or no browser up.
+     */
+    public synchronized Optional<String> refusal(Point at) {
+        if (page == null) return Optional.empty();
+        return page.tree().pressedAt(new java.awt.Point(at.x(), at.y()))
+                .flatMap(node -> Presses.press(node, page.pressFacts(node))).map(Presses.Refusal::line);
+    }
+
     @Override
     public synchronized void close() {
         closeBrowser();
@@ -382,6 +418,7 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
 
     private void sayStopped() {
         for (Guard.Stopped stopped : guard.stopped()) {
+            stoppedSince.add(stopped);
             Debug.log("the guard stopped " + stopped.kind().displayName().toLowerCase(Locale.ROOT) + ": "
                     + stopped.method() + " " + stopped.url());
         }

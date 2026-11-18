@@ -8,6 +8,7 @@ import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.Role;
 import com.botmaker.shared.web.WebTree;
+import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,7 @@ public record Overlay(Kind kind, String name) {
         DIALOG("dialog", "Dialog"),
         MENU("menu", "Menu"),
         TAB("tab", "Tab"),
+        @JsonEnumDefaultValue
         UNKNOWN("unknown", "Unknown");
 
         private final String id;

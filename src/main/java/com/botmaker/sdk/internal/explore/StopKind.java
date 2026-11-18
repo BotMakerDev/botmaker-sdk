@@ -29,6 +29,11 @@ public enum StopKind {
     GUARD("guard", "Guard"),
     /** The bot's own code threw. */
     CRASH("crash", "Crash"),
+    /**
+     * What presses of a screen's inputs did, read off its tree: ways to screens the bot has, and notes. The run
+     * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.
+     */
+    SETTLED("settled", "Settled by the tree"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

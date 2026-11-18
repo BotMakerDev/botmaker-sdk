@@ -128,7 +128,7 @@ class TreeAnswerTest {
         assertTrue(screen.overlay().none());
 
         List<TreeAnswer.NewInput> inputs = TreeAnswer.inputs(screen.name(), page, Set.of(), Set.of("home"),
-                locator -> "Buy now".equals(locator.name()) ? Optional.of("its name says buy") : Optional.empty());
+                input -> "Buy now".equals(input.locator().name()) ? Optional.of("its name says buy") : Optional.empty());
         assertEquals(List.of("home2", "buyNow"), inputs.stream().map(TreeAnswer.NewInput::field).toList());
         assertNull(inputs.getFirst().never());
         assertEquals("its name says buy", inputs.get(1).never());

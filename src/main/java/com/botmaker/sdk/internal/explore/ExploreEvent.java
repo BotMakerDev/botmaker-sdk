@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.internal.explore;
 
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 
 import java.util.List;
@@ -29,6 +30,7 @@ public sealed interface ExploreEvent {
             case Began ignored -> "began";
             case Ended ignored -> "ended";
             case Claude ignored -> "claude";
+            case Settled ignored -> "settled";
         };
     }
 
@@ -46,6 +48,7 @@ public sealed interface ExploreEvent {
             case "began" -> Began.class;
             case "ended" -> Ended.class;
             case "claude" -> Claude.class;
+            case "settled" -> Settled.class;
             default -> null;
         };
     }
@@ -82,6 +85,17 @@ public sealed interface ExploreEvent {
      * once, the fix did not take.
      */
     record Stopped(Stop stop, boolean again, long at) implements ExploreEvent {}
+
+    /**
+     * The run settled the stop {@code stopId} itself, off the screen's tree: {@code answers} say what the bot is to
+     * hold. Written just before its {@link Stopped}; the plugin side writes them and resumes the stop, and nobody
+     * doing so in time parks it as any other.
+     */
+    record Settled(String stopId, List<TreeAnswer> answers, long at) implements ExploreEvent {
+        public Settled {
+            answers = answers == null ? List.of() : List.copyOf(answers);
+        }
+    }
 
     /** The stop {@code stopId} is gone: after a reload, or the game back in front. */
     record Fixed(String stopId, String why, long at) implements ExploreEvent {}
