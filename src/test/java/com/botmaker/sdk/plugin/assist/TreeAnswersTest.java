@@ -72,6 +72,23 @@ class TreeAnswersTest {
         assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
     }
 
+    /** A new input's rendered picture becomes its element's shot, copied in by the write; a held element keeps its own. */
+    @Test
+    void aRenderedPictureIsTheNewElementsShot() {
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(Map.of()), List.of(
+                new TreeAnswer.NewScreen("Pricing", "/pricing", List.of("/pricing"), List.of(), null),
+                new TreeAnswer.NewInput("Pricing", "buyNow", BUY, null, "/run/inputs/Pricing.buyNow.png"),
+                new TreeAnswer.NewInput("Pricing", "docs", DOCS, null, "/run/inputs/Pricing.docs.png")),
+                Map.of("DOCS", DOCS.element().shot("elements/docs.png")));
+
+        Button buy = (Button) planned.added().getFirst().screen().input("buyNow").orElseThrow();
+        String shot = buy.element().shot();
+        assertEquals(Map.of(shot, "/run/inputs/Pricing.buyNow.png"), planned.pictures());
+        assertEquals(shot, planned.elements().values().iterator().next().shot());
+        Button docs = (Button) planned.added().getFirst().screen().input("docs").orElseThrow();
+        assertEquals("elements/docs.png", docs.element().shot());
+    }
+
     @Test
     void aDialogAPressOpensIsReachedByItAndTheNoteMarksItsInput() {
         ScreenGraph graph = map();

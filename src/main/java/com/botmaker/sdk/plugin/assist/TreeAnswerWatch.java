@@ -9,8 +9,11 @@ import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
+import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.SdkLog;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -49,8 +52,37 @@ public final class TreeAnswerWatch {
         Path project = services.projectDir();
         if (project == null) return;
         Journal journal = Journal.of(project);
-        thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(journal,
-                (id, answers) -> TreeAnswers.apply(services, "Explore: " + id, answers)));
+        thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(journal, (id, answers) -> {
+            Optional<String> failed = TreeAnswers.apply(services, "Explore: " + id, answers);
+            if (failed.isEmpty()) shots(services, journal, id, answers);
+            return failed;
+        }));
+    }
+
+    /**
+     * Gives each screen {@code answers} added the frame its stop {@code id} saved as its shot, so 🗺 Screens shows the
+     * page it was made from. A frame that cannot be read leaves the screen without one, as before.
+     */
+    private static void shots(StudioServices services, Journal journal, String id, List<TreeAnswer> answers) {
+        if (answers.stream().noneMatch(TreeAnswer.NewScreen.class::isInstance)) return;
+        JournalView view = JournalView.of(journal);
+        Optional<Stop> stop = view.open().filter(s -> s.id().equals(id))
+                .or(() -> view.queue().stream().filter(s -> s.id().equals(id)).findFirst());
+        if (stop.isEmpty() || stop.get().framePath().isEmpty()) return;
+        BufferedImage frame;
+        try {
+            frame = ImageIO.read(Path.of(stop.get().framePath()).toFile());
+        } catch (IOException | RuntimeException unread) {
+            return;
+        }
+        if (frame == null) return;
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
+        for (TreeAnswer answer : answers) {
+            if (answer instanceof TreeAnswer.NewScreen screen) {
+                ScreenBook.find(graph, screen.name())
+                        .ifPresent(constant -> ScreenShots.saveIfMissing(services, graph, constant, frame));
+            }
+        }
     }
 
     /** Stops watching. */

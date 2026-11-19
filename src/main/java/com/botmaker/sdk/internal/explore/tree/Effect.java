@@ -86,18 +86,17 @@ public sealed interface Effect {
 
     /**
      * The effect of a press from {@code before} to {@code after}, {@code stopped} what the guard stopped meanwhile: an
-     * exit first, then a blocked write or a page robots.txt keeps out, then another page, an overlay opened, an error
+     * exit first, then another page, an overlay opened, then a blocked write or a page robots.txt keeps out, an error
      * shown, an error printed, parts changed, and last nothing.
+     *
+     * <p>A page that came is the press's doing whatever the guard stopped beside it: a site posts its own telemetry
+     * ({@code POST /monitoring}) on every page, and that write blocked takes nothing from the way. A write the press
+     * itself made, a form sent, leaves the page where it was, so it is still told.
      */
     static Effect judge(State before, State after, List<Guard.Stopped> stopped) {
-        for (Guard.Stopped stop : stopped == null ? List.<Guard.Stopped>of() : stopped) {
+        List<Guard.Stopped> stops = stopped == null ? List.of() : stopped;
+        for (Guard.Stopped stop : stops) {
             if (stop.kind() == Guard.Kind.EXIT) return new Exits(stop.url());
-        }
-        for (Guard.Stopped stop : stopped == null ? List.<Guard.Stopped>of() : stopped) {
-            if (stop.kind() == Guard.Kind.WRITE) {
-                return new Fails("blocked write: " + (stop.method().isEmpty() ? "" : stop.method() + " ") + stop.url());
-            }
-            if (stop.kind() == Guard.Kind.ROBOTS) return new Fails("not visited (robots.txt): " + stop.url());
         }
         // A place read on one side only says nothing; a website's path is compared bare, an app's activity as it is.
         if (!before.place().isEmpty() && !after.place().isEmpty()) {
@@ -108,6 +107,12 @@ public sealed interface Effect {
         Overlay was = Overlay.of(before.tree());
         Overlay now = Overlay.of(after.tree());
         if (!now.none() && !now.equals(was)) return new Opens(now);
+        for (Guard.Stopped stop : stops) {
+            if (stop.kind() == Guard.Kind.WRITE) {
+                return new Fails("blocked write: " + (stop.method().isEmpty() ? "" : stop.method() + " ") + stop.url());
+            }
+            if (stop.kind() == Guard.Kind.ROBOTS) return new Fails("not visited (robots.txt): " + stop.url());
+        }
         for (String error : after.errorsShown()) {
             if (!before.errorsShown().contains(error)) return new ShowsError(error);
         }

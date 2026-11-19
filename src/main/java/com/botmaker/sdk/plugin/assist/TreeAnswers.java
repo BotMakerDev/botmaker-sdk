@@ -22,6 +22,10 @@ import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +33,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -60,10 +65,11 @@ final class TreeAnswers {
      * What the answers write, in order: the {@code words} kept as {@code Texts}, the new {@code Elements} constants by
      * name, the screens added, then the changes of screens the map has (or has once the added ones are), and the
      * launch specs made the bot's preferred targets, last first. {@code skipped} says each answer that could not be
-     * written, and why.
+     * written, and why. {@code pictures} are the files the run rendered, by the shot path in the bot's resources each
+     * new element names.
      */
     record Planned(List<Words> words, Map<String, Element> elements, List<Added> added, List<Change> changes,
-                   List<String> targets, List<String> skipped) {
+                   List<String> targets, List<String> skipped, Map<String, String> pictures) {
 
         boolean empty() {
             return added.isEmpty() && changes.isEmpty() && targets.isEmpty();
@@ -78,6 +84,7 @@ final class TreeAnswers {
         Map<String, Element> known = new LinkedHashMap<>(existing);
         Map<String, Element> made = new LinkedHashMap<>();
         Set<Words> words = new LinkedHashSet<>();
+        Map<String, String> pictures = new LinkedHashMap<>();
         List<String> skipped = new ArrayList<>();
         // The new screens' constants, by the name the answers call them.
         Map<String, String> newConstants = new HashMap<>();
@@ -124,7 +131,18 @@ final class TreeAnswers {
                         skipped.add(input.field() + ": no screen " + input.screen() + " in the map.");
                         continue;
                     }
-                    Button button = Button.of(kept(input.locator().element(), known, made, words));
+                    Element element = kept(input.locator().element(), known, made, words);
+                    // A new constant shows the picture the run rendered of it; one the bot had keeps its own.
+                    Optional<String> named = input.picture() == null || element.shot() != null ? Optional.empty()
+                            : nameOf(made, element);
+                    if (named.isPresent()) {
+                        String shot = ElementSaves.FOLDER + "/" + named.get().toLowerCase(Locale.ROOT) + ".png";
+                        element = element.shot(shot);
+                        made.put(named.get(), element);
+                        known.put(named.get(), element);
+                        pictures.put(shot, input.picture());
+                    }
+                    Button button = Button.of(element);
                     Input pressed = input.never() != null ? button.never(input.never()) : button.free();
                     UnaryOperator<MapScreen> add = s -> s.withInput(s.fieldFor(input.field()), pressed);
                     if (screens.containsKey(constant.get())) screens.compute(constant.get(), (c, s) -> add.apply(s));
@@ -201,7 +219,7 @@ final class TreeAnswers {
         screens.forEach((constant, screen) -> added.add(new Added(constant, screen)));
         // In the order found, so the same page writes its constants in the same order each time.
         return new Planned(List.copyOf(words), Collections.unmodifiableMap(made), List.copyOf(added), List.copyOf(changes),
-                List.copyOf(targets), List.copyOf(skipped));
+                List.copyOf(targets), List.copyOf(skipped), Map.copyOf(pictures));
     }
 
     /**
@@ -228,6 +246,18 @@ final class TreeAnswers {
         for (Words words : planned.words()) {
             Optional<String> failed = ScreenEdits.keptText(services, words);
             if (failed.isPresent()) return failed;
+        }
+        Path resources = services.resourcesDir();
+        for (Map.Entry<String, String> picture : planned.pictures().entrySet()) {
+            // A picture that cannot be copied leaves its element showing "?", as before: nothing to fail the write for.
+            if (resources == null) break;
+            try {
+                Path file = resources.resolve(picture.getKey());
+                Files.createDirectories(file.getParent());
+                Files.copy(Path.of(picture.getValue()), file, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException | RuntimeException uncopied) {
+                SdkLog.warn(picture.getKey() + " could not be copied: " + uncopied.getMessage());
+            }
         }
         if (!planned.elements().isEmpty()) {
             Optional<String> missing = values.create(ELEMENTS.value());
@@ -266,6 +296,11 @@ final class TreeAnswers {
         known.put(name, element);
         made.put(name, element);
         return element;
+    }
+
+    /** The name {@code made} gives {@code element}, the very one; empty when it is none of them. */
+    private static Optional<String> nameOf(Map<String, Element> made, Element element) {
+        return made.entrySet().stream().filter(e -> e.getValue() == element).map(Map.Entry::getKey).findFirst();
     }
 
     /** The constant of the screen {@code name}: one added here, else the map's. */

@@ -111,6 +111,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - Discover: a website's page with nothing open over it becomes a screen named and told by its route alone, never by
   its headings, so a page whose headline changes (a hero that cycles it) no longer turns into a new screen at each
   headline. A dialog or a menu over a page is still told by itself.
+- Discover on a website: a press that brings another page or opens an overlay is a way even when the guard blocked a
+  write beside it (the site's own telemetry, `POST /monitoring`), so 🗺 Screens links the pages it found. A page's
+  numbers raise no missing-fact stop. Each new screen gets the frame it was found on as its shot, and each new input
+  a picture Chromium renders of it, below the fold too, as its element's shot.
 
 ## [1.11.0] — 2026-11-16
 

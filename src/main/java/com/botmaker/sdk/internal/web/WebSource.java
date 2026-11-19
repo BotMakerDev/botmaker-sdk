@@ -28,6 +28,7 @@ import com.botmaker.shared.web.WebPage;
 import com.botmaker.shared.web.WebTree;
 
 import javax.imageio.ImageIO;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -178,6 +179,19 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         WebTree tree = looked != null ? looked : page().tree();
         looked = null;
         return Optional.of(tree.asUiTree());
+    }
+
+    /**
+     * The page's part inside {@code box}, a tree's box, rendered by the browser where the viewport does not reach too:
+     * an input's picture. Empty with no page up, for an empty box, or when the browser could not render it.
+     */
+    public synchronized Optional<BufferedImage> picture(Rectangle box) {
+        if (page == null || box == null || box.isEmpty()) return Optional.empty();
+        try {
+            return Optional.ofNullable(ImageIO.read(new ByteArrayInputStream(page.picture(box))));
+        } catch (IOException | RuntimeException unrendered) {
+            return Optional.empty();
+        }
     }
 
     /** Presses the node under {@code p} through the guard; one it refuses is not pressed, and the refusal is said. */

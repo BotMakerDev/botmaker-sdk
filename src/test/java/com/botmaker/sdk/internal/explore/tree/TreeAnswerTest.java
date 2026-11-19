@@ -102,6 +102,9 @@ class TreeAnswerTest {
                 List.of(new Guard.Stopped(Guard.Kind.EXIT, "https://x.com/nunu", "GET"))));
         assertEquals(new Effect.Fails("blocked write: POST https://nunu.ai/api/signup"), Effect.judge(before, before,
                 List.of(new Guard.Stopped(Guard.Kind.WRITE, "https://nunu.ai/api/signup", "POST"))));
+        // A page that came is the press's way, whatever telemetry the guard blocked beside it.
+        assertEquals(new Effect.Navigates("/pricing"), Effect.judge(before, Effect.State.of(home, "/pricing"),
+                List.of(new Guard.Stopped(Guard.Kind.WRITE, "https://nunu.ai/monitoring", "POST"))));
         assertEquals(new Effect.ShowsError("Enter a valid email"), Effect.judge(before,
                 new Effect.State(home, "/", List.of("Enter a valid email"), List.of()), List.of()));
         assertEquals(new Effect.Changes(List.of("checkbox \"News\" checkable checked clickable enabled")),

@@ -31,6 +31,7 @@ import com.botmaker.shared.web.FormRule;
 import com.botmaker.shared.web.Guard;
 import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 
+import java.awt.Rectangle;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -227,6 +228,14 @@ public final class ExploreLoop {
         default List<FormProbe.Result> forms() {
             return List.of();
         }
+
+        /**
+         * The part of the page inside {@code box}, a tree's box, rendered and saved in the run's folder as
+         * {@code name}: the file, so the input gets a picture in 🗺 Screens. Empty for a game with no renderer.
+         */
+        default Optional<String> picture(String name, Rectangle box) {
+            return Optional.empty();
+        }
     }
 
     /** Compiles the bot again and installs it: what came of it. */
@@ -286,6 +295,8 @@ public final class ExploreLoop {
     private boolean verdictsDue = true;
     /** Whether the game reads a tree, so the run settles what it shows itself; true once a read did. */
     private boolean readsTrees;
+    /** Whether the game is a website, so page text raises no missing fact; null until a tree says. */
+    private Boolean website;
     /** A website's page each screen was first met on, by screen: a sibling page of the same skeleton widens its route. */
     private final Map<String, RouteGuess.Page> pages = new LinkedHashMap<>();
     /** What presses of inputs that are no way did, not yet handed on: they go with the next settled stop. */
@@ -409,7 +420,8 @@ public final class ExploreLoop {
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
         }
         Look look = play.look(screen);
-        Optional<Stop.Text> value = missingFact(screen, look);
+        // A website's numbers are its content (a price, a count of devices), never a game's state to keep.
+        Optional<Stop.Text> value = website() ? Optional.empty() : missingFact(screen, look);
         if (value.isPresent()) {
             Stop.Text text = value.get();
             return stop(StopKind.MISSING_FACT, screen, textPlace(screen, text.box()), look, "\"" + text.text().strip()
@@ -523,6 +535,14 @@ public final class ExploreLoop {
     private boolean readsTrees() {
         if (!readsTrees) readsTrees = play.state().isPresent();
         return readsTrees;
+    }
+
+    /** Whether the game is a website: its tree's place is a path. Kept once known, asked again while unread. */
+    private boolean website() {
+        if (website == null && readsTrees()) {
+            website = play.state().map(state -> state.place().startsWith("/")).orElse(null);
+        }
+        return Boolean.TRUE.equals(website);
     }
 
     /** Keeps the website's page {@code screen} was first met on, for a sibling page to widen its route; none in an app. */
@@ -649,7 +669,9 @@ public final class ExploreLoop {
             TreeAnswer.NewScreen made = TreeAnswer.screen(state.tree(), path, path == null ? List.of() : List.of(path),
                     taken);
             answers.add(made);
-            answers.addAll(TreeAnswer.inputs(made.name(), state.tree(), Set.of(), Set.of(), play::refusal));
+            String named = made.name();
+            answers.addAll(TreeAnswer.inputs(named, state.tree(), Set.of(), Set.of(), play::refusal,
+                    (field, located) -> play.picture(named + "." + field, located.node().bounds()).orElse(null)));
             screen = made.name();
         }
         // A press that brought a sibling page of its own screen (a next page) widened its route: no way to itself.

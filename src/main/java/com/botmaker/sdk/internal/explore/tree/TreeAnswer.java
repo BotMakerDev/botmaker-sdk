@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -66,9 +67,19 @@ public sealed interface TreeAnswer {
 
     /**
      * An input to add on {@code screen} as its field {@code field}, found by {@code locator}; {@code never} why the
-     * guard refuses it, null when it is free.
+     * guard refuses it, null when it is free; {@code picture} the file the run rendered it to, null for none.
      */
-    record NewInput(String screen, String field, Locator locator, String never) implements TreeAnswer {}
+    record NewInput(String screen, String field, Locator locator, String never, String picture)
+            implements TreeAnswer {
+        public NewInput {
+            picture = picture == null || picture.isBlank() ? null : picture;
+        }
+
+        /** An input with no picture. */
+        public NewInput(String screen, String field, Locator locator, String never) {
+            this(screen, field, locator, never, null);
+        }
+    }
 
     /** A way: {@code field} of {@code screen} leads to the screen {@code to}. */
     record NewWay(String screen, String field, String to) implements TreeAnswer {}
@@ -173,13 +184,21 @@ public sealed interface TreeAnswer {
      */
     static List<NewInput> inputs(String screen, UiTree tree, Set<Locator> known, Set<String> taken,
                                  Function<Locator.Located, Optional<String>> refusal) {
+        return inputs(screen, tree, known, taken, refusal, (field, located) -> null);
+    }
+
+    /** As above, each input given the picture {@code picture} renders of it, by its field's name: a file, or null. */
+    static List<NewInput> inputs(String screen, UiTree tree, Set<Locator> known, Set<String> taken,
+                                 Function<Locator.Located, Optional<String>> refusal,
+                                 BiFunction<String, Locator.Located, String> picture) {
         List<NewInput> inputs = new ArrayList<>();
         Set<String> names = new HashSet<>(taken);
         for (Locator.Located located : Locator.inputs(tree)) {
             if (known.contains(located.locator())) continue;
             String field = unique(fieldName(said(located.locator())), names);
             names.add(field);
-            inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located).orElse(null)));
+            inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located).orElse(null),
+                    picture.apply(field, located)));
         }
         return List.copyOf(inputs);
     }

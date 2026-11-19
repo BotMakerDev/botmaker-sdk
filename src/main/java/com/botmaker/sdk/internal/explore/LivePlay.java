@@ -316,4 +316,19 @@ public final class LivePlay implements ExploreLoop.Play {
     public List<FormProbe.Result> forms() {
         return WebSource.of(Source.current()).map(WebSource::forms).orElse(List.of());
     }
+
+    @Override
+    public Optional<String> picture(String name, Rectangle box) {
+        Optional<Path> folder = MissFrames.folder();
+        Optional<BufferedImage> rendered = folder.isEmpty() ? Optional.empty()
+                : WebSource.of(Source.current()).flatMap(web -> web.picture(box));
+        if (rendered.isEmpty()) return Optional.empty();
+        try {
+            Path file = Files.createDirectories(folder.get().resolve("inputs")).resolve(name + ".png");
+            ImageIO.write(rendered.get(), "png", file.toFile());
+            return Optional.of(file.toString());
+        } catch (IOException | RuntimeException unsaved) {
+            return Optional.empty();
+        }
+    }
 }
