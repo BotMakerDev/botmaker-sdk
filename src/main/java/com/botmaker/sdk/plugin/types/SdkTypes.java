@@ -191,7 +191,8 @@ public final class SdkTypes implements TypeHolder {
     /**
      * {@link #ELEMENT} by another first clue: {@code Element.byId(…)}, a website's {@code byRole(…)}, {@code byLabel(…)},
      * {@code byHolding(…)},
-     * {@code byContaining(…)}, {@code textField()} or {@code passwordField()}.
+     * {@code byContaining(…)}, {@code textField()}, {@code passwordField()} or, a website's part nothing names,
+     * {@code ofRole(…)}.
      * Every factory rebuilds an element with every clue, so a {@code when} says which first clue it is written by.
      */
     public static final List<DeclaredCall<Element>> ELEMENT_BY_OTHER_CLUES = List.of(
@@ -209,7 +210,10 @@ public final class SdkTypes implements TypeHolder {
             ComponentType.part(Element.class).<Element>writtenAs(Element::textField)
                     .when(element -> noWords(element) && element.containing() == null && element.isField()),
             ComponentType.part(Element.class).<Element>writtenAs(Element::passwordField)
-                    .when(element -> noWords(element) && element.containing() == null && element.isPassword()));
+                    .when(element -> noWords(element) && element.containing() == null && element.isPassword()),
+            ComponentType.part(Element.class).<Role, Element>writtenAs(Element::ofRole)
+                    .when(element -> noWords(element) && element.containing() == null && !element.isField()
+                            && !element.isPassword() && element.role() != null));
 
     /** Whether {@code element} has no id, label, text or holding: a first clue past those writes it. */
     private static boolean noWords(Element element) {

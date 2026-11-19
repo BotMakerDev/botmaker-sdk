@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,6 +32,7 @@ import java.util.Optional;
  *   <li>{@code events.jsonl}: every {@link ExploreEvent}, one line each, appended. A line cut by a killed JVM is
  *       skipped on reading, so the journal reads back up to its last whole line.</li>
  *   <li>{@code queue.json}: the parked stops, oldest first, replaced whole.</li>
+ *   <li>{@code page.png}: a website run's page as it last looked, replaced whole, for the window to show.</li>
  *   <li>{@code command}: written by the plugin side ({@code resume <stopId>}, {@code stop}); read and deleted by the
  *       run.</li>
  * </ul>
@@ -41,6 +44,7 @@ public final class Journal {
     static final String FOLDER = "explore";
     public static final String EVENTS = "events.jsonl";
     public static final String QUEUE = "queue.json";
+    static final String PAGE = "page.png";
     static final String COMMAND = "command";
 
     /** Reads what a newer SDK wrote: a field it added is skipped, a constant it added reads as UNKNOWN, else null. */
@@ -127,6 +131,49 @@ public final class Journal {
     public synchronized void queue(List<Stop> stops) {
         write(QUEUE, () -> JSON.writeValueAsString(stops));
     }
+
+    /**
+     * Replaces {@link #PAGE} with {@code page}, whole or not at all: a website run's page as it last looked, which the
+     * Explore window shows, since no capture of this PC sees the run's browser.
+     */
+    public synchronized void page(BufferedImage page) {
+        try {
+            Files.createDirectories(folder);
+            Path temp = folder.resolve(PAGE + ".tmp");
+            ImageIO.write(page, "png", temp.toFile());
+            Files.move(temp, folder.resolve(PAGE), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException | RuntimeException unwritten) {
+            // the window shows the frame it last read
+        }
+    }
+
+    /** Deletes the page a run before wrote, so no window shows it as this run's. */
+    public synchronized void forgetPage() {
+        try {
+            Files.deleteIfExists(folder.resolve(PAGE));
+        } catch (IOException unread) {
+            // the window still shows only a page written since this run began
+        }
+    }
+
+    /**
+     * The page {@link #page} last wrote, with when it wrote it; empty when there is none, it does not read, or it was
+     * written at {@code knownAt} still: the page its reader holds already, not decoded again.
+     */
+    public Optional<Page> lastPage(long knownAt) {
+        Path file = folder.resolve(PAGE);
+        try {
+            long at = Files.getLastModifiedTime(file).toMillis();
+            if (at == knownAt) return Optional.empty();
+            BufferedImage image = ImageIO.read(file.toFile());
+            return image == null ? Optional.empty() : Optional.of(new Page(image, at));
+        } catch (IOException | RuntimeException unread) {
+            return Optional.empty();
+        }
+    }
+
+    /** A page {@link #page} wrote, and when, in epoch milliseconds. */
+    public record Page(BufferedImage image, long writtenAt) {}
 
     /** Writes {@code command} for the run to take: the plugin side's half. */
     public void command(String command) {

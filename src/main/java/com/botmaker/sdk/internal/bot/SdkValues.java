@@ -232,10 +232,9 @@ public final class SdkValues implements ValueHolder {
      * else the first its computer's system can launch ({@code LaunchKind.runsOn}), so nothing about a platform is
      * written. Empty: the bot starts no game, and is run against one already open.
      */
-    @SuppressWarnings("unchecked")
     public static final ManagedMethod<List<Launcher>> LAUNCH_TARGETS = ManagedValue.method(SdkValue.Id.LAUNCH_TARGETS)
             .in(SdkValue.Holder.SDK)
-            .holds((Class<List<Launcher>>) (Class<?>) List.class, List.of())
+            .startsAs(SdkValues::noTargets)
             .because("This is the list of games the bot supports. Add or remove a game in 🎮 Game.");
 
     /**
@@ -307,10 +306,9 @@ public final class SdkValues implements ValueHolder {
      * {@code Sdk.java}, the author's, matched case-blind as whole words (2026-11-09). Seeded empty: the guards are
      * general, currency signs are built in, and the author adds the app's own words and language.
      */
-    @SuppressWarnings("unchecked")
     public static final ManagedMethod<List<String>> GUARD_WORDS = ManagedValue.method(SdkValue.Id.GUARD_WORDS)
             .in(SdkValue.Holder.SDK)
-            .holds((Class<List<String>>) (Class<?>) List.class, List.of())
+            .startsAs(SdkValues::noWords)
             .because("These are words a run exploring on its own never presses beside unless the input spends, such"
                     + " as Buy or Delete in the app's language. Currency signs are refused without being listed.");
 
@@ -532,6 +530,16 @@ public final class SdkValues implements ValueHolder {
     /** {@link #INSTANCE}'s: none, so the capture source's own name is used. */
     private static Instance noInstance() {
         return Instance.named("");
+    }
+
+    /** {@link #LAUNCH_TARGETS}': none, so the bot is run against a game already open. */
+    private static List<Launcher> noTargets() {
+        return List.of();
+    }
+
+    /** {@link #GUARD_WORDS}': none, until the author lists the app's own words. */
+    private static List<String> noWords() {
+        return List.of();
     }
 
     /**

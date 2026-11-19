@@ -104,6 +104,11 @@ final class ExploreView {
     /** The screen the last frame read shows, by its markers; null for none, or no frame read. */
     private String liveScreen;
     private int frameWidth;
+    /** The frame drawn now: a website's page held from tick to tick is not drawn again. FX thread only. */
+    private Seen showing;
+    /** A website run's page as last read off the journal, and when it was written; read on the reading thread only. */
+    private volatile Seen lastPage;
+    private volatile long lastPageAt;
     private Map<String, Rect> areas = Map.of();
     private boolean closed;
     /** The journal as last shown. */
@@ -249,7 +254,8 @@ final class ExploreView {
         buttons();
         if (journal == null || closed || !reading.compareAndSet(false, true)) return;
         ScreenGraph map = graph.get();
-        PanelContext context = live(last) ? context() : null;
+        boolean running = live(last);
+        PanelContext context = running ? context() : null;
         if (context == null) forgetFrame();
         Thread.ofVirtual().name("explore-view").start(() -> {
             try {
@@ -258,7 +264,8 @@ final class ExploreView {
                 Read before = lastRead;
                 JournalView read = stamp.equals(before.stamp()) ? before.view() : JournalView.of(journal);
                 lastRead = new Read(stamp, read);
-                Seen seen = context == null ? null : look(context, map);
+                Seen seen = !running ? null : page(journal, read)
+                        .orElseGet(() -> context == null ? null : look(context, map));
                 Platform.runLater(() -> {
                     if (closed) return;
                     if (seen != null) shown(seen);
@@ -304,6 +311,20 @@ final class ExploreView {
     /** A frame of the game, the screen it shows and where that screen's readouts read on it. */
     private record Seen(BufferedImage image, String screen, Map<String, Rect> areas) {}
 
+    /**
+     * The page a website run wrote since it began ({@link Journal#page}): its browser is the run's own, which no
+     * capture of this PC sees. Its screen is the journal's to say, so none here.
+     */
+    private Optional<Seen> page(Journal journal, JournalView read) {
+        journal.lastPage(lastPageAt).ifPresent(page -> {
+            lastPage = new Seen(page.image(), null, Map.of());
+            lastPageAt = page.writtenAt();
+        });
+        // Unchanged since the last tick: the page held, not decoded again. One of an earlier run is never shown.
+        Seen held = lastPage;
+        return held != null && lastPageAt >= read.beganAt() ? Optional.of(held) : Optional.empty();
+    }
+
     private static Seen look(PanelContext context, ScreenGraph map) {
         try {
             PanelContext found = context.found();
@@ -323,6 +344,8 @@ final class ExploreView {
     }
 
     private void shown(Seen seen) {
+        if (seen == showing) return;
+        showing = seen;
         frame.setImage(ScreenCapture.toFxImage(seen.image()));
         frameWidth = seen.image().getWidth();
         liveScreen = seen.screen();

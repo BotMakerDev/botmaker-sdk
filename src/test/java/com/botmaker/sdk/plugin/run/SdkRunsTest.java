@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.run;
 import com.botmaker.plugin.api.assist.ToolSchema;
 import com.botmaker.plugin.api.run.RunArguments;
 import com.botmaker.plugin.api.run.RunEntry;
+import com.botmaker.sdk.api.bot.Discover;
 import com.botmaker.sdk.api.bot.ExploreMap;
 import com.botmaker.sdk.api.bot.KeepExploring;
 import com.botmaker.sdk.internal.explore.ExploreBudget;
@@ -23,23 +24,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class SdkRunsTest {
 
     @Test
-    void theSdkDeclaresExploreMapAndKeepExploring() {
+    void theSdkDeclaresExploreMapKeepExploringAndDiscover() {
         List<RunEntry> entries = new SdkPlugin().runEntries();
 
-        assertEquals(List.of("Explore map", "Keep exploring"), entries.stream().map(RunEntry::title).toList());
-        assertEquals(List.of(ExploreMap.class.getName(), KeepExploring.class.getName()),
+        assertEquals(List.of("Explore map", "Keep exploring", "Discover"), entries.stream().map(RunEntry::title).toList());
+        assertEquals(List.of(ExploreMap.class.getName(), KeepExploring.class.getName(), Discover.class.getName()),
                 entries.stream().map(RunEntry::mainClass).toList());
-        assertEquals(List.of(false, false), entries.stream().map(RunEntry::onBar).toList(),
-                "both start from 🗺 Screens ▸ 🔭 Explore");
+        assertEquals(List.of(false, false, true), entries.stream().map(RunEntry::onBar).toList(),
+                "the first two start from 🗺 Screens ▸ 🔭 Explore, Discover from the toolbar: a blank bot has no map");
     }
 
     @Test
     void eachTakesItsBudgetAndNeedsNone() {
         List<RunEntry> entries = new SdkPlugin().runEntries();
 
-        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens")), entries.stream()
+        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens"),
+                List.of("url", "minutes", "maxPages", "show")), entries.stream()
                 .map(e -> e.schema().fields().stream().map(ToolSchema.Field::name).toList()).toList());
-        assertEquals(List.of(false, false), entries.stream().map(RunEntry::needsArguments).toList(),
+        assertEquals(List.of(false, false, false), entries.stream().map(RunEntry::needsArguments).toList(),
                 "the window starts them with none");
 
         String before = System.getProperty(RunArguments.PROPERTY);

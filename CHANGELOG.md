@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- `Element.ofRole(Role.LINK).index(24)`: a website's element nothing names, an icon link or a field with no label,
+  told apart by its index. Discover wrote no settled stop holding one before, since one value it cannot write drops
+  the whole stop.
+- 🔭 Explore shows a website run's page as the run last looked at it (`page.png` in the explore journal): the run's
+  browser is its own, so the game capture showed the desktop instead.
+
 - `api.screens.Field`: a check of what a text field holds now, read from the screen's tree when it is asked, the rule
   a form keeps: `.when(Condition.all(Field.valid(() -> Screens.SIGN_UP.email, Field.Kind.EMAIL),
   Field.atLeast(() -> Screens.SIGN_UP.password, 8)))`, each field named lazily as screens name each other. `filled`,

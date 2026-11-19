@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.types;
 
 import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.text.Words;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,10 @@ class ElementTypeTest {
                 Element.byContaining(Words.of("backup code")).inside(LIST),
                 Element.textField().below(LIST),
                 Element.passwordField(),
-                Element.byText(Words.of("Code")).containing(Words.of("code")).field());
+                Element.byText(Words.of("Code")).containing(Words.of("code")).field(),
+                Element.byRole(Role.LINK, Words.of("Pricing")).index(1),
+                // A website's icon link nothing names: its role and its place among the page's links.
+                Element.ofRole(Role.LINK).index(24));
         List<String> factories = new ArrayList<>();
         for (Element element : elements) {
             ComponentType<Element> writer = writer(element);
@@ -49,14 +53,15 @@ class ElementTypeTest {
             assertEquals(element, writer.build(writer.components(element)), element.toString());
         }
         assertEquals(List.of("byId", "byLabel", "byText", "byHolding", "byContaining", "textField", "passwordField",
-                "byText"), factories);
+                "byText", "byRole", "ofRole"), factories);
     }
 
     @Test
     void onlyOneDeclarationWritesEachElement() {
         for (Element element : List.of(Element.byId("a"), Element.byLabel(Words.of("a")),
                 Element.byText(Words.of("a")), Element.byHolding(Words.of("a")), Element.byContaining(Words.of("a")),
-                Element.textField(), Element.passwordField(), Element.byContaining(Words.of("a")).field())) {
+                Element.textField(), Element.passwordField(), Element.byContaining(Words.of("a")).field(),
+                Element.byRole(Role.BUTTON, Words.of("a")), Element.ofRole(Role.BUTTON))) {
             assertEquals(1, declarations().stream().filter(d -> d.writes(element)).count(), element.toString());
         }
     }

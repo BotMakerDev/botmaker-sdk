@@ -88,6 +88,14 @@ public record Element(String id, Words label, Words text, Words holding, Words c
                 required(role, "role"));
     }
 
+    /**
+     * A website's element of the role {@code role} that nothing names: an icon link, a field with no label, told
+     * apart by its {@link #index}: {@code Element.ofRole(Role.LINK).index(24)}.
+     */
+    public static Element ofRole(Role role) {
+        return new Element(null, null, null, null, null, false, false, null, null, null, null, required(role, "role"));
+    }
+
     /** The element whose own text is {@code text}. */
     public static Element byText(Words text) {
         return new Element(null, null, required(text, "text"), null, null, false, false, null, null, null, null);

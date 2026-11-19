@@ -75,8 +75,10 @@ public final class LivePlay implements ExploreLoop.Play {
     public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget,
                                           List<TreeAnswer> settled) {
         Plan plan = first.plan();
+        Journal journal = Journal.of(project);
+        journal.forgetPage();
         LivePlay play = new LivePlay(ScreenMaps.installed(), plan == null ? null : RunGame.rounds(plan, first.holders()),
-                restart);
+                restart, journal);
         AtomicReference<Generation> current = new AtomicReference<>(first);
         ExploreLoop.Reload reload = () -> switch (current.get().next(project, current.get().number() + 1)) {
             case Generation.Ok(Generation next) -> {
@@ -89,14 +91,14 @@ public final class LivePlay implements ExploreLoop.Play {
             case Generation.Refused(List<String> errors) ->
                     new ExploreLoop.Reload.Reloaded(current.get().number(), ScreenMaps.installed(), null, errors);
         };
-        return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), Journal.of(project),
+        return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), journal,
                 ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
                         .upTo(budget.screens()), System::currentTimeMillis).handOn(settled).run();
     }
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
     public static LivePlay over(ScreenGraph map, Runnable restart) {
-        return new LivePlay(map, null, restart);
+        return new LivePlay(map, null, restart, null);
     }
 
     /** The guards with the author's words of {@code generation}'s bot. */
@@ -117,13 +119,21 @@ public final class LivePlay implements ExploreLoop.Play {
 
     private final Reach reach = new RunReach();
     private final Runnable restart;
+    /** Where a website's page is written as it is looked at; null: nowhere. */
+    private final Journal journal;
+    /** When the page was last written to {@link #journal}. */
+    private volatile long pageAt;
     private volatile ScreenGraph map;
     private volatile LiveMoves moves;
     private volatile BooleanSupplier rounds;
 
-    /** Plays {@code map} with the plan's {@code rounds} (null: no plan); {@code restart} restarts the game. */
-    private LivePlay(ScreenGraph map, BooleanSupplier rounds, Runnable restart) {
+    /**
+     * Plays {@code map} with the plan's {@code rounds} (null: no plan); {@code restart} restarts the game; a website's
+     * page goes to {@code journal} (null: nowhere).
+     */
+    private LivePlay(ScreenGraph map, BooleanSupplier rounds, Runnable restart, Journal journal) {
         this.restart = restart;
+        this.journal = journal;
         use(map, rounds);
     }
 
@@ -139,6 +149,13 @@ public final class LivePlay implements ExploreLoop.Play {
         if (screen != null) RunFacts.seen(screen);
         Optional<BufferedImage> frame = reach.look();
         if (frame.isEmpty()) return ExploreLoop.Look.NOTHING;
+        // The run's browser is its own, headless or not: the Explore window sees the page only through the journal,
+        // which it reads once a second, so no more often than that.
+        long now = System.currentTimeMillis();
+        if (journal != null && now - pageAt >= 1_000 && WebSource.of(Source.current()).isPresent()) {
+            pageAt = now;
+            journal.page(frame.get());
+        }
         List<Stop.Text> texts = read(frame.get()).stream().map(text -> new Stop.Text(text.text(), text.bounds())).toList();
         List<Rect> covered = new ArrayList<>();
         Optional<MapScreen> mapped = screen == null ? Optional.empty() : map.screen(screen);
