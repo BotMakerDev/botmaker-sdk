@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -76,7 +77,7 @@ class ExploreToolsTest {
     @Test
     void waitAnswersTheOpenStop() {
         Journal journal = journal();
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
 
         AgentReply reply = ExploreTools.waitFor(journal, Duration.ofSeconds(30));
@@ -95,7 +96,7 @@ class ExploreToolsTest {
     @Test
     void waitTimesOutWithCounts() {
         Journal journal = journal();
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.NewScreen("Home", null, null, 2));
         journal.append(new ExploreEvent.Claude(JournalView.WAIT, 3));
         journal.append(new ExploreEvent.Tried("Home", "shop", null, null, 4));
@@ -110,7 +111,7 @@ class ExploreToolsTest {
     void aParkedStopIsSaidOnceThenWaitBlocks() {
         Journal journal = journal();
         Stop parked = stop("wrong_arrival-1");
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(parked, false, 2));
         journal.append(new ExploreEvent.Parked(parked.id(), 3));
         journal.queue(List.of(parked));
@@ -125,7 +126,7 @@ class ExploreToolsTest {
     void anEndedRunIsSaidBeforeItsParkedStops() {
         Journal journal = journal();
         Stop parked = stop("wrong_arrival-1");
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Parked(parked.id(), 3));
         journal.queue(List.of(parked));
         journal.append(new ExploreEvent.Ended(ExploreLoop.End.BUDGET, 60_001));
@@ -139,7 +140,7 @@ class ExploreToolsTest {
     @Test
     void waitWakesOnAStop() {
         Journal journal = journal();
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         CompletableFuture.runAsync(() -> {
             try {
                 Thread.sleep(200);
@@ -159,7 +160,7 @@ class ExploreToolsTest {
     @Test
     void resumeAnswersRefusedWithErrors() {
         Journal journal = journal();
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
         run(command -> {
             if (command instanceof Journal.Command.Resume(String id, boolean ignore)) {
@@ -178,7 +179,7 @@ class ExploreToolsTest {
     @Test
     void twoResumesGiveOneGeneration() throws Exception {
         Journal journal = journal();
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
         AtomicInteger reloads = new AtomicInteger();
         run(command -> {
@@ -204,7 +205,7 @@ class ExploreToolsTest {
     void resumeOfAParkedStopReopensIt() {
         Journal journal = journal();
         Stop parked = stop("wrong_arrival-1");
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(parked, false, 2));
         journal.append(new ExploreEvent.Parked(parked.id(), 3));
         journal.queue(List.of(parked));
@@ -225,5 +226,79 @@ class ExploreToolsTest {
 
         assertTrue(said.startsWith("Resumed: reloaded as generation 2"), said);
         assertTrue(JournalView.of(journal).queue().isEmpty());
+    }
+
+    /** A dev run held on {@code stop}, which Claude called a fault. */
+    private Journal heldOn(Stop stop) {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(stop, false, 2));
+        journal.append(new ExploreEvent.Faulted(stop.id(), "claude", "judged a toggle as navigation", "", "2.0.0-SNAPSHOT",
+                3));
+        return journal;
+    }
+
+    @Test
+    void resumeOnAFaultIsRefused() {
+        Journal journal = heldOn(stop("wrong_arrival-1"));
+
+        AgentReply reply = ExploreTools.resume(journal, "wrong_arrival-1", false, Duration.ofSeconds(1));
+
+        assertTrue(reply.isRefused());
+        assertTrue(text(reply).contains("a fault resumes through reload_sdk"), text(reply));
+        assertFalse(journal.commandWaiting(), "nothing asked of the run");
+        String waited = text(ExploreTools.waitFor(journal, Duration.ofSeconds(1)));
+        assertTrue(waited.contains("Discover fault (claude): judged a toggle as navigation"), waited);
+        assertTrue(waited.contains("SDK: 2.0.0-SNAPSHOT") && waited.contains("reload_sdk"), waited);
+    }
+
+    @Test
+    void resumeIgnoreDropsAFault() {
+        Journal journal = heldOn(stop("wrong_arrival-1"));
+        run(command -> {
+            if (command instanceof Journal.Command.Resume(String id, boolean ignore) && ignore) {
+                journal().append(new ExploreEvent.Reloaded(id, 2, List.of(), 4));
+                journal().append(new ExploreEvent.Fixed(id, "ignored", 5));
+            }
+        });
+
+        String said = text(ExploreTools.resume(journal, "wrong_arrival-1", true, Duration.ofSeconds(20)));
+
+        assertTrue(said.startsWith("Resumed: reloaded as generation 2"), said);
+        assertTrue(JournalView.of(journal).open().isEmpty(), "the fault is dropped");
+    }
+
+    @Test
+    void faultActionWritesTheCommand() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
+        List<Journal.Command> taken = new CopyOnWriteArrayList<>();
+        run(command -> {
+            taken.add(command);
+            if (command instanceof Journal.Command.Fault(String id, String why)) {
+                journal().append(new ExploreEvent.Faulted(id, "claude", why, "", "", 3));
+            }
+        });
+
+        String said = text(ExploreTools.fault(journal, "wrong_arrival-1", " judged a toggle\nas navigation ",
+                Duration.ofSeconds(20)));
+
+        assertTrue(said.startsWith("Held wrong_arrival-1 as a Discover fault: judged a toggle as navigation."), said);
+        assertEquals(List.of(new Journal.Command.Fault("wrong_arrival-1", "judged a toggle as navigation")), taken);
+        assertTrue(JournalView.of(journal).held(stop("wrong_arrival-1")));
+    }
+
+    @Test
+    void aFaultIsRefusedOutOfDevMode() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(false, 1));
+        journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
+
+        AgentReply reply = ExploreTools.fault(journal, "wrong_arrival-1", "judged wrong", Duration.ofSeconds(1));
+
+        assertTrue(reply.isRefused());
+        assertTrue(text(reply).contains("released SDK"), text(reply));
+        assertFalse(journal.commandWaiting());
     }
 }

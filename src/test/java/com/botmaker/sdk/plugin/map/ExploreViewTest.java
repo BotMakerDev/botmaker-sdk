@@ -81,7 +81,7 @@ class ExploreViewTest extends ApplicationTest {
     @Test
     void feedShowsNewestFirst() {
         running = true;
-        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Began(false, 1_000));
         journal.append(new ExploreEvent.NewScreen("HOME", null, null, 2_000));
         journal.append(new ExploreEvent.NewScreen("SHOP", "HOME", "shop", 3_000));
         journal.append(new ExploreEvent.GoalMet("GOLD", 4_000));
@@ -102,7 +102,7 @@ class ExploreViewTest extends ApplicationTest {
         running = true;
         Stop stop = new Stop("MISSING_FACT-1", StopKind.MISSING_FACT, "HOME", "HOME#10,10", "", List.of(), List.of(),
                 Map.of(), List.of(), "the gold no readout reads", 2_000);
-        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Began(false, 1_000));
         journal.append(new ExploreEvent.Stopped(stop, false, 2_000));
         journal.append(new ExploreEvent.Claude("crop_pictures", 3_000));
 
@@ -125,7 +125,7 @@ class ExploreViewTest extends ApplicationTest {
     void killedRunShowsEnded() {
         Stop stop = new Stop("GUARD-1", StopKind.GUARD, "HOME", "HOME", "", List.of(), List.of(), Map.of(), List.of(),
                 "a foreign window", 2_000);
-        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Began(false, 1_000));
         journal.append(new ExploreEvent.Stopped(stop, false, 4_000));
 
         // Its JVM was stopped from Studio: no Ended line, and the host runs nothing.
@@ -139,7 +139,7 @@ class ExploreViewTest extends ApplicationTest {
     void laterRunIsNotTheExploreRun() {
         Stop stop = new Stop("GUARD-1", StopKind.GUARD, "HOME", "HOME", "", List.of(), List.of(), Map.of(), List.of(),
                 "a foreign window", 2_000);
-        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Began(false, 1_000));
         journal.append(new ExploreEvent.Stopped(stop, false, 4_000));
 
         // The explore run was killed; the host now runs a process that began long after it: the bot's own run.
@@ -159,7 +159,7 @@ class ExploreViewTest extends ApplicationTest {
                 Map.of(), List.of(), "the gold no readout reads", 2_000);
         Stop second = new Stop("MISSING_FACT-2", StopKind.MISSING_FACT, "SHOP", "SHOP#5,5", "", List.of(), List.of(),
                 Map.of(), List.of(), "the gems no readout reads", 5_000);
-        journal.append(new ExploreEvent.Began(1_000));
+        journal.append(new ExploreEvent.Began(false, 1_000));
         journal.append(new ExploreEvent.Stopped(first, false, 2_000));
         journal.append(new ExploreEvent.Claude("edit_map", 3_000));
         journal.append(new ExploreEvent.Fixed("MISSING_FACT-1", "a readout", 4_000));

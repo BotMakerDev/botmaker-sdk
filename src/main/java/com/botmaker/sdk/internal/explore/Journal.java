@@ -64,10 +64,20 @@ public final class Journal {
         /** End the run. */
         record End() implements Command {}
 
-        /** {@code line} as a command ({@code resume <id> [ignore]}, {@code stop}); empty for one this run does not know. */
+        /** Hold the open stop {@code stopId} as a Discover fault, {@code why} one line (2026-11-19): dev mode only. */
+        record Fault(String stopId, String why) implements Command {}
+
+        /**
+         * {@code line} as a command ({@code resume <id> [ignore]}, {@code fault <id> <why>}, {@code stop}); empty for
+         * one this run does not know.
+         */
         static Optional<Command> parse(String line) {
             String[] said = (line == null ? "" : line.strip()).split("\\s+");
             if (said.length == 1 && said[0].equals("stop")) return Optional.of(new End());
+            if (said[0].equals("fault") && said.length >= 3) {
+                String[] parts = line.strip().split("\\s+", 3);
+                return Optional.of(new Fault(parts[1], parts[2].strip()));
+            }
             if (said[0].equals("resume") && (said.length == 2 || said.length == 3 && said[2].equals("ignore"))) {
                 return Optional.of(new Resume(said[1], said.length == 3));
             }

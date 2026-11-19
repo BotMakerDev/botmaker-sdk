@@ -99,6 +99,29 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return !answers(stop.id()).isEmpty();
     }
 
+    /** Whether the latest run plays on an SDK under development, so it raises and holds Discover faults. */
+    public boolean dev() {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Began began) return began.dev();
+        }
+        return false;
+    }
+
+    /** What made the stop {@code stopId} a Discover fault in the latest run; empty for a plain stop. */
+    public Optional<ExploreEvent.Faulted> fault(String stopId) {
+        return events.stream().filter(ExploreEvent.Faulted.class::isInstance).map(ExploreEvent.Faulted.class::cast)
+                .filter(f -> f.stopId().equals(stopId)).reduce((first, last) -> last);
+    }
+
+    /**
+     * Whether {@code stop} is held as a Discover fault now: the stop the run waits on, raised as one or called one by
+     * Claude. A fault dropped by a resume with ignore is held no more.
+     */
+    public boolean held(Stop stop) {
+        if (open().filter(s -> s.id().equals(stop.id())).isEmpty()) return false;
+        return stop.kind() == StopKind.FAULT || fault(stop.id()).isPresent();
+    }
+
     /** The parked stop {@code stopId}, if the queue holds it. */
     public Optional<Stop> parked(String stopId) {
         return queue.stream().filter(s -> s.id().equals(stopId)).findFirst();

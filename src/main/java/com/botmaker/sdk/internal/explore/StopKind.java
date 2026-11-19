@@ -34,6 +34,11 @@ public enum StopKind {
      * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.
      */
     SETTLED("settled", "Settled by the tree"),
+    /**
+     * Discover itself got it wrong, not the bot (2026-11-19): raised only by a run on a {@code -SNAPSHOT} SDK
+     * ({@link DevBuild}), held until the SDK is fixed and reloaded, never parked ({@link ExploreEvent.Faulted}).
+     */
+    FAULT("fault", "Discover fault"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

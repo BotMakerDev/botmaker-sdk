@@ -33,6 +33,7 @@ public sealed interface ExploreEvent {
             case Claude ignored -> "claude";
             case Settled ignored -> "settled";
             case Pictured ignored -> "pictured";
+            case Faulted ignored -> "faulted";
         };
     }
 
@@ -52,12 +53,32 @@ public sealed interface ExploreEvent {
             case "claude" -> Claude.class;
             case "settled" -> Settled.class;
             case "pictured" -> Pictured.class;
+            case "faulted" -> Faulted.class;
             default -> null;
         };
     }
 
-    /** A run started: what the journal held before it is an earlier run's. */
-    record Began(long at) implements ExploreEvent {}
+    /**
+     * A run started: what the journal held before it is an earlier run's. {@code dev}: it plays on a {@code -SNAPSHOT}
+     * SDK, so it raises and holds Discover faults (false when an older SDK wrote the line).
+     */
+    record Began(boolean dev, long at) implements ExploreEvent {}
+
+    /**
+     * The stop {@code stopId} is a Discover fault, held until the SDK is fixed and reloaded (2026-11-19): {@code source}
+     * what found it ({@code claude} for one Claude called), {@code why} one line, {@code evidence} what proves it,
+     * {@code sdkVersion} the SDK the run plays on (blank when unknown). Written right after its {@link Stopped}, or
+     * later, when Claude calls a plain open stop a fault.
+     */
+    record Faulted(String stopId, String source, String why, String evidence, String sdkVersion, long at)
+            implements ExploreEvent {
+        public Faulted {
+            source = source == null ? "" : source;
+            why = why == null ? "" : why;
+            evidence = evidence == null ? "" : evidence;
+            sdkVersion = sdkVersion == null ? "" : sdkVersion;
+        }
+    }
 
     /** The run ended, {@code end} why (null: an end this SDK does not know). */
     record Ended(ExploreLoop.End end, long at) implements ExploreEvent {}

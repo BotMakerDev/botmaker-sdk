@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Dev discovery, for whoever edits the SDK: on a `-SNAPSHOT` SDK, *Keep exploring* holds a **Discover fault** (🛠 in
+  🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never
+  parked. Claude calls an open stop one with `explore fault`; `resume` on a fault is refused, `resume ignore` drops
+  it. A run on a released SDK never raises one.
 - The Game window's target field takes a website's address as it is (`https://nunu.ai`), and its hint says so; it
   used to take only `web:https://nunu.ai`, which nothing on screen named.
 - `Element.ofRole(Role.LINK).index(24)`: a website's element nothing names, an icon link or a field with no label,

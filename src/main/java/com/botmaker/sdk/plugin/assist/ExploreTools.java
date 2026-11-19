@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
+import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.plugin.run.SdkRuns;
@@ -74,6 +75,12 @@ final class ExploreTools {
     record Stop() implements Action {
     }
 
+    @Describe("dev mode: hold the open stop as a Discover fault, Discover's own mistake rather than the site's, until "
+            + "the SDK is fixed")
+    record Fault(@Describe("the open stop's id, as wait names it") String stop,
+                 @Describe("one line: what Discover got wrong") String why) implements Action {
+    }
+
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
@@ -96,8 +103,59 @@ final class ExploreTools {
             case Queue ignored -> queue(journal);
             case Resume resume -> resume(journal, resume.stop(), Boolean.TRUE.equals(resume.ignore()), RESUME_WITHIN);
             case Stop ignored -> stop(journal, STOP_WITHIN);
+            case Fault fault -> fault(journal, fault.stop(), fault.why(), STOP_WITHIN);
         };
     }
+
+    /**
+     * Has the run hold its open stop {@code stopId} as a Discover fault, {@code why} one line, and answers once it
+     * did (2026-11-19). Refused when the run plays on a released SDK: a fault is for whoever edits the SDK.
+     */
+    static AgentReply fault(Journal journal, String stopId, String why, Duration within) {
+        if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the stop to hold, as wait names it.");
+        if (why == null || why.isBlank()) return AgentReply.refused("Say in one line what Discover got wrong.");
+        String id = stopId.strip();
+        String line = why.strip().replaceAll("\\s+", " ");
+        synchronized (RESUMING) {
+            JournalView view = JournalView.of(journal);
+            if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended; run_bot entry \""
+                    + SdkRuns.KEEP_EXPLORING + "\" starts another." : noRun());
+            if (!view.dev()) {
+                return AgentReply.refused("This run plays on a released SDK: a Discover fault is for whoever edits the "
+                        + "SDK, in a dev-mode project on a local -SNAPSHOT build. Fix the bot, or resume with ignore.");
+            }
+            Optional<com.botmaker.sdk.internal.explore.Stop> open = view.open().filter(s -> s.id().equals(id));
+            if (open.isEmpty()) {
+                return AgentReply.refused("No stop " + id + " is open: only the stop the run waits on is held as a "
+                        + "fault. " + ids(view));
+            }
+            if (view.held(open.get())) return AgentReply.text(id + " is held as a Discover fault already.");
+            int seen = view.all().size();
+            claude(journal, "fault " + id);
+            journal.command("fault " + id + " " + line);
+            long deadline = System.nanoTime() + within.toNanos();
+            while (true) {
+                List<ExploreEvent> all = journal.events();
+                for (ExploreEvent event : all.subList(Math.min(seen, all.size()), all.size())) {
+                    if (event instanceof ExploreEvent.Faulted faulted && faulted.stopId().equals(id)) {
+                        return AgentReply.text("Held " + id + " as a Discover fault: " + line + ". " + FIX_THE_SDK);
+                    }
+                }
+                if (!JournalView.of(journal).running()) {
+                    return AgentReply.refused("The run ended before it held " + id + ".");
+                }
+                if (!changed(journal, all.size(), deadline)) {
+                    // A fault the run never took may be lost (the stop moved on, or a later command replaced it).
+                    return AgentReply.refused("The run did not hold " + id + " in " + within.toSeconds()
+                            + " s. Wait, and call fault again on the stop it waits on.");
+                }
+            }
+        }
+    }
+
+    /** What Claude does with a held fault. */
+    private static final String FIX_THE_SDK = "Fix the SDK with its test and install it; explore reload_sdk then "
+            + "replays the stop on the new build.";
 
     /**
      * Answers at once with the open stop, else the oldest parked one, else the screens found since the last wait;
@@ -129,7 +187,7 @@ final class ExploreTools {
         String found = screens.isEmpty() ? "" : "\nNew screens since the last wait: " + String.join(", ", screens) + ".";
         // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude.
         if (view.open().isPresent() && !view.settled(view.open().get())) {
-            return Optional.of(AgentReply.text("The run waits on this stop:\n" + whole(view.open().get()) + found));
+            return Optional.of(AgentReply.text("The run waits on this stop:\n" + whole(view.open().get(), view) + found));
         }
         if (view.ended().isPresent()) {
             return Optional.of(AgentReply.text("The run ended (" + view.ended().get().displayName() + "): "
@@ -149,7 +207,8 @@ final class ExploreTools {
         JournalView view = JournalView.of(journal);
         if (!view.began()) return AgentReply.refused(noRun());
         String state = view.ended().map(end -> "Ended (" + end.displayName() + "). ").orElse(
-                view.open().map(s -> "Waits on " + s.id() + ": " + s.missing() + ". ").orElse("Running. "));
+                view.open().map(s -> (view.held(s) ? "Holds the Discover fault " : "Waits on ") + s.id() + ": "
+                        + s.missing() + ". ").orElse("Running. "));
         return AgentReply.text(state + counts(view));
     }
 
@@ -175,6 +234,9 @@ final class ExploreTools {
             if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended; run_bot entry \""
                     + SdkRuns.KEEP_EXPLORING + "\" starts another." : noRun());
             boolean open = view.open().filter(s -> s.id().equals(id)).isPresent();
+            if (!ignore && view.open().filter(s -> s.id().equals(id)).filter(view::held).isPresent()) {
+                return AgentReply.refused(id + " is a Discover fault: " + ExploreLoop.FAULT_RESUMES + ".");
+            }
             if (!open && view.parked(id).isEmpty()) {
                 Optional<ExploreEvent.Reloaded> done = view.reloadOf(id).filter(r -> !r.refused());
                 if (done.isPresent()) return AgentReply.text("Already resumed: " + took(done.get()));
@@ -238,8 +300,31 @@ final class ExploreTools {
                 + "'s place again, and wait says whether the fix took.";
     }
 
+    /**
+     * {@code stop} whole as {@link #whole(com.botmaker.sdk.internal.explore.Stop)} says it, and, held as a Discover
+     * fault in {@code view}, what found it, its evidence, the SDK it plays on, and how it goes on.
+     */
+    static String whole(com.botmaker.sdk.internal.explore.Stop stop, JournalView view) {
+        if (!view.held(stop)) return whole(stop);
+        List<String> fault = new ArrayList<>();
+        view.fault(stop.id()).ifPresent(faulted -> {
+            fault.add("Discover fault (" + (faulted.source().isEmpty() ? "unknown source" : faulted.source()) + "): "
+                    + faulted.why());
+            if (!faulted.evidence().isEmpty()) fault.add("Evidence: " + faulted.evidence());
+            if (!faulted.sdkVersion().isEmpty()) fault.add("SDK: " + faulted.sdkVersion());
+        });
+        fault.add(FIX_THE_SDK + " Resume ignore true drops it as a misreading.");
+        return whole(stop, fault);
+    }
+
     /** {@code stop} whole, as Claude fixes it from: what is missing, the frame, what was read and pressed. */
     static String whole(com.botmaker.sdk.internal.explore.Stop stop) {
+        return whole(stop, List.of("Fix it with the map tools, then explore resume stop " + stop.id()
+                + " (ignore true: it is fine as it is)."));
+    }
+
+    /** {@code stop} whole, ending with {@code end}: how Claude goes on from it. */
+    private static String whole(com.botmaker.sdk.internal.explore.Stop stop, List<String> end) {
         List<String> lines = new ArrayList<>();
         lines.add(stop.id() + ": " + stop.kind().displayName() + " on " + (stop.screen() == null ? "a screen the map "
                 + "lacks" : stop.screen()) + (stop.place().isEmpty() ? "" : " (" + stop.place() + ")"));
@@ -256,8 +341,7 @@ final class ExploreTools {
                     .collect(Collectors.joining("; ")));
         }
         if (!stop.lastPresses().isEmpty()) lines.add("Last presses: " + String.join(", ", stop.lastPresses()));
-        lines.add("Fix it with the map tools, then explore resume stop " + stop.id()
-                + " (ignore true: it is fine as it is).");
+        lines.addAll(end);
         return String.join("\n", lines);
     }
 

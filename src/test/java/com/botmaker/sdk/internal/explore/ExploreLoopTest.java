@@ -71,6 +71,18 @@ class ExploreLoopTest {
         /** The screen's tree, null for a game with none. */
         Effect.State state;
         final List<String> pressed = new ArrayList<>();
+        /** Whether the run plays on a -SNAPSHOT SDK, so faults are raised and held. */
+        boolean dev;
+
+        @Override
+        public boolean dev() {
+            return dev;
+        }
+
+        @Override
+        public String sdkVersion() {
+            return dev ? "9.9.9-SNAPSHOT" : "9.9.9";
+        }
 
         @Override
         public Optional<Effect.State> state() {
@@ -437,6 +449,92 @@ class ExploreLoopTest {
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "parked on time despite the stale resumes");
         assertTrue(events(ExploreEvent.Reloaded.class).stream().allMatch(ExploreEvent.Reloaded::refused),
                 "a stale resume reloads nothing, and says so");
+    }
+
+    @Test
+    void aFaultIsHeldPastParkAfter() {
+        Game game = new Game();
+        game.dev = true;
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(35).toMillis()) journal().command("stop");
+        };
+        ExploreLoop loop = loop(map(), game, same(map()), Duration.ofHours(2));
+
+        ExploreLoop.Paused paused = loop.fault(StopKind.WRONG_ARRIVAL, "A", "A.b→B", "did-not-take",
+                "what the tree settled did not take", "NewWay A.b → B");
+
+        assertEquals(ExploreLoop.Paused.END, paused, "held until the run was stopped, 35 min in");
+        Stop held = stops().getFirst().stop();
+        assertEquals(StopKind.FAULT, held.kind());
+        assertEquals(List.of(new ExploreEvent.Faulted(held.id(), "did-not-take", "what the tree settled did not take",
+                "NewWay A.b → B", "9.9.9-SNAPSHOT", 0)), events(ExploreEvent.Faulted.class));
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked, 3 times its parking time");
+        assertTrue(journal().queue().isEmpty());
+    }
+
+    @Test
+    void aFaultIsAPlainStopOutOfDevMode() {
+        Game game = new Game();
+        ExploreLoop loop = loop(map(), game, same(map()), Duration.ofHours(2));
+
+        ExploreLoop.Paused paused = loop.fault(StopKind.WRONG_ARRIVAL, "A", "A.b→B", "did-not-take",
+                "what the tree settled did not take", "NewWay A.b → B");
+
+        assertEquals(ExploreLoop.Paused.PARKED, paused);
+        assertEquals(StopKind.WRONG_ARRIVAL, stops().getFirst().stop().kind());
+        assertTrue(events(ExploreEvent.Faulted.class).isEmpty(), "a bot's author is never told to edit the SDK");
+    }
+
+    @Test
+    void aCommandFaultTurnsTheOpenStopIntoAFault() {
+        Game game = new Game();
+        game.dev = true;
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "D") : new Took(Arrival.AT_TARGET, edge.to());
+        int[] reloads = {0};
+        ExploreLoop.Reload reload = () -> {
+            reloads[0]++;
+            return new ExploreLoop.Reload.Reloaded(2, map(), null, List.of());
+        };
+        game.onIdle = () -> {
+            if (game.nowMs == Duration.ofMinutes(1).toMillis()) {
+                journal().command("fault " + openStop() + " judged a toggle as navigation");
+            }
+            if (game.nowMs == Duration.ofMinutes(20).toMillis()) journal().command("resume " + openStop());
+        };
+
+        loop(map(), game, reload, Duration.ofMinutes(40)).run();
+
+        String id = stops().getFirst().stop().id();
+        assertEquals(1, stops().size(), stops().toString());
+        assertEquals(List.of(new ExploreEvent.Faulted(id, "claude", "judged a toggle as navigation", "",
+                "9.9.9-SNAPSHOT", Duration.ofMinutes(1).toMillis())), events(ExploreEvent.Faulted.class));
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "held, not parked");
+        assertEquals(List.of(ExploreLoop.FAULT_RESUMES), events(ExploreEvent.Reloaded.class).getFirst().errors());
+        assertEquals(0, reloads[0], "a fault resumes through reload_sdk, not by reloading the bot");
+        assertFalse(game.taken.contains("A.d→D"), "the run held, it went nowhere else");
+    }
+
+    @Test
+    void aFaultHoldsWhileAPlainStopStaysParked() {
+        Game game = new Game();
+        game.dev = true;
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "D") : new Took(Arrival.AT_TARGET, edge.to());
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !stops().isEmpty() && stops().getLast().stop().kind() == StopKind.STUCK) {
+                sent[0] = true;
+                journal().command("fault " + openStop() + " stuck while inputs were left");
+            }
+        };
+
+        loop(map(), game, same(map()), Duration.ofMinutes(90)).run();
+
+        String wrong = stops().getFirst().stop().id();
+        String stuck = stops().getLast().stop().id();
+        assertTrue(sent[0], stops().toString());
+        assertEquals(List.of(wrong), events(ExploreEvent.Parked.class).stream().map(ExploreEvent.Parked::stopId).toList());
+        assertEquals(List.of(stuck), events(ExploreEvent.Faulted.class).stream().map(ExploreEvent.Faulted::stopId).toList());
+        assertEquals(List.of(wrong), journal().queue().stream().map(Stop::id).toList(), "the plain stop stays queued");
     }
 
     @Test

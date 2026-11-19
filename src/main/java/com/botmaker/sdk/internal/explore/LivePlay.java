@@ -236,6 +236,8 @@ public final class LivePlay implements ExploreLoop.Play {
                     ? "Resume refused: " + String.join("; ", reloaded.errors())
                     : "Reloaded as generation " + reloaded.generation(), Map.of());
             case ExploreEvent.Parked(String stopId, long ignored) -> Say.info("Parked " + stopId, Map.of());
+            case ExploreEvent.Faulted faulted -> Say.warn("Held " + faulted.stopId() + " as a Discover fault: "
+                    + faulted.why(), Map.of());
             case ExploreEvent.Fixed(String stopId, String why, long ignored) -> Say.info("Fixed " + stopId + ": " + why, Map.of());
             default -> {}
         }

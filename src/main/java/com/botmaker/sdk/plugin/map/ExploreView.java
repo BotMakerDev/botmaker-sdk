@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
+import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -457,8 +458,10 @@ final class ExploreView {
                     + e.stop().kind().displayName() + ": " + e.stop().missing();
             case ExploreEvent.Fixed e -> "✔ " + e.stopId() + " fixed" + (e.why() == null ? "" : ": " + e.why());
             case ExploreEvent.Parked e -> "⏸ " + e.stopId() + " parked: nobody answered, the run goes on elsewhere";
+            case ExploreEvent.Faulted e -> "🛠 " + e.stopId() + " Discover fault: " + e.why();
             case ExploreEvent.Reloaded e -> e.refused()
-                    ? "⏸ " + e.stopId() + ": the bot did not compile, " + e.errors().getFirst()
+                    ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
+                    ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()
                     : "✔ " + e.stopId() + ": the bot reloaded, generation " + e.generation();
         };
     }

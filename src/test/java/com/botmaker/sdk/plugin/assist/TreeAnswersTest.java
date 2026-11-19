@@ -248,7 +248,7 @@ class TreeAnswersTest {
     @Test
     void theWatchWritesASettledStopOnceAndResumesIt(@TempDir Path folder) {
         Journal journal = new Journal(folder);
-        journal.append(new ExploreEvent.Began(1));
+        journal.append(new ExploreEvent.Began(false, 1));
         List<TreeAnswer> answers = List.of(new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees"));
         journal.append(new ExploreEvent.Settled("settled-1", answers, 2));
         journal.append(new ExploreEvent.Stopped(new Stop("settled-1", StopKind.SETTLED, "A", "A.toggle", null,

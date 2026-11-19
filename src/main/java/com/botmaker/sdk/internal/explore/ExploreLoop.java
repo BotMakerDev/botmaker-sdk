@@ -236,6 +236,16 @@ public final class ExploreLoop {
         default Optional<String> picture(String name, Rectangle box) {
             return Optional.empty();
         }
+
+        /** Whether the run plays on an SDK under development, so it raises and holds Discover faults. */
+        default boolean dev() {
+            return DevBuild.on();
+        }
+
+        /** The SDK's version, for a fault's evidence; blank when unknown. */
+        default String sdkVersion() {
+            return DevBuild.version();
+        }
     }
 
     /** Compiles the bot again and installs it: what came of it. */
@@ -262,10 +272,15 @@ public final class ExploreLoop {
     static final String MAP = "map";
 
     /** How a stop the loop paused on ended. */
-    private enum Paused { RESUMED, BACK, PARKED, END }
+    enum Paused { RESUMED, BACK, PARKED, END }
+
+    /** A resume of a fault without ignore is answered with this, and the fault stays held. */
+    public static final String FAULT_RESUMES = "a fault resumes through reload_sdk; resume ignore drops it as a misreading";
 
     private final Journal journal;
     private final Play play;
+    /** Whether faults are raised and held: the SDK is a {@code -SNAPSHOT} build ({@link Play#dev}). */
+    private final boolean dev;
     private final Reload reload;
     private Guards guards;
     private final Settings settings;
@@ -314,6 +329,7 @@ public final class ExploreLoop {
         this.journal = journal;
         this.settings = settings;
         this.nowMs = nowMs;
+        this.dev = play.dev();
         // A queue a run before left is avoided too; stop numbers go on from the journal's.
         for (Stop stop : journal.queue()) parked.put(key(stop), stop);
         stops = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
@@ -334,7 +350,7 @@ public final class ExploreLoop {
         lastPress = began;
         // A command a run before left is not this run's.
         journal.takeCommand();
-        emit(new ExploreEvent.Began(began));
+        emit(new ExploreEvent.Began(dev, began));
         End end = End.BROKE;
         try {
             end = rounds();
@@ -839,6 +855,25 @@ public final class ExploreLoop {
      * again: null.
      */
     private Paused stop(StopKind kind, String screen, String place, Look look, String missing, boolean neverParks) {
+        return stop(kind, screen, place, look, missing, neverParks, null);
+    }
+
+    /**
+     * A Discover fault (2026-11-19): in dev mode a stop of kind {@link StopKind#FAULT} on {@code place}, {@code why}
+     * its missing line, held until the SDK is reloaded or the run ends; {@code source} says what found it and
+     * {@code evidence} what proves it. Out of dev mode the stop of kind {@code plain} is raised instead, as the source
+     * raised it before faults existed: a bot's author is never told to edit the SDK. Null when that stop is parked.
+     */
+    Paused fault(StopKind plain, String screen, String place, String source, String why, String evidence) {
+        if (!dev) return stop(plain, screen, place, Look.NOTHING, why, false);
+        return stop(StopKind.FAULT, screen, place, Look.NOTHING, why, true, new Fault(source, evidence));
+    }
+
+    /** What found a fault the run raised, and what proves it. */
+    private record Fault(String source, String evidence) {}
+
+    private Paused stop(StopKind kind, String screen, String place, Look look, String missing, boolean neverParks,
+                        Fault fault) {
         if (parked.containsKey(parkedKey(kind, place))) return null;
         String id = kind.id() + "-" + ++stops;
         Stop stop = new Stop(id, kind, screen, place, play.keep(id), look.texts(), look.elements(), look.facts(),
@@ -848,22 +883,38 @@ public final class ExploreLoop {
                 stop.facts(), stop.lastPresses(), "the fix did not take: " + missing, stop.at());
         resumed = null;
         emit(new ExploreEvent.Stopped(stop, again, nowMs.getAsLong()));
+        if (fault != null) {
+            emit(new ExploreEvent.Faulted(id, fault.source(), missing, fault.evidence(), play.sdkVersion(),
+                    nowMs.getAsLong()));
+        }
         Paused paused = pause(stop, neverParks);
         // The time paused is Claude's, not the run's: it does not count as nothing pressed.
         lastPress = nowMs.getAsLong();
         return paused;
     }
 
-    /** Waits on {@code stop} for a command, the game back in front, or its parking time. */
+    /**
+     * Waits on {@code stop} for a command, the game back in front, or its parking time. A fault is held instead: only
+     * the SDK's reload, a resume with ignore, or the run's end lets it go.
+     */
     private Paused pause(Stop stop, boolean neverParks) {
         String id = stop.id();
+        boolean held = stop.kind() == StopKind.FAULT;
         long deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
         while (true) {
             Optional<Journal.Command> command = journal.takeCommand();
             if (command.orElse(null) instanceof Journal.Command.End || spent()) return Paused.END;
+            // Claude calls this stop a fault: held from now on. Out of dev mode, or for another stop, it is dropped.
+            if (command.orElse(null) instanceof Journal.Command.Fault(String stopId, String why)
+                    && dev && !held && id.equals(stopId)) {
+                held = true;
+                emit(new ExploreEvent.Faulted(id, "claude", why, "", play.sdkVersion(), nowMs.getAsLong()));
+            }
             // A resume of a stop that is neither this one nor parked is stale: it changes nothing.
             if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore)) {
-                if (stop.id().equals(stopId) || parked(stopId)) {
+                if (held && !ignore && id.equals(stopId)) {
+                    emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
+                } else if (stop.id().equals(stopId) || parked(stopId)) {
                     Optional<Paused> resumedNow = resume(stop, stopId, ignore);
                     if (resumedNow.isPresent()) return resumedNow.get();
                     // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
@@ -871,6 +922,11 @@ public final class ExploreLoop {
                 } else {
                     stale(stopId);
                 }
+            }
+            // A fault waits for its fix: never parked, never let go by the game coming back.
+            if (held) {
+                play.idle(settings.poll());
+                continue;
             }
             if (stop.kind() == StopKind.GUARD && neverParks) {
                 Foreground front = play.front();
