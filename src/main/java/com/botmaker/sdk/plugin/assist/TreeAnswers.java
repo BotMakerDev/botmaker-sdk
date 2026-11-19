@@ -187,7 +187,17 @@ final class TreeAnswers {
                     } else {
                         Optional<String> refused = ScreenEdits.wayRefused(graph, to.get(), from.get(), way.field());
                         if (refused.isPresent()) {
-                            skipped.add(way.screen() + "'s " + way.field() + ": " + refused.get());
+                            // A link to a screen no way may lead into (the start, a popup, one this screen is
+                            // reached through) is what the page is, not a mistake: noted and tried, so no run
+                            // presses it as new and nothing settled is left unwritten.
+                            MapScreen source = graph.screens().get(from.get());
+                            if (source != null && source.input(way.field()).isPresent()) {
+                                TreeAnswer.InputNote leads = new TreeAnswer.InputNote(way.screen(), way.field(),
+                                        "Leads to " + graph.shown(to.get()));
+                                changes.add(new Change(from.get(), s -> noted(s, leads)));
+                            } else {
+                                skipped.add(way.screen() + "'s " + way.field() + ": " + refused.get());
+                            }
                             continue;
                         }
                         changes.add(new Change(to.get(), s -> ScreenEdits.withWay(s, from.get(), way.field())));

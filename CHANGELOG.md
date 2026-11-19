@@ -140,6 +140,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   pictured the same way when the run reaches it, for whatever it lacks: a map made before fills itself in. An input
   a note says fails is pressed again once a run, and what it does now replaces that note.
 
+### Fixed
+
+- Discover no longer stops on a link to a screen no way may lead into, such as a site's Home link on a page two
+  screens down: the input is noted as leading there and kept tried, instead of being left unwritten.
+
 ## [1.11.0] — 2026-11-16
 
 - **What the runs did is kept on this PC, per instance and game** (2026-11-15): `DoneRecords` moved from the bot's

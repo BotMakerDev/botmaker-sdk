@@ -179,6 +179,30 @@ class TreeAnswersTest {
         assertTrue(kase.setup().back() != null, "its way back");
     }
 
+    /**
+     * A link two screens down back to the start (a site's Home in every page's header) is no way and no fault: the
+     * input is noted as leading there and tried, and nothing is skipped.
+     */
+    @Test
+    void aLinkToTheStartFromDeeperIsNotedNotSkipped() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("home", Button.of(new Locator(Role.LINK, "Home", null, null, null).element()).free());
+        inputs.put("deeper", Button.of(new Locator(Role.LINK, "Deeper", null, null, null).element()).free());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case").from(BotConstants.input("A", "open"))
+                .back(BotConstants.input("CASE", "home")), inputs));
+        screens.put("DEEP", new MapScreen(Setup.named("Deep").route("/deep")
+                .from(BotConstants.input("CASE", "deeper")), inputs));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("DEEP", "home", "A")), Map.of());
+
+        assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
+        MapScreen deep = changed(graph, planned, "DEEP");
+        assertEquals("home: Leads to A", deep.setup().notes());
+        assertTrue(deep.input("home").orElseThrow().isTried(), "tried, so no run presses it as new");
+        assertEquals(BotConstants.input("CASE", "deeper"), deep.setup().fromInput(), "its way in unchanged");
+    }
+
     /** A way to a page no way reached yet is its tree's way in. */
     @Test
     void theFirstWayToAPageIsItsTreesWayIn() {
