@@ -92,7 +92,9 @@ final class ExploreTools {
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
-                    + SdkRuns.KEEP_EXPLORING + "\" starts it")
+                    + SdkRuns.KEEP_EXPLORING + "\" starts it. On a -SNAPSHOT SDK (dev mode), a stop that is "
+                    + "Discover's own mistake is held as a fault (raised by the run, or by fault): fix and install the "
+                    + "SDK, then reload_sdk restarts the run on it and replays the fault")
             .takesOneOf(Action.class).handledBy(ExploreTools::handle));
 
     private ExploreTools() {}

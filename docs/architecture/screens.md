@@ -390,6 +390,35 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`wheel -5, step 120px, settles in 400 ms`, or `not measured`).
 - `Protocol` and `SdkAssist.GUIDE` say when each runs (Discovery, Upkeep).
 
+## Dev discovery (2026-11-19, spec `../docs/superpowers/specs/2026-11-19-dev-discovery-design.md` in the umbrella)
+
+A stop that is Discover's own mistake, not the game's, is part of *Keep exploring*'s flow: the run holds it, the SDK is
+fixed and rebuilt, and the run restarts on the new jar and replays it.
+
+- **Only on a `-SNAPSHOT` SDK** (`internal/explore/DevBuild`), which only a dev-mode project loads. On a released SDK
+  each source below raises the plain stop of its kind instead: a bot's author is never told to edit the SDK.
+- **A fault** is a stop of kind `StopKind.FAULT`, with an `ExploreEvent.Faulted` saying what found it, its evidence
+  and the SDK version (`ExploreLoop.fault`). Its sources:
+  - `skipped`: the plugin side left out lines of what the run settled.
+  - `did-not-take`: the same place settles again right after its answer was written.
+  - `exception`: Discover's own code threw.
+  - `claude`: Claude calls the open stop one, `explore fault <id> <why>`.
+  - A replayed fault's place raising its old stop again comes back as a fault ("the stop came back … after the SDK's
+    reload").
+- **Held, never parked**: only the SDK's reload, `explore resume <id> ignore` (a misreading, which deletes the memory)
+  or the run's end lets it go. A plain `resume` of it changes nothing but says `ExploreLoop.FAULT_RESUMES`.
+- **`resume.json`** (`ResumeFile`), beside the journal, is written before the run holds: the fault, the stop kind its
+  place raised, its source, and the screens seen, presses tried, ways that worked and text places answered. It is run
+  data, never in `params/`, a version, a publish or a `.bmk`. A *Keep exploring* that finds it starts there
+  (`ExploreEvent.Restarted`, ↻ in 🔭 Explore), walks back to the fault's place and replays it: the plain stop passes it
+  (✔ fixed, `replayed`), the stop again is "the fix did not take".
+- **`explore reload_sdk <id>`** (`ExploreTools.reloadSdk`) is refused unless `<id>` is the fault held now. It calls the
+  contract's `StudioServices.devReload` with *Keep exploring*'s `RunEntry`; the core (`DevReloads`) loads the
+  admitted classpath on a loader of its own first and refuses, with nothing stopped, a jar that does not load or no
+  longer declares the run. Then, off the call's thread, it stops the run, reloads the plugins and starts the entry
+  with no arguments, so the budget is the default. What fails after that is on the status line and in the core's log
+  only; `explore wait` answers the replay.
+
 ## The window (`plugin/map`)
 
 - **`ScreenMap`**: one window per project (and a narrow copy in the overlay editor). Every 1.5 s it reads the map
