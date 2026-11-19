@@ -57,6 +57,13 @@ class GameCatalogTest {
     }
 
     @Test
+    void aTypedAddressIsAWebsite() {
+        assertEquals(Optional.of("web:https://nunu.ai"), GameCatalog.typed(" https://nunu.ai "));
+        assertEquals(Optional.of("web:HTTP://example.com/a"), GameCatalog.typed("HTTP://example.com/a"));
+        assertEquals(Optional.of("web:https://nunu.ai"), GameCatalog.typed("web:https://nunu.ai"));
+    }
+
+    @Test
     void theMenuIsSplitAndLauncherShortcutsAreLeftToTheirLauncher() {
         var kpat = new com.botmaker.shared.launch.DesktopEntries.Entry("org.kde.kpat", "KPatience", "kpat",
                 "", java.util.Set.of("Game"), "");

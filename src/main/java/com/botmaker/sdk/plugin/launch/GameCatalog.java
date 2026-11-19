@@ -501,7 +501,12 @@ public final class GameCatalog {
      * A typed target as the spec to store, or empty when it is not one a run can launch.
      */
     static Optional<String> typed(String text) {
-        LaunchSpec spec = LaunchSpec.parse(text);
+        // A page's address pasted as it is: a website, as web:<url> says it.
+        String said = text == null ? "" : text.strip();
+        if (said.regionMatches(true, 0, "https://", 0, 8) || said.regionMatches(true, 0, "http://", 0, 7)) {
+            said = LaunchKind.WEB.id() + ":" + said;
+        }
+        LaunchSpec spec = LaunchSpec.parse(said);
         if (spec == null || spec.kind() == LaunchKind.UNKNOWN) return Optional.empty();
         return Optional.of(spec.spec());
     }

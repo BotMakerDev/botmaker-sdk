@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The Game window's target field takes a website's address as it is (`https://nunu.ai`), and its hint says so; it
+  used to take only `web:https://nunu.ai`, which nothing on screen named.
 - `Element.ofRole(Role.LINK).index(24)`: a website's element nothing names, an icon link or a field with no label,
   told apart by its index. Discover wrote no settled stop holding one before, since one value it cannot write drops
   the whole stop.

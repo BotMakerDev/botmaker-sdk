@@ -215,7 +215,8 @@ public final class GameDialog {
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
         TextField typed = new TextField();
-        typed.setPromptText("…or type a target: steam:620, lutris:3, exe:/path/to/game");
+        typed.setPromptText("…or type a target: a website's address (https://example.com), steam:620, lutris:3, "
+                + "exe:/path/to/game");
         HBox.setHgrow(typed, Priority.ALWAYS);
         Button use = new Button("Use");
         Runnable useTyped = () -> GameCatalog.typed(typed.getText()).ifPresentOrElse(
