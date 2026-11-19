@@ -100,8 +100,12 @@ class ExploreLoopTest {
             return Optional.ofNullable(at);
         }
 
+        /** What {@link #look} throws; null: it looks. */
+        RuntimeException lookThrows;
+
         @Override
         public ExploreLoop.Look look(String screen) {
+            if (lookThrows != null) throw lookThrows;
             return ExploreLoop.Look.NOTHING;
         }
 
@@ -535,6 +539,124 @@ class ExploreLoopTest {
         assertEquals(List.of(wrong), events(ExploreEvent.Parked.class).stream().map(ExploreEvent.Parked::stopId).toList());
         assertEquals(List.of(stuck), events(ExploreEvent.Faulted.class).stream().map(ExploreEvent.Faulted::stopId).toList());
         assertEquals(List.of(wrong), journal().queue().stream().map(Stop::id).toList(), "the plain stop stays queued");
+    }
+
+    /** A game on a page no screen matches, which the run settles; resumed once with {@code skipped}, stopped at 40 min. */
+    private Game settledPage(boolean dev, List<String> skipped) {
+        Game game = new Game();
+        game.dev = dev;
+        game.at = null;
+        game.state = Effect.State.of(page(web("heading", "Pricing plans", Set.of())), "/pricing");
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(40).toMillis()) journal().command("stop");
+            else if (!sent[0] && !events(ExploreEvent.Settled.class).isEmpty()) {
+                sent[0] = true;
+                journal().command(Journal.Command.resume(openStop(), skipped));
+            }
+        };
+        return game;
+    }
+
+    @Test
+    void aSkippedAnswerIsAFaultInDevMode() {
+        Game game = settledPage(true, List.of("x: no screen GONE in the map."));
+
+        loop(map(), game, same(map()), Duration.ofHours(2)).run();
+
+        String settled = stops().getFirst().stop().id();
+        ExploreEvent.Faulted fault = events(ExploreEvent.Faulted.class).getFirst();
+        assertEquals("skipped", fault.source());
+        assertTrue(fault.why().contains(settled) && fault.why().contains("x: no screen GONE in the map."), fault.why());
+        assertTrue(fault.evidence().contains("settled: [NewScreen"), fault.evidence());
+        assertEquals(StopKind.FAULT, stops().get(1).stop().kind());
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "held");
+    }
+
+    @Test
+    void whatWasLeftOutOutlivesARefusedReload() {
+        Game game = settledPage(true, List.of("x: no screen GONE in the map."));
+        Runnable first = game.onIdle;
+        game.onIdle = () -> {
+            first.run();
+            // The bot did not compile: Claude fixes it and resumes with a plain resume, which says nothing left out.
+            List<ExploreEvent.Reloaded> reloads = events(ExploreEvent.Reloaded.class);
+            if (reloads.size() == 1 && reloads.getFirst().refused() && !journal().commandWaiting()) {
+                journal().command("resume " + reloads.getFirst().stopId());
+            }
+        };
+        int[] reloads = {0};
+        ExploreLoop.Reload reload = () -> ++reloads[0] == 1
+                ? new ExploreLoop.Reload.Reloaded(1, map(), null, List.of("Shop.java:3: ';' expected"))
+                : new ExploreLoop.Reload.Reloaded(2, map(), null, List.of());
+
+        loop(map(), game, reload, Duration.ofHours(2)).run();
+
+        assertEquals("skipped", events(ExploreEvent.Faulted.class).getFirst().source());
+    }
+
+    @Test
+    void aSkippedAnswerIsSaidOutOfDevMode() {
+        Game game = settledPage(false, List.of("x: no screen GONE in the map."));
+
+        loop(map(), game, same(map()), Duration.ofHours(2)).run();
+
+        Stop said = stops().get(1).stop();
+        assertEquals(StopKind.UNKNOWN_SCREEN, said.kind());
+        assertTrue(said.missing().contains("x: no screen GONE in the map."), said.missing());
+        assertFalse(JournalView.of(journal()).settled(said), "Claude's to write, not the plugin side's");
+        assertTrue(events(ExploreEvent.Faulted.class).isEmpty());
+    }
+
+    @Test
+    void aSettleThatDidNotTakeIsAFault() {
+        // Resumed with nothing skipped, and the page is still none of the map's: what was written did not take.
+        Game game = settledPage(true, List.of());
+
+        loop(map(), game, same(map()), Duration.ofHours(2)).run();
+
+        ExploreEvent.Faulted fault = events(ExploreEvent.Faulted.class).getFirst();
+        assertEquals("did-not-take", fault.source());
+        assertTrue(fault.evidence().startsWith("settled again: [NewScreen"), fault.evidence());
+        assertEquals(StopKind.FAULT, stops().get(1).stop().kind());
+        assertEquals(stops().getFirst().stop().place(), stops().get(1).stop().place());
+    }
+
+    @Test
+    void anExceptionInTheLoopIsAFault() {
+        Game game = new Game();
+        game.dev = true;
+        game.lookThrows = new IllegalStateException("no look");
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) journal().command("stop");
+        };
+
+        loop(map(), game, same(map()), Duration.ofHours(2)).run();
+
+        Stop stop = stops().getFirst().stop();
+        assertEquals(StopKind.FAULT, stop.kind());
+        assertEquals("A:IllegalStateException", stop.place());
+        ExploreEvent.Faulted fault = events(ExploreEvent.Faulted.class).getFirst();
+        assertEquals("exception", fault.source());
+        assertTrue(fault.evidence().startsWith("java.lang.IllegalStateException: no look\n  at "), fault.evidence());
+    }
+
+    @Test
+    void theBotsExceptionStaysACrash() {
+        Game game = new Game();
+        game.dev = true;
+        IllegalStateException thrown = new IllegalStateException("the bot's own");
+        thrown.setStackTrace(new StackTraceElement[]{new StackTraceElement("com.example.bot.Farm", "run", "Farm.java", 3),
+                new StackTraceElement("com.botmaker.sdk.internal.explore.LivePlay", "look", "LivePlay.java", 9)});
+        game.lookThrows = thrown;
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(5).toMillis()) journal().command("stop");
+        };
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        assertEquals(StopKind.CRASH, stops().getFirst().stop().kind());
+        assertTrue(events(ExploreEvent.Faulted.class).isEmpty());
     }
 
     @Test

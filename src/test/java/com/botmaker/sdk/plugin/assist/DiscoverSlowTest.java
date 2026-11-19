@@ -186,7 +186,8 @@ class DiscoverSlowTest {
                     targets.addAll(planned.targets());
                     planned.skipped().forEach(why -> System.out.println("[test] " + id + " left out " + why));
                     graph.set(applied(graph.get(), planned));
-                    return Optional.empty();
+                    // Said above, not handed back: this test walks the site, it does not hold on what a plan skips.
+                    return new TreeAnswers.Written(Optional.empty(), List.of());
                 });
                 if (whole.test(graph.get()) && !journal.commandWaiting()) journal.command("stop");
                 try {

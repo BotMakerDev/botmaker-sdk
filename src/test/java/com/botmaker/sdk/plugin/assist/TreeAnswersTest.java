@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
@@ -258,16 +259,77 @@ class TreeAnswersTest {
 
         TreeAnswerWatch.round(journal, done, (id, said) -> {
             written.add(id + " " + said.size());
-            return Optional.empty();
+            return new TreeAnswers.Written(Optional.empty(), List.of());
         });
         assertEquals(Optional.of(new Journal.Command.Resume("settled-1", false)), journal.takeCommand());
         TreeAnswerWatch.round(journal, done, (id, said) -> {
             written.add(id);
-            return Optional.empty();
+            return new TreeAnswers.Written(Optional.empty(), List.of());
         });
 
         assertEquals(List.of("settled-1 1"), written, "written once");
         assertFalse(journal.commandWaiting());
+    }
+
+    @Test
+    void theWatchResumesWithWhatItSkipped(@TempDir Path folder) {
+        Journal journal = new Journal(folder);
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Settled("settled-1", List.of(new TreeAnswer.InputNote("GONE", "x", "y")), 2));
+        journal.append(new ExploreEvent.Stopped(new Stop("settled-1", StopKind.SETTLED, "A", "A.toggle", null,
+                List.of(), List.of(), Map.of(), List.of(), "notes", 2), false, 2));
+
+        TreeAnswerWatch.round(journal, new HashSet<>(), (id, said) -> new TreeAnswers.Written(Optional.empty(),
+                List.of("x: no screen GONE\nin the map.")));
+
+        assertEquals(Optional.of(new Journal.Command.Resume("settled-1", false, List.of("x: no screen GONE in the map."))),
+                journal.takeCommand(), "one line each, read back as written");
+    }
+
+    @Test
+    void applyReturnsWhatItSkipped() {
+        Planned planned = TreeAnswers.plan(map(), List.of(new TreeAnswer.InputNote("GONE", "x", "y")), Map.of());
+
+        assertEquals(List.of("x: no screen GONE in the map."), planned.skipped());
+    }
+
+    @Test
+    void oneUnwritableValueKeepsTheOthers() {
+        Planned planned = TreeAnswers.plan(map(), List.of(new TreeAnswer.InputNote("A", "toggle", "Does nothing"),
+                new TreeAnswer.NewScreen("Shop", "/shop", List.of("/shop"), List.of(), null)), Map.of());
+        List<String> written = new ArrayList<>();
+
+        List<String> unwritten = TreeAnswers.write(planned, new TreeAnswers.Writes() {
+            @Override
+            public Optional<String> text(Words words) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> elements() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> element(String name, Element element) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> screen(TreeAnswers.Added added) {
+                return Optional.of("it does not compile");
+            }
+
+            @Override
+            public Optional<String> change(TreeAnswers.Change change) {
+                written.add(change.constant());
+                return Optional.empty();
+            }
+        });
+
+        assertEquals(List.of("could not write the screen " + planned.added().getFirst().constant()
+                + ": it does not compile"), unwritten);
+        assertEquals(List.of("A"), written, "the change after it written all the same");
     }
 
     /** A, the start, with a button {@code open} and a free {@code toggle}. */

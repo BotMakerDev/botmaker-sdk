@@ -59,7 +59,20 @@ public final class Journal {
          * Reload the bot and go on from {@code stopId}; {@code ignore}: what it stopped on is fine as it is (a value
          * no fact needs), never raised again.
          */
-        record Resume(String stopId, boolean ignore) implements Command {}
+        record Resume(String stopId, boolean ignore, List<String> skipped) implements Command {
+
+            /**
+             * {@code skipped}: what the plugin side left out of the answers the run settled at {@code stopId}, one
+             * line each, why with it (2026-11-19); the run raises it again rather than let it be lost.
+             */
+            public Resume {
+                skipped = List.copyOf(skipped);
+            }
+
+            public Resume(String stopId, boolean ignore) {
+                this(stopId, ignore, List.of());
+            }
+        }
 
         /** End the run. */
         record End() implements Command {}
@@ -68,20 +81,29 @@ public final class Journal {
         record Fault(String stopId, String why) implements Command {}
 
         /**
-         * {@code line} as a command ({@code resume <id> [ignore]}, {@code fault <id> <why>}, {@code stop}); empty for
-         * one this run does not know.
+         * {@code text} as a command, read off its first line ({@code resume <id> [ignore]}, {@code fault <id> <why>},
+         * {@code stop}); a resume's further lines are what was skipped. Empty for one this run does not know.
          */
-        static Optional<Command> parse(String line) {
-            String[] said = (line == null ? "" : line.strip()).split("\\s+");
+        static Optional<Command> parse(String text) {
+            List<String> lines = (text == null ? "" : text).lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
+            String line = lines.isEmpty() ? "" : lines.getFirst();
+            String[] said = line.split("\\s+");
             if (said.length == 1 && said[0].equals("stop")) return Optional.of(new End());
             if (said[0].equals("fault") && said.length >= 3) {
-                String[] parts = line.strip().split("\\s+", 3);
+                String[] parts = line.split("\\s+", 3);
                 return Optional.of(new Fault(parts[1], parts[2].strip()));
             }
             if (said[0].equals("resume") && (said.length == 2 || said.length == 3 && said[2].equals("ignore"))) {
-                return Optional.of(new Resume(said[1], said.length == 3));
+                return Optional.of(new Resume(said[1], said.length == 3, lines.subList(1, lines.size())));
             }
             return Optional.empty();
+        }
+
+        /** The text of a resume of {@code stopId} that says {@code skipped}, each on a line of its own. */
+        public static String resume(String stopId, List<String> skipped) {
+            StringBuilder text = new StringBuilder("resume ").append(stopId);
+            for (String line : skipped) text.append('\n').append(line.replaceAll("\\s+", " ").strip());
+            return text.toString();
         }
     }
 

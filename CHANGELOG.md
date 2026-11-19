@@ -25,6 +25,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never
   parked. Claude calls an open stop one with `explore fault`; `resume` on a fault is refused, `resume ignore` drops
   it. A run on a released SDK never raises one.
+- The run raises a Discover fault itself in three cases. First, it settled answers that the bot's writer left out,
+  each listed with its reason. Second, it settled a place, and the place came back unchanged after the write.
+  Third, its own code threw, rather than the bot's. On a released SDK, the first case is a plain stop that lists
+  what was left out. Before, those answers were lost, with only a line in the log. The other two cases stay the
+  stops they were. A settled stop is also written in full now: one value that does not write is listed, and the
+  rest are still written.
 - The Game window's target field takes a website's address as it is (`https://nunu.ai`), and its hint says so; it
   used to take only `web:https://nunu.ai`, which nothing on screen named.
 - `Element.ofRole(Role.LINK).index(24)`: a website's element nothing names, an icon link or a field with no label,

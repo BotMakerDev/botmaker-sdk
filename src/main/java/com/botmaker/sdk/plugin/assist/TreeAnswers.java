@@ -234,50 +234,112 @@ final class TreeAnswers {
     }
 
     /**
-     * Writes {@code answers} into the bot in one step named {@code label}, on the FX thread: the words, the elements,
-     * the screens added, then each change. Empty when written (or nothing was to be), else why not.
+     * What {@link #apply} did: {@code failed} says why nothing was written, else empty; {@code skipped} each answer
+     * left out, and each value that could not be written, why with it (2026-11-19: never swallowed, the run raises
+     * them again).
      */
-    static Optional<String> apply(StudioServices services, String label, List<TreeAnswer> answers) {
+    record Written(Optional<String> failed, List<String> skipped) {
+
+        Written {
+            skipped = List.copyOf(skipped);
+        }
+    }
+
+    /**
+     * Writes {@code answers} into the bot in one step named {@code label}, on the FX thread: the words, the elements,
+     * the screens added, then each change. A value that does not write is listed and the rest written.
+     */
+    static Written apply(StudioServices services, String label, List<TreeAnswer> answers) {
         return FxCall.call(() -> {
             PluginValues values = services.pluginValues();
-            if (values == null) return Optional.of("Studio has no source tree open.");
+            if (values == null) return new Written(Optional.of("Studio has no source tree open."), List.of());
             Planned planned = plan(ScreenBook.read(services), answers, elements(values));
-            for (String skipped : planned.skipped()) SdkLog.warn(label + " left out " + skipped);
-            if (planned.empty()) return Optional.empty();
-            return ScreenBook.step(services, label, () -> write(services, values, planned));
+            List<String> skipped = new ArrayList<>(planned.skipped());
+            if (!planned.empty()) {
+                ScreenBook.step(services, label, () -> {
+                    skipped.addAll(write(services, values, planned));
+                    return Optional.empty();
+                });
+            }
+            for (String line : skipped) SdkLog.warn(label + ": " + line);
+            return new Written(Optional.empty(), skipped);
         });
     }
 
-    private static Optional<String> write(StudioServices services, PluginValues values, Planned planned) {
+    /** Where {@link #write(Planned, Writes)} puts each value: the bot, or a test's record of it. Empty when written. */
+    interface Writes {
+        Optional<String> text(Words words);
+
+        /** Makes the bot's {@code Elements} class, before its first constant. */
+        Optional<String> elements();
+
+        Optional<String> element(String name, Element element);
+
+        Optional<String> screen(Added added);
+
+        Optional<String> change(Change change);
+    }
+
+    private static List<String> write(StudioServices services, PluginValues values, Planned planned) {
         // The launch target first: what the run was started on is the bot's game, whatever else fails to write.
         for (String target : planned.targets()) {
             LaunchTargetValue.set(services, target).ifPresent(why -> SdkLog.warn(target
                     + " was not made the bot's launch target: " + why));
         }
-        for (Words words : planned.words()) {
-            Optional<String> failed = ScreenEdits.keptText(services, words);
-            if (failed.isPresent()) return failed;
-        }
         for (Map.Entry<String, String> picture : planned.pictures().entrySet()) {
             copy(services, picture.getKey(), picture.getValue());
         }
-        if (!planned.elements().isEmpty()) {
-            Optional<String> missing = values.create(ELEMENTS.value());
-            if (missing.isPresent()) return missing;
+        return write(planned, new Writes() {
+            @Override
+            public Optional<String> text(Words words) {
+                return ScreenEdits.keptText(services, words);
+            }
+
+            @Override
+            public Optional<String> elements() {
+                return values.create(ELEMENTS.value());
+            }
+
+            @Override
+            public Optional<String> element(String name, Element element) {
+                return ELEMENTS.add(values, Member.of(name), element);
+            }
+
+            @Override
+            public Optional<String> screen(Added added) {
+                return ScreenBook.add(services, added.constant(), added.screen());
+            }
+
+            @Override
+            public Optional<String> change(Change change) {
+                return ScreenBook.update(services, change.constant(), change.change());
+            }
+        });
+    }
+
+    /**
+     * Writes {@code planned}'s values through {@code writes}: the words, the elements, the screens added, then each
+     * change. One that does not write is listed, {@code "could not write <value>: <why>"}, and the rest are written.
+     */
+    static List<String> write(Planned planned, Writes writes) {
+        List<String> unwritten = new ArrayList<>();
+        for (Words words : planned.words()) {
+            writes.text(words).ifPresent(why -> unwritten.add("could not write the text " + words + ": " + why));
         }
+        Optional<String> noElements = planned.elements().isEmpty() ? Optional.empty() : writes.elements();
         for (Map.Entry<String, Element> element : planned.elements().entrySet()) {
-            Optional<String> failed = ELEMENTS.add(values, Member.of(element.getKey()), element.getValue());
-            if (failed.isPresent()) return failed;
+            noElements.or(() -> writes.element(element.getKey(), element.getValue())).ifPresent(why ->
+                    unwritten.add("could not write the element " + element.getKey() + ": " + why));
         }
         for (Added added : planned.added()) {
-            Optional<String> failed = ScreenBook.add(services, added.constant(), added.screen());
-            if (failed.isPresent()) return failed;
+            writes.screen(added).ifPresent(why -> unwritten.add("could not write the screen " + added.constant()
+                    + ": " + why));
         }
         for (Change change : planned.changes()) {
-            Optional<String> failed = ScreenBook.update(services, change.constant(), change.change());
-            if (failed.isPresent()) return failed;
+            writes.change(change).ifPresent(why -> unwritten.add("could not write a change of " + change.constant()
+                    + ": " + why));
         }
-        return Optional.empty();
+        return unwritten;
     }
 
     /**

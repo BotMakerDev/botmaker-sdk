@@ -319,6 +319,18 @@ public final class ExploreLoop {
     private int settledNotes;
     /** The screens whose forms were tried: once each. */
     private final Set<String> probed = new HashSet<>();
+    /** What the run settled at each stop, by its id: the evidence when the plugin side's write of it falls short. */
+    private final Map<String, List<TreeAnswer>> settledAt = new HashMap<>();
+    /**
+     * What the plugin side left out of each settled stop, by its id, kept until a resume of it takes: a refused reload
+     * loses none of it, and a resume with ignore drops it.
+     */
+    private final Map<String, List<String>> leftOut = new HashMap<>();
+    /** Settled stops resumed with answers the plugin side left out, raised again at the next round's start. */
+    private final Deque<Skip> skips = new ArrayDeque<>();
+
+    /** The settled stop {@code stop}, resumed with {@code lines} left out of what it settled. */
+    private record Skip(Stop stop, List<String> lines) {}
 
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
@@ -367,9 +379,13 @@ public final class ExploreLoop {
             Journal.Command command = journal.takeCommand().orElse(null);
             if (command instanceof Journal.Command.End) return End.STOPPED;
             // Between stops only a parked stop can be resumed: its fix is loaded and its place tried again.
-            if (command instanceof Journal.Command.Resume(String stopId, boolean ignore)) {
-                if (parked(stopId)) resume(null, stopId, ignore);
-                else stale(stopId);
+            if (command instanceof Journal.Command.Resume(String stopId, boolean ignore, List<String> skipped)) {
+                if (parked(stopId)) {
+                    keepLeftOut(stopId, skipped);
+                    resume(null, stopId, ignore);
+                } else {
+                    stale(stopId);
+                }
             }
             if (!round()) return spent() ? End.BUDGET : End.STOPPED;
         }
@@ -383,6 +399,7 @@ public final class ExploreLoop {
 
     /** One round; false when a command, or the budget, ended the run while it was paused. */
     boolean round() {
+        if (!skips.isEmpty()) return skipped(skips.poll()) != Paused.END;
         if (verdictsDue) {
             verdictsDue = false;
             List<InputName> untagged = map.untagged();
@@ -408,9 +425,56 @@ public final class ExploreLoop {
         } catch (RuntimeException e) {
             rethrowStop(e);
             String at = whereAfterCrash();
-            return stop(StopKind.CRASH, at, (at == null ? "unknown" : at) + ":" + e.getClass().getSimpleName(),
-                    Look.NOTHING, "the bot's code threw: " + e, false) != Paused.END;
+            String place = (at == null ? "unknown" : at) + ":" + e.getClass().getSimpleName();
+            // Thrown by Discover itself, not by the bot's code it ran: the SDK's to fix, in dev mode.
+            if (dev && discovers(e)) {
+                return fault(StopKind.CRASH, at, place, "exception", "Discover's own code threw: " + e,
+                        evidence(e)) != Paused.END;
+            }
+            return stop(StopKind.CRASH, at, place, Look.NOTHING, "the bot's code threw: " + e, false) != Paused.END;
         }
+    }
+
+    /** The packages of Discover's own code, as a frame's class names them. */
+    private static final List<String> DISCOVER = List.of("com.botmaker.sdk.internal.explore.",
+            "com.botmaker.sdk.plugin.assist.");
+
+    /** Whether {@code e} was thrown in Discover's own code: its top frame outside the JDK is one of {@link #DISCOVER}. */
+    static boolean discovers(Throwable e) {
+        for (StackTraceElement frame : e.getStackTrace()) {
+            String type = frame.getClassName();
+            if (type.startsWith("java.") || type.startsWith("javax.") || type.startsWith("jdk.")
+                    || type.startsWith("sun.")) continue;
+            return DISCOVER.stream().anyMatch(type::startsWith);
+        }
+        return false;
+    }
+
+    /** What proves a fault {@code e} is: its class, its message and its first five frames. */
+    private static String evidence(Throwable e) {
+        StringBuilder text = new StringBuilder(e.getClass().getName()).append(": ").append(e.getMessage());
+        StackTraceElement[] frames = e.getStackTrace();
+        for (int i = 0; i < Math.min(5, frames.length); i++) text.append("\n  at ").append(frames[i]);
+        return text.toString();
+    }
+
+    /**
+     * Raises again what the plugin side left out of the settled stop {@code skip.stop()}: a fault in dev mode, else a
+     * plain stop of its kind that says the lines, Claude's to write. Never let go unsaid.
+     */
+    private Paused skipped(Skip skip) {
+        Stop stop = skip.stop();
+        // What follows is this stop's own word on it: the resume is not checked again.
+        if (resumed != null && resumed.id().equals(stop.id())) resumed = null;
+        return fault(stop.kind(), stop.screen(), stop.place(), "skipped", "what the run settled at " + stop.id()
+                + " was not all written: " + String.join("; ", skip.lines()), String.join("\n", skip.lines())
+                + settledEvidence(stop.id()));
+    }
+
+    /** The answers the run settled at {@code stopId}, as a fault's evidence; blank when none are known. */
+    private String settledEvidence(String stopId) {
+        List<TreeAnswer> answers = settledAt.getOrDefault(stopId, List.of());
+        return answers.isEmpty() ? "" : "\nsettled: " + answers;
     }
 
     private boolean play() {
@@ -491,6 +555,8 @@ public final class ExploreLoop {
     private void passed(StopKind kind, String place) {
         if (resumed == null || resumed.kind() != kind || !resumed.place().equals(place)) return;
         emit(new ExploreEvent.Fixed(resumed.id(), "reloaded as generation " + generation, nowMs.getAsLong()));
+        // Its fix took: what it settled is evidence of nothing any more.
+        settledAt.remove(resumed.id());
         resumed = null;
     }
 
@@ -749,18 +815,21 @@ public final class ExploreLoop {
     /**
      * Stops on what the run settled itself, {@code answers} and the notes not yet handed on, for the plugin side to
      * write and resume: the {@link ExploreEvent.Settled} first, then the stop, waited on and parked as any. The same
-     * place settled again right after its resume did not take: it is Claude's then, as a plain stop.
+     * place settled again right after its resume did not take: a Discover fault in dev mode, else Claude's as a plain
+     * stop.
      */
     private Paused settle(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
         if (parked.containsKey(parkedKey(kind, place))) return null;
         if (resumed != null && resumed.kind() == kind && resumed.place().equals(place)) {
-            return stop(kind, screen, place, Look.NOTHING, missing + "; what the tree settled was written and did not "
-                    + "take", false);
+            return fault(kind, screen, place, "did-not-take", missing + "; what the tree settled was written and did "
+                    + "not take", "settled again: " + answers + settledEvidence(resumed.id()));
         }
         List<TreeAnswer> all = new ArrayList<>(answers);
         all.addAll(notes);
         notes.clear();
-        emit(new ExploreEvent.Settled(kind.id() + "-" + (stops + 1), all, nowMs.getAsLong()));
+        String id = kind.id() + "-" + (stops + 1);
+        settledAt.put(id, List.copyOf(all));
+        emit(new ExploreEvent.Settled(id, all, nowMs.getAsLong()));
         return stop(kind, screen, place, Look.NOTHING, missing, false);
     }
 
@@ -911,10 +980,12 @@ public final class ExploreLoop {
                 emit(new ExploreEvent.Faulted(id, "claude", why, "", play.sdkVersion(), nowMs.getAsLong()));
             }
             // A resume of a stop that is neither this one nor parked is stale: it changes nothing.
-            if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore)) {
+            if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore,
+                                                                        List<String> skipped)) {
                 if (held && !ignore && id.equals(stopId)) {
                     emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
                 } else if (stop.id().equals(stopId) || parked(stopId)) {
+                    keepLeftOut(stopId, skipped);
                     Optional<Paused> resumedNow = resume(stop, stopId, ignore);
                     if (resumedNow.isPresent()) return resumedNow.get();
                     // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
@@ -942,6 +1013,15 @@ public final class ExploreLoop {
             }
             play.idle(settings.poll());
         }
+    }
+
+    /** Keeps {@code lines}, left out of the stop {@code stopId}, until a resume of it takes. */
+    private void keepLeftOut(String stopId, List<String> lines) {
+        if (!lines.isEmpty()) leftOut.merge(stopId, lines, (kept, more) -> {
+            List<String> all = new ArrayList<>(kept);
+            all.addAll(more);
+            return List.copyOf(all);
+        });
     }
 
     /** Whether the queue holds the stop {@code stopId}. */
@@ -975,6 +1055,8 @@ public final class ExploreLoop {
         verdictsDue = true;
         emit(new ExploreEvent.Reloaded(stopId, generation, List.of(), nowMs.getAsLong()));
         Stop fixed = parkedStop != null ? parkedStop : open;
+        List<String> lines = leftOut.remove(fixed.id());
+        if (lines != null && !ignore) skips.add(new Skip(fixed, lines));
         if (parkedStop != null) {
             parked.remove(key(parkedStop));
             journal.queue(List.copyOf(parked.values()));

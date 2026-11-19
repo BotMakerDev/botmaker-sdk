@@ -163,7 +163,7 @@ class ExploreToolsTest {
         journal.append(new ExploreEvent.Began(false, 1));
         journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
         run(command -> {
-            if (command instanceof Journal.Command.Resume(String id, boolean ignore)) {
+            if (command instanceof Journal.Command.Resume(String id, boolean ignore, List<String> skipped)) {
                 journal().append(new ExploreEvent.Reloaded(id, 1, List.of("Shop.java:3: ';' expected"), 3));
             }
         });
@@ -183,7 +183,7 @@ class ExploreToolsTest {
         journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
         AtomicInteger reloads = new AtomicInteger();
         run(command -> {
-            if (command instanceof Journal.Command.Resume(String id, boolean ignore)) {
+            if (command instanceof Journal.Command.Resume(String id, boolean ignore, List<String> skipped)) {
                 journal().append(new ExploreEvent.Reloaded(id, 1 + reloads.incrementAndGet(), List.of(), 3));
             }
         });
@@ -210,7 +210,7 @@ class ExploreToolsTest {
         journal.append(new ExploreEvent.Parked(parked.id(), 3));
         journal.queue(List.of(parked));
         run(command -> {
-            if (command instanceof Journal.Command.Resume(String id, boolean ignore)) {
+            if (command instanceof Journal.Command.Resume(String id, boolean ignore, List<String> skipped)) {
                 journal().append(new ExploreEvent.Reloaded(id, 2, List.of(), 4));
                 journal().queue(List.of());
                 journal().append(new ExploreEvent.Fixed(id, "reloaded as generation 2", 5));
@@ -256,7 +256,7 @@ class ExploreToolsTest {
     void resumeIgnoreDropsAFault() {
         Journal journal = heldOn(stop("wrong_arrival-1"));
         run(command -> {
-            if (command instanceof Journal.Command.Resume(String id, boolean ignore) && ignore) {
+            if (command instanceof Journal.Command.Resume(String id, boolean ignore, List<String> skipped) && ignore) {
                 journal().append(new ExploreEvent.Reloaded(id, 2, List.of(), 4));
                 journal().append(new ExploreEvent.Fixed(id, "ignored", 5));
             }

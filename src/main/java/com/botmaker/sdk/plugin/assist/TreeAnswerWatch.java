@@ -54,9 +54,9 @@ public final class TreeAnswerWatch {
         if (project == null) return;
         Journal journal = Journal.of(project);
         thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(journal, (id, answers) -> {
-            Optional<String> failed = TreeAnswers.apply(services, "Explore: " + id, answers);
-            if (failed.isEmpty()) shots(services, journal, id, answers);
-            return failed;
+            TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
+            if (written.failed().isEmpty()) shots(services, journal, id, answers);
+            return written;
         }, pictured -> TreeAnswers.pictured(services, pictured)));
     }
 
@@ -92,7 +92,7 @@ public final class TreeAnswerWatch {
         thread = null;
     }
 
-    private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, Optional<String>> write,
+    private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write,
                               Consumer<ExploreEvent.Pictured> picture) {
         Set<String> done = new HashSet<>();
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
@@ -162,11 +162,12 @@ public final class TreeAnswerWatch {
 
     /**
      * One look at the journal: the first stop the run settled and nobody resumed yet, open or parked, written by
-     * {@code write} and resumed. One that does not write is resumed too, and comes back to the run as Claude's. One
-     * resume at a time: none while a command waits.
+     * {@code write} and resumed. One that does not write is resumed too, and comes back to the run as Claude's. What
+     * the write left out goes with the resume, for the run to raise again. One resume at a time: none while a command
+     * waits.
      */
     static void round(Journal journal, Set<String> done,
-                      BiFunction<String, List<TreeAnswer>, Optional<String>> write) {
+                      BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
         if (journal.commandWaiting()) return;
         JournalView view = JournalView.of(journal);
         if (!view.running()) return;
@@ -179,9 +180,13 @@ public final class TreeAnswerWatch {
             String key = view.beganAt() + "/" + id;
             if (done.contains(key) || !view.settled(stop) || view.reloadOf(id).isPresent()) continue;
             done.add(key);
-            write.apply(id, view.answers(id)).ifPresent(why -> SdkLog.warn("What the explore run settled at " + id
+            TreeAnswers.Written written = write.apply(id, view.answers(id));
+            written.failed().ifPresent(why -> SdkLog.warn("What the explore run settled at " + id
                     + " was not written: " + why));
-            journal.command("resume " + id);
+            // Nothing written at all is said too: the run raises it, rather than meet the place again unexplained.
+            List<String> leftOut = written.failed().map(why -> List.of("nothing was written: " + why))
+                    .orElse(written.skipped());
+            journal.command(Journal.Command.resume(id, leftOut));
             return;
         }
     }
