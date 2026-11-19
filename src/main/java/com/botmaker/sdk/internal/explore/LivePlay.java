@@ -149,13 +149,7 @@ public final class LivePlay implements ExploreLoop.Play {
         if (screen != null) RunFacts.seen(screen);
         Optional<BufferedImage> frame = reach.look();
         if (frame.isEmpty()) return ExploreLoop.Look.NOTHING;
-        // The run's browser is its own, headless or not: the Explore window sees the page only through the journal,
-        // which it reads once a second, so no more often than that.
-        long now = System.currentTimeMillis();
-        if (journal != null && now - pageAt >= 1_000 && WebSource.of(Source.current()).isPresent()) {
-            pageAt = now;
-            journal.page(frame.get());
-        }
+        showPage(frame.get());
         List<Stop.Text> texts = read(frame.get()).stream().map(text -> new Stop.Text(text.text(), text.bounds())).toList();
         List<Rect> covered = new ArrayList<>();
         Optional<MapScreen> mapped = screen == null ? Optional.empty() : map.screen(screen);
@@ -164,6 +158,18 @@ public final class LivePlay implements ExploreLoop.Play {
             reach.find(readout.area().anchor(), frame.get()).map(readout.area()::place).ifPresent(covered::add);
         }
         return new ExploreLoop.Look(texts, List.of(), Map.of(), covered);
+    }
+
+    /**
+     * {@code frame} as a website's page for the Explore window: the run's browser is its own, headless or not, so the
+     * window sees the page only through the journal, which it reads once a second, so no more often than that.
+     */
+    private void showPage(BufferedImage frame) {
+        long now = System.currentTimeMillis();
+        if (journal != null && now - pageAt >= 1_000 && WebSource.of(Source.current()).isPresent()) {
+            pageAt = now;
+            journal.page(frame);
+        }
     }
 
     private List<TextResult> read(BufferedImage frame) {
@@ -193,6 +199,8 @@ public final class LivePlay implements ExploreLoop.Play {
     public String keep(String name) {
         Optional<Path> folder = MissFrames.folder();
         Optional<BufferedImage> frame = reach.look();
+        // A website's stop on a page no screen matches looks at nothing else: its kept frame is the page shown.
+        frame.ifPresent(this::showPage);
         if (folder.isEmpty() || frame.isEmpty()) return "";
         try {
             Path file = Files.createDirectories(folder.get()).resolve(name + ".png");
