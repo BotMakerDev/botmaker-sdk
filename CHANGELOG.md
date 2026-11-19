@@ -22,10 +22,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Added
 
 - `api.screens.Field`: a check of what a text field holds now, read from the screen's tree when it is asked, the rule
-  a form keeps: `.when(Condition.all(Field.valid(email, Field.Kind.EMAIL), Field.atLeast(password, 8)))`. `filled`,
+  a form keeps: `.when(Condition.all(Field.valid(() -> Screens.SIGN_UP.email, Field.Kind.EMAIL),
+  Field.atLeast(() -> Screens.SIGN_UP.password, 8)))`, each field named lazily as screens name each other. `filled`,
   `valid` (an email, a URL or a number, as a browser judges one), `holds` and `lacks` a text, `atLeast` some
   characters, `inRange` of numbers. Unknown where the text cannot be read: an input found by a picture, a target with
   no tree, an element not found exactly once.
+- *Discover* on a website tries each screen's forms once, typing samples through the guard and never submitting, and
+  writes what the tries showed into the bot: the submit a rule enables gets it as its `.when(…)` of `Field` checks,
+  and a field's message is a note on that field. A rule no check says whole (a phone number's validity, a field the
+  screen has no input for) is a note on its submit instead, never a weaker rule.
 - *Discover*, the SDK's run that maps a game or a website into the bot: *Keep exploring* within a budget
   (`minutes`, `maxPages`), its browser shown with `show`. Given a website's `url` on a bot with no launch target,
   the run opens it at once and the website becomes the bot's launch target with the first stop it settles, so a

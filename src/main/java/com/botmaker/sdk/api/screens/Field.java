@@ -8,6 +8,7 @@ import com.botmaker.sdk.internal.screens.FieldText;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -15,10 +16,13 @@ import java.util.regex.Pattern;
  * keeps, written as the {@code .when(…)} of the input it enables.
  *
  * <pre>{@code
- * .when(Condition.all(Field.valid(email, Field.Kind.EMAIL), Field.atLeast(password, 8)))
+ * .when(Condition.all(Field.valid(() -> Screens.SIGN_UP.email, Field.Kind.EMAIL),
+ *         Field.atLeast(() -> Screens.SIGN_UP.password, 8)))
  * }</pre>
  *
- * <p>The field is an input found by its {@link Element}; its text is what the tree states, a website's field its value.
+ * <p>The field is named lazily, as screens name each other ({@code Do.over}): a rule on a screen's input names its
+ * sibling fields, and the screen's constant is not set while its fields are made. It is an input found by its
+ * {@link Element}; its text is what the tree states, a website's field its value.
  * A check says {@link Answer#UNKNOWN} when it cannot read that text: the input is found by a picture, the target shows
  * no tree, the tree could not be read, or the element is not found there exactly once. An unknown never closes a way.
  * A password's text is the bullets it shows, as many as its characters: only {@link #atLeast} and {@link #filled} tell
@@ -26,8 +30,8 @@ import java.util.regex.Pattern;
  */
 public sealed interface Field extends Condition {
 
-    /** The text field it checks. */
-    Button input();
+    /** The text field it checks, named lazily. */
+    Supplier<Button> input();
 
     /** What it says of {@code text}, the field's text. */
     Answer says(String text);
@@ -35,42 +39,42 @@ public sealed interface Field extends Condition {
     /** What it says of the field's text now; unknown when it cannot be read, or is a password's bullets it cannot. */
     @Override
     default Answer answer() {
-        return FieldText.now(input())
+        return FieldText.now(input().get())
                 .map(read -> read.masked() && !(this instanceof Filled || this instanceof AtLeast)
                         ? Answer.UNKNOWN : says(read.text()))
                 .orElse(Answer.UNKNOWN);
     }
 
     /** Yes when {@code input} holds any text. */
-    static Field filled(Button input) {
+    static Field filled(Supplier<Button> input) {
         return new Filled(input);
     }
 
     /** Yes when {@code input} holds a valid value of {@code kind}, as a browser judges one; empty is not valid. */
-    static Field valid(Button input, Kind kind) {
+    static Field valid(Supplier<Button> input, Kind kind) {
         return new Valid(input, kind);
     }
 
-    /** Yes when {@code input}'s text holds {@code text}: {@code Field.holds(email, "@")}. */
-    static Field holds(Button input, String text) {
+    /** Yes when {@code input}'s text holds {@code text}: {@code Field.holds(() -> Screens.SIGN_UP.email, "@")}. */
+    static Field holds(Supplier<Button> input, String text) {
         return new Holds(input, text);
     }
 
-    /** Yes when {@code input}'s text does not hold {@code text}: {@code Field.lacks(email, "@")}. */
-    static Field lacks(Button input, String text) {
+    /** Yes when {@code input}'s text does not hold {@code text}: {@code Field.lacks(() -> Screens.SIGN_UP.email, "@")}. */
+    static Field lacks(Supplier<Button> input, String text) {
         return new Lacks(input, text);
     }
 
     /** Yes when {@code input} holds {@code characters} characters or more. */
-    static Field atLeast(Button input, int characters) {
+    static Field atLeast(Supplier<Button> input, int characters) {
         return new AtLeast(input, characters);
     }
 
     /**
      * Yes when {@code input} holds a number from {@code min} to {@code max}, both in; text that is no number is not in
-     * it. An open side is an infinity: {@code inRange(age, 18, Double.POSITIVE_INFINITY)}.
+     * it. An open side is the largest double: {@code inRange(() -> Screens.SIGN_UP.age, 18, Double.MAX_VALUE)}.
      */
-    static Field inRange(Button input, double min, double max) {
+    static Field inRange(Supplier<Button> input, double min, double max) {
         return new InRange(input, min, max);
     }
 
@@ -137,7 +141,7 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #filled}. */
-    record Filled(Button input) implements Field {
+    record Filled(Supplier<Button> input) implements Field {
         public Filled {
             Objects.requireNonNull(input, "input");
         }
@@ -149,7 +153,7 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #valid}: of a kind a browser judges, never {@link Kind#UNKNOWN}, which would never answer. */
-    record Valid(Button input, Kind kind) implements Field {
+    record Valid(Supplier<Button> input, Kind kind) implements Field {
         public Valid {
             Objects.requireNonNull(input, "input");
             if (kind == null || kind == Kind.UNKNOWN) {
@@ -164,7 +168,7 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #holds}. */
-    record Holds(Button input, String text) implements Field {
+    record Holds(Supplier<Button> input, String text) implements Field {
         public Holds {
             Objects.requireNonNull(input, "input");
             some(text);
@@ -177,7 +181,7 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #lacks}. */
-    record Lacks(Button input, String text) implements Field {
+    record Lacks(Supplier<Button> input, String text) implements Field {
         public Lacks {
             Objects.requireNonNull(input, "input");
             some(text);
@@ -190,7 +194,7 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #atLeast}: characters, not the UTF-16 units a string counts. */
-    record AtLeast(Button input, int characters) implements Field {
+    record AtLeast(Supplier<Button> input, int characters) implements Field {
         public AtLeast {
             Objects.requireNonNull(input, "input");
             if (characters < 1) throw new IllegalArgumentException("A field holds at least one character, or is filled");
@@ -203,10 +207,11 @@ public sealed interface Field extends Condition {
     }
 
     /** {@link #inRange}. */
-    record InRange(Button input, double min, double max) implements Field {
+    record InRange(Supplier<Button> input, double min, double max) implements Field {
         public InRange {
             Objects.requireNonNull(input, "input");
-            if (Double.isNaN(min) || Double.isNaN(max) || min > max) {
+            // An open side is Double.MAX_VALUE: an infinity is no number the bot's Java can write back.
+            if (!Double.isFinite(min) || !Double.isFinite(max) || min > max) {
                 throw new IllegalArgumentException("A range runs from its least number to its most: " + min + " to "
                         + max);
             }

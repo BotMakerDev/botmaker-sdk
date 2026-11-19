@@ -3,7 +3,10 @@
 
 package com.botmaker.sdk.internal.explore.tree;
 
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.internal.screens.ElementMatch;
+import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.Role;
@@ -19,6 +22,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * A stop of <em>Keep exploring</em> that a screen's tree settles, answered by the run itself (web discovery spec §2):
@@ -33,6 +37,7 @@ import java.util.function.Function;
         @JsonSubTypes.Type(value = TreeAnswer.NewInput.class, name = "new_input"),
         @JsonSubTypes.Type(value = TreeAnswer.NewWay.class, name = "new_way"),
         @JsonSubTypes.Type(value = TreeAnswer.InputNote.class, name = "input_note"),
+        @JsonSubTypes.Type(value = TreeAnswer.InputRule.class, name = "input_rule"),
         @JsonSubTypes.Type(value = TreeAnswer.NewTarget.class, name = "new_target")})
 public sealed interface TreeAnswer {
 
@@ -72,6 +77,69 @@ public sealed interface TreeAnswer {
     record InputNote(String screen, String field, String note) implements TreeAnswer {}
 
     /**
+     * A form's rule (web discovery phase 7): {@code field} of {@code screen} is enabled when every one of
+     * {@code checks} holds, each of a field of the same screen, as the form's tries showed; {@code note} the rule and
+     * the tries that showed it.
+     */
+    record InputRule(String screen, String field, List<FieldCheck> checks, String note) implements TreeAnswer {
+        public InputRule {
+            checks = checks == null ? List.of() : List.copyOf(checks);
+        }
+    }
+
+    /**
+     * One check of what the field {@code field} holds: {@code text} the {@link Field.Kind} id of {@link Test#VALID}
+     * or the text of {@link Test#HOLDS} and {@link Test#LACKS}, {@code characters} that of {@link Test#AT_LEAST},
+     * {@code min} and {@code max} those of {@link Test#IN_RANGE}, null for an open side.
+     */
+    record FieldCheck(String field, Test test, String text, Integer characters, Double min, Double max) {
+
+        /** Which {@link Field} check it is. */
+        public enum Test { FILLED, VALID, HOLDS, LACKS, AT_LEAST, IN_RANGE }
+
+        public static FieldCheck filled(String field) {
+            return new FieldCheck(field, Test.FILLED, null, null, null, null);
+        }
+
+        public static FieldCheck valid(String field, Field.Kind kind) {
+            return new FieldCheck(field, Test.VALID, kind.id(), null, null, null);
+        }
+
+        public static FieldCheck holds(String field, String text) {
+            return new FieldCheck(field, Test.HOLDS, text, null, null, null);
+        }
+
+        public static FieldCheck atLeast(String field, int characters) {
+            return new FieldCheck(field, Test.AT_LEAST, null, characters, null, null);
+        }
+
+        public static FieldCheck inRange(String field, Double min, Double max) {
+            return new FieldCheck(field, Test.IN_RANGE, null, null, min, max);
+        }
+
+        /**
+         * The check, of the field {@code input} gives: an open side of a range the largest double, as a bot writes it.
+         *
+         * @throws IllegalArgumentException for a check its parts cannot make, as {@link Field}'s own refuse
+         */
+        public Field check(Supplier<Button> input) {
+            return switch (test) {
+                case FILLED -> Field.filled(input);
+                case VALID -> Field.valid(input, Field.Kind.fromId(text));
+                case HOLDS -> Field.holds(input, text);
+                case LACKS -> Field.lacks(input, text);
+                case AT_LEAST -> Field.atLeast(input, characters == null ? 0 : characters);
+                case IN_RANGE -> {
+                    // Both sides open says nothing: refused, never written as a range every number passes.
+                    if (min == null && max == null) throw new IllegalArgumentException("a range with no bound");
+                    yield Field.inRange(input, min == null ? -Double.MAX_VALUE : min,
+                            max == null ? Double.MAX_VALUE : max);
+                }
+            };
+        }
+    }
+
+    /**
      * The launch spec {@code spec} made the bot's preferred launch target: <em>Discover</em> started on a bot with none
      * ({@code web:https://…}).
      */
@@ -107,6 +175,20 @@ public sealed interface TreeAnswer {
             inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located).orElse(null)));
         }
         return List.copyOf(inputs);
+    }
+
+    /**
+     * The control of {@code screen} labelled {@code label} that {@link Locator#inputs} leaves out, being disabled now: a
+     * form's submit its rule enables. Named after its locator, never one of {@code taken}; empty when the tree has no
+     * website control of that label, or more than one.
+     */
+    public static Optional<NewInput> disabledInput(String screen, UiTree tree, String label, Set<String> taken) {
+        ElementMatch.Matcher matcher = ElementMatch.in(tree);
+        List<UiNode> labelled = matcher.nodes().stream().filter(node -> WebTree.roleOf(node.className()).isPresent()
+                && !node.has(Trait.ENABLED) && node.label().strip().equalsIgnoreCase(label.strip())).toList();
+        if (labelled.size() != 1) return Optional.empty();
+        return Locator.of(labelled.getFirst(), matcher).map(locator -> new NewInput(screen,
+                unique(fieldName(said(locator)), new HashSet<>(taken)), locator, null));
     }
 
     /**

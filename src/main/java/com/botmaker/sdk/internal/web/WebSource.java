@@ -23,6 +23,7 @@ import com.botmaker.shared.web.Presses;
 import com.botmaker.shared.web.Robots;
 import com.botmaker.shared.web.Scope;
 import com.botmaker.shared.web.WebNode;
+import com.botmaker.shared.web.FormProbe;
 import com.botmaker.shared.web.WebPage;
 import com.botmaker.shared.web.WebTree;
 
@@ -290,6 +291,38 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
      */
     public synchronized UiTree treeNow() {
         return page().tree().asUiTree();
+    }
+
+    /**
+     * Tries each form the page shows, typing through the guard and never submitting, and leaves every field it typed
+     * into empty: what the tries showed. A form whose try fails is left out, said in the debug log.
+     */
+    public synchronized List<FormProbe.Result> forms() {
+        WebPage on = page();
+        List<FormProbe.Result> results = new ArrayList<>();
+        List<FormProbe.Form> forms;
+        try {
+            forms = FormProbe.forms(on);
+        } catch (RuntimeException e) {
+            Debug.log("the page's forms were not read: " + e);
+            return List.of();
+        }
+        try {
+            for (FormProbe.Form form : forms) {
+                if (form.fields().isEmpty()) continue;
+                try {
+                    results.add(FormProbe.probe(guard, on, form));
+                } catch (RuntimeException e) {
+                    Debug.log("the form " + (form.submit().isEmpty() ? "with no submit" : form.submit())
+                            + " was not tried: " + e);
+                }
+            }
+        } finally {
+            // The fields were typed into: the tree last looked at no longer says the page.
+            looked = null;
+            sayStopped();
+        }
+        return List.copyOf(results);
     }
 
     /** What the guard stopped since the last call: each said in the run's log already, handed on once. */

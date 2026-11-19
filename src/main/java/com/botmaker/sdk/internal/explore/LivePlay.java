@@ -20,6 +20,7 @@ import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.web.WebSource;
 import com.botmaker.shared.emulator.tree.UiTree;
+import com.botmaker.shared.web.FormProbe;
 import com.botmaker.shared.web.Guard;
 import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.plan.RunGame;
@@ -283,5 +284,11 @@ public final class LivePlay implements ExploreLoop.Play {
     @Override
     public Optional<String> press(String screen, String field, long withinMs) {
         return moves.press(screen, field, withinMs);
+    }
+
+    /** A website's forms, tried through its guard; an app's none. */
+    @Override
+    public List<FormProbe.Result> forms() {
+        return WebSource.of(Source.current()).map(WebSource::forms).orElse(List.of());
     }
 }

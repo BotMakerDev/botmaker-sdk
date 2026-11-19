@@ -4,7 +4,11 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.capture.Source;
+import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Field;
+import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Guards;
 import com.botmaker.sdk.internal.explore.Journal;
@@ -44,8 +48,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -99,53 +105,10 @@ class DiscoverSlowTest {
     @Test
     void aBlankMapEndsWithTheSitesScreensAndIsWalkedAgain(@TempDir Path project) throws InterruptedException {
         web.open();
-        AtomicReference<ScreenGraph> graph = new AtomicReference<>(ScreenGraph.of(Map.of()));
-        Map<String, Element> elements = new LinkedHashMap<>();
         List<String> targets = new ArrayList<>();
-        Journal journal = Journal.of(project);
-        LivePlay play = LivePlay.over(graph.get(), web::open);
-        AtomicInteger generation = new AtomicInteger();
-        ExploreLoop.Reload reload = () -> {
-            ScreenGraph now = graph.get();
-            play.use(now, null);
-            return new ExploreLoop.Reload.Reloaded(generation.incrementAndGet(), now, Guards.with(List.of()),
-                    List.of());
-        };
-        ExploreLoop.Settings settings = new ExploreLoop.Settings(Duration.ofSeconds(2), Duration.ofSeconds(60), 0,
-                Duration.ofSeconds(10), Duration.ofMinutes(3), Duration.ofMillis(100), 0);
-        ExploreLoop loop = new ExploreLoop(graph.get(), play, reload, Guards.with(List.of()), journal, settings,
-                System::currentTimeMillis).handOn(List.of(new TreeAnswer.NewTarget("web:" + web.url())));
-
-        // The plugin side: what each settled stop says, written into the map, then resumed; stopped once it is whole.
-        Thread watch = Thread.ofPlatform().daemon().start(() -> {
-            Set<String> done = new HashSet<>();
-            while (!Thread.currentThread().isInterrupted()) {
-                TreeAnswerWatch.round(journal, done, (id, answers) -> {
-                    TreeAnswers.Planned planned = TreeAnswers.plan(graph.get(), answers, elements);
-                    elements.putAll(planned.elements());
-                    targets.addAll(planned.targets());
-                    planned.skipped().forEach(why -> System.out.println("[test] " + id + " left out " + why));
-                    graph.set(applied(graph.get(), planned));
-                    return Optional.empty();
-                });
-                if (whole(graph.get()) && !journal.commandWaiting()) journal.command("stop");
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException stopped) {
-                    return;
-                }
-            }
-        });
-        try {
-            loop.run();
-        } finally {
-            watch.interrupt();
-            watch.join();
-        }
-
-        ScreenGraph map = graph.get();
-        String said = map.screens().entrySet().stream().map(e -> e.getKey() + " " + e.getValue().setup().route()
-                + " " + e.getValue().setup().examples() + " " + e.getValue().inputs().keySet()).toList().toString();
+        ScreenGraph map = discover(project, web::open, List.of(new TreeAnswer.NewTarget("web:" + web.url())),
+                DiscoverSlowTest::whole, targets);
+        String said = said(map);
         assertTrue(whole(map), said);
         assertEquals(List.of("web:" + web.url()), targets, "the website is the bot's launch target");
         MapScreen kase = caseStudy(map).orElseThrow();
@@ -163,10 +126,104 @@ class DiscoverSlowTest {
         assertEquals(map.screens().size(), summary.reached(), summary.said());
     }
 
+    /**
+     * The sign-up's form tried (web discovery phase 7c): Create account gets the rule its tries showed as its
+     * {@code .when(…)}, a valid email and 8 characters of password, and Email's message is a note on it. Started on
+     * the page itself, so the case studies' re-match (owed from 6c) does not spend the budget.
+     */
+    @Test
+    void aFormsRulesAreWrittenAsTheWhenOfItsSubmit(@TempDir Path project) throws InterruptedException {
+        Runnable signUpPage = () -> web.openPath("/auth/signup");
+        signUpPage.run();
+        int writes = site.writes();
+        ScreenGraph map = discover(project, signUpPage, List.of(),
+                m -> signUp(m).flatMap(DiscoverSlowTest::create).map(Input::when).isPresent(), new ArrayList<>());
+        String said = said(map);
+
+        MapScreen signUp = signUp(map).orElseThrow(() -> new AssertionError(said));
+        Condition.All rule = assertInstanceOf(Condition.All.class,
+                create(signUp).orElseThrow(() -> new AssertionError(said + " " + signUp.setup().notes())).when(), said);
+        assertTrue(rule.conditions().stream().anyMatch(c -> c instanceof Field.Valid v && v.kind() == Field.Kind.EMAIL),
+                rule.toString());
+        assertTrue(rule.conditions().stream().anyMatch(c -> c instanceof Field.AtLeast a && a.characters() == 8),
+                rule.toString());
+        assertTrue(signUp.setup().notes().contains("Enter a valid email"), signUp.setup().notes());
+        System.out.println("[test] sign-up notes: " + signUp.setup().notes());
+        assertEquals(writes, site.writes(), "the form was never submitted");
+    }
+
+    /**
+     * Runs <em>Keep exploring</em> from a blank map until {@code whole} holds of it or the budget ends, writing each
+     * settled stop's answers into the map as the plugin side does; {@code restart} reopens the site, {@code targets}
+     * collects the launch targets written.
+     */
+    private static ScreenGraph discover(Path project, Runnable restart, List<TreeAnswer> settled,
+                                        Predicate<ScreenGraph> whole, List<String> targets)
+            throws InterruptedException {
+        AtomicReference<ScreenGraph> graph = new AtomicReference<>(ScreenGraph.of(Map.of()));
+        Map<String, Element> elements = new LinkedHashMap<>();
+        Journal journal = Journal.of(project);
+        LivePlay play = LivePlay.over(graph.get(), restart);
+        AtomicInteger generation = new AtomicInteger();
+        ExploreLoop.Reload reload = () -> {
+            ScreenGraph now = graph.get();
+            play.use(now, null);
+            return new ExploreLoop.Reload.Reloaded(generation.incrementAndGet(), now, Guards.with(List.of()),
+                    List.of());
+        };
+        ExploreLoop.Settings settings = new ExploreLoop.Settings(Duration.ofSeconds(2), Duration.ofSeconds(60), 0,
+                Duration.ofSeconds(10), Duration.ofMinutes(3), Duration.ofMillis(100), 0);
+        ExploreLoop loop = new ExploreLoop(graph.get(), play, reload, Guards.with(List.of()), journal, settings,
+                System::currentTimeMillis).handOn(settled);
+
+        // The plugin side: what each settled stop says, written into the map, then resumed; stopped once it is whole.
+        Thread watch = Thread.ofPlatform().daemon().start(() -> {
+            Set<String> done = new HashSet<>();
+            while (!Thread.currentThread().isInterrupted()) {
+                TreeAnswerWatch.round(journal, done, (id, answers) -> {
+                    TreeAnswers.Planned planned = TreeAnswers.plan(graph.get(), answers, elements);
+                    elements.putAll(planned.elements());
+                    targets.addAll(planned.targets());
+                    planned.skipped().forEach(why -> System.out.println("[test] " + id + " left out " + why));
+                    graph.set(applied(graph.get(), planned));
+                    return Optional.empty();
+                });
+                if (whole.test(graph.get()) && !journal.commandWaiting()) journal.command("stop");
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException stopped) {
+                    return;
+                }
+            }
+        });
+        try {
+            loop.run();
+        } finally {
+            watch.interrupt();
+            watch.join();
+        }
+        return graph.get();
+    }
+
+    private static String said(ScreenGraph map) {
+        return map.screens().entrySet().stream().map(e -> e.getKey() + " " + e.getValue().setup().route()
+                + " " + e.getValue().setup().examples() + " " + e.getValue().inputs().keySet()).toList().toString();
+    }
+
     /** Whether {@code map} has the case study widened and the dialog reached by its button. */
     private static boolean whole(ScreenGraph map) {
         return caseStudy(map).isPresent() && map.screens().values().stream()
                 .anyMatch(s -> s.setup().name().contains("Details") && !s.setup().ways().isEmpty());
+    }
+
+    private static Optional<MapScreen> signUp(ScreenGraph map) {
+        return map.screens().values().stream().filter(s -> "/auth/signup".equals(s.setup().route())).findFirst();
+    }
+
+    /** The sign-up's Create account, whatever the run named it. */
+    private static Optional<Input> create(MapScreen signUp) {
+        return signUp.inputs().values().stream().filter(i -> i instanceof Button b && b.element() != null
+                && b.element().toString().contains("Create account")).findFirst();
     }
 
     private static Optional<MapScreen> caseStudy(ScreenGraph map) {
@@ -184,10 +241,45 @@ class DiscoverSlowTest {
         return ScreenGraph.of(screens);
     }
 
+    /**
+     * Shared's sign-up fixture: Create account enabled only once Email is a valid email and Password has 8 characters,
+     * a message when Email holds no {@code @}, Company free.
+     */
+    private static final String SIGN_UP = """
+            <main><h1>Create your account</h1>
+            <form id="signup" action="/api/signup" method="post" novalidate>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required aria-describedby="email-error">
+            <p id="email-error" role="alert" hidden></p>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" required minlength="8">
+            <label for="company">Company</label>
+            <input id="company" name="company" type="text">
+            <button id="create" type="submit" disabled>Create account</button>
+            </form></main>
+            <script>
+            const email = document.getElementById('email');
+            const password = document.getElementById('password');
+            const error = document.getElementById('email-error');
+            const create = document.getElementById('create');
+            const answer = () => {
+              create.disabled = !(email.value && email.validity.valid && password.value.length >= 8);
+            };
+            email.addEventListener('blur', () => {
+              const wrong = email.value !== '' && !email.value.includes('@');
+              error.hidden = !wrong;
+              error.textContent = wrong ? 'Enter a valid email' : '';
+              email.setAttribute('aria-invalid', wrong ? 'true' : 'false');
+            });
+            for (const field of [email, password]) field.addEventListener('input', answer);
+            document.getElementById('signup').addEventListener('submit', e => e.preventDefault());
+            </script></body></html>""";
+
     private static Map<String, String> pages(String otherBase) {
         String head = "<!doctype html><html><head><meta charset=utf-8><title>Fixture</title></head><body>";
         String kase = "<main><h1>%s</h1><p>How %s plays.</p><a href=/case-studies>All case studies</a></main>";
         return Map.of(
+                "/auth/signup", head + SIGN_UP,
                 "/", head + "<nav aria-label=Main><a href=/case-studies>Case studies</a> "
                         + "<a href='" + otherBase + "/jobs'>Jobs board</a></nav><main><h1>Agents that play</h1>"
                         + "<button id=open onclick=\"document.getElementById('d').hidden=false\">Open details</button>"

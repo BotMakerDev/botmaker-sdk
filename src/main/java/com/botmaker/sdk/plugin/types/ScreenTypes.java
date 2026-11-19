@@ -21,6 +21,7 @@ import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Element;
+import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -55,6 +56,7 @@ import com.botmaker.sdk.internal.signin.SignedInCheck;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -86,7 +88,8 @@ public final class ScreenTypes implements TypeHolder {
                 BESIDE_SHAPE, NODE_SHAPE, TREE_SHAPE, SCROLL_SHAPE, SCROLL_DRAG_SHAPE, PICK_FIRST_SHAPE, PICK_NTH_SHAPE, PICK_EACH_SHAPE,
                 PICK_UNTIL_NONE_SHAPE, PICK_UNTIL_SHAPE, PICK_AT_SHAPE, PICK_CELL_SHAPE, WHEN_SHAPE, AT_LEAST_SHAPE,
                 AT_MOST_SHAPE, IS_SHAPE, IS_TRUE_SHAPE, IS_SET_SHAPE, CONDITION_OF_SHAPE, CONDITION_ALL_SHAPE, CONDITION_ANY_SHAPE,
-                CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE, SIGNED_IN_SHAPE);
+                CONDITION_XOR_SHAPE, CONDITION_NOT_SHAPE, SIGNED_IN_SHAPE, FIELD_FILLED_SHAPE, FIELD_VALID_SHAPE,
+                FIELD_HOLDS_SHAPE, FIELD_LACKS_SHAPE, FIELD_AT_LEAST_SHAPE, FIELD_IN_RANGE_SHAPE);
     }
 
     /**
@@ -454,6 +457,37 @@ public final class ScreenTypes implements TypeHolder {
     /** {@code Accounts.signedIn(Login::email)}: the parameter, as the method reference it is written as. */
     public static final DeclaredCall<SignedInCheck> SIGNED_IN_SHAPE = ComponentType.part(SignedInCheck.class)
             .<Params.Of, Condition>writtenAs(Accounts::signedIn, Parts.SIGNED_IN_EMAIL.part(ScreenTypes::parameter));
+
+    /*
+     * A form's rule, a check of what a text field holds (web discovery phase 7): the field a lazy reference to its
+     * screen's input, () -> Screens.SIGN_UP.email, as an action's .over(() -> …) names one.
+     */
+
+    /** {@code Field.filled(() -> Screens.SIGN_UP.email)}. */
+    public static final DeclaredCall<Field.Filled> FIELD_FILLED_SHAPE = ComponentType.part(Field.Filled.class)
+            .<Supplier<Button>, Field>writtenAs(Field::filled, Field.Filled::input);
+
+    /** {@code Field.valid(() -> Screens.SIGN_UP.email, Field.Kind.EMAIL)}. */
+    public static final DeclaredCall<Field.Valid> FIELD_VALID_SHAPE = ComponentType.part(Field.Valid.class)
+            .<Supplier<Button>, Field.Kind, Field>writtenAs(Field::valid, Field.Valid::input, Field.Valid::kind);
+
+    /** {@code Field.holds(() -> Screens.SIGN_UP.email, "@")}. */
+    public static final DeclaredCall<Field.Holds> FIELD_HOLDS_SHAPE = ComponentType.part(Field.Holds.class)
+            .<Supplier<Button>, String, Field>writtenAs(Field::holds, Field.Holds::input, Field.Holds::text);
+
+    /** {@code Field.lacks(() -> Screens.SIGN_UP.email, "@")}. */
+    public static final DeclaredCall<Field.Lacks> FIELD_LACKS_SHAPE = ComponentType.part(Field.Lacks.class)
+            .<Supplier<Button>, String, Field>writtenAs(Field::lacks, Field.Lacks::input, Field.Lacks::text);
+
+    /** {@code Field.atLeast(() -> Screens.SIGN_UP.password, 8)}. */
+    public static final DeclaredCall<Field.AtLeast> FIELD_AT_LEAST_SHAPE = ComponentType.part(Field.AtLeast.class)
+            .<Supplier<Button>, Integer, Field>writtenAs(Field::atLeast, Field.AtLeast::input,
+                    Field.AtLeast::characters);
+
+    /** {@code Field.inRange(() -> Screens.SIGN_UP.age, 18.0, 120.0)}. */
+    public static final DeclaredCall<Field.InRange> FIELD_IN_RANGE_SHAPE = ComponentType.part(Field.InRange.class)
+            .<Supplier<Button>, Double, Double, Field>writtenAs(Field::inRange, Field.InRange::input,
+                    Field.InRange::min, Field.InRange::max);
 
     /** {@code Condition.of(Firestone::eventOn)}: a bot method asked, its reference crossing as the text it is written as. */
     public static final DeclaredCall<Condition.Of> CONDITION_OF_SHAPE = ComponentType.part(Condition.Of.class)

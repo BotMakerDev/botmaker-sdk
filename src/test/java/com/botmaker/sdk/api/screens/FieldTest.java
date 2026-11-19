@@ -17,6 +17,7 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A form's rule checked against what its fields hold in the tree, and unknown where no tree tells. */
 class FieldTest {
 
-    private static final Button EMAIL = Button.of(Element.byId("email"));
-    private static final Button PASSWORD = Button.of(Element.byId("password"));
-    private static final Button AGE = Button.of(Element.byId("age"));
+    private static final Supplier<Button> EMAIL = () -> Button.of(Element.byId("email"));
+    private static final Supplier<Button> PASSWORD = () -> Button.of(Element.byId("password"));
+    private static final Supplier<Button> AGE = () -> Button.of(Element.byId("age"));
+    private static final Supplier<Button> NOWHERE = () -> Button.of(Element.byId("nowhere"));
 
     @AfterEach
     void unpin() {
@@ -60,10 +62,11 @@ class FieldTest {
     void aCheckIsUnknownWhereItsTextCannotBeReadAndAnUnknownClosesNothing() {
         Field filled = Field.filled(EMAIL);
         show(form("probe@example.com", "", ""));
-        assertEquals(Answer.UNKNOWN, Field.filled(Button.of(Element.byId("nowhere"))).answer(), "not on the page");
+        assertEquals(Answer.UNKNOWN, Field.filled(NOWHERE).answer(), "not on the page");
         assertEquals(Answer.NO, Field.filled(PASSWORD).answer());
         assertFalse(Field.filled(PASSWORD).getAsBoolean());
-        assertTrue(Field.filled(Button.of(Element.byId("nowhere"))).getAsBoolean(), "an unknown closes nothing");
+        assertTrue(Field.filled(NOWHERE).getAsBoolean(), "an unknown closes nothing");
+        assertEquals(Answer.UNKNOWN, Field.filled(() -> null).answer(), "a sibling not made yet");
 
         Source.set(new Window());
         assertEquals(Answer.UNKNOWN, filled.answer(), "a game window shows no tree");
@@ -88,7 +91,9 @@ class FieldTest {
         for (String no : new String[] {"NaN", "12d", "+5", "5.", " 120 ", "1e999"}) {
             assertEquals(Answer.NO, number.says(no), no + " is no number a browser takes");
         }
-        Field adult = Field.inRange(AGE, 18, Double.POSITIVE_INFINITY);
+        Field adult = Field.inRange(AGE, 18, Double.MAX_VALUE);
+        assertThrows(IllegalArgumentException.class, () -> Field.inRange(AGE, 18, Double.POSITIVE_INFINITY),
+                "an open side is MAX_VALUE, which the bot's Java writes back");
         assertEquals(Answer.NO, adult.says("17"));
         assertEquals(Answer.YES, adult.says("120"));
         assertEquals(Answer.NO, adult.says("eighteen"));

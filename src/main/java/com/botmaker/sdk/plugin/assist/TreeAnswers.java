@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -177,6 +180,21 @@ final class TreeAnswers {
                     }
                     changes.add(new Change(constant.get(), s -> noted(s, note)));
                 }
+                case TreeAnswer.InputRule rule -> {
+                    Optional<String> constant = constantOf(graph, newConstants, rule.screen());
+                    if (constant.isEmpty()) {
+                        skipped.add(rule.field() + "'s rule: no screen " + rule.screen() + " in the map.");
+                        continue;
+                    }
+                    Optional<BooleanSupplier> when = when(constant.get(), rule);
+                    if (when.isEmpty()) {
+                        skipped.add(rule.field() + "'s rule: a check its parts cannot make.");
+                        continue;
+                    }
+                    UnaryOperator<MapScreen> ruled = s -> ruled(s, rule, when.get());
+                    if (screens.containsKey(constant.get())) screens.compute(constant.get(), (c, s) -> ruled.apply(s));
+                    else changes.add(new Change(constant.get(), ruled));
+                }
             }
         }
         List<Added> added = new ArrayList<>();
@@ -271,10 +289,49 @@ final class TreeAnswers {
 
     /** {@code screen} with {@code note} on its notes and the input it says of marked tried. */
     private static MapScreen noted(MapScreen screen, TreeAnswer.InputNote note) {
-        String line = note.field() + ": " + note.note();
-        MapScreen now = screen.setup(s -> s.notes(s.notes() == null || s.notes().isBlank() ? line
+        MapScreen now = withNote(screen, note.field() + ": " + note.note());
+        return now.input(note.field()).map(i -> now.withInput(note.field(), i.tried())).orElse(now);
+    }
+
+    /** {@code screen} with {@code line} on its notes, once. */
+    private static MapScreen withNote(MapScreen screen, String line) {
+        return screen.setup(s -> s.notes(s.notes() == null || s.notes().isBlank() ? line
                 : s.notes().contains(line) ? s.notes() : s.notes() + "\n" + line));
-        MapScreen at = now;
-        return now.input(note.field()).map(i -> at.withInput(note.field(), i.tried())).orElse(now);
+    }
+
+    /**
+     * The {@code .when(…)} of {@code rule}'s input on the screen {@code constant}: its one check, or all of them; each
+     * field a lazy reference to the screen's own, so the screen names its sibling once they are made. Empty when a
+     * check's parts make none.
+     */
+    static Optional<BooleanSupplier> when(String constant, TreeAnswer.InputRule rule) {
+        if (rule.checks().isEmpty()) return Optional.empty();
+        List<Condition> checks = new ArrayList<>();
+        try {
+            for (TreeAnswer.FieldCheck check : rule.checks()) {
+                checks.add(check.check(new Sibling(BotConstants.input(constant, check.field()))));
+            }
+        } catch (IllegalArgumentException unmade) {
+            return Optional.empty();
+        }
+        return Optional.of(checks.size() == 1 ? checks.getFirst() : Condition.all(checks.toArray(Condition[]::new)));
+    }
+
+    /**
+     * {@code screen} with {@code rule}'s input enabled {@code when}, and the rule in its notes. An input that has a
+     * {@code .when(…)} already keeps it, the author's or an earlier run's, and gets the note only.
+     */
+    private static MapScreen ruled(MapScreen screen, TreeAnswer.InputRule rule, BooleanSupplier when) {
+        MapScreen now = withNote(screen, rule.field() + ": " + rule.note());
+        return now.input(rule.field()).filter(i -> i.when() == null)
+                .map(i -> now.withInput(rule.field(), i.when(when))).orElse(now);
+    }
+
+    /** A lazy reference to a screen's input, equal to another naming the same one: what a rule's check names. */
+    private record Sibling(Button input) implements Supplier<Button> {
+        @Override
+        public Button get() {
+            return input;
+        }
     }
 }

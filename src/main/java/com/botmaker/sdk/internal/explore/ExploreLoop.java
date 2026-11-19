@@ -11,17 +11,23 @@ import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.explore.tree.Effect;
+import com.botmaker.sdk.internal.explore.tree.FormRules;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.RouteGuess;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.Conditions;
+import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.shared.emulator.tree.UiNode;
+import com.botmaker.shared.emulator.tree.UiTree;
+import com.botmaker.shared.web.FormProbe;
+import com.botmaker.shared.web.FormRule;
 import com.botmaker.shared.web.Guard;
 import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 
@@ -29,10 +35,12 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -211,6 +219,14 @@ public final class ExploreLoop {
         default Optional<String> press(String screen, String field, long withinMs) {
             return Optional.empty();
         }
+
+        /**
+         * Tries each form the page shows now, never submitting, and leaves its fields empty: what the tries showed.
+         * None for a game or an app, whose fields no probe tries.
+         */
+        default List<FormProbe.Result> forms() {
+            return List.of();
+        }
     }
 
     /** Compiles the bot again and installs it: what came of it. */
@@ -275,6 +291,8 @@ public final class ExploreLoop {
     /** What presses of inputs that are no way did, not yet handed on: they go with the next settled stop. */
     private final List<TreeAnswer> notes = new ArrayList<>();
     private int settledNotes;
+    /** The screens whose forms were tried: once each. */
+    private final Set<String> probed = new HashSet<>();
 
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
@@ -402,13 +420,16 @@ public final class ExploreLoop {
         Optional<Edge> untried = untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
         if (readsTrees()) {
+            // Once per screen the map holds: its inputs name the fields the tries found.
+            if (!probed.contains(screen) && map.screen(screen).isPresent()) {
+                probed.add(screen);
+                notes.addAll(rules(screen));
+            }
             Optional<String> input = untriedInput(screen);
             if (input.isPresent()) return pressInput(screen, input.get());
             if (!notes.isEmpty()) {
                 return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
-                        notes.stream().allMatch(TreeAnswer.InputNote.class::isInstance)
-                                ? "what pressing " + notes.size() + " inputs did, read off the page"
-                                : "what the run settled before it met this screen") != Paused.END;
+                        settledWhy(screen)) != Paused.END;
             }
         }
         if (planRounds < settings.planRoundsWithoutNew()) {
@@ -528,6 +549,54 @@ public final class ExploreLoop {
             return Optional.of(field);
         }
         return Optional.empty();
+    }
+
+    /** What the notes handed on with {@code screen}'s settled stop are: its forms' tries, presses, or earlier answers. */
+    private String settledWhy(String screen) {
+        if (notes.stream().anyMatch(TreeAnswer.InputRule.class::isInstance)) {
+            return "what " + screen + "'s forms showed when tried, never submitted";
+        }
+        return notes.stream().allMatch(TreeAnswer.InputNote.class::isInstance)
+                ? "what pressing " + notes.size() + " inputs did, read off the page"
+                : "what the run settled before it met this screen";
+    }
+
+    /**
+     * The rules {@code screen}'s forms showed when tried, as answers handed on with the next settled stop: each field
+     * named by the screen's input whose element finds, alone, the part of the label the tries gave it.
+     */
+    private List<TreeAnswer> rules(String screen) {
+        MapScreen on = map.screen(screen).orElseThrow();
+        List<FormProbe.Result> tried = play.forms();
+        if (tried.isEmpty()) return List.of();
+        UiTree tree = play.state().map(Effect.State::tree).orElse(null);
+        if (tree == null) return List.of();
+        Map<String, String> fields = new HashMap<>();
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            if (!(input.getValue() instanceof Button button) || button.element() == null) continue;
+            List<UiNode> found = ElementMatch.matches(button.element(), tree);
+            if (found.size() == 1 && !found.getFirst().label().isBlank()) {
+                fields.putIfAbsent(found.getFirst().label().strip().toLowerCase(Locale.ROOT), input.getKey());
+            }
+        }
+        List<TreeAnswer> answers = new ArrayList<>();
+        Set<String> taken = new HashSet<>(on.inputs().keySet());
+        for (FormProbe.Result result : tried) {
+            // A submit disabled until its rule holds is no input the page's read made: added here, the rule's to hold.
+            for (FormRule rule : result.rules()) {
+                if (!(rule instanceof FormRule.Enables enables)) continue;
+                String label = enables.input().strip().toLowerCase(Locale.ROOT);
+                if (fields.containsKey(label)) continue;
+                TreeAnswer.disabledInput(screen, tree, enables.input(), taken).ifPresent(input -> {
+                    answers.add(input);
+                    taken.add(input.field());
+                    fields.put(label, input.field());
+                });
+            }
+            answers.addAll(FormRules.answers(screen, result.rules(),
+                    label -> Optional.ofNullable(fields.get(label.strip().toLowerCase(Locale.ROOT)))));
+        }
+        return answers;
     }
 
     /**

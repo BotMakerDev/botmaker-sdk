@@ -4,6 +4,8 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Condition;
+import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
@@ -120,6 +122,29 @@ class TreeAnswersTest {
 
         assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
         assertNotNull(changed(graph, planned, "CASE").setup().back(), "its way back");
+    }
+
+    @Test
+    void aFormsRuleIsTheWhenOfTheInputItEnablesAndItsNote() {
+        ScreenGraph graph = map();
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.InputRule("A", "open", List.of(
+                TreeAnswer.FieldCheck.valid("toggle", Field.Kind.EMAIL),
+                TreeAnswer.FieldCheck.atLeast("toggle", 8)), "Enabled when toggle holds an email")), Map.of());
+
+        assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
+        MapScreen a = changed(graph, planned, "A");
+        Condition.All when = assertInstanceOf(Condition.All.class, a.input("open").orElseThrow().when());
+        Field.Valid valid = assertInstanceOf(Field.Valid.class, when.conditions().get(0));
+        assertEquals(BotConstants.input("A", "toggle"), valid.input().get(), "the sibling, named lazily");
+        assertEquals(Field.Kind.EMAIL, valid.kind());
+        assertEquals(8, assertInstanceOf(Field.AtLeast.class, when.conditions().get(1)).characters());
+        assertEquals("open: Enabled when toggle holds an email", a.setup().notes());
+
+        // A second rule on the same input keeps the first: the author's or an earlier run's .when is never replaced.
+        ScreenGraph ruled = ScreenGraph.of(Map.of("A", a));
+        Planned again = TreeAnswers.plan(ruled, List.of(new TreeAnswer.InputRule("A", "open",
+                List.of(TreeAnswer.FieldCheck.filled("toggle")), "Enabled once toggle is filled")), Map.of());
+        assertEquals(when, changed(ruled, again, "A").input("open").orElseThrow().when());
     }
 
     @Test
