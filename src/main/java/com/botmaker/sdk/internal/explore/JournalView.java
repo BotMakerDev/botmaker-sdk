@@ -211,6 +211,15 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 .orElse(0);
     }
 
+    /**
+     * When the latest run's own process began playing, epoch milliseconds: its last {@link ExploreEvent.Restarted}, a
+     * new process on the rebuilt SDK, else {@link #beganAt}.
+     */
+    public long playingSince() {
+        List<ExploreEvent> since = sinceRestart();
+        return since != events && !since.isEmpty() ? since.getFirst().at() : beganAt();
+    }
+
     /** How long the latest run has run: to its end when it ended, else to {@code nowMs}. */
     public Duration ranFor(long nowMs) {
         if (beganAt() == 0) return Duration.ZERO;

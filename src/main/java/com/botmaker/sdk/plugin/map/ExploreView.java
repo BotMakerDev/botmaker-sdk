@@ -247,7 +247,7 @@ final class ExploreView {
         Optional<Instant> started = pid.isEmpty() ? Optional.empty()
                 : ProcessHandle.of(pid.getAsLong()).flatMap(process -> process.info().startInstant());
         // A second's slack: a process's start is kept to the clock tick.
-        return started.isEmpty() || read.beganAt() >= started.get().toEpochMilli() - 1_000;
+        return started.isEmpty() || read.playingSince() >= started.get().toEpochMilli() - 1_000;
     }
 
     /** Reads the journal, and a frame while an explore run goes, off the FX thread; one read at a time. */

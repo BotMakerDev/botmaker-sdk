@@ -136,6 +136,21 @@ class ExploreViewTest extends ApplicationTest {
     }
 
     @Test
+    void runRestartedOnTheRebuiltSdkIsLive() {
+        long processBegan = ProcessHandle.current().info().startInstant().orElseThrow().toEpochMilli();
+        journal.append(new ExploreEvent.Began(true, 1_000));
+        // The SDK's reload started a new process long after the run began, which goes on from its memory.
+        journal.append(new ExploreEvent.Restarted("fault-3", true, processBegan + 500));
+
+        running = true;
+        pid = OptionalLong.of(ProcessHandle.current().pid());
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertFalse(view.statusText().endsWith("ended"), view.statusText());
+        assertFalse(view.stopButton().isDisabled(), "Stop ends the restarted run");
+    }
+
+    @Test
     void laterRunIsNotTheExploreRun() {
         Stop stop = new Stop("GUARD-1", StopKind.GUARD, "HOME", "HOME", "", List.of(), List.of(), Map.of(), List.of(),
                 "a foreign window", 2_000);

@@ -277,6 +277,9 @@ public final class ExploreLoop {
     /** A resume of a fault without ignore is answered with this, and the fault stays held. */
     public static final String FAULT_RESUMES = "a fault resumes through reload_sdk; resume ignore drops it as a misreading";
 
+    /** The source of a fault the plugin side raised by leaving lines of a settled stop unwritten. */
+    private static final String SKIPPED = "skipped";
+
     private final Journal journal;
     private final Play play;
     /** Whether faults are raised and held: the SDK is a {@code -SNAPSHOT} build ({@link Play#dev}). */
@@ -543,7 +546,7 @@ public final class ExploreLoop {
         Stop stop = skip.stop();
         // What follows is this stop's own word on it: the resume is not checked again.
         if (resumed != null && resumed.id().equals(stop.id())) resumed = null;
-        return fault(stop.kind(), stop.screen(), stop.place(), "skipped", "what the run settled at " + stop.id()
+        return fault(stop.kind(), stop.screen(), stop.place(), SKIPPED, "what the run settled at " + stop.id()
                 + " was not all written: " + String.join("; ", skip.lines()), String.join("\n", skip.lines())
                 + settledEvidence(stop.id()));
     }
@@ -912,11 +915,35 @@ public final class ExploreLoop {
     private Paused settle(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
         if (parked.containsKey(parkedKey(kind, place))) return null;
         boolean replayed = replays(kind, place);
+        // A fault the plugin side's writing raised replays by settling again: the rebuilt SDK writes it this time.
+        if (replayed && SKIPPED.equals(replay.source())) return rewrite(kind, screen, place, answers, missing);
         if (replayed || resumed != null && resumed.kind() == kind && resumed.place().equals(place)) {
             return fault(kind, screen, place, "did-not-take", missing + "; what the tree settled was written and did "
                     + "not take", "settled again: " + answers
                     + settledEvidence(replayed ? replay.fault().id() : resumed.id()));
         }
+        return settled(kind, screen, place, answers, missing);
+    }
+
+    /**
+     * Settles the place of the fault being replayed again, a fault the writing of what it settled raised: resumed with
+     * every line written on the rebuilt SDK, the fault is fixed and its memory goes; a line left out again is raised by
+     * the next round, as any.
+     */
+    private Paused rewrite(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
+        // No longer replayed: the stop is a settled one, never turned back into the fault. Its file stays until written.
+        String faultId = replay.fault().id();
+        replay = null;
+        Paused paused = settled(kind, screen, place, answers, missing);
+        if (paused == Paused.RESUMED && skips.stream().noneMatch(skip -> skip.stop().place().equals(place))) {
+            emit(new ExploreEvent.Fixed(faultId, "written on the rebuilt SDK", nowMs.getAsLong()));
+            ResumeFile.delete(journal);
+        }
+        return paused;
+    }
+
+    /** The stop that hands {@code answers} and the notes not yet handed on to the plugin side to write. */
+    private Paused settled(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
         List<TreeAnswer> all = new ArrayList<>(answers);
         all.addAll(notes);
         notes.clear();

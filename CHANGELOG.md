@@ -144,6 +144,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - Discover no longer stops on a link to a screen no way may lead into, such as a site's Home link on a page two
   screens down: the input is noted as leading there and kept tried, instead of being left unwritten.
+- A Discover fault raised because a settled stop was not all written replays by settling its place again, so the
+  rebuilt SDK writes it; it was judged a fix that did not take.
+- 🔭 Explore shows a run restarted on the rebuilt SDK as going, with its page and Stop: it compared the new
+  process's start with when the run first began.
 
 ## [1.11.0] — 2026-11-16
 
