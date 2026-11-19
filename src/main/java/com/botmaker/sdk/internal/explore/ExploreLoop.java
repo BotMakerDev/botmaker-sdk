@@ -510,9 +510,11 @@ public final class ExploreLoop {
         }
     }
 
-    /** The packages of Discover's own code, as a frame's class names them. */
-    private static final List<String> DISCOVER = List.of("com.botmaker.sdk.internal.explore.",
-            "com.botmaker.sdk.plugin.assist.");
+    /**
+     * The packages of Discover's own code, as a frame's class names them. Only the bot's half: the run plays in the
+     * bot's JVM, where the plugin half's assistant tools are never on the stack.
+     */
+    private static final List<String> DISCOVER = List.of("com.botmaker.sdk.internal.explore.");
 
     /** Whether {@code e} was thrown in Discover's own code: its top frame outside the JDK is one of {@link #DISCOVER}. */
     static boolean discovers(Throwable e) {
