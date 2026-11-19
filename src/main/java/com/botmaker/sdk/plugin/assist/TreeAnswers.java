@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 /**
  * What a run settled off a screen's tree ({@link TreeAnswer}, web discovery phase 6b), written into the bot as
@@ -190,8 +191,12 @@ final class TreeAnswers {
                         changes.add(new Change(to.get(), s -> ScreenEdits.withWay(s, from.get(), way.field())));
                     }
                     if (!screens.containsKey(from.get())) {
-                        changes.add(new Change(from.get(), s -> s.input(way.field())
-                                .map(i -> s.withInput(way.field(), ScreenEdits.untried(i))).orElse(s)));
+                        // A way now: what an earlier press noted of it is gone with its tried mark.
+                        changes.add(new Change(from.get(), s -> {
+                            MapScreen clean = withoutNote(s, way.field());
+                            return clean.input(way.field())
+                                    .map(i -> clean.withInput(way.field(), ScreenEdits.untried(i))).orElse(clean);
+                        }));
                     }
                 }
                 case TreeAnswer.InputNote note -> {
@@ -384,10 +389,19 @@ final class TreeAnswers {
         return all.stream().limit(Setup.EXAMPLES).toList();
     }
 
-    /** {@code screen} with {@code note} on its notes and the input it says of marked tried. */
+    /** {@code screen} with {@code note} on its notes, over what it said of that input before, the input marked tried. */
     private static MapScreen noted(MapScreen screen, TreeAnswer.InputNote note) {
-        MapScreen now = withNote(screen, note.field() + ": " + note.note());
+        MapScreen now = withNote(withoutNote(screen, note.field()), note.field() + ": " + note.note());
         return now.input(note.field()).map(i -> now.withInput(note.field(), i.tried())).orElse(now);
+    }
+
+    /** {@code screen} without the lines of its notes that say something of its input {@code field}. */
+    private static MapScreen withoutNote(MapScreen screen, String field) {
+        String notes = screen.setup().notes();
+        if (notes == null || notes.isBlank()) return screen;
+        String kept = notes.lines().filter(line -> !line.startsWith(field + ": "))
+                .collect(Collectors.joining("\n"));
+        return kept.equals(notes) ? screen : screen.setup(s -> s.notes(kept));
     }
 
     /** {@code screen} with {@code line} on its notes, once. */

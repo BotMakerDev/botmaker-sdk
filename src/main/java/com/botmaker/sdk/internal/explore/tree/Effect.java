@@ -41,6 +41,9 @@ public sealed interface Effect {
     /** Nothing a tester sees changed. */
     record Nothing() implements Effect {}
 
+    /** How a {@link Fails}'s {@link #line()} begins. */
+    String FAILS = "Fails: ";
+
     /** The press failed: a write the guard blocked, a page robots.txt keeps out, or an error in the console. */
     record Fails(String why) implements Effect {}
 
@@ -60,7 +63,7 @@ public sealed interface Effect {
             case Changes(List<String> parts) -> "Changes " + String.join("; ", parts);
             case ShowsError(String text) -> "Shows the error \"" + text + "\"";
             case Nothing() -> "Does nothing a visitor sees";
-            case Fails(String why) -> "Fails: " + why;
+            case Fails(String why) -> FAILS + why;
             case Exits(String url) -> "Leaves the site for " + url;
         };
     }

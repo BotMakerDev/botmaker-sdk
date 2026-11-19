@@ -274,6 +274,25 @@ class ExploreLoopTest {
                 events(ExploreEvent.Pictured.class), "the docs link has its picture already");
     }
 
+    /** A tried input a note says fails is pressed again, once; one a note says does nothing is not. */
+    @Test
+    void anInputThatFailedIsPressedAgainOnce() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free().tried());
+        inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()).free().tried());
+        screens.put("A", new MapScreen(Setup.named("A").start().notes("toggle: Fails: blocked write: POST /monitoring\n"
+                + "docs: Does nothing a visitor sees"), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of("A.toggle"), game.pressed);
+    }
+
     /** An input that is no way is pressed once; what it did goes with the next settled stop as a note. */
     @Test
     void aFreeInputIsPressedAndNoted() {

@@ -578,17 +578,20 @@ public final class ExploreLoop {
 
     /**
      * The first input of {@code screen} that is no way, free, found in its tree, never pressed: an input no note
-     * says anything of yet. One the bot's code presses ({@code Custom}) or one found by a picture is Claude's.
+     * says anything of yet. One the bot's code presses ({@code Custom}) or one found by a picture is Claude's. One a
+     * note says fails is pressed again, once a run: what failed may have been the page's, or an older run's judging.
      */
     private Optional<String> untriedInput(String screen) {
         MapScreen on = map.screen(screen).orElse(null);
         if (on == null) return Optional.empty();
         Set<String> ways = new HashSet<>();
         for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
+        String notes = on.setup().notes() == null ? "" : "\n" + on.setup().notes();
         for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
             String field = input.getKey();
             if (!(input.getValue() instanceof Button button) || button.element() == null) continue;
-            if (!(button.verdict() instanceof Verdict.Free) || button.isTried() || button.isInfo()) continue;
+            boolean failed = notes.contains("\n" + field + ": " + Effect.FAILS);
+            if (!(button.verdict() instanceof Verdict.Free) || button.isTried() && !failed || button.isInfo()) continue;
             String key = screen + "." + field;
             if (ways.contains(field) || tried.contains(key) || avoided(key)) continue;
             return Optional.of(field);

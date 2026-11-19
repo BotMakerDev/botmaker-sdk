@@ -115,7 +115,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   write beside it (the site's own telemetry, `POST /monitoring`), so 🗺 Screens links the pages it found. A page's
   numbers raise no missing-fact stop. Each new screen gets the frame it was found on as its shot, and each new input
   a picture Chromium renders of it, below the fold too, as its element's shot. A screen the map already holds is
-  pictured the same way when the run reaches it, for whatever it lacks: a map made before fills itself in.
+  pictured the same way when the run reaches it, for whatever it lacks: a map made before fills itself in. An input
+  a note says fails is pressed again once a run, and what it does now replaces that note.
 
 ## [1.11.0] — 2026-11-16
 

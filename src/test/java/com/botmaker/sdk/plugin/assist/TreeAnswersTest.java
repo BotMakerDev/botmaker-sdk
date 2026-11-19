@@ -126,6 +126,21 @@ class TreeAnswersTest {
         assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
     }
 
+    /** An input pressed again says only what it does now: a new note replaces its old one, a way drops it. */
+    @Test
+    void aPressAgainReplacesWhatTheInputsNoteSaid() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.compute("A", (c, s) -> s.setup(x -> x.notes("open: Fails: blocked write: POST /monitoring\n"
+                + "toggle: Fails: console error: CORS\nopener: Does nothing a visitor sees")));
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case"), Map.of()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("A", "open", "Case"),
+                new TreeAnswer.InputNote("A", "toggle", "Changes the theme")), Map.of());
+
+        assertEquals("opener: Does nothing a visitor sees\ntoggle: Changes the theme",
+                changed(graph, planned, "A").setup().notes());
+    }
+
     @Test
     void aLinkUpToTheScreenItWasReachedFromIsItsWayBack() {
         Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
