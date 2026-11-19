@@ -5,8 +5,10 @@ package com.botmaker.sdk.plugin.run;
 
 import com.botmaker.plugin.api.RunEntryHolder;
 import com.botmaker.plugin.api.run.RunEntry;
+import com.botmaker.sdk.api.bot.Discover;
 import com.botmaker.sdk.api.bot.ExploreMap;
 import com.botmaker.sdk.api.bot.KeepExploring;
+import com.botmaker.sdk.internal.explore.DiscoverArgs;
 import com.botmaker.sdk.internal.explore.ExploreBudget;
 import com.botmaker.sdk.internal.screens.MapCheckBudget;
 
@@ -24,11 +26,19 @@ public final class SdkRuns implements RunEntryHolder {
     /** The title of the long exploring run, as {@link #EXPLORE_MAP}. */
     public static final String KEEP_EXPLORING = "Keep exploring";
 
+    /**
+     * The title of the run that maps a game or website into a bot, a blank one given its {@code url}
+     * ({@link Discover}); the shell's {@code botmaker tool sdk discover}.
+     */
+    public static final String DISCOVER = "Discover";
+
     @Override
     public List<RunEntry> runs() {
         // Started from 🗺 Screens ▸ 🔭 Explore, not the toolbar (2026-11-09, spec screens-rail goal 9).
         // Each takes its budget, all optional, so the window's start with none still runs (web discovery phase 4).
         return List.of(RunEntry.of(EXPLORE_MAP, ExploreMap::main).takes(MapCheckBudget.class).offBar(),
-                RunEntry.of(KEEP_EXPLORING, KeepExploring::main).takes(ExploreBudget.class).offBar());
+                RunEntry.of(KEEP_EXPLORING, KeepExploring::main).takes(ExploreBudget.class).offBar(),
+                // Its button is the toolbar's: a blank bot has no map to open the Explore window on.
+                RunEntry.of(DISCOVER, Discover::main).takes(DiscoverArgs.class));
     }
 }

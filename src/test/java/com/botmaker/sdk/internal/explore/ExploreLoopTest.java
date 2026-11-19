@@ -228,6 +228,21 @@ class ExploreLoopTest {
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody wrote it in 10 min");
     }
 
+    /** What the run's start settled (Discover's launch target) goes with the first settled stop. */
+    @Test
+    void whatTheStartSettledGoesWithTheFirstSettledStop() {
+        Game game = new Game();
+        game.at = null;
+        game.state = Effect.State.of(page(web("heading", "Pricing plans", Set.of())), "/pricing");
+        TreeAnswer target = new TreeAnswer.NewTarget("web:https://site.test/");
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).handOn(List.of(target)).run();
+
+        List<TreeAnswer> answers = events(ExploreEvent.Settled.class).getFirst().answers();
+        assertTrue(answers.getFirst() instanceof TreeAnswer.NewScreen, answers.toString());
+        assertEquals(target, answers.getLast());
+    }
+
     /** An input that is no way is pressed once; what it did goes with the next settled stop as a note. */
     @Test
     void aFreeInputIsPressedAndNoted() {
@@ -467,7 +482,8 @@ class ExploreLoopTest {
                 new TreeAnswer.NewRoute("CASE", "/case/{slug}", List.of("/case/a", "/case/b")),
                 new TreeAnswer.NewInput("Pricing", "buyNow", buy, "a buy"),
                 new TreeAnswer.NewWay("A", "b", "Pricing"),
-                new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees")), 7);
+                new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees"),
+                new TreeAnswer.NewTarget("web:https://site.test/")), 7);
         journal().append(settled);
 
         assertEquals(List.of(settled), journal().events());

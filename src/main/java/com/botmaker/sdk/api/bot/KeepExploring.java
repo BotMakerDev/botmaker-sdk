@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.explore.ExploreBudget;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Generation;
 import com.botmaker.sdk.internal.explore.LivePlay;
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.trace.Say;
 
 import java.nio.file.Path;
@@ -47,12 +48,17 @@ public final class KeepExploring {
             Debug.error("Keep exploring cannot load the bot's classes: " + e);
             return;
         }
-        Bot.trial(() -> explore(first, budget), first.holders());
+        Bot.trial(() -> {
+            first.install();
+            explore(first, budget, List.of());
+        }, first.holders());
     }
 
-    /** Starts the game as a run's cold start does, then explores until stopped or past {@code budget}. */
-    private static void explore(Generation first, ExploreBudget budget) {
-        first.install();
+    /**
+     * Starts the game as a run's cold start does, then explores until stopped or past {@code budget}, {@code settled}
+     * handed on with the first stop it settles. {@code first} is installed already.
+     */
+    static void explore(Generation first, ExploreBudget budget, List<TreeAnswer> settled) {
         Bot.launchConfiguredTarget(Bot.StartMode.COLD);
         AtomicInteger restarts = new AtomicInteger();
         Runnable restart = () -> {
@@ -60,7 +66,8 @@ public final class KeepExploring {
             Wait.time(Bot.backOff(restarts.incrementAndGet()));
             Bot.launchConfiguredTarget(Bot.StartMode.RESTART);
         };
-        ExploreLoop.End end = LivePlay.explore(first, Path.of(System.getProperty("user.dir", ".")), restart, budget);
+        ExploreLoop.End end = LivePlay.explore(first, Path.of(System.getProperty("user.dir", ".")), restart, budget,
+                settled);
         Say.info(end == ExploreLoop.End.BUDGET ? "Keep exploring ended: its budget is spent."
                 : "Keep exploring ended.");
     }

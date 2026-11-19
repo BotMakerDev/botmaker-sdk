@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- *Discover*, the SDK's run that maps a game or a website into the bot: *Keep exploring* within a budget
+  (`minutes`, `maxPages`), its browser shown with `show`. Given a website's `url` on a bot with no launch target,
+  the run opens it at once and the website becomes the bot's launch target with the first stop it settles, so a
+  blank bot ends with its game and its map: `botmaker tool sdk discover --new <dir> --url https://…`, or
+  `run_bot entry=Discover`, or its toolbar button. On a bot that has a target, the url is left out.
 - *Keep exploring* answers its own stops on a game with a tree (a website, an emulator): a page no screen matches
   is written into the bot as a new screen, with its marking parts and its inputs, each refused by the guard marked
   never; a sibling page of one template widens its screen's route; an input that is no way is pressed once and what

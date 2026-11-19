@@ -18,10 +18,13 @@ import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.SdkLog;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,14 +55,15 @@ final class TreeAnswers {
 
     /**
      * What the answers write, in order: the {@code words} kept as {@code Texts}, the new {@code Elements} constants by
-     * name, the screens added, then the changes of screens the map has (or has once the added ones are).
-     * {@code skipped} says each answer that could not be written, and why.
+     * name, the screens added, then the changes of screens the map has (or has once the added ones are), and the
+     * launch specs made the bot's preferred targets, last first. {@code skipped} says each answer that could not be
+     * written, and why.
      */
     record Planned(List<Words> words, Map<String, Element> elements, List<Added> added, List<Change> changes,
-                   List<String> skipped) {
+                   List<String> targets, List<String> skipped) {
 
         boolean empty() {
-            return added.isEmpty() && changes.isEmpty();
+            return added.isEmpty() && changes.isEmpty() && targets.isEmpty();
         }
     }
 
@@ -100,9 +104,16 @@ final class TreeAnswers {
         }
 
         List<Change> changes = new ArrayList<>();
+        List<String> targets = new ArrayList<>();
+        // The screens given a way back by this plan: one each.
+        Set<String> backs = new HashSet<>();
         for (TreeAnswer answer : answers) {
             switch (answer) {
                 case TreeAnswer.NewScreen ignored -> {
+                }
+                case TreeAnswer.NewTarget target -> {
+                    if (target.spec() == null || target.spec().isBlank()) skipped.add("a launch target with no spec.");
+                    else targets.add(target.spec().strip());
                 }
                 case TreeAnswer.NewInput input -> {
                     Optional<String> constant = constantOf(graph, newConstants, input.screen());
@@ -137,6 +148,14 @@ final class TreeAnswers {
                         // Its way in, read once the field it names is written.
                         Way in = Way.of(BotConstants.input(from.get(), way.field()));
                         screens.compute(to.get(), (c, s) -> s.setup(x -> x.fromWay(in)));
+                    } else if (graph.screens().get(from.get()) instanceof MapScreen on && on.setup().back() == null
+                            && on.input(way.field()).isPresent() && MapTools.goesBack(graph, from.get(), to.get())
+                            && backs.add(from.get())) {
+                        // A link up to the screen it was reached from is its way back, as Discovery makes it; the
+                        // first such link of a batch, the rest ways as any.
+                        Input back = BotConstants.input(from.get(), way.field());
+                        changes.add(new Change(from.get(), s -> s.setup(x -> x.back(back))));
+                        continue;
                     } else {
                         Optional<String> refused = ScreenEdits.wayRefused(graph, to.get(), from.get(), way.field());
                         if (refused.isPresent()) {
@@ -164,7 +183,7 @@ final class TreeAnswers {
         screens.forEach((constant, screen) -> added.add(new Added(constant, screen)));
         // In the order found, so the same page writes its constants in the same order each time.
         return new Planned(List.copyOf(words), Collections.unmodifiableMap(made), List.copyOf(added), List.copyOf(changes),
-                List.copyOf(skipped));
+                List.copyOf(targets), List.copyOf(skipped));
     }
 
     /**
@@ -176,12 +195,18 @@ final class TreeAnswers {
             PluginValues values = services.pluginValues();
             if (values == null) return Optional.of("Studio has no source tree open.");
             Planned planned = plan(ScreenBook.read(services), answers, elements(values));
+            for (String skipped : planned.skipped()) SdkLog.warn(label + " left out " + skipped);
             if (planned.empty()) return Optional.empty();
             return ScreenBook.step(services, label, () -> write(services, values, planned));
         });
     }
 
     private static Optional<String> write(StudioServices services, PluginValues values, Planned planned) {
+        // The launch target first: what the run was started on is the bot's game, whatever else fails to write.
+        for (String target : planned.targets()) {
+            LaunchTargetValue.set(services, target).ifPresent(why -> SdkLog.warn(target
+                    + " was not made the bot's launch target: " + why));
+        }
         for (Words words : planned.words()) {
             Optional<String> failed = ScreenEdits.keptText(services, words);
             if (failed.isPresent()) return failed;

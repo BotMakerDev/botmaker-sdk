@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
+import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.web.WebSource;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.Guard;
@@ -63,6 +64,15 @@ public final class LivePlay implements ExploreLoop.Play {
      * the next generation and plays it.
      */
     public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget) {
+        return explore(first, project, restart, budget, List.of());
+    }
+
+    /**
+     * Explores as {@link #explore(Generation, Path, Runnable, ExploreBudget)} does, {@code settled} handed on with the
+     * first stop the run settles: what its start settled already.
+     */
+    public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget,
+                                          List<TreeAnswer> settled) {
         Plan plan = first.plan();
         LivePlay play = new LivePlay(ScreenMaps.installed(), plan == null ? null : RunGame.rounds(plan, first.holders()),
                 restart);
@@ -80,7 +90,12 @@ public final class LivePlay implements ExploreLoop.Play {
         };
         return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), Journal.of(project),
                 ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
-                        .upTo(budget.screens()), System::currentTimeMillis).run();
+                        .upTo(budget.screens()), System::currentTimeMillis).handOn(settled).run();
+    }
+
+    /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
+    public static LivePlay over(ScreenGraph map, Runnable restart) {
+        return new LivePlay(map, null, restart);
     }
 
     /** The guards with the author's words of {@code generation}'s bot. */
@@ -112,7 +127,7 @@ public final class LivePlay implements ExploreLoop.Play {
     }
 
     /** Plays {@code map} and {@code rounds} from now on: a new generation's. */
-    void use(ScreenGraph map, BooleanSupplier rounds) {
+    public void use(ScreenGraph map, BooleanSupplier rounds) {
         this.map = map;
         this.moves = new LiveMoves(map, reach, restart);
         this.rounds = rounds;

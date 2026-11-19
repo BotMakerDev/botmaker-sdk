@@ -8,7 +8,9 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Verdict;
+import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -106,11 +108,36 @@ class TreeAnswersTest {
     }
 
     @Test
+    void aLinkUpToTheScreenItWasReachedFromIsItsWayBack() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("up", Button.of(new Locator(Role.LINK, "All", null, null, null).element()).free());
+        screens.put("CASE", new MapScreen(Setup.named("Case").fromWay(Way.of(BotConstants.input("A", "open"))),
+                inputs));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("CASE", "up", "A")), Map.of());
+
+        assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
+        assertNotNull(changed(graph, planned, "CASE").setup().back(), "its way back");
+    }
+
+    @Test
     void anAnswerOnAScreenTheMapLacksIsSkipped() {
         Planned planned = TreeAnswers.plan(map(), List.of(new TreeAnswer.InputNote("GONE", "x", "y")), Map.of());
 
         assertTrue(planned.empty());
         assertEquals(1, planned.skipped().size());
+    }
+
+    @Test
+    void discoversWebsiteBecomesTheBotsLaunchTarget() {
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(Map.of()),
+                List.of(new TreeAnswer.NewTarget(" web:https://site.test/ ")), Map.of());
+
+        assertFalse(planned.empty(), "a target alone is written");
+        assertEquals(List.of("web:https://site.test/"), planned.targets());
+        assertEquals(List.of(), planned.skipped());
     }
 
     @Test

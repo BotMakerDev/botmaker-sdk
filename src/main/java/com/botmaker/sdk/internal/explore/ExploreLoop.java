@@ -290,6 +290,15 @@ public final class ExploreLoop {
         stops = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
     }
 
+    /**
+     * Hands {@code answers} on with the first stop the run settles, as a note is: what the run's start already settled
+     * (<em>Discover</em>'s launch target). Called before {@link #run}.
+     */
+    public ExploreLoop handOn(List<TreeAnswer> answers) {
+        notes.addAll(answers);
+        return this;
+    }
+
     /** Runs rounds until a command stops it or its budget runs out. */
     public End run() {
         began = nowMs.getAsLong();
@@ -397,7 +406,9 @@ public final class ExploreLoop {
             if (input.isPresent()) return pressInput(screen, input.get());
             if (!notes.isEmpty()) {
                 return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
-                        "what pressing " + notes.size() + " inputs did, read off the page") != Paused.END;
+                        notes.stream().allMatch(TreeAnswer.InputNote.class::isInstance)
+                                ? "what pressing " + notes.size() + " inputs did, read off the page"
+                                : "what the run settled before it met this screen") != Paused.END;
             }
         }
         if (planRounds < settings.planRoundsWithoutNew()) {

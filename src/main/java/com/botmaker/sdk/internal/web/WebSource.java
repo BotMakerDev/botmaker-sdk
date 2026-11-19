@@ -77,6 +77,9 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         }
     }
 
+    /** The run property showing the browser in a window rather than headless ({@code Discover --show}). */
+    public static final String SHOW = "botmaker.web.show";
+
     private static final Object CURRENT_LOCK = new Object();
     private static WebSource current;
 
@@ -337,7 +340,7 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         Path binary = options.chromium().get().orElseThrow(() -> new IllegalStateException(
                 "no Chromium for this computer, or its download failed: a website cannot be opened"));
         try {
-            chromium = Chromium.start(binary, false, options.switches());
+            chromium = Chromium.start(binary, Boolean.getBoolean(SHOW), options.switches());
         } catch (IOException e) {
             throw new UncheckedIOException("Chromium did not start", e);
         }

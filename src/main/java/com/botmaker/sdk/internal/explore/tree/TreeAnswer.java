@@ -32,7 +32,8 @@ import java.util.function.Function;
         @JsonSubTypes.Type(value = TreeAnswer.NewRoute.class, name = "new_route"),
         @JsonSubTypes.Type(value = TreeAnswer.NewInput.class, name = "new_input"),
         @JsonSubTypes.Type(value = TreeAnswer.NewWay.class, name = "new_way"),
-        @JsonSubTypes.Type(value = TreeAnswer.InputNote.class, name = "input_note")})
+        @JsonSubTypes.Type(value = TreeAnswer.InputNote.class, name = "input_note"),
+        @JsonSubTypes.Type(value = TreeAnswer.NewTarget.class, name = "new_target")})
 public sealed interface TreeAnswer {
 
     /**
@@ -69,6 +70,12 @@ public sealed interface TreeAnswer {
 
     /** A note on {@code field} of {@code screen}: what pressing it does, when that is no way. */
     record InputNote(String screen, String field, String note) implements TreeAnswer {}
+
+    /**
+     * The launch spec {@code spec} made the bot's preferred launch target: <em>Discover</em> started on a bot with none
+     * ({@code web:https://…}).
+     */
+    record NewTarget(String spec) implements TreeAnswer {}
 
     /** How many marker parts a new screen gets. */
     int MARKERS = 2;
