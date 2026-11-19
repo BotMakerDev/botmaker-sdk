@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- `api.screens.Field`: a check of what a text field holds now, read from the screen's tree when it is asked, the rule
+  a form keeps: `.when(Condition.all(Field.valid(email, Field.Kind.EMAIL), Field.atLeast(password, 8)))`. `filled`,
+  `valid` (an email, a URL or a number, as a browser judges one), `holds` and `lacks` a text, `atLeast` some
+  characters, `inRange` of numbers. Unknown where the text cannot be read: an input found by a picture, a target with
+  no tree, an element not found exactly once.
 - *Discover*, the SDK's run that maps a game or a website into the bot: *Keep exploring* within a budget
   (`minutes`, `maxPages`), its browser shown with `show`. Given a website's `url` on a bot with no launch target,
   the run opens it at once and the website becomes the bot's launch target with the first stop it settles, so a
