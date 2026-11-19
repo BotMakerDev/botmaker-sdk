@@ -180,7 +180,8 @@ final class TreeAnswers {
                         // A link up to the screen it was reached from is its way back, as Discovery makes it; the
                         // first such link of a batch, the rest ways as any.
                         Input back = BotConstants.input(from.get(), way.field());
-                        changes.add(new Change(from.get(), s -> s.setup(x -> x.back(back))));
+                        // Kept tried, so no run presses it as new; what an earlier press noted of it is gone.
+                        changes.add(new Change(from.get(), s -> withoutNote(s, way.field()).setup(x -> x.back(back))));
                         continue;
                     } else {
                         Optional<String> refused = ScreenEdits.wayRefused(graph, to.get(), from.get(), way.field());

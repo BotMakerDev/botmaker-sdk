@@ -141,6 +141,22 @@ class TreeAnswersTest {
                 changed(graph, planned, "A").setup().notes());
     }
 
+    /** A link that became the way back drops its old note too, so no run presses it again for it. */
+    @Test
+    void aWayBackDropsTheInputsNote() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("home", Button.of(new Locator(Role.LINK, "Home", null, null, null).element()).free().tried());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case").from(BotConstants.input("A", "open"))
+                .notes("home: Fails: blocked write: POST /monitoring"), inputs));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("CASE", "home", "A")), Map.of());
+
+        MapScreen kase = changed(graph, planned, "CASE");
+        assertEquals(null, kase.setup().notes(), "no note left");
+        assertTrue(kase.setup().back() != null, "its way back");
+    }
+
     @Test
     void aLinkUpToTheScreenItWasReachedFromIsItsWayBack() {
         Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
