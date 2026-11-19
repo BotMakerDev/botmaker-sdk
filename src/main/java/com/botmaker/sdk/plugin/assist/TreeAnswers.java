@@ -175,13 +175,14 @@ final class TreeAnswers {
                         Way in = Way.of(BotConstants.input(from.get(), way.field()));
                         screens.compute(to.get(), (c, s) -> s.setup(x -> x.fromWay(in)));
                     } else if (graph.screens().get(from.get()) instanceof MapScreen on && on.setup().back() == null
-                            && on.input(way.field()).isPresent() && MapTools.goesBack(graph, from.get(), to.get())
+                            && on.input(way.field()).isPresent() && goesBack(graph, from.get(), to.get())
                             && backs.add(from.get())) {
                         // A link up to the screen it was reached from is its way back, as Discovery makes it; the
                         // first such link of a batch, the rest ways as any.
                         Input back = BotConstants.input(from.get(), way.field());
                         // Kept tried, so no run presses it as new; what an earlier press noted of it is gone.
-                        changes.add(new Change(from.get(), s -> withoutNote(s, way.field()).setup(x -> x.back(back))));
+                        changes.add(new Change(from.get(), s -> ScreenEdits.rooted(withoutNote(s, way.field()))
+                                .setup(x -> x.back(back))));
                         continue;
                     } else {
                         Optional<String> refused = ScreenEdits.wayRefused(graph, to.get(), from.get(), way.field());
@@ -364,6 +365,18 @@ final class TreeAnswers {
         known.put(name, element);
         made.put(name, element);
         return element;
+    }
+
+    /**
+     * Whether a link of {@code screen} to {@code known} is its way back ({@link MapTools#goesBack}), the screen taken
+     * as {@link ScreenEdits#rooted} hangs it: a page whose every way in is from {@code known} goes back there.
+     */
+    private static boolean goesBack(ScreenGraph graph, String screen, String known) {
+        MapScreen on = graph.screens().get(screen);
+        if (on == null || on.from() != null) return MapTools.goesBack(graph, screen, known);
+        Map<String, MapScreen> screens = new LinkedHashMap<>(graph.screens());
+        screens.put(screen, ScreenEdits.rooted(on));
+        return MapTools.goesBack(ScreenGraph.of(screens), screen, known);
     }
 
     /** The name {@code made} gives {@code element}, the very one; empty when it is none of them. */

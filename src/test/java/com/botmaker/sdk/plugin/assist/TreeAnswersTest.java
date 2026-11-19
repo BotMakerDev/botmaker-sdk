@@ -157,6 +157,38 @@ class TreeAnswersTest {
         assertTrue(kase.setup().back() != null, "its way back");
     }
 
+    /**
+     * A page settled off the tree and reached later by two links of A hangs under A by the first: a link of it back to
+     * A, the start, is its way back, never a way into the start that is refused.
+     */
+    @Test
+    void aPageReachedOnlyFromAGoesBackToIt() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("home", Button.of(new Locator(Role.LINK, "Home", null, null, null).element()).free().tried());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case").alsoFrom(List.of(
+                Way.of(BotConstants.input("A", "open")), Way.of(BotConstants.input("A", "toggle")))), inputs));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("CASE", "home", "A")), Map.of());
+
+        MapScreen kase = changed(graph, planned, "CASE");
+        assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
+        assertEquals(BotConstants.input("A", "open"), kase.setup().fromInput(), "hung under A by its first way");
+        assertEquals(1, kase.setup().alsoFrom().size());
+        assertTrue(kase.setup().back() != null, "its way back");
+    }
+
+    /** A way to a page no way reached yet is its tree's way in. */
+    @Test
+    void theFirstWayToAPageIsItsTreesWayIn() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case"), Map.of()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.NewWay("A", "open", "Case")), Map.of());
+
+        assertEquals(BotConstants.input("A", "open"), changed(graph, planned, "CASE").setup().fromInput());
+    }
+
     @Test
     void aLinkUpToTheScreenItWasReachedFromIsItsWayBack() {
         Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());

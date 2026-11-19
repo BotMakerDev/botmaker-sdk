@@ -1062,11 +1062,24 @@ public final class ScreenEdits {
 
     /** {@code screen} with one more way in, through {@code from}'s field {@code viaField}. */
     static MapScreen withWay(MapScreen screen, String from, String viaField) {
-        return screen.setup(s -> {
+        Way way = Way.of(BotConstants.input(from, viaField));
+        // A screen no way reached yet (a page Discover settled off the tree) hangs under the first one.
+        if (screen.from() == null && screen.setup().alsoFrom().isEmpty()) return screen.setup(s -> s.fromWay(way));
+        return rooted(screen).setup(s -> {
             List<Way> ways = new ArrayList<>(s.alsoFrom());
-            ways.add(Way.of(BotConstants.input(from, viaField)));
+            ways.add(way);
             return s.alsoFrom(ways);
         });
+    }
+
+    /**
+     * {@code screen} with its first other way in as its tree's when it has none there, as a map made before
+     * {@link #withWay} did so has it: the screen it opens from is then its parent, a link back to it its way back.
+     */
+    static MapScreen rooted(MapScreen screen) {
+        List<Way> also = screen.setup().alsoFrom();
+        if (screen.from() != null || also.isEmpty()) return screen;
+        return screen.setup(s -> s.fromWay(also.getFirst()).alsoFrom(also.subList(1, also.size())));
     }
 
     /**

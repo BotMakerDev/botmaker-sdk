@@ -91,6 +91,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Element.byRole(Role.LINK, Words.of("Pricing"))` finds an element by its accessible role. A press on a website
   that the guard refuses is said and not done; a drag that moves and a key with a modifier are not done on a
   website.
+- A page Discover settled off the tree hangs under the first page that links to it, and a link back there is its
+  way back. A link back from a page with no way in but extra ones was skipped, so the stop came back as "the fix
+  did not take".
 
 ### Deprecated
 
