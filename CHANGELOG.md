@@ -108,6 +108,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   push.
 - Licensed under PolyForm Noncommercial 1.0.0, copyright LiQiyeDev: free for any noncommercial use, commercial use
   needs a license from LiQiyeDev. Releases up to v1.11.0 stay CC0 1.0.
+- Discover: a website's page with nothing open over it becomes a screen named and told by its route alone, never by
+  its headings, so a page whose headline changes (a hero that cycles it) no longer turns into a new screen at each
+  headline. A dialog or a menu over a page is still told by itself.
 
 ## [1.11.0] — 2026-11-16
 

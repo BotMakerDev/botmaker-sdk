@@ -113,19 +113,21 @@ class TreeAnswerTest {
     }
 
     @Test
-    void anUnknownPageBecomesAScreenNamedByItsHeadingMarkedByItsRouteAndHeadings() {
+    void anUnknownPageBecomesAScreenNamedAndMarkedByItsRouteAlone() {
         UiTree page = page(web("banner", "", Set.of(), web("link", "Home", PRESSABLE)),
                 web("main", "", Set.of(), web("heading", "Our case studies", Set.of()),
                         web("heading", "Stormforge", Set.of()), web("button", "Buy now", PRESSABLE)));
 
         TreeAnswer.NewScreen screen = TreeAnswer.screen(page, "/case-studies/{slug}",
-                List.of("/case-studies/stormforge"), Set.of("OurCaseStudies"));
+                List.of("/case-studies/stormforge"), Set.of("CaseStudiesPage"));
 
-        assertEquals("OurCaseStudies2", screen.name());
+        assertEquals("CaseStudiesPage2", screen.name());
         assertEquals("/case-studies/{slug}", screen.route());
-        assertEquals(List.of("heading \"Our case studies\"", "heading \"Stormforge\""),
-                screen.markers().stream().map(Locator::line).toList());
+        // Its headings are content a page changes (a hero cycling its headline): never what tells it.
+        assertTrue(screen.markers().isEmpty());
         assertTrue(screen.overlay().none());
+        assertEquals("Home", TreeAnswer.screen(page(web("heading", "Solve your game testing", Set.of())), "/",
+                List.of("/"), Set.of()).name());
 
         List<TreeAnswer.NewInput> inputs = TreeAnswer.inputs(screen.name(), page, Set.of(), Set.of("home"),
                 input -> "Buy now".equals(input.locator().name()) ? Optional.of("its name says buy") : Optional.empty());

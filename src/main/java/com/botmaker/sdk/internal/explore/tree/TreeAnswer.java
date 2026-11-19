@@ -150,13 +150,20 @@ public sealed interface TreeAnswer {
 
     /**
      * The screen the page {@code tree} shows, of {@code route} (null in an app) with {@code examples}, named after
-     * what is open over it, else its first heading, else its route, never one of {@code taken}.
+     * what is open over it, else its route, else its first heading, never one of {@code taken}.
+     *
+     * <p>A website's page with nothing open over it is told by its route alone: its headings are content, which a
+     * page changes as it likes (a hero that cycles its headline, a case study's title), so a marker of them stops
+     * matching the very page it was cut from. Two pages at one route are one screen; a dialog or a menu over it is
+     * its own, told by its route and by itself, so it outranks the page under it.
      */
     static NewScreen screen(UiTree tree, String route, List<String> examples, Set<String> taken) {
         Overlay overlay = Overlay.of(tree);
-        String said = !overlay.name().isEmpty() ? overlay.name()
+        boolean page = route != null && overlay.none();
+        String said = !overlay.name().isEmpty() ? overlay.name() : page ? lastSegment(route)
                 : firstHeading(tree).orElseGet(() -> route == null ? "Screen" : lastSegment(route));
-        return new NewScreen(unique(className(said), taken), route, examples, markers(tree, overlay), overlay);
+        return new NewScreen(unique(className(said), taken), route, examples,
+                page ? List.of() : markers(tree, overlay), overlay);
     }
 
     /**

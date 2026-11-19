@@ -217,7 +217,7 @@ class ExploreLoopTest {
         assertEquals(settled.stopId(), stopped.stop().id(), "the stop it settled");
         assertEquals(StopKind.UNKNOWN_SCREEN, stopped.stop().kind());
         TreeAnswer.NewScreen screen = (TreeAnswer.NewScreen) settled.answers().getFirst();
-        assertEquals("PricingPlans", screen.name());
+        assertEquals("Pricing", screen.name());
         assertEquals("/pricing", screen.route());
         List<TreeAnswer.NewInput> inputs = settled.answers().stream().filter(TreeAnswer.NewInput.class::isInstance)
                 .map(TreeAnswer.NewInput.class::cast).toList();
