@@ -35,6 +35,8 @@ import java.util.Optional;
  *   <li>{@code page.png}: a website run's page as it last looked, replaced whole, for the window to show.</li>
  *   <li>{@code command}: written by the plugin side ({@code resume <stopId>}, {@code stop}); read and deleted by the
  *       run.</li>
+ *   <li>{@code resume.json}: the run's memory while it holds a Discover fault ({@link ResumeFile}), for the run
+ *       restarted on the rebuilt SDK.</li>
  * </ul>
  *
  * A file that cannot be written leaves the run going: the journal never ends a run.
@@ -230,6 +232,32 @@ public final class Journal {
             return Command.parse(said);
         } catch (IOException unread) {
             return Optional.empty();
+        }
+    }
+
+    /** Writes {@code value} as JSON in the file {@code name} of the journal's folder, whole or not at all. */
+    synchronized void writeJson(String name, Object value) {
+        write(name, () -> JSON.writeValueAsString(value));
+    }
+
+    /**
+     * The file {@code name} of the journal's folder read as {@code type}, leniently as the events are; empty when it is
+     * not there.
+     *
+     * @throws IOException when it is there and does not read
+     */
+    <T> Optional<T> readJson(String name, Class<T> type) throws IOException {
+        Path file = folder.resolve(name);
+        if (!Files.exists(file)) return Optional.empty();
+        return Optional.ofNullable(JSON.readValue(file.toFile(), type));
+    }
+
+    /** Deletes the file {@code name} of the journal's folder, if it is there. */
+    synchronized void delete(String name) {
+        try {
+            Files.deleteIfExists(folder.resolve(name));
+        } catch (IOException undeleted) {
+            // read again by the next run, which checks it against the journal
         }
     }
 

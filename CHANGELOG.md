@@ -25,6 +25,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never
   parked. Claude calls an open stop one with `explore fault`; `resume` on a fault is refused, `resume ignore` drops
   it. A run on a released SDK never raises one.
+- A run holding a Discover fault writes its memory beside the journal (`resume.json`: the fault, the screens seen,
+  what it pressed). *Keep exploring* started while that file lies there goes on as the same run (↻ in 🔭 Explore):
+  it walks to the fault's screen and replays its place. Passing it says the fault is fixed; meeting the same stop
+  holds it again, marked "the fix did not take". A fault whose screen the fix removed is said, and the run explores
+  on. The file is run data, in no version, publish or `.bmk`, and a `resume ignore` deletes it.
 - The run raises a Discover fault itself in three cases. First, it settled answers that the bot's writer left out,
   each listed with its reason. Second, it settled a place, and the place came back unchanged after the write.
   Third, its own code threw, rather than the bot's. On a released SDK, the first case is a plain stop that lists

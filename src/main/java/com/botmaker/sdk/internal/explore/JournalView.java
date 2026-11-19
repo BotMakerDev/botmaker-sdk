@@ -14,7 +14,8 @@ import java.util.Optional;
  * counts. The {@code explore} tool and the Explore tab both read the run through it.
  *
  * @param all    every event of the journal, oldest first
- * @param events the latest run's: from its {@link ExploreEvent.Began} on (all of them when none began)
+ * @param events the latest run's: from its {@link ExploreEvent.Began} on (all of them when none began), through every
+ *               {@link ExploreEvent.Restarted} of it
  * @param queue  the parked stops, oldest first
  */
 public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, List<Stop> queue) {
@@ -43,10 +44,36 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return events.stream().anyMatch(ExploreEvent.Began.class::isInstance);
     }
 
-    /** How the latest run ended; empty while it runs (or was killed before it could say). */
+    /**
+     * How the latest run ended; empty while it runs (or was killed before it could say). An end it went on from, by a
+     * {@link ExploreEvent.Restarted}, is no end.
+     */
     public Optional<ExploreLoop.End> ended() {
-        return events.stream().filter(ExploreEvent.Ended.class::isInstance).map(e -> ((ExploreEvent.Ended) e).end())
+        return sinceRestart().stream().filter(ExploreEvent.Ended.class::isInstance)
+                .map(e -> ((ExploreEvent.Ended) e).end())
                 .map(end -> end == null ? ExploreLoop.End.UNKNOWN : end).reduce((first, last) -> last);
+    }
+
+    /** The latest run's events since it last restarted; all of them when it never did. */
+    private List<ExploreEvent> sinceRestart() {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Restarted) return events.subList(i, events.size());
+        }
+        return events;
+    }
+
+    /**
+     * Whether the latest run left the stop {@code stopId} held as a Discover fault: the last it stopped on, a fault,
+     * nothing closing it since, however it ended. A run restarted from its {@link ResumeFile} only then.
+     */
+    public boolean heldWhenLeft(String stopId) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Stopped(Stop stop, boolean again, long at)) {
+                return stop.id().equals(stopId) && !closedAfter(stopId, i)
+                        && (stop.kind() == StopKind.FAULT || fault(stopId).isPresent());
+            }
+        }
+        return false;
     }
 
     /** Whether the latest run began and has not ended. */
@@ -103,6 +130,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     public boolean dev() {
         for (int i = events.size() - 1; i >= 0; i--) {
             if (events.get(i) instanceof ExploreEvent.Began began) return began.dev();
+            if (events.get(i) instanceof ExploreEvent.Restarted restarted) return restarted.dev();
         }
         return false;
     }
@@ -186,7 +214,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     /** How long the latest run has run: to its end when it ended, else to {@code nowMs}. */
     public Duration ranFor(long nowMs) {
         if (beganAt() == 0) return Duration.ZERO;
-        long until = events.stream().filter(ExploreEvent.Ended.class::isInstance).mapToLong(ExploreEvent::at)
+        long until = sinceRestart().stream().filter(ExploreEvent.Ended.class::isInstance).mapToLong(ExploreEvent::at)
                 .reduce((a, b) -> b).orElse(nowMs);
         return Duration.ofMillis(Math.max(0, until - beganAt()));
     }

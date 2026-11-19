@@ -459,6 +459,7 @@ final class ExploreView {
             case ExploreEvent.Fixed e -> "✔ " + e.stopId() + " fixed" + (e.why() == null ? "" : ": " + e.why());
             case ExploreEvent.Parked e -> "⏸ " + e.stopId() + " parked: nobody answered, the run goes on elsewhere";
             case ExploreEvent.Faulted e -> "🛠 " + e.stopId() + " Discover fault: " + e.why();
+            case ExploreEvent.Restarted e -> "↻ Restarted on the rebuilt SDK, replaying " + e.faultId();
             case ExploreEvent.Reloaded e -> e.refused()
                     ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
                     ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()

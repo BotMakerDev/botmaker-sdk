@@ -34,6 +34,7 @@ public sealed interface ExploreEvent {
             case Settled ignored -> "settled";
             case Pictured ignored -> "pictured";
             case Faulted ignored -> "faulted";
+            case Restarted ignored -> "restarted";
         };
     }
 
@@ -54,6 +55,7 @@ public sealed interface ExploreEvent {
             case "settled" -> Settled.class;
             case "pictured" -> Pictured.class;
             case "faulted" -> Faulted.class;
+            case "restarted" -> Restarted.class;
             default -> null;
         };
     }
@@ -79,6 +81,13 @@ public sealed interface ExploreEvent {
             sdkVersion = sdkVersion == null ? "" : sdkVersion;
         }
     }
+
+    /**
+     * The run, ended while it held the fault {@code faultId}, goes on in a new JVM on the rebuilt SDK with the memory it
+     * wrote ({@link ResumeFile}), and replays the fault: the same run, so its history before stays its own (2026-11-19).
+     * {@code dev} as {@link Began}'s: the rebuilt SDK's, which says from now on.
+     */
+    record Restarted(String faultId, boolean dev, long at) implements ExploreEvent {}
 
     /** The run ended, {@code end} why (null: an end this SDK does not know). */
     record Ended(ExploreLoop.End end, long at) implements ExploreEvent {}

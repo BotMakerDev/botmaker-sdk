@@ -93,7 +93,8 @@ public final class LivePlay implements ExploreLoop.Play {
         };
         return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), journal,
                 ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
-                        .upTo(budget.screens()), System::currentTimeMillis).handOn(settled).run();
+                        .upTo(budget.screens()), System::currentTimeMillis).handOn(settled)
+                .resuming(ResumeFile.pending(journal, why -> Say.warn(why, Map.of()))).run();
     }
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
@@ -239,6 +240,8 @@ public final class LivePlay implements ExploreLoop.Play {
             case ExploreEvent.Faulted faulted -> Say.warn("Held " + faulted.stopId() + " as a Discover fault: "
                     + faulted.why(), Map.of());
             case ExploreEvent.Fixed(String stopId, String why, long ignored) -> Say.info("Fixed " + stopId + ": " + why, Map.of());
+            case ExploreEvent.Restarted(String faultId, boolean dev, long ignored) ->
+                    Say.info("Restarted on the rebuilt SDK, replaying " + faultId, Map.of());
             default -> {}
         }
     }

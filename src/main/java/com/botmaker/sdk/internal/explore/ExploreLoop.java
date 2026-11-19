@@ -332,6 +332,12 @@ public final class ExploreLoop {
     /** The settled stop {@code stop}, resumed with {@code lines} left out of what it settled. */
     private record Skip(Stop stop, List<String> lines) {}
 
+    /**
+     * The fault a run restarted on the rebuilt SDK replays, until it passes the fault's place or meets it again; null
+     * for a run started fresh, or once the replay said.
+     */
+    private ResumeFile replay;
+
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
         this.map = map;
@@ -356,21 +362,82 @@ public final class ExploreLoop {
         return this;
     }
 
+    /**
+     * Goes on from {@code file}, the memory a run holding a Discover fault wrote ({@link ResumeFile#pending}): the
+     * run is that run restarted, and replays the fault before it explores on. None: it starts fresh. Called before
+     * {@link #run}.
+     */
+    public ExploreLoop resuming(Optional<ResumeFile> file) {
+        replay = file.orElse(null);
+        return this;
+    }
+
     /** Runs rounds until a command stops it or its budget runs out. */
     public End run() {
         began = nowMs.getAsLong();
         lastPress = began;
         // A command a run before left is not this run's.
         journal.takeCommand();
-        emit(new ExploreEvent.Began(dev, began));
         End end = End.BROKE;
         try {
+            if (replay != null) {
+                emit(new ExploreEvent.Restarted(replay.fault().id(), dev, began));
+                restore();
+            } else {
+                emit(new ExploreEvent.Began(dev, began));
+            }
             end = rounds();
             return end;
         } finally {
             // Said however it ends, so the plugin side never waits on a run that is gone.
             emit(new ExploreEvent.Ended(end, nowMs.getAsLong()));
         }
+    }
+
+    /**
+     * Takes back the memory of {@link #replay} and sets up its replay: the fault's place free to be met again, and the
+     * game walked to the fault's screen. Passing the place says it is fixed and meeting it says the fix did not take;
+     * other stops met meanwhile leave the replay waiting. A screen the map no longer has (the fix renamed it) is said,
+     * and the run explores on. The file stays until the replay says, so a run restarted again before still replays.
+     */
+    private void restore() {
+        ResumeFile file = replay;
+        seen.addAll(file.seen());
+        tried.addAll(file.tried());
+        worked.addAll(file.worked());
+        answered.addAll(file.answered());
+        Stop fault = file.fault();
+        tried.remove(fault.place());
+        answered.remove(fault.place());
+        String screen = fault.screen();
+        if (screen != null && map.screen(screen).isEmpty()) {
+            replayed("its screen " + screen + " is no longer in the map: nothing to replay, the run explores on");
+            return;
+        }
+        if (screen == null) return;
+        try {
+            play.goTo(screen);
+        } catch (RuntimeException e) {
+            // The first round finds where the game is, as after any walk that fell short.
+            rethrowStop(e);
+        }
+    }
+
+    /** Whether {@code kind} on {@code place} is the stop the fault being replayed was. */
+    private boolean replays(StopKind kind, String place) {
+        return replay != null && replay.replays() == kind && replay.fault().place().equals(place);
+    }
+
+    /** Closes the fault being replayed, fixed for {@code why}: its memory is no longer needed. */
+    private void replayed(String why) {
+        emit(new ExploreEvent.Fixed(replay.fault().id(), why, nowMs.getAsLong()));
+        ResumeFile.delete(journal);
+        replay = null;
+    }
+
+    /** The run's memory, for a restart on the rebuilt SDK to go on from the fault {@code fault}. */
+    private ResumeFile memory(Stop fault, StopKind replays, String source) {
+        return new ResumeFile(fault, replays, source, seen, tried, worked, answered);
     }
 
     private End rounds() {
@@ -380,7 +447,14 @@ public final class ExploreLoop {
             if (command instanceof Journal.Command.End) return End.STOPPED;
             // Between stops only a parked stop can be resumed: its fix is loaded and its place tried again.
             if (command instanceof Journal.Command.Resume(String stopId, boolean ignore, List<String> skipped)) {
-                if (parked(stopId)) {
+                // The fault being replayed is still held: only ignore lets it go, as while the run paused on it.
+                if (replay != null && replay.fault().id().equals(stopId)) {
+                    if (ignore) {
+                        replayed("ignored");
+                    } else {
+                        emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
+                    }
+                } else if (parked(stopId)) {
                     keepLeftOut(stopId, skipped);
                     resume(null, stopId, ignore);
                 } else {
@@ -421,6 +495,7 @@ public final class ExploreLoop {
         try {
             boolean goesOn = play();
             if (resumed != null && resumed.kind() == StopKind.CRASH) passed(StopKind.CRASH, resumed.place());
+            if (replay != null) passed(StopKind.CRASH, replay.fault().place());
             return goesOn;
         } catch (RuntimeException e) {
             rethrowStop(e);
@@ -494,6 +569,9 @@ public final class ExploreLoop {
         }
         String screen = where.get();
         if (resumed != null) passed(StopKind.UNKNOWN_SCREEN, resumed.place());
+        // A page settled as unknown before is passed once a screen of the map matches it.
+        if (replay != null && readsTrees()) play.state().map(ExploreLoop::pagePlace)
+                .ifPresent(page -> passed(StopKind.UNKNOWN_SCREEN, page));
         if (seen.add(screen)) {
             planRounds = 0;
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
@@ -510,6 +588,7 @@ public final class ExploreLoop {
                     false) != Paused.END;
         }
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
+        if (replay != null && screen.equals(replay.fault().screen())) passed(StopKind.MISSING_FACT, replay.fault().place());
         Optional<Edge> untried = untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
         if (readsTrees()) {
@@ -553,6 +632,7 @@ public final class ExploreLoop {
      * a screen read with no value outside its readouts, a way pressed that arrived, a press after a stuck stop.
      */
     private void passed(StopKind kind, String place) {
+        if (replays(kind, place)) replayed("replayed");
         if (resumed == null || resumed.kind() != kind || !resumed.place().equals(place)) return;
         emit(new ExploreEvent.Fixed(resumed.id(), "reloaded as generation " + generation, nowMs.getAsLong()));
         // Its fix took: what it settled is evidence of nothing any more.
@@ -586,6 +666,8 @@ public final class ExploreLoop {
                 if (arrival == Arrival.AT_TARGET) {
                     worked.add(key);
                     lastEdge = null;
+                    // A way that led to a screen no map matched now arrives.
+                    passed(StopKind.UNKNOWN_SCREEN, key);
                 }
                 from = screen;
                 by = edge.label();
@@ -609,6 +691,7 @@ public final class ExploreLoop {
 
     private void pressed(String what) {
         if (resumed != null) passed(StopKind.STUCK, resumed.place());
+        if (replay != null) passed(StopKind.STUCK, replay.fault().place());
         lastPress = nowMs.getAsLong();
         presses.addLast(what);
         while (presses.size() > Stop.PRESSES) presses.removeFirst();
@@ -786,14 +869,20 @@ public final class ExploreLoop {
         }
         // A press that brought a sibling page of its own screen (a next page) widened its route: no way to itself.
         if (by != null && !by.screen().equals(screen)) answers.add(new TreeAnswer.NewWay(by.screen(), by.field(), screen));
-        String place = "page " + (path != null ? path + Overlay.of(state.tree()).line() : by != null
-                ? by.screen() + "." + by.field() : "unknown");
+        String place = path != null ? pagePlace(state) : "page " + (by != null ? by.screen() + "." + by.field()
+                : "unknown");
         Paused paused = settle(StopKind.UNKNOWN_SCREEN, null, place, answers, "no screen of the map matches the page: "
                 + screen + " is written from its tree");
         if (paused == Paused.PARKED || paused == null) {
             if (!play.recover()) play.restart();
         }
         return paused;
+    }
+
+    /** The place of a website's page as a stop on it names it: its bare path and overlay; null off a website. */
+    private static String pagePlace(Effect.State state) {
+        if (!state.place().startsWith("/")) return null;
+        return "page " + RouteGuess.bare(state.place()) + Overlay.of(state.tree()).line();
     }
 
     /**
@@ -820,9 +909,11 @@ public final class ExploreLoop {
      */
     private Paused settle(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
         if (parked.containsKey(parkedKey(kind, place))) return null;
-        if (resumed != null && resumed.kind() == kind && resumed.place().equals(place)) {
+        boolean replayed = replays(kind, place);
+        if (replayed || resumed != null && resumed.kind() == kind && resumed.place().equals(place)) {
             return fault(kind, screen, place, "did-not-take", missing + "; what the tree settled was written and did "
-                    + "not take", "settled again: " + answers + settledEvidence(resumed.id()));
+                    + "not take", "settled again: " + answers
+                    + settledEvidence(replayed ? replay.fault().id() : resumed.id()));
         }
         List<TreeAnswer> all = new ArrayList<>(answers);
         all.addAll(notes);
@@ -935,26 +1026,36 @@ public final class ExploreLoop {
      */
     Paused fault(StopKind plain, String screen, String place, String source, String why, String evidence) {
         if (!dev) return stop(plain, screen, place, Look.NOTHING, why, false);
-        return stop(StopKind.FAULT, screen, place, Look.NOTHING, why, true, new Fault(source, evidence));
+        return stop(StopKind.FAULT, screen, place, Look.NOTHING, why, true, new Fault(plain, source, evidence));
     }
 
-    /** What found a fault the run raised, and what proves it. */
-    private record Fault(String source, String evidence) {}
+    /** What found a fault the run raised, what proves it, and the kind of stop its place raised before it was one. */
+    private record Fault(StopKind plain, String source, String evidence) {}
 
     private Paused stop(StopKind kind, String screen, String place, Look look, String missing, boolean neverParks,
                         Fault fault) {
         if (parked.containsKey(parkedKey(kind, place))) return null;
+        // The stop a replayed fault was came back on the rebuilt SDK: the fault is still there, held again.
+        if (fault == null && dev && replays(kind, place)) {
+            return stop(StopKind.FAULT, screen, place, look, missing, true, new Fault(kind, replay.source(),
+                    "the stop came back as " + kind.id() + " after the SDK's reload"));
+        }
         String id = kind.id() + "-" + ++stops;
         Stop stop = new Stop(id, kind, screen, place, play.keep(id), look.texts(), look.elements(), look.facts(),
                 List.copyOf(presses), missing, nowMs.getAsLong());
-        boolean again = resumed != null && resumed.same(stop);
+        boolean again = resumed != null && resumed.same(stop)
+                || replay != null && kind == StopKind.FAULT && place.equals(replay.fault().place());
         if (again) stop = new Stop(id, kind, screen, place, stop.framePath(), stop.texts(), stop.elements(),
                 stop.facts(), stop.lastPresses(), "the fix did not take: " + missing, stop.at());
         resumed = null;
+        // Another stop met on the way leaves the replay waiting for the fault's place.
+        if (replay != null && place.equals(replay.fault().place())) replay = null;
         emit(new ExploreEvent.Stopped(stop, again, nowMs.getAsLong()));
         if (fault != null) {
-            emit(new ExploreEvent.Faulted(id, fault.source(), missing, fault.evidence(), play.sdkVersion(),
+            emit(new ExploreEvent.Faulted(id, fault.source(), stop.missing(), fault.evidence(), play.sdkVersion(),
                     nowMs.getAsLong()));
+            // Written before the run holds, so the SDK's reload restarts it where it is.
+            memory(stop, fault.plain(), fault.source()).write(journal);
         }
         Paused paused = pause(stop, neverParks);
         // The time paused is Claude's, not the run's: it does not count as nothing pressed.
@@ -978,6 +1079,7 @@ public final class ExploreLoop {
                     && dev && !held && id.equals(stopId)) {
                 held = true;
                 emit(new ExploreEvent.Faulted(id, "claude", why, "", play.sdkVersion(), nowMs.getAsLong()));
+                memory(stop, stop.kind(), "claude").write(journal);
             }
             // A resume of a stop that is neither this one nor parked is stale: it changes nothing.
             if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore,
@@ -987,7 +1089,11 @@ public final class ExploreLoop {
                 } else if (stop.id().equals(stopId) || parked(stopId)) {
                     keepLeftOut(stopId, skipped);
                     Optional<Paused> resumedNow = resume(stop, stopId, ignore);
-                    if (resumedNow.isPresent()) return resumedNow.get();
+                    if (resumedNow.isPresent()) {
+                        // A fault dropped as a misreading: no restart goes on from it.
+                        if (held) ResumeFile.delete(journal);
+                        return resumedNow.get();
+                    }
                     // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
                     if (stop.id().equals(stopId)) deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
                 } else {

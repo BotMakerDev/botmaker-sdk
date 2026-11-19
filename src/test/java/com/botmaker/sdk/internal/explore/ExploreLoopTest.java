@@ -660,6 +660,192 @@ class ExploreLoopTest {
     }
 
     @Test
+    void aHeldFaultWritesItsMemory() {
+        Game game = new Game();
+        game.dev = true;
+        game.lookThrows = new IllegalStateException("no look");
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) journal().command("stop");
+        };
+
+        loop(map(), game, same(map()), Duration.ofHours(2)).run();
+
+        ResumeFile file = ResumeFile.read(journal(), why -> {}).orElseThrow();
+        assertEquals(stops().getFirst().stop(), file.fault());
+        assertEquals(StopKind.CRASH, file.replays(), "what its place raised before it was a fault");
+        assertEquals("exception", file.source());
+        assertEquals(Set.of("A"), file.seen());
+        assertTrue(JournalView.of(journal()).heldWhenLeft(file.fault().id()), "the run ended holding it");
+    }
+
+    /**
+     * A run that held {@code fault-3} on {@code place} of {@code screen}, its memory written with {@code tried}, then
+     * ended as the SDK's reload ends it.
+     */
+    private void heldAndLeft(StopKind replays, String screen, String place, Set<String> tried) {
+        Journal journal = journal();
+        Stop fault = new Stop("fault-3", StopKind.FAULT, screen, place, "", List.of(), List.of(), Map.of(), List.of(),
+                "judged wrong", 1);
+        journal.append(new ExploreEvent.Began(true, 0));
+        journal.append(new ExploreEvent.Stopped(fault, false, 1));
+        journal.append(new ExploreEvent.Faulted("fault-3", "claude", "judged wrong", "", "9.9.9-SNAPSHOT", 1));
+        journal.append(new ExploreEvent.Ended(ExploreLoop.End.STOPPED, 2));
+        new ResumeFile(fault, replays, "claude", Set.of("A"), tried, Set.of(), Set.of()).write(journal);
+    }
+
+    private ExploreLoop resumed(Game game, Duration within) {
+        return loop(map(), game, same(map()), within).resuming(ResumeFile.pending(journal(), why -> {}));
+    }
+
+    private boolean resumeFileLies() {
+        return Files.exists(folder.resolve(ResumeFile.FILE));
+    }
+
+    @Test
+    void aRunWithAResumeFileRestoresWhatItTried() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.b→B", "A.d→D"));
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        assertFalse(game.taken.contains("A.b→B"), "tried before the restart: " + game.taken);
+        assertEquals("A.d→D", game.taken.getFirst(), "the fault's place, pressed again");
+        assertEquals(1, events(ExploreEvent.Began.class).size(), "the same run");
+        assertEquals("fault-3", events(ExploreEvent.Restarted.class).getFirst().faultId());
+    }
+
+    @Test
+    void aReplayThatPassesSaysFixed() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.d→D"));
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        ExploreEvent.Fixed fixed = events(ExploreEvent.Fixed.class).getFirst();
+        assertEquals("fault-3", fixed.stopId());
+        assertEquals("replayed", fixed.why());
+        assertFalse(resumeFileLies());
+        assertEquals(1, stops().size(), "nothing stopped again");
+    }
+
+    @Test
+    void aResumeReplaysTheFaultsPlace() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.d→D"));
+        Game game = new Game();
+        game.dev = true;
+        // The fix did not take: d still arrives elsewhere.
+        game.arrival = edge -> edge.to().equals("D") ? new Took(Arrival.ELSEWHERE, "B") : new Took(Arrival.AT_TARGET, edge.to());
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) journal().command("stop");
+        };
+
+        resumed(game, Duration.ofHours(2)).run();
+
+        ExploreEvent.Stopped again = stops().getLast();
+        assertEquals(StopKind.FAULT, again.stop().kind(), "held again, never parked");
+        assertEquals("A.d→D", again.stop().place());
+        assertTrue(again.again());
+        assertTrue(again.stop().missing().startsWith("the fix did not take: "), again.stop().missing());
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty());
+        assertEquals("claude", events(ExploreEvent.Faulted.class).getLast().source());
+        assertEquals(again.stop().id(), ResumeFile.read(journal(), why -> {}).orElseThrow().fault().id(),
+                "its memory written again");
+    }
+
+    @Test
+    void aReplayOutlivesAnotherStopOnTheWay() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.d→D"));
+        Game game = new Game();
+        game.dev = true;
+        // b, pressed first, stops elsewhere: a stop of its own, parked, and the replay still waits for d.
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "A") : new Took(Arrival.AT_TARGET, edge.to());
+
+        resumed(game, Duration.ofMinutes(14)).run();
+
+        assertEquals("A.b→B", stops().get(1).stop().place());
+        assertEquals("replayed", events(ExploreEvent.Fixed.class).stream().filter(f -> f.stopId().equals("fault-3"))
+                .findFirst().orElseThrow().why());
+        assertFalse(resumeFileLies());
+    }
+
+    @Test
+    void aReplayedFaultIsLetGoByIgnoreOnly() {
+        // On no screen and a place never met again: the replay waits as long as the run.
+        heldAndLeft(StopKind.WRONG_ARRIVAL, null, "Z.x→A", Set.of());
+        Game game = new Game();
+        game.dev = true;
+        boolean[] sent = {false, false};
+        game.onIdle = () -> {
+            if (!sent[0]) {
+                sent[0] = true;
+                journal().command("resume fault-3");
+            } else if (!sent[1] && !journal().commandWaiting()) {
+                sent[1] = true;
+                journal().command("resume fault-3 ignore");
+            }
+        };
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of(ExploreLoop.FAULT_RESUMES), events(ExploreEvent.Reloaded.class).getFirst().errors());
+        assertEquals("ignored", events(ExploreEvent.Fixed.class).getFirst().why());
+        assertFalse(resumeFileLies());
+    }
+
+    @Test
+    void aResumeToAScreenGoneExploresOn() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "GONE", "GONE.x→A", Set.of());
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        ExploreEvent.Fixed fixed = events(ExploreEvent.Fixed.class).getFirst();
+        assertEquals("fault-3", fixed.stopId());
+        assertTrue(fixed.why().contains("GONE is no longer in the map"), fixed.why());
+        assertFalse(resumeFileLies());
+        assertFalse(game.taken.isEmpty(), "it explores on");
+    }
+
+    @Test
+    void anEndedRunsResumeFileIsIgnored() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.b→B", "A.d→D"));
+        // Let go after all: the file lying there is stale.
+        journal().append(new ExploreEvent.Fixed("fault-3", "ignored", 3));
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        assertFalse(resumeFileLies());
+        assertTrue(events(ExploreEvent.Restarted.class).isEmpty());
+        assertEquals(2, events(ExploreEvent.Began.class).size(), "a fresh run");
+        assertTrue(game.taken.contains("A.b→B"), "nothing restored: " + game.taken);
+    }
+
+    @Test
+    void aResumeIgnoreDropsTheMemory() {
+        Game game = new Game();
+        game.dev = true;
+        game.lookThrows = new IllegalStateException("no look");
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && resumeFileLies()) {
+                sent[0] = true;
+                game.lookThrows = null;
+                journal().command("resume " + openStop() + " ignore");
+            }
+        };
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        assertTrue(sent[0]);
+        assertFalse(resumeFileLies(), "no restart goes on from a fault let go");
+    }
+
+    @Test
     void aRunThatThrowsSaysItEnded() {
         Game game = new Game();
         // What the loop does not take for a stop of its own goes on up: an error of the JVM here.
