@@ -418,6 +418,7 @@ public final class ExploreLoop {
             planRounds = 0;
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
+            if (website()) pictured(screen);
         }
         Look look = play.look(screen);
         // A website's numbers are its content (a price, a count of devices), never a game's state to keep.
@@ -549,6 +550,30 @@ public final class ExploreLoop {
     private void page(String screen, Effect.State state) {
         if (!state.place().startsWith("/") || !Overlay.of(state.tree()).none()) return;
         pages.putIfAbsent(screen, new RouteGuess.Page(RouteGuess.bare(state.place()), RouteGuess.skeleton(state.tree())));
+    }
+
+    /**
+     * The pictures the map's website screen {@code screen} lacks, taken now it is reached: the page as its shot, and
+     * each input whose element shows none rendered where the tree finds it, once. A map made before these existed
+     * fills itself in as the run passes.
+     */
+    private void pictured(String screen) {
+        MapScreen on = map.screen(screen).orElse(null);
+        Optional<Effect.State> state = on == null ? Optional.empty() : play.state();
+        if (state.isEmpty()) return;
+        Map<String, String> inputs = new LinkedHashMap<>();
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            if (!(input.getValue() instanceof Button button) || button.element() == null
+                    || button.element().shot() != null) continue;
+            List<UiNode> found = ElementMatch.matches(button.element(), state.get().tree());
+            if (found.size() != 1) continue;
+            String field = input.getKey();
+            play.picture(screen + "." + field, found.getFirst().bounds()).ifPresent(file -> inputs.put(field, file));
+        }
+        String frame = on.setup().shot() == null ? play.keep("shot-" + screen) : "";
+        if (!frame.isEmpty() || !inputs.isEmpty()) {
+            emit(new ExploreEvent.Pictured(screen, frame, inputs, nowMs.getAsLong()));
+        }
     }
 
     /**

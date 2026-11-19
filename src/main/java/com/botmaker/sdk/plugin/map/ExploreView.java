@@ -441,6 +441,7 @@ final class ExploreView {
             case ExploreEvent.Began e -> "▶ Began";
             case ExploreEvent.Ended e -> "■ Ended: " + (e.end() == null ? "unknown" : e.end().displayName());
             case ExploreEvent.Claude e -> null;
+            case ExploreEvent.Pictured e -> "📷 " + e.screen() + " pictured";
             case ExploreEvent.Settled e -> "✎ " + e.stopId() + ": the page settles " + e.answers().size()
                     + (e.answers().size() == 1 ? " change" : " changes");
             case ExploreEvent.NewScreen e -> "✚ " + e.screen()

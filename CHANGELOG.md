@@ -114,7 +114,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - Discover on a website: a press that brings another page or opens an overlay is a way even when the guard blocked a
   write beside it (the site's own telemetry, `POST /monitoring`), so 🗺 Screens links the pages it found. A page's
   numbers raise no missing-fact stop. Each new screen gets the frame it was found on as its shot, and each new input
-  a picture Chromium renders of it, below the fold too, as its element's shot.
+  a picture Chromium renders of it, below the fold too, as its element's shot. A screen the map already holds is
+  pictured the same way when the run reaches it, for whatever it lacks: a map made before fills itself in.
 
 ## [1.11.0] — 2026-11-16
 

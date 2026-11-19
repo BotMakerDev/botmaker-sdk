@@ -103,9 +103,17 @@ class ExploreLoopTest {
             return front;
         }
 
+        /** Where {@link #keep} saves a frame, blank for nowhere. */
+        String keptIn = "";
+
         @Override
         public String keep(String name) {
-            return "";
+            return keptIn.isEmpty() ? "" : keptIn + "/" + name + ".png";
+        }
+
+        @Override
+        public Optional<String> picture(String name, Rectangle box) {
+            return state == null ? Optional.empty() : Optional.of("/run/inputs/" + name + ".png");
         }
 
         @Override
@@ -224,6 +232,7 @@ class ExploreLoopTest {
         assertEquals(2, inputs.size(), inputs.toString());
         assertEquals("a buy", inputs.getFirst().never());
         assertEquals(null, inputs.get(1).never(), "a link is free");
+        assertEquals("/run/inputs/Pricing.docs.png", inputs.get(1).picture(), "each input rendered");
         assertTrue(JournalView.of(journal()).settled(stopped.stop()), "the plugin side's, not Claude's");
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody wrote it in 10 min");
     }
@@ -241,6 +250,28 @@ class ExploreLoopTest {
         List<TreeAnswer> answers = events(ExploreEvent.Settled.class).getFirst().answers();
         assertTrue(answers.getFirst() instanceof TreeAnswer.NewScreen, answers.toString());
         assertEquals(target, answers.getLast());
+    }
+
+    /** A page the map holds with no pictures gets them as the run reaches it: its frame, each input rendered. */
+    @Test
+    void aKnownPageWithNoPicturesIsPicturedWhenReached() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()
+                .shot("elements/docs.png")).free());
+        screens.put("A", new MapScreen(Setup.named("A").start().route("/"), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.keptIn = "/run";
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of(new ExploreEvent.Pictured("A", "/run/shot-A.png",
+                Map.of("toggle", "/run/inputs/A.toggle.png"), events(ExploreEvent.Pictured.class).getFirst().at())),
+                events(ExploreEvent.Pictured.class), "the docs link has its picture already");
     }
 
     /** An input that is no way is pressed once; what it did goes with the next settled stop as a note. */

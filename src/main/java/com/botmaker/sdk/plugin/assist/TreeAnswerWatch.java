@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 /**
  * Writes what <em>Keep exploring</em> settled off a screen's tree ({@link ExploreEvent.Settled}) into the bot while a
@@ -56,7 +57,7 @@ public final class TreeAnswerWatch {
             Optional<String> failed = TreeAnswers.apply(services, "Explore: " + id, answers);
             if (failed.isEmpty()) shots(services, journal, id, answers);
             return failed;
-        }));
+        }, pictured -> TreeAnswers.pictured(services, pictured)));
     }
 
     /**
@@ -91,8 +92,10 @@ public final class TreeAnswerWatch {
         thread = null;
     }
 
-    private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, Optional<String>> write) {
+    private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, Optional<String>> write,
+                              Consumer<ExploreEvent.Pictured> picture) {
         Set<String> done = new HashSet<>();
+        Set<ExploreEvent.Pictured> pictured = new HashSet<>();
         Path folder = journal.folder().toAbsolutePath().normalize();
         FileChannel channel = null;
         FileLock lock = null;
@@ -112,7 +115,10 @@ public final class TreeAnswerWatch {
                             HELD.remove(folder);
                         }
                     }
-                    if (lock != null) round(journal, done, write);
+                    if (lock != null) {
+                        round(journal, done, write);
+                        pictures(journal, pictured, picture);
+                    }
                     failedLast = null;
                 } catch (IOException | RuntimeException failed) {
                     // Said once, then tried again each round: one bad read or slow write stops nothing for good.
@@ -133,6 +139,13 @@ public final class TreeAnswerWatch {
                 // The lock goes with the process anyway.
             }
             if (lock != null) HELD.remove(folder);
+        }
+    }
+
+    /** The latest run's pictures not yet in {@code done}, each given to {@code picture} once. */
+    static void pictures(Journal journal, Set<ExploreEvent.Pictured> done, Consumer<ExploreEvent.Pictured> picture) {
+        for (ExploreEvent event : JournalView.of(journal).events()) {
+            if (event instanceof ExploreEvent.Pictured pictured && done.add(pictured)) picture.accept(pictured);
         }
     }
 

@@ -7,6 +7,7 @@ import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * One line of a run's explore journal ({@link Journal}): what the run found, pressed, refused, stopped on, and how
@@ -31,6 +32,7 @@ public sealed interface ExploreEvent {
             case Ended ignored -> "ended";
             case Claude ignored -> "claude";
             case Settled ignored -> "settled";
+            case Pictured ignored -> "pictured";
         };
     }
 
@@ -49,6 +51,7 @@ public sealed interface ExploreEvent {
             case "ended" -> Ended.class;
             case "claude" -> Claude.class;
             case "settled" -> Settled.class;
+            case "pictured" -> Pictured.class;
             default -> null;
         };
     }
@@ -94,6 +97,18 @@ public sealed interface ExploreEvent {
     record Settled(String stopId, List<TreeAnswer> answers, long at) implements ExploreEvent {
         public Settled {
             answers = answers == null ? List.of() : List.copyOf(answers);
+        }
+    }
+
+    /**
+     * The pictures a website's screen {@code screen} the map holds lacked, taken as the run reached it: {@code frame}
+     * the page as its shot (blank when it has one), {@code inputs} each input's rendered picture by its field, for an
+     * element that shows none. The plugin side copies them in; what already has a picture keeps it.
+     */
+    record Pictured(String screen, String frame, Map<String, String> inputs, long at) implements ExploreEvent {
+        public Pictured {
+            frame = frame == null ? "" : frame;
+            inputs = inputs == null ? Map.of() : Map.copyOf(inputs);
         }
     }
 

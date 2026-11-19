@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.plugin.api.source.PluginValues.Member;
+import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.ManagedSet;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Condition;
@@ -16,12 +17,15 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -247,17 +251,8 @@ final class TreeAnswers {
             Optional<String> failed = ScreenEdits.keptText(services, words);
             if (failed.isPresent()) return failed;
         }
-        Path resources = services.resourcesDir();
         for (Map.Entry<String, String> picture : planned.pictures().entrySet()) {
-            // A picture that cannot be copied leaves its element showing "?", as before: nothing to fail the write for.
-            if (resources == null) break;
-            try {
-                Path file = resources.resolve(picture.getKey());
-                Files.createDirectories(file.getParent());
-                Files.copy(Path.of(picture.getValue()), file, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException | RuntimeException uncopied) {
-                SdkLog.warn(picture.getKey() + " could not be copied: " + uncopied.getMessage());
-            }
+            copy(services, picture.getKey(), picture.getValue());
         }
         if (!planned.elements().isEmpty()) {
             Optional<String> missing = values.create(ELEMENTS.value());
@@ -274,6 +269,73 @@ final class TreeAnswers {
         for (Change change : planned.changes()) {
             Optional<String> failed = ScreenBook.update(services, change.constant(), change.change());
             if (failed.isPresent()) return failed;
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Copies the run's {@code file} into the bot's resources as {@code shot}; false when it could not, which leaves its
+     * element showing "?", as before: nothing to fail a write for.
+     */
+    private static boolean copy(StudioServices services, String shot, String file) {
+        Path resources = services.resourcesDir();
+        if (resources == null) return false;
+        try {
+            Path to = resources.resolve(shot);
+            Files.createDirectories(to.getParent());
+            Files.copy(Path.of(file), to, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException | RuntimeException uncopied) {
+            SdkLog.warn(shot + " could not be copied: " + uncopied.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Fills in what a screen the map holds lacked, from the pictures the run took as it reached it: the page as the
+     * screen's shot when it has none, and each input's picture as its element's shot when that shows none. One step
+     * of Studio's history; what has a picture keeps it, and what fails is said and left.
+     */
+    static void pictured(StudioServices services, ExploreEvent.Pictured pictured) {
+        ScreenGraph graph = FxCall.call(() -> ScreenBook.read(services));
+        Optional<String> constant = ScreenBook.find(graph, pictured.screen());
+        if (constant.isEmpty()) return;
+        if (!pictured.frame().isEmpty()) {
+            try {
+                BufferedImage frame = ImageIO.read(Path.of(pictured.frame()).toFile());
+                if (frame != null) ScreenShots.saveIfMissing(services, graph, constant.get(), frame);
+            } catch (IOException | RuntimeException unread) {
+                // The screen keeps showing its marker.
+            }
+        }
+        MapScreen screen = graph.screens().get(constant.get());
+        if (pictured.inputs().isEmpty() || screen == null) return;
+        Optional<String> failed = FxCall.call(() -> {
+            PluginValues values = services.pluginValues();
+            if (values == null) return Optional.of("Studio has no source tree open.");
+            return ScreenBook.step(services, "Explore: " + pictured.screen() + " pictured",
+                    () -> elementShots(services, values, screen, pictured.inputs()));
+        });
+        failed.ifPresent(why -> SdkLog.warn(pictured.screen() + "'s pictures were not written: " + why));
+    }
+
+    /** Each of {@code screen}'s inputs in {@code pictures} gives its element, when it shows none, its picture. */
+    private static Optional<String> elementShots(StudioServices services, PluginValues values, MapScreen screen,
+                                                 Map<String, String> pictures) {
+        for (Map.Entry<String, String> picture : pictures.entrySet()) {
+            if (!(screen.input(picture.getKey()).orElse(null) instanceof Button button)
+                    || button.element() == null) continue;
+            for (Member member : ELEMENTS.members(values)) {
+                Optional<ValueContext> ctx = ELEMENTS.open(values, member);
+                Optional<Element> held = ctx.flatMap(ELEMENTS::read);
+                if (held.isEmpty() || held.get().shot() != null
+                        || !ElementSaves.sameClues(held.get(), button.element())) continue;
+                String shot = ElementSaves.FOLDER + "/" + member.name().toLowerCase(Locale.ROOT) + ".png";
+                if (!copy(services, shot, picture.getValue())) break;
+                Optional<String> refused = ctx.get().write(held.get().shot(shot));
+                if (refused.isPresent()) return refused;
+                break;
+            }
         }
         return Optional.empty();
     }
