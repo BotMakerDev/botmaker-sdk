@@ -3,10 +3,13 @@
 
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.assist.AgentContext;
 import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
+import com.botmaker.plugin.api.run.DevReload;
+import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
@@ -81,6 +84,11 @@ final class ExploreTools {
                  @Describe("one line: what Discover got wrong") String why) implements Action {
     }
 
+    @Describe("dev mode, once the SDK's fix is installed: stop the run, reload the plugins at the rebuilt -SNAPSHOT "
+            + "and start the run again from its memory, which replays the held fault; wait answers the replay")
+    record ReloadSdk(@Describe("the held fault's id, as wait names it") String stop) implements Action {
+    }
+
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
@@ -92,6 +100,7 @@ final class ExploreTools {
     static AgentReply handle(Action action, AgentContext context) {
         Path project = context == null || context.services() == null ? null : context.services().projectDir();
         if (project == null) return AgentReply.refused(Frames.noProject());
+        if (action instanceof ReloadSdk reload) return reloadSdk(Journal.of(project), reload.stop(), context.services());
         return handle(action, Journal.of(project));
     }
 
@@ -104,7 +113,42 @@ final class ExploreTools {
             case Resume resume -> resume(journal, resume.stop(), Boolean.TRUE.equals(resume.ignore()), RESUME_WITHIN);
             case Stop ignored -> stop(journal, STOP_WITHIN);
             case Fault fault -> fault(journal, fault.stop(), fault.why(), STOP_WITHIN);
+            // Reached only without the host's services: handle(Action, AgentContext) sends a reload to reloadSdk.
+            case ReloadSdk ignored -> AgentReply.refused("A reload needs the host's services, which this call has not.");
         };
+    }
+
+    /**
+     * Has the host restart the run on the rebuilt SDK, held on the Discover fault {@code stopId} (2026-11-19): the
+     * host stops the run, reloads the plugins and starts {@value SdkRuns#KEEP_EXPLORING} again, which resumes from its
+     * memory and replays the fault. Answers at once; refused, with nothing stopped, unless {@code stopId} is the fault
+     * the run holds now, or with the host's words when it will not reload. The host closes this plugin's instance, so
+     * nothing is done after its answer.
+     */
+    static AgentReply reloadSdk(Journal journal, String stopId, StudioServices services) {
+        if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the held fault, as wait names it.");
+        String id = stopId.strip();
+        synchronized (RESUMING) {
+            JournalView view = JournalView.of(journal);
+            if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended; run_bot entry \""
+                    + SdkRuns.KEEP_EXPLORING + "\" starts another." : noRun());
+            if (view.open().filter(s -> s.id().equals(id)).filter(view::held).isEmpty()) {
+                return AgentReply.refused("No Discover fault " + id + " is held: reload_sdk replays the fault the run "
+                        + "holds; a plain stop is fixed in the bot and resumed. " + ids(view));
+            }
+            Optional<RunEntry> entry = new SdkRuns().runs().stream()
+                    .filter(e -> e.title().equals(SdkRuns.KEEP_EXPLORING)).findFirst();
+            if (entry.isEmpty()) return AgentReply.refused("This SDK declares no " + SdkRuns.KEEP_EXPLORING + " run.");
+            return switch (services.devReload(entry.get())) {
+                case DevReload.Started started -> {
+                    claude(journal, "reload_sdk " + id);
+                    yield AgentReply.text("Reloading the SDK: the run stops and starts again on the new build, then "
+                            + "replays " + id + "; explore wait answers the replay. A wait that finds the run ended "
+                            + "means the restart failed: the status line and the core's log say why.");
+                }
+                case DevReload.Refused(String why) -> AgentReply.refused("The host did not reload: " + why);
+            };
+        }
     }
 
     /**

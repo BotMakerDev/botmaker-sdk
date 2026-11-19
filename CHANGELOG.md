@@ -30,6 +30,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   it walks to the fault's screen and replays its place. Passing it says the fault is fixed; meeting the same stop
   holds it again, marked "the fix did not take". A fault whose screen the fix removed is said, and the run explores
   on. The file is run data, in no version, publish or `.bmk`, and a `resume ignore` deletes it.
+- `explore reload_sdk <fault>`: once the SDK's fix is installed, the host stops *Keep exploring*, reloads the plugins
+  at the rebuilt `-SNAPSHOT` and starts the run again, which replays the held fault; `explore wait` answers the
+  replay. Refused on a plain stop, and with the host's words when the new build does not load (the run then stays
+  held).
 - The run raises a Discover fault itself in three cases. First, it settled answers that the bot's writer left out,
   each listed with its reason. Second, it settled a place, and the place came back unchanged after the write.
   Third, its own code threw, rather than the bot's. On a released SDK, the first case is a plain stop that lists

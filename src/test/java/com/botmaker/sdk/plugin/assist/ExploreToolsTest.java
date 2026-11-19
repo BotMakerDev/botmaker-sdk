@@ -3,7 +3,13 @@
 
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.plugin.api.Dialogs;
+import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.plugin.api.run.DevReload;
+import com.botmaker.plugin.api.run.RunEntry;
+import com.botmaker.sdk.plugin.run.SdkRuns;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
@@ -300,5 +306,53 @@ class ExploreToolsTest {
         assertTrue(reply.isRefused());
         assertTrue(text(reply).contains("released SDK"), text(reply));
         assertFalse(journal.commandWaiting());
+    }
+
+    /** A host that records what it was asked to reload, and answers {@code answer}. */
+    private static StudioServices reloading(List<RunEntry> asked, DevReload answer) {
+        return new StudioServices() {
+            @Override public Path projectDir() { return Path.of("."); }
+            @Override public Path resourcesDir() { return Path.of("."); }
+            @Override public Theme theme() { return null; }
+            @Override public Dialogs dialogs() { return Dialogs.NONE; }
+
+            @Override
+            public DevReload devReload(RunEntry entry) {
+                asked.add(entry);
+                return answer;
+            }
+        };
+    }
+
+    @Test
+    void reloadSdkCallsTheHost() {
+        Journal journal = heldOn(stop("wrong_arrival-1"));
+        List<RunEntry> asked = new CopyOnWriteArrayList<>();
+
+        AgentReply reply = ExploreTools.reloadSdk(journal, "wrong_arrival-1", reloading(asked, new DevReload.Started()));
+
+        assertFalse(reply.isRefused(), text(reply));
+        assertTrue(text(reply).contains("explore wait answers the replay"), text(reply));
+        assertEquals(1, asked.size());
+        assertEquals(SdkRuns.KEEP_EXPLORING, asked.getFirst().title());
+        assertFalse(journal.commandWaiting(), "the host restarts the run, not a command");
+
+        String refused = text(ExploreTools.reloadSdk(journal, "wrong_arrival-1",
+                reloading(asked, new DevReload.Refused("com.botmaker.sdk.SdkPlugin — p/Gone is not on the classpath"))));
+        assertTrue(refused.contains("The host did not reload: com.botmaker.sdk.SdkPlugin — p/Gone"), refused);
+    }
+
+    @Test
+    void reloadSdkOnAPlainStopIsRefused() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(stop("wrong_arrival-1"), false, 2));
+        List<RunEntry> asked = new CopyOnWriteArrayList<>();
+
+        AgentReply reply = ExploreTools.reloadSdk(journal, "wrong_arrival-1", reloading(asked, new DevReload.Started()));
+
+        assertTrue(reply.isRefused());
+        assertTrue(text(reply).contains("No Discover fault wrong_arrival-1 is held"), text(reply));
+        assertTrue(asked.isEmpty(), "the host is not asked");
     }
 }
