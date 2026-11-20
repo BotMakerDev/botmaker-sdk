@@ -315,6 +315,16 @@ public final class ExploreLoop {
     /** The screens whose inputs made twice this process looked for; never restored from a run's memory. */
     private final Set<String> merged = new HashSet<>();
     private final Set<String> tried = new HashSet<>();
+    /**
+     * The ways whose button was not on their screen when the run looked, this run: absent is not tried, so each is
+     * looked for again once the run reaches its screen again, and is tried only when absent that second time too.
+     * Never restored: a restarted run looks again.
+     */
+    private final Set<String> notSeen = new HashSet<>();
+    /** The ways of {@link #notSeen} looked for on this visit of the screen the run is on: not looked for again on it. */
+    private final Set<String> notSeenHere = new HashSet<>();
+    /** The last screen of the map a round was on, a frame no screen matched skipped; null before the first. */
+    private String lastScreen;
     /** The places a guard refused this run, way or input, with the guard's kind: each said once, never restored. */
     private final Set<String> refused = new HashSet<>();
     private final Set<String> worked = new HashSet<>();
@@ -544,9 +554,13 @@ public final class ExploreLoop {
      */
     private void retry(StopKind kind, String place) {
         tried.remove(place);
+        notSeen.remove(place);
         // A fault's place is the crash's when a crash raised it.
         String press = kind == StopKind.CRASH || kind == StopKind.FAULT ? pressOf(place) : null;
-        if (press != null) tried.removeIf(t -> t.equals(press) || t.startsWith(press + "→"));
+        if (press != null) {
+            tried.removeIf(t -> t.equals(press) || t.startsWith(press + "→"));
+            notSeen.removeIf(t -> t.startsWith(press + "→"));
+        }
     }
 
     /** Whether {@code press}, {@code "SHOP.buy"}, is still a way or an input of the map. */
@@ -778,6 +792,12 @@ public final class ExploreLoop {
         // Nothing left here the run presses itself: the nearest screen not done, a set-aside one last.
         Optional<String> next = next(screen, true).or(() -> next(screen, false));
         if (next.isPresent()) return walk(screen, next.get());
+        // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
+        if (!notSeenHere.isEmpty()) {
+            tried.addAll(notSeenHere);
+            notSeenHere.clear();
+            return true;
+        }
         doing = Spent.IDLE;
         play.idle(settings.poll());
         return true;
@@ -1046,6 +1066,10 @@ public final class ExploreLoop {
             }
         }
         waited.clear();
+        // A screen left for another and reached again is looked at afresh: its ways not seen are looked for again. A
+        // frame no screen matched between two of the same one is no visit elsewhere.
+        if (screen != null && !screen.equals(lastScreen)) notSeenHere.clear();
+        if (screen != null) lastScreen = screen;
         onScreen = screen;
         onSince = now;
         if (screen != null && !built.contains(screen) && open(screen).isEmpty()) built(screen, now);
@@ -1453,8 +1477,11 @@ public final class ExploreLoop {
         for (Edge edge : map.edges()) {
             // One taken by waiting is not pressed: the game takes it by itself (untriedEdge leaves it out).
             if (!edge.from().equals(screen) || !untriedEdge(edge)) continue;
+            if (notSeenHere.contains(key(edge))) continue;
             if (open(edge)) return Optional.of(edge);
-            tried.add(key(edge));
+            // Not there now: looked for again on the next visit, tried once absent then too.
+            if (notSeen.add(key(edge))) notSeenHere.add(key(edge));
+            else tried.add(key(edge));
         }
         return Optional.empty();
     }
@@ -1484,7 +1511,8 @@ public final class ExploreLoop {
         // One no way reaches from here comes last in the map's order: then none is reached, and the run waits here.
         return map.nextToExplore(Optional.of(screen), to -> !to.equals(screen)
                 && !(notAside && aside.contains(to)) && hasWork(to))
-                .filter(to -> map.pathTo(screen, to, edge -> true).isPresent());
+                // Not through a way not on the screen now.
+                .filter(to -> map.pathTo(screen, to, edge -> !notSeenHere.contains(key(edge))).isPresent());
     }
 
     /** Whether the run has work of its own on {@code screen}: a way not taken this run, or an input it presses. */

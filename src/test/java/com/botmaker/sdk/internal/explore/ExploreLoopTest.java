@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
 import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
@@ -201,6 +202,17 @@ class ExploreLoopTest {
             return true;
         }
 
+        /** Whether a way's button is on the screen when the run looks for it; every one by default. */
+        Predicate<Edge> shown = edge -> true;
+        /** Each way the run looked for, by key, in order. */
+        final List<String> lookedFor = new ArrayList<>();
+
+        @Override
+        public boolean open(Edge edge) {
+            lookedFor.add(ExploreLoop.key(edge));
+            return shown.test(edge);
+        }
+
         @Override
         public Took take(Edge edge, long withinMs) {
             taken.add(ExploreLoop.key(edge));
@@ -278,6 +290,55 @@ class ExploreLoopTest {
 
         assertTrue(game.taken.contains("A.b→B"), game.taken.toString());
         assertTrue(events(ExploreEvent.Built.class).stream().anyMatch(b -> b.screen().equals("B")),
+                journal().events().toString());
+    }
+
+    /**
+     * A way whose button is not on its screen now is skipped there, and looked for again once the run left the screen
+     * and reached it again: pressed when it shows then. Absent a second time, it is left for the next run, which looks
+     * for it again.
+     */
+    @Test
+    void aWayNotSeenIsRetriedAfterItsScreenIsReachedAgain() {
+        Game game = new Game();
+        // Shown from the second look on.
+        game.shown = edge -> !ExploreLoop.key(edge).equals("A.b→B")
+                || game.lookedFor.stream().filter("A.b→B"::equals).count() > 1;
+        ScreenGraph map = map();
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(game.taken.contains("A.b→B"), game.taken.toString());
+        assertTrue(game.taken.indexOf("A.d→D") < game.taken.indexOf("A.b→B"), game.taken.toString());
+
+        Game never = new Game();
+        never.shown = edge -> !ExploreLoop.key(edge).equals("A.b→B");
+        loop(map, never, same(map), Duration.ofMinutes(12)).run();
+
+        assertFalse(never.taken.contains("A.b→B"), never.taken.toString());
+        assertEquals(2, never.lookedFor.stream().filter("A.b→B"::equals).count(), never.lookedFor.toString());
+
+        Game next = new Game();
+        loop(map, next, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(next.taken.contains("A.b→B"), next.taken.toString());
+    }
+
+    /** A way not seen on a screen the run has nowhere to leave for is tried there: the screen is built, not waited on. */
+    @Test
+    void aWayNotSeenWithNowhereToGoIsTried() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.shown = edge -> false;
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        // Looked for once, then tried; the fake game's walk reaching B anyway is not a look on A.
+        assertEquals(1, game.lookedFor.stream().filter("A.b→B"::equals).count(), game.lookedFor.toString());
+        assertTrue(events(ExploreEvent.Built.class).stream().anyMatch(b -> b.screen().equals("A")),
                 journal().events().toString());
     }
 

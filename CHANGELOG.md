@@ -39,6 +39,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`linked`, `stays`, `not_pressed`, `failed`, `untried`). A screen card counts the inputs left (untried or
   failed) and shows *✓ done* only once the screen is all cut with nothing left. A picture screen with nothing
   left that does not say `.allCut()` shows *not all cut* and is owed until it does.
+- **A way whose button is not on screen now is tried again later.** Keep exploring no longer gives up on a way the
+  first time its button is missing. It skips the way, and looks for it again once the run has left the screen and
+  come back, pressing it if it shows. Missing a second time, it is left untried for the next run. A screen the run
+  has nowhere to leave for gives up on such a way at once rather than waiting on it, and no walk goes through a
+  way that is missing on the current screen.
 - **Every explore stop now ends.** The start-of-run list of inputs with no verdict is parked like any other stop
   nobody answers, and the guard still presses no such input. A window that stays in front of the game for the stuck
   time (15 min) ends the run as *Stuck* instead of waiting forever; nothing is pressed into that window. A server
