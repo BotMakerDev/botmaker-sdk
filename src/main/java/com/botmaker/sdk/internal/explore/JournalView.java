@@ -7,10 +7,12 @@ import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A {@link Journal} read as the plugin side needs it: the latest run's events, its open stop, its parked stops, its
@@ -274,13 +276,14 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
 
     /**
      * How far the latest run built the map: each screen built with its clock, and each screen it left open, as it
-     * last left it, longest clock first.
+     * last left it, longest clock first, and the screens set aside over their budget and not built since.
      */
-    public record Build(List<ExploreEvent.Built> built, List<ExploreEvent.Building> open) {
+    public record Build(List<ExploreEvent.Built> built, List<ExploreEvent.Building> open, Set<String> aside) {
 
         public Build {
             built = List.copyOf(built);
             open = List.copyOf(open);
+            aside = Set.copyOf(aside);
         }
 
         /** The median time a built screen took; zero when none is. */
@@ -302,13 +305,16 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     public Build build() {
         Map<String, ExploreEvent.Built> built = new LinkedHashMap<>();
         Map<String, ExploreEvent.Building> open = new LinkedHashMap<>();
+        Set<String> aside = new HashSet<>();
         for (ExploreEvent event : events) {
             switch (event) {
                 // The latest says it: a built screen a parked stop opens again is building until built again.
                 case ExploreEvent.Built b -> {
                     built.put(b.screen(), b);
                     open.remove(b.screen());
+                    aside.remove(b.screen());
                 }
+                case ExploreEvent.SetAside a -> aside.add(a.screen());
                 case ExploreEvent.Building b -> {
                     open.put(b.screen(), b);
                     built.remove(b.screen());
@@ -317,6 +323,6 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
             }
         }
         return new Build(List.copyOf(built.values()), open.values().stream()
-                .sorted(Comparator.comparingLong(ExploreEvent.Building::ms).reversed()).toList());
+                .sorted(Comparator.comparingLong(ExploreEvent.Building::ms).reversed()).toList(), aside);
     }
 }

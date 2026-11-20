@@ -37,6 +37,7 @@ public sealed interface ExploreEvent {
             case Restarted ignored -> "restarted";
             case Built ignored -> "built";
             case Building ignored -> "building";
+            case SetAside ignored -> "set_aside";
         };
     }
 
@@ -60,6 +61,7 @@ public sealed interface ExploreEvent {
             case "restarted" -> Restarted.class;
             case "built" -> Built.class;
             case "building" -> Building.class;
+            case "set_aside" -> SetAside.class;
             default -> null;
         };
     }
@@ -116,6 +118,16 @@ public sealed interface ExploreEvent {
      */
     record Building(String screen, long ms, List<String> open, long at) implements ExploreEvent {
         public Building {
+            open = open == null ? List.of() : List.copyOf(open);
+        }
+    }
+
+    /**
+     * {@code screen}'s clock ran past the screen budget at {@code ms} with {@code open} still to do: the run works the
+     * other open screens first, and comes back to it once none is.
+     */
+    record SetAside(String screen, long ms, List<String> open, long at) implements ExploreEvent {
+        public SetAside {
             open = open == null ? List.of() : List.copyOf(open);
         }
     }

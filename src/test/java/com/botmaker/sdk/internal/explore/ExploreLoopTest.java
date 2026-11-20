@@ -406,6 +406,38 @@ class ExploreLoopTest {
         assertEquals(List.of("A", "B", "D"), built.keySet().stream().sorted().toList());
     }
 
+    /**
+     * A screen with more ways than its budget allows is set aside once its clock runs over: the run walks to the next
+     * open screen, builds it, and finishes the first one after.
+     */
+    @Test
+    void aScreenOverItsBudgetIsLeftForTheNextOne() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        List<String> xs = List.of("x1", "x2", "x3", "x4", "x5", "x6");
+        List<Input> ways = new ArrayList<>();
+        xs.forEach(x -> ways.add(click(x).free()));
+        ways.add(click("b").free());
+        screens.put("A", screen(Setup.named("A").start(), ways.toArray(Input[]::new)));
+        for (String x : xs) screens.put(x.toUpperCase(), screen(Setup.named(x.toUpperCase()).from(ref("A", x))));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b")), click("y").free()));
+        screens.put("Y", screen(Setup.named("Y").from(ref("B", "y"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.takeMs = 25_000;
+
+        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+
+        List<ExploreEvent.SetAside> aside = events(ExploreEvent.SetAside.class);
+        assertEquals(List.of("A"), aside.stream().map(ExploreEvent.SetAside::screen).toList(), aside.toString());
+        assertEquals(125_000, aside.getFirst().ms(), "five presses of 25 s: " + game.taken);
+        int y = game.taken.indexOf("B.y→Y");
+        int x6 = game.taken.indexOf("A.x6→X6");
+        assertTrue(y >= 0 && x6 > y, "B is built before A's last ways: " + game.taken);
+        assertTrue(events(ExploreEvent.Built.class).stream().anyMatch(b -> b.screen().equals("A")),
+                "A is finished after: " + game.taken);
+        assertTrue(JournalView.of(journal()).build().aside().isEmpty(), "built, it is no longer aside");
+    }
+
     /** An element with no shot is open until the run takes its picture off the page. */
     @Test
     void anElementWithNoPictureIsUncropped() {

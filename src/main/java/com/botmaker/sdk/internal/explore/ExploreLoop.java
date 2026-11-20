@@ -140,22 +140,23 @@ public final class ExploreLoop {
     /**
      * How long a stop waits before it is parked, how long with no press is stuck, how many plan rounds with no new
      * screen before a walk to an untried input, one press's time, the whole run's (null: no end), how often a
-     * paused run looks for a command, and the screens it is on before it ends, each counted once (0: no end).
+     * paused run looks for a command, the screens it is on before it ends, each counted once (0: no end), and the
+     * time a screen's own clock may run unbuilt before the run sets it aside for another open one (null: never).
      */
     public record Settings(Duration parkAfter, Duration stuckAfter, int planRoundsWithoutNew, Duration edge,
-                           Duration hours, Duration poll, int maxScreens) {
+                           Duration hours, Duration poll, int maxScreens, Duration screenBudget) {
 
         public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15), 5,
-                Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0);
+                Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0, Duration.ofMinutes(2));
 
         /** These settings with a budget of {@code hours}; null for none. */
         public Settings within(Duration hours) {
-            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, maxScreens);
+            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, maxScreens, screenBudget);
         }
 
         /** These settings ending once the run has been on {@code screens} screens; 0 for no end. */
         public Settings upTo(int screens) {
-            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, screens);
+            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, screens, screenBudget);
         }
     }
 
@@ -343,6 +344,10 @@ public final class ExploreLoop {
     private final Set<String> built = new HashSet<>();
     /** What was open on each screen when the run last said it building. */
     private final Map<String, List<String>> leftOpen = new HashMap<>();
+    /** Screens over their budget unbuilt: the run works another open screen first, and these once none is. */
+    private final Set<String> aside = new HashSet<>();
+    /** The last walk, {@code from→to}, until a press: a set-aside screen a walk came back to does not walk again. */
+    private String lastWalk;
     /** The inputs this run took a picture of ({@code SCREEN.field}), before the map it plays holds them. */
     private final Set<String> pictures = new HashSet<>();
     /** The screen the last round was on, null when on none; since when, epoch ms. */
@@ -626,6 +631,12 @@ public final class ExploreLoop {
         }
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
         if (replay != null && screen.equals(replay.fault().screen())) passed(StopKind.MISSING_FACT, replay.fault().place());
+        if (overBudget(screen)) {
+            // Its own work waits while another screen has some: that one is walked to first.
+            // A walk that came back here does its own work instead of walking again.
+            Optional<String> other = nearest(screen, true);
+            if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
+        }
         Optional<Edge> untried = untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
         if (readsTrees()) {
@@ -651,15 +662,35 @@ public final class ExploreLoop {
             }
         }
         planRounds = 0;
-        Optional<String> nearest = nearest(screen);
-        if (nearest.isPresent()) {
-            lastEdge = null;
-            from = screen;
-            by = Mode.WALK.id();
-            play.goTo(nearest.get());
-            return true;
-        }
+        Optional<String> nearest = nearest(screen, true).or(() -> nearest(screen, false));
+        if (nearest.isPresent()) return walk(screen, nearest.get());
         play.idle(settings.poll());
+        return true;
+    }
+
+    private boolean walk(String screen, String to) {
+        lastWalk = screen + "→" + to;
+        lastEdge = null;
+        from = screen;
+        by = Mode.WALK.id();
+        play.goTo(to);
+        return true;
+    }
+
+    /**
+     * Whether {@code screen} is set aside: unbuilt past {@link Settings#screenBudget} on its own clock. Said once, when
+     * its clock first runs over, with what is still open on it.
+     */
+    private boolean overBudget(String screen) {
+        Duration budget = settings.screenBudget();
+        if (budget == null) return false;
+        if (aside.contains(screen)) return true;
+        long ms = clock.getOrDefault(screen, 0L);
+        if (built.contains(screen) || ms < budget.toMillis()) return false;
+        List<String> open = open(screen);
+        if (open.isEmpty()) return false;
+        aside.add(screen);
+        emit(new ExploreEvent.SetAside(screen, ms, open, nowMs.getAsLong()));
         return true;
     }
 
@@ -730,6 +761,7 @@ public final class ExploreLoop {
         if (resumed != null) passed(StopKind.STUCK, resumed.place());
         if (replay != null) passed(StopKind.STUCK, replay.fault().place());
         lastPress = nowMs.getAsLong();
+        lastWalk = null;
         presses.addLast(what);
         while (presses.size() > Stop.PRESSES) presses.removeFirst();
     }
@@ -844,6 +876,7 @@ public final class ExploreLoop {
             clock.put(b.screen(), b.ms());
             leftOpen.put(b.screen(), b.open());
         }
+        aside.addAll(build.aside());
         // A built screen a stop of the last run is still parked on is open again.
         long now = nowMs.getAsLong();
         for (String screen : List.copyOf(built)) {
@@ -857,6 +890,7 @@ public final class ExploreLoop {
 
     private void built(String screen, long now) {
         built.add(screen);
+        aside.remove(screen);
         emit(new ExploreEvent.Built(screen, clock.getOrDefault(screen, 0L), now));
     }
 
@@ -1175,17 +1209,20 @@ public final class ExploreLoop {
         }
     }
 
-    /** The nearest screen by the map's edges, from {@code screen}, with an edge not tried yet; not itself. */
-    private Optional<String> nearest(String screen) {
+    /**
+     * The nearest screen by the map's edges, from {@code screen}, with an edge not tried yet; not itself, nor, when
+     * {@code notAside}, one set aside.
+     */
+    private Optional<String> nearest(String screen, boolean notAside) {
         Set<String> reached = new LinkedHashSet<>(List.of(screen));
         Deque<String> queue = new ArrayDeque<>(reached);
         while (!queue.isEmpty()) {
             String at = queue.poll();
             for (Edge edge : map.edges()) {
                 if (!edge.from().equals(at) || !reached.add(edge.to())) continue;
-                if (map.edges().stream().anyMatch(e -> e.from().equals(edge.to()) && untriedEdge(e))) {
-                    return Optional.of(edge.to());
-                }
+                String to = edge.to();
+                boolean work = map.edges().stream().anyMatch(e -> e.from().equals(to) && untriedEdge(e));
+                if (work &&!(notAside && aside.contains(to))) return Optional.of(to);
                 queue.add(edge.to());
             }
         }

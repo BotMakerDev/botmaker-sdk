@@ -27,7 +27,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)`), and the Explore tab lists both. A screen is
   open too while a way out of it waits on its condition, while a missing-fact or missing-condition stop on it is
   parked, and, in a run that plays a plan, while an input on it spends a fact with no action of the plan's goals
-  pressing it.
+  pressing it. A screen whose clock runs past its budget unbuilt, 2 minutes (`ExploreLoop.Settings.screenBudget`),
+  is set aside (`set_aside` in the journal, "set aside" in `status`): the run walks to the nearest other open screen
+  and comes back to it once no other is open.
 
 - Dev discovery, for whoever edits the SDK: on a `-SNAPSHOT` SDK, *Keep exploring* holds a **Discover fault** (🛠 in
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never

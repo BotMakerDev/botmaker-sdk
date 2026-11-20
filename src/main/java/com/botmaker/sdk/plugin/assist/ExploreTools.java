@@ -407,14 +407,19 @@ final class ExploreTools {
                 + build(view.build());
     }
 
-    /** How far the map is built, on a line of its own: {@code map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)}. */
+    /**
+     * How far the map is built, on a line of its own: {@code map: 4 built (median 1m40s), 2 open: PRICING 3m12s set
+     * aside (9 untried)}.
+     */
     static String build(JournalView.Build build) {
         if (build.built().isEmpty() && build.open().isEmpty()) return "";
         StringBuilder line = new StringBuilder("\nmap: ").append(build.built().size()).append(" built");
         if (!build.built().isEmpty()) line.append(" (median ").append(JournalView.took(build.median().toMillis())).append(")");
         if (!build.open().isEmpty()) {
             line.append(", ").append(build.open().size()).append(" open: ").append(build.open().stream()
-                    .map(b -> b.screen() + " " + JournalView.took(b.ms()) + " (" + String.join(", ", b.open()) + ")")
+                    .map(b -> b.screen() + " " + JournalView.took(b.ms())
+                            + (build.aside().contains(b.screen()) ? " set aside" : "")
+                            + " (" + String.join(", ", b.open()) + ")")
                     .collect(Collectors.joining("; ")));
         }
         return line.append(".").toString();

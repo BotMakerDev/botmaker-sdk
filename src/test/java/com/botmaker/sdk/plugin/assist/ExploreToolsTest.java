@@ -92,6 +92,9 @@ class ExploreToolsTest {
 
         assertTrue(said.endsWith("\nmap: 1 built (median 1m40s), 1 open: PRICING 3m12s (9 untried, 1 without verdict)."),
                 said);
+
+        journal.append(new ExploreEvent.SetAside("PRICING", 192_000, List.of("9 untried"), 4));
+        assertTrue(text(ExploreTools.status(journal)).endsWith("PRICING 3m12s set aside (9 untried, 1 without verdict)."));
     }
 
     @Test
