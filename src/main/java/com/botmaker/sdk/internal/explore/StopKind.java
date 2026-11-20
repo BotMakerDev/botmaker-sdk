@@ -44,6 +44,12 @@ public enum StopKind {
      * open and where its clock went. A resume gives it a fresh clock; a resume with ignore leaves it as it is.
      */
     LOW_YIELD("low_yield", "Low yield"),
+    /**
+     * What the run settled at a stop that its companion could not write into the bot, or wrote in part (2026-11-20):
+     * it says each line left out and why, and what was settled. Claude writes it with the map tools, or fixes what
+     * refused it, then resumes.
+     */
+    UNWRITTEN("unwritten", "Settled, not written"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

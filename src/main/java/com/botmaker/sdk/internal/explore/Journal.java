@@ -21,8 +21,11 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * A run's explore journal, the files the run and the SDK plugin (the {@code explore} tool, 🗺 Screens' 🔭 Explore) talk
@@ -33,8 +36,9 @@ import java.util.Optional;
  *       skipped on reading, so the journal reads back up to its last whole line.</li>
  *   <li>{@code queue.json}: the parked stops, oldest first, replaced whole.</li>
  *   <li>{@code page.png}: a website run's page as it last looked, replaced whole, for the window to show.</li>
- *   <li>{@code command}: written by the plugin side ({@code resume <stopId>}, {@code stop}); read and deleted by the
- *       run.</li>
+ *   <li>{@code commands.jsonl}: appended by the plugin side, one command a line with its id ({@code resume <stopId>},
+ *       {@code stop}); {@code commands.taken}: appended by the run, the id of each it took, so each is taken once and
+ *       in order.</li>
  *   <li>{@code resume.json}: the run's memory while it holds a Discover fault ({@link ResumeFile}), for the run
  *       restarted on the rebuilt SDK.</li>
  * </ul>
@@ -47,7 +51,8 @@ public final class Journal {
     public static final String EVENTS = "events.jsonl";
     public static final String QUEUE = "queue.json";
     static final String PAGE = "page.png";
-    static final String COMMAND = "command";
+    static final String COMMANDS = "commands.jsonl";
+    static final String TAKEN = "commands.taken";
 
     /** Reads what a newer SDK wrote: a field it added is skipped, a constant it added reads as UNKNOWN, else null. */
     private static final ObjectMapper JSON = new ObjectMapper()
@@ -209,29 +214,66 @@ public final class Journal {
     /** A page {@link #page} wrote, and when, in epoch milliseconds. */
     public record Page(BufferedImage image, long writtenAt) {}
 
-    /** Writes {@code command} for the run to take: the plugin side's half. */
-    public void command(String command) {
-        write(COMMAND, () -> command);
+    /** A command as {@link #COMMANDS} holds it: its id and its text. */
+    record Written(String id, String text) {}
+
+    /**
+     * Appends {@code command} for the run to take: the plugin side's half. Two written before the run takes either are
+     * both taken, in the order written (2026-11-20; a single file let the second replace the first).
+     */
+    public synchronized void command(String command) {
+        try {
+            Files.createDirectories(folder);
+            String line = JSON.writeValueAsString(new Written(UUID.randomUUID().toString(), command)) + "\n";
+            Files.writeString(folder.resolve(COMMANDS), line, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException | RuntimeException unwritten) {
+            // the plugin side's tool says it could not reach the run when the run never answers
+        }
     }
 
     /** Whether a command is written and the run has not taken it yet. */
     public boolean commandWaiting() {
-        return Files.exists(folder.resolve(COMMAND));
+        return !waiting().isEmpty();
     }
 
-    /** The command waiting, read and deleted; empty when there is none, or it does not read. */
-    public Optional<Command> takeCommand() {
-        Path file = folder.resolve(COMMAND);
-        if (!Files.exists(file)) return Optional.empty();
-        // Moved aside before it is read, so a command written meanwhile is a new file, never deleted unread.
-        Path taken = folder.resolve(COMMAND + ".taken");
+    /** The first command waiting, read and marked taken; empty when there is none, or it does not read. */
+    public synchronized Optional<Command> takeCommand() {
+        List<Written> waiting = waiting();
+        if (waiting.isEmpty()) return Optional.empty();
+        Written first = waiting.getFirst();
+        taken(List.of(first.id()));
+        return Command.parse(first.text());
+    }
+
+    /** Marks every command waiting taken, unread: what a run before left is not this run's. */
+    public synchronized void dropCommands() {
+        taken(waiting().stream().map(Written::id).toList());
+    }
+
+    /** The commands written and not taken, oldest first; a line cut by a writer still writing waits for its end. */
+    private List<Written> waiting() {
+        Set<String> taken = new HashSet<>(lines(folder.resolve(TAKEN)));
+        List<Written> waiting = new ArrayList<>();
+        for (String line : lines(folder.resolve(COMMANDS))) {
+            try {
+                Written command = JSON.readValue(line, Written.class);
+                if (command != null && command.id() != null && !taken.contains(command.id())) waiting.add(command);
+            } catch (JsonProcessingException | RuntimeException unread) {
+                // a line still being written
+            }
+        }
+        return waiting;
+    }
+
+    private void taken(List<String> ids) {
+        if (ids.isEmpty()) return;
         try {
-            Files.move(file, taken, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            String said = Files.readString(taken, StandardCharsets.UTF_8);
-            Files.deleteIfExists(taken);
-            return Command.parse(said);
-        } catch (IOException unread) {
-            return Optional.empty();
+            Files.createDirectories(folder);
+            Files.writeString(folder.resolve(TAKEN), String.join("\n", ids) + "\n", StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException unwritten) {
+            // taken again next time: a resume of a stop already resumed is stale and changes nothing
         }
     }
 
