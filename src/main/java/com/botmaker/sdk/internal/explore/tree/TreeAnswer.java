@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.explore.tree;
 
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.shared.emulator.tree.Trait;
@@ -17,8 +18,10 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import javax.lang.model.SourceVersion;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -39,6 +42,7 @@ import java.util.function.Supplier;
         @JsonSubTypes.Type(value = TreeAnswer.NewWay.class, name = "new_way"),
         @JsonSubTypes.Type(value = TreeAnswer.InputNote.class, name = "input_note"),
         @JsonSubTypes.Type(value = TreeAnswer.InputRule.class, name = "input_rule"),
+        @JsonSubTypes.Type(value = TreeAnswer.SameInput.class, name = "same_input"),
         @JsonSubTypes.Type(value = TreeAnswer.NewTarget.class, name = "new_target")})
 public sealed interface TreeAnswer {
 
@@ -86,6 +90,12 @@ public sealed interface TreeAnswer {
 
     /** A note on {@code field} of {@code screen}: what pressing it does, when that is no way. */
     record InputNote(String screen, String field, String note) implements TreeAnswer {}
+
+    /**
+     * {@code field} of {@code screen} is the control {@code kept} is, nested in or around it with its name: an older
+     * read made both inputs (a menu's button and its link). {@code field} goes; {@code kept} stays.
+     */
+    record SameInput(String screen, String field, String kept) implements TreeAnswer {}
 
     /**
      * A form's rule (web discovery phase 7): {@code field} of {@code screen} is enabled when every one of
@@ -323,6 +333,54 @@ public sealed interface TreeAnswer {
         } catch (ClassNotFoundException e) {
             return false;
         }
+    }
+
+    /**
+     * The inputs of {@code screen} that are another's control, as {@link Locator#inputs} now folds them: each of
+     * {@code elements} (its inputs' elements, by field) found alone in {@code tree}, nested in or around another's node
+     * of its name. The one {@link Locator#inputs} folds goes, unless only it is {@code referenced} (a way or the way
+     * back names it): then the other goes. A pair whose fields are both referenced is left as it is.
+     */
+    public static List<SameInput> sameInputs(String screen, UiTree tree, Map<String, Element> elements,
+                                             Set<String> referenced) {
+        ElementMatch.Matcher matcher = ElementMatch.in(tree);
+        Map<String, UiNode> nodes = new LinkedHashMap<>();
+        elements.forEach((field, element) -> {
+            List<UiNode> hits = matcher.matches(element);
+            if (hits.size() == 1 && Locator.acted(hits.getFirst())) nodes.put(field, hits.getFirst());
+        });
+        List<SameInput> same = new ArrayList<>();
+        Set<String> gone = new HashSet<>();
+        for (Map.Entry<String, UiNode> one : nodes.entrySet()) {
+            for (Map.Entry<String, UiNode> other : nodes.entrySet()) {
+                String a = one.getKey();
+                String b = other.getKey();
+                if (a.equals(b) || gone.contains(a) || gone.contains(b) || !Locator.folded(one.getValue(), matcher)
+                        || !nested(one.getValue(), other.getValue(), matcher)) {
+                    continue;
+                }
+                boolean aNamed = referenced.contains(a);
+                boolean bNamed = referenced.contains(b);
+                if (aNamed && bNamed) continue;
+                String drop = aNamed ? b : a;
+                gone.add(drop);
+                same.add(new SameInput(screen, drop, drop.equals(a) ? b : a));
+            }
+        }
+        return List.copyOf(same);
+    }
+
+    /** Whether {@code one} and {@code other} are one control: either inside the other, both of one name. */
+    private static boolean nested(UiNode one, UiNode other, ElementMatch.Matcher matcher) {
+        if (one == other || !one.label().strip().equalsIgnoreCase(other.label().strip())) return false;
+        return inside(one, other, matcher) || inside(other, one, matcher);
+    }
+
+    private static boolean inside(UiNode node, UiNode outer, ElementMatch.Matcher matcher) {
+        for (UiNode up = matcher.parentOf(node); up != null; up = matcher.parentOf(up)) {
+            if (up == outer) return true;
+        }
+        return false;
     }
 
     /** {@code name}, or with the first number from 2 that makes it none of {@code taken}. */

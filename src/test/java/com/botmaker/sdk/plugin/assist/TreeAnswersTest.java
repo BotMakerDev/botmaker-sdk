@@ -142,6 +142,24 @@ class TreeAnswersTest {
                 changed(graph, planned, "A").setup().notes());
     }
 
+    /** An input an older read made twice goes with its note; the one kept stays as it was. */
+    @Test
+    void anInputMadeTwiceGoesWithItsNote() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("home", Button.of(new Locator(Role.LINK, "Home", null, null, null).element()).free());
+        inputs.put("home2", Button.of(new Locator(Role.BUTTON, "Home", null, null, null).element()).free().tried());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("CASE", new MapScreen(Setup.named("Case").route("/case").from(BotConstants.input("A", "open"))
+                .notes("home2: Does nothing a visitor sees"), inputs));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.SameInput("CASE", "home2", "home")),
+                Map.of());
+
+        MapScreen kase = changed(graph, planned, "CASE");
+        assertEquals(List.of("home"), List.copyOf(kase.inputs().keySet()));
+        assertEquals(null, kase.setup().notes(), "its note gone with it");
+    }
+
     /** A link that became the way back drops its old note too, so no run presses it again for it. */
     @Test
     void aWayBackDropsTheInputsNote() {

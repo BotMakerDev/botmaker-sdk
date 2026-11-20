@@ -3,7 +3,9 @@
 
 package com.botmaker.sdk.internal.explore.tree;
 
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Role;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
@@ -12,7 +14,9 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.Rectangle;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -58,6 +62,27 @@ class TreeAnswerTest {
         assertEquals(List.of("link \"Pricing\"", "link \"Company\"", "button \"Menu\" [1]", "button \"Help\"",
                         "link \"Docs\""),
                 Locator.inputs(page).stream().map(l -> l.locator().line()).toList());
+    }
+
+    @Test
+    void anOlderMapsTwoInputsOfOneControlKeepTheLinkUnlessOnlyTheOtherLeadsSomewhere() {
+        UiTree page = page(
+                web("navigation", "", Set.of(),
+                        web("button", "Pricing", PRESSABLE, web("link", "Pricing", PRESSABLE)),
+                        web("button", "Home", PRESSABLE, web("link", "Home", PRESSABLE)),
+                        web("link", "Docs", PRESSABLE)));
+        Map<String, Element> elements = new LinkedHashMap<>();
+        elements.put("pricing", Element.byRole(Role.BUTTON, Words.of("Pricing")));
+        elements.put("pricing2", Element.byRole(Role.LINK, Words.of("Pricing")));
+        elements.put("home", Element.byRole(Role.LINK, Words.of("Home")));
+        elements.put("home2", Element.byRole(Role.BUTTON, Words.of("Home")));
+        elements.put("docs", Element.byRole(Role.LINK, Words.of("Docs")));
+
+        assertEquals(List.of(new TreeAnswer.SameInput("Nav", "pricing", "pricing2"),
+                        new TreeAnswer.SameInput("Nav", "home", "home2")),
+                TreeAnswer.sameInputs("Nav", page, elements, Set.of("home2")));
+        assertEquals(List.of(), TreeAnswer.sameInputs("Nav", page, elements, Set.of("pricing", "pricing2", "home",
+                "home2")));
     }
 
     @Test

@@ -162,6 +162,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   no longer a change noted on the input: a dialog's Close now leads somewhere on the map.
 - An input made of an element (`Button.of(Elements.CLOSE)`) shows the element's shot, `elements/close.png`, on the
   map's cards and side panel instead of an empty thumb.
+- Keep exploring merges the inputs an older read made twice for one control (`home` and `home2`, a menu's button and
+  its link): on its first visit of a known website screen it drops the one the read now folds, or the other when only
+  the folded one leads somewhere (`TreeAnswer.SameInput`).
+- A website's screen, which has no marker picture, shows its shot as its thumb on its card and in the side panel's
+  head instead of a `?`.
 - Keep exploring on a website walks back to a screen whose only work left is an input it presses itself (a button
   that opens a dialog). It counted only ways not yet tried, so with none left it idled until it stopped as stuck.
 - Keep exploring on a website loads the page again after a press that left a list or menu open on it (a select's

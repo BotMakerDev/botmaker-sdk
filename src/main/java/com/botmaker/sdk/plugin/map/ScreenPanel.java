@@ -567,7 +567,7 @@ final class ScreenPanel {
         VBox titles = new VBox(3, name, path, constant);
         titles.setMinWidth(0);
         HBox.setHgrow(titles, Priority.ALWAYS);
-        HBox head = new HBox(12, canvas.thumb(card.marker(), HEAD_THUMB, "screen-card-thumb"), titles);
+        HBox head = new HBox(12, canvas.screenThumb(card, HEAD_THUMB, "screen-card-thumb"), titles);
         head.setAlignment(Pos.CENTER_LEFT);
 
         FlowPane pills = ScreenCanvas.pills(card);

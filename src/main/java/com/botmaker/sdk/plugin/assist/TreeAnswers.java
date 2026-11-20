@@ -219,6 +219,15 @@ final class TreeAnswers {
                     }
                     changes.add(new Change(constant.get(), s -> noted(s, note)));
                 }
+                case TreeAnswer.SameInput same -> {
+                    Optional<String> constant = constantOf(graph, newConstants, same.screen());
+                    if (constant.isEmpty()) {
+                        skipped.add(same.field() + ": no screen " + same.screen() + " in the map.");
+                        continue;
+                    }
+                    changes.add(new Change(constant.get(), s -> s.input(same.field()).isEmpty() ? s
+                            : withoutNote(s, same.field()).withoutInput(same.field())));
+                }
                 case TreeAnswer.InputRule rule -> {
                     Optional<String> constant = constantOf(graph, newConstants, rule.screen());
                     if (constant.isEmpty()) {

@@ -539,7 +539,7 @@ final class ScreenCanvas {
         middle.setMinWidth(0);
         HBox.setHgrow(middle, Priority.ALWAYS);
 
-        HBox body = new HBox(10, thumb(card.marker(), THUMB, "screen-card-thumb"), middle, ring(card));
+        HBox body = new HBox(10, screenThumb(card, THUMB, "screen-card-thumb"), middle, ring(card));
         body.setAlignment(Pos.CENTER_LEFT);
         body.setPadding(new Insets(8, 10, 9, 8));
 
@@ -652,6 +652,28 @@ final class ScreenCanvas {
             none.getStyleClass().add("screen-thumb-none");
             box.getChildren().add(none);
         }
+        return box;
+    }
+
+    /**
+     * The screen's own thumb: its marker, else its shot, which a screen told by its page and parts (a website's) has
+     * instead of a marker; the {@link #thumb} placeholder when it has neither.
+     */
+    Node screenThumb(Card card, double size, String style) {
+        if (card.marker() != null) return thumb(card.marker(), size, style);
+        Optional<Image> shot = image(card.constant(), size, false);
+        if (shot.isEmpty()) return thumb(null, size, style);
+        StackPane box = new StackPane();
+        box.getStyleClass().add(style);
+        box.setMinSize(size, size);
+        box.setPrefSize(size, size);
+        box.setMaxSize(size, size);
+        ImageView view = new ImageView(shot.get());
+        view.setPreserveRatio(true);
+        view.setFitWidth(size - 4);
+        view.setFitHeight(size - 4);
+        view.setSmooth(true);
+        box.getChildren().add(view);
         return box;
     }
 

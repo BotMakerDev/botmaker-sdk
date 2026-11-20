@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Do;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
@@ -671,6 +672,7 @@ public final class ExploreLoop {
             // Once per screen the map holds: its inputs name the fields the tries found.
             if (!probed.contains(screen) && map.screen(screen).isPresent()) {
                 probed.add(screen);
+                notes.addAll(sameInputs(screen));
                 notes.addAll(rules(screen));
             }
             Optional<String> input = untriedInput(screen);
@@ -1113,9 +1115,34 @@ public final class ExploreLoop {
         if (notes.stream().anyMatch(TreeAnswer.InputRule.class::isInstance)) {
             return "what " + screen + "'s forms showed when tried, never submitted";
         }
+        if (notes.stream().allMatch(TreeAnswer.SameInput.class::isInstance)) {
+            return "inputs of " + screen + " an older read made twice, one control and its holder";
+        }
         return notes.stream().allMatch(TreeAnswer.InputNote.class::isInstance)
                 ? "what pressing " + notes.size() + " inputs did, read off the page"
                 : "what the run settled before it met this screen";
+    }
+
+    /**
+     * The inputs of {@code screen} an older read made twice, a control and another of its name around it, as answers
+     * handed on with the next settled stop: the map keeps one ({@link TreeAnswer#sameInputs}).
+     */
+    private List<TreeAnswer.SameInput> sameInputs(String screen) {
+        MapScreen on = map.screen(screen).orElseThrow();
+        UiTree tree = play.state().map(Effect.State::tree).orElse(null);
+        if (tree == null) return List.of();
+        Map<String, Element> elements = new LinkedHashMap<>();
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            if (input.getValue() instanceof Button button && button.element() != null) {
+                elements.put(input.getKey(), button.element());
+            }
+        }
+        Set<String> referenced = new HashSet<>();
+        for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) referenced.add(edge.input());
+        List<TreeAnswer.SameInput> same = TreeAnswer.sameInputs(screen, tree, elements, referenced);
+        // Gone from what this run presses too, before the notes are written.
+        same.forEach(s -> tried.add(screen + "." + s.field()));
+        return same;
     }
 
     /**
