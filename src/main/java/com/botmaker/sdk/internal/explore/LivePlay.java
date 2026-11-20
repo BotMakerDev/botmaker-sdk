@@ -316,6 +316,15 @@ public final class LivePlay implements ExploreLoop.Play {
         return moves.press(screen, field, withinMs);
     }
 
+    /** A website loads the address it is at again; an app has none. */
+    @Override
+    public boolean reopen() {
+        return WebSource.of(Source.current()).map(web -> {
+            web.path().ifPresent(web::openPath);
+            return web.path().isPresent();
+        }).orElse(false);
+    }
+
     /** A website's forms, tried through its guard; an app's none. */
     @Override
     public List<FormProbe.Result> forms() {

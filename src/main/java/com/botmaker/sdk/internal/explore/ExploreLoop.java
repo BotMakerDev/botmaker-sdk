@@ -230,6 +230,14 @@ public final class ExploreLoop {
         }
 
         /**
+         * Brings the page back as it loads, after a press left something open on it (a list, a menu) that would
+         * catch the next press: a website loads its address again. False for a game, which has no address.
+         */
+        default boolean reopen() {
+            return false;
+        }
+
+        /**
          * The part of the page inside {@code box}, a tree's box, rendered and saved in the run's folder as
          * {@code name}: the file, so the input gets a picture in 🗺 Screens. Empty for a game with no renderer.
          */
@@ -849,6 +857,9 @@ public final class ExploreLoop {
             return settleUnknown(after, new InputName(screen, field)) != Paused.END;
         }
         notes.add(new TreeAnswer.InputNote(screen, field, effect.line()));
+        // A list or menu left open catches every press after it (a select's list holds the page): the page is
+        // loaded again so the next input is pressed on the page as it was.
+        if (effect instanceof Effect.Changes) play.reopen();
         return true;
     }
 

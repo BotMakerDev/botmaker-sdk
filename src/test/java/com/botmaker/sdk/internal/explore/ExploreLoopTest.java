@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +98,22 @@ class ExploreLoopTest {
         @Override
         public Optional<String> press(String screen, String field, long withinMs) {
             pressed.add(screen + "." + field);
+            Effect.State left = afterPress.get(field);
+            if (left != null) state = left;
             return Optional.ofNullable(at);
+        }
+
+        /** The tree a press of a field leaves; a field not here leaves the tree as it was. */
+        final Map<String, Effect.State> afterPress = new HashMap<>();
+        /** The tree the page loads with again; null: reopening is not offered, as for a game. */
+        Effect.State loads;
+
+        @Override
+        public boolean reopen() {
+            if (loads == null) return false;
+            pressed.add("reopen");
+            state = loads;
+            return true;
         }
 
         /** What {@link #look} throws; null: it looks. */
@@ -328,6 +344,28 @@ class ExploreLoopTest {
         assertEquals(List.of(new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees")),
                 settled.answers());
         assertEquals(StopKind.SETTLED, stops().getFirst().stop().kind());
+    }
+
+    /** A press that leaves a list open on the page has the page loaded again, so the next press is not caught by it. */
+    @Test
+    void aListLeftOpenIsClosedBeforeTheNextPress() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("plan", Button.of(new Locator(Role.BUTTON, "Plan", null, null, null).element()).free());
+        inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        UiNode plan = web("button", "Plan", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE));
+        UiNode docs = web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE));
+        game.loads = Effect.State.of(page(plan, docs), "/");
+        game.state = game.loads;
+        game.afterPress.put("plan", Effect.State.of(page(plan, docs,
+                web("option", "20,000 credits", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/"));
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of("A.plan", "reopen", "A.docs"), game.pressed);
     }
 
     @Test

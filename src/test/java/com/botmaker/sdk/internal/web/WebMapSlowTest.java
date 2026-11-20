@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -128,6 +129,19 @@ class WebMapSlowTest {
         assertEquals(List.of(), stops, "the run was never stopped");
     }
 
+    /** A link far below the fold, as a site's footer holds, is pressed as one on view is: its page is reached. */
+    @Test
+    void aLinkBelowTheFoldIsPressed() {
+        web.openPath("/case-studies");
+        ScreenGraph map = map();
+        LiveMoves moves = new LiveMoves(map, new RunReach(), web::open);
+
+        Optional<String> at = moves.press("CASES", "footer", 20_000);
+
+        assertEquals("/", web.path().orElseThrow(), "the footer's link was followed");
+        assertEquals(Optional.of("HOME"), at);
+    }
+
     /** The middle of the node the tree names {@code label}. */
     private static Point centre(String label) {
         UiNode node = web.tree().orElseThrow().all().stream().filter(n -> n.label().equals(label)).findFirst()
@@ -143,7 +157,7 @@ class WebMapSlowTest {
                 "cases", link("Case studies"), "details", button("Open details"))));
         screens.put("CASES", screen(Setup.named("Case studies").route("/case-studies")
                         .from(BotConstants.input("HOME", "cases")).back(BotConstants.input("CASES", "home")),
-                Map.of("alpha", link("Alpha"), "home", link("Home"))));
+                Map.of("alpha", link("Alpha"), "home", link("Home"), "footer", link("Back home"))));
         screens.put("CASE", screen(Setup.named("Case study").route("/case-studies/{slug}")
                         .examples(List.of("/case-studies/alpha")).from(BotConstants.input("CASES", "alpha"))
                         .back(BotConstants.input("CASE", "up")),
@@ -179,7 +193,8 @@ class WebMapSlowTest {
                         + "<button onclick=\"document.getElementById('d').hidden=true\">Close</button></div>"
                         + "</main></body></html>",
                 "/case-studies", head + "<h1>Case studies</h1><a href=/case-studies/alpha>Alpha</a> "
-                        + "<a href=/case-studies/beta>Beta</a> <a href=/>Home</a></body></html>",
+                        + "<a href=/case-studies/beta>Beta</a> <a href=/>Home</a>"
+                        + "<div style='height:3000px'></div><footer><a href=/>Back home</a></footer></body></html>",
                 "/case-studies/alpha", head + "<h1>Alpha</h1><a href=/case-studies>All case studies</a></body></html>",
                 "/case-studies/beta", head + "<h1>Beta</h1><a href=/case-studies>All case studies</a></body></html>");
     }
