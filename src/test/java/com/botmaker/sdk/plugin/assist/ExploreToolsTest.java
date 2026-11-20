@@ -80,6 +80,20 @@ class ExploreToolsTest {
         run.start();
     }
 
+    /** status says how far the map is built: built screens with their median, open ones with their clock and list. */
+    @Test
+    void statusSaysTheMapBuild() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(false, 1));
+        journal.append(new ExploreEvent.Built("HOME", 100_000, 2));
+        journal.append(new ExploreEvent.Building("PRICING", 192_000, List.of("9 untried", "1 without verdict"), 3));
+
+        String said = text(ExploreTools.status(journal));
+
+        assertTrue(said.endsWith("\nmap: 1 built (median 1m40s), 1 open: PRICING 3m12s (9 untried, 1 without verdict)."),
+                said);
+    }
+
     @Test
     void waitAnswersTheOpenStop() {
         Journal journal = journal();

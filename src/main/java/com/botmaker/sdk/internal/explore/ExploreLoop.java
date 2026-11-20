@@ -328,6 +328,17 @@ public final class ExploreLoop {
     /** What presses of inputs that are no way did, not yet handed on: they go with the next settled stop. */
     private final List<TreeAnswer> notes = new ArrayList<>();
     private int settledNotes;
+    /** Each screen's own clock, in ms: the time the run spent on it, charged at each round. */
+    private final Map<String, Long> clock = new HashMap<>();
+    /** The screens nothing is open about any more, said once each. */
+    private final Set<String> built = new HashSet<>();
+    /** What was open on each screen when the run last said it building. */
+    private final Map<String, List<String>> leftOpen = new HashMap<>();
+    /** The inputs this run took a picture of ({@code SCREEN.field}), before the map it plays holds them. */
+    private final Set<String> pictures = new HashSet<>();
+    /** The screen the last round was on, null when on none; since when, epoch ms. */
+    private String onScreen;
+    private long onSince;
     /** The screens whose forms were tried: once each. */
     private final Set<String> probed = new HashSet<>();
     /** What the run settled at each stop, by its id: the evidence when the plugin side's write of it falls short. */
@@ -394,6 +405,7 @@ public final class ExploreLoop {
             if (replay != null) {
                 emit(new ExploreEvent.Restarted(replay.fault().id(), dev, began));
                 restore();
+                restoreClocks();
             } else {
                 emit(new ExploreEvent.Began(dev, began));
             }
@@ -569,6 +581,7 @@ public final class ExploreLoop {
         Optional<String> where = play.where();
         // A page the tree reads is added by the run itself; a frame alone is Claude's to cut.
         Optional<Effect.State> unknown = where.isEmpty() && readsTrees() ? play.state() : Optional.empty();
+        if (where.isEmpty()) clock(null);
         if (unknown.isPresent()) return settleUnknown(unknown.get(), null) != Paused.END;
         if (where.isEmpty()) {
             String place = lastEdge == null ? "unknown" : lastEdge;
@@ -591,6 +604,8 @@ public final class ExploreLoop {
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
             if (website()) pictured(screen);
         }
+        // After the screen is said found and pictured: one with nothing to do is built once it is reached.
+        clock(screen);
         Look look = play.look(screen);
         // A website's numbers are its content (a price, a count of devices), never a game's state to keep.
         Optional<Stop.Text> value = website() ? Optional.empty() : missingFact(screen, look);
@@ -748,6 +763,7 @@ public final class ExploreLoop {
             String field = input.getKey();
             play.picture(screen + "." + field, found.getFirst().bounds()).ifPresent(file -> inputs.put(field, file));
         }
+        inputs.keySet().forEach(field -> pictures.add(screen + "." + field));
         String frame = on.setup().shot() == null ? play.keep("shot-" + screen) : "";
         if (!frame.isEmpty() || !inputs.isEmpty()) {
             emit(new ExploreEvent.Pictured(screen, frame, inputs, nowMs.getAsLong()));
@@ -760,8 +776,14 @@ public final class ExploreLoop {
      * note says fails is pressed again, once a run: what failed may have been the page's, or an older run's judging.
      */
     private Optional<String> untriedInput(String screen) {
+        return untriedInputs(screen).stream().findFirst();
+    }
+
+    /** Every input {@link #untriedInput} would press on {@code screen}, in the screen's order. */
+    private List<String> untriedInputs(String screen) {
         MapScreen on = map.screen(screen).orElse(null);
-        if (on == null) return Optional.empty();
+        if (on == null) return List.of();
+        List<String> untried = new ArrayList<>();
         Set<String> ways = new HashSet<>();
         for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
         String notes = on.setup().notes() == null ? "" : "\n" + on.setup().notes();
@@ -772,9 +794,81 @@ public final class ExploreLoop {
             if (!(button.verdict() instanceof Verdict.Free) || button.isTried() && !failed || button.isInfo()) continue;
             String key = screen + "." + field;
             if (ways.contains(field) || tried.contains(key) || avoided(key)) continue;
-            return Optional.of(field);
+            untried.add(field);
         }
-        return Optional.empty();
+        return untried;
+    }
+
+    /**
+     * Charges the time since the last round to the screen it was on, and moves the run's clock to {@code screen}
+     * (null: on no screen of the map). A screen the run leaves is said built, or building with what is still open on
+     * it; a screen it reaches with nothing open is said built at once.
+     */
+    private void clock(String screen) {
+        long now = nowMs.getAsLong();
+        if (onScreen != null) {
+            clock.merge(onScreen, Math.max(0, now - onSince), Long::sum);
+            if (!onScreen.equals(screen) && !built.contains(onScreen)) {
+                List<String> open = open(onScreen);
+                if (open.isEmpty()) {
+                    built(onScreen, now);
+                } else if (!open.equals(leftOpen.put(onScreen, open))) {
+                    // Said when what is open changed: a hub passed through again and again says it once.
+                    emit(new ExploreEvent.Building(onScreen, clock.get(onScreen), open, now));
+                }
+            }
+        }
+        onScreen = screen;
+        onSince = now;
+        if (screen != null && !built.contains(screen) && open(screen).isEmpty()) built(screen, now);
+    }
+
+    /** A restarted run's clocks go on where the journal left them: its built screens stay built. */
+    private void restoreClocks() {
+        JournalView.Build build = JournalView.of(journal).build();
+        for (ExploreEvent.Built b : build.built()) {
+            built.add(b.screen());
+            clock.put(b.screen(), b.ms());
+        }
+        for (ExploreEvent.Building b : build.open()) {
+            clock.put(b.screen(), b.ms());
+            leftOpen.put(b.screen(), b.open());
+        }
+    }
+
+    private void built(String screen, long now) {
+        built.add(screen);
+        emit(new ExploreEvent.Built(screen, clock.getOrDefault(screen, 0L), now));
+    }
+
+    /**
+     * What is still to do on {@code screen} before it is built, one line a kind ({@code "3 untried"}): inputs with no
+     * picture, ways and inputs not tried yet, inputs with no verdict. Empty when nothing is.
+     */
+    List<String> open(String screen) {
+        MapScreen on = map.screen(screen).orElse(null);
+        if (on == null) return List.of();
+        int uncropped = 0;
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            // An app's element is found by its tree alone, and only a website's is pictured by the run: an app's is
+            // not held open for a shot nothing takes.
+            if (input.getValue() instanceof Button button && !cropped(button, website())
+                    && !pictures.contains(screen + "." + input.getKey())) uncropped++;
+        }
+        long untried = map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).count()
+                + (readsTrees() ? untriedInputs(screen).size() : 0);
+        long unjudged = map.untagged().stream().filter(name -> name.screen().equals(screen)).count();
+        List<String> open = new ArrayList<>();
+        if (uncropped > 0) open.add(uncropped + " uncropped");
+        if (untried > 0) open.add(untried + " untried");
+        if (unjudged > 0) open.add(unjudged + " without verdict");
+        return open;
+    }
+
+    /** Whether {@code button} has a picture the run can find it by: its own, its element's shot, or another's it sits beside. */
+    private static boolean cropped(Button button, boolean website) {
+        if (button.element() != null) return !website || button.element().shot() != null;
+        return button.picture() != null || !button.cycle().isEmpty() || button.beside() != null;
     }
 
     /** What the notes handed on with {@code screen}'s settled stop are: its forms' tries, presses, or earlier answers. */

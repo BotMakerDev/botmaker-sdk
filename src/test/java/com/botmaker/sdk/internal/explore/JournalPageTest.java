@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,29 @@ class JournalPageTest {
 
         journal.forgetPage();
         assertTrue(journal.lastPage(0).isEmpty(), "a run's start forgets the last run's page");
+    }
+
+    /**
+     * The map's build: a screen built after it was left open counts as built only; the open ones are each as last
+     * left, longest clock first; the median is over the built.
+     */
+    @Test
+    void theBuildSaysBuiltAndOpenScreens(@TempDir Path dir) {
+        Journal journal = new Journal(dir.resolve("explore"));
+        journal.append(new ExploreEvent.Began(false, 1));
+        journal.append(new ExploreEvent.Building("A", 20_000, List.of("1 untried"), 2));
+        journal.append(new ExploreEvent.Built("B", 0, 3));
+        journal.append(new ExploreEvent.Built("A", 40_000, 4));
+        journal.append(new ExploreEvent.Building("C", 30_000, List.of("9 untried"), 5));
+        journal.append(new ExploreEvent.Building("E", 90_000, List.of("2 uncropped"), 6));
+        journal.append(new ExploreEvent.Building("C", 60_000, List.of("4 untried"), 7));
+
+        JournalView.Build build = JournalView.of(journal).build();
+
+        assertEquals(List.of("B", "A"), build.built().stream().map(ExploreEvent.Built::screen).toList());
+        assertEquals(Duration.ofSeconds(20), build.median());
+        assertEquals(List.of("E", "C"), build.open().stream().map(ExploreEvent.Building::screen).toList());
+        assertEquals(List.of("4 untried"), build.open().get(1).open());
     }
 
     /** A run restarted on the rebuilt SDK is the same run: its history before stays, and its earlier end is no end. */

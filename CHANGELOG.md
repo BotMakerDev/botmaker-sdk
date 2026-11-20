@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Keep exploring times each screen on its own clock, the time the run spent on it, and says it built once every
+  element has its picture and every way and input is tried and has a verdict, or what is still open when it leaves it
+  (`built` and `building` in the journal). The explore tool's `status` and `wait` end with how far the map is built
+  (`map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)`), and the Explore tab lists both.
+
 - Dev discovery, for whoever edits the SDK: on a `-SNAPSHOT` SDK, *Keep exploring* holds a **Discover fault** (🛠 in
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never
   parked. Claude calls an open stop one with `explore fault`; `resume` on a fault is refused, `resume ignore` drops

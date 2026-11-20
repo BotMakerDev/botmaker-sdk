@@ -35,6 +35,8 @@ public sealed interface ExploreEvent {
             case Pictured ignored -> "pictured";
             case Faulted ignored -> "faulted";
             case Restarted ignored -> "restarted";
+            case Built ignored -> "built";
+            case Building ignored -> "building";
         };
     }
 
@@ -56,6 +58,8 @@ public sealed interface ExploreEvent {
             case "pictured" -> Pictured.class;
             case "faulted" -> Faulted.class;
             case "restarted" -> Restarted.class;
+            case "built" -> Built.class;
+            case "building" -> Building.class;
             default -> null;
         };
     }
@@ -100,6 +104,21 @@ public sealed interface ExploreEvent {
 
     /** A screen this run reached for the first time, from {@code from} by {@code by} (both null at the start). */
     record NewScreen(String screen, String from, String by, long at) implements ExploreEvent {}
+
+    /**
+     * Nothing about {@code screen} is open any more: every element has its picture, every input is tried and has its
+     * verdict. {@code ms} is the screen's own clock: the time the run spent on it since it first reached it.
+     */
+    record Built(String screen, long ms, long at) implements ExploreEvent {}
+
+    /**
+     * The run left {@code screen} with {@code open} still to do on it ({@code "3 untried"}), {@code ms} on its clock.
+     */
+    record Building(String screen, long ms, List<String> open, long at) implements ExploreEvent {
+        public Building {
+            open = open == null ? List.of() : List.copyOf(open);
+        }
+    }
 
     /**
      * A press: on {@code screen}, by {@code by}, chosen in {@code mode}, arrived as {@code arrival} (null when a newer

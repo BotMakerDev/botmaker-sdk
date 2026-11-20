@@ -6,7 +6,10 @@ package com.botmaker.sdk.internal.explore;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 
 import java.time.Duration;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -267,5 +270,52 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     /** How many of the latest run's events are {@code type}. */
     public long count(Class<? extends ExploreEvent> type) {
         return events.stream().filter(type::isInstance).count();
+    }
+
+    /**
+     * How far the latest run built the map: each screen built with its clock, and each screen it left open, as it
+     * last left it, longest clock first.
+     */
+    public record Build(List<ExploreEvent.Built> built, List<ExploreEvent.Building> open) {
+
+        public Build {
+            built = List.copyOf(built);
+            open = List.copyOf(open);
+        }
+
+        /** The median time a built screen took; zero when none is. */
+        public Duration median() {
+            if (built.isEmpty()) return Duration.ZERO;
+            long[] ms = built.stream().mapToLong(ExploreEvent.Built::ms).sorted().toArray();
+            return Duration.ofMillis(ms.length % 2 == 1 ? ms[ms.length / 2]
+                    : (ms[ms.length / 2 - 1] + ms[ms.length / 2]) / 2);
+        }
+    }
+
+    /** A screen's clock said short: {@code 1m40s}, {@code 2m}, or {@code 40s} under a minute. */
+    public static String took(long ms) {
+        long s = ms / 1000;
+        return s < 60 ? s + "s" : s / 60 + "m" + (s % 60 == 0 ? "" : s % 60 + "s");
+    }
+
+    /** The latest run's {@link Build}. */
+    public Build build() {
+        Map<String, ExploreEvent.Built> built = new LinkedHashMap<>();
+        Map<String, ExploreEvent.Building> open = new LinkedHashMap<>();
+        for (ExploreEvent event : events) {
+            switch (event) {
+                case ExploreEvent.Built b -> {
+                    // The first says it: a restarted run that says it again starts no clock over.
+                    built.putIfAbsent(b.screen(), b);
+                    open.remove(b.screen());
+                }
+                case ExploreEvent.Building b -> {
+                    if (!built.containsKey(b.screen())) open.put(b.screen(), b);
+                }
+                default -> {}
+            }
+        }
+        return new Build(List.copyOf(built.values()), open.values().stream()
+                .sorted(Comparator.comparingLong(ExploreEvent.Building::ms).reversed()).toList());
     }
 }

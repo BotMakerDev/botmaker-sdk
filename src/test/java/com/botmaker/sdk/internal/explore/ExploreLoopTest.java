@@ -71,6 +71,8 @@ class ExploreLoopTest {
         final List<String> taken = new ArrayList<>();
         /** The screen's tree, null for a game with none. */
         Effect.State state;
+        /** How long taking a way takes. */
+        long takeMs;
         final List<String> pressed = new ArrayList<>();
         /** Whether the run plays on a -SNAPSHOT SDK, so faults are raised and held. */
         boolean dev;
@@ -173,6 +175,7 @@ class ExploreLoopTest {
         @Override
         public Took take(Edge edge, long withinMs) {
             taken.add(ExploreLoop.key(edge));
+            nowMs += takeMs;
             Took took = arrival.apply(edge);
             at = took.at();
             return took;
@@ -366,6 +369,43 @@ class ExploreLoopTest {
         loop(map, game, same(map), Duration.ofMinutes(12)).run();
 
         assertEquals(List.of("A.plan", "reopen", "A.docs"), game.pressed);
+    }
+
+    /**
+     * A screen is built once its ways are all tried, on its own clock: the time the run was on it, not the time it
+     * spent elsewhere between. Left with a way untried, it is building, with what is open.
+     */
+    @Test
+    void aScreenIsBuiltOnItsOwnClock() {
+        Game game = new Game();
+        game.takeMs = 20_000;
+
+        loop(map(), game, same(map()), Duration.ofMinutes(5)).run();
+
+        List<ExploreEvent.Building> building = events(ExploreEvent.Building.class);
+        assertEquals("A", building.getFirst().screen());
+        assertEquals(20_000, building.getFirst().ms());
+        assertEquals(List.of("1 untried"), building.getFirst().open());
+        Map<String, Long> built = new LinkedHashMap<>();
+        events(ExploreEvent.Built.class).forEach(b -> built.put(b.screen(), b.ms()));
+        assertEquals(40_000L, built.get("A"), built.toString());
+        assertEquals(20_000L, built.get("B"), "its way back is its one press");
+        assertEquals(List.of("A", "B", "D"), built.keySet().stream().sorted().toList());
+    }
+
+    /** An element with no shot is open until the run takes its picture off the page. */
+    @Test
+    void anElementWithNoPictureIsUncropped() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        ExploreLoop loop = loop(map, game, same(map), Duration.ofMinutes(1));
+
+        assertEquals(List.of("1 uncropped", "1 untried"), loop.open("A"));
     }
 
     @Test

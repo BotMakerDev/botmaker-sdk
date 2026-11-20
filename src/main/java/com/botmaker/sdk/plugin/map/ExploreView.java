@@ -454,6 +454,9 @@ final class ExploreView {
                     + (e.guard() == null ? "" : " by " + e.guard().name().toLowerCase().replace('_', ' '))
                     + (e.why() == null || e.why().isBlank() ? "" : ": " + e.why());
             case ExploreEvent.GoalMet e -> "🎯 " + e.goal() + " met";
+            case ExploreEvent.Built e -> "✅ " + e.screen() + " built in " + JournalView.took(e.ms());
+            case ExploreEvent.Building e -> "… " + e.screen() + " left after " + JournalView.took(e.ms()) + ": "
+                    + String.join(", ", e.open());
             case ExploreEvent.Stopped e -> "⏸ " + e.stop().id() + (e.again() ? " again" : "") + " — "
                     + e.stop().kind().displayName() + ": " + e.stop().missing();
             case ExploreEvent.Fixed e -> "✔ " + e.stopId() + " fixed" + (e.why() == null ? "" : ": " + e.why());
