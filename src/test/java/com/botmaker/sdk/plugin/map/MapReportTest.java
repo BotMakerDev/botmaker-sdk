@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
@@ -83,15 +84,51 @@ class MapReportTest {
     @Test
     void theTreeIsIndentedUnderTheScreenThatOpensEach() {
         String text = MapReport.text(map(), Map.of(), NAMED::contains, id -> true, "TAVERN"::equals, null);
-        assertTrue(text.startsWith("The map: 4 screens, 1 popup.\nHome [HOME] "), text);
-        assertTrue(text.contains("\n    Tavern [TAVERN] finished, activity\n"
+        assertTrue(text.startsWith("The map: 4 screens, 1 popup.\nNext to explore: Home, the shallowest screen not "
+                + "done.\nHome [HOME] "), text);
+        assertTrue(text.contains("\n    Tavern [TAVERN] not all cut\n"
                 + "      marker tavern_title · back close · shot yes\n"
                 + "      in from Home by tavern\n"
-                + "      - market: → Market\n"
-                + "      - play: tried\n"
-                + "      - close: way back\n"), text);
+                + "      - market [linked]: → Market\n"
+                + "      - play [stays]: tried\n"
+                + "      - close [linked]: way back\n"), text);
         assertTrue(text.contains("\n        Market [MARKET] "), text);
         assertTrue(text.contains("\nPopups (opened by the game itself):\nReward [REWARD] "), text);
+    }
+
+    @Test
+    void readMapNamesEachInputsStatus() {
+        Map<String, MapScreen> screens = screens();
+        screens.put("MARKET", screen(Setup.named("Market").markers(marks("market_title")).from(ref("TAVERN", "market")),
+                click("gems").never("spends gems"), click("buy").failed("no reply"), click("sort")));
+        String text = MapReport.text(ScreenGraph.of(screens), Map.of(), NAMED::contains, id -> true, id -> true,
+                "MARKET");
+        assertTrue(text.contains("- gems [not_pressed]: "), text);
+        assertTrue(text.contains("- buy [failed]: "), text);
+        assertTrue(text.contains("- sort [untried]: "), text);
+        String tavern = MapReport.text(map(), Map.of(), NAMED::contains, id -> true, id -> true, "TAVERN");
+        assertTrue(tavern.contains("- market [linked]: → Market\n") && tavern.contains("- play [stays]: tried\n")
+                && tavern.contains("- close [linked]: way back\n"), tavern);
+    }
+
+    @Test
+    void theNextScreenIsTheRunsWhileARunIsLive() {
+        // Home's tavern and Market's gems: Home is the shallowest not done, Market where a run stands.
+        Map<String, MapScreen> screens = screens();
+        screens.put("MARKET", screen(Setup.named("Market").markers(marks("market_title")).from(ref("TAVERN", "market")),
+                click("sort").free()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        assertEquals("Next to explore: Home, the shallowest screen not done.", MapReport.next(graph, Optional.empty()));
+        assertEquals("Next to explore: Market, where the run is: it finishes a screen before it leaves it.",
+                MapReport.next(graph, Optional.of("MARKET")));
+        String text = MapReport.text(graph, Map.of(), NAMED::contains, id -> true, id -> true, Map.of(), List.of(),
+                null, Optional.of("MARKET"));
+        assertTrue(text.startsWith("The map: 4 screens, 1 popup.\nNext to explore: Market, where the run is"), text);
+        assertEquals("Next to explore: Market, the nearest screen not done from Tavern, where the run is.",
+                MapReport.next(graph, Optional.of("TAVERN")),
+                "Tavern, only not all cut, holds nothing a run presses: it is not the run's next");
+        assertEquals(MapReport.next(graph, Optional.empty()), MapReport.next(graph, Optional.of("GONE")),
+                "a screen the map lost is no place to start from");
     }
 
     @Test
@@ -133,13 +170,13 @@ class MapReportTest {
         ScreenGraph graph = ScreenGraph.of(screens);
 
         String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, null);
-        assertTrue(text.contains("- event: not seen yet (comes and goes) while Firestone::eventOn\n"), text);
-        assertTrue(text.contains("- tavern: → Tavern (while Firestone::tavernOpen); looks normal tavern → "
+        assertTrue(text.contains("- event [untried]: not seen yet (comes and goes) while Firestone::eventOn\n"), text);
+        assertTrue(text.contains("- tavern [linked]: → Tavern (while Firestone::tavernOpen); looks normal tavern → "
                 + "Tavern (while Firestone::tavernOpen), Presses.BADGE tavern_badge → Tavern (while Firestone::tavernOpen)\n"),
                 text);
         assertTrue(text.contains("in from Home by tavern (while Firestone::tavernOpen)\n"), text);
         assertTrue(text.contains("look Halloween: marker pumpkin\n"), text);
-        assertTrue(text.contains("- candy: untried [look Halloween]\n"), text);
+        assertTrue(text.contains("- candy [untried]: untried [look Halloween]\n"), text);
         assertTrue(MapReport.problems(graph, id -> true, id -> true, null).stream()
                         .noneMatch(p -> p.contains("comes and goes")),
                 "a method saying when it is there answers for what comes and goes");

@@ -43,9 +43,9 @@ final class ScreenCards {
     enum State {
         /** It owes its marker, or has nothing cut: red. */
         OWES,
-        /** It has inputs left to try: amber. */
+        /** It has inputs left to press, or is not all cut: amber. */
         UNTRIED,
-        /** Every input is tried, never done or locked: green. */
+        /** {@link ScreenGraph#done Done}: all cut, no input left: green. */
         FINISHED
     }
 
@@ -213,7 +213,8 @@ final class ScreenCards {
         MapScreen screen = graph.screens().get(constant);
         List<String> fields = graph.fields(constant);
         int tried = (int) fields.stream().filter(f -> graph.tried(constant, f)).count();
-        int untried = graph.untried(constant).size();
+        // What the run reads too: the inputs left (untried or failed), and done (all cut, none left).
+        int left = graph.left(constant).size();
         int unseen = graph.unseen(constant).size();
         State state;
         String said;
@@ -223,12 +224,15 @@ final class ScreenCards {
         } else if (graph.noneCut(constant)) {
             state = State.OWES;
             said = "nothing cut";
-        } else if (untried > 0) {
+        } else if (left > 0) {
             state = State.UNTRIED;
-            said = untried + " untried";
+            said = left + " left";
+        } else if (!graph.done(constant)) {
+            state = State.UNTRIED;
+            said = "not all cut";
         } else {
             state = State.FINISHED;
-            said = unseen > 0 ? "finished, " + unseen + " not seen" : "finished";
+            said = unseen > 0 ? "✓ done, " + unseen + " not seen" : "✓ done";
         }
         String shape = state == State.FINISHED
                 ? graph.shape(constant).map(s -> s.name().toLowerCase(Locale.ROOT)).orElse("") : "";

@@ -35,6 +35,20 @@ class JournalTest {
     }
 
     @Test
+    void aLiveRunsScreenIsItsLastWhereAndNoneOnceItEnded(@TempDir Path project) {
+        assertEquals(Optional.empty(), Journal.liveAt(project), "no run yet");
+        Journal run = Journal.begin(project, 1_000);
+        run.append(new ExploreEvent.Began(false, 1_000));
+        assertEquals(Optional.empty(), Journal.liveAt(project), "before it reached a screen");
+        run.append(new ExploreEvent.NewScreen("HOME", null, null, 1_100));
+        run.append(new ExploreEvent.NewScreen("SHOP", "HOME", "shop", 1_200));
+        assertEquals(Optional.of("SHOP"), Journal.liveAt(project));
+        run.append(new ExploreEvent.Ended(ExploreLoop.End.STOPPED, 1_300));
+        assertEquals(Optional.empty(), Journal.liveAt(project), "an ended run stands nowhere");
+        assertEquals(Optional.empty(), Journal.liveAt(null));
+    }
+
+    @Test
     void eachRunWritesItsOwnFolder(@TempDir Path project) {
         Journal first = Journal.begin(project, 1_000);
         first.append(new ExploreEvent.Began(false, 1_000));

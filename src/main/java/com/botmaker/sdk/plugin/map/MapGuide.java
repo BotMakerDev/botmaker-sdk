@@ -288,8 +288,10 @@ final class MapGuide {
                     new Entry("3/5", null, "The ring: how many of the screen's inputs were tried, out of all."),
                     new Entry("owes its marker", "screen-pill-owes", "Nothing tells this screen yet: cut its marker, "
                             + "a part only it shows. \"nothing cut\": it has a marker but no input."),
-                    new Entry("2 untried", "screen-pill-untried", "Inputs are left to try."),
-                    new Entry("finished", "screen-pill-finished", "Every input was tried; \"not seen\" counts inputs "
+                    new Entry("2 left", "screen-pill-untried", "Inputs are left to press, untried or failed, as a run "
+                            + "exploring reads them. \"not all cut\": every input cut is done, but the screen does not "
+                            + "say all its inputs are cut (✂ Cut inputs, then mark it all cut)."),
+                    new Entry("✓ done", "screen-pill-finished", "All cut, and no input left; \"not seen\" counts inputs "
                             + "that come and go and were not there."),
                     new Entry("list", "screen-pill-plain", "Its shape once finished, a popup, or a screen reached "
                             + "only at times or locked; such a card is drawn dashed."),

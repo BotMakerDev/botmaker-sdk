@@ -854,6 +854,7 @@ public final class ScreenGraph {
             List<String> untried = untried(c).stream().filter(f -> status(c, f) != InputStatus.FAILED).toList();
             if (!untried.isEmpty()) owed.add(name + ": untried " + String.join(", ", untried));
             else if (noneCut(c)) owed.add(name + ": no input cut yet");
+            else if (left(c).isEmpty() && !done(c)) owed.add(name + ": not all cut (cut what is left, then allCut)");
             List<String> failed = fields(c).stream().filter(f -> status(c, f) == InputStatus.FAILED).toList();
             if (!failed.isEmpty()) owed.add(name + ": failed " + String.join(", ", failed));
             List<String> unseen = unseen(c);

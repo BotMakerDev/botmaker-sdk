@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 
@@ -193,7 +194,8 @@ final class NotesTools {
         if (target.problem() != null) return AgentReply.refused(target.problem());
         try {
             ScreenGraph map = FxCall.call(() -> ScreenBook.read(services));
-            return AgentReply.text(Protocol.where(target.run().home() != null, map).said());
+            return AgentReply.text(Protocol.where(target.run().home() != null, map,
+                    Journal.liveAt(services.projectDir())).said());
         } catch (IllegalArgumentException | IllegalStateException e) {
             return AgentReply.refused(e.getMessage());
         }

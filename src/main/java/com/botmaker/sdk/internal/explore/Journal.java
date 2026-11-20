@@ -159,6 +159,16 @@ public final class Journal {
         return runs.isEmpty() ? Optional.empty() : Optional.of(new Journal(root(project).resolve(runs.getLast())));
     }
 
+    /**
+     * The screen the latest run of the bot in {@code project} stands on while it runs, as its journal last said it;
+     * empty when no run is live, before it reached a screen, or with no project. The assistant's tools and 🗺 Screens
+     * name the next screen to explore from it, as the run does.
+     */
+    public static Optional<String> liveAt(Path project) {
+        if (project == null) return Optional.empty();
+        return latest(project).map(JournalView::of).filter(JournalView::running).flatMap(JournalView::where);
+    }
+
     /** The journal of the run {@code runId} of the bot in {@code project}; empty when the index has none of that id. */
     public static Optional<Journal> of(Path project, String runId) {
         return runs(project).contains(runId) ? Optional.of(new Journal(root(project).resolve(runId))) : Optional.empty();

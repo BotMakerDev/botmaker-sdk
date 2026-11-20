@@ -24,6 +24,7 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
+import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MarkerSets;
 import com.botmaker.sdk.internal.screens.Markers;
@@ -122,10 +123,30 @@ public final class MapReport {
         // Kept for Studio's next start, which matches only the shots and pictures changed since.
         MapAudit.keep(resources);
         AgentReply said = AgentReply.text(text(read.graph(), read.stages(), read.pictures()::contains, file, shot,
-                audits, clashes, only));
+                audits, clashes, only, Journal.liveAt(services.projectDir())));
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));
+    }
+
+    /** The screen {@link #next} names, ▶▶'s too. */
+    static Optional<String> nextScreen(ScreenGraph graph, Optional<String> live) {
+        Optional<String> at = live.filter(graph.screens()::containsKey);
+        return at.isPresent() ? graph.nextToExplore(at, c -> !graph.left(c).isEmpty()) : graph.nextToExplore(at);
+    }
+
+    /**
+     * The screen exploring works on next, in words, as read_map, read_guide and ▶▶ name it: from {@code live}, the
+     * screen a live run stands on ({@link Journal#liveAt}), so the assistant and the window name the run's own next
+     * screen: while it runs, among the screens with inputs left to press, the run's work, a screen only not all cut
+     * being cutting work it never goes to; empty when nothing is left.
+     */
+    public static String next(ScreenGraph graph, Optional<String> live) {
+        Optional<String> at = live.filter(graph.screens()::containsKey);
+        return nextScreen(graph, live).map(c -> "Next to explore: " + graph.shown(c) + (at.filter(c::equals).isPresent()
+                ? ", where the run is: it finishes a screen before it leaves it."
+                : at.isPresent() ? ", the nearest screen not done from " + graph.shown(at.get()) + ", where the run is."
+                : ", the shallowest screen not done.")).orElse("");
     }
 
     /**
@@ -147,6 +168,16 @@ public final class MapReport {
     /** {@link #text}, with the markers other screens' shots show too ({@link MapAudit#clashes}). */
     static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
                        Predicate<String> shot, Map<String, Audit> audits, List<String> clashes, String only) {
+        return text(graph, stages, named, file, shot, audits, clashes, only, Optional.empty());
+    }
+
+    /**
+     * {@link #text}, the whole map's naming the next screen to explore from {@code live}, the screen a live run stands
+     * on ({@link #next}).
+     */
+    static String text(ScreenGraph graph, Map<String, String> stages, Predicate<String> named, Predicate<String> file,
+                       Predicate<String> shot, Map<String, Audit> audits, List<String> clashes, String only,
+                       Optional<String> live) {
         StringBuilder out = new StringBuilder();
         Set<String> written = new LinkedHashSet<>();
         if (only != null) {
@@ -156,6 +187,8 @@ public final class MapReport {
             long popups = cards.stream().filter(Card::popup).count();
             out.append("The map: ").append(cards.size()).append(" screens").append(popups > 0 ? ", " + popups
                     + " popup" + (popups > 1 ? "s" : "") : "").append(".\n");
+            String next = next(graph, live);
+            if (!next.isEmpty()) out.append(next).append('\n');
             Optional<String> root = ScreenCards.root(graph);
             root.ifPresent(r -> tree(out, graph, stages, shot, r, "", written));
             List<String> popupList = graph.screens().keySet().stream()
@@ -233,7 +266,9 @@ public final class MapReport {
                     .append(when.isEmpty() ? "" : ", while " + when).append('\n');
         }
         for (Row row : ScreenCards.rows(graph, constant)) {
-            out.append(indent).append("  - ").append(row.label()).append(": ").append(row.result());
+            // Its status for exploring, as the run and the window read it (linked, stays, not_pressed, failed, untried).
+            out.append(indent).append("  - ").append(row.label()).append(" [")
+                    .append(graph.status(constant, row.field()).id()).append("]: ").append(row.result());
             // Its verdict for a run exploring alone; a never is said in its result already, a read-only one needs none.
             // Free and spends said here; never is the row's own word, and none is listed in the problems.
             if (row.input().verdict() instanceof Verdict.Free || row.input().verdict() instanceof Verdict.Spends) {

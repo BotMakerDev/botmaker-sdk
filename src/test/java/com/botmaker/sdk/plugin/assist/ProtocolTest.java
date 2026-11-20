@@ -117,7 +117,7 @@ class ProtocolTest {
         Where owingInput = Protocol.where(true,ScreenGraph.of(untried));
         assertEquals(Stage.DISCOVERY, owingInput.stage(), "an input never tried is owed");
         assertTrue(owingInput.said().contains("Tavern: untried drink"), owingInput.said());
-        assertTrue(owingInput.said().contains("Next to explore: Tavern, the shallowest screen with inputs left."),
+        assertTrue(owingInput.said().contains("Next to explore: Tavern, the shallowest screen not done."),
                 owingInput.said());
     }
 

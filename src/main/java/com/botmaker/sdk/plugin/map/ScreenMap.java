@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.overlay.OverlayToolContext;
 import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.graph.GraphCanvas;
+import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenStep;
 import com.botmaker.sdk.plugin.HistoryKeys;
@@ -956,22 +957,24 @@ public final class ScreenMap {
     }
 
     /**
-     * ▶▶: the next input to try, as Discovery goes ({@link ScreenGraph#nextToExplore}, then its first untried input),
-     * picked and shown big, so ▶ Try in the panel tries it. A screen with nothing cut is shown for its cut.
+     * ▶▶: the next input to try, as Discovery goes ({@link ScreenGraph#nextToExplore}, from the screen a live run
+     * stands on, then its first input {@link ScreenGraph#left left}), picked and shown big, so ▶ Try in the panel tries
+     * it. A screen with nothing cut, or not all cut, is shown for its cut.
      */
     private void nextUntried() {
-        Optional<String> next = graph.nextToExplore();
+        Optional<String> next = MapReport.nextScreen(graph, Journal.liveAt(project));
         if (next.isEmpty()) {
             tell(graph.screens().isEmpty() ? "No screen yet: ● Live, then ❄ Freeze on the game's first screen."
-                    : "Nothing is left to try: every screen reached has each of its inputs tried.");
+                    : "Nothing is left to try: every screen reached is done.");
             return;
         }
         String constant = next.get();
-        String field = graph.untried(constant).stream().findFirst().orElse(null);
+        String field = graph.left(constant).stream().findFirst().orElse(null);
         canvas.select(constant);
         panel.pickInput(field);
         showScreen();
-        tell(field == null ? graph.shown(constant) + " has nothing cut yet: ✂ Cut inputs on it."
+        tell(field == null ? graph.shown(constant) + (graph.noneCut(constant) ? " has nothing cut yet"
+                : " is not all cut") + ": ✂ Cut inputs on it."
                 : "Next to try: " + graph.shown(constant) + " · " + field + ". ▶ Try it in the panel.");
     }
 

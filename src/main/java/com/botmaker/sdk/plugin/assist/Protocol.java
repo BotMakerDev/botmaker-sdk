@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.map.MapReport;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -283,6 +284,11 @@ final class Protocol {
      * stage.
      */
     static Where where(boolean hasHome, ScreenGraph graph) {
+        return where(hasHome, graph, Optional.empty());
+    }
+
+    /** {@link #where(boolean, ScreenGraph)}, the next screen to explore named from {@code live}, a live run's screen. */
+    static Where where(boolean hasHome, ScreenGraph graph, Optional<String> live) {
         Map<String, String> screens = new LinkedHashMap<>();
         // A map with a root is a way home of its own: a run with no home method walks there.
         if (!hasHome && graph.root().isEmpty()) return new Where(Stage.SETUP, "the bot has no home method.", screens);
@@ -305,10 +311,10 @@ final class Protocol {
                     owed);
         }
         if (!owed.isEmpty()) {
-            String next = graph.nextToExplore().map(c -> " Next to explore: " + graph.shown(c) + ", the shallowest "
-                    + "screen with inputs left.").orElse("");
+            String next = MapReport.next(graph, live);
             return new Where(Stage.DISCOVERY, owed.size() + (owed.size() == 1 ? " thing is" : " things are")
-                    + " still owed: Discovery is done when none is." + next, screens, owed);
+                    + " still owed: Discovery is done when none is." + (next.isEmpty() ? "" : " " + next), screens,
+                    owed);
         }
         if (earliest == null) {
             return new Where(Stage.UPKEEP, "every screen is tuned or locked.", screens);

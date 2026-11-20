@@ -55,7 +55,7 @@ class ScreenCardsTest {
         screens.put("HOME", screen(Setup.named("Home").markers(marks("home")), click("campaign"), click("engineer"),
                 click("gold"), Hotkey.of(Key.M), click("arena").locked(picture("padlock")), click("event").occasional()));
         screens.put("CAMPAIGN", screen(Setup.named("Campaign").markers(marks("campaign_title"))
-                        .from(ref("HOME", "campaign")),
+                        .from(ref("HOME", "campaign")).allCut(),
                 click("claim").tried(), click("map"),
                 click("gems").never("spends gems")));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map"))
@@ -79,7 +79,7 @@ class ScreenCardsTest {
     void aCardSaysHowFarDiscoveryGotByColourAndByWord() {
         Card home = card("HOME");
         assertEquals(State.UNTRIED, home.state());
-        assertEquals("1 untried", home.said(), "gold only: a key that opened a screen is tried, a lock settled, an "
+        assertEquals("1 left", home.said(), "gold only: a key that opened a screen is tried, a lock settled, an "
                 + "input that comes and goes waits");
         assertEquals(4, home.tried());
         assertEquals(6, home.inputs());
@@ -198,13 +198,13 @@ class ScreenCardsTest {
 
     @Test
     void theCardsPillsAreOneListForEveryView() {
-        assertEquals(List.of("finished", "activity", "surveyed"),
+        assertEquals(List.of("✓ done", "activity", "surveyed"),
                 ScreenCards.pills(card("CAMPAIGN")).stream().map(ScreenCards.Pill::text).toList());
         assertEquals(List.of("screen-pill-finished", "screen-pill-plain", "screen-pill-stage"),
                 ScreenCards.pills(card("CAMPAIGN")).stream().map(ScreenCards.Pill::style).toList());
         assertEquals(List.of("nothing cut", "locked"),
                 ScreenCards.pills(card("ARENA")).stream().map(ScreenCards.Pill::text).toList());
-        assertEquals(List.of("finished", "popup"),
+        assertEquals(List.of("✓ done", "popup"),
                 ScreenCards.pills(card("REWARD")).stream().map(ScreenCards.Pill::text).toList());
     }
 

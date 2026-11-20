@@ -443,9 +443,11 @@ class ScreenGraphTest {
         assertEquals(List.of(), graph.left("MAP"));
         assertEquals(List.of(
                 "Home: untried gold",
+                "Campaign: not all cut (cut what is left, then allCut)",
+                "Map: not all cut (cut what is left, then allCut)",
                 "Map: never seen to try loot (comes and goes)",
                 "Engineer: marker",
-                "Engineer: no input cut yet"), graph.owed());
+                "Engineer: no input cut yet"), graph.owed(), "a picture screen with nothing left still owes its allCut");
     }
 
     @Test

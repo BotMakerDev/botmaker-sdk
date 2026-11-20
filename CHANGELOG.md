@@ -34,6 +34,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   second failure stops the run with the new *Failed input* stop, so Claude gives it a verdict or fixes how it is
   pressed. A screen read from a page's tree is written all cut unless part of it scrolls. Old `field: Fails:`
   note lines are no longer read.
+- **Claude and 🗺 Screens name the same next screen as the run.** While Keep exploring runs, read_map, read_guide
+  and ▶▶ name the next screen to explore from the screen the run is on. read_map gives each input its status
+  (`linked`, `stays`, `not_pressed`, `failed`, `untried`). A screen card counts the inputs left (untried or
+  failed) and shows *✓ done* only once the screen is all cut with nothing left. A picture screen with nothing
+  left that does not say `.allCut()` shows *not all cut* and is owed until it does.
 - **Every explore stop now ends.** The start-of-run list of inputs with no verdict is parked like any other stop
   nobody answers, and the guard still presses no such input. A window that stays in front of the game for the stuck
   time (15 min) ends the run as *Stuck* instead of waiting forever; nothing is pressed into that window. A server
