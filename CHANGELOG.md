@@ -142,6 +142,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- `explore wait` no longer says again the screens the wait before it found while it blocked.
 - `explore wait` after `reload_sdk` waits for the replay of the held fault instead of answering the fault again at
   once. The fault stays open while it replays, so a wait answered with the stale stop until the replay said something.
 - 🗺 Screens' cards box a web page's elements on the screen's shot: each element's own shot (`elements/<name>.png`)

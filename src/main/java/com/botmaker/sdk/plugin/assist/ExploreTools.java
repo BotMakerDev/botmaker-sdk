@@ -222,7 +222,11 @@ final class ExploreTools {
             view = JournalView.of(journal);
             seen = view.all().size();
             now = answer(view);
-            if (now.isPresent()) return now.get();
+            if (now.isPresent()) {
+                // Said now: the next wait reports only what was found after this answer.
+                claude(journal, JournalView.WAIT);
+                return now.get();
+            }
         }
     }
 

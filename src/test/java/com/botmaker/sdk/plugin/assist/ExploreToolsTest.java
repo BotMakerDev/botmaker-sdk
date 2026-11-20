@@ -143,6 +143,26 @@ class ExploreToolsTest {
         assertTrue(ExploreTools.resume(journal, parked.id(), false, Duration.ofSeconds(1)).isRefused());
     }
 
+    /** A screen found while a wait blocked is said by that wait only; the next one blocks for what comes after. */
+    @Test
+    void aScreenFoundDuringAWaitIsSaidOnce() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(false, 1));
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ignored) {
+                return;
+            }
+            journal().append(new ExploreEvent.NewScreen("Shop", null, null, 5));
+        });
+
+        assertTrue(text(ExploreTools.waitFor(journal, Duration.ofSeconds(20))).contains("Shop"));
+        String again = text(ExploreTools.waitFor(journal, Duration.ofMillis(300)));
+
+        assertTrue(again.startsWith("Still running"), again);
+    }
+
     @Test
     void waitWakesOnAStop() {
         Journal journal = journal();
