@@ -72,6 +72,31 @@ class ElkLayoutTest {
         }
     }
 
+    /** Home and the bag pinned where the shop and the mail were laid, in every mode: pushed apart, nothing on another. */
+    @Test
+    void everyModeKeepsPinnedCardsApart() {
+        for (LayoutMode mode : LayoutMode.values()) {
+            for (Direction direction : Direction.values()) {
+                Placement placed = laid(mode, direction);
+                Map<String, Pt> pins = Map.of("HOME", placed.at().get("SHOP"), "BAG", placed.at().get("MAIL"));
+                Placement apart = placed.pinned(pins).apart(CARDS, Set.of(), pins.keySet(), 20);
+                for (Card a : CARDS) {
+                    for (Card b : CARDS) {
+                        if (a != b) {
+                            assertFalse(box(apart, a.id()).overlaps(box(apart, b.id())),
+                                    mode.id() + " " + direction + ": " + a.id() + " on " + b.id());
+                        }
+                    }
+                }
+                // Home is bigger than the shop: pinned there it may cover the bag, and then one of the two gives way.
+                boolean pinsMeet = box(placed.pinned(pins), "HOME").overlaps(box(placed.pinned(pins), "BAG"));
+                long movedPins = pins.entrySet().stream().filter(e -> !e.getValue().equals(apart.at().get(e.getKey())))
+                        .count();
+                assertTrue(movedPins == 0 || pinsMeet && movedPins == 1, mode.id() + ": pins moved " + movedPins);
+            }
+        }
+    }
+
     @Test
     void treeRootIsOnTop() {
         Placement placed = laid(LayoutMode.TREE, Direction.DOWN);

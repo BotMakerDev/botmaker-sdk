@@ -44,6 +44,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   time per press, never under two minutes nor over fifteen. A page of 18 inputs at 12.6 s a press gets about 3m47s
   and is built in one go instead of being set aside on every run. A low-yield stop now names the ways and inputs
   still left on its screen.
+- **The Screens map never lays a card over another.** After a card was moved by hand, every card was pinned
+  where it stood, and a screen found later was laid out as if the pinned cards were not there, often on top of
+  one; a pinned card that grew (more pictures) covered the card under it. Now a card the layout puts on another
+  moves to the nearest free place beside it, pinned cards move only when two of them meet, and a card dropped on
+  another stays where it was dropped while the other gives way. Every layout mode.
 - **A stop carries what is on screen.** A Keep exploring stop now holds the app's elements as the tree reads them (at
   most 40, the tappable ones said so) and what the stop's screen's readouts show, by the fact each feeds. Claude's
   `explore wait` lists both under *Elements* and *Facts*, so it no longer needs a `describe` or `list_elements` call
