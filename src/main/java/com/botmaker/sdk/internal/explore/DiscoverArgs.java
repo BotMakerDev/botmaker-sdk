@@ -49,6 +49,11 @@ public record DiscoverArgs(
         new ExploreBudget(minutes, maxPages);
     }
 
+    /** Whether any field is given. */
+    public boolean given() {
+        return url != null || minutes != null || maxPages != null || show != null;
+    }
+
     /** The budget of the exploring it runs. */
     public ExploreBudget budget() {
         return new ExploreBudget(minutes, maxPages);

@@ -10,6 +10,8 @@ import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.explore.DiscoverArgs;
 import com.botmaker.sdk.internal.explore.Generation;
+import com.botmaker.sdk.internal.explore.LivePlay;
+import com.botmaker.sdk.internal.explore.ResumeFile;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
 import com.botmaker.sdk.internal.launch.Target;
@@ -20,6 +22,7 @@ import com.botmaker.shared.launch.LaunchSpec;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The SDK's <em>Discover</em> run (web discovery phase 6c): maps a game or a website into the bot's screen map by
@@ -50,9 +53,12 @@ public final class Discover {
         }
         Bot.trial(() -> {
             first.install();
-            List<TreeAnswer> settled = target(given);
+            Optional<ResumeFile> pending = LivePlay.pending(KeepExploring.project());
+            // A restart (a dev reload, a crash) is handed no arguments: it takes those the run kept.
+            DiscoverArgs started = ResumeFile.discoverOf(given, pending);
+            List<TreeAnswer> settled = target(started);
             if (settled == null) return;
-            KeepExploring.explore(first, given.budget(), settled);
+            KeepExploring.explore(first, started.budget(), started, settled, pending);
         }, first.holders());
     }
 

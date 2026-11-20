@@ -35,13 +35,35 @@ class ResumeFileTest {
     void itReadsBackAsWritten() {
         Journal journal = new Journal(folder);
         ResumeFile file = new ResumeFile(fault(), StopKind.WRONG_ARRIVAL, "claude", Set.of("A", "D"),
-                Set.of("A.d→D", "A.b→B"), Set.of("A.b→B"), Set.of("A#20,40"));
+                Set.of("A.d→D", "A.b→B"), Set.of("A.b→B"), Set.of("A#20,40"), null, null);
 
         file.write(journal);
 
         assertEquals(Optional.of(file), ResumeFile.read(journal, why -> {}));
         ResumeFile.delete(journal);
         assertEquals(Optional.empty(), ResumeFile.read(journal, why -> {}));
+    }
+
+    @Test
+    void keepsTheRunsArguments() {
+        Journal journal = new Journal(folder);
+        ExploreBudget budget = new ExploreBudget(10, null);
+        DiscoverArgs discover = new DiscoverArgs("https://example.com", 10, 40, true);
+        ResumeFile file = new ResumeFile(fault(), StopKind.CRASH, "exception", Set.of("A"), Set.of(), Set.of(),
+                Set.of(), budget, discover);
+
+        file.write(journal);
+
+        ResumeFile back = ResumeFile.read(journal, why -> {}).orElseThrow();
+        assertEquals(file, back);
+        assertEquals(budget, ResumeFile.budgetOf(ExploreBudget.NONE, Optional.of(back)), "a restart given none");
+        assertEquals(new ExploreBudget(3, null), ResumeFile.budgetOf(new ExploreBudget(3, null), Optional.of(back)),
+                "a run given its own keeps them");
+        assertEquals(discover, ResumeFile.discoverOf(new DiscoverArgs(null, null, null, null), Optional.of(back)));
+        DiscoverArgs none = new DiscoverArgs(null, null, null, null);
+        ResumeFile kept = new ResumeFile(fault(), StopKind.CRASH, "exception", Set.of(), Set.of(), Set.of(), Set.of(),
+                budget, null);
+        assertEquals(none, ResumeFile.discoverOf(none, Optional.of(kept)), "a Keep exploring file kept none");
     }
 
     @Test

@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.explore;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -21,14 +22,18 @@ import java.util.function.Consumer;
  * @param tried    the presses it had made, by place, each made once a run
  * @param worked   the ways it had pressed that arrived
  * @param answered the text places a missing fact was raised on
+ * @param budget   the budget the run was started with, which a restart started with none takes (2026-11-20): a dev
+ *                 reload or a crash restart hands the entry no arguments
+ * @param discover what <em>Discover</em> was started with, taken the same way; null for a <em>Keep exploring</em> run
  */
 public record ResumeFile(Stop fault, StopKind replays, String source, Set<String> seen, Set<String> tried,
-                         Set<String> worked, Set<String> answered) {
+                         Set<String> worked, Set<String> answered, ExploreBudget budget, DiscoverArgs discover) {
 
     /** The file's name in the journal's folder. */
     static final String FILE = "resume.json";
 
     public ResumeFile {
+        budget = budget == null ? ExploreBudget.NONE : budget;
         replays = replays == null ? StopKind.UNKNOWN : replays;
         source = source == null ? "" : source;
         seen = seen == null ? Set.of() : Set.copyOf(seen);
@@ -64,6 +69,20 @@ public record ResumeFile(Stop fault, StopKind replays, String source, Set<String
             return Optional.empty();
         }
         return file;
+    }
+
+    /**
+     * The budget a run starting now takes: {@code given} when it gives an end, else the one {@code file} kept, so a
+     * restart is the same run.
+     */
+    public static ExploreBudget budgetOf(ExploreBudget given, Optional<ResumeFile> file) {
+        return given.given() ? given : file.map(ResumeFile::budget).orElse(given);
+    }
+
+    /** What a <em>Discover</em> starting now takes: {@code given} when it gives anything, else what {@code file} kept. */
+    public static DiscoverArgs discoverOf(DiscoverArgs given, Optional<ResumeFile> file) {
+        // A Keep exploring run's file, or an older SDK's, kept none.
+        return given.given() ? given : file.map(ResumeFile::discover).filter(Objects::nonNull).orElse(given);
     }
 
     /** Replaces the file of {@code journal} with this one. */

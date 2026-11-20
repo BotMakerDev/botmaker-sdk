@@ -1117,6 +1117,11 @@ class ExploreLoopTest {
      * ended as the SDK's reload ends it.
      */
     private void heldAndLeft(StopKind replays, String screen, String place, Set<String> tried) {
+        heldAndLeft(replays, screen, place, tried, ExploreBudget.NONE);
+    }
+
+    /** {@link #heldAndLeft(StopKind, String, String, Set)} by a run started with {@code budget}. */
+    private void heldAndLeft(StopKind replays, String screen, String place, Set<String> tried, ExploreBudget budget) {
         Journal journal = journal();
         Stop fault = new Stop("fault-3", StopKind.FAULT, screen, place, "", List.of(), List.of(), Map.of(), List.of(),
                 "judged wrong", 1);
@@ -1124,7 +1129,40 @@ class ExploreLoopTest {
         journal.append(new ExploreEvent.Stopped(fault, false, 1));
         journal.append(new ExploreEvent.Faulted("fault-3", "claude", "judged wrong", "", "9.9.9-SNAPSHOT", 1));
         journal.append(new ExploreEvent.Ended(ExploreLoop.End.STOPPED, 2));
-        new ResumeFile(fault, replays, "claude", Set.of("A"), tried, Set.of(), Set.of()).write(journal);
+        new ResumeFile(fault, replays, "claude", Set.of("A"), tried, Set.of(), Set.of(), budget, null).write(journal);
+    }
+
+    /**
+     * A restart (a dev reload, a crash) hands the entry no arguments: it takes the budget the run kept, as
+     * {@code KeepExploring.main} does, and keeps it again in the memory it writes.
+     */
+    @Test
+    void aRestartedRunReadsItsArgumentsFromTheResumeFile() {
+        heldAndLeft(StopKind.WRONG_ARRIVAL, "A", "A.d→D", Set.of("A.d→D"), new ExploreBudget(10, null));
+        Game game = new Game();
+        game.dev = true;
+        Optional<ResumeFile> pending = ResumeFile.pending(journal(), why -> {});
+        ExploreBudget budget = ResumeFile.budgetOf(ExploreBudget.NONE, pending);
+
+        ExploreLoop.End end = new ExploreLoop(map(), game, same(map()), Guards.with(List.of()), journal(),
+                ExploreLoop.Settings.DEFAULT.within(budget.time()).upTo(budget.screens()), () -> game.nowMs)
+                .startedWith(budget, null).resuming(pending).run();
+
+        assertEquals(ExploreLoop.End.BUDGET, end);
+        assertTrue(game.nowMs >= Duration.ofMinutes(10).toMillis() && game.nowMs < Duration.ofMinutes(12).toMillis(),
+                "ran its 10 minutes: " + game.nowMs);
+    }
+
+    @Test
+    void aHeldFaultKeepsTheRunsArguments() {
+        Game game = new Game();
+        game.dev = true;
+        game.lookThrows = new IllegalStateException("no look");
+        ExploreBudget budget = new ExploreBudget(30, null);
+
+        loop(map(), game, same(map()), Duration.ofMinutes(30)).startedWith(budget, null).run();
+
+        assertEquals(budget, ResumeFile.read(journal(), why -> {}).orElseThrow().budget());
     }
 
     private ExploreLoop resumed(Game game, Duration within) {

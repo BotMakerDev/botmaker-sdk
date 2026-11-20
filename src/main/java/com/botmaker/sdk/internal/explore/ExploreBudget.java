@@ -28,6 +28,11 @@ public record ExploreBudget(
     /** No end of either kind. */
     public static final ExploreBudget NONE = new ExploreBudget(null, null);
 
+    /** Whether it gives an end of either kind. */
+    public boolean given() {
+        return minutes != null || maxScreens != null;
+    }
+
     /** {@link #minutes} as a time; null without it. */
     public Duration time() {
         return minutes == null ? null : Duration.ofMinutes(minutes);

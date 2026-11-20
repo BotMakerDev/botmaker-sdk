@@ -161,6 +161,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A restart of Keep exploring or Discover is the same run: after a dev reload or a crash, the entry, handed no
+  arguments, takes the budget, url and window it was started with from `resume.json`, so a 10-minute Discover
+  restarts with its 10 minutes on its url, not until stopped. Each restart gets the whole budget again.
 - Keep exploring proves a crash fixed only by pressing the way or input that threw again: a crash's place names it
   (`SHOP.buy:IllegalStateException`), its replay or resume frees it to be pressed, and a round elsewhere no longer
   says it fixed. A replay another stop set aside first is said (`replay_lost` in the journal) and its `resume.json`

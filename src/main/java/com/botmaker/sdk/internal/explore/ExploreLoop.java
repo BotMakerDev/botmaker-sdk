@@ -406,6 +406,9 @@ public final class ExploreLoop {
      * for a run started fresh, or once the replay said.
      */
     private ResumeFile replay;
+    /** The arguments the run was started with, kept in its memory for a restart started with none. */
+    private ExploreBudget startedBudget = ExploreBudget.NONE;
+    private DiscoverArgs startedDiscover;
 
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
@@ -438,6 +441,16 @@ public final class ExploreLoop {
      */
     public ExploreLoop resuming(Optional<ResumeFile> file) {
         replay = file.orElse(null);
+        return this;
+    }
+
+    /**
+     * Keeps {@code budget} and {@code discover} (null for <em>Keep exploring</em>), what the run's entry was started
+     * with, in the memory a held fault writes. Called before {@link #run}.
+     */
+    public ExploreLoop startedWith(ExploreBudget budget, DiscoverArgs discover) {
+        startedBudget = budget;
+        startedDiscover = discover;
         return this;
     }
 
@@ -564,7 +577,7 @@ public final class ExploreLoop {
 
     /** The run's memory, for a restart on the rebuilt SDK to go on from the fault {@code fault}. */
     private ResumeFile memory(Stop fault, StopKind replays, String source) {
-        return new ResumeFile(fault, replays, source, seen, tried, worked, answered);
+        return new ResumeFile(fault, replays, source, seen, tried, worked, answered, startedBudget, startedDiscover);
     }
 
     private End rounds() {

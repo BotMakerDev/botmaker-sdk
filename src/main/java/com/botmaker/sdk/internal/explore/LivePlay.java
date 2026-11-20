@@ -68,15 +68,18 @@ public final class LivePlay implements ExploreLoop.Play {
      * the next generation and plays it.
      */
     public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget) {
-        return explore(first, project, restart, budget, List.of());
+        return explore(first, project, restart, budget, null, List.of(), pending(project));
     }
 
     /**
      * Explores as {@link #explore(Generation, Path, Runnable, ExploreBudget)} does, {@code settled} handed on with the
-     * first stop the run settles: what its start settled already.
+     * first stop the run settles: what its start settled already. It goes on from {@code pending} ({@link #pending}),
+     * and keeps {@code budget} and {@code discover} (null: a <em>Keep exploring</em> run) in the memory a held fault
+     * writes, for a restart started with no arguments to take.
      */
     public static ExploreLoop.End explore(Generation first, Path project, Runnable restart, ExploreBudget budget,
-                                          List<TreeAnswer> settled) {
+                                          DiscoverArgs discover, List<TreeAnswer> settled,
+                                          Optional<ResumeFile> pending) {
         Plan plan = first.plan();
         Journal journal = Journal.of(project);
         journal.forgetPage();
@@ -97,7 +100,15 @@ public final class LivePlay implements ExploreLoop.Play {
         return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), journal,
                 ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
                         .upTo(budget.screens()), System::currentTimeMillis).handOn(settled)
-                .resuming(ResumeFile.pending(journal, why -> Say.warn(why, Map.of()))).run();
+                .startedWith(budget, discover).resuming(pending).run();
+    }
+
+    /**
+     * The resume file the run in {@code project} starting now goes on from ({@link ResumeFile#pending}), read before
+     * the entry takes its arguments, so a restart started with none takes those it kept.
+     */
+    public static Optional<ResumeFile> pending(Path project) {
+        return ResumeFile.pending(Journal.of(project), why -> Say.warn(why, Map.of()));
     }
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
