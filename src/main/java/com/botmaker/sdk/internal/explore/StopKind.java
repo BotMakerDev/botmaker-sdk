@@ -39,6 +39,11 @@ public enum StopKind {
      * ({@link DevBuild}), held until the SDK is fixed and reloaded, never parked ({@link ExploreEvent.Faulted}).
      */
     FAULT("fault", "Discover fault"),
+    /**
+     * A screen set aside over its budget, back and still unbuilt after a second one (2026-11-20): it says what is
+     * open and where its clock went. A resume gives it a fresh clock; a resume with ignore leaves it as it is.
+     */
+    LOW_YIELD("low_yield", "Low yield"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

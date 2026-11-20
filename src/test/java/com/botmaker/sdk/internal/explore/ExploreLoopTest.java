@@ -406,6 +406,97 @@ class ExploreLoopTest {
         assertEquals(List.of("A", "B", "D"), built.keySet().stream().sorted().toList());
     }
 
+    /** A start screen A with {@code ways} ways x1…xn, each to a screen of its own with nothing on it. */
+    private static ScreenGraph wide(int ways) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        List<Input> inputs = new ArrayList<>();
+        for (int i = 1; i <= ways; i++) inputs.add(click("x" + i).free());
+        screens.put("A", screen(Setup.named("A").start(), inputs.toArray(Input[]::new)));
+        for (int i = 1; i <= ways; i++) screens.put("X" + i, screen(Setup.named("X" + i).from(ref("A", "x" + i))));
+        return ScreenGraph.of(screens);
+    }
+
+    private List<Stop> lowYields() {
+        return stops().stream().map(ExploreEvent.Stopped::stop).filter(s -> s.kind() == StopKind.LOW_YIELD).toList();
+    }
+
+    private Optional<ExploreEvent.Built> builtA() {
+        return events(ExploreEvent.Built.class).stream().filter(b -> b.screen().equals("A")).findFirst();
+    }
+
+    /**
+     * A screen set aside at 2m5s with no other open screen to go to is back on its own work; a second budget later,
+     * still open, it stops on its yield and says what is open and where its clock went. Unanswered, it parks and the
+     * screen is built anyway.
+     */
+    @Test
+    void aScreenStillUnbuiltAfterASecondBudgetStopsOnItsYield() {
+        ScreenGraph map = wide(12);
+        Game game = new Game();
+        game.takeMs = 25_000;
+
+        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+
+        List<Stop> low = lowYields();
+        assertEquals(1, low.size(), stops().toString());
+        Stop stop = low.getFirst();
+        assertEquals("A", stop.screen());
+        assertTrue(stop.missing().contains("after 4m10s on its clock, 2m5s since it was set aside: 2 untried"),
+                stop.missing());
+        assertTrue(stop.missing().contains("its clock went to pressing 4m10s."), stop.missing());
+        assertEquals(1, events(ExploreEvent.Parked.class).stream().filter(p -> p.stopId().equals(stop.id())).count());
+        assertTrue(builtA().isPresent(), "a parked low-yield stop holds nothing open: " + game.taken);
+        assertTrue(events(ExploreEvent.Fixed.class).stream().anyMatch(f -> f.stopId().equals(stop.id())
+                && f.why().equals("its screen was built")), events(ExploreEvent.Fixed.class).toString());
+        assertTrue(journal().queue().stream().noneMatch(s -> s.kind() == StopKind.LOW_YIELD), "answered once built");
+    }
+
+    /** A resume gives the screen a fresh clock: built two presses later, which says the fix took. */
+    @Test
+    void aLowYieldResumedStartsTheScreensClockAgain() {
+        ScreenGraph map = wide(12);
+        Game game = new Game();
+        game.takeMs = 25_000;
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !lowYields().isEmpty()) {
+                sent[0] = true;
+                journal().command("resume " + lowYields().getFirst().id());
+            }
+        };
+
+        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+
+        assertEquals(1, lowYields().size(), stops().toString());
+        assertEquals(50_000, builtA().orElseThrow().ms(), "x11 and x12 on a fresh clock");
+        String id = lowYields().getFirst().id();
+        assertTrue(events(ExploreEvent.Fixed.class).stream().anyMatch(f -> f.stopId().equals(id)
+                && f.why().equals("built on its fresh clock")), events(ExploreEvent.Fixed.class).toString());
+    }
+
+    /** A resume with ignore leaves the screen as it is: no fresh clock, and no low-yield stop on it again. */
+    @Test
+    void aLowYieldIgnoredLeavesTheScreenAsItIs() {
+        ScreenGraph map = wide(20);
+        Game game = new Game();
+        game.takeMs = 25_000;
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !lowYields().isEmpty()) {
+                sent[0] = true;
+                journal().command("resume " + lowYields().getFirst().id() + " ignore");
+            }
+        };
+
+        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+
+        assertEquals(1, lowYields().size(), "ten more presses past another budget, not stopped on again");
+        assertTrue(builtA().orElseThrow().ms() > 500_000, "its clock goes on: " + builtA());
+        String id = lowYields().getFirst().id();
+        assertTrue(events(ExploreEvent.Fixed.class).stream().anyMatch(f -> f.stopId().equals(id)
+                && f.why().equals("ignored")), events(ExploreEvent.Fixed.class).toString());
+    }
+
     /**
      * A screen with more ways than its budget allows is set aside once its clock runs over: the run walks to the next
      * open screen, builds it, and finishes the first one after.

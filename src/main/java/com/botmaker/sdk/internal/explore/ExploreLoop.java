@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -292,6 +293,17 @@ public final class ExploreLoop {
     /** How a stop the loop paused on ended. */
     enum Paused { RESUMED, BACK, PARKED, END }
 
+    /** What a screen's clock went to, as a low-yield stop says it. */
+    private enum Spent {
+        PRESSING("pressing"), SETTLING("settling"), WALKING("walking"), CLAUDE("waiting on Claude"), IDLE("idle");
+
+        private final String label;
+
+        Spent(String label) {
+            this.label = label;
+        }
+    }
+
     /** A resume of a fault without ignore is answered with this, and the fault stays held. */
     public static final String FAULT_RESUMES = "a fault resumes through reload_sdk; resume ignore drops it as a misreading";
 
@@ -348,6 +360,20 @@ public final class ExploreLoop {
     private final Set<String> aside = new HashSet<>();
     /** The last walk, {@code from→to}, until a press: a set-aside screen a walk came back to does not walk again. */
     private String lastWalk;
+    /** Each set-aside screen's clock when it was set aside: a second budget past it is a low-yield stop. */
+    private final Map<String, Long> asideAt = new HashMap<>();
+    /** The screens a low-yield stop was resumed with ignore on: left as they are for the run. */
+    private final Set<String> leftAsIs = new HashSet<>();
+    /** The low-yield stop resumed with a fresh clock on each screen, by screen: fixed once the screen is built. */
+    private final Map<String, String> yieldResumed = new HashMap<>();
+    /** What each screen's clock went to, in ms. */
+    private final Map<String, EnumMap<Spent, Long>> spentOn = new HashMap<>();
+    /** What the last round did, which the time to the next one is charged to, but what it waited on a stop. */
+    private Spent doing = Spent.PRESSING;
+    /** What the run waited on at stops since the last round's charge, in ms. */
+    private final EnumMap<Spent, Long> waited = new EnumMap<>(Spent.class);
+    /** Whether the stop raised next hands what the run settled on: its wait is settling, not Claude's. */
+    private boolean settling;
     /** The inputs this run took a picture of ({@code SCREEN.field}), before the map it plays holds them. */
     private final Set<String> pictures = new HashSet<>();
     /** The screen the last round was on, null when on none; since when, epoch ms. */
@@ -636,6 +662,8 @@ public final class ExploreLoop {
             // A walk that came back here does its own work instead of walking again.
             Optional<String> other = nearest(screen, true);
             if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
+            Paused low = lowYield(screen, look);
+            if (low != null) return low != Paused.END;
         }
         Optional<Edge> untried = untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
@@ -654,6 +682,7 @@ public final class ExploreLoop {
         }
         if (planRounds < settings.planRoundsWithoutNew()) {
             planRounds++;
+            doing = Spent.PRESSING;
             if (play.planRound()) {
                 // A screen met after a plan round or a walk is not blamed on the last way pressed.
                 lastEdge = null;
@@ -664,11 +693,13 @@ public final class ExploreLoop {
         planRounds = 0;
         Optional<String> nearest = nearest(screen, true).or(() -> nearest(screen, false));
         if (nearest.isPresent()) return walk(screen, nearest.get());
+        doing = Spent.IDLE;
         play.idle(settings.poll());
         return true;
     }
 
     private boolean walk(String screen, String to) {
+        doing = Spent.WALKING;
         lastWalk = screen + "→" + to;
         lastEdge = null;
         from = screen;
@@ -690,8 +721,59 @@ public final class ExploreLoop {
         List<String> open = open(screen);
         if (open.isEmpty()) return false;
         aside.add(screen);
+        asideAt.put(screen, ms);
         emit(new ExploreEvent.SetAside(screen, ms, open, nowMs.getAsLong()));
         return true;
+    }
+
+    /**
+     * The low-yield stop on {@code screen}, set aside and back on its own work: raised once a second budget ran on its
+     * clock since it was set aside with it still open; null while not, once it was ignored, or while it is parked.
+     */
+    private Paused lowYield(String screen, Look look) {
+        if (leftAsIs.contains(screen)) return null;
+        long ms = clock.getOrDefault(screen, 0L);
+        // A screen a restarted run found aside gets its second budget from now.
+        long since = asideAt.computeIfAbsent(screen, s -> ms);
+        if (ms - since < settings.screenBudget().toMillis()) return null;
+        List<String> open = open(screen);
+        if (open.isEmpty()) return null;
+        // A fresh clock that ran out too did not take.
+        yieldResumed.remove(screen);
+        return stop(StopKind.LOW_YIELD, screen, screen, look, screen + " is still unbuilt after "
+                + JournalView.took(ms) + " on its clock, " + JournalView.took(ms - since) + " since it was set aside: "
+                + String.join(", ", open) + "; its clock went to " + spent(screen)
+                + ". Fix what is open and resume for a fresh clock, or resume with ignore to leave it as it is", false);
+    }
+
+    /** Where {@code screen}'s clock went, one part a kind ({@code "pressing 3m2s, walking 18s"}). */
+    private String spent(String screen) {
+        List<String> parts = new ArrayList<>();
+        spentOn.getOrDefault(screen, new EnumMap<>(Spent.class)).forEach((kind, ms) -> {
+            if (ms >= 1000) parts.add(kind.label + " " + JournalView.took(ms));
+        });
+        // Kept in memory only: a restarted run times from its restart.
+        return parts.isEmpty() ? "nothing timed since the run started" : String.join(", ", parts);
+    }
+
+    /**
+     * What a resume of the low-yield stop on {@code screen} does: a fresh clock, the screen no longer aside, or with
+     * {@code ignore} the screen left as it is for the run, never stopped on for its yield again.
+     */
+    private void yielded(String screen, boolean ignore) {
+        if (ignore) {
+            leftAsIs.add(screen);
+            return;
+        }
+        clock.put(screen, 0L);
+        spentOn.remove(screen);
+        aside.remove(screen);
+        asideAt.remove(screen);
+        // The wait on the stop itself is not charged to the fresh clock.
+        if (screen.equals(onScreen)) {
+            onSince = nowMs.getAsLong();
+            waited.clear();
+        }
     }
 
     /**
@@ -723,6 +805,7 @@ public final class ExploreLoop {
         }
         tried.add(key);
         lastEdge = key;
+        doing = Spent.PRESSING;
         pressed(screen + ": " + edge.label());
         long before = nowMs.getAsLong();
         Took took = play.take(edge, settings.edge().toMillis());
@@ -849,7 +932,9 @@ public final class ExploreLoop {
     private void clock(String screen) {
         long now = nowMs.getAsLong();
         if (onScreen != null) {
-            clock.merge(onScreen, Math.max(0, now - onSince), Long::sum);
+            long ms = Math.max(0, now - onSince);
+            clock.merge(onScreen, ms, Long::sum);
+            charge(onScreen, ms);
             if (!onScreen.equals(screen)) {
                 List<String> open = open(onScreen);
                 if (open.isEmpty()) {
@@ -860,9 +945,22 @@ public final class ExploreLoop {
                 }
             }
         }
+        waited.clear();
         onScreen = screen;
         onSince = now;
         if (screen != null && !built.contains(screen) && open(screen).isEmpty()) built(screen, now);
+    }
+
+    /** Splits {@code ms} charged to {@code screen}: what the run waited on at stops, the rest to what it did. */
+    private void charge(String screen, long ms) {
+        EnumMap<Spent, Long> on = spentOn.computeIfAbsent(screen, s -> new EnumMap<>(Spent.class));
+        long rest = ms;
+        for (Map.Entry<Spent, Long> wait : waited.entrySet()) {
+            long part = Math.min(rest, wait.getValue());
+            on.merge(wait.getKey(), part, Long::sum);
+            rest -= part;
+        }
+        if (rest > 0) on.merge(doing, rest, Long::sum);
     }
 
     /** A restarted run's clocks go on where the journal left them: its built screens stay built. */
@@ -877,6 +975,15 @@ public final class ExploreLoop {
             leftOpen.put(b.screen(), b.open());
         }
         aside.addAll(build.aside());
+        // A low-yield stop resumed with ignore leaves its screen as it is across the restart too.
+        Map<String, String> lowYieldOn = new HashMap<>();
+        for (ExploreEvent event : journal.events()) {
+            if (event instanceof ExploreEvent.Stopped s && s.stop().kind() == StopKind.LOW_YIELD
+                    && s.stop().screen() != null) lowYieldOn.put(s.stop().id(), s.stop().screen());
+            if (event instanceof ExploreEvent.Fixed f && f.why().equals("ignored") && lowYieldOn.containsKey(f.stopId())) {
+                leftAsIs.add(lowYieldOn.get(f.stopId()));
+            }
+        }
         // A built screen a stop of the last run is still parked on is open again.
         long now = nowMs.getAsLong();
         for (String screen : List.copyOf(built)) {
@@ -891,7 +998,17 @@ public final class ExploreLoop {
     private void built(String screen, long now) {
         built.add(screen);
         aside.remove(screen);
+        asideAt.remove(screen);
         emit(new ExploreEvent.Built(screen, clock.getOrDefault(screen, 0L), now));
+        // A low-yield stop resumed with a fresh clock took once its screen is built; one parked on it is answered.
+        String resumedId = yieldResumed.remove(screen);
+        if (resumedId != null) emit(new ExploreEvent.Fixed(resumedId, "built on its fresh clock", now));
+        parked.values().stream().filter(s -> s.kind() == StopKind.LOW_YIELD && screen.equals(s.screen()))
+                .findFirst().ifPresent(s -> {
+                    parked.remove(key(s));
+                    journal.queue(List.copyOf(parked.values()));
+                    emit(new ExploreEvent.Fixed(s.id(), "its screen was built", now));
+                });
     }
 
     /**
@@ -918,7 +1035,9 @@ public final class ExploreLoop {
                 && !tried.contains(key(e)) && !avoided(key(e)) && Conditions.answer(e.when()) != Answer.YES).count();
         long facts = parkedOn(screen, StopKind.MISSING_FACT);
         long conditions = parkedOn(screen, StopKind.MISSING_CONDITION);
-        long others = parked.values().stream().filter(stop -> screen.equals(stop.screen())).count() - facts - conditions;
+        // A low-yield stop is about the screen's yield, not something on it: it holds nothing open.
+        long others = parked.values().stream().filter(stop -> screen.equals(stop.screen())).count() - facts - conditions
+                - parkedOn(screen, StopKind.LOW_YIELD);
         long unplanned = website() ? 0 : unplanned(on);
         List<String> open = new ArrayList<>();
         if (uncropped > 0) open.add(uncropped + " uncropped");
@@ -1048,6 +1167,7 @@ public final class ExploreLoop {
         // What the guard stopped before this press is not its doing.
         play.stopped();
         Effect.State before = play.state().orElse(Effect.State.of(null, ""));
+        doing = Spent.PRESSING;
         pressed(screen + ": " + field);
         lastEdge = null;
         Optional<String> at = play.press(screen, field, settings.edge().toMillis());
@@ -1173,6 +1293,7 @@ public final class ExploreLoop {
         String id = kind.id() + "-" + (stops + 1);
         settledAt.put(id, List.copyOf(all));
         emit(new ExploreEvent.Settled(id, all, nowMs.getAsLong()));
+        settling = true;
         return stop(kind, screen, place, Look.NOTHING, missing, false);
     }
 
@@ -1289,9 +1410,12 @@ public final class ExploreLoop {
 
     private Paused stop(StopKind kind, String screen, String place, Look look, String missing, boolean neverParks,
                         Fault fault) {
+        Spent waits = settling ? Spent.SETTLING : Spent.CLAUDE;
+        settling = false;
         if (parked.containsKey(parkedKey(kind, place))) return null;
         // The stop a replayed fault was came back on the rebuilt SDK: the fault is still there, held again.
         if (fault == null && dev && replays(kind, place)) {
+            settling = waits == Spent.SETTLING;
             return stop(StopKind.FAULT, screen, place, look, missing, true, new Fault(kind, replay.source(),
                     "the stop came back as " + kind.id() + " after the SDK's reload"));
         }
@@ -1312,7 +1436,10 @@ public final class ExploreLoop {
             // Written before the run holds, so the SDK's reload restarts it where it is.
             memory(stop, fault.plain(), fault.source()).write(journal);
         }
+        long pausedAt = nowMs.getAsLong();
         Paused paused = pause(stop, neverParks);
+        // A resume that gave the screen a fresh clock moved its start past the pause: only what follows it is waited.
+        waited.merge(waits, Math.max(0, nowMs.getAsLong() - Math.max(pausedAt, onSince)), Long::sum);
         // The time paused is Claude's, not the run's: it does not count as nothing pressed.
         lastPress = nowMs.getAsLong();
         return paused;
@@ -1416,6 +1543,10 @@ public final class ExploreLoop {
         verdictsDue = true;
         emit(new ExploreEvent.Reloaded(stopId, generation, List.of(), nowMs.getAsLong()));
         Stop fixed = parkedStop != null ? parkedStop : open;
+        if (fixed.kind() == StopKind.LOW_YIELD && fixed.screen() != null && !built.contains(fixed.screen())) {
+            yielded(fixed.screen(), ignore);
+            if (!ignore && parkedStop == null) yieldResumed.put(fixed.screen(), fixed.id());
+        }
         List<String> lines = leftOut.remove(fixed.id());
         if (lines != null && !ignore) skips.add(new Skip(fixed, lines));
         if (parkedStop != null) {

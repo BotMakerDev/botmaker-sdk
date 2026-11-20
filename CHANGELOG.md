@@ -29,7 +29,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   parked, and, in a run that plays a plan, while an input on it spends a fact with no action of the plan's goals
   pressing it. A screen whose clock runs past its budget unbuilt, 2 minutes (`ExploreLoop.Settings.screenBudget`),
   is set aside (`set_aside` in the journal, "set aside" in `status`): the run walks to the nearest other open screen
-  and comes back to it once no other is open.
+  and comes back to it once no other is open. Back and still unbuilt after a second budget, it stops as **Low yield**
+  (`low_yield`), which says what is open and where its clock went: pressing, settling, walking, waiting on Claude. A
+  resume gives the screen a fresh clock; a resume with ignore leaves it as it is for the run. A parked one holds
+  nothing open.
 
 - Dev discovery, for whoever edits the SDK: on a `-SNAPSHOT` SDK, *Keep exploring* holds a **Discover fault** (🛠 in
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never
