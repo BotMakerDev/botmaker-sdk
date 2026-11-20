@@ -4,8 +4,11 @@
 package com.botmaker.sdk.internal.explore;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
@@ -43,6 +46,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.LongSupplier;
@@ -188,6 +192,11 @@ public final class ExploreLoop {
 
         /** Runs one round of the bot's plan; false when it has nothing to do. */
         boolean planRound();
+
+        /** The plan {@link #planRound} plays; {@link Plan#NONE} when the run plays none. */
+        default Plan plan() {
+            return Plan.NONE;
+        }
 
         /** Waits {@code time}; a stop of the run ends it by its throw. */
         void idle(Duration time);
@@ -802,17 +811,18 @@ public final class ExploreLoop {
     /**
      * Charges the time since the last round to the screen it was on, and moves the run's clock to {@code screen}
      * (null: on no screen of the map). A screen the run leaves is said built, or building with what is still open on
-     * it; a screen it reaches with nothing open is said built at once.
+     * it, a built one too, which a stop parked on it while there opens again; a screen it reaches with nothing open
+     * is said built at once.
      */
     private void clock(String screen) {
         long now = nowMs.getAsLong();
         if (onScreen != null) {
             clock.merge(onScreen, Math.max(0, now - onSince), Long::sum);
-            if (!onScreen.equals(screen) && !built.contains(onScreen)) {
+            if (!onScreen.equals(screen)) {
                 List<String> open = open(onScreen);
                 if (open.isEmpty()) {
-                    built(onScreen, now);
-                } else if (!open.equals(leftOpen.put(onScreen, open))) {
+                    if (!built.contains(onScreen)) built(onScreen, now);
+                } else if (built.remove(onScreen) | !open.equals(leftOpen.put(onScreen, open))) {
                     // Said when what is open changed: a hub passed through again and again says it once.
                     emit(new ExploreEvent.Building(onScreen, clock.get(onScreen), open, now));
                 }
@@ -834,6 +844,15 @@ public final class ExploreLoop {
             clock.put(b.screen(), b.ms());
             leftOpen.put(b.screen(), b.open());
         }
+        // A built screen a stop of the last run is still parked on is open again.
+        long now = nowMs.getAsLong();
+        for (String screen : List.copyOf(built)) {
+            List<String> open = open(screen);
+            if (open.isEmpty()) continue;
+            built.remove(screen);
+            leftOpen.put(screen, open);
+            emit(new ExploreEvent.Building(screen, clock.getOrDefault(screen, 0L), open, now));
+        }
     }
 
     private void built(String screen, long now) {
@@ -843,7 +862,9 @@ public final class ExploreLoop {
 
     /**
      * What is still to do on {@code screen} before it is built, one line a kind ({@code "3 untried"}): inputs with no
-     * picture, ways and inputs not tried yet, inputs with no verdict. Empty when nothing is.
+     * picture, ways and inputs not tried yet, inputs with no verdict, ways waiting on their condition, stops parked
+     * on it (missing facts, missing conditions, the rest), and, in a run that plays a plan, inputs that spend with no
+     * action of its goals pressing them. Empty when nothing is.
      */
     List<String> open(String screen) {
         MapScreen on = map.screen(screen).orElse(null);
@@ -858,11 +879,74 @@ public final class ExploreLoop {
         long untried = map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).count()
                 + (readsTrees() ? untriedInputs(screen).size() : 0);
         long unjudged = map.untagged().stream().filter(name -> name.screen().equals(screen)).count();
+        // A way whose condition does not hold now is not tried yet: the screen waits for it to hold.
+        long waiting = map.edges().stream().filter(e -> e.from().equals(screen) && !e.onItsOwn()
+                && !tried.contains(key(e)) && !avoided(key(e)) && Conditions.answer(e.when()) != Answer.YES).count();
+        long facts = parkedOn(screen, StopKind.MISSING_FACT);
+        long conditions = parkedOn(screen, StopKind.MISSING_CONDITION);
+        long others = parked.values().stream().filter(stop -> screen.equals(stop.screen())).count() - facts - conditions;
+        long unplanned = website() ? 0 : unplanned(on);
         List<String> open = new ArrayList<>();
         if (uncropped > 0) open.add(uncropped + " uncropped");
         if (untried > 0) open.add(untried + " untried");
         if (unjudged > 0) open.add(unjudged + " without verdict");
+        if (waiting > 0) open.add(waiting + " waiting on a condition");
+        if (facts > 0) open.add(facts + (facts == 1 ? " fact missing" : " facts missing"));
+        if (conditions > 0) open.add(conditions + (conditions == 1 ? " condition missing" : " conditions missing"));
+        if (others > 0) open.add(others + (others == 1 ? " stop parked" : " stops parked"));
+        if (unplanned > 0) open.add(unplanned + " spending for no goal");
         return open;
+    }
+
+    /** How many stops of {@code kind} on {@code screen} are parked: each one Claude has still to answer. */
+    private long parkedOn(String screen, StopKind kind) {
+        return parked.values().stream().filter(stop -> stop.kind() == kind && screen.equals(stop.screen())).count();
+    }
+
+    /**
+     * How many of {@code on}'s inputs spend a fact with no action of the plan's goals pressing them: an input that
+     * spends is there to meet a goal. None when the run plays no plan.
+     */
+    private long unplanned(MapScreen on) {
+        Plan plan = play.plan();
+        if (plan == null || plan.tiers().isEmpty()) return 0;
+        Set<Goal> goals = planned(plan);
+        List<Do> done = doneBy(goals);
+        return on.inputs().values().stream()
+                .filter(input -> input.spends() != null && input.never() == null)
+                .filter(input -> on.actions().values().stream().noneMatch(action -> Objects.equals(action.input(), input)
+                        && (action.serves().stream().anyMatch(goals::contains) || done.contains(action))))
+                .count();
+    }
+
+    /** The goals {@code plan} plays, with every goal an action serving one of them needs first. */
+    private Set<Goal> planned(Plan plan) {
+        Set<Goal> goals = new HashSet<>();
+        plan.tiers().forEach(tier -> goals.addAll(tier.goals()));
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (MapScreen screen : map.screens().values()) {
+                for (Do action : screen.actions().values()) {
+                    if (action.serves().stream().anyMatch(goals::contains)) grew |= goals.addAll(action.goalNeeds());
+                }
+            }
+        }
+        return goals;
+    }
+
+    /** The actions whose being done is one of {@code goals}. */
+    private static List<Do> doneBy(Set<Goal> goals) {
+        List<Do> done = new ArrayList<>();
+        for (Goal goal : goals) {
+            if (!(goal instanceof Goal.Done doneGoal)) continue;
+            try {
+                done.add(doneGoal.action().get());
+            } catch (RuntimeException | LinkageError unreadable) {
+                // a goal whose action cannot be named uses none; the plan run says why when it plays it
+            }
+        }
+        return done;
     }
 
     /** Whether {@code button} has a picture the run can find it by: its own, its element's shot, or another's it sits beside. */

@@ -3,7 +3,11 @@
 
 package com.botmaker.sdk.internal.explore;
 
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.plan.Goal;
+import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
@@ -120,11 +124,20 @@ class ExploreLoopTest {
 
         /** What {@link #look} throws; null: it looks. */
         RuntimeException lookThrows;
+        /** What {@link #look} reads, by screen; a screen not here reads nothing. */
+        final Map<String, ExploreLoop.Look> seen = new HashMap<>();
+        /** The plan the run plays. */
+        Plan plan = Plan.NONE;
 
         @Override
         public ExploreLoop.Look look(String screen) {
             if (lookThrows != null) throw lookThrows;
-            return ExploreLoop.Look.NOTHING;
+            return seen.getOrDefault(screen, ExploreLoop.Look.NOTHING);
+        }
+
+        @Override
+        public Plan plan() {
+            return plan;
         }
 
         @Override
@@ -406,6 +419,59 @@ class ExploreLoopTest {
         ExploreLoop loop = loop(map, game, same(map), Duration.ofMinutes(1));
 
         assertEquals(List.of("1 uncropped", "1 untried"), loop.open("A"));
+    }
+
+    /** A value nothing reads, parked unanswered, keeps its screen open until its stop is resumed. */
+    @Test
+    void aParkedMissingFactKeepsItsScreenOpenUntilResumed() {
+        Game game = new Game();
+        game.seen.put("A", new ExploreLoop.Look(List.of(new Stop.Text("Gold 1200", new Rect(40, 40, 80, 20))),
+                List.of(), Map.of(), List.of()));
+        ExploreLoop parked = loop(map(), game, same(map()), Duration.ofMinutes(12));
+        parked.run();
+
+        assertEquals(StopKind.MISSING_FACT, stops().getFirst().stop().kind());
+        assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody answered in 10 min");
+        assertTrue(parked.open("A").contains("1 fact missing"), parked.open("A").toString());
+        assertFalse(parked.open("B").contains("1 fact missing"), "only its own screen");
+        assertTrue(JournalView.of(journal()).build().built().stream().noneMatch(b -> b.screen().equals("A")),
+                "not built while its stop is parked");
+
+        // The fix: a readout now reads the value, and the stop is resumed.
+        game.seen.clear();
+        game.onIdle = () -> {
+            if (!journal().queue().isEmpty()) journal().command("resume " + journal().queue().getFirst().id());
+        };
+        ExploreLoop resumed = loop(map(), game, same(map()), Duration.ofMinutes(15));
+        resumed.run();
+
+        assertTrue(journal().queue().isEmpty(), "it left the queue");
+        assertFalse(resumed.open("A").contains("1 fact missing"), resumed.open("A").toString());
+    }
+
+    /** An input that spends with no goal's action pressing it is open; one a goal of the plan does is not. */
+    @Test
+    void aSpendingInputWithNoGoalKeepsItsScreenOpen() {
+        Button buy = click("buy").spends(Progress::gems);
+        Button sell = click("sell").spends(Progress::gems);
+        Do selling = Do.press(sell);
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), buy, sell).withAction("selling", selling)
+                .withAction("buying", Do.press(buy)));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.plan = Plan.of(Plan.tier(Goal.done(() -> selling)));
+
+        ExploreLoop loop = loop(map, game, same(map), Duration.ofMinutes(1));
+        assertEquals(List.of("1 spending for no goal"), loop.open("A"));
+
+        game.plan = Plan.NONE;
+        assertEquals(List.of(), loop.open("A"), "a run with no plan asks no goal of a spend");
+    }
+
+    /** A fact group of the test's, for an input to spend. */
+    private interface Progress {
+        int gems();
     }
 
     @Test

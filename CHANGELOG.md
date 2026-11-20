@@ -24,7 +24,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - Keep exploring times each screen on its own clock, the time the run spent on it, and says it built once every
   element has its picture and every way and input is tried and has a verdict, or what is still open when it leaves it
   (`built` and `building` in the journal). The explore tool's `status` and `wait` end with how far the map is built
-  (`map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)`), and the Explore tab lists both.
+  (`map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)`), and the Explore tab lists both. A screen is
+  open too while a way out of it waits on its condition, while a missing-fact or missing-condition stop on it is
+  parked, and, in a run that plays a plan, while an input on it spends a fact with no action of the plan's goals
+  pressing it.
 
 - Dev discovery, for whoever edits the SDK: on a `-SNAPSHOT` SDK, *Keep exploring* holds a **Discover fault** (🛠 in
   🔭 Explore), a stop that is Discover's own mistake rather than the site's, until the SDK is fixed; it is never

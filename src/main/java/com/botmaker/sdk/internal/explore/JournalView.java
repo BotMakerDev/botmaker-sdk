@@ -304,13 +304,14 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         Map<String, ExploreEvent.Building> open = new LinkedHashMap<>();
         for (ExploreEvent event : events) {
             switch (event) {
+                // The latest says it: a built screen a parked stop opens again is building until built again.
                 case ExploreEvent.Built b -> {
-                    // The first says it: a restarted run that says it again starts no clock over.
-                    built.putIfAbsent(b.screen(), b);
+                    built.put(b.screen(), b);
                     open.remove(b.screen());
                 }
                 case ExploreEvent.Building b -> {
-                    if (!built.containsKey(b.screen())) open.put(b.screen(), b);
+                    open.put(b.screen(), b);
+                    built.remove(b.screen());
                 }
                 default -> {}
             }

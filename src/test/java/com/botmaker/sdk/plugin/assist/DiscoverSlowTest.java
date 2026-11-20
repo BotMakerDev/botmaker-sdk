@@ -167,7 +167,7 @@ class DiscoverSlowTest {
         AtomicInteger generation = new AtomicInteger();
         ExploreLoop.Reload reload = () -> {
             ScreenGraph now = graph.get();
-            play.use(now, null);
+            play.use(now, null, null);
             return new ExploreLoop.Reload.Reloaded(generation.incrementAndGet(), now, Guards.with(List.of()),
                     List.of());
         };

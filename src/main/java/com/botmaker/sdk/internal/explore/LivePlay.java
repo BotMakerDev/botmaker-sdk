@@ -77,7 +77,7 @@ public final class LivePlay implements ExploreLoop.Play {
         Plan plan = first.plan();
         Journal journal = Journal.of(project);
         journal.forgetPage();
-        LivePlay play = new LivePlay(ScreenMaps.installed(), plan == null ? null : RunGame.rounds(plan, first.holders()),
+        LivePlay play = new LivePlay(ScreenMaps.installed(), plan, plan == null ? null : RunGame.rounds(plan, first.holders()),
                 restart, journal);
         AtomicReference<Generation> current = new AtomicReference<>(first);
         ExploreLoop.Reload reload = () -> switch (current.get().next(project, current.get().number() + 1)) {
@@ -85,7 +85,7 @@ public final class LivePlay implements ExploreLoop.Play {
                 next.install();
                 current.set(next);
                 Plan now = next.plan();
-                play.use(ScreenMaps.installed(), now == null ? null : RunGame.rounds(now, next.holders()));
+                play.use(ScreenMaps.installed(), now, now == null ? null : RunGame.rounds(now, next.holders()));
                 yield new ExploreLoop.Reload.Reloaded(next.number(), ScreenMaps.installed(), guards(next), List.of());
             }
             case Generation.Refused(List<String> errors) ->
@@ -99,7 +99,7 @@ public final class LivePlay implements ExploreLoop.Play {
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
     public static LivePlay over(ScreenGraph map, Runnable restart) {
-        return new LivePlay(map, null, restart, null);
+        return new LivePlay(map, null, null, restart, null);
     }
 
     /** The guards with the author's words of {@code generation}'s bot. */
@@ -127,22 +127,29 @@ public final class LivePlay implements ExploreLoop.Play {
     private volatile ScreenGraph map;
     private volatile LiveMoves moves;
     private volatile BooleanSupplier rounds;
+    private volatile Plan plan = Plan.NONE;
 
     /**
-     * Plays {@code map} with the plan's {@code rounds} (null: no plan); {@code restart} restarts the game; a website's
-     * page goes to {@code journal} (null: nowhere).
+     * Plays {@code map} with {@code plan} (null: none); {@code restart} restarts the game; a website's page goes to
+     * {@code journal} (null: nowhere).
      */
-    private LivePlay(ScreenGraph map, BooleanSupplier rounds, Runnable restart, Journal journal) {
+    private LivePlay(ScreenGraph map, Plan plan, BooleanSupplier rounds, Runnable restart, Journal journal) {
         this.restart = restart;
         this.journal = journal;
-        use(map, rounds);
+        use(map, plan, rounds);
     }
 
-    /** Plays {@code map} and {@code rounds} from now on: a new generation's. */
-    public void use(ScreenGraph map, BooleanSupplier rounds) {
+    /** Plays {@code map} and {@code plan} by its {@code rounds} from now on: a new generation's. */
+    public void use(ScreenGraph map, Plan plan, BooleanSupplier rounds) {
         this.map = map;
         this.moves = new LiveMoves(map, reach, restart);
+        this.plan = plan == null ? Plan.NONE : plan;
         this.rounds = rounds;
+    }
+
+    @Override
+    public Plan plan() {
+        return plan;
     }
 
     @Override
