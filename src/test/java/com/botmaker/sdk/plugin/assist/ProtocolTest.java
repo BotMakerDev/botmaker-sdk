@@ -51,12 +51,12 @@ class ProtocolTest {
     /** Home, its Quests and Tavern each opened and finished, and an Offer popup. */
     private static ScreenGraph finished() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
-        screens.put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("home")),
+        screens.put("HOME", MapFixtures.screen(Setup.named("Home").markers(marks("home")).allCut(),
                 Button.of(picture("quests")), Button.of(picture("tavern"))));
         screens.put("QUESTS", MapFixtures.screen(Setup.named("Quests").markers(marks("quests_title"))
-                .from(BotConstants.input("HOME", "quests")), Button.of(picture("claim")).tried()));
+                .from(BotConstants.input("HOME", "quests")).allCut(), Button.of(picture("claim")).tried()));
         screens.put("TAVERN", MapFixtures.screen(Setup.named("Tavern").markers(marks("tavern_title"))
-                .from(BotConstants.input("HOME", "tavern")), Button.of(picture("drink")).tried()));
+                .from(BotConstants.input("HOME", "tavern")).allCut(), Button.of(picture("drink")).tried()));
         screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(marks("offer")).popup()));
         return ScreenGraph.of(screens);
     }

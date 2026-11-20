@@ -103,7 +103,7 @@ public final class Screens {
 
         @Override
         public Setup setup() {
-            return Setup.named("Settings").from(HOME.collect);
+            return Setup.named("Settings").from(HOME.collect).allCut();
         }
     }
 

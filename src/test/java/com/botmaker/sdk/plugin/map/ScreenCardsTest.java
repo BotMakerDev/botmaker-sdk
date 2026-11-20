@@ -190,7 +190,7 @@ class ScreenCardsTest {
         screens.put("OFFER", MapScreen.of(Setup.named("Offer").markers(marks("offer")).popup()));
         ScreenGraph graph = ScreenGraph.of(screens);
         assertFalse(graph.noneCut("OFFER"), "its default way back is its way out");
-        assertFalse(graph.unfinished("OFFER"));
+        assertTrue(graph.done("OFFER"));
         assertEquals(State.FINISHED, ScreenCards.card(graph, "OFFER", "").state());
         assertTrue(graph.owed().stream().noneMatch(o -> o.startsWith("Offer")));
         assertTrue(graph.noneCut("ENGINEER"));

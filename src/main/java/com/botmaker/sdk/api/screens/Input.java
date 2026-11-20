@@ -15,7 +15,8 @@ import java.util.function.BooleanSupplier;
  * buttons that scrolls in two dimensions, or the bot's own {@link Custom} Java. The traits here are each kind's.
  *
  * <p>Until it is {@link #tried}, {@link #leaving left by}, {@link #never} done or {@link #locked locked} it is
- * untried: Discovery tries every input of a screen before the screen counts as finished. An input that opened a
+ * untried: Discovery tries every input of a screen before the screen counts as finished. One whose press did not
+ * take is {@link #failed}, and holds its screen back too. An input that opened a
  * screen is tried too, and says so by the screen it opened ({@link Setup#from}). An input that is
  * {@link #occasional occasional} never holds a screen back while it is not on it; {@link #when} says when it is
  * there, as a method of the bot or of a plugin ({@code Firestone::eventOn}), and a run asks it before walking there
@@ -71,9 +72,19 @@ public sealed interface Input extends ScreenPart permits Button, TextButton, Hot
     /** When it is there, for an occasional one: a method answering whether it is; null when not known. */
     BooleanSupplier when();
 
-    /** This input, tried, opening no screen. */
+    /**
+     * Why its last press did not take, a run's words: {@code "the page answered HTTP 404"}; null when none did. An
+     * input that failed is pressed once more by the next run, and its screen is not done until it takes (2026-11-20).
+     */
+    String failed();
+
+    /** This input, tried, opening no screen: its press took, so a failure said before is gone. */
     @Link
     Input tried();
+
+    /** This input, its last press not taking because {@code why}. */
+    @Link
+    Input failed(String why);
 
     /** This input, going to a screen mapped already that it is no way into. */
     @Link

@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A screen is done by one rule, and exploring finishes the screen it is on first.** Each input of a screen is
+  now linked, stays, not pressed (never, spends, locked), failed or untried, and a screen is done once none is
+  failed or untried. A screen of pictures is done only once it is also marked all cut: `Setup.allCut()` in
+  the bot, or `allCut` on `write_notes`. Popups and the start screen need no such mark. An input now keeps why its
+  last press did not take (`failed("…")`), and a press that takes clears it. After the screen it is on, Discovery
+  goes to the nearest unfinished screen, by the cost of the way there, instead of the shallowest. Ties keep the
+  old breadth-first order.
 - **Every explore stop now ends.** The start-of-run list of inputs with no verdict is parked like any other stop
   nobody answers, and the guard still presses no such input. A window that stays in front of the game for the stuck
   time (15 min) ends the run as *Stuck* instead of waiting forever; nothing is pressed into that window. A server

@@ -149,7 +149,7 @@ class ScreenGraphTest {
     /** Breadth first (the user's call, 2026-10-16): a screen's own inputs, then the screens they opened, shallowest first. */
     @Test
     void discoveryExploresTheShallowestScreenWithInputsLeftFirst() {
-        Map<String, MapScreen> screens = firestone();
+        Map<String, MapScreen> screens = allCut(firestone());
         assertEquals(Optional.of("HOME"), ScreenGraph.of(screens).nextToExplore(),
                 "Home's gold before Engineer, which it opened");
 
@@ -174,7 +174,7 @@ class ScreenGraphTest {
     /** Help, rules and leaderboards only tell: tried last on their screen, and explored after every other screen. */
     @Test
     void informationIsTriedAndExploredLast() {
-        Map<String, MapScreen> screens = firestone();
+        Map<String, MapScreen> screens = allCut(firestone());
         Input ranks = click("ranks").info();
         screens.put("HOME", screen(screens.get("HOME").setup(), click("help_button"), ranks, click("campaign"),
                 click("engineer"), click("gold")));
@@ -196,6 +196,81 @@ class ScreenGraphTest {
         assertEquals(Optional.of("MAP"), ScreenGraph.of(withHelp).nextToExplore(), "a deeper screen before help");
         withHelp.put("MAP", with(withHelp.get("MAP"), click("node").tried()));
         assertEquals(Optional.of("RULES"), ScreenGraph.of(withHelp).nextToExplore());
+    }
+
+    @Test
+    void anInputsStatusIsLinkedStaysNotPressedFailedOrUntried() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("CAMPAIGN", with(screens.get("CAMPAIGN"), click("arena").locked(picture("padlock")),
+                click("chest").failed("nothing changed"), click("shop")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(InputStatus.LINKED, graph.status("CAMPAIGN", "map"), "it opens Map");
+        assertEquals(InputStatus.STAYS, graph.status("CAMPAIGN", "claim"));
+        assertEquals(InputStatus.NOT_PRESSED, graph.status("CAMPAIGN", "gems"), "never done");
+        assertEquals(InputStatus.NOT_PRESSED, graph.status("CAMPAIGN", "arena"), "locked");
+        assertEquals(InputStatus.FAILED, graph.status("CAMPAIGN", "chest"));
+        assertEquals(InputStatus.UNTRIED, graph.status("CAMPAIGN", "shop"));
+        assertEquals(List.of("chest", "shop"), graph.left("CAMPAIGN"), "a failed input is still to press");
+        assertEquals(null, click("chest").failed("x").tried().failed(), "a press that took clears the failure");
+    }
+
+    /** Review Focus 1: inputs never pressed are accounted for, so the run leaves the screen instead of circling. */
+    @Test
+    void aScreenOfOnlyNeverAndLockedInputsIsDone() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("SHOP", screen(Setup.named("Shop").markers(marks("shop_title")).from(ref("HOME", "gold"))
+                .allCut(), click("buy_gems").never("real money"), click("vip").locked(picture("padlock"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of(), graph.left("SHOP"));
+        assertTrue(graph.done("SHOP"));
+    }
+
+    @Test
+    void aPictureScreenIsDoneOnlyOnceAllCut() {
+        Map<String, MapScreen> screens = firestone();
+        assertEquals(List.of(), ScreenGraph.of(screens).left("CAMPAIGN"), "claim stays, map is linked, gems never");
+        assertFalse(ScreenGraph.of(screens).done("CAMPAIGN"), "an element nobody cut may be on it still");
+
+        screens.put("CAMPAIGN", screens.get("CAMPAIGN").setup(Setup::allCut));
+        assertTrue(ScreenGraph.of(screens).done("CAMPAIGN"));
+        assertFalse(ScreenGraph.of(screens).done("ENGINEER"), "nothing cut is never done");
+    }
+
+    @Test
+    void aFailedInputIsOwedAsFailedNotUntried() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("CAMPAIGN", with(screens.get("CAMPAIGN"), click("shop").failed("nothing changed"))
+                .setup(Setup::allCut));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        assertEquals(InputStatus.FAILED, graph.status("CAMPAIGN", "shop"));
+        assertFalse(graph.done("CAMPAIGN"), "a failed press holds its screen back");
+        assertTrue(graph.owed().contains("Campaign: failed shop"), graph.owed().toString());
+        assertTrue(graph.owed().stream().noneMatch(o -> o.startsWith("Campaign: untried")), graph.owed().toString());
+    }
+
+    @Test
+    void nextFinishesHereThenTheNearest() {
+        Map<String, MapScreen> screens = firestone();
+        screens.put("HOME", with(screens.get("HOME"), click("gold").tried()).setup(Setup::allCut));
+        screens.put("CAMPAIGN", with(screens.get("CAMPAIGN"), click("shop")).setup(Setup::allCut));
+        assertEquals(Optional.of("CAMPAIGN"), ScreenGraph.of(screens).nextToExplore(Optional.of("CAMPAIGN")),
+                "its shop is still to press");
+
+        screens.put("CAMPAIGN", with(screens.get("CAMPAIGN"), click("shop").tried()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        assertTrue(graph.done("CAMPAIGN"));
+        assertEquals(Optional.of("ENGINEER"), graph.nextToExplore(), "breadth first: Engineer, a step down");
+        assertEquals(Optional.of("MAP"), graph.nextToExplore(Optional.of("CAMPAIGN")),
+                "Map one way away, not Engineer two");
+    }
+
+    @Test
+    void nextWithNoPlaceIsTodaysOrder() {
+        ScreenGraph graph = ScreenGraph.of(firestone());
+        assertEquals(Optional.of("HOME"), graph.nextToExplore(Optional.empty()));
+        assertEquals(graph.nextToExplore(), graph.nextToExplore(Optional.of("NOWHERE")), "a screen not on the map");
     }
 
     @Test
@@ -365,7 +440,7 @@ class ScreenGraphTest {
         screens.put("MAP", with(screens.get("MAP"), click("loot").occasional()));
         ScreenGraph graph = ScreenGraph.of(screens);
 
-        assertFalse(graph.unfinished("MAP"));
+        assertEquals(List.of(), graph.left("MAP"));
         assertEquals(List.of(
                 "Home: untried gold",
                 "Map: never seen to try loot (comes and goes)",
@@ -530,7 +605,14 @@ class ScreenGraphTest {
                 .from(ref("HOME", "campaign")), click("map"), click("claim").tried()));
         screens.put("MAP", screen(Setup.named("Map").markers(marks("map_title")).from(ref("CAMPAIGN", "map")),
                 click("x").tried()));
-        return ScreenGraph.of(screens);
+        return ScreenGraph.of(allCut(screens));
+    }
+
+    /** {@code screens}, each marked all cut: its inputs here are all it shows. */
+    private static Map<String, MapScreen> allCut(Map<String, MapScreen> screens) {
+        Map<String, MapScreen> cut = new LinkedHashMap<>();
+        screens.forEach((c, s) -> cut.put(c, s.setup(Setup::allCut)));
+        return cut;
     }
 
     /**
@@ -594,7 +676,7 @@ class ScreenGraphTest {
         assertEquals(List.of("BATTLE"), graph.followers("ENTERING"));
         assertEquals(ScreenGraph.Presence.ALWAYS, graph.presence("BATTLE"));
         assertFalse(graph.noneCut("LOADING"), "a start screen has nothing to cut but its marker");
-        assertFalse(graph.unfinished("LOADING"));
+        assertTrue(graph.done("LOADING"), "a start screen need not say it is all cut");
     }
 
     @Test

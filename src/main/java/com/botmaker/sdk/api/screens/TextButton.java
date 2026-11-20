@@ -30,10 +30,19 @@ import java.util.function.BooleanSupplier;
  * @param hold         how long a {@link Gesture#HOLD} is held; {@link Button#HOLD_TIME} when null, none for any other
  * @param isMarking    whether its words tell its screen: read there while the game shows it
  * @param isAbsent     whether its words are never read while the game shows its screen
+ * @param failed       why its last press did not take; null when none did
  */
 public record TextButton(Caption caption, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
                          boolean isOccasional, ImageTemplate locked, BooleanSupplier when, Gesture gesture,
-                         Duration hold, boolean isMarking, boolean isAbsent) implements Input {
+                         Duration hold, boolean isMarking, boolean isAbsent, String failed) implements Input {
+
+    /** Words whose presses all took, or none was made. */
+    public TextButton(Caption caption, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
+                      boolean isOccasional, ImageTemplate locked, BooleanSupplier when, Gesture gesture,
+                      Duration hold, boolean isMarking, boolean isAbsent) {
+        this(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold, isMarking,
+                isAbsent, null);
+    }
 
     public TextButton {
         verdict = verdict == null ? Verdict.NONE : verdict;
@@ -51,13 +60,19 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     @Override
     public TextButton tried() {
         return new TextButton(caption, true, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, null);
+    }
+
+    @Override
+    public TextButton failed(String why) {
+        return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
+                isMarking, isAbsent, why);
     }
 
     @Override
     public TextButton leaving() {
         return new TextButton(caption, isTried, true, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     @Override
@@ -69,7 +84,7 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     @Override
     public TextButton info() {
         return new TextButton(caption, isTried, isLeaving, true, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     @Override
@@ -90,13 +105,13 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     @Override
     public TextButton verdict(Verdict verdict) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     @Override
     public TextButton occasional() {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, true, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     @Override
@@ -108,51 +123,51 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     @Override
     public TextButton locked(ImageTemplate proof) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     @Override
     public TextButton when(BooleanSupplier condition) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition, gesture,
-                hold, isMarking, isAbsent);
+                hold, isMarking, isAbsent, failed);
     }
 
     /** This button, reading {@code caption} instead. */
     public TextButton caption(Caption caption) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     /** This button, pressed by {@code gesture}: {@code .gesture(Gesture.DOUBLE)}. A hold keeps its time. */
     public TextButton gesture(Gesture gesture) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                isMarking, isAbsent);
+                isMarking, isAbsent, failed);
     }
 
     /** This button, held down {@code time} then let go: {@code .hold(Duration.ofSeconds(2))}. */
     public TextButton hold(Duration time) {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, Gesture.HOLD,
-                time, isMarking, isAbsent);
+                time, isMarking, isAbsent, failed);
     }
 
     /** This button, its words telling its screen: read there while the game shows it. */
     @Link
     public TextButton marking() {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                true, false);
+                true, false, failed);
     }
 
     /** This button, its words telling its screen apart from one alike by never being read there. */
     @Link
     public TextButton absent() {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                false, true);
+                false, true, failed);
     }
 
     /** This button, its words telling nothing of its screen: neither {@link #marking} nor {@link #absent}. */
     public TextButton unmarked() {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, gesture, hold,
-                false, false);
+                false, false, failed);
     }
 
     /** How long it is held when its gesture is a hold: its own time, else {@link Button#HOLD_TIME}. */

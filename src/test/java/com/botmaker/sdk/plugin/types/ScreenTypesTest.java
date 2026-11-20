@@ -169,6 +169,13 @@ class ScreenTypesTest {
         assertEquals(strip, roundTrip(ScreenTypes.STRIP_SHAPE, strip));
         assertEquals(never, roundTrip(ScreenTypes.BUTTON_SHAPE, never));
         assertTrue(never.repeats(), "a repeated button says so");
+
+        Button failed = Button.of(picture("chest")).failed("nothing changed");
+        Hotkey keyFailed = Hotkey.of(Key.Q).failed("no screen showed");
+        assertEquals(failed, roundTrip(ScreenTypes.BUTTON_SHAPE, failed), "a failure is written by its link");
+        assertEquals(keyFailed, roundTrip(ScreenTypes.HOTKEY_KEY_SHAPE, keyFailed));
+        Setup cut = Setup.named("Shop").allCut();
+        assertEquals(cut, roundTrip(ScreenTypes.SETUP_SHAPE, cut), "all cut is written by its link");
     }
 
     /**

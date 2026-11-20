@@ -719,8 +719,8 @@ final class MapTools {
     }
 
     /**
-     * {@code said}, and when the try left {@code screen} finished, the game walked to the screen Discovery explores next
-     * ({@link ScreenGraph#nextToExplore}: the shallowest with work left), checked by that screen's marker;
+     * {@code said}, and when the try left {@code screen} {@link ScreenGraph#done done}, the game walked to the screen
+     * Discovery explores next ({@link ScreenGraph#nextToExplore(Optional)}: the nearest not done), checked by that screen's marker;
      * {@code input}'s {@code stay} keeps it. A popup's inputs are tried while it shows, so it walks nowhere.
      */
     private static AgentReply up(AgentContext context, AgentReply said, String screen, One input) {
@@ -731,9 +731,9 @@ final class MapTools {
         } catch (IllegalStateException busy) {
             return said;
         }
-        boolean stays = graph.unfinished(screen) || graph.screen(screen).filter(MapScreen::isPopup).isPresent();
+        boolean stays = !graph.done(screen) || graph.screen(screen).filter(MapScreen::isPopup).isPresent();
         Optional<String> to = stays ? Optional.empty()
-                : graph.nextToExplore().filter(c -> !c.equals(screen));
+                : graph.nextToExplore(Optional.of(screen)).filter(c -> !c.equals(screen));
         Optional<ToolReach> reach = ToolReach.of(context);
         if (to.isEmpty() || reach.isEmpty()
                 || ActTools.desktopRefusal(context, reach.get().hands(), input.desktop()).isPresent()) {
@@ -955,10 +955,12 @@ final class MapTools {
                     + "read again: read_guide says what is left.");
         }
         String name = graph.shown(screen);
-        List<String> left = graph.untried(screen);
+        List<String> left = graph.left(screen);
         return AgentReply.text("Noted in " + name + ": tried " + what + ", " + did + "." + (left.isEmpty()
                 ? " Every input cut on it is tried" + graph.shape(screen).map(s -> s == ScreenGraph.Shape.MENU
                 ? ": a menu." : ": an activity.").orElse(".")
+                + (graph.done(screen) ? "" : " " + name + " is not done until it is all cut: once every input on "
+                + "it is cut, write_notes with screen " + name + " and allCut true.")
                 + (ask ? " Before leaving " + name + ": was every list and panel on it scrolled to both ends "
                 + "(try_input with scroll), every tab opened, every toggle flipped, every arrow paged? Each one "
                 + "that was not: crop_pictures it with screen " + name + " and try it." : "")

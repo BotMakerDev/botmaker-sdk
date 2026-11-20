@@ -48,6 +48,17 @@ public record Custom(Runnable method, boolean isLeaving, boolean isInfo, Verdict
         return this;
     }
 
+    /** None: Discovery never runs it, so no press of it fails. */
+    @Override
+    public String failed() {
+        return null;
+    }
+
+    @Override
+    public Custom failed(String why) {
+        return this;
+    }
+
     @Override
     public Custom leaving() {
         return new Custom(method, true, isInfo, verdict, isOccasional, locked, when);

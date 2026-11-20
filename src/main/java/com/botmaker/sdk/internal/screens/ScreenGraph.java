@@ -492,11 +492,43 @@ public final class ScreenGraph {
     }
 
     /**
-     * Whether {@code constant} still has inputs to try, or none cut yet: every screen has one, its way out, which
-     * counts once it is the screen's {@code back}.
+     * Where the field {@code field} of {@code constant} stands for exploring: linked when a way from it is in the map,
+     * it is the screen's way back or it is {@link Input#isLeaving leaving}; else not pressed when it is never done,
+     * spends a fact or is locked; else failed when its last press did not take; else stays when it was tried; else
+     * untried. One verdict not said yet is untried: the screen is not done until it is judged.
      */
-    public boolean unfinished(String constant) {
-        return noneCut(constant) || !untried(constant).isEmpty();
+    public InputStatus status(String constant, String field) {
+        Optional<Input> input = input(constant, field);
+        if (isBack(constant, field) || opens(constant, field).isPresent()
+                || input.filter(Input::isLeaving).isPresent()) {
+            return InputStatus.LINKED;
+        }
+        if (input.isEmpty()) return InputStatus.UNTRIED;
+        Input it = input.get();
+        if (it.never() != null || it.spends() != null || it.locked() != null) return InputStatus.NOT_PRESSED;
+        if (it.failed() != null) return InputStatus.FAILED;
+        return it.isTried() ? InputStatus.STAYS : InputStatus.UNTRIED;
+    }
+
+    /**
+     * {@code constant}'s fields still to press, untried or failed, in the order Discovery presses them: the screen's
+     * own work first, its information ({@link #isInfo}) last. Those that come and go are aside.
+     */
+    public List<String> left(String constant) {
+        return fields(constant).stream().filter(f -> !comesAndGoes(constant, f) && status(constant, f).counts())
+                .sorted(Comparator.comparing(f -> isInfo(f, input(constant, f).orElse(null)))).toList();
+    }
+
+    /**
+     * Whether {@code constant} is done: every input it shows is in the map ({@link Setup#isAllCut}, which a popup and
+     * a start screen need not say, the game showing them on its own), and none is {@link #left}. A screen nothing is
+     * cut on is never done, nor one the map does not hold.
+     */
+    public boolean done(String constant) {
+        MapScreen screen = screens.get(constant);
+        if (screen == null || noneCut(constant)) return false;
+        boolean allCut = screen.setup().isAllCut() || screen.isPopup() || screen.isStart();
+        return allCut && left(constant).isEmpty();
     }
 
     /**
@@ -539,14 +571,35 @@ public final class ScreenGraph {
      * declared first, as the map was found. Empty when nothing is left.
      */
     public Optional<String> nextToExplore() {
+        return nextToExplore(Optional.empty());
+    }
+
+    /**
+     * The screen exploring works on next from {@code at}, the screen a run stands on (spec
+     * {@code 2026-11-20-explore-screen-done-design.md}): {@code at} itself while it is not {@link #done}, so a screen is
+     * finished before it is left; else the not-done screen nearest it by the map's ways, a walk costing about a press
+     * a way; ties, and no {@code at}, by {@link #nextToExplore()}'s order, breadth first. Empty when nothing is left.
+     */
+    public Optional<String> nextToExplore(Optional<String> at) {
         List<String> order = new ArrayList<>(screens.keySet());
         Map<String, Presence> presence = presences();
-        return order.stream()
-                .filter(c -> depth(c).isPresent() && presence.get(c) != Presence.LOCKED && unfinished(c))
-                .min(Comparator.<String, Presence>comparing(presence::get)
-                        .thenComparing(this::underInfo)
-                        .thenComparingInt(c -> depth(c).orElse(DEEPEST))
-                        .thenComparingInt(order::indexOf));
+        Comparator<String> breadthFirst = Comparator.<String, Presence>comparing(presence::get)
+                .thenComparing(this::underInfo)
+                .thenComparingInt(c -> depth(c).orElse(DEEPEST))
+                .thenComparingInt(order::indexOf);
+        List<String> open = order.stream()
+                .filter(c -> depth(c).isPresent() && presence.get(c) != Presence.LOCKED && !done(c)).toList();
+        Optional<String> here = at.filter(screens::containsKey);
+        if (here.isEmpty()) return open.stream().min(breadthFirst);
+        if (open.contains(here.get())) return here;
+        Map<String, Long> away = new HashMap<>();
+        for (String c : open) {
+            pathTo(here.get(), c, edge -> true)
+                    .ifPresent(path -> away.put(c, path.stream().mapToLong(this::cost).sum()));
+        }
+        // A screen no way reaches from here comes after every one that is, in the breadth-first order.
+        return open.stream().min(Comparator.<String>comparingLong(c -> away.getOrDefault(c, Long.MAX_VALUE))
+                .thenComparing(breadthFirst));
     }
 
     /** Whether a way on {@code constant}'s path from the first screen is an information input, or names help. */
@@ -790,9 +843,11 @@ public final class ScreenGraph {
         for (String c : screens.keySet()) {
             String name = shown(c);
             if (!screens.get(c).hasMarker() && !markerExplained(screens.get(c))) owed.add(name + ": marker");
-            List<String> untried = untried(c);
+            List<String> untried = untried(c).stream().filter(f -> status(c, f) != InputStatus.FAILED).toList();
             if (!untried.isEmpty()) owed.add(name + ": untried " + String.join(", ", untried));
             else if (noneCut(c)) owed.add(name + ": no input cut yet");
+            List<String> failed = fields(c).stream().filter(f -> status(c, f) == InputStatus.FAILED).toList();
+            if (!failed.isEmpty()) owed.add(name + ": failed " + String.join(", ", failed));
             List<String> unseen = unseen(c);
             if (!unseen.isEmpty()) {
                 owed.add(name + ": never seen to try " + String.join(", ", unseen) + " (comes and goes)");

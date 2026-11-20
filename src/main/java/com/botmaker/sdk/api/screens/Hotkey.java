@@ -22,9 +22,17 @@ import java.util.function.BooleanSupplier;
  * @param isOccasional whether it works only at times
  * @param locked       the picture proving it locked on this account; null when it is not
  * @param when         when it works, for one that comes and goes; null when not known
+ * @param failed       why its last press did not take; null when none did
  */
 public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
-                     boolean isOccasional, ImageTemplate locked, BooleanSupplier when) implements Input {
+                     boolean isOccasional, ImageTemplate locked, BooleanSupplier when, String failed)
+        implements Input {
+
+    /** A key whose presses all took, or none was made. */
+    public Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean isInfo, Verdict verdict,
+                  boolean isOccasional, ImageTemplate locked, BooleanSupplier when) {
+        this(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, null);
+    }
 
     public Hotkey {
         verdict = verdict == null ? Verdict.NONE : verdict;
@@ -53,12 +61,17 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey tried() {
-        return new Hotkey(combo, true, isLeaving, isInfo, verdict, isOccasional, locked, when);
+        return new Hotkey(combo, true, isLeaving, isInfo, verdict, isOccasional, locked, when, null);
+    }
+
+    @Override
+    public Hotkey failed(String why) {
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, why);
     }
 
     @Override
     public Hotkey leaving() {
-        return new Hotkey(combo, isTried, true, isInfo, verdict, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, true, isInfo, verdict, isOccasional, locked, when, failed);
     }
 
     @Override
@@ -69,7 +82,7 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey info() {
-        return new Hotkey(combo, isTried, isLeaving, true, verdict, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, true, verdict, isOccasional, locked, when, failed);
     }
 
     @Override
@@ -89,12 +102,12 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey verdict(Verdict verdict) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, failed);
     }
 
     @Override
     public Hotkey occasional() {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, true, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, true, locked, when, failed);
     }
 
     @Override
@@ -105,17 +118,17 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
 
     @Override
     public Hotkey locked(ImageTemplate proof) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, proof, when, failed);
     }
 
     @Override
     public Hotkey when(BooleanSupplier condition) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, condition, failed);
     }
 
     /** This hotkey, pressing {@code combo} instead. */
     public Hotkey combo(Combo combo) {
-        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when);
+        return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, failed);
     }
 
     @Override

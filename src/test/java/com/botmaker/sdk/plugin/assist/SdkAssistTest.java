@@ -1122,6 +1122,9 @@ class SdkAssistTest {
         assertNull(screen("SHOP").from().state(), "the button's usual look is no look the way needs");
         run("crop_pictures", "screen", "Shop", "boxes", List.of(box("shop", 300, 40, 48, 48, "marker", "set"),
                 box("close_shop", 200, 200, 48, 48)));
+        assertTrue(run("write_notes", "screen", "Shop", "allCut", false).isRefused(), "allCut is only ever set");
+        assertEquals("Kept on Shop (Screens.SHOP).", text(run("write_notes", "screen", "Shop", "allCut", true)));
+        assertTrue(screen("SHOP").setup().isAllCut(), "a picture screen is done only once all cut");
 
         game.then(home);
         String closed = text(tryOne("screen", "Shop", "picture", "close_shop", "desktop", true,

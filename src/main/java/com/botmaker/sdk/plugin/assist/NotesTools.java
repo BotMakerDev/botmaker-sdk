@@ -55,7 +55,9 @@ final class NotesTools {
                         + "removes them; left out keeps them", optional = true) String text,
                 @Describe(value = "how far the screen got; none for not surveyed", optional = true) Reach reached,
                 @Describe(value = "what the screen still owes, one thing each (marker — every icon here animates); "
-                        + "replaces the list; empty clears it", optional = true) List<String> owes) {
+                        + "replaces the list; empty clears it", optional = true) List<String> owes,
+                @Describe(value = "true once every input the screen shows is cut: only then is it done, each input "
+                        + "tried or judged", optional = true) Boolean allCut) {
     }
 
     record Which(@Describe(value = "a stage by number or name (0 or Setup … 5 or Upkeep); empty for the one the "
@@ -69,7 +71,8 @@ final class NotesTools {
                     .takes(Section.class).handledBy(NotesTools::readNotes),
             AssistantTool.named("write_notes")
                     .describedAs("Keep what you learnt: a screen's notes (spends, earns, refills, work badge, "
-                            + "unlock), how far it got (reached) and what it owes; no screen: the whole game. Short "
+                            + "unlock), how far it got (reached), what it owes and once all its inputs are cut "
+                            + "(allCut); no screen: the whole game. Short "
                             + "lines, replacing the notes whole: read_notes first")
                     .takes(Note.class).handledBy(NotesTools::writeNotes),
             AssistantTool.named("read_guide")
@@ -121,6 +124,7 @@ final class NotesTools {
         StringBuilder out = new StringBuilder(graph.shown(constant)).append(" [").append(constant).append("]: ")
                 .append(screen.reached() == null ? "not surveyed" : screen.reached().name().toLowerCase(Locale.ROOT));
         if (!screen.owes().isEmpty()) out.append("; owes ").append(String.join("; ", screen.owes()));
+        if (screen.setup().isAllCut()) out.append("; all cut");
         out.append('\n');
         if (screen.notes() != null) out.append(screen.notes().strip()).append('\n');
         return out.toString();
@@ -129,14 +133,18 @@ final class NotesTools {
     static AgentReply writeNotes(Note note, AgentContext context) {
         StudioServices services = context.services();
         if (services.projectDir() == null) return AgentReply.refused(Frames.noProject());
-        if (note.text() == null && note.reached() == null && note.owes() == null) {
-            return AgentReply.refused("Give text, reached or owes: nothing was written.");
+        if (note.text() == null && note.reached() == null && note.owes() == null && note.allCut() == null) {
+            return AgentReply.refused("Give text, reached, owes or allCut: nothing was written.");
+        }
+        if (Boolean.FALSE.equals(note.allCut())) {
+            return AgentReply.refused("allCut is only ever set: a screen with an input not cut yet says so in owes. "
+                    + "Nothing was written.");
         }
         try {
             if (note.screen() == null || note.screen().isBlank()) {
-                if (note.reached() != null || note.owes() != null) {
-                    return AgentReply.refused("reached and owes are a screen's: give its screen. Nothing was "
-                            + "written.");
+                if (note.reached() != null || note.owes() != null || note.allCut() != null) {
+                    return AgentReply.refused("reached, owes and allCut are a screen's: give its screen. Nothing "
+                            + "was written.");
                 }
                 Optional<String> failed = FxCall.call(() -> {
                     RunRead target = readRun(services);
@@ -156,6 +164,7 @@ final class NotesTools {
                 if (note.reached() != null) now = now.reached(note.reached().reached());
                 if (note.owes() != null) now = now.owes(note.owes().stream().map(String::strip)
                         .filter(w -> !w.isEmpty()).toList());
+                if (Boolean.TRUE.equals(note.allCut())) now = now.allCut();
                 return now;
             })));
             return failed.map(AgentReply::refused).orElseGet(() -> AgentReply.text("Kept on "
