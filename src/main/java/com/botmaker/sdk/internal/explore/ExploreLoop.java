@@ -108,6 +108,11 @@ public final class ExploreLoop {
         STOPPED("stopped", "Stopped"),
         /** Its budget ({@link Settings#hours}, {@link Settings#maxScreens}) ran out. */
         BUDGET("budget", "Budget spent"),
+        /**
+         * It waited on a stop that cannot park, another window in front of the game, for {@link Settings#stuckAfter}
+         * with nothing it could press (2026-11-20).
+         */
+        STUCK("stuck", "Stuck: nothing could be pressed"),
         /** It threw: the bot crashed, or the run was stopped from Studio. Only the journal says it. */
         BROKE("broke", "Crashed or stopped from Studio"),
         /** An end this SDK does not know, read from a journal a newer one wrote. */
@@ -330,6 +335,10 @@ public final class ExploreLoop {
     /** The text places a missing-fact stop was raised on: once each. */
     private final Set<String> answered = new HashSet<>();
     private final Deque<String> presses = new ArrayDeque<>();
+    /** How many times in a row the server answered an error page after each place: a way, an input or a page. */
+    private final Map<String, Integer> errorPages = new HashMap<>();
+    /** Whether the run ends because a stop that cannot park waited past {@link Settings#stuckAfter}. */
+    private boolean stuck;
     private long began;
     private long lastPress;
     private int planRounds;
@@ -610,7 +619,7 @@ public final class ExploreLoop {
                     stale(stopId);
                 }
             }
-            if (!round()) return spent() ? End.BUDGET : End.STOPPED;
+            if (!round()) return spent() ? End.BUDGET : stuck ? End.STUCK : End.STOPPED;
         }
     }
 
@@ -628,8 +637,10 @@ public final class ExploreLoop {
             List<InputName> untagged = map.untagged();
             if (!untagged.isEmpty()) {
                 String names = String.join(", ", untagged.stream().map(n -> n.screen() + "." + n.field()).toList());
+                // Parked like any stop nobody answers: the run goes on, and the guard still presses no input
+                // without a verdict.
                 Paused paused = stop(StopKind.NO_VERDICT, null, MAP, Look.NOTHING, untagged.size()
-                        + " inputs have no verdict; say free, spends or never for each: " + names, true);
+                        + " inputs have no verdict; say free, spends or never for each: " + names, false);
                 return paused != Paused.END;
             }
             passed(StopKind.NO_VERDICT, MAP);
@@ -716,8 +727,9 @@ public final class ExploreLoop {
         if (where.isEmpty()) clock(null);
         // An error page the server answered (a 431) is no screen: the run goes back to one it knows.
         if (unknown.isPresent() && unknown.get().httpError()) {
-            if (!play.recover()) play.restart();
-            return true;
+            // With no way pressed last, the page's own path is the place, so two pages are never counted as one.
+            String page = pagePlace(unknown.get());
+            return errorPage(null, lastEdge != null ? lastEdge : page != null ? page : "unknown", unknown.get());
         }
         if (unknown.isPresent()) return settleUnknown(unknown.get(), null) != Paused.END;
         if (where.isEmpty()) {
@@ -732,6 +744,9 @@ public final class ExploreLoop {
         }
         String screen = where.get();
         if (resumed != null) passed(StopKind.UNKNOWN_SCREEN, resumed.place());
+        // A screen of the map reached: the error page is not met again, and its count starts over.
+        if (resumed != null) passed(StopKind.ERROR_PAGE, resumed.place());
+        if (lastEdge != null) errorPages.remove(lastEdge);
         // A page settled as unknown before is passed once a screen of the map matches it.
         if (replay != null && readsTrees()) play.state().map(ExploreLoop::pagePlace)
                 .ifPresent(page -> passed(StopKind.UNKNOWN_SCREEN, page));
@@ -1348,13 +1363,27 @@ public final class ExploreLoop {
         }
         notes.add(new TreeAnswer.InputNote(screen, field, effect.line()));
         // An error page the server answered is left for a screen of the map.
-        if (after.httpError()) {
-            if (!play.recover()) play.restart();
-            return true;
-        }
+        if (after.httpError()) return errorPage(screen, key, after);
+        errorPages.remove(key);
+        passed(StopKind.ERROR_PAGE, key);
         // A list or menu left open catches every press after it (a select's list holds the page): the page is
         // loaded again so the next input is pressed on the page as it was.
         if (effect instanceof Effect.Changes) play.reopen();
+        return true;
+    }
+
+    /**
+     * The server answered {@code page}, an error page, after {@code place} on {@code screen} (null: none known): the
+     * game is brought back to a screen of the map. The second time in a row on one place it is a stop of its own, said rather
+     * than recovered in silence (R6). False when the run ended while paused on it.
+     */
+    private boolean errorPage(String screen, String place, Effect.State page) {
+        Paused paused = errorPages.merge(place, 1, Integer::sum) < 2 ? null
+                : stop(StopKind.ERROR_PAGE, screen, place, Look.NOTHING, "the server answered HTTP " + page.status()
+                        + (page.place().isEmpty() ? "" : " at " + page.place()) + " twice after " + place
+                        + "; the run went back to a screen of the map each time", false);
+        if (paused == Paused.END) return false;
+        if (!play.recover()) play.restart();
         return true;
     }
 
@@ -1610,6 +1639,8 @@ public final class ExploreLoop {
         String id = stop.id();
         boolean held = stop.kind() == StopKind.FAULT;
         long deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
+        // A stop that cannot park (a window in front) ends the run once nothing could be pressed for the stuck time.
+        long stuckAt = nowMs.getAsLong() + settings.stuckAfter().toMillis();
         while (true) {
             Optional<Journal.Command> command = journal.takeCommand();
             if (command.orElse(null) instanceof Journal.Command.End || spent()) return Paused.END;
@@ -1634,7 +1665,10 @@ public final class ExploreLoop {
                         return resumedNow.get();
                     }
                     // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
-                    if (stop.id().equals(stopId)) deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
+                    if (stop.id().equals(stopId)) {
+                        deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
+                        stuckAt = nowMs.getAsLong() + settings.stuckAfter().toMillis();
+                    }
                 } else {
                     stale(stopId);
                 }
@@ -1649,6 +1683,11 @@ public final class ExploreLoop {
                 if (!front.foreign() && front.dialog().isEmpty()) {
                     emit(new ExploreEvent.Fixed(id, "the game is in front again", nowMs.getAsLong()));
                     return Paused.BACK;
+                }
+                // Never parked, so no press goes to the window in front: the run ends instead (R3).
+                if (nowMs.getAsLong() >= stuckAt) {
+                    stuck = true;
+                    return Paused.END;
                 }
             } else if (!neverParks && nowMs.getAsLong() >= deadline) {
                 parked.put(key(stop), stop);

@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Every explore stop now ends.** The start-of-run list of inputs with no verdict is parked like any other stop
+  nobody answers, and the guard still presses no such input. A window that stays in front of the game for the stuck
+  time (15 min) ends the run as *Stuck* instead of waiting forever; nothing is pressed into that window. A server
+  error page (a 431, a 494, a 404) met twice after the same way or input is now a stop of its own, *Error page*,
+  instead of a silent recovery each time.
+
 - Each Keep exploring or Discover run keeps its own explore journal, `explore/<runId>/`, and `explore/runs.json`
   lists the runs oldest first. A restart on a rebuilt SDK goes on in its run's journal, and a new run takes over
   the stops the last one parked. Before this, one journal served every run of the bot and grew without end. The

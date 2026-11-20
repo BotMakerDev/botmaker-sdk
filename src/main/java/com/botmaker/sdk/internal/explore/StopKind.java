@@ -29,6 +29,8 @@ public enum StopKind {
     GUARD("guard", "Guard"),
     /** The bot's own code threw. */
     CRASH("crash", "Crash"),
+    /** The server answered an error page (a 431, a 404) twice after one way or input (2026-11-20). */
+    ERROR_PAGE("error_page", "Error page"),
     /**
      * What presses of a screen's inputs did, read off its tree: ways to screens the bot has, and notes. The run
      * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.

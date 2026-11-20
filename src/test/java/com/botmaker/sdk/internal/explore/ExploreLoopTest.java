@@ -71,6 +71,8 @@ class ExploreLoopTest {
     /** A game that does what {@code arrival} says, at its target by default; its clock moves only while idle. */
     private static final class Game implements ExploreLoop.Play {
         String at = "A";
+        /** Where a recovery or a restart brings the game; null: nowhere the map knows. */
+        String recoversTo = "A";
         long nowMs;
         Foreground front = Foreground.UNKNOWN;
         Function<Edge, Took> arrival = edge -> new Took(Arrival.AT_TARGET, edge.to());
@@ -202,13 +204,13 @@ class ExploreLoopTest {
 
         @Override
         public boolean recover() {
-            at = "A";
+            at = recoversTo;
             return true;
         }
 
         @Override
         public void restart() {
-            at = "A";
+            at = recoversTo;
         }
     }
 
@@ -351,6 +353,27 @@ class ExploreLoopTest {
         assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.UNKNOWN_SCREEN), stops().toString());
         assertTrue(events(ExploreEvent.Settled.class).stream().flatMap(s -> s.answers().stream())
                 .noneMatch(TreeAnswer.NewScreen.class::isInstance), "no screen written");
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.ERROR_PAGE), "once is recovered");
+    }
+
+    /** An error page met twice after one place is said, not recovered in silence again. */
+    @Test
+    void anErrorPageTwiceOnOnePlaceStops() {
+        Game game = new Game();
+        game.at = null;
+        game.recoversTo = null;
+        game.state = new Effect.State(page(web("heading", "HTTP Error 494", Set.of())), "/jobs", List.of(),
+                List.of(), 494);
+        // The site lets the run back in once it waited on the stop.
+        game.onIdle = () -> game.recoversTo = "A";
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        List<Stop> errors = stops().stream().map(ExploreEvent.Stopped::stop)
+                .filter(s -> s.kind() == StopKind.ERROR_PAGE).toList();
+        assertEquals(1, errors.size(), stops().toString());
+        assertTrue(errors.getFirst().missing().contains("HTTP 494 at /jobs twice"), errors.getFirst().missing());
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.UNKNOWN_SCREEN), stops().toString());
     }
 
     /** What the run's start settled (Discover's launch target) goes with the first settled stop. */
@@ -460,7 +483,7 @@ class ExploreLoopTest {
         game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
         game.front = new Foreground("com.android.chrome", "com.game");
         game.onIdle = () -> {
-            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) game.front = new Foreground("com.game", "com.game");
+            if (game.nowMs >= Duration.ofMinutes(12).toMillis()) game.front = new Foreground("com.game", "com.game");
         };
 
         loop(map, game, same(map), Duration.ofMinutes(35)).run();
@@ -762,12 +785,14 @@ class ExploreLoopTest {
 
         loop(ScreenGraph.of(screens), game, same(map()), Duration.ofMinutes(30)).run();
 
-        assertEquals(1, stops().size());
         Stop batch = stops().getFirst().stop();
         assertEquals(StopKind.NO_VERDICT, batch.kind());
         assertTrue(batch.missing().contains("A.b") && batch.missing().contains("A.d"), batch.missing());
-        assertTrue(game.taken.isEmpty(), "nothing pressed before every input has a verdict");
-        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked");
+        // A way back has no input to judge: only what is in front guards it.
+        assertTrue(game.taken.stream().noneMatch(t -> t.startsWith("A.")),
+                "no input pressed without a verdict: " + game.taken);
+        assertEquals(1, stops().stream().filter(s -> s.stop().place().equals(batch.place())).count(),
+                "the batch is raised once");
     }
 
     /** A dialog opened from B and from A: its close goes back where the game came from, not to its first parent. */
@@ -830,7 +855,7 @@ class ExploreLoopTest {
         Game game = new Game();
         game.front = new Foreground("com.android.chrome", "com.game");
         game.onIdle = () -> {
-            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) game.front = new Foreground("com.game", "com.game");
+            if (game.nowMs >= Duration.ofMinutes(12).toMillis()) game.front = new Foreground("com.game", "com.game");
         };
 
         loop(map(), game, same(map()), Duration.ofMinutes(35)).run();
@@ -838,9 +863,41 @@ class ExploreLoopTest {
         Stop guard = stops().getFirst().stop();
         assertEquals(StopKind.GUARD, guard.kind());
         assertTrue(guard.missing().contains("com.android.chrome"), guard.missing());
-        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked, 30 min in front");
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked, 12 min in front");
         assertEquals(guard.id(), events(ExploreEvent.Fixed.class).getFirst().stopId());
         assertTrue(game.taken.contains("A.b→B"), "pressed once the game was back");
+    }
+
+    /** A window that stays in front past the stuck time ends the run: never parked, nothing pressed into it. */
+    @Test
+    void stuckIsCheckedWhilePaused() {
+        Game game = new Game();
+        game.front = new Foreground("com.android.chrome", "com.game");
+
+        ExploreLoop.End end = loop(map(), game, same(map()), Duration.ofMinutes(60)).run();
+
+        assertEquals(ExploreLoop.End.STUCK, end);
+        assertTrue(game.nowMs < Duration.ofMinutes(20).toMillis(), "ended at the stuck time: " + game.nowMs);
+        assertTrue(game.taken.isEmpty(), game.taken.toString());
+        assertTrue(events(ExploreEvent.Parked.class).isEmpty());
+    }
+
+    /** The start-of-run batch of inputs with no verdict parks like any stop nobody answers. */
+    @Test
+    void everyBlockingStopEndsOnItsBudget() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b"), click("d")));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b"))));
+        Game game = new Game();
+
+        loop(ScreenGraph.of(screens), game, same(map()), Duration.ofMinutes(15)).run();
+
+        Stop batch = stops().getFirst().stop();
+        assertEquals(StopKind.NO_VERDICT, batch.kind());
+        assertTrue(events(ExploreEvent.Parked.class).stream().anyMatch(p -> p.stopId().equals(batch.id())),
+                "parked after 10 min");
+        assertTrue(game.taken.stream().noneMatch(t -> t.startsWith("A.")),
+                "still no input pressed without a verdict: " + game.taken);
     }
 
     @Test

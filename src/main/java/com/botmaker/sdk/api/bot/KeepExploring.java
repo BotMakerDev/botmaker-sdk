@@ -81,7 +81,10 @@ public final class KeepExploring {
             Bot.launchConfiguredTarget(Bot.StartMode.RESTART);
         };
         ExploreLoop.End end = LivePlay.explore(first, project(), restart, budget, discover, settled, pending);
-        Say.info(end == ExploreLoop.End.BUDGET ? "Keep exploring ended: its budget is spent."
-                : "Keep exploring ended.");
+        Say.info(switch (end) {
+            case BUDGET -> "Keep exploring ended: its budget is spent.";
+            case STUCK -> "Keep exploring ended: another window stayed in front of the game, nothing could be pressed.";
+            default -> "Keep exploring ended.";
+        });
     }
 }
