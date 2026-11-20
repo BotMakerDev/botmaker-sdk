@@ -26,6 +26,7 @@ public sealed interface ExploreEvent {
             case GoalMet ignored -> "goal_met";
             case Stopped ignored -> "stopped";
             case Fixed ignored -> "fixed";
+            case ReplayLost ignored -> "replay_lost";
             case Parked ignored -> "parked";
             case Reloaded ignored -> "reloaded";
             case Began ignored -> "began";
@@ -50,6 +51,7 @@ public sealed interface ExploreEvent {
             case "goal_met" -> GoalMet.class;
             case "stopped" -> Stopped.class;
             case "fixed" -> Fixed.class;
+            case "replay_lost" -> ReplayLost.class;
             case "parked" -> Parked.class;
             case "reloaded" -> Reloaded.class;
             case "began" -> Began.class;
@@ -175,6 +177,12 @@ public sealed interface ExploreEvent {
 
     /** The stop {@code stopId} is gone: after a reload, or the game back in front. */
     record Fixed(String stopId, String why, long at) implements ExploreEvent {}
+
+    /**
+     * The replay of the fault {@code faultId}, restarted on the rebuilt SDK, can no longer happen ({@code why}): another
+     * stop set its place aside first. Its memory is deleted; whether the fix took is not known.
+     */
+    record ReplayLost(String faultId, String why, long at) implements ExploreEvent {}
 
     /** Nobody took up the stop {@code stopId} in time: it is in the queue, its place avoided, the run goes on. */
     record Parked(String stopId, long at) implements ExploreEvent {}

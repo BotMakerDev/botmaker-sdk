@@ -130,6 +130,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         for (ExploreEvent event : events.subList(index + 1, events.size())) {
             boolean closes = switch (event) {
                 case ExploreEvent.Fixed fixed -> fixed.stopId().equals(stopId);
+                case ExploreEvent.ReplayLost lost -> lost.faultId().equals(stopId);
                 case ExploreEvent.Parked parked -> parked.stopId().equals(stopId);
                 case ExploreEvent.Reloaded reloaded -> reloaded.stopId().equals(stopId) && !reloaded.refused();
                 default -> false;

@@ -161,6 +161,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring proves a crash fixed only by pressing the way or input that threw again: a crash's place names it
+  (`SHOP.buy:IllegalStateException`), its replay or resume frees it to be pressed, and a round elsewhere no longer
+  says it fixed. A replay another stop set aside first is said (`replay_lost` in the journal) and its `resume.json`
+  deleted, so the next start does not replay it.
 - Keep exploring presses a way whose condition is unknown, one behind a fact not read yet, as the map does: an
   unknown never closes a way. Only a condition that says no leaves the screen waiting on it.
 - Keep exploring takes a way back that returned where the game came from as arrived: a dialog's close, opened from

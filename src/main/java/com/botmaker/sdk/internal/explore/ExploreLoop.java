@@ -339,6 +339,8 @@ public final class ExploreLoop {
     private int stops;
     /** The edge last pressed, by its key: where an unknown screen came from. */
     private String lastEdge;
+    /** The way or input being pressed, {@code "SHOP.buy"}, while its press runs: what a crash in it names. */
+    private String pressing;
     private String from;
     private String by;
     /** The stop resumed last, until the next round says whether the fix took. */
@@ -475,11 +477,16 @@ public final class ExploreLoop {
         worked.addAll(file.worked());
         answered.addAll(file.answered());
         Stop fault = file.fault();
-        tried.remove(fault.place());
+        retry(file.replays(), fault.place());
         answered.remove(fault.place());
         String screen = fault.screen();
         if (screen != null && map.screen(screen).isEmpty()) {
             replayed("its screen " + screen + " is no longer in the map: nothing to replay, the run explores on");
+            return;
+        }
+        String press = file.replays() == StopKind.CRASH ? pressOf(fault.place()) : null;
+        if (press != null && !mapped(press)) {
+            replayed(press + " is no longer in the map: nothing to replay, the run explores on");
             return;
         }
         if (screen == null) return;
@@ -501,6 +508,58 @@ public final class ExploreLoop {
         emit(new ExploreEvent.Fixed(replay.fault().id(), why, nowMs.getAsLong()));
         ResumeFile.delete(journal);
         replay = null;
+    }
+
+    /**
+     * The replay of the fault can no longer happen: a stop of another kind met its place first and set it aside. Said,
+     * and its memory deleted, so the next start does not replay it.
+     */
+    private void replayLost(String why) {
+        emit(new ExploreEvent.ReplayLost(replay.fault().id(), why, nowMs.getAsLong()));
+        ResumeFile.delete(journal);
+        replay = null;
+    }
+
+    /**
+     * Frees {@code place} to be pressed again: the place itself and, for a crash, the way or input it names, so a fix
+     * shows only once that press is made again.
+     */
+    private void retry(StopKind kind, String place) {
+        tried.remove(place);
+        // A fault's place is the crash's when a crash raised it.
+        String press = kind == StopKind.CRASH || kind == StopKind.FAULT ? pressOf(place) : null;
+        if (press != null) tried.removeIf(t -> t.equals(press) || t.startsWith(press + "→"));
+    }
+
+    /** Whether {@code press}, {@code "SHOP.buy"}, is still a way or an input of the map. */
+    private boolean mapped(String press) {
+        int dot = press.indexOf('.');
+        String screen = press.substring(0, dot);
+        String field = press.substring(dot + 1);
+        return map.screen(screen).map(s -> s.inputs().containsKey(field)).orElse(false)
+                || map.edges().stream().anyMatch(e -> e.from().equals(screen) && e.label().equals(field));
+    }
+
+    /** The way or input a crash's place {@code "SHOP.buy:IllegalStateException"} names; null when it names none. */
+    static String pressOf(String place) {
+        int colon = place.lastIndexOf(':');
+        if (colon < 0) return null;
+        String press = place.substring(0, colon);
+        return press.contains(".") ? press : null;
+    }
+
+    /**
+     * A crash's place is passed where it was raised: one that names a press when that press is made again and does
+     * not throw ({@code press}), one that names none when a round plays through ({@code press} null).
+     */
+    private void passedCrash(String press) {
+        if (resumed != null && resumed.kind() == StopKind.CRASH && Objects.equals(pressOf(resumed.place()), press)) {
+            passed(StopKind.CRASH, resumed.place());
+        }
+        if (replay != null && replay.replays() == StopKind.CRASH
+                && Objects.equals(pressOf(replay.fault().place()), press)) {
+            passed(StopKind.CRASH, replay.fault().place());
+        }
     }
 
     /** The run's memory, for a restart on the rebuilt SDK to go on from the fault {@code fault}. */
@@ -560,15 +619,20 @@ public final class ExploreLoop {
                     + settings.stuckAfter().toMinutes() + " min: no input left to try, no goal the plan can reach",
                     false) != Paused.END;
         }
+        // Only a press of this round can have thrown in it.
+        pressing = null;
         try {
             boolean goesOn = play();
-            if (resumed != null && resumed.kind() == StopKind.CRASH) passed(StopKind.CRASH, resumed.place());
-            if (replay != null) passed(StopKind.CRASH, replay.fault().place());
+            passedCrash(null);
             return goesOn;
         } catch (RuntimeException e) {
+            String press = pressing;
+            pressing = null;
             rethrowStop(e);
-            String at = whereAfterCrash();
-            String place = (at == null ? "unknown" : at) + ":" + e.getClass().getSimpleName();
+            // A crash in a press is the screen's it was pressed on, wherever the game went.
+            String at = press != null ? press.substring(0, press.indexOf('.')) : whereAfterCrash();
+            // A crash in a press names it, so its replay presses that way or input again.
+            String place = (press != null ? press : at == null ? "unknown" : at) + ":" + e.getClass().getSimpleName();
             // Thrown by Discover itself, not by the bot's code it ran: the SDK's to fix, in dev mode.
             if (dev && discovers(e)) {
                 return fault(StopKind.CRASH, at, place, "exception", "Discover's own code threw: " + e,
@@ -830,7 +894,9 @@ public final class ExploreLoop {
         doing = Spent.PRESSING;
         pressed(screen + ": " + edge.label());
         long before = nowMs.getAsLong();
+        pressing = screen + "." + edge.label();
         Took took = play.take(edge, settings.edge().toMillis());
+        pressing = null;
         Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > settings.edge().toMillis()
                 ? Arrival.TIMED_OUT : took.arrival();
         // A way back returns where the game came from: any screen with a way in, not only the one the map names.
@@ -838,6 +904,7 @@ public final class ExploreLoop {
             arrival = Arrival.AT_TARGET;
         }
         emit(new ExploreEvent.Tried(screen, edge.label(), mode, arrival,nowMs.getAsLong()));
+        passedCrash(screen + "." + edge.label());
         return switch (arrival) {
             case AT_TARGET, UNKNOWN, NOT_NOW -> {
                 if (arrival == Arrival.AT_TARGET) {
@@ -1235,12 +1302,15 @@ public final class ExploreLoop {
         doing = Spent.PRESSING;
         pressed(screen + ": " + field);
         lastEdge = null;
+        pressing = key;
         Optional<String> at = play.press(screen, field, settings.edge().toMillis());
+        pressing = null;
         Effect.State after = play.state().orElse(Effect.State.of(null, ""));
         Effect effect = Effect.judge(before, after, play.stopped());
         String to = at.orElse(null);
         Arrival arrival = to == null ? Arrival.UNKNOWN : to.equals(screen) ? Arrival.UNCHANGED : Arrival.AT_TARGET;
         emit(new ExploreEvent.Tried(screen, field, Mode.UNTRIED, arrival, nowMs.getAsLong()));
+        passedCrash(key);
         if (effect.way() && to != null && !to.equals(screen)) {
             from = screen;
             by = field;
@@ -1500,8 +1570,16 @@ public final class ExploreLoop {
         if (again) stop = new Stop(id, kind, screen, place, stop.framePath(), stop.texts(), stop.elements(),
                 stop.facts(), stop.lastPresses(), "the fix did not take: " + missing, stop.at());
         resumed = null;
-        // Another stop met on the way leaves the replay waiting for the fault's place.
-        if (replay != null && place.equals(replay.fault().place())) replay = null;
+        // A stop elsewhere, or one that only pauses on the fault's place, leaves the replay waiting for it. One of
+        // another kind that set the place aside as tried means the fault is never met again: the replay is lost, and
+        // said. Its own kind there is the fault again.
+        if (replay != null && place.equals(replay.fault().place())) {
+            if (kind == StopKind.FAULT || kind == replay.replays()) {
+                replay = null;
+            } else if (tried.contains(place)) {
+                replayLost(kind.id() + " was met on " + place + " before the fault could be replayed");
+            }
+        }
         emit(new ExploreEvent.Stopped(stop, again, nowMs.getAsLong()));
         if (fault != null) {
             emit(new ExploreEvent.Faulted(id, fault.source(), stop.missing(), fault.evidence(), play.sdkVersion(),
@@ -1627,7 +1705,7 @@ public final class ExploreLoop {
             journal.queue(List.copyOf(parked.values()));
         }
         // Its place is tried again, so a fix that did not take shows; an ignored value is never raised again.
-        tried.remove(fixed.place());
+        retry(fixed.kind(), fixed.place());
         if (!(ignore && fixed.kind() == StopKind.MISSING_FACT)) answered.remove(fixed.place());
         if (parkedStop != null) {
             emit(new ExploreEvent.Fixed(parkedStop.id(), "reloaded as generation " + generation, nowMs.getAsLong()));

@@ -274,6 +274,8 @@ public final class LivePlay implements ExploreLoop.Play {
             case ExploreEvent.Faulted faulted -> Say.warn("Held " + faulted.stopId() + " as a Discover fault: "
                     + faulted.why(), Map.of());
             case ExploreEvent.Fixed(String stopId, String why, long ignored) -> Say.info("Fixed " + stopId + ": " + why, Map.of());
+            case ExploreEvent.ReplayLost(String faultId, String why, long ignored) ->
+                    Say.warn("Not replayed " + faultId + ": " + why, Map.of());
             case ExploreEvent.Restarted(String faultId, boolean dev, long ignored) ->
                     Say.info("Restarted on the rebuilt SDK, replaying " + faultId, Map.of());
             default -> {}

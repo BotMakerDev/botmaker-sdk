@@ -1239,6 +1239,82 @@ class ExploreLoopTest {
     }
 
     @Test
+    void aCrashPassesOnlyWhenItsInputIsPressedAgain() {
+        // d threw before the restart, and was tried: the replay presses it again, and only that press passes it.
+        heldAndLeft(StopKind.CRASH, "A", "A.d:IllegalStateException", Set.of("A.b→B", "A.d→D"));
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        assertTrue(game.taken.contains("A.d→D"), "pressed again: " + game.taken);
+        assertFalse(game.taken.contains("A.b→B"), "tried before the restart: " + game.taken);
+        List<ExploreEvent> events = journal().events();
+        int pressedAt = -1;
+        int fixedAt = -1;
+        for (int i = 0; i < events.size(); i++) {
+            if (pressedAt < 0 && events.get(i) instanceof ExploreEvent.Tried(String s, String by, ExploreLoop.Mode m,
+                    Arrival a, long at) && by.equals("d")) pressedAt = i;
+            if (events.get(i) instanceof ExploreEvent.Fixed fixed && fixed.stopId().equals("fault-3")) fixedAt = i;
+        }
+        assertTrue(pressedAt >= 0 && fixedAt > pressedAt, "fixed after d's press: " + events);
+        assertEquals("replayed", ((ExploreEvent.Fixed) events.get(fixedAt)).why());
+        assertFalse(resumeFileLies());
+    }
+
+    @Test
+    void aCrashReplayWhosePressIsGoneSaysSo() {
+        // The fix removed A's x: it can never be pressed again, so the replay is closed for that, not passed.
+        heldAndLeft(StopKind.CRASH, "A", "A.x:IllegalStateException", Set.of());
+        Game game = new Game();
+        game.dev = true;
+
+        resumed(game, Duration.ofMinutes(12)).run();
+
+        ExploreEvent.Fixed fixed = events(ExploreEvent.Fixed.class).getFirst();
+        assertEquals("fault-3", fixed.stopId());
+        assertTrue(fixed.why().contains("A.x is no longer in the map"), fixed.why());
+        assertFalse(resumeFileLies());
+    }
+
+    @Test
+    void aCrashPlaceNamesItsEdge() {
+        Game game = new Game();
+        game.arrival = edge -> {
+            if (edge.to().equals("D")) throw new IllegalStateException("the bot's own");
+            return new Took(Arrival.AT_TARGET, edge.to());
+        };
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(5).toMillis()) journal().command("stop");
+        };
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        Stop crash = stops().stream().map(ExploreEvent.Stopped::stop).filter(s -> s.kind() == StopKind.CRASH)
+                .findFirst().orElseThrow();
+        assertEquals("A.d:IllegalStateException", crash.place());
+    }
+
+    @Test
+    void aReplayDroppedByAnotherStopIsRecorded() {
+        // A page b led to was unknown; on the rebuilt SDK b arrives elsewhere first, which sets the place aside.
+        heldAndLeft(StopKind.UNKNOWN_SCREEN, "A", "A.b→B", Set.of("A.b→B"));
+        Game game = new Game();
+        game.dev = true;
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "D") : new Took(Arrival.AT_TARGET, edge.to());
+
+        resumed(game, Duration.ofMinutes(14)).run();
+
+        assertEquals(StopKind.WRONG_ARRIVAL, stops().get(1).stop().kind());
+        List<ExploreEvent.ReplayLost> lost = events(ExploreEvent.ReplayLost.class);
+        assertEquals(1, lost.size(), "said once: " + lost);
+        assertEquals("fault-3", lost.getFirst().faultId());
+        assertTrue(events(ExploreEvent.Fixed.class).stream().noneMatch(f -> f.stopId().equals("fault-3")));
+        assertFalse(resumeFileLies(), "its memory deleted");
+        assertFalse(JournalView.of(journal()).heldWhenLeft("fault-3"));
+    }
+
+    @Test
     void aReplayedFaultIsLetGoByIgnoreOnly() {
         // On no screen and a place never met again: the replay waits as long as the run.
         heldAndLeft(StopKind.WRONG_ARRIVAL, null, "Z.x→A", Set.of());
