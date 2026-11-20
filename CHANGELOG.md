@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🧩 Elements' tree rows have a ⋯ menu: Rename… renames the element's constant and every use by binding, and Delete
+  removes it with its shot, refused while an input or a step still names it.
+- A dialog or menu Discover finds is one screen over any page, told by its own marks with no route: a site's Book a
+  Demo opened from Home, Pricing and Enterprise is mapped once, not once per page. One its marks cannot tell keeps the
+  route.
+
 - Keep exploring times each screen on its own clock, the time the run spent on it, and says it built once every
   element has its picture and every way and input is tried and has a verdict, or what is still open when it leaves it
   (`built` and `building` in the journal). The explore tool's `status` and `wait` end with how far the map is built
@@ -155,6 +161,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The explore tool's `fault` on a stop the run went on from before it read the command answers at once, naming the
+  open stops, instead of waiting its whole 30 s and saying the run "did not hold" it.
 - Discover never maps an HTTP error page (a 404, a 431 "Request Header Fields Too Large") as a screen: a press
   that lands on one is a broken way, noted "Fails: HTTP 431 at /jobs" on its input, and the run goes back to a
   screen it knows.

@@ -176,15 +176,19 @@ public sealed interface TreeAnswer {
      * <p>A website's page with nothing open over it is told by its route alone: its headings are content, which a
      * page changes as it likes (a hero that cycles its headline, a case study's title), so a marker of them stops
      * matching the very page it was cut from. Two pages at one route are one screen; a dialog or a menu over it is
-     * its own, told by its route and by itself, so it outranks the page under it.
+     * its own, told by itself alone: the same dialog opened over any page is one screen (a site's Book a Demo, opened
+     * from Home, Pricing and Enterprise), and it outranks the pages it is opened from. One its markers cannot tell
+     * keeps the route.
      */
     static NewScreen screen(UiTree tree, String route, List<String> examples, Set<String> taken) {
         Overlay overlay = Overlay.of(tree);
         boolean page = route != null && overlay.none();
         String said = !overlay.name().isEmpty() ? overlay.name() : page ? lastSegment(route)
                 : firstHeading(tree).orElseGet(() -> route == null ? "Screen" : lastSegment(route));
-        return new NewScreen(unique(className(said), taken), route, examples,
-                page ? List.of() : markers(tree, overlay), overlay);
+        List<Locator> markers = page ? List.of() : markers(tree, overlay);
+        boolean anyPage = !overlay.none() && !markers.isEmpty();
+        return new NewScreen(unique(className(said), taken), anyPage ? null : route,
+                anyPage ? List.of() : examples, markers, overlay);
     }
 
     /**

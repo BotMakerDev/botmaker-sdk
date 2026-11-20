@@ -186,8 +186,15 @@ final class ExploreTools {
                         return AgentReply.text("Held " + id + " as a Discover fault: " + line + ". " + FIX_THE_SDK);
                     }
                 }
-                if (!JournalView.of(journal).running()) {
+                JournalView now = JournalView.of(journal);
+                if (!now.running()) {
                     return AgentReply.refused("The run ended before it held " + id + ".");
+                }
+                // The run went on from the stop before it read the command (a settled stop resumes once written):
+                // between stops a fault is dropped, so nothing is left to wait for.
+                if (now.open().filter(s -> s.id().equals(id)).isEmpty()) {
+                    return AgentReply.refused("The run went on from " + id + " before it held it. " + ids(now)
+                            + " Call fault on the stop it waits on, or on the next one its place raises.");
                 }
                 if (!changed(journal, all.size(), deadline)) {
                     // A fault the run never took may be lost (the stop moved on, or a later command replaced it).

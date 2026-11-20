@@ -4,8 +4,10 @@
 package com.botmaker.sdk.plugin.map;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.source.PluginValues.Member;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.ElementSaves;
@@ -14,8 +16,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.Image;
@@ -27,12 +32,14 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -86,8 +93,9 @@ final class ElementsView {
         TextField search = new TextField();
         search.setPromptText("🔍 filter tree elements");
         List<Row> rows = new ArrayList<>();
-        Runnable draw = () -> draw(treeRows, rows, search.getText(), services.resourcesDir());
-        Runnable read = () -> {
+        Runnable[] read = new Runnable[1];
+        Runnable draw = () -> draw(services, treeRows, rows, search.getText(), () -> read[0].run());
+        read[0] = () -> {
             rows.clear();
             rows.addAll(rows(ElementSaves.elements(services.pluginValues()), graph.get()));
             draw.run();
@@ -133,10 +141,10 @@ final class ElementsView {
         boolean[] shownOnce = {false};
         root.sceneProperty().addListener((o, was, is) -> {
             if (is == null) return;
-            if (shownOnce[0]) read.run();
+            if (shownOnce[0]) read[0].run();
             shownOnce[0] = true;
         });
-        read.run();
+        read[0].run();
         return root;
     }
 
@@ -190,7 +198,8 @@ final class ElementsView {
         return String.join(" ", parts);
     }
 
-    private static void draw(VBox box, List<Row> rows, String query, Path resources) {
+    private static void draw(StudioServices services, VBox box, List<Row> rows, String query, Runnable reread) {
+        Path resources = services.resourcesDir();
         String q = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
         box.getChildren().clear();
         List<Row> shown = rows.stream().filter(r -> r.matches(q)).toList();
@@ -198,10 +207,49 @@ final class ElementsView {
             box.getChildren().add(new Label(rows.isEmpty() ? "The bot has no tree element yet: Discover adds the ones"
                     + " a page's inputs are found by." : "No tree element matches."));
         }
-        for (Row row : shown) box.getChildren().add(row(row, resources));
+        for (Row row : shown) box.getChildren().add(row(services, row, resources, reread));
     }
 
-    private static Node row(Row row, Path resources) {
+    /**
+     * The row's ⋯: Rename… renames the constant by binding, every use with it; Delete removes it, refused while an
+     * input or a step still names it, and its shot with it. Either reads the list again after.
+     */
+    private static MenuButton more(StudioServices services, Row row, Runnable reread) {
+        MenuItem rename = new MenuItem("Rename…");
+        rename.setOnAction(e -> {
+            TextInputDialog ask = new TextInputDialog(row.name());
+            ask.setTitle("Rename " + row.name());
+            ask.setHeaderText(null);
+            ask.setContentText("New name (UPPER_SNAKE):");
+            services.dialogs().ownerWindow().ifPresent(ask::initOwner);
+            ask.showAndWait().map(String::strip).filter(n -> !n.isEmpty() && !n.equals(row.name())).ifPresent(n -> {
+                Optional<String> refused = services.pluginValues().rename(SdkValues.ELEMENTS, Member.of(row.name()), n);
+                services.status(refused.map(why -> "Not renamed: " + why).orElse("Renamed " + row.name() + " to " + n
+                        + "."));
+                reread.run();
+            });
+        });
+        MenuItem delete = new MenuItem("Delete");
+        delete.setOnAction(e -> {
+            Optional<String> refused = services.pluginValues().remove(SdkValues.ELEMENTS, Member.of(row.name()));
+            if (refused.isEmpty() && row.shot() != null && services.resourcesDir() != null) {
+                try {
+                    Files.deleteIfExists(services.resourcesDir().resolve(row.shot()));
+                } catch (IOException ex) {
+                    services.status("Deleted " + row.name() + "; its shot stays: " + ex.getMessage());
+                    reread.run();
+                    return;
+                }
+            }
+            services.status(refused.map(why -> "Not deleted: " + why).orElse("Deleted " + row.name() + "."));
+            reread.run();
+        });
+        MenuButton more = new MenuButton("⋯", null, rename, delete);
+        more.getStyleClass().add("flat");
+        return more;
+    }
+
+    private static Node row(StudioServices services, Row row, Path resources, Runnable reread) {
         Label name = new Label(row.name());
         name.getStyleClass().add("screen-card-name");
         Label found = new Label("tree · " + row.found());
@@ -212,7 +260,7 @@ final class ElementsView {
         VBox text = new VBox(2, name, found, on);
         text.setMinWidth(0);
         HBox.setHgrow(text, Priority.ALWAYS);
-        HBox line = new HBox(10, thumb(row.shot(), resources), text);
+        HBox line = new HBox(10, thumb(row.shot(), resources), text, more(services, row, reread));
         line.setAlignment(Pos.CENTER_LEFT);
         line.setPadding(new Insets(6, 8, 6, 6));
         line.getStyleClass().add("screen-card");

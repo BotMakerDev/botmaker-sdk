@@ -199,6 +199,9 @@ class TreeAnswerTest {
         assertEquals("TalkToUs", screen.name());
         assertEquals(Overlay.Kind.DIALOG, screen.overlay().kind());
         assertEquals("dialog \"Talk to us\"", screen.markers().getFirst().line());
+        // Told by itself alone: the same dialog opened over another page is this screen, not a new one.
+        assertNull(screen.route());
+        assertEquals(List.of(), screen.examples());
     }
 
     @Test

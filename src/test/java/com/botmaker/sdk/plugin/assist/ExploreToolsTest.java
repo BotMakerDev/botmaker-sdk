@@ -332,6 +332,22 @@ class ExploreToolsTest {
         assertTrue(JournalView.of(journal).held(stop("wrong_arrival-1")));
     }
 
+    /** A stop the run went on from before it read the fault (a settled one, written and resumed) answers at once. */
+    @Test
+    void aFaultOnAStopTheRunLeftIsRefusedAtOnce() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(stop("settled-1"), false, 2));
+        run(command -> journal().append(new ExploreEvent.Fixed("settled-1", "written", 3)));
+
+        long began = System.nanoTime();
+        AgentReply reply = ExploreTools.fault(journal, "settled-1", "judged wrong", Duration.ofSeconds(20));
+
+        assertTrue(reply.isRefused());
+        assertTrue(text(reply).contains("went on from settled-1"), text(reply));
+        assertTrue(Duration.ofNanos(System.nanoTime() - began).toSeconds() < 10, "never waits its whole time");
+    }
+
     @Test
     void aFaultIsRefusedOutOfDevMode() {
         Journal journal = journal();
