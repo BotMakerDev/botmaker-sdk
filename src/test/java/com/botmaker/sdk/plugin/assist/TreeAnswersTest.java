@@ -19,9 +19,11 @@ import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopKind;
+import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
+import com.botmaker.sdk.internal.screens.InputStatus;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.TreeAnswers.Planned;
@@ -41,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What a run settled off a tree, planned as the bot's screens, elements and texts, and the watch that resumes it. */
@@ -401,6 +404,44 @@ class TreeAnswersTest {
     }
 
     /** A, the start, with a button {@code open} and a free {@code toggle}. */
+    /**
+     * A press that failed writes the input's own trait, why it failed, and a plain note; a later press that takes clears
+     * it. An old {@code field: Fails: x} note is not read: that input is untried.
+     */
+    @Test
+    void aFailWritesTheTypedTraitAndAPlainNote() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.compute("A", (c, s) -> s.setup(x -> x.notes("open: Fails: console error: CORS")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        assertEquals(InputStatus.UNTRIED, graph.status("A", "open"), "an old note line is not read");
+
+        Planned failed = TreeAnswers.plan(graph, List.of(TreeAnswer.InputNote.of("A", "toggle",
+                new Effect.Fails("blocked write: POST /monitoring"))), Map.of());
+        MapScreen a = changed(graph, failed, "A");
+        assertEquals("blocked write: POST /monitoring", a.input("toggle").orElseThrow().failed());
+        assertTrue(a.setup().notes().contains("toggle: press failed, blocked write: POST /monitoring"),
+                a.setup().notes());
+        Map<String, MapScreen> after = new LinkedHashMap<>(screens);
+        after.put("A", a);
+        assertEquals(InputStatus.FAILED, ScreenGraph.of(after).status("A", "toggle"));
+
+        ScreenGraph failedGraph = ScreenGraph.of(after);
+        Planned took = TreeAnswers.plan(failedGraph, List.of(new TreeAnswer.InputNote("A", "toggle",
+                "Changes the theme")), Map.of());
+        assertNull(changed(failedGraph, took, "A").input("toggle").orElseThrow().failed(), "a press that took");
+    }
+
+    /** A new screen its tree showed whole is written all cut; one with a part that scrolls is not. */
+    @Test
+    void aScreenItsTreeShowedWholeIsWrittenAllCut() {
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(Map.of()), List.of(
+                new TreeAnswer.NewScreen("Shop", "/shop", List.of("/shop"), List.of(), null, true),
+                new TreeAnswer.NewScreen("List", "/list", List.of("/list"), List.of(), null, false)), Map.of());
+
+        assertTrue(planned.added().get(0).screen().setup().isAllCut());
+        assertFalse(planned.added().get(1).screen().setup().isAllCut());
+    }
+
     private static ScreenGraph map() {
         Map<String, Input> inputs = new LinkedHashMap<>();
         inputs.put("open", Button.of(new Locator(Role.BUTTON, "Open", null, null, null).element()).free());

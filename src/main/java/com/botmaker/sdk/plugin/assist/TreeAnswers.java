@@ -113,6 +113,8 @@ final class TreeAnswers {
                     .map(locator -> kept(locator.element(), known, made, words)).toList();
             Setup setup = Setup.named(screen.name()).elements(markers);
             if (screen.route() != null) setup = setup.route(screen.route()).examples(screen.examples());
+            // Its tree showed every element: the run writes each as an input, so the screen is all cut.
+            if (screen.allCut()) setup = setup.allCut();
             // A map's first screen is the one the game opens on; an overlay no press opened is the game's own popup.
             if (empty && screens.isEmpty()) setup = setup.start();
             else if (!screen.overlay().none() && !wayTargets.contains(screen.name())) setup = setup.popup();
@@ -496,10 +498,14 @@ final class TreeAnswers {
         return all.stream().limit(Setup.EXAMPLES).toList();
     }
 
-    /** {@code screen} with {@code note} on its notes, over what it said of that input before, the input marked tried. */
+    /**
+     * {@code screen} with {@code note} on its notes, over what it said of that input before, the input marked tried,
+     * or failed with why when the press did not take: the input's own trait, never read back from the note.
+     */
     private static MapScreen noted(MapScreen screen, TreeAnswer.InputNote note) {
         MapScreen now = withNote(withoutNote(screen, note.field()), note.field() + ": " + note.note());
-        return now.input(note.field()).map(i -> now.withInput(note.field(), i.tried())).orElse(now);
+        return now.input(note.field()).map(i -> now.withInput(note.field(),
+                note.failed() == null ? i.tried() : i.failed(note.failed()))).orElse(now);
     }
 
     /** Whether {@code input} is the field {@code name} of the map {@code graph}. */

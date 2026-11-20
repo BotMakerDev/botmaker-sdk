@@ -48,14 +48,20 @@ public sealed interface TreeAnswer {
 
     /**
      * A screen to add: {@code name} its class, {@code route} and {@code examples} a website's (null and none in an
-     * app), {@code markers} the parts that tell it, {@code overlay} what is open over its page.
+     * app), {@code markers} the parts that tell it, {@code overlay} what is open over its page; {@code allCut} when its
+     * tree showed every element it has, so its inputs are all of them (none while a part of it scrolls).
      */
-    record NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay)
-            implements TreeAnswer {
+    record NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay,
+                     boolean allCut) implements TreeAnswer {
         public NewScreen {
             examples = examples == null ? List.of() : List.copyOf(examples);
             markers = markers == null ? List.of() : List.copyOf(markers);
             overlay = overlay == null ? Overlay.NONE : overlay;
+        }
+
+        /** A screen whose elements are not said to be all in its tree. */
+        public NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay) {
+            this(name, route, examples, markers, overlay, false);
         }
     }
 
@@ -88,8 +94,24 @@ public sealed interface TreeAnswer {
     /** A way: {@code field} of {@code screen} leads to the screen {@code to}. */
     record NewWay(String screen, String field, String to) implements TreeAnswer {}
 
-    /** A note on {@code field} of {@code screen}: what pressing it does, when that is no way. */
-    record InputNote(String screen, String field, String note) implements TreeAnswer {}
+    /**
+     * A note on {@code field} of {@code screen}: what pressing it does, when that is no way; {@code failed} why the
+     * press did not take, null when it did.
+     */
+    record InputNote(String screen, String field, String note, String failed) implements TreeAnswer {
+
+        /** A note of a press that took. */
+        public InputNote(String screen, String field, String note) {
+            this(screen, field, note, null);
+        }
+
+        /** What a press of {@code field} that stayed on {@code screen} did: failed when the effect is a failure. */
+        public static InputNote of(String screen, String field, Effect effect) {
+            return effect instanceof Effect.Fails(String why)
+                    ? new InputNote(screen, field, "press failed, " + why, why)
+                    : new InputNote(screen, field, effect.line());
+        }
+    }
 
     /**
      * {@code field} of {@code screen} is the control {@code kept} is, nested in or around it with its name: an older
@@ -187,8 +209,10 @@ public sealed interface TreeAnswer {
                 : firstHeading(tree).orElseGet(() -> route == null ? "Screen" : lastSegment(route));
         List<Locator> markers = page ? List.of() : markers(tree, overlay);
         boolean anyPage = !overlay.none() && !markers.isEmpty();
+        // A part that scrolls holds elements the tree does not show yet: the screen is all cut once it is scrolled.
+        boolean scrolls = tree.all().stream().anyMatch(node -> node.has(Trait.SCROLLABLE));
         return new NewScreen(unique(className(said), taken), anyPage ? null : route,
-                anyPage ? List.of() : examples, markers, overlay);
+                anyPage ? List.of() : examples, markers, overlay, !scrolls);
     }
 
     /**
@@ -238,7 +262,7 @@ public sealed interface TreeAnswer {
      */
     static Optional<TreeAnswer> effect(String screen, String field, Effect effect,
                                        Function<Effect, Optional<String>> screenOf) {
-        if (!effect.way()) return Optional.of(new InputNote(screen, field, effect.line()));
+        if (!effect.way()) return Optional.of(InputNote.of(screen, field, effect));
         return screenOf.apply(effect).map(to -> new NewWay(screen, field, to));
     }
 

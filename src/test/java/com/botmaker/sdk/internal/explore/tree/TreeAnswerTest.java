@@ -268,6 +268,29 @@ class TreeAnswerTest {
         assertTrue(Locator.inputs(field).isEmpty());
     }
 
+    /** A screen read off its tree records every element as an input, and is all cut: the tree showed them all. */
+    @Test
+    void aTreeScreenRecordsEveryElementAndIsAllCut() {
+        UiTree shop = new UiTree(List.of(app("android.widget.FrameLayout", "", "", "", Set.of(),
+                app("android.widget.Button", "buy", "Buy", "", PRESSABLE),
+                app("android.widget.Button", "sell", "Sell", "", PRESSABLE))));
+
+        assertTrue(TreeAnswer.screen(shop, null, List.of(), Set.of()).allCut());
+        assertEquals(2, TreeAnswer.inputs("Shop", shop, Set.of(), Set.of(), located -> Optional.empty()).size());
+    }
+
+    /**
+     * A screen with a part that scrolls is not all cut when it is read: what is under the fold is not in its tree
+     * yet, so it waits for that part to be scrolled (the Cartographer's, or a later read).
+     */
+    @Test
+    void aScrollingScreenWaitsForItsScrollToBeAllCut() {
+        UiTree list = new UiTree(List.of(app("androidx.recyclerview.widget.RecyclerView", "items", "", "",
+                EnumSet.of(Trait.SCROLLABLE), app("android.widget.Button", "item1", "Item 1", "", PRESSABLE))));
+
+        assertFalse(TreeAnswer.screen(list, null, List.of(), Set.of()).allCut());
+    }
+
     private static UiTree page(UiNode... parts) {
         return new UiTree(List.of(new UiNode("", "", "", "web:RootWebArea", "", BOX, Set.of(), List.of(parts))));
     }

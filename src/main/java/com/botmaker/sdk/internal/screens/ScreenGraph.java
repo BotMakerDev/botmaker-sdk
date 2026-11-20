@@ -581,24 +581,32 @@ public final class ScreenGraph {
      * a way; ties, and no {@code at}, by {@link #nextToExplore()}'s order, breadth first. Empty when nothing is left.
      */
     public Optional<String> nextToExplore(Optional<String> at) {
+        return nextToExplore(at, c -> !done(c));
+    }
+
+    /**
+     * As {@link #nextToExplore(Optional)}, among the screens {@code open} keeps in place of those not {@link #done}: a
+     * run keeps those it has work of its own on, set-aside ones in a second call.
+     */
+    public Optional<String> nextToExplore(Optional<String> at, Predicate<String> open) {
         List<String> order = new ArrayList<>(screens.keySet());
         Map<String, Presence> presence = presences();
         Comparator<String> breadthFirst = Comparator.<String, Presence>comparing(presence::get)
                 .thenComparing(this::underInfo)
                 .thenComparingInt(c -> depth(c).orElse(DEEPEST))
                 .thenComparingInt(order::indexOf);
-        List<String> open = order.stream()
-                .filter(c -> depth(c).isPresent() && presence.get(c) != Presence.LOCKED && !done(c)).toList();
+        List<String> left = order.stream()
+                .filter(c -> depth(c).isPresent() && presence.get(c) != Presence.LOCKED && open.test(c)).toList();
         Optional<String> here = at.filter(screens::containsKey);
-        if (here.isEmpty()) return open.stream().min(breadthFirst);
-        if (open.contains(here.get())) return here;
+        if (here.isEmpty()) return left.stream().min(breadthFirst);
+        if (left.contains(here.get())) return here;
         Map<String, Long> away = new HashMap<>();
-        for (String c : open) {
+        for (String c : left) {
             pathTo(here.get(), c, edge -> true)
                     .ifPresent(path -> away.put(c, path.stream().mapToLong(this::cost).sum()));
         }
         // A screen no way reaches from here comes after every one that is, in the breadth-first order.
-        return open.stream().min(Comparator.<String>comparingLong(c -> away.getOrDefault(c, Long.MAX_VALUE))
+        return left.stream().min(Comparator.<String>comparingLong(c -> away.getOrDefault(c, Long.MAX_VALUE))
                 .thenComparing(breadthFirst));
     }
 

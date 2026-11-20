@@ -167,11 +167,11 @@ class DiscoverSlowTest {
         AtomicInteger generation = new AtomicInteger();
         ExploreLoop.Reload reload = () -> {
             ScreenGraph now = graph.get();
-            play.use(now, null, null);
+            play.use(now, null);
             return new ExploreLoop.Reload.Reloaded(generation.incrementAndGet(), now, Guards.with(List.of()),
                     List.of());
         };
-        ExploreLoop.Settings settings = new ExploreLoop.Settings(Duration.ofSeconds(2), Duration.ofSeconds(60), 0,
+        ExploreLoop.Settings settings = new ExploreLoop.Settings(Duration.ofSeconds(2), Duration.ofSeconds(60),
                 Duration.ofSeconds(10), Duration.ofMinutes(3), Duration.ofMillis(100), 0, Duration.ofMinutes(2));
         ExploreLoop loop = new ExploreLoop(graph.get(), play, reload, Guards.with(List.of()), journal, settings,
                 System::currentTimeMillis).handOn(settled);

@@ -25,6 +25,7 @@ import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
+import com.botmaker.shared.web.Guard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -111,7 +112,19 @@ class ExploreLoopTest {
             pressed.add(screen + "." + field);
             Effect.State left = afterPress.get(field);
             if (left != null) state = left;
+            guardStopped = stopsOnPress.getOrDefault(field, List.of());
             return Optional.ofNullable(at);
+        }
+
+        /** What the guard stops on a press of a field: a field not here, nothing. */
+        final Map<String, List<Guard.Stopped>> stopsOnPress = new HashMap<>();
+        private List<Guard.Stopped> guardStopped = List.of();
+
+        @Override
+        public List<Guard.Stopped> stopped() {
+            List<Guard.Stopped> now = guardStopped;
+            guardStopped = List.of();
+            return now;
         }
 
         /** The tree a press of a field leaves; a field not here leaves the tree as it was. */
@@ -169,11 +182,6 @@ class ExploreLoopTest {
         @Override
         public Optional<String> picture(String name, Rectangle box) {
             return state == null ? Optional.empty() : Optional.of("/run/inputs/" + name + ".png");
-        }
-
-        @Override
-        public boolean planRound() {
-            return false;
         }
 
         @Override
@@ -413,23 +421,98 @@ class ExploreLoopTest {
                 events(ExploreEvent.Pictured.class), "the docs link has its picture already");
     }
 
-    /** A tried input a note says fails is pressed again, once; one a note says does nothing is not. */
+    /**
+     * An input whose last press failed is pressed once again; failing again is the Cartographer's stop, and its screen
+     * stays not done. One tried that stays is not pressed, and an old {@code Fails:} note is not read.
+     */
     @Test
-    void anInputThatFailedIsPressedAgainOnce() {
+    void aFailedInputIsPressedOnceAgainThenStops() {
         Map<String, MapScreen> screens = new LinkedHashMap<>();
         Map<String, Input> inputs = new LinkedHashMap<>();
-        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free().tried());
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free()
+                .failed("blocked write: POST /monitoring"));
         inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()).free().tried());
-        screens.put("A", new MapScreen(Setup.named("A").start().notes("toggle: Fails: blocked write: POST /monitoring\n"
-                + "docs: Does nothing a visitor sees"), inputs));
+        screens.put("A", new MapScreen(Setup.named("A").start().notes("docs: Fails: an older run's line"), inputs));
         ScreenGraph map = ScreenGraph.of(screens);
         Game game = new Game();
         game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
                 web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.stopsOnPress.put("toggle", List.of(new Guard.Stopped(Guard.Kind.WRITE, "/monitoring", "POST")));
 
         loop(map, game, same(map), Duration.ofMinutes(12)).run();
 
-        assertEquals(List.of("A.toggle"), game.pressed);
+        assertEquals(List.of("A.toggle"), game.pressed, "pressed once again, the docs link not at all");
+        assertEquals(StopKind.FAILED_INPUT, stops().getFirst().stop().kind());
+        assertEquals("A.toggle", stops().getFirst().stop().place());
+        assertFalse(map.done("A"));
+    }
+
+    /** A screen is finished before it is left: both inputs that stay are pressed before the way to the next screen. */
+    @Test
+    void theRunFinishesItsScreenBeforeLeaving() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("b", click("b").free());
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        inputs.put("theme", Button.of(new Locator(Role.BUTTON, "Theme", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("button", "Theme", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        List<List<String>> pressedBeforeWay = new ArrayList<>();
+        game.arrival = edge -> {
+            pressedBeforeWay.add(List.copyOf(game.pressed));
+            return new Took(Arrival.AT_TARGET, edge.to());
+        };
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of("A.b→B"), game.taken.subList(0, 1));
+        assertEquals(List.of("A.toggle", "A.theme"), pressedBeforeWay.getFirst());
+    }
+
+    /**
+     * A run restarted in the middle of a screen (a reload put it back where the game is) goes on with that screen,
+     * not with a shallower one: its way first, before any of the start screen's.
+     */
+    @Test
+    void aReloadedRunGoesBackToItsScreen() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free(), click("d").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b")), click("c").free()));
+        screens.put("C", screen(Setup.named("C").from(ref("B", "c"))));
+        screens.put("D", screen(Setup.named("D").from(ref("A", "d"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.at = "B";
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(game.taken.getFirst().startsWith("B."), game.taken.toString());
+        assertTrue(game.taken.indexOf("B.c→C") < game.taken.indexOf("A.d→D"), "B's way before the start's other");
+    }
+
+    /** A first failure is no stop: it goes with the next settled stop as a note that says the input failed. */
+    @Test
+    void aFirstFailureIsANoteNotAStop() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.stopsOnPress.put("toggle", List.of(new Guard.Stopped(Guard.Kind.WRITE, "/monitoring", "POST")));
+
+        loop(map, game, same(map), Duration.ofMinutes(1)).run();
+
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.FAILED_INPUT));
+        assertTrue(events(ExploreEvent.Settled.class).stream().flatMap(s -> s.answers().stream())
+                .anyMatch(a -> a.equals(new TreeAnswer.InputNote("A", "toggle",
+                        "press failed, blocked write: POST /monitoring", "blocked write: POST /monitoring"))),
+                events(ExploreEvent.Settled.class).toString());
     }
 
     /** An input that is no way is pressed once; what it did goes with the next settled stop as a note. */
@@ -694,32 +777,18 @@ class ExploreLoopTest {
         assertEquals(List.of("1 uncropped", "1 untried"), loop.open("A"));
     }
 
-    /** A value nothing reads, parked unanswered, keeps its screen open until its stop is resumed. */
+    /** Exploring builds the map only: a value no readout covers raises no stop, and the ways are taken all the same. */
     @Test
-    void aParkedMissingFactKeepsItsScreenOpenUntilResumed() {
+    void exploringPlaysNoPlanAndStopsForNoFact() {
         Game game = new Game();
         game.seen.put("A", new ExploreLoop.Look(List.of(new Stop.Text("Gold 1200", new Rect(40, 40, 80, 20))),
                 List.of(), Map.of(), List.of()));
-        ExploreLoop parked = loop(map(), game, same(map()), Duration.ofMinutes(12));
-        parked.run();
+        game.plan = Plan.of(Plan.tier(Goal.done(() -> Do.press(click("b")))));
 
-        assertEquals(StopKind.MISSING_FACT, stops().getFirst().stop().kind());
-        assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody answered in 10 min");
-        assertTrue(parked.open("A").contains("1 fact missing"), parked.open("A").toString());
-        assertFalse(parked.open("B").contains("1 fact missing"), "only its own screen");
-        assertTrue(JournalView.of(journal()).build().built().stream().noneMatch(b -> b.screen().equals("A")),
-                "not built while its stop is parked");
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
 
-        // The fix: a readout now reads the value, and the stop is resumed.
-        game.seen.clear();
-        game.onIdle = () -> {
-            if (!journal().queue().isEmpty()) journal().command("resume " + journal().queue().getFirst().id());
-        };
-        ExploreLoop resumed = loop(map(), game, same(map()), Duration.ofMinutes(15));
-        resumed.run();
-
-        assertTrue(journal().queue().isEmpty(), "it left the queue");
-        assertFalse(resumed.open("A").contains("1 fact missing"), resumed.open("A").toString());
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.MISSING_FACT), stops().toString());
+        assertTrue(game.taken.containsAll(List.of("A.b→B", "A.d→D")), game.taken.toString());
     }
 
     /** An input that spends with no goal's action pressing it is open; one a goal of the plan does is not. */

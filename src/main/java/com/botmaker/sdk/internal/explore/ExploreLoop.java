@@ -44,7 +44,6 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,7 +51,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.LongSupplier;
-import java.util.regex.Pattern;
 
 /**
  * <em>Keep exploring</em>'s loop (spec §1–3): each round, where the game is, everything read on it, one press chosen,
@@ -145,25 +143,25 @@ public final class ExploreLoop {
     }
 
     /**
-     * How long a stop waits before it is parked, how long with no press is stuck, how many plan rounds with no new
-     * screen before a walk to an untried input, one press's time, the whole run's (null: no end), how often a
-     * paused run looks for a command, the screens it is on before it ends, each counted once (0: no end), and the
-     * time a screen's own clock may run unbuilt before the run sets it aside for another open one (null: never).
+     * How long a stop waits before it is parked, how long with no press is stuck, one press's time, the whole run's
+     * (null: no end), how often a paused run looks for a command, the screens it is on before it ends, each counted
+     * once (0: no end), and the time a screen's own clock may run unbuilt before the run sets it aside for another
+     * open one (null: never).
      */
-    public record Settings(Duration parkAfter, Duration stuckAfter, int planRoundsWithoutNew, Duration edge,
-                           Duration hours, Duration poll, int maxScreens, Duration screenBudget) {
+    public record Settings(Duration parkAfter, Duration stuckAfter, Duration edge, Duration hours, Duration poll,
+                           int maxScreens, Duration screenBudget) {
 
-        public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15), 5,
+        public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15),
                 Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0, Duration.ofMinutes(2));
 
         /** These settings with a budget of {@code hours}; null for none. */
         public Settings within(Duration hours) {
-            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, maxScreens, screenBudget);
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget);
         }
 
         /** These settings ending once the run has been on {@code screens} screens; 0 for no end. */
         public Settings upTo(int screens) {
-            return new Settings(parkAfter, stuckAfter, planRoundsWithoutNew, edge, hours, poll, screens, screenBudget);
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, screens, screenBudget);
         }
     }
 
@@ -198,10 +196,7 @@ public final class ExploreLoop {
         /** Saves the frame the game shows now as {@code name}; where it is, or {@code ""} when it was not saved. */
         String keep(String name);
 
-        /** Runs one round of the bot's plan; false when it has nothing to do. */
-        boolean planRound();
-
-        /** The plan {@link #planRound} plays; {@link Plan#NONE} when the run plays none. */
+        /** The bot's plan, whose goals say which spending inputs have a use; {@link Plan#NONE} for none. */
         default Plan plan() {
             return Plan.NONE;
         }
@@ -286,13 +281,6 @@ public final class ExploreLoop {
         }
     }
 
-    /**
-     * Text that reads as a value: a count with {@code k/m/b}, {@code x/y}, a timer {@code hh:mm(:ss)}, a percentage, or
-     * a number of two digits or more.
-     */
-    static final Pattern VALUE = Pattern.compile(
-            "\\d+(?:[.,]\\d+)?\\s*[kmbKMB]\\b|\\d+\\s*/\\s*\\d+|\\d{1,2}:\\d{2}(?::\\d{2})?|\\d+(?:[.,]\\d+)?\\s*%|\\d{2,}");
-
     /** The place of the stop listing every input with no verdict. */
     static final String MAP = "map";
 
@@ -341,7 +329,6 @@ public final class ExploreLoop {
     private boolean stuck;
     private long began;
     private long lastPress;
-    private int planRounds;
     private int stops;
     /** The edge last pressed, by its key: where an unknown screen came from. */
     private String lastEdge;
@@ -751,7 +738,6 @@ public final class ExploreLoop {
         if (replay != null && readsTrees()) play.state().map(ExploreLoop::pagePlace)
                 .ifPresent(page -> passed(StopKind.UNKNOWN_SCREEN, page));
         if (seen.add(screen)) {
-            planRounds = 0;
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
             if (website()) pictured(screen);
@@ -761,53 +747,37 @@ public final class ExploreLoop {
         if (readsTrees() && map.screen(screen).isPresent() && merged.add(screen)) notes.addAll(sameInputs(screen));
         // After the screen is said found and pictured: one with nothing to do is built once it is reached.
         clock(screen);
+        // Exploring builds the map only: no value read here raises a missing fact (spec 2026-11-20, § Out of exploring).
         Look look = play.look(screen);
-        // A website's numbers are its content (a price, a count of devices), never a game's state to keep.
-        Optional<Stop.Text> value = website() ? Optional.empty() : missingFact(screen, look);
-        if (value.isPresent()) {
-            Stop.Text text = value.get();
-            return stop(StopKind.MISSING_FACT, screen, textPlace(screen, text.box()), look, "\"" + text.text().strip()
-                    + "\" reads as a value no readout covers: add a readout into a fact, or resume with ignore",
-                    false) != Paused.END;
-        }
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
         if (replay != null && screen.equals(replay.fault().screen())) passed(StopKind.MISSING_FACT, replay.fault().place());
         if (overBudget(screen)) {
             // Its own work waits while another screen has some: that one is walked to first.
             // A walk that came back here does its own work instead of walking again.
-            Optional<String> other = nearest(screen, true);
+            Optional<String> other = next(screen, true);
             if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
             Paused low = lowYield(screen, look);
             if (low != null) return low != Paused.END;
         }
-        Optional<Edge> untried = untried(screen);
-        if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
+        // The screen is finished before it is left: its inputs left, which mostly stay, before its ways, which leave.
         if (readsTrees()) {
             // Once per screen the map holds: its inputs name the fields the tries found.
             if (!probed.contains(screen) && map.screen(screen).isPresent()) {
                 probed.add(screen);
                 notes.addAll(rules(screen));
             }
-            Optional<String> input = untriedInput(screen);
+            Optional<String> input = inputsLeft(screen).stream().findFirst();
             if (input.isPresent()) return pressInput(screen, input.get(), look);
-            if (!notes.isEmpty()) {
-                return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
-                        settledWhy(screen)) != Paused.END;
-            }
         }
-        if (planRounds < settings.planRoundsWithoutNew()) {
-            planRounds++;
-            doing = Spent.PRESSING;
-            if (play.planRound()) {
-                // A screen met after a plan round or a walk is not blamed on the last way pressed.
-                lastEdge = null;
-                pressed("plan round on " + screen);
-                return true;
-            }
+        Optional<Edge> untried = untried(screen);
+        if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
+        if (readsTrees() && !notes.isEmpty()) {
+            return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
+                    settledWhy(screen)) != Paused.END;
         }
-        planRounds = 0;
-        Optional<String> nearest = nearest(screen, true).or(() -> nearest(screen, false));
-        if (nearest.isPresent()) return walk(screen, nearest.get());
+        // Nothing left here the run presses itself: the nearest screen not done, a set-aside one last.
+        Optional<String> next = next(screen, true).or(() -> next(screen, false));
+        if (next.isPresent()) return walk(screen, next.get());
         doing = Spent.IDLE;
         play.idle(settings.poll());
         return true;
@@ -1032,32 +1002,25 @@ public final class ExploreLoop {
     }
 
     /**
-     * The first input of {@code screen} that is no way, free, found in its tree, never pressed: an input no note
-     * says anything of yet. One the bot's code presses ({@code Custom}) or one found by a picture is Claude's. One a
-     * note says fails is pressed again, once a run: what failed may have been the page's, or an older run's judging.
+     * The inputs of {@code screen} the run presses itself, in the map's order ({@link ScreenGraph#left}: untried or
+     * failed, information last): no way, free, found in its tree, not pressed yet this run. One the bot's code presses
+     * ({@code Custom}) or one found by a picture is Claude's. A failed one is pressed again once a run: what failed may
+     * have been the page's, or an older run's judging.
      */
-    private Optional<String> untriedInput(String screen) {
-        return untriedInputs(screen).stream().findFirst();
-    }
-
-    /** Every input {@link #untriedInput} would press on {@code screen}, in the screen's order. */
-    private List<String> untriedInputs(String screen) {
+    private List<String> inputsLeft(String screen) {
         MapScreen on = map.screen(screen).orElse(null);
         if (on == null) return List.of();
-        List<String> untried = new ArrayList<>();
         Set<String> ways = new HashSet<>();
         for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
-        String notes = on.setup().notes() == null ? "" : "\n" + on.setup().notes();
-        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
-            String field = input.getKey();
-            if (!(input.getValue() instanceof Button button) || button.element() == null) continue;
-            boolean failed = notes.contains("\n" + field + ": " + Effect.FAILS);
-            if (!(button.verdict() instanceof Verdict.Free) || button.isTried() && !failed || button.isInfo()) continue;
+        List<String> left = new ArrayList<>();
+        for (String field : map.left(screen)) {
+            if (!(on.inputs().get(field) instanceof Button button) || button.element() == null) continue;
+            if (!(button.verdict() instanceof Verdict.Free)) continue;
             String key = screen + "." + field;
             if (ways.contains(field) || tried.contains(key) || avoided(key)) continue;
-            untried.add(field);
+            left.add(field);
         }
-        return untried;
+        return left;
     }
 
     /**
@@ -1165,7 +1128,7 @@ public final class ExploreLoop {
                     && !pictures.contains(screen + "." + input.getKey())) uncropped++;
         }
         long untried = map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).count()
-                + (readsTrees() ? untriedInputs(screen).size() : 0);
+                + (readsTrees() ? inputsLeft(screen).size() : 0);
         long unjudged = map.untagged().stream().filter(name -> name.screen().equals(screen)).count();
         // A way whose condition says no is not tried yet: the screen waits for it to hold. An unknown one is untried.
         long waiting = map.edges().stream().filter(e -> e.from().equals(screen) && !e.onItsOwn()
@@ -1361,7 +1324,12 @@ public final class ExploreLoop {
             by = field;
             return settleUnknown(after, new InputName(screen, field)) != Paused.END;
         }
-        notes.add(new TreeAnswer.InputNote(screen, field, effect.line()));
+        notes.add(TreeAnswer.InputNote.of(screen, field, effect));
+        // An input that failed before and fails again is the Cartographer's: a verdict, or a press fixed.
+        if (effect instanceof Effect.Fails(String why) && input != null && input.failed() != null) {
+            return stop(StopKind.FAILED_INPUT, screen, key, look, field + " failed again (" + why + "; before: "
+                    + input.failed() + "): give it a verdict, or fix how it is pressed", false) != Paused.END;
+        }
         // An error page the server answered is left for a screen of the map.
         if (after.httpError()) return errorPage(screen, key, after);
         errorPages.remove(key);
@@ -1507,41 +1475,23 @@ public final class ExploreLoop {
     }
 
     /**
-     * The nearest screen by the map's edges, from {@code screen}, with an edge not tried yet, or, where the run reads
-     * trees, an input; not itself, nor, when {@code notAside}, one set aside.
+     * The screen the run walks to from {@code screen}: the map's next to explore ({@link ScreenGraph#nextToExplore}),
+     * nearest first, among the screens with work the run does itself there, an input {@link ScreenGraph#left} or a
+     * way not taken this run (a done screen's ways are still taken once a run, which proves them); not {@code screen},
+     * nor, when {@code notAside}, one set aside.
      */
-    private Optional<String> nearest(String screen, boolean notAside) {
-        Set<String> reached = new LinkedHashSet<>(List.of(screen));
-        Deque<String> queue = new ArrayDeque<>(reached);
-        while (!queue.isEmpty()) {
-            String at = queue.poll();
-            for (Edge edge : map.edges()) {
-                if (!edge.from().equals(at) || !reached.add(edge.to())) continue;
-                String to = edge.to();
-                // A website's input the run presses itself is work too: a dialog's button is no edge until pressed.
-                boolean work = map.edges().stream().anyMatch(e -> e.from().equals(to) && untriedEdge(e))
-                        || readsTrees() && !untriedInputs(to).isEmpty();
-                if (work &&!(notAside && aside.contains(to))) return Optional.of(to);
-                queue.add(edge.to());
-            }
-        }
-        return Optional.empty();
+    private Optional<String> next(String screen, boolean notAside) {
+        // One no way reaches from here comes last in the map's order: then none is reached, and the run waits here.
+        return map.nextToExplore(Optional.of(screen), to -> !to.equals(screen)
+                && !(notAside && aside.contains(to)) && hasWork(to))
+                .filter(to -> map.pathTo(screen, to, edge -> true).isPresent());
     }
 
-    /** The first text on {@code look} that reads as a value, outside every readout, not raised before. */
-    private Optional<Stop.Text> missingFact(String screen, Look look) {
-        for (Stop.Text text : look.texts()) {
-            if (!VALUE.matcher(text.text()).find()) continue;
-            if (text.box() != null && look.covered().stream().anyMatch(area -> area.overlaps(text.box()))) continue;
-            String place = textPlace(screen, text.box());
-            if (answered.add(place)) return Optional.of(text);
-        }
-        return Optional.empty();
-    }
-
-    /** A text box's place on {@code screen}, rounded to 20 px so a box read a few pixels off is the same. */
-    static String textPlace(String screen, Rect box) {
-        return box == null ? screen + "#?" : screen + "#" + Math.round(box.x() / 20.0) * 20 + "," + Math.round(box.y() / 20.0) * 20;
+    /** Whether the run has work of its own on {@code screen}: a way not taken this run, or an input it presses. */
+    private boolean hasWork(String screen) {
+        // A website's input the run presses itself is work too: a dialog's button is no edge until pressed.
+        return map.edges().stream().anyMatch(e -> e.from().equals(screen) && untriedEdge(e))
+                || readsTrees() && !inputsLeft(screen).isEmpty();
     }
 
     /** An edge's key: {@code "Home.shop→Shop"}. */

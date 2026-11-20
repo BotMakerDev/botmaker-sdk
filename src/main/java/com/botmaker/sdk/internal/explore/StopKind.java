@@ -17,7 +17,7 @@ public enum StopKind {
     UNMAPPED_INPUT("unmapped_input", "Unmapped input"),
     /** Inputs with no safety verdict: free, spends or never. */
     NO_VERDICT("no_verdict", "No verdict"),
-    /** Text that reads as a value, with no readout covering it. */
+    /** Text that reads as a value, with no readout covering it: a plan run's, never raised by exploring (2026-11-20). */
     MISSING_FACT("missing_fact", "Missing fact"),
     /** A way that worked once and not again, with nothing in the bot saying when. */
     MISSING_CONDITION("missing_condition", "Missing condition"),
@@ -31,6 +31,11 @@ public enum StopKind {
     CRASH("crash", "Crash"),
     /** The server answered an error page (a 431, a 404) twice after one way or input (2026-11-20). */
     ERROR_PAGE("error_page", "Error page"),
+    /**
+     * An input that failed before failed again when the run pressed it once more (2026-11-20): the Cartographer gives it
+     * a verdict or fixes its press; its screen stays not done.
+     */
+    FAILED_INPUT("failed_input", "Failed input"),
     /**
      * What presses of a screen's inputs did, read off its tree: ways to screens the bot has, and notes. The run
      * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.

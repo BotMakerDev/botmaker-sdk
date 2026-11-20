@@ -25,7 +25,6 @@ import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.FormProbe;
 import com.botmaker.shared.web.Guard;
 import com.botmaker.sdk.internal.params.RunFacts;
-import com.botmaker.sdk.internal.plan.RunGame;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.LiveMoves;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -50,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BooleanSupplier;
 
 /**
  * {@link ExploreLoop}'s play on the running bot's game: the map's walk and presses by {@link LiveMoves}, the frame read
@@ -85,15 +83,13 @@ public final class LivePlay implements ExploreLoop.Play {
         Journal journal = pending.flatMap(file -> Journal.latest(project))
                 .orElseGet(() -> Journal.begin(project, System.currentTimeMillis()));
         journal.forgetPage();
-        LivePlay play = new LivePlay(ScreenMaps.installed(), plan, plan == null ? null : RunGame.rounds(plan, first.holders()),
-                restart, journal);
+        LivePlay play = new LivePlay(ScreenMaps.installed(), plan, restart, journal);
         AtomicReference<Generation> current = new AtomicReference<>(first);
         ExploreLoop.Reload reload = () -> switch (current.get().next(project, current.get().number() + 1)) {
             case Generation.Ok(Generation next) -> {
                 next.install();
                 current.set(next);
-                Plan now = next.plan();
-                play.use(ScreenMaps.installed(), now, now == null ? null : RunGame.rounds(now, next.holders()));
+                play.use(ScreenMaps.installed(), next.plan());
                 yield new ExploreLoop.Reload.Reloaded(next.number(), ScreenMaps.installed(), guards(next), List.of());
             }
             case Generation.Refused(List<String> errors) ->
@@ -115,7 +111,7 @@ public final class LivePlay implements ExploreLoop.Play {
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */
     public static LivePlay over(ScreenGraph map, Runnable restart) {
-        return new LivePlay(map, null, null, restart, null);
+        return new LivePlay(map, null, restart, null);
     }
 
     /** The guards with the author's words of {@code generation}'s bot. */
@@ -142,25 +138,23 @@ public final class LivePlay implements ExploreLoop.Play {
     private volatile long pageAt;
     private volatile ScreenGraph map;
     private volatile LiveMoves moves;
-    private volatile BooleanSupplier rounds;
     private volatile Plan plan = Plan.NONE;
 
     /**
      * Plays {@code map} with {@code plan} (null: none); {@code restart} restarts the game; a website's page goes to
      * {@code journal} (null: nowhere).
      */
-    private LivePlay(ScreenGraph map, Plan plan, BooleanSupplier rounds, Runnable restart, Journal journal) {
+    private LivePlay(ScreenGraph map, Plan plan, Runnable restart, Journal journal) {
         this.restart = restart;
         this.journal = journal;
-        use(map, plan, rounds);
+        use(map, plan);
     }
 
-    /** Plays {@code map} and {@code plan} by its {@code rounds} from now on: a new generation's. */
-    public void use(ScreenGraph map, Plan plan, BooleanSupplier rounds) {
+    /** Plays {@code map} with {@code plan}'s goals from now on: a new generation's. Exploring plays no round of it. */
+    public void use(ScreenGraph map, Plan plan) {
         this.map = map;
         this.moves = new LiveMoves(map, reach, restart);
         this.plan = plan == null ? Plan.NONE : plan;
-        this.rounds = rounds;
     }
 
     @Override
@@ -257,12 +251,6 @@ public final class LivePlay implements ExploreLoop.Play {
         } catch (IOException | RuntimeException unsaved) {
             return "";
         }
-    }
-
-    @Override
-    public boolean planRound() {
-        BooleanSupplier now = rounds;
-        return now != null && now.getAsBoolean();
     }
 
     @Override

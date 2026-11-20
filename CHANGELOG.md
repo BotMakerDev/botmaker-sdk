@@ -28,6 +28,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   last press did not take (`failed("…")`), and a press that takes clears it. After the screen it is on, Discovery
   goes to the nearest unfinished screen, by the cost of the way there, instead of the shallowest. Ties keep the
   old breadth-first order.
+- **Keep exploring reads what is left from the map.** A run presses a screen's inputs before it takes the
+  screen's ways out, so it finishes a screen before it leaves. A run restarted on a screen goes on with that
+  screen. A press that fails is written on the input as `failed("…")`. The next run presses it once more, and a
+  second failure stops the run with the new *Failed input* stop, so Claude gives it a verdict or fixes how it is
+  pressed. A screen read from a page's tree is written all cut unless part of it scrolls. Old `field: Fails:`
+  note lines are no longer read.
 - **Every explore stop now ends.** The start-of-run list of inputs with no verdict is parked like any other stop
   nobody answers, and the guard still presses no such input. A window that stays in front of the game for the stuck
   time (15 min) ends the run as *Stuck* instead of waiting forever; nothing is pressed into that window. A server
@@ -160,6 +166,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - A page Discover settled off the tree hangs under the first page that links to it, and a link back there is its
   way back. A link back from a page with no way in but extra ones was skipped, so the stop came back as "the fix
   did not take".
+
+### Removed
+
+- **Exploring no longer plays the bot's plan between screens, and no longer stops for a missing fact.** The
+  *Missing fact* stop stays for a plan run.
 
 ### Deprecated
 
