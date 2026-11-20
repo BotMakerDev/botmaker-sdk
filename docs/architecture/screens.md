@@ -390,6 +390,37 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   (`wheel -5, step 120px, settles in 400 ms`, or `not measured`).
 - `Protocol` and `SdkAssist.GUIDE` say when each runs (Discovery, Upkeep).
 
+## Keep exploring's build rate (2026-11-20, plan `../docs/superpowers/plans/2026-11-20-map-build-rate.md` in the umbrella)
+
+The rate that counts is how fast the map gets built, screen by screen, on every target (a PC game, an Android app, a
+website), not how fast one press goes: a whole screen should be built in a minute or two.
+
+- **A screen's clock** (`ExploreLoop.clock`) is the time the run spent on it since it first reached it, charged each
+  round to the screen the run was on. It is split by what the time went to (`Spent`): pressing, settling, walking,
+  waiting on Claude.
+- **Built** means nothing on it is open (`ExploreLoop.open`, one line a kind): every input the run pictures has its
+  picture (a website's; an app's element is found by its tree, so none is held open for a shot), every way and input
+  is tried and has its verdict, no way waits on its condition, no stop is parked on it (a missing fact or condition
+  counts by name), and, in a run that plays a plan, no input spends a fact with no action of the plan's goals pressing
+  it. Leaving a screen writes `ExploreEvent.Built` or `ExploreEvent.Building` with what is open, the latter only when
+  that changed, so a hub passed again and again says it once. A parked stop arriving on a built screen opens it again.
+- **The budget** (`Settings.screenBudget`, 2 minutes): a screen whose clock runs past it unbuilt is set aside
+  (`ExploreEvent.SetAside`). The run walks to the nearest other open screen and comes back once no other is open.
+  Back and still unbuilt after a second budget, the run stops as `StopKind.LOW_YIELD`, saying what is open and where
+  the clock went. A `resume` gives the screen a fresh clock, answered once it builds; `resume ignore` leaves it as it
+  is for the run, across a restart too. A low-yield stop holds nothing open itself, and a parked one is answered when
+  its screen builds.
+- **A restart** (`restoreClocks`) reads the journal back: built screens stay built with their clocks, open ones keep
+  theirs, set-aside ones stay aside.
+- **What reads it**: the journal's `JournalView.build()`; the explore tool's `status` and `wait` end with one line
+  (`map: 4 built (median 1m40s), 2 open: PRICING 3m12s (9 untried)`, `ExploreTools`), and 🔭 Explore lists it.
+- **A website's settle** is shared's `WebPage.settled`: quiet 500 ms with nothing it waits for in flight. It does not
+  wait for a streaming request (`EventSource`, `WebSocket`, `Media`), nor for a worker's own script (type `Script`,
+  initiator `other`), which loads in the worker's target and never finishes on the tab's. A `style` change counts
+  only when it shows or hides a node (its inline `display` or `visibility`). Every input counts as activity, so a
+  settle after a press waits at least the quiet half second. nunu.ai's home page settled at the 10 s cap before;
+  it settles in about 4 s now, Chromium's start included.
+
 ## Dev discovery (2026-11-19, spec `../docs/superpowers/specs/2026-11-19-dev-discovery-design.md` in the umbrella)
 
 A stop that is Discover's own mistake, not the game's, is part of *Keep exploring*'s flow: the run holds it, the SDK is
