@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- What Keep exploring or Discover settled that the bot refused to take is a stop of its own, *Settled, not written*
+  (`unwritten`): it says each line left out and why, and what was settled, for Claude to write or fix. It used to be a
+  Discover fault in dev mode, held until the SDK was reloaded.
+- What Keep exploring and Discover settle is written by the SDK's run companion (`TreeAnswerWatch`), which the core
+  starts with each such run and stops at its end. It no longer runs in every process that opened the project, behind
+  a file lock, with a timer of its own.
+- Explore commands queue (`explore/commands.jsonl`): two sent close together, such as the settled stop's resume and
+  Claude's, are both taken, in order; the single `command` file kept only the last. A run drops what a run before it
+  left.
 - 🧩 Elements' tree rows have a ⋯ menu: Rename… renames the element's constant and every use by binding, and Delete
   removes it with its shot, refused while an input or a step still names it.
 - A dialog or menu Discover finds is one screen over any page, told by its own marks with no route: a site's Book a

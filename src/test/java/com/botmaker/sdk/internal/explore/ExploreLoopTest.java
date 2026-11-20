@@ -882,18 +882,18 @@ class ExploreLoopTest {
     }
 
     @Test
-    void aSkippedAnswerIsAFaultInDevMode() {
+    void aSkippedAnswerIsATypedStopNotAFault() {
         Game game = settledPage(true, List.of("x: no screen GONE in the map."));
 
         loop(map(), game, same(map()), Duration.ofHours(2)).run();
 
         String settled = stops().getFirst().stop().id();
-        ExploreEvent.Faulted fault = events(ExploreEvent.Faulted.class).getFirst();
-        assertEquals("skipped", fault.source());
-        assertTrue(fault.why().contains(settled) && fault.why().contains("x: no screen GONE in the map."), fault.why());
-        assertTrue(fault.evidence().contains("settled: [NewScreen"), fault.evidence());
-        assertEquals(StopKind.FAULT, stops().get(1).stop().kind());
-        assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "held");
+        Stop unwritten = stops().get(1).stop();
+        assertEquals(StopKind.UNWRITTEN, unwritten.kind(), "the bot's to fix, even in dev mode");
+        assertTrue(unwritten.missing().contains(settled) && unwritten.missing().contains("x: no screen GONE in the map."),
+                unwritten.missing());
+        assertTrue(unwritten.missing().contains("settled: [NewScreen"), unwritten.missing());
+        assertTrue(events(ExploreEvent.Faulted.class).isEmpty(), events(ExploreEvent.Faulted.class).toString());
     }
 
     @Test
@@ -915,7 +915,8 @@ class ExploreLoopTest {
 
         loop(map(), game, reload, Duration.ofHours(2)).run();
 
-        assertEquals("skipped", events(ExploreEvent.Faulted.class).getFirst().source());
+        assertTrue(stops().stream().map(ExploreEvent.Stopped::stop).anyMatch(stop -> stop.kind() == StopKind.UNWRITTEN
+                && stop.missing().contains("x: no screen GONE in the map.")), stops().toString());
     }
 
     @Test
@@ -925,7 +926,7 @@ class ExploreLoopTest {
         loop(map(), game, same(map()), Duration.ofHours(2)).run();
 
         Stop said = stops().get(1).stop();
-        assertEquals(StopKind.UNKNOWN_SCREEN, said.kind());
+        assertEquals(StopKind.UNWRITTEN, said.kind());
         assertTrue(said.missing().contains("x: no screen GONE in the map."), said.missing());
         assertFalse(JournalView.of(journal()).settled(said), "Claude's to write, not the plugin side's");
         assertTrue(events(ExploreEvent.Faulted.class).isEmpty());
@@ -1036,40 +1037,6 @@ class ExploreLoopTest {
         assertEquals("A.d→D", game.taken.getFirst(), "the fault's place, pressed again");
         assertEquals(1, events(ExploreEvent.Began.class).size(), "the same run");
         assertEquals("fault-3", events(ExploreEvent.Restarted.class).getFirst().faultId());
-    }
-
-    /**
-     * A fault the writing raised (a line left out) replays by settling its place again, never as a fix that did not
-     * take: written whole on the rebuilt SDK, it is fixed and its memory goes.
-     */
-    @Test
-    void aSkippedFaultReplaysBySettlingAgain() {
-        loop(map(), settledPage(true, List.of("x: no screen GONE in the map.")), same(map()), Duration.ofHours(2)).run();
-        assertTrue(resumeFileLies(), "held with its memory");
-        String held = events(ExploreEvent.Faulted.class).getFirst().stopId();
-
-        Game again = settledPage(true, List.of());
-        boolean[] sent = {false};
-        again.onIdle = () -> {
-            if (again.nowMs >= Duration.ofMinutes(40).toMillis()) journal().command("stop");
-            else if (!sent[0] && events(ExploreEvent.Settled.class).size() == 2) {
-                sent[0] = true;
-                journal().command(Journal.Command.resume(openStop(), List.of()));
-            }
-        };
-        // Written whole this time: the page is a screen of the reloaded bot.
-        ExploreLoop.Reload written = () -> {
-            again.at = "B";
-            return new ExploreLoop.Reload.Reloaded(1, map(), null, List.of());
-        };
-        loop(map(), again, written, Duration.ofHours(2)).resuming(ResumeFile.pending(journal(), why -> {})).run();
-
-        assertEquals(1, events(ExploreEvent.Faulted.class).size(), "no fault again: "
-                + events(ExploreEvent.Faulted.class));
-        assertEquals(2, events(ExploreEvent.Settled.class).size(), "settled again, for the rebuilt SDK to write");
-        assertEquals(List.of("written on the rebuilt SDK"), events(ExploreEvent.Fixed.class).stream()
-                .filter(fixed -> fixed.stopId().equals(held)).map(ExploreEvent.Fixed::why).toList());
-        assertFalse(resumeFileLies());
     }
 
     @Test

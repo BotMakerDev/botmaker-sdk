@@ -4,6 +4,9 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.run.RunCompanion;
+import com.botmaker.plugin.api.run.RunContext;
+import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
@@ -11,53 +14,61 @@ import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.SdkLog;
+import com.botmaker.sdk.plugin.run.SdkRuns;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 /**
- * Writes what <em>Keep exploring</em> settled off a screen's tree ({@link ExploreEvent.Settled}) into the bot while a
- * project is open, then resumes its stop, so the run goes on without Claude (web discovery phase 6b). The plugin is
- * opened in both the core and Studio: the process holding the journal's lock file writes, the other only watches for
- * the lock to come free.
+ * Writes what <em>Keep exploring</em> or <em>Discover</em> settled off a screen's tree ({@link ExploreEvent.Settled})
+ * into the bot, then resumes its stop, so the run goes on without Claude (web discovery phase 6b). It is the SDK's
+ * companion of those runs (2026-11-20): the core starts one with each run and stops it at the run's end, whether or
+ * not Studio or a session is open, and Studio's copy of the plugin never runs one, so two never race on one journal.
  */
-public final class TreeAnswerWatch {
+public final class TreeAnswerWatch implements RunCompanion {
 
     /** How often the journal is read. */
     static final long POLL_MS = 500;
 
-    private static final String LOCK = "answers.lock";
+    private Thread thread;
 
-    private static Thread thread;
+    /** A watch not started yet: the core builds one for each run. */
+    public TreeAnswerWatch() {}
 
-    private TreeAnswerWatch() {}
+    @Override
+    public List<RunEntry> serves() {
+        return new SdkRuns().runs().stream().filter(entry -> entry.title().equals(SdkRuns.KEEP_EXPLORING)
+                || entry.title().equals(SdkRuns.DISCOVER)).toList();
+    }
 
-    /** Watches the journal of the project {@code services} has open, until {@link #stop()}. */
-    public static synchronized void start(StudioServices services) {
-        stop();
-        Path project = services.projectDir();
-        if (project == null) return;
+    /** Watches the journal of the project the run is of, until {@link #stop()}. */
+    @Override
+    public synchronized void start(RunContext run) {
+        StudioServices services = run.services();
+        Path project = services == null ? null : services.projectDir();
+        if (project == null || thread != null) return;
         Journal journal = Journal.of(project);
         thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(journal, (id, answers) -> {
             TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
             if (written.failed().isEmpty()) shots(services, journal, id, answers);
             return written;
         }, pictured -> TreeAnswers.pictured(services, pictured)));
+    }
+
+    /** Stops watching. */
+    @Override
+    public synchronized void stop() {
+        if (thread != null) thread.interrupt();
+        thread = null;
     }
 
     /**
@@ -86,41 +97,18 @@ public final class TreeAnswerWatch {
         }
     }
 
-    /** Stops watching. */
-    public static synchronized void stop() {
-        if (thread != null) thread.interrupt();
-        thread = null;
-    }
-
     private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write,
                               Consumer<ExploreEvent.Pictured> picture) {
         Set<String> done = new HashSet<>();
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
-        Path folder = journal.folder().toAbsolutePath().normalize();
-        FileChannel channel = null;
-        FileLock lock = null;
         String failedLast = null;
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    // Another watcher of this JVM holding it is never asked through a channel of its own: closing that
-                    // channel would drop the lock this JVM holds.
-                    if (lock == null && Files.isDirectory(folder) && HELD.add(folder)) {
-                        channel = FileChannel.open(folder.resolve(LOCK), StandardOpenOption.CREATE,
-                                StandardOpenOption.WRITE);
-                        lock = tryLock(channel);
-                        if (lock == null) {
-                            channel.close();
-                            channel = null;
-                            HELD.remove(folder);
-                        }
-                    }
-                    if (lock != null) {
-                        round(journal, done, write);
-                        pictures(journal, pictured, picture);
-                    }
+                    round(journal, done, write);
+                    pictures(journal, pictured, picture);
                     failedLast = null;
-                } catch (IOException | RuntimeException failed) {
+                } catch (RuntimeException failed) {
                     // Said once, then tried again each round: one bad read or slow write stops nothing for good.
                     if (!String.valueOf(failed.getMessage()).equals(failedLast)) {
                         SdkLog.warn("What the explore run settled could not be written: " + failed.getMessage());
@@ -131,14 +119,6 @@ public final class TreeAnswerWatch {
             }
         } catch (InterruptedException stopped) {
             Thread.currentThread().interrupt();
-        } finally {
-            try {
-                if (lock != null) lock.release();
-                if (channel != null) channel.close();
-            } catch (IOException ignored) {
-                // The lock goes with the process anyway.
-            }
-            if (lock != null) HELD.remove(folder);
         }
     }
 
@@ -149,22 +129,10 @@ public final class TreeAnswerWatch {
         }
     }
 
-    /** The journal folders a watcher of this JVM holds the lock of. */
-    private static final Set<Path> HELD = ConcurrentHashMap.newKeySet();
-
-    private static FileLock tryLock(FileChannel channel) throws IOException {
-        try {
-            return channel.tryLock();
-        } catch (OverlappingFileLockException heldHere) {
-            return null;
-        }
-    }
-
     /**
      * One look at the journal: the first stop the run settled and nobody resumed yet, open or parked, written by
-     * {@code write} and resumed. One that does not write is resumed too, and comes back to the run as Claude's. What
-     * the write left out goes with the resume, for the run to raise again. One resume at a time: none while a command
-     * waits.
+     * {@code write} and resumed. One that does not write is resumed too, saying why: the run raises what was left out
+     * as a stop of its own ({@code UNWRITTEN}), Claude's to write. One resume at a time: none while a command waits.
      */
     static void round(Journal journal, Set<String> done,
                       BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
