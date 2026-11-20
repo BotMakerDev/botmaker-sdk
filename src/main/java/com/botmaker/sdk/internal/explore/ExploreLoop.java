@@ -623,6 +623,11 @@ public final class ExploreLoop {
         // A page the tree reads is added by the run itself; a frame alone is Claude's to cut.
         Optional<Effect.State> unknown = where.isEmpty() && readsTrees() ? play.state() : Optional.empty();
         if (where.isEmpty()) clock(null);
+        // An error page the server answered (a 431) is no screen: the run goes back to one it knows.
+        if (unknown.isPresent() && unknown.get().httpError()) {
+            if (!play.recover()) play.restart();
+            return true;
+        }
         if (unknown.isPresent()) return settleUnknown(unknown.get(), null) != Paused.END;
         if (where.isEmpty()) {
             String place = lastEdge == null ? "unknown" : lastEdge;
@@ -644,6 +649,8 @@ public final class ExploreLoop {
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
             if (website()) pictured(screen);
+            // Before anything on it is pressed: an input an older read made twice is never pressed again.
+            if (readsTrees() && map.screen(screen).isPresent()) notes.addAll(sameInputs(screen));
         }
         // After the screen is said found and pictured: one with nothing to do is built once it is reached.
         clock(screen);
@@ -672,7 +679,6 @@ public final class ExploreLoop {
             // Once per screen the map holds: its inputs name the fields the tries found.
             if (!probed.contains(screen) && map.screen(screen).isPresent()) {
                 probed.add(screen);
-                notes.addAll(sameInputs(screen));
                 notes.addAll(rules(screen));
             }
             Optional<String> input = untriedInput(screen);
@@ -1137,9 +1143,13 @@ public final class ExploreLoop {
                 elements.put(input.getKey(), button.element());
             }
         }
-        Set<String> referenced = new HashSet<>();
-        for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) referenced.add(edge.input());
-        List<TreeAnswer.SameInput> same = TreeAnswer.sameInputs(screen, tree, elements, referenced);
+        Map<String, Set<String>> leads = new HashMap<>();
+        for (Edge edge : map.edges()) {
+            if (edge.from().equals(screen) && edge.input() != null) {
+                leads.computeIfAbsent(edge.input(), k -> new HashSet<>()).add(edge.to());
+            }
+        }
+        List<TreeAnswer.SameInput> same = TreeAnswer.sameInputs(screen, tree, elements, leads);
         // Gone from what this run presses too, before the notes are written.
         same.forEach(s -> tried.add(screen + "." + s.field()));
         return same;
@@ -1216,6 +1226,11 @@ public final class ExploreLoop {
             return settleUnknown(after, new InputName(screen, field)) != Paused.END;
         }
         notes.add(new TreeAnswer.InputNote(screen, field, effect.line()));
+        // An error page the server answered is left for a screen of the map.
+        if (after.httpError()) {
+            if (!play.recover()) play.restart();
+            return true;
+        }
         // A list or menu left open catches every press after it (a select's list holds the page): the page is
         // loaded again so the next input is pressed on the page as it was.
         if (effect instanceof Effect.Changes) play.reopen();

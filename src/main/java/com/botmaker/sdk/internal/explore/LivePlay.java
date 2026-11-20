@@ -302,7 +302,8 @@ public final class LivePlay implements ExploreLoop.Play {
         if (tree.isEmpty()) return Optional.empty();
         String place = web.flatMap(WebSource::path).orElse("");
         List<String> errors = web.map(WebSource::consoleErrors).orElse(List.of());
-        return Optional.of(new Effect.State(tree.get(), place, List.of(), errors));
+        int status = web.map(WebSource::status).orElse(0);
+        return Optional.of(new Effect.State(tree.get(), place, List.of(), errors, status));
     }
 
     @Override

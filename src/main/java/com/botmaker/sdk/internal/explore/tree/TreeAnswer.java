@@ -338,11 +338,13 @@ public sealed interface TreeAnswer {
     /**
      * The inputs of {@code screen} that are another's control, as {@link Locator#inputs} now folds them: each of
      * {@code elements} (its inputs' elements, by field) found alone in {@code tree}, nested in or around another's node
-     * of its name. The one {@link Locator#inputs} folds goes, unless only it is {@code referenced} (a way or the way
-     * back names it): then the other goes. A pair whose fields are both referenced is left as it is.
+     * of its name. {@code leads} says where each field's ways go (a field with none leads nowhere known). The one
+     * {@link Locator#inputs} folds goes, unless only it leads somewhere: then the other goes. When both lead somewhere,
+     * one control pressed twice, the one whose places the other's cover goes, the folded one first; a pair that leads
+     * apart is left as it is.
      */
     public static List<SameInput> sameInputs(String screen, UiTree tree, Map<String, Element> elements,
-                                             Set<String> referenced) {
+                                             Map<String, Set<String>> leads) {
         ElementMatch.Matcher matcher = ElementMatch.in(tree);
         Map<String, UiNode> nodes = new LinkedHashMap<>();
         elements.forEach((field, element) -> {
@@ -359,10 +361,13 @@ public sealed interface TreeAnswer {
                         || !nested(one.getValue(), other.getValue(), matcher)) {
                     continue;
                 }
-                boolean aNamed = referenced.contains(a);
-                boolean bNamed = referenced.contains(b);
-                if (aNamed && bNamed) continue;
-                String drop = aNamed ? b : a;
+                Set<String> aTo = leads.getOrDefault(a, Set.of());
+                Set<String> bTo = leads.getOrDefault(b, Set.of());
+                String drop;
+                if (aTo.isEmpty() || bTo.isEmpty()) drop = aTo.isEmpty() ? a : b;
+                else if (bTo.containsAll(aTo)) drop = a;
+                else if (aTo.containsAll(bTo)) drop = b;
+                else continue;
                 gone.add(drop);
                 same.add(new SameInput(screen, drop, drop.equals(a) ? b : a));
             }

@@ -347,6 +347,11 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         return since;
     }
 
+    /** The HTTP status the page was last loaded with (a 431 error page); 0 before the browser is up or any load. */
+    public synchronized int status() {
+        return page == null ? 0 : page.documentStatus();
+    }
+
     /** The page's console errors since the last call; none before the browser is up. */
     public synchronized List<String> consoleErrors() {
         if (page == null) return List.of();

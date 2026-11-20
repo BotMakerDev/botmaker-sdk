@@ -75,9 +75,9 @@ public sealed interface Effect {
     /**
      * What a screen showed when it was read: its tree, its place (a website's path, an app's activity; {@code ""}
      * when not known), the errors it shows (a field's message, an alert) and the errors its console printed since the
-     * last read.
+     * last read, and the HTTP status a website's page was loaded with (0 when not known, an app's).
      */
-    record State(UiTree tree, String place, List<String> errorsShown, List<String> consoleErrors) {
+    record State(UiTree tree, String place, List<String> errorsShown, List<String> consoleErrors, int status) {
         public State {
             tree = tree == null ? new UiTree(List.of()) : tree;
             place = place == null ? "" : place;
@@ -85,9 +85,18 @@ public sealed interface Effect {
             consoleErrors = consoleErrors == null ? List.of() : List.copyOf(consoleErrors);
         }
 
+        public State(UiTree tree, String place, List<String> errorsShown, List<String> consoleErrors) {
+            this(tree, place, errorsShown, consoleErrors, 0);
+        }
+
         /** A state of {@code tree} at {@code place}, no error shown or printed. */
         public static State of(UiTree tree, String place) {
             return new State(tree, place, List.of(), List.of());
+        }
+
+        /** Whether the server answered the page with an error (a 404, a 431): an error page, never a screen. */
+        public boolean httpError() {
+            return status >= 400;
         }
     }
 
@@ -104,6 +113,10 @@ public sealed interface Effect {
         List<Guard.Stopped> stops = stopped == null ? List.of() : stopped;
         for (Guard.Stopped stop : stops) {
             if (stop.kind() == Guard.Kind.EXIT) return new Exits(stop.url());
+        }
+        // A page the server refused is a broken way, not a page to map.
+        if (after.httpError()) {
+            return new Fails("HTTP " + after.status() + (after.place().isEmpty() ? "" : " at " + after.place()));
         }
         // A place read on one side only says nothing; a website's path is compared bare, an app's activity as it is.
         if (!before.place().isEmpty() && !after.place().isEmpty()) {

@@ -155,6 +155,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Discover never maps an HTTP error page (a 404, a 431 "Request Header Fields Too Large") as a screen: a press
+  that lands on one is a broken way, noted "Fails: HTTP 431 at /jobs" on its input, and the run goes back to a
+  screen it knows.
+- Keep exploring merges an input made twice for one control on a screen's first visit, also when an older run
+  pressed both: the one whose ways the other's cover goes.
 - 🗺 Screens' 🖼 Pictures is 🧩 Elements: all the bot finds things by. Chips show its pictures (the picture manager as
   it was), its tree elements (the `Elements` class, each with its shot, what finds it and the screens whose inputs
   press it, filtered by a search), or both. A website bot, whose screens are told by their tree, no longer sees an

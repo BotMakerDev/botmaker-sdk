@@ -80,9 +80,14 @@ class TreeAnswerTest {
 
         assertEquals(List.of(new TreeAnswer.SameInput("Nav", "pricing", "pricing2"),
                         new TreeAnswer.SameInput("Nav", "home", "home2")),
-                TreeAnswer.sameInputs("Nav", page, elements, Set.of("home2")));
-        assertEquals(List.of(), TreeAnswer.sameInputs("Nav", page, elements, Set.of("pricing", "pricing2", "home",
-                "home2")));
+                TreeAnswer.sameInputs("Nav", page, elements, Map.of("home2", Set.of("HOME"))));
+        // Both pressed already, as an older run did: one control leads one place, the folded one goes.
+        assertEquals(List.of(new TreeAnswer.SameInput("Nav", "pricing", "pricing2"),
+                        new TreeAnswer.SameInput("Nav", "home2", "home")),
+                TreeAnswer.sameInputs("Nav", page, elements, Map.of("pricing", Set.of("PRICING"),
+                        "pricing2", Set.of("PRICING"), "home", Set.of("HOME"), "home2", Set.of("HOME"))));
+        assertEquals(List.of(), TreeAnswer.sameInputs("Nav", page, elements, Map.of("pricing", Set.of("PRICING"),
+                "pricing2", Set.of("ABOUT"), "home", Set.of("HOME"), "home2", Set.of("BLOG"))));
     }
 
     @Test
@@ -135,6 +140,10 @@ class TreeAnswerTest {
         Effect.State before = Effect.State.of(home, "/");
         assertEquals(new Effect.Navigates("/pricing"),
                 Effect.judge(before, Effect.State.of(home, "/pricing/"), List.of()));
+        // A page the server refused is a broken way, never a page to map.
+        Effect.State refused = new Effect.State(page(web("main", "", Set.of())), "/jobs", List.of(), List.of(), 431);
+        assertEquals(new Effect.Fails("HTTP 431 at /jobs"), Effect.judge(before, refused, List.of()));
+        assertFalse(Effect.judge(before, refused, List.of()).way());
         assertEquals(new Effect.Opens(new Overlay(Overlay.Kind.DIALOG, "Talk to us")),
                 Effect.judge(before, Effect.State.of(dialog, "/"), List.of()));
         assertEquals(new Effect.Exits("https://x.com/nunu"), Effect.judge(before, before,

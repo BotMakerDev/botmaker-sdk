@@ -285,6 +285,21 @@ class ExploreLoopTest {
         assertEquals(1, events(ExploreEvent.Parked.class).size(), "nobody wrote it in 10 min");
     }
 
+    /** A page the server answered with an error (a 431) is no screen: the run goes back to one it knows. */
+    @Test
+    void anErrorPageIsNeverSettledAsAScreen() {
+        Game game = new Game();
+        game.at = null;
+        game.state = new Effect.State(page(web("heading", "HTTP Error 431", Set.of())), "/jobs", List.of(),
+                List.of(), 431);
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.UNKNOWN_SCREEN), stops().toString());
+        assertTrue(events(ExploreEvent.Settled.class).stream().flatMap(s -> s.answers().stream())
+                .noneMatch(TreeAnswer.NewScreen.class::isInstance), "no screen written");
+    }
+
     /** What the run's start settled (Discover's launch target) goes with the first settled stop. */
     @Test
     void whatTheStartSettledGoesWithTheFirstSettledStop() {
