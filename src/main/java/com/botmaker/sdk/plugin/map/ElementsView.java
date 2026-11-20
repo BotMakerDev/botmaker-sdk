@@ -232,9 +232,10 @@ final class ElementsView {
         MenuItem delete = new MenuItem("Delete");
         delete.setOnAction(e -> {
             Optional<String> refused = services.pluginValues().remove(SdkValues.ELEMENTS, Member.of(row.name()));
-            if (refused.isEmpty() && row.shot() != null && services.resourcesDir() != null) {
+            Path shot = shotFile(services.resourcesDir(), row.shot());
+            if (refused.isEmpty() && shot != null) {
                 try {
-                    Files.deleteIfExists(services.resourcesDir().resolve(row.shot()));
+                    Files.deleteIfExists(shot);
                 } catch (IOException ex) {
                     services.status("Deleted " + row.name() + "; its shot stays: " + ex.getMessage());
                     reread.run();
@@ -247,6 +248,20 @@ final class ElementsView {
         MenuButton more = new MenuButton("⋯", null, rename, delete);
         more.getStyleClass().add("flat");
         return more;
+    }
+
+    /**
+     * The shot's file under {@code resources}, or null: a shot written as an absolute path, or one that leads out of the
+     * folder or through a link (a bot cloned from someone else names its own), is never touched.
+     */
+    static Path shotFile(Path resources, String shot) {
+        if (resources == null || shot == null || shot.isBlank()) return null;
+        Path relative = Path.of(shot);
+        if (relative.isAbsolute()) return null;
+        Path base = resources.toAbsolutePath().normalize();
+        Path file = base.resolve(relative).normalize();
+        if (!file.startsWith(base) || file.equals(base) || Files.isSymbolicLink(file)) return null;
+        return file;
     }
 
     private static Node row(StudioServices services, Row row, Path resources, Runnable reread) {
