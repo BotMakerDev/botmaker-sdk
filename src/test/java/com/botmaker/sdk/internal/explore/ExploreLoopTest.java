@@ -883,7 +883,7 @@ class ExploreLoopTest {
     void exploringPlaysNoPlanAndStopsForNoFact() {
         Game game = new Game();
         game.seen.put("A", new ExploreLoop.Look(List.of(new Stop.Text("Gold 1200", new Rect(40, 40, 80, 20))),
-                List.of(), Map.of(), List.of()));
+                List.of()));
         game.plan = Plan.of(Plan.tier(Goal.done(() -> Do.press(click("b")))));
 
         loop(map(), game, same(map()), Duration.ofMinutes(12)).run();

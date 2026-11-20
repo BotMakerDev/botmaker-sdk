@@ -25,6 +25,8 @@ import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.FormProbe;
 import com.botmaker.shared.web.Guard;
 import com.botmaker.sdk.internal.params.RunFacts;
+import com.botmaker.sdk.internal.params.RunParams;
+import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.LiveMoves;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -41,10 +43,12 @@ import javax.imageio.ImageIO;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -130,6 +134,9 @@ public final class LivePlay implements ExploreLoop.Play {
         }
     }
 
+    /** How many of the tree's nodes a stop carries: a long list's rows would cost more than a look at the frame. */
+    static final int ELEMENTS = 40;
+
     private final Reach reach = new RunReach();
     private final Runnable restart;
     /** Where a website's page is written as it is looked at; null: nowhere. */
@@ -168,14 +175,72 @@ public final class LivePlay implements ExploreLoop.Play {
         Optional<BufferedImage> frame = reach.look();
         if (frame.isEmpty()) return ExploreLoop.Look.NOTHING;
         showPage(frame.get());
-        List<Stop.Text> texts = read(frame.get()).stream().map(text -> new Stop.Text(text.text(), text.bounds())).toList();
+        List<Stop.Text> texts = read(reach, frame.get()).stream()
+                .map(text -> new Stop.Text(text.text(), text.bounds())).toList();
         List<Rect> covered = new ArrayList<>();
-        Optional<MapScreen> mapped = screen == null ? Optional.empty() : map.screen(screen);
-        for (Readout readout : mapped.map(s -> s.readouts().values()).orElse(List.of())) {
+        for (Readout readout : mapped(screen).map(s -> s.readouts().values()).orElse(List.of())) {
             if (readout.area() == null) continue;
             reach.find(readout.area().anchor(), frame.get()).map(readout.area()::place).ifPresent(covered::add);
         }
-        return new ExploreLoop.Look(texts, List.of(), Map.of(), covered);
+        return new ExploreLoop.Look(texts, covered);
+    }
+
+    @Override
+    public ExploreLoop.Shown shown(String screen) {
+        Optional<BufferedImage> frame = reach.look();
+        return frame.isEmpty() ? ExploreLoop.Shown.NOTHING : shown(reach, mapped(screen), frame.get());
+    }
+
+    private Optional<MapScreen> mapped(String screen) {
+        return screen == null ? Optional.empty() : map.screen(screen);
+    }
+
+    /**
+     * What {@code frame} shows for a stop: the tree's nodes that read, as {@link #line} says them, at most
+     * {@link #ELEMENTS}; and what {@code mapped}'s readouts show, by the fact each feeds. A readout the bot's own error
+     * keeps from reading (an element on a target with no tree, or one the tree finds twice) is left out: it is no
+     * stop's to raise, and a throw here would lose the stop being built.
+     */
+    static ExploreLoop.Shown shown(Reach reach, Optional<MapScreen> mapped, BufferedImage frame) {
+        List<String> elements = List.of();
+        if (reach.readsTrees()) {
+            try {
+                elements = reach.treeOn(frame).map(tree -> tree.nodes().stream().map(LivePlay::line)
+                        .filter(line -> !line.isEmpty()).distinct().limit(ELEMENTS).toList()).orElse(List.of());
+            } catch (RuntimeException unread) {
+                elements = List.of();
+            }
+        }
+        Map<String, String> facts = new LinkedHashMap<>();
+        mapped.map(MapScreen::readouts).orElse(Map.of()).forEach((field, readout) -> {
+            if (readout.element() != null && !reach.readsTrees()) return;
+            try {
+                reach.readoutOrNone(readout, frame).ifPresent(value -> facts.put(factName(field, readout), value));
+            } catch (RuntimeException unread) {
+                // Left out, as said above.
+            }
+        });
+        return new ExploreLoop.Shown(elements, facts);
+    }
+
+    /** {@code node} as a stop says it, {@code "Settings" tappable (20,900 40x16)}; blank for a node that reads nothing. */
+    static String line(UiNode node) {
+        String words = !node.text().isBlank() ? node.text().strip() : node.label().strip();
+        if (words.isEmpty()) return "";
+        Rectangle box = node.bounds();
+        return "\"" + words + "\"" + (node.has(Trait.CLICKABLE) ? " tappable" : "")
+                + " (" + box.x + "," + box.y + " " + box.width + "x" + box.height + ")";
+    }
+
+    /** The fact {@code readout} feeds, {@code Progress.gold}; {@code field}, its own name, when it feeds none it can name. */
+    private static String factName(String field, Readout readout) {
+        if (readout.fact() == null) return field;
+        try {
+            Method parameter = RunParams.parameterOf(readout.fact());
+            return parameter.getDeclaringClass().getSimpleName() + "." + parameter.getName();
+        } catch (RuntimeException | LinkageError unnamed) {
+            return field;
+        }
     }
 
     /**
@@ -190,7 +255,7 @@ public final class LivePlay implements ExploreLoop.Play {
         }
     }
 
-    private List<TextResult> read(BufferedImage frame) {
+    private static List<TextResult> read(Reach reach, BufferedImage frame) {
         try {
             return reach.read(frame);
         } catch (Reach.TextUnread unread) {
@@ -207,7 +272,7 @@ public final class LivePlay implements ExploreLoop.Play {
     public Guards.Around around(Input input) {
         Optional<BufferedImage> frame = reach.look();
         if (input == null || frame.isEmpty()) return new Guards.Around(List.of(), Foreground.now(), List.of());
-        List<TextResult> text = read(frame.get());
+        List<TextResult> text = read(reach, frame.get());
         if (!(input instanceof Button button)) return new Guards.Around(text, Foreground.now(), List.of());
         List<UiNode> at = nodes(reach, button, frame.get());
         return new Guards.Around(Guards.near(box(reach, button, frame.get(), at), text), Foreground.now(), at);

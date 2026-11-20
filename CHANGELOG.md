@@ -44,6 +44,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   time per press, never under two minutes nor over fifteen. A page of 18 inputs at 12.6 s a press gets about 3m47s
   and is built in one go instead of being set aside on every run. A low-yield stop now names the ways and inputs
   still left on its screen.
+- **A stop carries what is on screen.** A Keep exploring stop now holds the app's elements as the tree reads them (at
+  most 40, the tappable ones said so) and what the stop's screen's readouts show, by the fact each feeds. Claude's
+  `explore wait` lists both under *Elements* and *Facts*, so it no longer needs a `describe` or `list_elements` call
+  to see the screen. Both are read only when the run stops, never each round. A game window, which has no tree,
+  carries its readouts alone.
 - **A way whose button is not on screen now is tried again later.** Keep exploring no longer gives up on a way the
   first time its button is missing. It skips the way, and looks for it again once the run has left the screen and
   come back, pressing it if it shows. Missing a second time, it is left untried for the next run. A screen the run

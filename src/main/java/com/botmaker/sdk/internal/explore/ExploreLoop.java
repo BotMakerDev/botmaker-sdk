@@ -39,6 +39,7 @@ import java.awt.Rectangle;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -192,15 +193,30 @@ public final class ExploreLoop {
      * What was read on the game: the frame's every line, the tree's elements, the facts' values, and the places on
      * the frame that the screen's readouts cover.
      */
-    public record Look(List<Stop.Text> texts, List<String> elements, Map<String, String> facts, List<Rect> covered) {
+    public record Look(List<Stop.Text> texts, List<Rect> covered) {
 
-        public static final Look NOTHING = new Look(List.of(), List.of(), Map.of(), List.of());
+        public static final Look NOTHING = new Look(List.of(), List.of());
 
         public Look {
             texts = texts == null ? List.of() : List.copyOf(texts);
-            elements = elements == null ? List.of() : List.copyOf(elements);
-            facts = facts == null ? Map.of() : Map.copyOf(facts);
             covered = covered == null ? List.of() : List.copyOf(covered);
+        }
+    }
+
+    /**
+     * What a stop carries of the screen beside its text, read only when the run stops, never each round: a tree's read
+     * costs a dump of the app.
+     *
+     * @param elements the tree's nodes that read, one line each; none without a tree
+     * @param facts    what the stop's screen's readouts show now, by the fact each feeds (its field when it feeds none)
+     */
+    public record Shown(List<String> elements, Map<String, String> facts) {
+
+        public static final Shown NOTHING = new Shown(List.of(), Map.of());
+
+        public Shown {
+            elements = elements == null ? List.of() : List.copyOf(elements);
+            facts = facts == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(facts));
         }
     }
 
@@ -209,6 +225,11 @@ public final class ExploreLoop {
 
         /** Reads the game on {@code screen} (null: none of the map): its readouts into the facts, the frame's text. */
         Look look(String screen);
+
+        /** What the game shows now of {@code screen} (null: none of the map), for a stop: its elements and facts. */
+        default Shown shown(String screen) {
+            return Shown.NOTHING;
+        }
 
         /** What is around a press of {@code input} now, for the guards; null: a press of no input, its front only. */
         Guards.Around around(Input input);
@@ -1638,7 +1659,8 @@ public final class ExploreLoop {
                     "the stop came back as " + kind.id() + " after the SDK's reload"));
         }
         String id = kind.id() + "-" + ++stops;
-        Stop stop = new Stop(id, kind, screen, place, play.keep(id), look.texts(), look.elements(), look.facts(),
+        Shown shown = play.shown(screen);
+        Stop stop = new Stop(id, kind, screen, place, play.keep(id), look.texts(), shown.elements(), shown.facts(),
                 List.copyOf(presses), missing, nowMs.getAsLong());
         boolean again = resumed != null && resumed.same(stop)
                 || replay != null && kind == StopKind.FAULT && place.equals(replay.fault().place());
