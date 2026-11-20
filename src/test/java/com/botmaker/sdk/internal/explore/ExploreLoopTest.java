@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
@@ -656,6 +657,46 @@ class ExploreLoopTest {
         assertTrue(batch.missing().contains("A.b") && batch.missing().contains("A.d"), batch.missing());
         assertTrue(game.taken.isEmpty(), "nothing pressed before every input has a verdict");
         assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked");
+    }
+
+    /** A dialog opened from B and from A: its close goes back where the game came from, not to its first parent. */
+    private static ScreenGraph dialogMap() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free(), click("p").free(), click("d").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b")), click("x").free()));
+        screens.put("D", screen(Setup.named("D").from(ref("A", "d"))));
+        screens.put("P", screen(Setup.named("P").from(ref("B", "x")).alsoFrom(List.of(Way.of(ref("A", "p"))))
+                .back(ref("P", "close")), click("close").free()));
+        return ScreenGraph.of(screens);
+    }
+
+    @Test
+    void aWayBackArrivesWhereTheGameCameFrom() {
+        Game game = new Game();
+        String[] came = {null};
+        game.arrival = edge -> {
+            if (!edge.back()) {
+                came[0] = edge.from();
+                return new Took(Arrival.AT_TARGET, edge.to());
+            }
+            return new Took(came[0].equals(edge.to()) ? Arrival.AT_TARGET : Arrival.ELSEWHERE, came[0]);
+        };
+
+        loop(dialogMap(), game, same(dialogMap()), Duration.ofMinutes(14)).run();
+
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.WRONG_ARRIVAL), stops().toString());
+        assertTrue(game.taken.stream().anyMatch(k -> k.startsWith("P.")), game.taken.toString());
+    }
+
+    @Test
+    void aWayBackToAScreenThatNeverLedThereStops() {
+        Game game = new Game();
+        game.arrival = edge -> edge.back() && edge.from().equals("P") ? new Took(Arrival.ELSEWHERE, "D")
+                : new Took(Arrival.AT_TARGET, edge.to());
+
+        loop(dialogMap(), game, same(dialogMap()), Duration.ofMinutes(14)).run();
+
+        assertTrue(stops().stream().anyMatch(s -> s.stop().kind() == StopKind.WRONG_ARRIVAL), stops().toString());
     }
 
     @Test

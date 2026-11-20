@@ -822,6 +822,10 @@ public final class ExploreLoop {
         Took took = play.take(edge, settings.edge().toMillis());
         Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > settings.edge().toMillis()
                 ? Arrival.TIMED_OUT : took.arrival();
+        // A way back returns where the game came from: any screen with a way in, not only the one the map names.
+        if (arrival == Arrival.ELSEWHERE && edge.back() && took.at() != null && cameFrom(screen, took.at())) {
+            arrival = Arrival.AT_TARGET;
+        }
         emit(new ExploreEvent.Tried(screen, edge.label(), mode, arrival,nowMs.getAsLong()));
         return switch (arrival) {
             case AT_TARGET, UNKNOWN, NOT_NOW -> {
@@ -849,6 +853,12 @@ public final class ExploreLoop {
             case TIMED_OUT -> stop(StopKind.WRONG_ARRIVAL, screen, key, look, edge.label() + " showed no screen after "
                     + settings.edge().toSeconds() + " s", false) != Paused.END;
         };
+    }
+
+    /** Whether the game can have come to {@code screen} from {@code at}: the screen it was pressed from, or a way in. */
+    private boolean cameFrom(String screen, String at) {
+        return at.equals(from) || map.edges().stream()
+                .anyMatch(e -> e.to().equals(screen) && e.from().equals(at) && !e.back() && !e.onItsOwn());
     }
 
     private void pressed(String what) {

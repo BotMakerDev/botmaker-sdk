@@ -161,6 +161,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring takes a way back that returned where the game came from as arrived: a dialog's close, opened from
+  another of its ways in, no longer stops as a wrong arrival at its first parent.
 - Keep exploring judges a page's link by the words around its own node: a tree element's button was never boxed, so
   every footer link of a pricing page was refused for a `$` elsewhere on it.
 - The explore tool's `fault` on a stop the run went on from before it read the command answers at once, naming the
