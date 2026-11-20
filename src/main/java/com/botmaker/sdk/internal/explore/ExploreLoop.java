@@ -184,8 +184,8 @@ public final class ExploreLoop {
         /** Reads the game on {@code screen} (null: none of the map): its readouts into the facts, the frame's text. */
         Look look(String screen);
 
-        /** What is around {@code edge}'s press now, for the guards. */
-        Guards.Around around(Edge edge);
+        /** What is around a press of {@code input} now, for the guards; null: a press of no input, its front only. */
+        Guards.Around around(Input input);
 
         /** What is in front of the bot now. */
         Foreground front();
@@ -325,6 +325,8 @@ public final class ExploreLoop {
     /** The screens whose inputs made twice this process looked for; never restored from a run's memory. */
     private final Set<String> merged = new HashSet<>();
     private final Set<String> tried = new HashSet<>();
+    /** The places a guard refused this run, way or input, with the guard's kind: each said once, never restored. */
+    private final Set<String> refused = new HashSet<>();
     private final Set<String> worked = new HashSet<>();
     /** The parked stops, by kind and place ({@link #key(Stop)}): never pressed, never stopped on again until fixed. */
     private final Map<String, Stop> parked = new LinkedHashMap<>();
@@ -685,7 +687,7 @@ public final class ExploreLoop {
                 notes.addAll(rules(screen));
             }
             Optional<String> input = untriedInput(screen);
-            if (input.isPresent()) return pressInput(screen, input.get());
+            if (input.isPresent()) return pressInput(screen, input.get(), look);
             if (!notes.isEmpty()) {
                 return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
                         settledWhy(screen)) != Paused.END;
@@ -801,19 +803,28 @@ public final class ExploreLoop {
         resumed = null;
     }
 
+    /**
+     * What the round returns when {@code refusal} refuses the press of {@code label} on {@code screen}, its place
+     * {@code key}; empty when nothing refused it. A window in front refuses nothing of the press itself: it stops, and
+     * the press is made once the game is back. Any other refusal sets the place aside, said once a run.
+     */
+    private Optional<Boolean> refused(String screen, String key, String label, Guards.Refusal refusal, Look look) {
+        if (!refusal.refused()) return Optional.empty();
+        if (refused.add(key + "#" + refusal.kind())) emit(new ExploreEvent.Refused(screen, label, refusal.kind(), refusal.why(), nowMs.getAsLong()));
+        if (refusal.kind() == Guards.Kind.FOREIGN_WINDOW || refusal.kind() == Guards.Kind.SYSTEM_DIALOG) {
+            return Optional.of(stop(StopKind.GUARD, screen, screen, look, refusal.why(), true) != Paused.END);
+        }
+        tried.add(key);
+        return Optional.of(refusal.kind() != Guards.Kind.NO_VERDICT
+                || stop(StopKind.NO_VERDICT, screen, key, look, label + ": " + refusal.why(), false) != Paused.END);
+    }
+
     private boolean press(String screen, Edge edge, Mode mode, Look look) {
         String key = key(edge);
-        Guards.Refusal refusal = edge.via() == null ? guards.front(play.around(edge)) : guards.check(edge.via(), play.around(edge));
-        if (refusal.refused()) {
-            emit(new ExploreEvent.Refused(screen, edge.label(), refusal.kind(),refusal.why(), nowMs.getAsLong()));
-            // A window in front refuses nothing of the way itself: it is pressed once the game is back.
-            if (refusal.kind() == Guards.Kind.FOREIGN_WINDOW || refusal.kind() == Guards.Kind.SYSTEM_DIALOG) {
-                return stop(StopKind.GUARD, screen, screen, look, refusal.why(), true) != Paused.END;
-            }
-            tried.add(key);
-            return refusal.kind() != Guards.Kind.NO_VERDICT
-                    || stop(StopKind.NO_VERDICT, screen, key, look, edge.label() + ": " + refusal.why(), false) != Paused.END;
-        }
+        Guards.Around around = play.around(edge.via());
+        Guards.Refusal refusal = edge.via() == null ? guards.front(around) : guards.check(edge.via(), around);
+        Optional<Boolean> refused = refused(screen, key, edge.label(), refusal, look);
+        if (refused.isPresent()) return refused.get();
         tried.add(key);
         lastEdge = key;
         doing = Spent.PRESSING;
@@ -1211,8 +1222,12 @@ public final class ExploreLoop {
      * after: a way to a screen the bot has is settled at once, a page or an overlay it has not is added with its way,
      * and anything else is a note handed on with the next settled stop.
      */
-    private boolean pressInput(String screen, String field) {
+    private boolean pressInput(String screen, String field, Look look) {
         String key = screen + "." + field;
+        Input input = map.screen(screen).map(s -> s.inputs().get(field)).orElse(null);
+        Guards.Refusal refusal = input == null ? guards.front(play.around(null)) : guards.check(input, play.around(input));
+        Optional<Boolean> refused = refused(screen, key, field, refusal, look);
+        if (refused.isPresent()) return refused.get();
         tried.add(key);
         // What the guard stopped before this press is not its doing.
         play.stopped();

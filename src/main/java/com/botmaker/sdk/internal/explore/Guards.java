@@ -162,10 +162,11 @@ public final class Guards {
 
     /**
      * The text of {@code read} near {@code box}: inside the box grown by half its width each side and half its height
-     * above and below. A box of no size is not known: then all of {@code read}, so nothing is missed.
+     * above and below. A box of no size is not known: then none, since all of {@code read} refused a page's every
+     * link for a price elsewhere on it (2026-11-20).
      */
     public static List<TextResult> near(Rect box, List<TextResult> read) {
-        if (box == null || box.width() <= 0 || box.height() <= 0) return List.copyOf(read);
+        if (box == null || box.width() <= 0 || box.height() <= 0) return List.of();
         Rect grown = new Rect(box.x() - box.width() / 2, box.y() - box.height() / 2, box.width() * 2, box.height() * 2);
         return read.stream().filter(text -> text.bounds() != null && grown.overlaps(text.bounds())).toList();
     }

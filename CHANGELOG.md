@@ -165,6 +165,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   another of its ways in, no longer stops as a wrong arrival at its first parent.
 - Keep exploring judges a page's link by the words around its own node: a tree element's button was never boxed, so
   every footer link of a pricing page was refused for a `$` elsewhere on it.
+- Keep exploring guards a tree input that is no way like a way: another app in front stops the run before the press,
+  and a password field or a price beside it refuses it. A press whose place is unknown is judged by no text, not the
+  whole screen's, and a refused place is said once a run.
 - The explore tool's `fault` on a stop the run went on from before it read the command answers at once, naming the
   open stops, instead of waiting its whole 30 s and saying the run "did not hold" it.
 - Discover never maps an HTTP error page (a 404, a 431 "Request Header Fields Too Large") as a screen: a press

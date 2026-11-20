@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.time.Wait;
@@ -191,27 +192,36 @@ public final class LivePlay implements ExploreLoop.Play {
     }
 
     /**
-     * The text near {@code edge}'s button, found by its picture or, a tree element, by its node's place; all the
-     * frame's text when it has none to find, so nothing is missed.
+     * The text near {@code input}'s button, found by its picture or, a tree element, by its node's place, and the nodes
+     * it is found at for the field guards; no text when a button is not found. Any other input has no box of its own
+     * to find: it is judged by all the frame's text, so a price on a text button still refuses it.
      */
     @Override
-    public Guards.Around around(Edge edge) {
+    public Guards.Around around(Input input) {
         Optional<BufferedImage> frame = reach.look();
-        List<TextResult> text = frame.map(this::read).orElse(List.of());
-        Rect box = edge.via() instanceof Button button && frame.isPresent() ? box(reach, button, frame.get()) : null;
-        return new Guards.Around(Guards.near(box, text), Foreground.now(), List.of());
+        if (input == null || frame.isEmpty()) return new Guards.Around(List.of(), Foreground.now(), List.of());
+        List<TextResult> text = read(frame.get());
+        if (!(input instanceof Button button)) return new Guards.Around(text, Foreground.now(), List.of());
+        List<UiNode> at = nodes(reach, button, frame.get());
+        return new Guards.Around(Guards.near(box(reach, button, frame.get(), at), text), Foreground.now(), at);
+    }
+
+    /** The tree's nodes {@code button}, a tree element, is found at on {@code frame}; none for a picture's button. */
+    private static List<UiNode> nodes(Reach reach, Button button, BufferedImage frame) {
+        return button.isElement() && reach.readsTrees() ? reach.elements(button.element(), frame) : List.of();
+    }
+
+    /** Where {@code button} is on {@code frame}, or null ({@link #box(Reach, Button, BufferedImage, List)}). */
+    static Rect box(Reach reach, Button button, BufferedImage frame) {
+        return box(reach, button, frame, nodes(reach, button, frame));
     }
 
     /**
-     * Where {@code button} is on {@code frame}, or null. A tree element is its first node's place: without it, a page's
-     * footer link was judged by every price on the page (2026-11-20).
+     * Where {@code button} is on {@code frame}, or null: a tree element is the place of {@code nodes}' first, the nodes
+     * found for it. Without it, a page's footer link was judged by every price on the page (2026-11-20).
      */
-    static Rect box(Reach reach, Button button, BufferedImage frame) {
-        if (button.isElement()) {
-            if (!reach.readsTrees()) return null;
-            List<UiNode> nodes = reach.elements(button.element(), frame);
-            return nodes.isEmpty() ? null : ElementMatch.place(nodes.getFirst());
-        }
+    private static Rect box(Reach reach, Button button, BufferedImage frame, List<UiNode> nodes) {
+        if (button.isElement()) return nodes.isEmpty() ? null : ElementMatch.place(nodes.getFirst());
         return button.picture() == null ? null : reach.find(button.picture(), frame).orElse(null);
     }
 

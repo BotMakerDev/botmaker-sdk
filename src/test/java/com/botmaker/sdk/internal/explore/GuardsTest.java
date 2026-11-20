@@ -6,8 +6,10 @@ package com.botmaker.sdk.internal.explore;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.vision.ImageTemplate;
+import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
@@ -127,6 +129,20 @@ class GuardsTest {
         TextResult close = new TextResult("€ 1", new Rect(110, 100, 20, 10), 90, TextResult.Level.LINE);
         TextResult far = new TextResult("€ 2", new Rect(400, 400, 20, 10), 90, TextResult.Level.LINE);
         assertEquals(List.of(close), Guards.near(new Rect(100, 100, 40, 20), List.of(close, far)));
-        assertEquals(List.of(close, far), Guards.near(new Rect(), List.of(close, far)), "an unknown box misses nothing");
+        assertEquals(List.of(), Guards.near(new Rect(), List.of(close, far)), "an unknown box reads nothing");
+        assertEquals(List.of(), Guards.near(null, List.of(close, far)));
+    }
+
+    /** A tree element is judged by the text near its node's box, not by a price elsewhere on the page. */
+    @Test
+    void anElementButtonIsJudgedByTheTextNearItsOwnBox() {
+        Rect box = new Rect(10, 10, 80, 20);
+        Input link = Button.of(new Locator(Role.LINK, "Blog", null, null, null).element()).free();
+        TextResult far = new TextResult("$0 … ¢200", new Rect(490, 10, 60, 20), 90, TextResult.Level.LINE);
+        TextResult close = new TextResult("$0 … ¢200", new Rect(95, 10, 60, 20), 90, TextResult.Level.LINE);
+        assertEquals(Guards.Kind.NONE, GUARDS.check(link,
+                new Guards.Around(Guards.near(box, List.of(far)), IN_GAME, List.of())).kind());
+        assertEquals(Guards.Kind.TEXT, GUARDS.check(link,
+                new Guards.Around(Guards.near(box, List.of(close)), IN_GAME, List.of())).kind());
     }
 }

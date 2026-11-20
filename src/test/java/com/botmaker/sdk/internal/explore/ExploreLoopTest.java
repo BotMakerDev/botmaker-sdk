@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
@@ -141,9 +142,12 @@ class ExploreLoopTest {
             return plan;
         }
 
+        /** The text read around any press. */
+        List<TextResult> near = List.of();
+
         @Override
-        public Guards.Around around(Edge edge) {
-            return new Guards.Around(List.of(), front, List.of());
+        public Guards.Around around(Input input) {
+            return new Guards.Around(near, front, List.of());
         }
 
         @Override
@@ -376,6 +380,65 @@ class ExploreLoopTest {
         assertEquals(List.of(new TreeAnswer.InputNote("A", "toggle", "Does nothing a visitor sees")),
                 settled.answers());
         assertEquals(StopKind.SETTLED, stops().getFirst().stop().kind());
+    }
+
+    /** A tree input is guarded like a way: with another window in front, the run stops and presses nothing. */
+    @Test
+    void aTreeInputUnderAForeignWindowIsRefused() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.front = new Foreground("com.android.chrome", "com.game");
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(StopKind.GUARD, stops().getFirst().stop().kind());
+        assertEquals(List.of(), game.pressed, "not pressed under another window");
+    }
+
+    /** A window in front of an input stops each round it is there, but its refusal is said once a run. */
+    @Test
+    void aRefusalIsRaisedOncePerRun() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("toggle", Button.of(new Locator(Role.BUTTON, "Toggle", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Toggle", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.front = new Foreground("com.android.chrome", "com.game");
+        game.onIdle = () -> {
+            if (game.nowMs >= Duration.ofMinutes(30).toMillis()) game.front = new Foreground("com.game", "com.game");
+        };
+
+        loop(map, game, same(map), Duration.ofMinutes(35)).run();
+
+        assertEquals(1, events(ExploreEvent.Refused.class).size(), events(ExploreEvent.Refused.class).toString());
+        assertEquals(List.of("A.toggle"), game.pressed, "pressed once the game was back");
+    }
+
+    /** An input a price beside it refuses is set aside, said once, and never pressed. */
+    @Test
+    void aPriceBesideATreeInputRefusesIt() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("buy", Button.of(new Locator(Role.BUTTON, "Buy", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("button", "Buy", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.near = List.of(new TextResult("$5", new Rect(0, 0, 10, 10), 90, TextResult.Level.LINE));
+
+        loop(map, game, same(map), Duration.ofMinutes(35)).run();
+
+        List<ExploreEvent.Refused> refused = events(ExploreEvent.Refused.class);
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Guards.Kind.TEXT, refused.getFirst().guard());
+        assertEquals(List.of(), game.pressed);
     }
 
     /** A press that leaves a list open on the page has the page loaded again, so the next press is not caught by it. */
