@@ -19,11 +19,13 @@ import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.web.WebSource;
+import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.FormProbe;
 import com.botmaker.shared.web.Guard;
 import com.botmaker.sdk.internal.params.RunFacts;
 import com.botmaker.sdk.internal.plan.RunGame;
+import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.LiveMoves;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
@@ -188,14 +190,29 @@ public final class LivePlay implements ExploreLoop.Play {
         }
     }
 
-    /** The text near {@code edge}'s button; all the frame's text when it has none to find, so nothing is missed. */
+    /**
+     * The text near {@code edge}'s button, found by its picture or, a tree element, by its node's place; all the
+     * frame's text when it has none to find, so nothing is missed.
+     */
     @Override
     public Guards.Around around(Edge edge) {
         Optional<BufferedImage> frame = reach.look();
         List<TextResult> text = frame.map(this::read).orElse(List.of());
-        Rect box = edge.via() instanceof Button button && frame.isPresent()
-                ? reach.find(button.picture(), frame.get()).orElse(null) : null;
+        Rect box = edge.via() instanceof Button button && frame.isPresent() ? box(reach, button, frame.get()) : null;
         return new Guards.Around(Guards.near(box, text), Foreground.now(), List.of());
+    }
+
+    /**
+     * Where {@code button} is on {@code frame}, or null. A tree element is its first node's place: without it, a page's
+     * footer link was judged by every price on the page (2026-11-20).
+     */
+    static Rect box(Reach reach, Button button, BufferedImage frame) {
+        if (button.isElement()) {
+            if (!reach.readsTrees()) return null;
+            List<UiNode> nodes = reach.elements(button.element(), frame);
+            return nodes.isEmpty() ? null : ElementMatch.place(nodes.getFirst());
+        }
+        return button.picture() == null ? null : reach.find(button.picture(), frame).orElse(null);
     }
 
     @Override
