@@ -474,7 +474,7 @@ fixed and rebuilt, and the run restarts on the new jar and replays it.
   screen's name, its areas boxed (`FrameBoxes`, shared with the live board) and the facts it reads
   (`pluginValues().runParameters()`); right, the feed newest first, with the open stop and Claude's last tool call
   pinned above it while the run is live. The frame is grabbed by the window, beside the run's own capture; the
-  run's telemetry could carry it instead (`ROADMAP.md`).
+  run's telemetry could carry it instead (deferred).
 - **Reads on the FX thread** go through `ScreenMapRead.orEmpty` (`plugin/pictures`): one read per FX event, shared
   by every card and editor drawn in it, dropped after it; a write calls `forget()`. A picture opens on its own cut
   (`TemplateUses.cut`), never on every picture constant's. A read after a step is skipped while the files beside

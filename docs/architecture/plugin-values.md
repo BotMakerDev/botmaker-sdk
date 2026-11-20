@@ -1,8 +1,9 @@
 # A plugin's values are Java this plugin ships
 
 `../docs/refactor/33-plugin-java.md`. Each value is marked `@SdkValue(SdkValue.Id.…)` (`api.bot.SdkValue`,
-meta-annotated `@ManagedMarker`), so a misspelt id is a compile error. A project gets its files from its
-template, in `src/main/java/<bot package>/plugins/sdk/`: **`Sdk.java`** — `RUN` returning a `Run` (the game's
+meta-annotated `@ManagedMarker`), so a misspelt id is a compile error. A project's files are in
+`src/main/java/<bot package>/plugins/sdk/`; the core writes, from what the plugin declares, each one a project lacks
+when it opens it (templates are gone since 2026-10-23): **`Sdk.java`** — `RUN` returning a `Run` (the game's
 home and setup, whichever plan runs), `LAUNCH_TARGETS` the games the bot supports,
 `VM` its virtual machine (a `GameVm`; the settings are parameters of the `Settings` group since 2026-11-09), each written as a chain of named calls — then
 **`Pictures.java`**, `PICTURES` on the type, one `ImageTemplate` constant per picture, filed under its tags by its own

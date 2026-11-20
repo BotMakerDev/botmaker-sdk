@@ -37,4 +37,4 @@ Wayland the JVM is an **XWayland** client that can *write* the pointer (warp + c
 when the cursor isn't over our surface — and the bot has no window). `LinuxController` therefore
 skips the restore when `WAYLAND_DISPLAY` is set, leaving the cursor on the target. The Wayland-correct
 "click without disturbing the cursor" path is the xdg-desktop-portal **RemoteDesktop** (libei/
-PipeWire) interface — deferred; see `ROADMAP.md`.
+PipeWire) interface — deferred (there is no roadmap file since 2026-11-10).
