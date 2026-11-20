@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -158,6 +159,31 @@ class TreeAnswersTest {
         MapScreen kase = changed(graph, planned, "CASE");
         assertEquals(List.of("home"), List.copyOf(kase.inputs().keySet()));
         assertEquals(null, kase.setup().notes(), "its note gone with it");
+    }
+
+    /**
+     * An input made twice that a way still goes through is merged all the same: the way goes through the input
+     * kept, once, and the copy is taken off.
+     */
+    @Test
+    void aWayThroughTheCopyGoesThroughTheInputKept() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("pricing", Button.of(new Locator(Role.LINK, "Pricing", null, null, null).element()).free());
+        inputs.put("pricing2", Button.of(new Locator(Role.BUTTON, "Pricing", null, null, null).element()).free());
+        Map<String, MapScreen> screens = new LinkedHashMap<>(map().screens());
+        screens.put("HOME", new MapScreen(Setup.named("Home").route("/").from(BotConstants.input("A", "open")),
+                inputs));
+        screens.put("PRICING", new MapScreen(Setup.named("Pricing").route("/pricing")
+                .from(BotConstants.input("HOME", "pricing2"))
+                .alsoFrom(List.of(Way.of(BotConstants.input("HOME", "pricing")))), Map.of()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+        Planned planned = TreeAnswers.plan(graph, List.of(new TreeAnswer.SameInput("HOME", "pricing2", "pricing")),
+                Map.of());
+
+        MapScreen pricing = changed(graph, planned, "PRICING");
+        assertEquals(List.of(new InputName("HOME", "pricing")),
+                pricing.ways().stream().map(w -> BotConstants.inputName(w.via())).toList());
+        assertEquals(List.of("pricing"), List.copyOf(changed(graph, planned, "HOME").inputs().keySet()));
     }
 
     /** A link that became the way back drops its old note too, so no run presses it again for it. */

@@ -322,6 +322,8 @@ public final class ExploreLoop {
     private ScreenGraph map;
 
     private final Set<String> seen = new HashSet<>();
+    /** The screens whose inputs made twice this process looked for; never restored from a run's memory. */
+    private final Set<String> merged = new HashSet<>();
     private final Set<String> tried = new HashSet<>();
     private final Set<String> worked = new HashSet<>();
     /** The parked stops, by kind and place ({@link #key(Stop)}): never pressed, never stopped on again until fixed. */
@@ -649,9 +651,10 @@ public final class ExploreLoop {
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
             if (website()) pictured(screen);
-            // Before anything on it is pressed: an input an older read made twice is never pressed again.
-            if (readsTrees() && map.screen(screen).isPresent()) notes.addAll(sameInputs(screen));
         }
+        // Before anything on it is pressed: an input an older read made twice is never pressed again. Once a screen
+        // per run, a run restarted on its memory included, so a merge an older build could not write is tried again.
+        if (readsTrees() && map.screen(screen).isPresent() && merged.add(screen)) notes.addAll(sameInputs(screen));
         // After the screen is said found and pictured: one with nothing to do is built once it is reached.
         clock(screen);
         Look look = play.look(screen);

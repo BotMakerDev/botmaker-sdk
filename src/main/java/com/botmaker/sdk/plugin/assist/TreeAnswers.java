@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.bot.BotConstants;
+import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
@@ -225,6 +226,17 @@ final class TreeAnswers {
                         skipped.add(same.field() + ": no screen " + same.screen() + " in the map.");
                         continue;
                     }
+                    // The ways and ways back naming the input that goes name the one kept first: an input still
+                    // named is never taken off.
+                    InputName gone = new InputName(constant.get(), same.field());
+                    Input kept = BotConstants.input(constant.get(), same.kept());
+                    InputName keptName = new InputName(constant.get(), same.kept());
+                    graph.screens().forEach((to, screen) -> {
+                        if (screen.ways().stream().anyMatch(w -> names(graph, w.via(), gone))
+                                || names(graph, screen.back(), gone)) {
+                            changes.add(new Change(to, s -> repointed(graph, s, gone, keptName, kept)));
+                        }
+                    });
                     changes.add(new Change(constant.get(), s -> s.input(same.field()).isEmpty() ? s
                             : withoutNote(s, same.field()).withoutInput(same.field())));
                 }
@@ -488,6 +500,38 @@ final class TreeAnswers {
     private static MapScreen noted(MapScreen screen, TreeAnswer.InputNote note) {
         MapScreen now = withNote(withoutNote(screen, note.field()), note.field() + ": " + note.note());
         return now.input(note.field()).map(i -> now.withInput(note.field(), i.tried())).orElse(now);
+    }
+
+    /** Whether {@code input} is the field {@code name} of the map {@code graph}. */
+    private static boolean names(ScreenGraph graph, Input input, InputName name) {
+        return input != null && graph.nameOf(input).filter(name::equals).isPresent();
+    }
+
+    /**
+     * {@code screen} with its ways in and its way back through {@code gone} through {@code kept} instead, as one
+     * control's two inputs merged; a way in {@code kept} already has goes, not twice.
+     */
+    static MapScreen repointed(ScreenGraph graph, MapScreen screen, InputName gone, InputName keptName, Input kept) {
+        return screen.setup(s -> {
+            List<Way> ways = new ArrayList<>();
+            boolean keptIn = s.ways().stream().anyMatch(w -> names(graph, w.via(), keptName));
+            for (Way way : s.ways()) {
+                if (!names(graph, way.via(), gone)) ways.add(way);
+                else if (!keptIn) {
+                    ways.add(new Way(kept, way.pick(), way.state(), way.when(), way.after()));
+                    keptIn = true;
+                }
+            }
+            Setup now = s;
+            // The tree's way in is the first, as it was when it stays.
+            if (s.from() != null) {
+                now = ways.isEmpty() ? now.fromWay(null).alsoFrom(List.of())
+                        : now.fromWay(ways.getFirst()).alsoFrom(ways.subList(1, ways.size()));
+            } else {
+                now = now.alsoFrom(ways);
+            }
+            return names(graph, s.back(), gone) ? now.back(kept) : now;
+        });
     }
 
     /** {@code screen} without the lines of its notes that say something of its input {@code field}. */
