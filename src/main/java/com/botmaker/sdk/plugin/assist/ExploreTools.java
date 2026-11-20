@@ -142,7 +142,7 @@ final class ExploreTools {
             if (entry.isEmpty()) return AgentReply.refused("This SDK declares no " + SdkRuns.KEEP_EXPLORING + " run.");
             return switch (services.devReload(entry.get())) {
                 case DevReload.Started started -> {
-                    claude(journal, "reload_sdk " + id);
+                    claude(journal, JournalView.RELOAD_SDK + " " + id);
                     yield AgentReply.text("Reloading the SDK: the run stops and starts again on the new build, then "
                             + "replays " + id + "; explore wait answers the replay. A wait that finds the run ended "
                             + "means the restart failed: the status line and the core's log say why.");
@@ -230,8 +230,9 @@ final class ExploreTools {
     private static Optional<AgentReply> answer(JournalView view) {
         List<String> screens = view.newScreensSinceWait();
         String found = screens.isEmpty() ? "" : "\nNew screens since the last wait: " + String.join(", ", screens) + ".";
-        // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude.
-        if (view.open().isPresent() && !view.settled(view.open().get())) {
+        // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude; a held
+        // fault being replayed is answered by its replay.
+        if (view.open().isPresent() && !view.settled(view.open().get()) && !view.replaying(view.open().get())) {
             return Optional.of(AgentReply.text("The run waits on this stop:\n" + whole(view.open().get(), view) + found));
         }
         if (view.ended().isPresent()) {

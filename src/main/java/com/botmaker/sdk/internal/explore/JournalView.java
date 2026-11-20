@@ -83,7 +83,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
 
     /**
      * The stop the run waits on: the latest it stopped on that was neither fixed, parked, nor reloaded for since. A
-     * refused reload leaves it open.
+     * refused reload leaves it open, and so does a restart: the held fault stays open while its replay runs.
      */
     public Optional<Stop> open() {
         if (!running()) return Optional.empty();
@@ -93,6 +93,33 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         }
         return Optional.empty();
     }
+
+    /**
+     * Whether {@code stop} is a held fault the run is replaying, or about to: since the run last stopped on it, Claude
+     * asked {@code reload_sdk} for it or the run {@link ExploreEvent.Restarted restarted}. Its answer is the replay's,
+     * so a wait does not answer it again.
+     */
+    public boolean replaying(Stop stop) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            switch (events.get(i)) {
+                case ExploreEvent.Stopped(Stop s, boolean again, long at) when s.id().equals(stop.id()) -> {
+                    return false;
+                }
+                case ExploreEvent.Restarted restarted -> {
+                    return true;
+                }
+                case ExploreEvent.Claude(String call, long at) when call.equals(RELOAD_SDK + " " + stop.id()) -> {
+                    return true;
+                }
+                default -> {
+                }
+            }
+        }
+        return false;
+    }
+
+    /** The call a {@code reload_sdk} writes as its {@link ExploreEvent.Claude} event, before the stop's id. */
+    public static final String RELOAD_SDK = "reload_sdk";
 
     private boolean closedAfter(String stopId, int index) {
         for (ExploreEvent event : events.subList(index + 1, events.size())) {

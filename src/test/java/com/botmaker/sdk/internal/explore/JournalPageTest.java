@@ -50,6 +50,9 @@ class JournalPageTest {
         journal.append(new ExploreEvent.Stopped(fault, false, 2));
         journal.append(new ExploreEvent.Ended(ExploreLoop.End.STOPPED, 3));
         assertTrue(JournalView.of(journal).heldWhenLeft("fault-1"));
+        assertFalse(JournalView.of(journal).replaying(fault), "held, and no reload asked yet");
+        journal.append(new ExploreEvent.Claude(JournalView.RELOAD_SDK + " fault-1", 3));
+        assertTrue(JournalView.of(journal).replaying(fault), "a reload asked: the replay answers it");
 
         journal.append(new ExploreEvent.Restarted("fault-1", false, 4));
         journal.append(new ExploreEvent.NewScreen("D", "A", "d", 5));
@@ -60,6 +63,9 @@ class JournalPageTest {
         assertEquals(2, view.count(ExploreEvent.NewScreen.class), "its history before the restart");
         assertEquals(Optional.of(fault), view.open(), "the fault waits on its replay");
         assertFalse(view.dev(), "the rebuilt SDK's word, not the first run's");
+        assertTrue(view.replaying(fault), "a wait does not answer the fault again while it replays");
+        journal.append(new ExploreEvent.Stopped(fault, true, 6));
+        assertFalse(JournalView.of(journal).replaying(fault), "the replay stopped on it again: that is its answer");
 
         journal.append(new ExploreEvent.Ended(ExploreLoop.End.BUDGET, 9));
         assertEquals(Optional.of(ExploreLoop.End.BUDGET), JournalView.of(journal).ended());
