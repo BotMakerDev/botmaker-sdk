@@ -243,6 +243,13 @@ class ExploreLoopTest {
                 ExploreLoop.Settings.DEFAULT.within(within), () -> game.nowMs);
     }
 
+    /** A 30-minute run whose screens each get 2 minutes, whatever they hold. */
+    private ExploreLoop twoMinutesEach(ScreenGraph map, Game game) {
+        return new ExploreLoop(map, game, same(map), Guards.with(List.of()), journal(),
+                ExploreLoop.Settings.DEFAULT.within(Duration.ofMinutes(30))
+                        .screens(ExploreLoop.ScreenBudget.fixed(Duration.ofMinutes(2))), () -> game.nowMs);
+    }
+
     private static ExploreLoop.Reload same(ScreenGraph map) {
         return () -> new ExploreLoop.Reload.Reloaded(1, map, null, List.of());
     }
@@ -729,7 +736,7 @@ class ExploreLoopTest {
         Game game = new Game();
         game.takeMs = 25_000;
 
-        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+        twoMinutesEach(map, game).run();
 
         List<Stop> low = lowYields();
         assertEquals(1, low.size(), stops().toString());
@@ -759,7 +766,7 @@ class ExploreLoopTest {
             }
         };
 
-        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+        twoMinutesEach(map, game).run();
 
         assertEquals(1, lowYields().size(), stops().toString());
         assertEquals(50_000, builtA().orElseThrow().ms(), "x11 and x12 on a fresh clock");
@@ -782,7 +789,7 @@ class ExploreLoopTest {
             }
         };
 
-        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+        twoMinutesEach(map, game).run();
 
         assertEquals(1, lowYields().size(), "ten more presses past another budget, not stopped on again");
         assertTrue(builtA().orElseThrow().ms() > 500_000, "its clock goes on: " + builtA());
@@ -810,7 +817,7 @@ class ExploreLoopTest {
         Game game = new Game();
         game.takeMs = 25_000;
 
-        loop(map, game, same(map), Duration.ofMinutes(30)).run();
+        twoMinutesEach(map, game).run();
 
         List<ExploreEvent.SetAside> aside = events(ExploreEvent.SetAside.class);
         assertEquals(List.of("A"), aside.stream().map(ExploreEvent.SetAside::screen).toList(), aside.toString());
@@ -821,6 +828,39 @@ class ExploreLoopTest {
         assertTrue(events(ExploreEvent.Built.class).stream().anyMatch(b -> b.screen().equals("A")),
                 "A is finished after: " + game.taken);
         assertTrue(JournalView.of(journal()).build().aside().isEmpty(), "built, it is no longer aside");
+    }
+
+    /**
+     * A screen's budget is what it holds at the run's measured press time: 18 ways at 12.6 s give 3m47s, inside floor
+     * and cap, so the screen is built without being set aside. Two ways get the floor; a huge screen the cap.
+     */
+    @Test
+    void aScreensBudgetIsItsLeftInputsTimesThePressTime() {
+        ScreenGraph map = wide(18);
+        Game game = new Game();
+        game.takeMs = 12_600;
+        ExploreLoop loop = loop(map, game, same(map), Duration.ofMinutes(30));
+
+        loop.run();
+
+        assertEquals(Duration.ofMillis(226_800), loop.budget("A"));
+        assertTrue(events(ExploreEvent.SetAside.class).isEmpty(), events(ExploreEvent.SetAside.class).toString());
+        assertTrue(builtA().isPresent(), game.taken.toString());
+        assertEquals(Duration.ofMinutes(2), loop.budget("X1"), "nothing on it: the floor");
+        assertEquals(Duration.ofMinutes(15), ExploreLoop.Settings.DEFAULT.screenBudget().fit(Duration.ofHours(1)));
+    }
+
+    /** A low-yield stop names what is left on its screen, so whoever answers sees which inputs never got pressed. */
+    @Test
+    void lowYieldNamesTheInputsLeft() {
+        ScreenGraph map = wide(12);
+        Game game = new Game();
+        game.takeMs = 25_000;
+
+        twoMinutesEach(map, game).run();
+
+        Stop stop = lowYields().getFirst();
+        assertTrue(stop.missing().contains("2 untried (left: x11, x12)"), stop.missing());
     }
 
     /** An element with no shot is open until the run takes its picture off the page. */

@@ -39,6 +39,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   (`linked`, `stays`, `not_pressed`, `failed`, `untried`). A screen card counts the inputs left (untried or
   failed) and shows *✓ done* only once the screen is all cut with nothing left. A picture screen with nothing
   left that does not say `.allCut()` shows *not all cut* and is owed until it does.
+- **A screen's time budget fits what it holds.** Keep exploring no longer sets aside every screen after a fixed two
+  minutes. A screen gets the time its presses take: those it made and those left on it, at the run's own measured
+  time per press, never under two minutes nor over fifteen. A page of 18 inputs at 12.6 s a press gets about 3m47s
+  and is built in one go instead of being set aside on every run. A low-yield stop now names the ways and inputs
+  still left on its screen.
 - **A way whose button is not on screen now is tried again later.** Keep exploring no longer gives up on a way the
   first time its button is missing. It skips the way, and looks for it again once the run has left the screen and
   come back, pressing it if it shows. Missing a second time, it is left untried for the next run. A screen the run

@@ -145,14 +145,20 @@ public final class ExploreLoop {
     /**
      * How long a stop waits before it is parked, how long with no press is stuck, one press's time, the whole run's
      * (null: no end), how often a paused run looks for a command, the screens it is on before it ends, each counted
-     * once (0: no end), and the time a screen's own clock may run unbuilt before the run sets it aside for another
-     * open one (null: never).
+     * once (0: no end), and the bounds of the time a screen's own clock may run unbuilt before the run sets it aside
+     * for another open one (null: never).
      */
     public record Settings(Duration parkAfter, Duration stuckAfter, Duration edge, Duration hours, Duration poll,
-                           int maxScreens, Duration screenBudget) {
+                           int maxScreens, ScreenBudget screenBudget) {
 
         public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15),
-                Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0, Duration.ofMinutes(2));
+                Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0,
+                new ScreenBudget(Duration.ofMinutes(2), Duration.ofMinutes(15)));
+
+        /** These settings with {@code budget} for each screen's clock; null for none. */
+        public Settings screens(ScreenBudget budget) {
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, budget);
+        }
 
         /** These settings with a budget of {@code hours}; null for none. */
         public Settings within(Duration hours) {
@@ -162,6 +168,23 @@ public final class ExploreLoop {
         /** These settings ending once the run has been on {@code screens} screens; 0 for no end. */
         public Settings upTo(int screens) {
             return new Settings(parkAfter, stuckAfter, edge, hours, poll, screens, screenBudget);
+        }
+    }
+
+    /**
+     * The bounds of a screen's budget: what its work takes at the run's measured press time, never under {@code floor}
+     * nor over {@code cap}.
+     */
+    public record ScreenBudget(Duration floor, Duration cap) {
+
+        /** The same budget for every screen, whatever it holds. */
+        public static ScreenBudget fixed(Duration budget) {
+            return new ScreenBudget(budget, budget);
+        }
+
+        /** {@code work} between floor and cap. */
+        public Duration fit(Duration work) {
+            return work.compareTo(floor) < 0 ? floor : work.compareTo(cap) > 0 ? cap : work;
         }
     }
 
@@ -378,6 +401,15 @@ public final class ExploreLoop {
     private final Map<String, String> yieldResumed = new HashMap<>();
     /** What each screen's clock went to, in ms. */
     private final Map<String, EnumMap<Spent, Long>> spentOn = new HashMap<>();
+    /** The presses this run made on each screen, ways and inputs: the work its budget counts beside what is left. */
+    private final Map<String, Integer> pressedOn = new HashMap<>();
+    /** The run's presses, and the ms their presses took: its measured press time. */
+    private int pressCount;
+    private long pressingMs;
+    /** Each screen's largest budget so far, in ms. */
+    private final Map<String, Long> budgets = new HashMap<>();
+    /** The clock each open screen had when this run restarted, in ms: its budget counts from there. */
+    private final Map<String, Long> restoredMs = new HashMap<>();
     /** What the last round did, which the time to the next one is charged to, but what it waited on a stop. */
     private Spent doing = Spent.PRESSING;
     /** What the run waited on at stops since the last round's charge, in ms. */
@@ -814,15 +846,14 @@ public final class ExploreLoop {
     }
 
     /**
-     * Whether {@code screen} is set aside: unbuilt past {@link Settings#screenBudget} on its own clock. Said once, when
-     * its clock first runs over, with what is still open on it.
+     * Whether {@code screen} is set aside: unbuilt past its {@link #budget} on its own clock. Said once, when its clock
+     * first runs over, with what is still open on it.
      */
     private boolean overBudget(String screen) {
-        Duration budget = settings.screenBudget();
-        if (budget == null) return false;
+        if (settings.screenBudget() == null) return false;
         if (aside.contains(screen)) return true;
         long ms = clock.getOrDefault(screen, 0L);
-        if (built.contains(screen) || ms < budget.toMillis()) return false;
+        if (built.contains(screen) || ms < budget(screen).toMillis()) return false;
         List<String> open = open(screen);
         if (open.isEmpty()) return false;
         aside.add(screen);
@@ -840,14 +871,17 @@ public final class ExploreLoop {
         long ms = clock.getOrDefault(screen, 0L);
         // A screen a restarted run found aside gets its second budget from now.
         long since = asideAt.computeIfAbsent(screen, s -> ms);
-        if (ms - since < settings.screenBudget().toMillis()) return null;
+        // The second budget is the screen's work alone: the clock a restart found is behind {@code since} already.
+        if (ms - since < budget(screen).toMillis() - restoredMs.getOrDefault(screen, 0L)) return null;
         List<String> open = open(screen);
         if (open.isEmpty()) return null;
         // A fresh clock that ran out too did not take.
         yieldResumed.remove(screen);
+        List<String> left = left(screen);
         return stop(StopKind.LOW_YIELD, screen, screen, look, screen + " is still unbuilt after "
                 + JournalView.took(ms) + " on its clock, " + JournalView.took(ms - since) + " since it was set aside: "
-                + String.join(", ", open) + "; its clock went to " + spent(screen)
+                + String.join(", ", open) + (left.isEmpty() ? "" : " (left: " + String.join(", ", left) + ")")
+                + "; its clock went to " + spent(screen)
                 + ". Fix what is open and resume for a fresh clock, or resume with ignore to leave it as it is", false);
     }
 
@@ -920,10 +954,11 @@ public final class ExploreLoop {
         tried.add(key);
         lastEdge = key;
         doing = Spent.PRESSING;
-        pressed(screen + ": " + edge.label());
+        pressed(screen, edge.label());
         long before = nowMs.getAsLong();
         pressing = screen + "." + edge.label();
         Took took = play.take(edge, settings.edge().toMillis());
+        pressingMs += nowMs.getAsLong() - before;
         pressing = null;
         Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > settings.edge().toMillis()
                 ? Arrival.TIMED_OUT : took.arrival();
@@ -967,12 +1002,14 @@ public final class ExploreLoop {
                 .anyMatch(e -> e.to().equals(screen) && e.from().equals(at) && !e.back() && !e.onItsOwn());
     }
 
-    private void pressed(String what) {
+    private void pressed(String screen, String what) {
         if (resumed != null) passed(StopKind.STUCK, resumed.place());
         if (replay != null) passed(StopKind.STUCK, replay.fault().place());
         lastPress = nowMs.getAsLong();
         lastWalk = null;
-        presses.addLast(what);
+        pressedOn.merge(screen, 1, Integer::sum);
+        pressCount++;
+        presses.addLast(screen + ": " + what);
         while (presses.size() > Stop.PRESSES) presses.removeFirst();
     }
 
@@ -1087,6 +1124,28 @@ public final class ExploreLoop {
         if (rest > 0) on.merge(doing, rest, Long::sum);
     }
 
+    /**
+     * {@code screen}'s budget: each press made on it this run and each input or way left on it, at the run's measured
+     * press time, within {@link Settings#screenBudget}'s floor and cap, the floor before any press is measured; on top
+     * of the clock a restarted run found it at. It never shrinks: a way refused, or a run of quick presses elsewhere,
+     * does not put a screen over.
+     */
+    Duration budget(String screen) {
+        long work = pressedOn.getOrDefault(screen, 0) + left(screen).size();
+        long perPress = pressCount == 0 ? 0 : pressingMs / pressCount;
+        long ms = restoredMs.getOrDefault(screen, 0L)
+                + settings.screenBudget().fit(Duration.ofMillis(work * perPress)).toMillis();
+        return Duration.ofMillis(budgets.merge(screen, ms, Math::max));
+    }
+
+    /** What the run still presses itself on {@code screen}: its ways not tried, then its inputs left, by name. */
+    private List<String> left(String screen) {
+        List<String> left = new ArrayList<>();
+        map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).forEach(e -> left.add(e.label()));
+        if (readsTrees()) left.addAll(inputsLeft(screen));
+        return left;
+    }
+
     /** A restarted run's clocks go on where the journal left them: its built screens stay built. */
     private void restoreClocks() {
         JournalView.Build build = JournalView.of(journal).build();
@@ -1096,6 +1155,7 @@ public final class ExploreLoop {
         }
         for (ExploreEvent.Building b : build.open()) {
             clock.put(b.screen(), b.ms());
+            restoredMs.put(b.screen(), b.ms());
             leftOpen.put(b.screen(), b.open());
         }
         aside.addAll(build.aside());
@@ -1325,10 +1385,12 @@ public final class ExploreLoop {
         play.stopped();
         Effect.State before = play.state().orElse(Effect.State.of(null, ""));
         doing = Spent.PRESSING;
-        pressed(screen + ": " + field);
+        pressed(screen, field);
         lastEdge = null;
         pressing = key;
+        long started = nowMs.getAsLong();
         Optional<String> at = play.press(screen, field, settings.edge().toMillis());
+        pressingMs += nowMs.getAsLong() - started;
         pressing = null;
         Effect.State after = play.state().orElse(Effect.State.of(null, ""));
         Effect effect = Effect.judge(before, after, play.stopped());
