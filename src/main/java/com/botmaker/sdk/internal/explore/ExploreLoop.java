@@ -1331,8 +1331,8 @@ public final class ExploreLoop {
     }
 
     /**
-     * The nearest screen by the map's edges, from {@code screen}, with an edge not tried yet; not itself, nor, when
-     * {@code notAside}, one set aside.
+     * The nearest screen by the map's edges, from {@code screen}, with an edge not tried yet, or, where the run reads
+     * trees, an input; not itself, nor, when {@code notAside}, one set aside.
      */
     private Optional<String> nearest(String screen, boolean notAside) {
         Set<String> reached = new LinkedHashSet<>(List.of(screen));
@@ -1342,7 +1342,9 @@ public final class ExploreLoop {
             for (Edge edge : map.edges()) {
                 if (!edge.from().equals(at) || !reached.add(edge.to())) continue;
                 String to = edge.to();
-                boolean work = map.edges().stream().anyMatch(e -> e.from().equals(to) && untriedEdge(e));
+                // A website's input the run presses itself is work too: a dialog's button is no edge until pressed.
+                boolean work = map.edges().stream().anyMatch(e -> e.from().equals(to) && untriedEdge(e))
+                        || readsTrees() && !untriedInputs(to).isEmpty();
                 if (work &&!(notAside && aside.contains(to))) return Optional.of(to);
                 queue.add(edge.to());
             }

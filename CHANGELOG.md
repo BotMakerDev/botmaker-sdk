@@ -155,6 +155,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring on a website walks back to a screen whose only work left is an input it presses itself (a button
+  that opens a dialog). It counted only ways not yet tried, so with none left it idled until it stopped as stuck.
 - Keep exploring on a website loads the page again after a press that left a list or menu open on it (a select's
   options), so the inputs pressed after it are pressed on the page as it was instead of each one "doing nothing".
 - `explore wait` no longer says again the screens the wait before it found while it blocked.
