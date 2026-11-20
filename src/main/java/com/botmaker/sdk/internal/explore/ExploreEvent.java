@@ -28,6 +28,7 @@ public sealed interface ExploreEvent {
             case Fixed ignored -> "fixed";
             case ReplayLost ignored -> "replay_lost";
             case Parked ignored -> "parked";
+            case Asked ignored -> "asked";
             case Reloaded ignored -> "reloaded";
             case Began ignored -> "began";
             case Ended ignored -> "ended";
@@ -53,6 +54,7 @@ public sealed interface ExploreEvent {
             case "fixed" -> Fixed.class;
             case "replay_lost" -> ReplayLost.class;
             case "parked" -> Parked.class;
+            case "asked" -> Asked.class;
             case "reloaded" -> Reloaded.class;
             case "began" -> Began.class;
             case "ended" -> Ended.class;
@@ -186,6 +188,12 @@ public sealed interface ExploreEvent {
 
     /** Nobody took up the stop {@code stopId} in time: it is in the queue, its place avoided, the run goes on. */
     record Parked(String stopId, long at) implements ExploreEvent {}
+
+    /**
+     * Claude handed the stop {@code stopId} to the user with {@code question} (2026-11-21): a verdict that can spend
+     * real money, or a call only the user makes. The run parks it; the Explore tab lists it for the user.
+     */
+    record Asked(String stopId, String question, long at) implements ExploreEvent {}
 
     /**
      * A resume of {@code stopId}: the bot compiled and loaded as {@code generation}, or, {@code errors} not empty,

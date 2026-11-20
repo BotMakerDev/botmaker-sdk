@@ -17,14 +17,19 @@ import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopKind;
+import com.botmaker.sdk.internal.explore.StopRole;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The explore tool over a journal a scripted run writes: what wait answers, what resume waits for. */
@@ -114,6 +120,84 @@ class ExploreToolsTest {
         assertTrue(said.contains("Facts: gold = 120"), said);
         assertTrue(journal.events().getLast() instanceof ExploreEvent.Claude(String call, long at)
                 && call.equals(JournalView.WAIT), "the call is in the journal, for the Explore tab");
+    }
+
+    /** The routing table of the audit's §2.3: every kind has one role, none this SDK does not know. */
+    @Test
+    void eachStopKindHasOneRole() {
+        Map<StopRole, Set<StopKind>> byRole = new EnumMap<>(StopRole.class);
+        for (StopKind kind : StopKind.values()) {
+            StopRole role = StopRole.of(kind);
+            assertNotEquals(StopRole.UNKNOWN, role, kind.id());
+            byRole.computeIfAbsent(role, r -> EnumSet.noneOf(StopKind.class)).add(kind);
+        }
+        assertEquals(EnumSet.of(StopKind.UNKNOWN_SCREEN, StopKind.UNMAPPED_INPUT, StopKind.NO_VERDICT,
+                StopKind.MISSING_FACT, StopKind.MISSING_CONDITION, StopKind.WRONG_ARRIVAL, StopKind.ERROR_PAGE,
+                StopKind.FAILED_INPUT, StopKind.LOW_YIELD, StopKind.UNWRITTEN), byRole.get(StopRole.CARTOGRAPHER));
+        assertEquals(EnumSet.of(StopKind.FAULT, StopKind.CRASH), byRole.get(StopRole.MECHANIC));
+        assertEquals(EnumSet.of(StopKind.GUARD, StopKind.STUCK, StopKind.UNKNOWN), byRole.get(StopRole.USER));
+        assertEquals(StopRole.CARTOGRAPHER, StopRole.fromId(" Cartographer "));
+        assertEquals(StopRole.UNKNOWN, StopRole.fromId("pilot"));
+    }
+
+    /** A Cartographer's wait passes over a fault and the user's stops, and answers its own parked one. */
+    @Test
+    void aCartographersWaitKeepsToItsStops() {
+        Journal journal = journal();
+        Stop guard = new Stop("guard-1", StopKind.GUARD, "Shop", "Shop", "", List.of(), List.of(), Map.of(), List.of(),
+                "another window is in front", 2);
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(guard, false, 2));
+        journal.append(new ExploreEvent.Parked(guard.id(), 3));
+        journal.queue(List.of(guard));
+        Stop fault = new Stop("fault-2", StopKind.FAULT, "Shop", "Shop", "", List.of(), List.of(), Map.of(), List.of(),
+                "Discover read the page wrong", 4);
+        journal.append(new ExploreEvent.Stopped(fault, false, 4));
+
+        String cartographer = text(ExploreTools.waitFor(journal, Duration.ofMillis(300), StopRole.CARTOGRAPHER));
+        assertTrue(cartographer.startsWith("Still running"), cartographer);
+        assertTrue(text(ExploreTools.waitFor(journal, Duration.ofSeconds(5), StopRole.MECHANIC))
+                .startsWith("The run waits on this stop:\nfault-2"));
+
+        Stop wrong = stop("wrong_arrival-3");
+        journal.append(new ExploreEvent.Fixed(fault.id(), "reloaded", 5));
+        journal.append(new ExploreEvent.Stopped(wrong, false, 6));
+        journal.append(new ExploreEvent.Parked(wrong.id(), 7));
+        journal.queue(List.of(guard, wrong));
+        // The Mechanic waiting in between never uses up the news of the Cartographer's parked stop.
+        assertTrue(text(ExploreTools.waitFor(journal, Duration.ofMillis(300), StopRole.MECHANIC))
+                .startsWith("Still running"));
+        String mine =text(ExploreTools.waitFor(journal, Duration.ofSeconds(5), StopRole.CARTOGRAPHER));
+        assertTrue(mine.contains("The oldest of 1 parked") && mine.contains("wrong_arrival-3: "), mine);
+        assertTrue(ExploreTools.handle(new ExploreTools.Wait(1, null, "pilot"), journal).isRefused());
+    }
+
+    /** ask hands the open stop to the user: the run is told to park it, and the user's queue lists it, not Claude's. */
+    @Test
+    void askParksTheStopForTheUser() {
+        Journal journal = journal();
+        Stop buy = stop("no_verdict-1");
+        journal.append(new ExploreEvent.Began(false, 1));
+        journal.append(new ExploreEvent.Stopped(buy, false, 2));
+
+        String said = text(ExploreTools.ask(journal, buy.id(), "Buy 10 costs real money: free, spends or never?"));
+
+        assertTrue(said.startsWith("Handed no_verdict-1 to the user"), said);
+        assertEquals(Optional.of(new Journal.Command.Park(buy.id())), journal.takeCommand());
+        JournalView view = JournalView.of(journal);
+        assertEquals(List.of(new JournalView.ForUser(buy, "Buy 10 costs real money: free, spends or never?")),
+                view.forUser());
+        assertEquals(StopRole.USER, view.roleOf(buy));
+        assertTrue(text(ExploreTools.waitFor(journal, Duration.ofMillis(300), StopRole.CARTOGRAPHER))
+                .startsWith("Still running"));
+        assertTrue(ExploreTools.ask(journal, "no_verdict-9", "x").isRefused(), "no such stop");
+        assertTrue(ExploreTools.ask(journal, buy.id(), " ").isRefused(), "no question");
+
+        Stop guard = new Stop("guard-2", StopKind.GUARD, "Shop", "Shop", "", List.of(), List.of(), Map.of(), List.of(),
+                "another window is in front", 3);
+        journal.append(new ExploreEvent.Stopped(guard, false, 3));
+        assertTrue(ExploreTools.ask(journal, guard.id(), "x").isRefused(), "a guard is the user's already");
+        assertFalse(journal.commandWaiting(), "and no park is written for it");
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
+import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -120,6 +121,32 @@ class ExploreViewTest extends ApplicationTest {
         journal.append(new ExploreEvent.Fixed("MISSING_FACT-1", "a readout", 4_000));
         interact(() -> view.show(JournalView.of(journal)));
         assertEquals(List.of(), view.pinnedLines(), "a fixed stop is not pinned");
+    }
+
+    /** A stop handed to the user is listed for them; its Ignore writes the run's resume with ignore. */
+    @Test
+    void theUsersStopsAreListedWithTheirButtons() throws InterruptedException {
+        running = true;
+        Stop buy = new Stop("no_verdict-1", StopKind.NO_VERDICT, "SHOP", "SHOP", "", List.of(), List.of(), Map.of(),
+                List.of(), "Buy has no verdict", 2_000);
+        journal.append(new ExploreEvent.Began(false, 1_000));
+        journal.append(new ExploreEvent.Stopped(buy, false, 2_000));
+        journal.append(new ExploreEvent.Asked(buy.id(), "Buy costs real money: spends or never?", 3_000));
+
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertEquals(List.of("❓ no_verdict-1 — No verdict on SHOP: Buy costs real money: spends or never?"),
+                view.yourLines());
+        assertTrue(view.feedLines().getFirst().endsWith("❓ no_verdict-1 for you: Buy costs real money: spends or never?"),
+                view.feedLines().getFirst());
+        clickOn("Ignore");
+        for (int i = 0; i < 50 && !journal.commandWaiting(); i++) Thread.sleep(20);
+        assertEquals(Optional.of(new Journal.Command.Resume(buy.id(), true)), journal.takeCommand());
+
+        journal.append(new ExploreEvent.Ended(ExploreLoop.End.STOPPED, 4_000));
+        running = false;
+        interact(() -> view.show(JournalView.of(journal)));
+        assertEquals(List.of(), view.yourLines(), "nothing to resume once the run ended");
     }
 
     @Test

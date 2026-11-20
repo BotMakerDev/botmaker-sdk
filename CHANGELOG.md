@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Each stop of Keep exploring says who takes it.** A stop's line in the journal carries its `role`: the
+  Cartographer (what the map lacks), the Mechanic (Discover's own fault or a crash), the user (a guard, a stuck
+  run) or the settler (answered by itself). `botmaker_sdk_explore` `wait` takes a `role`, so a session waits on its
+  own stops only, and its new `ask` action hands a stop to the user with one line of what they decide: the run
+  parks it at once (the journal's `park <id>` command) and goes on. The Explore tab lists those stops under
+  *For you*, each with Resume and Ignore. The umbrella's `tools/explore-watch.sh` drives such a run headless, a
+  fresh Claude session per ten stops.
 - **A screen is done by one rule, and exploring finishes the screen it is on first.** Each input of a screen is
   now linked, stays, not pressed (never, spends, locked), failed or untried, and a screen is done once none is
   failed or untried. A screen of pictures is done only once it is also marked all cut: `Setup.allCut()` in

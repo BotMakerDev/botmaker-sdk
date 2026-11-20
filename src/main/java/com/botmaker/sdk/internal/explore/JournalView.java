@@ -214,6 +214,50 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return stop.kind() == StopKind.FAULT || fault(stop.id()).isPresent();
     }
 
+    /** A stop the user's queue lists (2026-11-21): the stop, and what the user is to decide on it. */
+    public record ForUser(Stop stop, String question) {}
+
+    /**
+     * The user's queue: the parked stops that are the user's or that Claude handed them, oldest first, then the open
+     * stop when it is the user's; none once the run ended, as nothing can be resumed then.
+     */
+    public List<ForUser> forUser() {
+        if (!running()) return List.of();
+        List<ForUser> mine = new ArrayList<>();
+        for (Stop stop : queue) {
+            if (roleOf(stop) == StopRole.USER) mine.add(new ForUser(stop, asked(stop.id()).orElse(stop.missing())));
+        }
+        open().filter(s -> roleOf(s) == StopRole.USER && parked(s.id()).isEmpty())
+                .ifPresent(s -> mine.add(new ForUser(s, asked(s.id()).orElse(s.missing()))));
+        return List.copyOf(mine);
+    }
+
+    /**
+     * Who takes {@code stop} now: the user once Claude handed it to them, the Mechanic once Claude called it a Discover
+     * fault, else its kind's role.
+     */
+    public StopRole roleOf(Stop stop) {
+        if (asked(stop.id()).isPresent()) return StopRole.USER;
+        return fault(stop.id()).isPresent() ? StopRole.MECHANIC : stop.role();
+    }
+
+    /** The question Claude handed the stop {@code stopId} to the user with, since the run last stopped on it. */
+    public Optional<String> asked(String stopId) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            switch (events.get(i)) {
+                case ExploreEvent.Asked asked when asked.stopId().equals(stopId) -> {
+                    return Optional.of(asked.question());
+                }
+                case ExploreEvent.Stopped stopped when stopped.stop().id().equals(stopId) -> {
+                    return Optional.empty();
+                }
+                default -> {
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** The parked stop {@code stopId}, if the queue holds it. */
     public Optional<Stop> parked(String stopId) {
         return queue.stream().filter(s -> s.id().equals(stopId)).findFirst();
@@ -292,13 +336,22 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return Duration.ofMillis(Math.max(0, until - beganAt()));
     }
 
-    /** Whether the latest run parked a stop since Claude last waited on it. */
-    public boolean parkedSinceWait() {
+    /**
+     * Whether the latest run parked a stop since Claude last waited on it as {@code role} (null: a wait on every
+     * stop), so one role's wait never uses up the news of a stop parked for another.
+     */
+    public boolean parkedSinceWait(StopRole role) {
+        String mine = waitCall(role);
         for (int i = events.size() - 1; i >= 0; i--) {
             if (events.get(i) instanceof ExploreEvent.Parked) return true;
-            if (events.get(i) instanceof ExploreEvent.Claude(String call, long at) && call.startsWith(WAIT)) return false;
+            if (events.get(i) instanceof ExploreEvent.Claude(String call, long at) && call.equals(mine)) return false;
         }
         return false;
+    }
+
+    /** The call a wait as {@code role} writes: {@link #WAIT}, then the role's id when it keeps to one. */
+    public static String waitCall(StopRole role) {
+        return role == null ? WAIT : WAIT + " " + role.id();
     }
 
     /** How many of the latest run's events are {@code type}. */

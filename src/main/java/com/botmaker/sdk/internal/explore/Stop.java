@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.explore;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -52,6 +53,12 @@ public record Stop(String id, StopKind kind, String screen, String place, String
         lastPresses = lastPresses == null ? List.of()
                 : List.copyOf(lastPresses.subList(Math.max(0, lastPresses.size() - PRESSES), lastPresses.size()));
         missing = missing == null ? "" : missing;
+    }
+
+    /** Who takes it; written on the journal's lines for {@code tools/explore-watch.sh}, never read back. */
+    @JsonProperty(value = "role", access = JsonProperty.Access.READ_ONLY)
+    public StopRole role() {
+        return StopRole.of(kind);
     }
 
     /** Whether {@code other} is this stop again: the same kind on the same place. */

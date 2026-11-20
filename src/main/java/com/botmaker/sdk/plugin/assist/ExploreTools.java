@@ -14,6 +14,7 @@ import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
+import com.botmaker.sdk.internal.explore.StopRole;
 import com.botmaker.sdk.plugin.run.SdkRuns;
 
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -57,8 +59,16 @@ final class ExploreTools {
 
     @Describe("block until the run stops, finds a screen or ends; answers the open stop whole, else the oldest parked")
     record Wait(@Describe(value = "the longest to wait; blank: 600", optional = true) Integer seconds,
-                @Describe(value = RUN_ID, optional = true) String run)
+                @Describe(value = RUN_ID, optional = true) String run,
+                @Describe(value = "cartographer or mechanic: only the stops that role takes; blank: every stop",
+                        optional = true) String role)
             implements Action {
+    }
+
+    @Describe("hand the open or a parked stop to the user, for a verdict that can spend real money or a call only "
+            + "they can make; the run parks it and goes on, and the Explore tab lists it for them")
+    record Ask(@Describe("the stop's id, as wait names it") String stop,
+               @Describe("one line: what the user is to decide") String question) implements Action {
     }
 
     @Describe("the run's id, counts, where it is, and its open stop")
@@ -95,7 +105,8 @@ final class ExploreTools {
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
-                    + SdkRuns.KEEP_EXPLORING + "\" starts it. Dev mode: Discover's own mistake is held as a "
+                    + SdkRuns.KEEP_EXPLORING + "\" starts it. A verdict that can spend real money, or a call only "
+                    + "the user makes: ask hands the stop to them. Dev mode: Discover's own mistake is held as a "
                     + "fault; fix and install the SDK, then reload_sdk replays it")
             .takesOneOf(Action.class).handledBy(ExploreTools::handle));
 
@@ -123,8 +134,15 @@ final class ExploreTools {
 
     static AgentReply handle(Action action, Journal journal) {
         return switch (action) {
-            case Wait wait -> waitFor(journal, Duration.ofSeconds(wait.seconds() == null || wait.seconds() <= 0
-                    ? WAIT_SECONDS : wait.seconds()));
+            case Wait wait -> {
+                StopRole role = wait.role() == null || wait.role().isBlank() ? null : StopRole.fromId(wait.role());
+                if (role == StopRole.UNKNOWN) {
+                    yield AgentReply.refused("No role " + wait.role().strip() + ": cartographer, mechanic, or blank.");
+                }
+                yield waitFor(journal, Duration.ofSeconds(wait.seconds() == null || wait.seconds() <= 0
+                        ? WAIT_SECONDS : wait.seconds()), role);
+            }
+            case Ask ask -> ask(journal, ask.stop(), ask.question());
             case Status ignored -> status(journal);
             case Queue ignored -> queue(journal);
             case Resume resume -> resume(journal, resume.stop(), Boolean.TRUE.equals(resume.ignore()), RESUME_WITHIN);
@@ -230,10 +248,18 @@ final class ExploreTools {
      * otherwise blocks until the run stops, finds a screen or ends, or {@code within} passes ("still running").
      */
     static AgentReply waitFor(Journal journal, Duration within) {
+        return waitFor(journal, within, null);
+    }
+
+    /**
+     * Blocks until the run has something to say, within {@code within}; {@code role}, when not null, keeps to the
+     * stops that role takes (2026-11-21), so a Cartographer's session never sees a fault or the user's stops.
+     */
+    static AgentReply waitFor(Journal journal, Duration within, StopRole role) {
         JournalView view = JournalView.of(journal);
         if (!view.began()) return AgentReply.refused(noRun());
-        Optional<AgentReply> now = answer(view);
-        claude(journal, JournalView.WAIT);
+        Optional<AgentReply> now = answer(view, role);
+        claude(journal, JournalView.waitCall(role));
         if (now.isPresent()) return now.get();
         long deadline = System.nanoTime() + within.toNanos();
         int seen = view.all().size();
@@ -244,22 +270,24 @@ final class ExploreTools {
             }
             view = JournalView.of(journal);
             seen = view.all().size();
-            now = answer(view);
+            now = answer(view, role);
             if (now.isPresent()) {
                 // Said now: the next wait reports only what was found after this answer.
-                claude(journal, JournalView.WAIT);
+                claude(journal, JournalView.waitCall(role));
                 return now.get();
             }
         }
     }
 
     /** What a wait answers with now, if anything: the open stop, the oldest parked, new screens, or the run's end. */
-    private static Optional<AgentReply> answer(JournalView view) {
+    private static Optional<AgentReply> answer(JournalView view, StopRole role) {
         List<String> screens = view.newScreensSinceWait();
         String found = screens.isEmpty() ? "" : "\nNew screens since the last wait: " + String.join(", ", screens) + ".";
+        Predicate<com.botmaker.sdk.internal.explore.Stop> takes = s -> role == null || view.roleOf(s) == role;
         // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude; a held
         // fault being replayed is answered by its replay.
-        if (view.open().isPresent() && !view.settled(view.open().get()) && !view.replaying(view.open().get())) {
+        if (view.open().filter(takes).isPresent() && !view.settled(view.open().get())
+                && !view.replaying(view.open().get())) {
             return Optional.of(AgentReply.text("The run waits on this stop:\n" + whole(view.open().get(), view) + found));
         }
         if (view.ended().isPresent()) {
@@ -267,9 +295,10 @@ final class ExploreTools {
                     + counts(view) + found));
         }
         // Said once each time one is parked, so a stop left for later never keeps a wait from blocking.
-        if (!view.queue().isEmpty() && view.parkedSinceWait()) {
-            return Optional.of(AgentReply.text("No stop open; the run goes on. The oldest of " + view.queue().size()
-                    + " parked (queue lists them):\n" + whole(view.queue().getFirst()) + found));
+        List<com.botmaker.sdk.internal.explore.Stop> parked = view.queue().stream().filter(takes).toList();
+        if (!parked.isEmpty() && view.parkedSinceWait(role)) {
+            return Optional.of(AgentReply.text("No stop open; the run goes on. The oldest of " + parked.size()
+                    + " parked (queue lists them):\n" + whole(parked.getFirst()) + found));
         }
         if (!screens.isEmpty()) return Optional.of(AgentReply.text(found.strip() + " " + counts(view)));
         return Optional.empty();
@@ -292,6 +321,36 @@ final class ExploreTools {
         return AgentReply.text(parked.stream().map(s -> s.id() + " — " + s.kind().displayName() + " on " + s.screen()
                 + (s.place().isEmpty() ? "" : " (" + s.place() + ")") + ": " + s.missing())
                 .collect(Collectors.joining("\n")));
+    }
+
+    /**
+     * Hands the open or a parked stop {@code stopId} to the user with {@code question} (2026-11-21): written to the
+     * journal for the Explore tab's queue, and the open stop parked so the run goes on. Answers at once.
+     */
+    static AgentReply ask(Journal journal, String stopId, String question) {
+        if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the stop to hand over, as wait names it.");
+        if (question == null || question.isBlank()) return AgentReply.refused("Say in one line what the user decides.");
+        String id = stopId.strip();
+        synchronized (RESUMING) {
+            JournalView view = JournalView.of(journal);
+            if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended." : noRun());
+            boolean open = view.open().filter(s -> s.id().equals(id)).isPresent();
+            if (open && view.held(view.open().get())) {
+                return AgentReply.refused(id + " is a Discover fault, the Mechanic's: it is not the user's.");
+            }
+            Optional<com.botmaker.sdk.internal.explore.Stop> stop = open ? view.open() : view.parked(id);
+            if (stop.isEmpty()) return AgentReply.refused("No stop " + id + " is open or parked. " + ids(view));
+            if (stop.get().role() == StopRole.USER) {
+                return AgentReply.refused(id + " is the user's already: the Explore tab lists it for them.");
+            }
+            if (view.settled(stop.get())) return AgentReply.refused(id + " is settled off the page's tree: leave it.");
+            claude(journal, "ask " + id);
+            journal.append(new ExploreEvent.Asked(id, question.replaceAll("\\s+", " ").strip(),
+                    System.currentTimeMillis()));
+            if (open) journal.command("park " + id);
+            return AgentReply.text("Handed " + id + " to the user; " + (open ? "the run parks it and goes on."
+                    : "it stays parked.") + " Leave it: they resume or ignore it from the Explore tab.");
+        }
     }
 
     /**

@@ -1751,7 +1751,9 @@ public final class ExploreLoop {
                     stuck = true;
                     return Paused.END;
                 }
-            } else if (!neverParks && nowMs.getAsLong() >= deadline) {
+            } else if (!neverParks && (nowMs.getAsLong() >= deadline
+                    || command.orElse(null) instanceof Journal.Command.Park(String stopId) && id.equals(stopId))) {
+                // A stop Claude handed to the user waits in the queue for them at once: the run goes on.
                 parked.put(key(stop), stop);
                 journal.queue(List.copyOf(parked.values()));
                 emit(new ExploreEvent.Parked(id, nowMs.getAsLong()));

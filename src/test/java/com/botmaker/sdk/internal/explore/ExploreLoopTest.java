@@ -364,6 +364,27 @@ class ExploreLoopTest {
         assertTrue(loop.open("A").contains("1 waiting on a condition"), loop.open("A").toString());
     }
 
+    /** A stop Claude handed to the user is parked when the run reads the park, not after its 10 minutes. */
+    @Test
+    void aParkParksTheOpenStopAtOnce() {
+        Game game = new Game();
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.UNKNOWN, null) : new Took(Arrival.AT_TARGET, edge.to());
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !stops().isEmpty()) {
+                sent[0] = true;
+                journal().command("park " + openStop());
+            }
+        };
+
+        loop(map(), game, same(map()), Duration.ofMinutes(12)).run();
+
+        ExploreEvent.Stopped stopped = stops().getFirst();
+        ExploreEvent.Parked parked = events(ExploreEvent.Parked.class).getFirst();
+        assertEquals(stopped.stop().id(), parked.stopId());
+        assertTrue(parked.at() - stopped.at() < Duration.ofMinutes(1).toMillis(), (parked.at() - stopped.at()) + " ms");
+    }
+
     @Test
     void unknownScreenStops() {
         Game game = new Game();

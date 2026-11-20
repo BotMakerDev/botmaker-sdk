@@ -78,6 +78,8 @@ final class ExploreView {
     /** How often the journal and the frame are read again. */
     private static final Duration TICK = Duration.seconds(1);
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss");
+    /** How often, and how many times, a row's buttons look whether the run took the user's answer: two minutes. */
+    private static final int ANSWER_POLL_MS = 250, ANSWER_POLLS = 480;
 
     private final StudioServices services;
     private final Supplier<ScreenGraph> graph;
@@ -98,6 +100,9 @@ final class ExploreView {
     private final Label pinnedStop = new Label();
     private final Label pinnedClaude = new Label();
     private final VBox pinned = new VBox(2, pinnedStop, pinnedClaude);
+    /** The user's queue (2026-11-21): the stops only they decide, each with resume and ignore. */
+    private final VBox yours = new VBox(4);
+    private final VBox yoursBox = new VBox(4);
     private final ListView<String> feed = new ListView<>();
     private final Timeline ticker = new Timeline(new KeyFrame(TICK, e -> tick()));
     private final AtomicBoolean reading = new AtomicBoolean();
@@ -114,6 +119,8 @@ final class ExploreView {
     private volatile long lastPageAt;
     private Map<String, Rect> areas = Map.of();
     private boolean closed;
+    /** The user's queue as last shown, so its buttons are built again only when it changes. */
+    private List<JournalView.ForUser> yoursShown = List.of();
     /** The journal as last shown. */
     private JournalView last = new JournalView(List.of(), List.of(), List.of());
     /** The journal as last read, with its files' sizes and times then; the reading thread's, one at a time. */
@@ -179,7 +186,14 @@ final class ExploreView {
                 + " explores the game, and what it finds shows here."));
         Label feedTitle = new Label("Feed");
         feedTitle.getStyleClass().add("explore-heading");
-        VBox right = new VBox(6, feedTitle, pinned, feed);
+        Label yoursTitle = new Label("For you");
+        yoursTitle.getStyleClass().add("explore-heading");
+        yoursBox.getChildren().setAll(yoursTitle, yours);
+        yoursBox.getStyleClass().add("explore-pinned");
+        yoursBox.setPadding(new Insets(6));
+        yoursBox.setVisible(false);
+        yoursBox.setManaged(false);
+        VBox right = new VBox(6, feedTitle, pinned, yoursBox, feed);
         VBox.setVgrow(feed, Priority.ALWAYS);
         right.setPadding(new Insets(8));
         right.setMinWidth(0);
@@ -390,6 +404,13 @@ final class ExploreView {
             pinnedClaude.setText(claudeSince(read, waiting).map(call -> "Claude: " + call)
                     .orElse("Claude: not on it yet"));
         });
+        List<JournalView.ForUser> mine = live ? read.forUser() : List.of();
+        if (!mine.equals(yoursShown)) {
+            yoursShown = mine;
+            yours.getChildren().setAll(mine.stream().map(this::yourRow).toList());
+            yoursBox.setVisible(!mine.isEmpty());
+            yoursBox.setManaged(!mine.isEmpty());
+        }
         if (changed) {
             List<String> lines = feedLines(read);
             if (!lines.equals(feed.getItems())) feed.getItems().setAll(lines);
@@ -400,6 +421,57 @@ final class ExploreView {
         List<String> factsShown = facts.getChildren().stream().map(n -> ((Label) n).getText()).toList();
         if (!factLines.equals(factsShown)) facts.getChildren().setAll(factLines.stream().map(Label::new).toList());
         buttons();
+    }
+
+    /** One stop of the user's queue: what to decide, then resume and ignore, which the run takes at its next round. */
+    private Node yourRow(JournalView.ForUser item) {
+        Stop stop = item.stop();
+        Label what = new Label(yourLine(item));
+        what.setWrapText(true);
+        what.setMinWidth(0);
+        HBox.setHgrow(what, Priority.ALWAYS);
+        Button resume = new Button("Resume");
+        resume.setTooltip(new Tooltip("Goes on from it with the bot as it is now: fix it first, by hand or with Claude."));
+        Button ignore = new Button("Ignore");
+        ignore.setTooltip(new Tooltip("It is fine as it is: the run never raises it again."));
+        resume.setOnAction(e -> answer(stop.id(), false, resume, ignore));
+        ignore.setOnAction(e -> answer(stop.id(), true, resume, ignore));
+        HBox row = new HBox(6, what, resume, ignore);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private static String yourLine(JournalView.ForUser item) {
+        Stop stop = item.stop();
+        return "❓ " + stop.id() + " — " + stop.kind().displayName() + " on "
+                + (stop.screen() == null ? "an unknown screen" : stop.screen()) + ": " + item.question();
+    }
+
+    /**
+     * Writes the user's resume of {@code stopId} for the run, off the FX thread. The row's buttons wait until the run
+     * took it, then come back: a resume the run refused (the bot does not compile) leaves the stop listed, to try again.
+     */
+    private void answer(String stopId, boolean ignore, Button... buttons) {
+        for (Button button : buttons) button.setDisable(true);
+        Thread.ofVirtual().name("explore-answer").start(() -> {
+            try {
+                Optional<Journal> journal = journals.get();
+                if (journal.isEmpty()) return;
+                journal.get().command("resume " + stopId + (ignore ? " ignore" : ""));
+                for (int i = 0; i < ANSWER_POLLS && journal.get().commandWaiting(); i++) Thread.sleep(ANSWER_POLL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                Platform.runLater(() -> {
+                    for (Button button : buttons) button.setDisable(false);
+                });
+            }
+        });
+    }
+
+    /** The user's queue shown, one line each. */
+    List<String> yourLines() {
+        return yoursShown.stream().map(ExploreView::yourLine).toList();
     }
 
     /** The feed shown, newest first. */
@@ -477,7 +549,8 @@ final class ExploreView {
             case ExploreEvent.Stopped e -> "⏸ " + e.stop().id() + (e.again() ? " again" : "") + " — "
                     + e.stop().kind().displayName() + ": " + e.stop().missing();
             case ExploreEvent.Fixed e -> "✔ " + e.stopId() + " fixed" + (e.why() == null ? "" : ": " + e.why());
-            case ExploreEvent.Parked e -> "⏸ " + e.stopId() + " parked: nobody answered, the run goes on elsewhere";
+            case ExploreEvent.Parked e -> "⏸ " + e.stopId() + " parked: the run goes on elsewhere";
+            case ExploreEvent.Asked e -> "❓ " + e.stopId() + " for you: " + e.question();
             case ExploreEvent.Faulted e -> "🛠 " + e.stopId() + " Discover fault: " + e.why();
             case ExploreEvent.ReplayLost e -> "⚠ " + e.faultId() + " not replayed: " + e.why();
             case ExploreEvent.Restarted e -> "↻ Restarted on the rebuilt SDK, replaying " + e.faultId();

@@ -6,6 +6,7 @@ package com.botmaker.sdk.internal.explore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -32,6 +33,25 @@ class JournalTest {
                 journal.takeCommand());
         assertFalse(journal.commandWaiting());
         assertEquals(Optional.empty(), journal.takeCommand(), "each taken once");
+    }
+
+    /** A park names one stop; a stop's line carries who takes it, for the watcher, and reads back without it. */
+    @Test
+    void aParkIsACommandAndAStopSaysItsRole(@TempDir Path folder) throws IOException {
+        assertEquals(Optional.of(new Journal.Command.Park("guard-1")), Journal.Command.parse("park guard-1"));
+        assertEquals(Optional.empty(), Journal.Command.parse("park"));
+
+        Journal journal = new Journal(folder);
+        Stop stop = new Stop("fault-1", StopKind.FAULT, "A", "A", "", List.of(), List.of(), Map.of(),
+                List.of(), "x", 1);
+        journal.append(new ExploreEvent.Stopped(stop, false, 1));
+        journal.queue(List.of(stop));
+
+        assertTrue(journal.events().getFirst() instanceof ExploreEvent.Stopped(Stop read, boolean again, long at)
+                && read.equals(stop), journal.events().toString());
+        assertEquals(List.of(stop), journal.queue());
+        assertTrue(Files.readString(folder.resolve(Journal.EVENTS)).contains("\"role\":\"mechanic\""));
+        assertTrue(Files.readString(folder.resolve(Journal.QUEUE)).contains("\"role\":\"mechanic\""));
     }
 
     @Test

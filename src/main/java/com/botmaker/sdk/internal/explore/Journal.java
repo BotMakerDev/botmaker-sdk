@@ -95,15 +95,20 @@ public final class Journal {
         /** Hold the open stop {@code stopId} as a Discover fault, {@code why} one line (2026-11-19): dev mode only. */
         record Fault(String stopId, String why) implements Command {}
 
+        /** Park the open stop {@code stopId} now, for the user to take (2026-11-21): the run goes on elsewhere. */
+        record Park(String stopId) implements Command {}
+
         /**
          * {@code text} as a command, read off its first line ({@code resume <id> [ignore]}, {@code fault <id> <why>},
-         * {@code stop}); a resume's further lines are what was skipped. Empty for one this run does not know.
+         * {@code park <id>}, {@code stop}); a resume's further lines are what was skipped. Empty for one this run does
+         * not know.
          */
         static Optional<Command> parse(String text) {
             List<String> lines = (text == null ? "" : text).lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
             String line = lines.isEmpty() ? "" : lines.getFirst();
             String[] said = line.split("\\s+");
             if (said.length == 1 && said[0].equals("stop")) return Optional.of(new End());
+            if (said.length == 2 && said[0].equals("park")) return Optional.of(new Park(said[1]));
             if (said[0].equals("fault") && said.length >= 3) {
                 String[] parts = line.split("\\s+", 3);
                 return Optional.of(new Fault(parts[1], parts[2].strip()));
