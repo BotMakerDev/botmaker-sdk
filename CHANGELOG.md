@@ -142,6 +142,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- 🗺 Screens' cards box a web page's elements on the screen's shot: each element's own shot (`elements/<name>.png`)
+  is matched there as a picture is, and listed under the shot when it is not on it. They were skipped without a word,
+  being neither a picture nor a cut. A run still finds them by the tree.
 - Discover no longer stops on a link to a screen no way may lead into, such as a site's Home link on a page two
   screens down: the input is noted as leading there and kept tried, instead of being left unwritten.
 - A Discover fault raised because a settled stop was not all written replays by settling its place again, so the

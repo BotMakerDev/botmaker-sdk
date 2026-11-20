@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Do;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Scroll;
 import com.botmaker.sdk.api.screens.Setup;
@@ -111,6 +112,30 @@ class MapAuditTest {
         assertFalse(event.sure(), "one that comes and goes, missing, is only a note");
         // Made once for the same files and places.
         assertSame(audit, MapAudit.of(resources, 0.9, cuts, "HOME", screen()).orElseThrow());
+    }
+
+    /** A web page's element is found by the tree on a run; on the map its own shot is looked for on the screen's. */
+    @Test
+    void anElementsShotIsFoundOnTheScreensShot() throws IOException {
+        BufferedImage link = noise(SIZE, SIZE, 50);
+        writeShot(SHOT, Map.of(link, new Rect(120, 80, SIZE, SIZE)));
+        for (Map.Entry<String, BufferedImage> shot : Map.of("elements/pricing.png", link,
+                "elements/gone.png", noise(SIZE, SIZE, 51)).entrySet()) {
+            Path file = resources.resolve(shot.getKey());
+            Files.createDirectories(file.getParent());
+            ImageIO.write(shot.getValue(), "png", file.toFile());
+        }
+        MapScreen screen = MapFixtures.screen(Setup.named("Home").shot(SHOT),
+                Button.of(Element.byId("pricing").shot("elements/pricing.png")),
+                Button.of(Element.byId("gone").shot("elements/gone.png")));
+
+        Audit audit = MapAudit.of(resources, 0.9, Map.of(), "HOME", screen).orElseThrow();
+
+        // By its button's picture id, as a card asks.
+        Spot pricing = audit.of("pricing").orElseThrow();
+        assertEquals(Where.AT_PLACE, pricing.where());
+        assertEquals(new Rect(120, 80, SIZE, SIZE), pricing.at());
+        assertEquals(Where.MISSING, audit.of("gone").orElseThrow().where());
     }
 
     /** Hades II: the Options skull crowns Save slots too, whose shot came after the skull was cut. */

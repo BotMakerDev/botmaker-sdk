@@ -291,7 +291,7 @@ public final class MapAudit {
         Map<String, Check> checks = checks(resources, screen);
         StringBuilder key = new StringBuilder(resources + "|" + constant + "@" + shotTime + "|" + confidence);
         checks.values().forEach(c -> key.append('|').append(c).append('@')
-                .append(modified(TemplateLibrary.fileForName(resources, c.picture()))).append(cuts.get(c.picture())));
+                .append(modified(fileOf(resources, c.picture()))).append(cuts.get(c.picture())));
         Audit made = MADE.get(key.toString());
         if (made != null) return Optional.of(made);
         BufferedImage shot;
@@ -302,7 +302,8 @@ public final class MapAudit {
         }
         if (shot == null) return Optional.empty();
         List<String> names = List.copyOf(checks.keySet());
-        List<Fit> fits = fits(resources, confidence, cuts, names, shot);
+        // The card's audit alone reads element shots: a run's fit of a screen matches the bot's pictures only.
+        List<Fit> fits = fits(name -> fileOf(resources, name), confidence, cuts, names, shot);
         Size live = new Size(shot.getWidth(), shot.getHeight());
         List<Spot> spots = new ArrayList<>();
         for (Fit fit : fits) {
@@ -444,7 +445,8 @@ public final class MapAudit {
         if (!missing.isEmpty()) {
             Optional<BufferedImage> shot = shots.apply(screen);
             if (shot.isEmpty()) return Optional.empty();
-            List<MatchResult> matches = batch(resources, cuts, missing.stream().map(Sought::picture).toList(),
+            List<MatchResult> matches = batch(name -> TemplateLibrary.fileForName(resources, name), cuts,
+                    missing.stream().map(Sought::picture).toList(),
                     shot.get(), i -> missing.get(i).near(), Reach.MARKER_MARGIN);
             for (int i = 0; i < missing.size(); i++) {
                 Sought s = missing.get(i);
@@ -545,12 +547,18 @@ public final class MapAudit {
      */
     static List<Fit> fits(Path resources, double confidence, Map<String, FrameCut> cuts, List<String> pictures,
                           BufferedImage frame) {
-        List<MatchResult> near = batch(resources, cuts, pictures, frame, i -> true, LookTools.NEAR);
+        return fits(name -> TemplateLibrary.fileForName(resources, name), confidence, cuts, pictures, frame);
+    }
+
+    /** {@link #fits(Path, double, Map, List, BufferedImage)}, each of {@code pictures} read from {@code files}. */
+    private static List<Fit> fits(Function<String, Path> files, double confidence, Map<String, FrameCut> cuts,
+                                  List<String> pictures, BufferedImage frame) {
+        List<MatchResult> near = batch(files, cuts, pictures, frame, i -> true, LookTools.NEAR);
         List<String> away = new ArrayList<>();
         for (int i = 0; i < pictures.size(); i++) {
             if (!clears(near.get(i), confidence) && placed(cuts, pictures.get(i))) away.add(pictures.get(i));
         }
-        List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(resources, cuts, away, frame, i -> false, 0);
+        List<MatchResult> anywhere = away.isEmpty() ? List.of() : batch(files, cuts, away, frame, i -> false, 0);
         List<Fit> fits = new ArrayList<>();
         for (int i = 0, next = 0; i < pictures.size(); i++) {
             String picture = pictures.get(i);
@@ -579,14 +587,14 @@ public final class MapAudit {
      * Each picture's best match in one batch: within {@code margin} of its place when {@code near} holds for its index
      * and it has one, else anywhere; not found when it has no file.
      */
-    private static List<MatchResult> batch(Path resources, Map<String, FrameCut> cuts, List<String> pictures,
-                                           BufferedImage frame, IntPredicate near, int margin) {
+    private static List<MatchResult> batch(Function<String, Path> files, Map<String, FrameCut> cuts,
+                                           List<String> pictures, BufferedImage frame, IntPredicate near, int margin) {
         List<ImageTemplate> templates = new ArrayList<>();
         try {
             for (int i = 0; i < pictures.size(); i++) {
                 String picture = pictures.get(i);
                 FrameCut cut = cuts.get(picture);
-                ImageTemplate file = new ImageTemplate(TemplateLibrary.fileForName(resources, picture).toString());
+                ImageTemplate file = new ImageTemplate(files.apply(picture).toString());
                 if (near.test(i) && cut != null && cut.place() != null) file = file.at(cut.place());
                 if (cut != null) file = file.frames(cut.frames());
                 templates.add(cut == null || cut.frame() == null ? file : file.in(cut.frame()));
@@ -643,6 +651,16 @@ public final class MapAudit {
             Input its = screen.effective(input);
             boolean sure = !looksOnly.contains(input) && !its.isOccasional() && its.locked() == null && band == null
                     && !scrolled;
+            if (input instanceof Button button && button.isElement() && button.picture() != null) {
+                // Found by the tree on a run; on the map its shot, cut from the page, is matched on the screen's shot
+                // so the card boxes it where it sits.
+                String shot = button.picture().id();
+                if (!checks.containsKey(shot) && Files.isRegularFile(fileOf(resources, shot))) {
+                    Check was = checks.get(shot);
+                    checks.put(shot, new Check(shot, false, false, sure || (was != null && was.sure()), band));
+                }
+                continue;
+            }
             if (input instanceof Button button) {
                 for (Look look : button.allLooks()) {
                     add(checks, resources, look.picture(), false, sure && button.looks().isEmpty(), band);
@@ -655,6 +673,15 @@ public final class MapAudit {
             if (its.locked() != null) add(checks, resources, its.locked(), false, false, null);
         }
         return checks;
+    }
+
+    /**
+     * The file a check's {@code name} is read from: the bot's picture of that name, else an element's shot of it, which
+     * the element picker saves as {@code elements/<name>.png} below the resources.
+     */
+    static Path fileOf(Path resources, String name) {
+        Path picture = TemplateLibrary.fileForName(resources, name);
+        return Files.isRegularFile(picture) ? picture : resources.resolve(ElementSaves.FOLDER).resolve(name + ".png");
     }
 
     private static void add(Map<String, Check> checks, Path resources, ImageTemplate picture, boolean marker,
