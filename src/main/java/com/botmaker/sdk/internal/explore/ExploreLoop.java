@@ -1062,9 +1062,9 @@ public final class ExploreLoop {
         long untried = map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).count()
                 + (readsTrees() ? untriedInputs(screen).size() : 0);
         long unjudged = map.untagged().stream().filter(name -> name.screen().equals(screen)).count();
-        // A way whose condition does not hold now is not tried yet: the screen waits for it to hold.
+        // A way whose condition says no is not tried yet: the screen waits for it to hold. An unknown one is untried.
         long waiting = map.edges().stream().filter(e -> e.from().equals(screen) && !e.onItsOwn()
-                && !tried.contains(key(e)) && !avoided(key(e)) && Conditions.answer(e.when()) != Answer.YES).count();
+                && !tried.contains(key(e)) && !avoided(key(e)) && Conditions.answer(e.when()) == Answer.NO).count();
         long facts = parkedOn(screen, StopKind.MISSING_FACT);
         long conditions = parkedOn(screen, StopKind.MISSING_CONDITION);
         // A low-yield stop is about the screen's yield, not something on it: it holds nothing open.
@@ -1388,7 +1388,8 @@ public final class ExploreLoop {
 
     private boolean untriedEdge(Edge edge) {
         String key = key(edge);
-        return !edge.onItsOwn() && !tried.contains(key) && !avoided(key) && Conditions.answer(edge.when()) == Answer.YES;
+        // An unknown never closes a way: one behind a fact not read yet is pressed, as the screen map asks it.
+        return !edge.onItsOwn() && !tried.contains(key) && !avoided(key) && Conditions.holds(edge.when());
     }
 
     private boolean open(Edge edge) {

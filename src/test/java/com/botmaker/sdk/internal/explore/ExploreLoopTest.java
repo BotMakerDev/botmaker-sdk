@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
@@ -236,6 +237,53 @@ class ExploreLoopTest {
     /** The open stop's id, the last one stopped on. */
     private String openStop() {
         return stops().getLast().stop().id();
+    }
+
+    /** A fact a condition reads: null until the run reads it, when asking it throws and the condition is unknown. */
+    private static final class Gold {
+        Integer read;
+
+        int gold() {
+            if (read == null) throw new IllegalStateException("gold not read yet");
+            return read;
+        }
+    }
+
+    /** {@link #map()} with A's way to B behind {@code gold > 3}. */
+    private static ScreenGraph mapBehind(Gold gold) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free(), click("d").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b")).fromWhen(Condition.of(() -> gold.gold() > 3))));
+        screens.put("D", screen(Setup.named("D").from(ref("A", "d"))));
+        return ScreenGraph.of(screens);
+    }
+
+    /** An unknown never closes a way: one behind a fact never read is pressed, and its screen built. */
+    @Test
+    void aWayBehindAnUnreadFactIsPressed() {
+        Game game = new Game();
+        ScreenGraph map = mapBehind(new Gold());
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(game.taken.contains("A.b→B"), game.taken.toString());
+        assertTrue(events(ExploreEvent.Built.class).stream().anyMatch(b -> b.screen().equals("B")),
+                journal().events().toString());
+    }
+
+    /** A way whose condition says no is not pressed: its screen counts it as waiting. */
+    @Test
+    void aWayWhoseConditionIsNoWaits() {
+        Game game = new Game();
+        Gold gold = new Gold();
+        gold.read = 1;
+        ScreenGraph map = mapBehind(gold);
+        ExploreLoop loop = loop(map, game, same(map), Duration.ofMinutes(12));
+
+        loop.run();
+
+        assertFalse(game.taken.contains("A.b→B"), game.taken.toString());
+        assertTrue(loop.open("A").contains("1 waiting on a condition"), loop.open("A").toString());
     }
 
     @Test
