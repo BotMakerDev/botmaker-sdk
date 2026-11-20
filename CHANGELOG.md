@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Each Keep exploring or Discover run keeps its own explore journal, `explore/<runId>/`, and `explore/runs.json`
+  lists the runs oldest first. A restart on a rebuilt SDK goes on in its run's journal, and a new run takes over
+  the stops the last one parked. Before this, one journal served every run of the bot and grew without end. The
+  `explore` tool's `wait` and `status` take a run id (blank: the latest run), and `status` names the run. The
+  Explore view, the tool and the run companion read only the lines added since their last read. A journal from
+  before this change is not read.
 - What Keep exploring or Discover settled that the bot refused to take is a stop of its own, *Settled, not written*
   (`unwritten`): it says each line left out and why, and what was settled, for Claude to write or fix. It used to be a
   Discover fault in dev mode, held until the SDK was reloaded.

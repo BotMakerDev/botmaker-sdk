@@ -81,7 +81,9 @@ public final class LivePlay implements ExploreLoop.Play {
                                           DiscoverArgs discover, List<TreeAnswer> settled,
                                           Optional<ResumeFile> pending) {
         Plan plan = first.plan();
-        Journal journal = Journal.of(project);
+        // A restart goes on in the journal of the run it restarts; any other run begins its own.
+        Journal journal = pending.flatMap(file -> Journal.latest(project))
+                .orElseGet(() -> Journal.begin(project, System.currentTimeMillis()));
         journal.forgetPage();
         LivePlay play = new LivePlay(ScreenMaps.installed(), plan, plan == null ? null : RunGame.rounds(plan, first.holders()),
                 restart, journal);
@@ -108,7 +110,7 @@ public final class LivePlay implements ExploreLoop.Play {
      * the entry takes its arguments, so a restart started with none takes those it kept.
      */
     public static Optional<ResumeFile> pending(Path project) {
-        return ResumeFile.pending(Journal.of(project), why -> Say.warn(why, Map.of()));
+        return Journal.latest(project).flatMap(journal -> ResumeFile.pending(journal, why -> Say.warn(why, Map.of())));
     }
 
     /** A play of {@code map} with no plan, {@code restart} restarting the game: a test's, on a source it set. */

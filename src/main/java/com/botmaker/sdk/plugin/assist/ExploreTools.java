@@ -56,13 +56,16 @@ final class ExploreTools {
     }
 
     @Describe("block until the run stops, finds a screen or ends; answers the open stop whole, else the oldest parked")
-    record Wait(@Describe(value = "the longest to wait; blank: 600", optional = true) Integer seconds)
+    record Wait(@Describe(value = "the longest to wait; blank: 600", optional = true) Integer seconds,
+                @Describe(value = RUN_ID, optional = true) String run)
             implements Action {
     }
 
-    @Describe("the run's counts, where it is, and its open stop")
-    record Status() implements Action {
+    @Describe("the run's id, counts, where it is, and its open stop")
+    record Status(@Describe(value = RUN_ID, optional = true) String run) implements Action {
     }
+
+    private static final String RUN_ID = "the run's id, as status names it; blank: the latest run";
 
     @Describe("the parked stops, oldest first")
     record Queue() implements Action {
@@ -101,8 +104,21 @@ final class ExploreTools {
     static AgentReply handle(Action action, AgentContext context) {
         Path project = context == null || context.services() == null ? null : context.services().projectDir();
         if (project == null) return AgentReply.refused(Frames.noProject());
-        if (action instanceof ReloadSdk reload) return reloadSdk(Journal.of(project), reload.stop(), context.services());
-        return handle(action, Journal.of(project));
+        String run = switch (action) {
+            case Wait wait -> wait.run();
+            case Status status -> status.run();
+            default -> null;
+        };
+        Optional<Journal> journal = run == null || run.isBlank() ? Journal.latest(project)
+                : Journal.of(project, run.strip());
+        if (journal.isEmpty()) {
+            List<String> runs = Journal.runs(project);
+            return AgentReply.refused(runs.isEmpty() ? noRun() : "No explore run " + run.strip() + ". The runs, "
+                    + "oldest first: " + String.join(", ", runs.subList(Math.max(0, runs.size() - 10), runs.size()))
+                    + ".");
+        }
+        if (action instanceof ReloadSdk reload) return reloadSdk(journal.get(), reload.stop(), context.services());
+        return handle(action, journal.get());
     }
 
     static AgentReply handle(Action action, Journal journal) {
@@ -266,7 +282,7 @@ final class ExploreTools {
         String state = view.ended().map(end -> "Ended (" + end.displayName() + "). ").orElse(
                 view.open().map(s -> (view.held(s) ? "Holds the Discover fault " : "Waits on ") + s.id() + ": "
                         + s.missing() + ". ").orElse("Running. "));
-        return AgentReply.text(state + counts(view));
+        return AgentReply.text("Run " + journal.runId() + ". " + state + counts(view));
     }
 
     static AgentReply queue(Journal journal) {
@@ -463,13 +479,14 @@ final class ExploreTools {
             watch = close(watch);
         }
         long size = -1;
+        JournalView.Reader reader = new JournalView.Reader(journal);
         try {
             while (true) {
-                // The journal is read again only once it grew: a long one is not parsed every second.
+                // The journal is read again only once it grew, and then only its new lines.
                 long now = size(journal);
                 if (now != size) {
                     size = now;
-                    List<ExploreEvent> all = journal.events();
+                    List<ExploreEvent> all = reader.view().all();
                     if (all.subList(Math.min(seen, all.size()), all.size()).stream()
                             .anyMatch(e -> !(e instanceof ExploreEvent.Claude))) return true;
                 }

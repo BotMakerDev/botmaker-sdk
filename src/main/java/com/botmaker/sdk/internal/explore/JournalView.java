@@ -6,6 +6,7 @@ package com.botmaker.sdk.internal.explore;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,7 +34,10 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
 
     /** {@code journal} as it is now. */
     public static JournalView of(Journal journal) {
-        List<ExploreEvent> all = journal.events();
+        return of(journal.events(), journal.queue());
+    }
+
+    private static JournalView of(List<ExploreEvent> all, List<Stop> queue) {
         int began = 0;
         for (int i = all.size() - 1; i >= 0; i--) {
             if (all.get(i) instanceof ExploreEvent.Began) {
@@ -41,7 +45,34 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 break;
             }
         }
-        return new JournalView(all, all.subList(began, all.size()), journal.queue());
+        return new JournalView(all, all.subList(began, all.size()), queue);
+    }
+
+    /**
+     * Reads one journal again and again, each read parsing only the lines appended since the last (2026-11-20: a poll
+     * parsed the whole file each time). One reader's, one thread at a time.
+     */
+    public static final class Reader {
+
+        private final Journal journal;
+        private final List<ExploreEvent> all = new ArrayList<>();
+        private long next;
+
+        public Reader(Journal journal) {
+            this.journal = journal;
+        }
+
+        public Journal journal() {
+            return journal;
+        }
+
+        /** The journal as it is now: the events read before, the new ones after them. */
+        public JournalView view() {
+            Journal.Read read = journal.events(next);
+            all.addAll(read.events());
+            next = read.next();
+            return of(all, journal.queue());
+        }
     }
 
     /** Whether a run ever began on this journal. */

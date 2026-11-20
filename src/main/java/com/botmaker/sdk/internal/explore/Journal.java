@@ -15,12 +15,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -29,7 +35,9 @@ import java.util.UUID;
 
 /**
  * A run's explore journal, the files the run and the SDK plugin (the {@code explore} tool, 🗺 Screens' 🔭 Explore) talk
- * through, in the SDK's state folder of the bot under {@code explore/}: run data, never versioned.
+ * through, in the SDK's state folder of the bot under {@code explore/<runId>/}, one folder a run, which
+ * {@code explore/runs.json} lists oldest first (2026-11-20; one journal of the bot grew without end): run data,
+ * never versioned.
  *
  * <ul>
  *   <li>{@code events.jsonl}: every {@link ExploreEvent}, one line each, appended. A line cut by a killed JVM is
@@ -114,19 +122,72 @@ public final class Journal {
         }
     }
 
+    /** The index of the runs in the {@code explore/} folder, their ids oldest first. */
+    static final String RUNS = "runs.json";
+    private static final DateTimeFormatter RUN_ID = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+            .withZone(ZoneId.systemDefault());
+
     private final Path folder;
 
+    /** The journal kept in {@code folder}: one run's. */
     public Journal(Path folder) {
         this.folder = folder;
     }
 
-    /** The journal of the bot in {@code project}. */
-    public static Journal of(Path project) {
-        return new Journal(PluginState.folder(project, DoneRecords.GROUP, DoneRecords.ARTIFACT).resolve(FOLDER));
+    /**
+     * Begins the journal of a new run of the bot in {@code project} (2026-11-20): its own folder {@code explore/<id>/},
+     * its id added to the index, the latest run's parked stops carried into it, since what a run left for later is the
+     * bot's, not the run's. A run restarted from its {@link ResumeFile} goes on in its own journal ({@link #latest}).
+     */
+    public static synchronized Journal begin(Path project, long nowMs) {
+        Path root = root(project);
+        Optional<Journal> before = latest(project);
+        List<String> runs = new ArrayList<>(runs(project));
+        String base = RUN_ID.format(Instant.ofEpochMilli(nowMs));
+        String id = base;
+        for (int n = 2; runs.contains(id) || Files.exists(root.resolve(id)); n++) id = base + "-" + n;
+        Journal journal = new Journal(root.resolve(id));
+        before.map(Journal::queue).filter(q -> !q.isEmpty()).ifPresent(journal::queue);
+        runs.add(id);
+        new Journal(root).write(RUNS, () -> JSON.writeValueAsString(runs));
+        return journal;
+    }
+
+    /** The journal of the latest run of the bot in {@code project}; empty before any. */
+    public static Optional<Journal> latest(Path project) {
+        List<String> runs = runs(project);
+        return runs.isEmpty() ? Optional.empty() : Optional.of(new Journal(root(project).resolve(runs.getLast())));
+    }
+
+    /** The journal of the run {@code runId} of the bot in {@code project}; empty when the index has none of that id. */
+    public static Optional<Journal> of(Path project, String runId) {
+        return runs(project).contains(runId) ? Optional.of(new Journal(root(project).resolve(runId))) : Optional.empty();
+    }
+
+    /** The ids of the runs of the bot in {@code project}, oldest first; none when the index is missing or unread. */
+    public static List<String> runs(Path project) {
+        try {
+            Path index = root(project).resolve(RUNS);
+            if (!Files.exists(index)) return List.of();
+            List<String> runs = JSON.readValue(index.toFile(), new TypeReference<List<String>>() {});
+            return runs == null ? List.of() : runs.stream().filter(id -> id != null && !id.isBlank()
+                    && !id.contains("/") && !id.contains("\\") && !id.contains("..")).toList();
+        } catch (IOException | RuntimeException unread) {
+            return List.of();
+        }
+    }
+
+    private static Path root(Path project) {
+        return PluginState.folder(project, DoneRecords.GROUP, DoneRecords.ARTIFACT).resolve(FOLDER);
     }
 
     public Path folder() {
         return folder;
+    }
+
+    /** The run's id: its folder's name. */
+    public String runId() {
+        return folder.getFileName().toString();
     }
 
     /** Appends {@code event} as one line. */
@@ -135,26 +196,81 @@ public final class Journal {
             ObjectNode line = JSON.createObjectNode().put("type", event.type());
             line.setAll((ObjectNode) JSON.valueToTree(event));
             Files.createDirectories(folder);
-            Files.writeString(folder.resolve(EVENTS), JSON.writeValueAsString(line) + "\n", StandardCharsets.UTF_8,
+            Path file = folder.resolve(EVENTS);
+            // A last line a killed run cut is ended first, so this one is not glued to it and lost with it.
+            String cut = endsCut(file) ? "\n" : "";
+            Files.writeString(file, cut + JSON.writeValueAsString(line) + "\n", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException | RuntimeException unwritten) {
             // the run goes on: its run log says the same
         }
     }
 
+    /** Whether {@code file} ends inside a line: its last byte is no line's end. */
+    private static boolean endsCut(Path file) {
+        try (SeekableByteChannel channel = Files.newByteChannel(file)) {
+            long size = channel.size();
+            if (size == 0) return false;
+            ByteBuffer last = ByteBuffer.allocate(1);
+            channel.position(size - 1);
+            channel.read(last);
+            return last.get(0) != '\n';
+        } catch (IOException | RuntimeException none) {
+            return false;
+        }
+    }
+
     /** Every event read back, oldest first; a line that does not read (cut, or of a newer SDK) is left out. */
     public List<ExploreEvent> events() {
         List<ExploreEvent> events = new ArrayList<>();
-        for (String line : lines(folder.resolve(EVENTS))) {
-            try {
-                JsonNode node = JSON.readTree(line);
-                Class<? extends ExploreEvent> type = node == null ? null : ExploreEvent.typed(node.path("type").asText());
-                if (type != null) events.add(JSON.treeToValue(node, type));
-            } catch (JsonProcessingException | RuntimeException unread) {
-                // a cut last line, or one this SDK cannot read
-            }
-        }
+        for (String line : lines(folder.resolve(EVENTS))) event(line).ifPresent(events::add);
+        // A last line with no end yet is read here too: the run that wrote it was killed, or writes it now.
         return events;
+    }
+
+    /** The events written from byte {@code from} of {@link #EVENTS} on, and where the next read starts. */
+    public record Read(List<ExploreEvent> events, long next) {
+        public Read {
+            events = List.copyOf(events);
+        }
+    }
+
+    /**
+     * The events appended since byte {@code from}: only whole lines, so a line still being written is read by the
+     * next call, which starts at {@link Read#next}. Nothing new, or a file that does not read, reads none from
+     * {@code from}.
+     */
+    public Read events(long from) {
+        Path file = folder.resolve(EVENTS);
+        try (SeekableByteChannel channel = Files.newByteChannel(file)) {
+            long size = channel.size();
+            if (size <= from) return new Read(List.of(), from);
+            ByteBuffer bytes = ByteBuffer.allocate(Math.toIntExact(size - from));
+            channel.position(from);
+            while (bytes.hasRemaining() && channel.read(bytes) >= 0) {
+                // read to the size it had
+            }
+            byte[] read = Arrays.copyOf(bytes.array(), bytes.position());
+            int end = read.length;
+            while (end > 0 && read[end - 1] != '\n') end--;
+            List<ExploreEvent> events = new ArrayList<>();
+            new String(read, 0, end, StandardCharsets.UTF_8).lines().filter(line -> !line.isBlank())
+                    .forEach(line -> event(line).ifPresent(events::add));
+            return new Read(events, from + end);
+        } catch (IOException | RuntimeException unread) {
+            return new Read(List.of(), from);
+        }
+    }
+
+    private static Optional<ExploreEvent> event(String line) {
+        try {
+            JsonNode node = JSON.readTree(line);
+            Class<? extends ExploreEvent> type = node == null ? null : ExploreEvent.typed(node.path("type").asText());
+            return type == null ? Optional.empty() : Optional.ofNullable(JSON.treeToValue(node, type));
+        } catch (JsonProcessingException | RuntimeException unread) {
+            // a cut last line, or one this SDK cannot read
+            return Optional.empty();
+        }
     }
 
     /** The parked stops, oldest first; none when the file is missing or does not read. */

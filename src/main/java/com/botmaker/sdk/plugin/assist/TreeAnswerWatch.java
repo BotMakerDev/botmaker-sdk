@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Writes what <em>Keep exploring</em> or <em>Discover</em> settled off a screen's tree ({@link ExploreEvent.Settled})
@@ -56,12 +57,18 @@ public final class TreeAnswerWatch implements RunCompanion {
         StudioServices services = run.services();
         Path project = services == null ? null : services.projectDir();
         if (project == null || thread != null) return;
-        Journal journal = Journal.of(project);
-        thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(journal, (id, answers) -> {
-            TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
-            if (written.failed().isEmpty()) shots(services, journal, id, answers);
-            return written;
-        }, pictured -> TreeAnswers.pictured(services, pictured)));
+        // The latest run's journal, read again each round: the run begins its own once its process is up.
+        thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(() -> Journal.latest(project),
+                (journal, id, answers) -> {
+                    TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
+                    if (written.failed().isEmpty()) shots(services, journal, id, answers);
+                    return written;
+                }, pictured -> TreeAnswers.pictured(services, pictured)));
+    }
+
+    /** Writes what the run settled at a stop of {@code journal}'s run. */
+    private interface Writer {
+        TreeAnswers.Written write(Journal journal, String id, List<TreeAnswer> answers);
     }
 
     /** Stops watching. */
@@ -97,16 +104,26 @@ public final class TreeAnswerWatch implements RunCompanion {
         }
     }
 
-    private static void watch(Journal journal, BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write,
+    private static void watch(Supplier<Optional<Journal>> latest, Writer write,
                               Consumer<ExploreEvent.Pictured> picture) {
         Set<String> done = new HashSet<>();
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
         String failedLast = null;
+        JournalView.Reader reader = null;
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
-                    round(journal, done, write);
-                    pictures(journal, pictured, picture);
+                    Optional<Journal> journal = latest.get();
+                    if (journal.isPresent()) {
+                        // Read on from where the last round left off, unless a newer run began its own journal.
+                        if (reader == null || !reader.journal().folder().equals(journal.get().folder())) {
+                            reader = new JournalView.Reader(journal.get());
+                        }
+                        JournalView view = reader.view();
+                        Journal now = reader.journal();
+                        round(now, view, done, (id, answers) -> write.write(now, id, answers));
+                        pictures(view, pictured, picture);
+                    }
                     failedLast = null;
                 } catch (RuntimeException failed) {
                     // Said once, then tried again each round: one bad read or slow write stops nothing for good.
@@ -124,7 +141,12 @@ public final class TreeAnswerWatch implements RunCompanion {
 
     /** The latest run's pictures not yet in {@code done}, each given to {@code picture} once. */
     static void pictures(Journal journal, Set<ExploreEvent.Pictured> done, Consumer<ExploreEvent.Pictured> picture) {
-        for (ExploreEvent event : JournalView.of(journal).events()) {
+        pictures(JournalView.of(journal), done, picture);
+    }
+
+    private static void pictures(JournalView view, Set<ExploreEvent.Pictured> done,
+                                 Consumer<ExploreEvent.Pictured> picture) {
+        for (ExploreEvent event : view.events()) {
             if (event instanceof ExploreEvent.Pictured pictured && done.add(pictured)) picture.accept(pictured);
         }
     }
@@ -136,8 +158,12 @@ public final class TreeAnswerWatch implements RunCompanion {
      */
     static void round(Journal journal, Set<String> done,
                       BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
+        round(journal, JournalView.of(journal), done, write);
+    }
+
+    private static void round(Journal journal, JournalView view, Set<String> done,
+                              BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
         if (journal.commandWaiting()) return;
-        JournalView view = JournalView.of(journal);
         if (!view.running()) return;
         List<Stop> waiting = new ArrayList<>();
         view.open().ifPresent(waiting::add);

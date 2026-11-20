@@ -68,8 +68,8 @@ import java.util.function.Supplier;
  * game's frame with its readouts' areas drawn as the live board draws them, the screen's name and the facts it reads;
  * on the right the feed, newest first, with the stop the run waits on pinned above it and the last tool Claude called.
  *
- * <p>The journal ({@link Journal}, {@code events.jsonl}) and, while a run goes, a frame of the game are read once a
- * second off the FX thread, only while the view is shown. <b>Start</b> starts <em>Keep exploring</em> (its menu:
+ * <p>The latest run's journal ({@link Journal}, {@code events.jsonl}) and, while a run goes, a frame of the game are
+ * read once a second off the FX thread, only while the view is shown; the journal only its lines added since. <b>Start</b> starts <em>Keep exploring</em> (its menu:
  * <em>Explore map</em>) through {@link com.botmaker.plugin.api.Runs#start(RunEntry)}, while no run goes; <b>Stop</b>
  * ends the run going.
  */
@@ -81,8 +81,10 @@ final class ExploreView {
 
     private final StudioServices services;
     private final Supplier<ScreenGraph> graph;
-    /** Null while no project is open: nothing is read. */
-    private final Journal journal;
+    /** The latest run's journal, asked again each read; null while no project is open: nothing is read. */
+    private final Supplier<Optional<Journal>> journals;
+    /** Reads the latest run's journal on from where it left off; the reading thread's, one read at a time. */
+    private JournalView.Reader reader;
     private final LongSupplier nowMs;
 
     private final BorderPane root = new BorderPane();
@@ -120,10 +122,11 @@ final class ExploreView {
     /** A read of the journal and the stamp of its files it was made at, kept together. */
     private record Read(String stamp, JournalView view) {}
 
-    ExploreView(StudioServices services, Supplier<ScreenGraph> graph, Journal journal, LongSupplier nowMs) {
+    ExploreView(StudioServices services, Supplier<ScreenGraph> graph, Supplier<Optional<Journal>> journals,
+                LongSupplier nowMs) {
         this.services = services;
         this.graph = graph;
-        this.journal = journal;
+        this.journals = journals;
         this.nowMs = nowMs;
         root.getStylesheets().add(ScreenCanvas.SHEET);
         root.getStyleClass().add("explore-view");
@@ -200,8 +203,9 @@ final class ExploreView {
 
     /** The view of the bot open in {@code services}; {@code onClosed} is handed what ends it when the window closes. */
     static Node view(StudioServices services, Supplier<ScreenGraph> graph, Consumer<Runnable> onClosed) {
-        Journal journal = services.projectDir() == null ? null : Journal.of(services.projectDir());
-        ExploreView view = new ExploreView(services, graph, journal, System::currentTimeMillis);
+        Path project = services.projectDir();
+        Supplier<Optional<Journal>> journals = project == null ? null : () -> Journal.latest(project);
+        ExploreView view = new ExploreView(services, graph, journals, System::currentTimeMillis);
         onClosed.accept(view::close);
         return view.node();
     }
@@ -232,7 +236,7 @@ final class ExploreView {
 
     private void buttons() {
         boolean running = services.runs().isRunning();
-        start.setDisable(running || journal == null);
+        start.setDisable(running || journals == null);
         // Only an explore run's: the bot's own run is stopped where it was started.
         stop.setDisable(!live(last));
     }
@@ -253,17 +257,28 @@ final class ExploreView {
     /** Reads the journal, and a frame while an explore run goes, off the FX thread; one read at a time. */
     private void tick() {
         buttons();
-        if (journal == null || closed || !reading.compareAndSet(false, true)) return;
+        if (journals == null || closed || !reading.compareAndSet(false, true)) return;
         ScreenGraph map = graph.get();
         boolean running = live(last);
         PanelContext context = running ? context() : null;
         if (context == null) forgetFrame();
         Thread.ofVirtual().name("explore-view").start(() -> {
             try {
-                // A run of hours writes thousands of lines: parsed again only when the files changed.
-                String stamp = stamp(journal);
+                Journal journal = journals.get().orElse(null);
+                if (journal == null) return;
+                // A run of hours writes thousands of lines: read again only when the files changed, and then only
+                // the lines added since; a newer run's journal is read from its start.
+                String stamp = journal.folder() + " " + stamp(journal);
                 Read before = lastRead;
-                JournalView read = stamp.equals(before.stamp()) ? before.view() : JournalView.of(journal);
+                JournalView read;
+                if (stamp.equals(before.stamp())) {
+                    read = before.view();
+                } else {
+                    if (reader == null || !reader.journal().folder().equals(journal.folder())) {
+                        reader = new JournalView.Reader(journal);
+                    }
+                    read = reader.view();
+                }
                 lastRead = new Read(stamp, read);
                 Seen seen = !running ? null : page(journal, read)
                         .orElseGet(() -> context == null ? null : look(context, map));

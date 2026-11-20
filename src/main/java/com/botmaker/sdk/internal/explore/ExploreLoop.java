@@ -417,9 +417,21 @@ public final class ExploreLoop {
         this.settings = settings;
         this.nowMs = nowMs;
         this.dev = play.dev();
-        // A queue a run before left is avoided too; stop numbers go on from the journal's.
+        // A queue a run before left is avoided too; stop numbers go on past the journal's and the queue's, so a stop
+        // this run raises never takes the id of one a run before parked.
         for (Stop stop : journal.queue()) parked.put(key(stop), stop);
-        stops = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
+        int raised = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
+        stops = Math.max(raised, journal.queue().stream().mapToInt(s -> number(s.id())).max().orElse(0));
+    }
+
+    /** The number a stop's id ends with ({@code tap-12}: 12); 0 for one that ends with none. */
+    static int number(String id) {
+        int dash = id == null ? -1 : id.lastIndexOf('-');
+        try {
+            return dash < 0 ? 0 : Integer.parseInt(id.substring(dash + 1));
+        } catch (NumberFormatException none) {
+            return 0;
+        }
     }
 
     /**

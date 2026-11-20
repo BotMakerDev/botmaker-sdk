@@ -6,8 +6,10 @@ package com.botmaker.sdk.internal.explore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +32,27 @@ class JournalTest {
                 journal.takeCommand());
         assertFalse(journal.commandWaiting());
         assertEquals(Optional.empty(), journal.takeCommand(), "each taken once");
+    }
+
+    @Test
+    void eachRunWritesItsOwnFolder(@TempDir Path project) {
+        Journal first = Journal.begin(project, 1_000);
+        first.append(new ExploreEvent.Began(false, 1_000));
+        Stop parked = new Stop("tap-7", StopKind.MISSING_CONDITION, "Home", "", "", List.of(), List.of(), Map.of(),
+                List.of(), "no condition", 1_000);
+        first.queue(List.of(parked));
+        Journal second = Journal.begin(project, 1_000);
+        second.append(new ExploreEvent.Began(false, 2_000));
+
+        assertEquals(List.of(first.runId(), second.runId()), Journal.runs(project), "the index lists both, oldest first");
+        assertFalse(first.folder().equals(second.folder()), "one folder a run, even begun in the same second");
+        assertTrue(Files.exists(first.folder().resolve(Journal.EVENTS)));
+        assertTrue(Files.exists(second.folder().resolve(Journal.EVENTS)));
+        assertEquals(1, first.events().size(), "a run's events are its own");
+        assertEquals(List.of(parked), second.queue(), "what a run parked is carried into the next");
+        assertEquals(Optional.of(second.folder()), Journal.latest(project).map(Journal::folder));
+        assertEquals(Optional.of(first.folder()), Journal.of(project, first.runId()).map(Journal::folder));
+        assertEquals(Optional.empty(), Journal.of(project, "../elsewhere"));
     }
 
     @Test

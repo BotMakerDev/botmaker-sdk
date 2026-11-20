@@ -162,7 +162,7 @@ class DiscoverSlowTest {
             throws InterruptedException {
         AtomicReference<ScreenGraph> graph = new AtomicReference<>(ScreenGraph.of(Map.of()));
         Map<String, Element> elements = new LinkedHashMap<>();
-        Journal journal = Journal.of(project);
+        Journal journal = Journal.begin(project, System.currentTimeMillis());
         LivePlay play = LivePlay.over(graph.get(), restart);
         AtomicInteger generation = new AtomicInteger();
         ExploreLoop.Reload reload = () -> {

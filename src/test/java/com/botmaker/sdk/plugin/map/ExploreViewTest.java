@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Consumer;
 
@@ -72,7 +73,7 @@ class ExploreViewTest extends ApplicationTest {
     void build() {
         journal = new Journal(folder.resolve("explore"));
         interact(() -> {
-            view = new ExploreView(services(), () -> ScreenGraph.of(Map.of()), journal, () -> 10_000);
+            view = new ExploreView(services(), () -> ScreenGraph.of(Map.of()), () -> Optional.of(journal), () -> 10_000);
             stage.setScene(new Scene((Region) view.node(), 900, 600));
             stage.show();
         });
