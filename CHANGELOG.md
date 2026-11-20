@@ -155,6 +155,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- 🗺 Screens' 🖼 Pictures is 🧩 Elements: all the bot finds things by. Chips show its pictures (the picture manager as
+  it was), its tree elements (the `Elements` class, each with its shot, what finds it and the screens whose inputs
+  press it, filtered by a search), or both. A website bot, whose screens are told by their tree, no longer sees an
+  empty tab.
 - Discover on a website takes a control nested in another of its name as one input: a menu's button holding its link
   (nunu.ai's nav) was two elements, two boxes on the card and two presses for one page. The link is kept, else the
   inner one.

@@ -18,7 +18,6 @@ import com.botmaker.sdk.plugin.assist.ScreenShots;
 import com.botmaker.sdk.plugin.map.ScreenCards.Card;
 import com.botmaker.sdk.plugin.map.ScreenCards.Link;
 import com.botmaker.sdk.plugin.pictures.FrameViews;
-import com.botmaker.sdk.plugin.pictures.ResourceManagerDialog;
 import com.botmaker.sdk.plugin.pictures.ScreenMapRead;
 import com.botmaker.sdk.plugin.plan.GoalsView;
 import com.botmaker.sdk.internal.observe.RunEvent;
@@ -503,7 +502,7 @@ public final class ScreenMap {
         return switch (view) {
             case MAP -> root;
             case GOALS -> GoalsView.view(services, this::openScreen, closing -> subscriptions.add(closing::run));
-            case PICTURES -> ResourceManagerDialog.view(services, () -> window);
+            case ELEMENTS -> ElementsView.view(services, () -> graph, () -> window);
             case EXPLORE -> ExploreView.view(services, () -> graph, closing -> subscriptions.add(closing::run));
             case UNKNOWN -> UnknownPagesView.view(services);
         };

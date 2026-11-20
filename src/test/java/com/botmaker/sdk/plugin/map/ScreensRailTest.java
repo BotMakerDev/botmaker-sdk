@@ -75,7 +75,7 @@ class ScreensRailTest extends ApplicationTest {
         assertEquals(View.MAP, map.viewShown());
         assertSame(map.node(), window.getCenter());
         List<ToggleButton> buttons = railButtons();
-        assertEquals(List.of("Map", "Goals", "Explore", "Pictures", "Unknown"),
+        assertEquals(List.of("Map", "Goals", "Explore", "Elements", "Unknown"),
                 buttons.stream().map(b -> b.getText().split("\n")[1]).toList());
         assertTrue(buttons.stream().allMatch(b -> b.isVisible() && b.isManaged()), "every view offered");
 

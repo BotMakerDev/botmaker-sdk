@@ -27,7 +27,8 @@ final class ScreensRail {
         MAP("🗺", "Map", "The game's screens as a graph, and a tab per screen opened"),
         GOALS("🎯", "Goals", "The goals of a plan and the actions serving each, in the order a run would try them"),
         EXPLORE("🔭", "Explore", "A run that explores the game, and what it found"),
-        PICTURES("🖼", "Pictures", "Rename, retag, replace, delete, import and export the pictures the bot looks for"),
+        ELEMENTS("🧩", "Elements", "What the bot finds things by: its pictures, to rename, retag, replace, delete, import"
+                + " and export, and its tree elements, found in a page's or an app's tree"),
         UNKNOWN("❔", "Unknown", "The pages recent runs met that no screen matched, masked, to map from");
 
         private final String icon;

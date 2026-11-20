@@ -100,7 +100,7 @@ public final class SdkValues implements ValueHolder {
     public static final ManagedOpenSet.OfConstants<ImageTemplate> PICTURES = ManagedValue.openSet(SdkValue.Id.PICTURES)
             .of(ImageTemplate.class)
             .in(SdkValue.Holder.PICTURES)
-            .because("Picture constants are managed in 🗺 Screens ▸ 🖼 Pictures, which renames the picture and every"
+            .because("Picture constants are managed in 🗺 Screens ▸ 🧩 Elements, which renames the picture and every"
                     + " use of it together.");
 
     /**
@@ -112,7 +112,7 @@ public final class SdkValues implements ValueHolder {
             .of(PictureTag.class)
             .referredToAs(BotConstants::tag)
             .in(SdkValue.Holder.TAGS)
-            .because("Tags.java holds the groups 🗺 Screens ▸ 🖼 Pictures files pictures under. Add, rename or delete one"
+            .because("Tags.java holds the groups 🗺 Screens ▸ 🧩 Elements files pictures under. Add, rename or delete one"
                     + " there, which changes every picture it holds together.");
 
     /**

@@ -232,6 +232,11 @@ public final class ElementSaves {
         return String.join("\n", said);
     }
 
+    /** The bot's {@code Elements} by constant name, in the class's order; read on the FX thread. */
+    public static Map<String, Element> elements(PluginValues values) {
+        return values == null ? Map.of() : held(values).elements();
+    }
+
     /** The bot's {@code Elements} by name and its {@code Texts} by their text, read on the FX thread. */
     private record Held(Map<String, Element> elements, Map<String, Words> texts) {}
 
