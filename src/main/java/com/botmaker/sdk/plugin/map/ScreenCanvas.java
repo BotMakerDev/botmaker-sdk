@@ -18,6 +18,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
+import com.botmaker.sdk.plugin.assist.ElementSaves;
 import com.botmaker.sdk.plugin.assist.MapAudit.Audit;
 import com.botmaker.sdk.plugin.assist.MapAudit.Spot;
 import com.botmaker.sdk.plugin.assist.MapAudit.Where;
@@ -656,7 +657,7 @@ final class ScreenCanvas {
 
     private Image image(String id, int count) {
         if (resources == null) return null;
-        Path file = TemplateLibrary.fileForName(resources, id);
+        Path file = pictureFile(id);
         long time = modified(file);
         // Kept for a picture not there yet too: cut later, it is drawn then.
         drawnTimes.put(PICTURE_KEY + id, time);
@@ -664,6 +665,17 @@ final class ScreenCanvas {
         // Keyed by the file's time: a picture recut by the assistant's crop_pictures reads afresh, not from the cache.
         return thumbs.computeIfAbsent(id + "@" + time + "#" + count, key -> FrameViews.load(file, 96, 96, count,
                 !loadNow));
+    }
+
+    /**
+     * The file of the picture {@code id}: a picture the bot matches, else the shot of an element of that name, which a
+     * button of an element ({@code Button.of(Elements.CLOSE)}) shows.
+     */
+    private Path pictureFile(String id) {
+        Path picture = TemplateLibrary.fileForName(resources, id);
+        if (Files.exists(picture)) return picture;
+        Path shot = resources.resolve(ElementSaves.FOLDER).resolve(id + ".png");
+        return Files.exists(shot) ? shot : picture;
     }
 
     /** Draws the cards again with their pictures read afresh, after a recut here. */
@@ -675,14 +687,14 @@ final class ScreenCanvas {
     /** The picture {@code id}'s size as cut, one frame of a moving one, in the game's pixels; empty when not cut. */
     Size pictureSize(String id) {
         if (resources == null) return new Size();
-        Size file = ScreenShots.size(TemplateLibrary.fileForName(resources, id));
+        Size file = ScreenShots.size(pictureFile(id));
         int count = frames.applyAsInt(id);
         return count > 1 && file.width() % count == 0 ? new Size(file.width() / count, file.height()) : file;
     }
 
     /** When the picture {@code id} was written, 0 for none: a recut changes it. */
     long pictureTime(String id) {
-        return resources == null ? 0 : modified(TemplateLibrary.fileForName(resources, id));
+        return resources == null ? 0 : modified(pictureFile(id));
     }
 
     /** When {@code constant}'s shot was written, 0 for none: a retake changes it, and so does another look picked. */
@@ -985,7 +997,7 @@ final class ScreenCanvas {
         Map<String, Long> times = Map.copyOf(drawnTimes);
         return () -> constants.stream().anyMatch(c -> shotTime(c) != times.getOrDefault(SHOT_KEY + c, 0L))
                 || times.entrySet().stream().filter(e -> e.getKey().startsWith(PICTURE_KEY)).anyMatch(e ->
-                modified(TemplateLibrary.fileForName(resources, e.getKey().substring(PICTURE_KEY.length())))
+                modified(pictureFile(e.getKey().substring(PICTURE_KEY.length())))
                         != e.getValue());
     }
 

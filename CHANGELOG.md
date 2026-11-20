@@ -155,6 +155,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Discover on a website takes a control nested in another of its name as one input: a menu's button holding its link
+  (nunu.ai's nav) was two elements, two boxes on the card and two presses for one page. The link is kept, else the
+  inner one.
+- A press that closes a dialog and leaves the page under it is a way back to that page's screen (`Effect.Closes`),
+  no longer a change noted on the input: a dialog's Close now leads somewhere on the map.
+- An input made of an element (`Button.of(Elements.CLOSE)`) shows the element's shot, `elements/close.png`, on the
+  map's cards and side panel instead of an empty thumb.
 - Keep exploring on a website walks back to a screen whose only work left is an input it presses itself (a button
   that opens a dialog). It counted only ways not yet tried, so with none left it idled until it stopped as stuck.
 - Keep exploring on a website loads the page again after a press that left a list or menu open on it (a select's

@@ -47,6 +47,20 @@ class TreeAnswerTest {
     }
 
     @Test
+    void aMenuButtonHoldingItsLinkIsOneInputTheLink() {
+        UiTree page = page(
+                web("navigation", "", Set.of(),
+                        web("button", "Pricing", PRESSABLE, web("link", "Pricing", PRESSABLE)),
+                        web("link", "Company", PRESSABLE, web("button", "company", PRESSABLE)),
+                        web("button", "Menu", PRESSABLE, web("button", "Menu", PRESSABLE)),
+                        web("button", "Help", PRESSABLE, web("link", "Docs", PRESSABLE))));
+
+        assertEquals(List.of("link \"Pricing\"", "link \"Company\"", "button \"Menu\" [1]", "button \"Help\"",
+                        "link \"Docs\""),
+                Locator.inputs(page).stream().map(l -> l.locator().line()).toList());
+    }
+
+    @Test
     void siblingPagesOfOneTemplateAreOneRouteWithThreeExamples() {
         List<String> skeleton = List.of("banner", "main", "heading", "contentinfo");
         List<RouteGuess.Page> pages = List.of(
@@ -110,9 +124,11 @@ class TreeAnswerTest {
         assertEquals(new Effect.Changes(List.of("checkbox \"News\" checkable checked clickable enabled")),
                 Effect.judge(before, Effect.State.of(checked, "/"), List.of()));
         assertEquals(new Effect.Nothing(), Effect.judge(before, Effect.State.of(home, "/#top"), List.of()));
+        // A dialog closed leaves the page under it: a way back, as its Close button is.
         Effect closed = Effect.judge(Effect.State.of(dialog, "/"), before, List.of());
-        assertInstanceOf(Effect.Changes.class, closed);
-        assertTrue(((Effect.Changes) closed).parts().contains("closes dialog \"Talk to us\""));
+        assertInstanceOf(Effect.Closes.class, closed);
+        assertTrue(closed.way());
+        assertEquals("Closes dialog \"Talk to us\"", closed.line());
     }
 
     @Test

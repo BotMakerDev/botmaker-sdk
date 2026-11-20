@@ -28,6 +28,9 @@ public sealed interface Effect {
     /** The press opened {@code overlay} over the same page. */
     record Opens(Overlay overlay) implements Effect {}
 
+    /** The press closed {@code overlay}, leaving the page under it: a way back to that page's screen. */
+    record Closes(Overlay overlay) implements Effect {}
+
     /** The press changed {@code parts} of the page, each a line saying the part and what it is now. */
     record Changes(List<String> parts) implements Effect {
         public Changes {
@@ -52,7 +55,7 @@ public sealed interface Effect {
 
     /** Whether the bot writes this effect as a way to a screen; a note on the input otherwise. */
     default boolean way() {
-        return this instanceof Navigates || this instanceof Opens;
+        return this instanceof Navigates || this instanceof Opens || this instanceof Closes;
     }
 
     /** One line for a note or a report: {@code Leaves the site for https://x.com}. */
@@ -60,6 +63,7 @@ public sealed interface Effect {
         return switch (this) {
             case Navigates(String path) -> "Goes to " + path;
             case Opens(Overlay overlay) -> "Opens " + overlay.line();
+            case Closes(Overlay overlay) -> "Closes " + overlay.line();
             case Changes(List<String> parts) -> "Changes " + String.join("; ", parts);
             case ShowsError(String text) -> "Shows the error \"" + text + "\"";
             case Nothing() -> "Does nothing a visitor sees";
@@ -110,6 +114,7 @@ public sealed interface Effect {
         Overlay was = Overlay.of(before.tree());
         Overlay now = Overlay.of(after.tree());
         if (!now.none() && !now.equals(was)) return new Opens(now);
+        if (!was.none() && now.none()) return new Closes(was);
         for (Guard.Stopped stop : stops) {
             if (stop.kind() == Guard.Kind.WRITE) {
                 return new Fails("blocked write: " + (stop.method().isEmpty() ? "" : stop.method() + " ") + stop.url());

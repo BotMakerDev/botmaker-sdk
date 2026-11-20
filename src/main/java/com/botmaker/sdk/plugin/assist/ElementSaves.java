@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
 public final class ElementSaves {
 
     /** Where the shots go, under the bot's resources: {@code elements/battery.png}. */
-    static final String FOLDER = "elements";
+    public static final String FOLDER = "elements";
 
     private static final ManagedSet<Element> ELEMENTS = ManagedSet.of(SdkValues.ELEMENTS);
     private static final ManagedSet<Words> TEXTS = ManagedSet.of(SdkValues.TEXTS);

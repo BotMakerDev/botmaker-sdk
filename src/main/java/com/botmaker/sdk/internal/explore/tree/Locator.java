@@ -72,7 +72,7 @@ public record Locator(Role role, String name, String id, String text, Integer in
         Set<Locator> seen = new HashSet<>();
         List<Located> found = new ArrayList<>();
         for (UiNode node : matcher.nodes()) {
-            if (!acted(node)) continue;
+            if (!acted(node) || folded(node, matcher)) continue;
             Optional<Locator> locator = of(node, matcher);
             if (locator.isPresent() && seen.add(locator.get())) found.add(new Located(locator.get(), node));
         }
@@ -85,6 +85,38 @@ public record Locator(Role role, String name, String id, String text, Integer in
      */
     public static Optional<Locator> of(UiNode node, ElementMatch.Matcher matcher) {
         return bare(node).flatMap(bare -> placed(bare, node, matcher));
+    }
+
+    /**
+     * Whether {@code node} is one control with another of its name, nested in or around it: a menu's button that
+     * holds its link is pressed once, not twice for the same page. The link is kept, it says where it goes;
+     * otherwise the inner one.
+     */
+    static boolean folded(UiNode node, ElementMatch.Matcher matcher) {
+        String name = node.label().strip();
+        if (name.isEmpty()) return false;
+        for (UiNode up = matcher.parentOf(node); up != null; up = matcher.parentOf(up)) {
+            if (acted(up) && up.label().strip().equalsIgnoreCase(name)) {
+                // An inner link under an outer non-link is kept, its holder folded; any other pair keeps the inner.
+                return link(up) && !link(node);
+            }
+        }
+        return twin(node.children(), name, link(node));
+    }
+
+    /** Whether a control named {@code name} below {@code nodes} folds {@code outer}, a link or not. */
+    private static boolean twin(List<UiNode> nodes, String name, boolean outerLink) {
+        for (UiNode child : nodes) {
+            if (acted(child) && child.label().strip().equalsIgnoreCase(name) && (link(child) || !outerLink)) {
+                return true;
+            }
+            if (twin(child.children(), name, outerLink)) return true;
+        }
+        return false;
+    }
+
+    private static boolean link(UiNode node) {
+        return WebTree.roleOf(node.className()).map(r -> Role.fromId(r.id()) == Role.LINK).orElse(false);
     }
 
     /** Whether a person acts on {@code node}: a website's control, or an app's node it taps or types into. */
