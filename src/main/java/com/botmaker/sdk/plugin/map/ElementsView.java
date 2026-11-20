@@ -34,6 +34,7 @@ import javafx.stage.Window;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -252,16 +253,29 @@ final class ElementsView {
 
     /**
      * The shot's file under {@code resources}, or null: a shot written as an absolute path, or one that leads out of the
-     * folder or through a link (a bot cloned from someone else names its own), is never touched.
+     * folder, through a linked folder or to a link (a bot cloned from someone else names its own), is never touched.
+     * The folder holding it is compared by its real path, so a link anywhere on the way is caught.
      */
     static Path shotFile(Path resources, String shot) {
         if (resources == null || shot == null || shot.isBlank()) return null;
-        Path relative = Path.of(shot);
+        Path relative;
+        try {
+            relative = Path.of(shot);
+        } catch (InvalidPathException e) {
+            return null;
+        }
         if (relative.isAbsolute()) return null;
         Path base = resources.toAbsolutePath().normalize();
         Path file = base.resolve(relative).normalize();
         if (!file.startsWith(base) || file.equals(base) || Files.isSymbolicLink(file)) return null;
-        return file;
+        try {
+            Path realBase = base.toRealPath();
+            Path realFolder = file.getParent().toRealPath();
+            return realFolder.startsWith(realBase) ? realFolder.resolve(file.getFileName()) : null;
+        } catch (IOException e) {
+            // The folder is not there: nothing to delete.
+            return null;
+        }
     }
 
     private static Node row(StudioServices services, Row row, Path resources, Runnable reread) {

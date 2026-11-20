@@ -12,7 +12,10 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,12 +28,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ElementsViewTest {
 
-    /** A shot Delete may remove lies inside the resources: never an absolute path, never one that climbs out. */
+    /**
+     * A shot Delete may remove lies inside the resources: never an absolute path, one that climbs out, or one through
+     * a linked folder or to a link.
+     */
     @Test
-    void aShotOutsideTheResourcesIsNeverTouched() {
-        Path resources = Path.of("/project/src/main/resources");
+    void aShotOutsideTheResourcesIsNeverTouched(@TempDir Path dir) throws IOException {
+        Path resources = Files.createDirectories(dir.resolve("resources"));
+        Files.createDirectories(resources.resolve("elements"));
+        Path outside = Files.createDirectories(dir.resolve("outside"));
+        Files.writeString(outside.resolve("secret.png"), "x");
+        Files.createSymbolicLink(resources.resolve("linked"), outside);
+        Files.createSymbolicLink(resources.resolve("elements/link.png"), outside.resolve("secret.png"));
 
-        assertEquals(resources.resolve("elements/home.png"), ElementsView.shotFile(resources, "elements/home.png"));
+        assertEquals(resources.toRealPath().resolve("elements/home.png"),
+                ElementsView.shotFile(resources, "elements/home.png"));
+        assertNull(ElementsView.shotFile(resources, "linked/secret.png"));
+        assertNull(ElementsView.shotFile(resources, "elements/link.png"));
+        assertNull(ElementsView.shotFile(resources, "missing/home.png"));
         assertNull(ElementsView.shotFile(resources, "../../pom.xml"));
         assertNull(ElementsView.shotFile(resources, "elements/../../x.png"));
         assertNull(ElementsView.shotFile(resources, "/etc/passwd"));
