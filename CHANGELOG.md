@@ -41,6 +41,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   added after the map was pinned now come beside it rather than far off (toolkit `Placement.beside`).
 - 🗺 Screens: ⋯ ▸ Tidy, and a drag of many cards, read the map once rather than once per card: Tidy on a 63-screen
   map took half a minute with Studio frozen, now a moment.
+- 🗺 Screens: ⋯ ▸ Tidy, a drag of many cards and the verdicts set at once send their writes to Studio in one go
+  (`History.together`), made as one ↶ step or none: one Studio refuses leaves the map as it was and says why. A
+  screen gone or written by hand is still skipped, the others written. Moving markers to parts and naming old shots
+  still write each screen on its own, so one refused holds no other back.
+  Tidy on a 63-screen map now holds Studio 2.4 s, down from 4.3 s (3.4 s the first time).
 
 ## [1.12.0] — 2026-11-21
 

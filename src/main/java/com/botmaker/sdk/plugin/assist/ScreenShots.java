@@ -260,7 +260,8 @@ public final class ScreenShots {
                     .map(v -> x.withVariant(v.shot(shot.path()))).orElse(x));
             changes.merge(shot.constant(), named, (was, then) -> s -> then.apply(was.apply(s)));
         }
-        return ScreenBook.updateAll(services, "Name the screens' shots", changes);
+        // Each screen named on its own: one the host refuses leaves the other shots named.
+        return ScreenBook.updateEach(services, "Name the screens' shots", changes);
     }
 
     /** Every path a screen or look of {@code graph} names for its shot. */

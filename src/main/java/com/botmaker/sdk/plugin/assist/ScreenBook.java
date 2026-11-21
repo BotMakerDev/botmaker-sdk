@@ -92,7 +92,8 @@ final class ScreenBook {
         graph.screens().forEach((constant, screen) -> {
             if (MarkParts.old(screen)) changes.put(constant, MarkParts::move);
         });
-        return changes.isEmpty() ? Optional.empty() : updateAll(services, "Move markers to parts", changes);
+        // Each screen made on its own: one the host refuses must not keep every other in the old form.
+        return changes.isEmpty() ? Optional.empty() : updateEach(services, "Move markers to parts", changes);
     }
 
     /**
@@ -112,14 +113,34 @@ final class ScreenBook {
 
     /**
      * Each screen of {@code changes} as its change makes it, the map read once, all in one step named {@code label}:
-     * one a screen is gone or written by hand is left. Empty when written, else the first why not.
+     * one a screen is gone or written by hand is left, and its reason is the answer. The writes are sent together
+     * (2026-11-21): one the host refuses leaves the map as it was and is the answer. Empty when written, else the
+     * first why not.
      */
     static Optional<String> updateAll(StudioServices services, String label,
                                       Map<String, UnaryOperator<MapScreen>> changes) {
         PluginValues values = services.pluginValues();
         if (values == null) return Optional.of("Studio has no source tree open.");
-        ScreenGraph graph = read(services);
-        return step(services, label, () -> {
+        // Every write is computed from the map read once, never from what another wrote; one screen's own writes
+        // (a field removed then declared again in its new kind) count on being made in the order queued.
+        return together(services, label, writes(values, read(services), changes));
+    }
+
+    /**
+     * As {@link #updateAll}, but each write the host takes is made even when another is refused: for a migration, where
+     * one screen refused must not hold every other back.
+     */
+    static Optional<String> updateEach(StudioServices services, String label,
+                                       Map<String, UnaryOperator<MapScreen>> changes) {
+        PluginValues values = services.pluginValues();
+        if (values == null) return Optional.of("Studio has no source tree open.");
+        return step(services, label, writes(values, read(services), changes));
+    }
+
+    /** The writes of each screen of {@code changes} as {@code graph} holds it; their first why not. */
+    private static Supplier<Optional<String>> writes(PluginValues values, ScreenGraph graph,
+                                                     Map<String, UnaryOperator<MapScreen>> changes) {
+        return () -> {
             Optional<String> first = Optional.empty();
             for (Map.Entry<String, UnaryOperator<MapScreen>> change : changes.entrySet()) {
                 String constant = change.getKey();
@@ -130,7 +151,7 @@ final class ScreenBook {
                 if (first.isEmpty()) first = why;
             }
             return first;
-        });
+        };
     }
 
     /** {@code write} as one step of Studio's undo named {@code label}, or part of the batch already open. */
@@ -143,6 +164,19 @@ final class ScreenBook {
             ScreenMapRead.forget();
         }
         return answer.getFirst();
+    }
+
+    /**
+     * {@code writes} as {@link #step} makes them, sent to Studio together: all made as one step named {@code label}, or
+     * none. The refusal of one when one was refused, else what {@code writes} answered.
+     */
+    static Optional<String> together(StudioServices services, String label, Supplier<Optional<String>> writes) {
+        List<Optional<String>> answer = new ArrayList<>(List.of(Optional.empty()));
+        try {
+            return services.history().together(label, () -> answer.set(0, writes.get())).or(answer::getFirst);
+        } finally {
+            ScreenMapRead.forget();
+        }
     }
 
     /**

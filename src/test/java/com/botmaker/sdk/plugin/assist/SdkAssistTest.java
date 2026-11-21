@@ -1563,10 +1563,25 @@ class SdkAssistTest {
         assertNull(screen("SHOP").at());
         assertEquals(List.of("Move 2 cards", "Move Shop", "Tidy the map"), host.steps,
                 "each drag and Tidy is one step of Studio's undo, however many screens it wrote");
+        assertEquals(List.of("Move 2 cards", "Move Shop", "Tidy the map"), host.togethers,
+                "each sent in one go, never a write at a time (2026-11-21)");
         ScreenEdits.rename(host, "SHOP", "Store");
         assertEquals("Rename Shop to Store", host.steps.getLast(), "a rename is one step, its name and constant");
         ScreenEdits.setPopup(host, "STORE", true);
         assertEquals("Edit Store", host.steps.getLast(), "a lone edit is named for its screen");
+    }
+
+    /** Tidy refused by Studio leaves every card where it was, and the refusal is the answer (2026-11-21). */
+    @Test
+    void aRefusedTidyMovesNoCard() {
+        put("HOME", MapScreen.of(Setup.named("Home")));
+        put("SHOP", MapScreen.of(Setup.named("Shop")));
+        ScreenEdits.move(host, Map.of("HOME", new Point(0, 0), "SHOP", new Point(320, 40)));
+        host.refuseTogether = "Screens.java changed on disk.";
+
+        assertTrue(ScreenEdits.tidy(host).contains("Screens.java changed on disk."));
+        assertEquals(new Point(320, 40), screen("SHOP").at());
+        assertEquals(new Point(0, 0), screen("HOME").at());
     }
 
     /** edit_map does what 🗺 Screens' hand tools do, each input named as try_input names it (2026-10-15). */
@@ -2212,6 +2227,10 @@ class SdkAssistTest {
 
         /** Each outermost batch's label, as Studio's undo would name the step. */
         final List<String> steps = new ArrayList<>();
+        /** Each outermost together's label: writes sent in one go. */
+        final List<String> togethers = new ArrayList<>();
+        /** When set, every together is refused with it. */
+        String refuseTogether;
         private int batching;
 
         @Override
@@ -2233,6 +2252,15 @@ class SdkAssistTest {
                     } finally {
                         batching--;
                     }
+                }
+
+                @Override
+                public Optional<String> together(String label, Runnable writes) {
+                    if (batching == 0) togethers.add(label);
+                    // Refused as Studio refuses one: none of its writes made.
+                    if (refuseTogether != null) return Optional.of(refuseTogether);
+                    batch(label, writes);
+                    return Optional.empty();
                 }
             };
         }
