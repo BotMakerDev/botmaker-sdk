@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -112,7 +113,7 @@ public sealed interface Effect {
     static Effect judge(State before, State after, List<Guard.Stopped> stopped) {
         List<Guard.Stopped> stops = stopped == null ? List.of() : stopped;
         for (Guard.Stopped stop : stops) {
-            if (stop.kind() == Guard.Kind.EXIT) return new Exits(stop.url());
+            if (stop.kind() == Guard.Kind.EXIT) return new Exits(exitUrl(stop.url()));
         }
         // A page the server refused is a broken way, not a page to map.
         if (after.httpError()) {
@@ -137,11 +138,57 @@ public sealed interface Effect {
         for (String error : after.errorsShown()) {
             if (!before.errorsShown().contains(error)) return new ShowsError(error);
         }
-        if (!after.consoleErrors().isEmpty()) return new Fails("console error: " + after.consoleErrors().getFirst());
+        Optional<String> error = after.consoleErrors().stream().filter(e -> !background(e)).findFirst();
+        if (error.isPresent()) return new Fails("console error: " + error.get());
         List<String> changed = changed(before.tree(), after.tree());
         if (!was.equals(now)) changed.addFirst("closes " + was.line());
-        return changed.isEmpty() ? new Nothing() : new Changes(changed);
+        return changed.isEmpty() ? new Nothing() : new Changes(shortened(changed));
     }
+
+    /**
+     * Whether a console error is the browser's about a request the page made on its own, not the press's failure: a
+     * fetch CORS refused or a resource that did not load. nunu.ai prefetches {@code /auth/login} on every press, and
+     * its redirect to the sign-in host is refused by CORS, which marked every link of the page failed (2026-11-21).
+     */
+    static boolean background(String error) {
+        return error.contains("blocked by CORS policy") || error.startsWith("Failed to load resource")
+                || error.contains("net::ERR_");
+    }
+
+    /** At most this many parts a {@link Changes} names; the rest are counted. */
+    static final int PARTS_SAID = 8;
+
+    /**
+     * {@code parts} as a note says them: the first {@link #PARTS_SAID} parts shown or changed, then how many more, and
+     * the parts hidden counted when more than {@link #PARTS_SAID} (a list opened takes the page's every part from the
+     * tree: Pricing's selects listed all 44).
+     */
+    private static List<String> shortened(List<String> parts) {
+        List<String> hidden = parts.stream().filter(p -> p.endsWith(" hidden")).toList();
+        List<String> rest = parts.stream().filter(p -> !p.endsWith(" hidden")).toList();
+        List<String> said = new ArrayList<>(rest.subList(0, Math.min(PARTS_SAID, rest.size())));
+        if (rest.size() > PARTS_SAID) said.add((rest.size() - PARTS_SAID) + " more shown or changed");
+        if (hidden.size() > PARTS_SAID) said.add(hidden.size() + " parts hidden");
+        else said.addAll(hidden);
+        return said;
+    }
+
+    /**
+     * {@code url} as an exit says it: without its query when the query holds a value made for one visit (an OAuth
+     * {@code state}, a {@code nonce}, a {@code code_challenge}), which differs on every press and says nothing.
+     */
+    static String exitUrl(String url) {
+        int query = url.indexOf('?');
+        if (query < 0) return url;
+        for (String pair : url.substring(query + 1).split("&")) {
+            String key = pair.contains("=") ? pair.substring(0, pair.indexOf('=')) : pair;
+            if (ONE_VISIT.contains(key)) return url.substring(0, query);
+        }
+        return url;
+    }
+
+    /** The query keys whose value is made for one visit. */
+    Set<String> ONE_VISIT = Set.of("state", "nonce", "code_challenge", "code_verifier", "session_state");
 
     /** {@code place} as compared: a website's path bare, an app's activity as it is. */
     private static String path(String place) {

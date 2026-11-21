@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Exploring a website: a press is no longer marked failed for a console error about a request the page made on its
+  own (a fetch CORS refused, a resource that did not load). On nunu.ai every link was marked failed by the sign-in
+  prefetch's CORS error.
+- Exploring a website: an exit to a sign-in page drops the one-visit part of its address (an OAuth `state`,
+  `nonce`, `code_challenge`), so a note no longer carries a token that differs on every press.
+- Exploring a website: a press that changes many parts (a select's list opened hides the whole page) says the
+  first eight and counts the rest, instead of naming every part.
+- A screen named in camel case with a one-letter word or an acronym gets its words apart: `BookADemo` is
+  `BOOK_A_DEMO`, not `BOOK_ADEMO`. Only new screens and pictures are named so; rename an old one in 🗺 Screens.
 - 🗺 Screens: the first card dragged no longer pins every screen a collapsed layout put on one corner there, which
   stacked them for good and left the map showing a handful of screens. A map already stacked so: ⋯ ▸ Tidy. Screens
   added after the map was pinned now come beside it rather than far off (toolkit `Placement.beside`).

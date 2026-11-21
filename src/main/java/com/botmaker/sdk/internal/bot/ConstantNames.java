@@ -17,21 +17,26 @@ public final class ConstantNames {
      * to {@code HANDLE_FULL_INVENTORY} — or null when it can be none (no letter, or a digit first).
      *
      * <p>Letters and digits are kept, upper-cased; every run of anything else is one {@code _}, and so is a
-     * step from a lower-case letter or digit to an upper-case one. So an identifier label that is already a
-     * constant ({@code NOTHING_LEFT}) is its own constant.
+     * step from a lower-case letter or digit to an upper-case one, and the last capital of a run before a
+     * lower-case letter ({@code "BookADemo"} to {@code BOOK_A_DEMO}, {@code "HTTPServer"} to {@code HTTP_SERVER}).
+     * So an identifier label that is already a constant ({@code NOTHING_LEFT}) is its own constant.
      */
     public static String constantFor(String label) {
         if (label == null) return null;
         StringBuilder out = new StringBuilder();
         boolean gap = false;
         char previous = 0;
-        for (char c : label.strip().toCharArray()) {
+        char[] chars = label.strip().toCharArray();
+        for (int i = 0; i < chars.length; i++) {
+            char c = chars[i];
             if (!Character.isLetterOrDigit(c)) {
                 gap = !out.isEmpty();
                 continue;
             }
+            char next = i + 1 < chars.length ? chars[i + 1] : 0;
             boolean camelStep = Character.isUpperCase(c)
-                    && (Character.isLowerCase(previous) || Character.isDigit(previous));
+                    && (Character.isLowerCase(previous) || Character.isDigit(previous)
+                    || Character.isUpperCase(previous) && Character.isLowerCase(next));
             if (!out.isEmpty() && (gap || camelStep)) out.append('_');
             out.append(Character.toUpperCase(c));
             gap = false;

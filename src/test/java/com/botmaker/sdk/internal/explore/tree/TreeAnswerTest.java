@@ -158,6 +158,21 @@ class TreeAnswerTest {
         assertEquals(new Effect.Changes(List.of("checkbox \"News\" checkable checked clickable enabled")),
                 Effect.judge(before, Effect.State.of(checked, "/"), List.of()));
         assertEquals(new Effect.Nothing(), Effect.judge(before, Effect.State.of(home, "/#top"), List.of()));
+        // A request the page made on its own, refused by CORS, is no failure of the press; a script's error is.
+        assertEquals(new Effect.Nothing(), Effect.judge(before, new Effect.State(home, "/", List.of(),
+                List.of("Access to fetch at 'https://api.workos.com/authorize' (redirected from "
+                        + "'https://nunu.ai/auth/login?_rsc=1') from origin 'https://nunu.ai' has been blocked by CORS "
+                        + "policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+                        "Failed to load resource: net::ERR_FAILED")), List.of()));
+        assertEquals(new Effect.Fails("console error: TypeError: x is undefined"), Effect.judge(before,
+                new Effect.State(home, "/", List.of(), List.of("TypeError: x is undefined")), List.of()));
+        // An exit's one-visit query (an OAuth state) is dropped; a query that names the place is kept.
+        assertEquals(new Effect.Exits("https://api.workos.com/user_management/authorize"), Effect.judge(before,
+                before, List.of(new Guard.Stopped(Guard.Kind.EXIT,
+                        "https://api.workos.com/user_management/authorize?client_id=c&state=Fe26.2*1&code_challenge=x",
+                        "GET"))));
+        assertEquals(new Effect.Exits("https://www.youtube.com/watch?v=MgHj3ZEHrR4"), Effect.judge(before, before,
+                List.of(new Guard.Stopped(Guard.Kind.EXIT, "https://www.youtube.com/watch?v=MgHj3ZEHrR4", "GET"))));
         // A dialog closed leaves the page under it: a way back, as its Close button is.
         Effect closed = Effect.judge(Effect.State.of(dialog, "/"), before, List.of());
         assertInstanceOf(Effect.Closes.class, closed);
