@@ -30,10 +30,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.CodeSource;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -55,11 +58,14 @@ public final class Generation {
     /** Where the generations are compiled, under the bot's {@code target}; the trace agent knows the name. */
     public static final String FOLDER = "botmaker-explore";
 
-    /** What {@link #next} gives: a loaded generation, or why there is none. */
-    public sealed interface Result permits Ok, Refused {}
+    /** What {@link #next} gives: a loaded generation, none needed, or why there is none. */
+    public sealed interface Result permits Ok, Unchanged, Refused {}
 
     /** The new generation, loaded; nothing is installed yet. */
     public record Ok(Generation generation) implements Result {}
+
+    /** No source or resource changed since this generation was compiled: it serves on, and nothing was compiled. */
+    public record Unchanged() implements Result {}
 
     /** No new generation: the compile's errors, one a line, or why it could not compile. */
     public record Refused(List<String> errors) implements Result {
@@ -74,13 +80,20 @@ public final class Generation {
     private final Path started;
     private final BotLoader loader;
     private final List<String> holderNames;
+    /**
+     * What the sources and resources were when this generation was compiled ({@link #fingerprint}); null for the first,
+     * which the run started with and which was never compiled here, so the first resume always compiles.
+     */
+    private final String fingerprint;
 
-    private Generation(int number, Path classes, Path started, ClassLoader parent, List<String> holderNames) {
+    private Generation(int number, Path classes, Path started, ClassLoader parent, List<String> holderNames,
+                       String fingerprint) {
         this.number = number;
         this.classes = classes;
         this.started = started;
         this.loader = new BotLoader(classes, started, parent);
         this.holderNames = holderNames;
+        this.fingerprint = fingerprint;
     }
 
     /** The first generation, over the class folder the first of {@code holderNames} ({@code Sdk}) came from. */
@@ -107,13 +120,16 @@ public final class Generation {
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException(holder.getName() + "'s class folder is unreadable", e);
         }
-        return new Generation(0, folder, folder, parent, List.copyOf(holderNames));
+        return new Generation(0, folder, folder, parent, List.copyOf(holderNames), null);
     }
 
     /**
      * Compiles the bot under {@code project} ({@code src/main/java}, its resources copied) into
      * {@code target/botmaker-explore/gen-<number>}, against the run's class path without the bot's own class folders,
-     * and loads it over this generation's parent. This generation keeps serving, whatever the answer.
+     * and loads it over this generation's parent. This generation keeps serving, whatever the answer. When no source
+     * or resource changed since this generation was compiled, nothing is compiled: {@link Unchanged} (R8). The whole
+     * bot is compiled otherwise, never the changed files alone: a constant another class inlined, or a class deleted,
+     * would leave the classes wrong.
      */
     public Result next(Path project, int number) {
         if (number <= this.number) {
@@ -121,6 +137,13 @@ public final class Generation {
         }
         Path sources = project.resolve("src/main/java");
         if (!Files.isDirectory(sources)) return new Refused(List.of("The bot has no sources at " + sources + "."));
+        String now;
+        try {
+            now = fingerprint(project);
+        } catch (IOException | UncheckedIOException e) {
+            return new Refused(List.of("The bot's sources cannot be read: " + e.getMessage()));
+        }
+        if (now.equals(fingerprint)) return new Unchanged();
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             return new Refused(List.of("This JVM has no Java compiler (a JRE): the bot cannot be reloaded in the run."));
@@ -154,7 +177,43 @@ public final class Generation {
                     .filter(found -> found.getKind() == Diagnostic.Kind.ERROR).map(Generation::said).toList();
             return new Refused(errors.isEmpty() ? List.of("The bot did not compile.") : errors);
         }
-        return new Ok(new Generation(number, out, started, loader.getParent(), holderNames));
+        return new Ok(new Generation(number, out, started, loader.getParent(), holderNames, now));
+    }
+
+    /**
+     * Closes this generation's loader, once another serves the run: its open class folder and jar handles are let go,
+     * so a long run's reloads do not pile them up (N1). Classes it loaded already keep working; none is loaded after.
+     */
+    public void close() {
+        try {
+            loader.close();
+        } catch (IOException unclosed) {
+            // the folder stays open until the run's JVM ends: nothing the run reads again
+        }
+    }
+
+    /** A digest of every file under the bot's {@code src/main/java} and {@code src/main/resources}, by path and bytes. */
+    static String fingerprint(Path project) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is missing from this JVM", e);
+        }
+        for (String root : List.of("src/main/java", "src/main/resources")) {
+            Path folder = project.resolve(root);
+            if (!Files.isDirectory(folder)) continue;
+            List<Path> files;
+            try (Stream<Path> walk = Files.walk(folder)) {
+                files = walk.filter(Files::isRegularFile).sorted().toList();
+            }
+            for (Path file : files) {
+                digest.update((root + "/" + folder.relativize(file) + "\0").getBytes(StandardCharsets.UTF_8));
+                digest.update(Files.readAllBytes(file));
+                digest.update((byte) 0);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     /**

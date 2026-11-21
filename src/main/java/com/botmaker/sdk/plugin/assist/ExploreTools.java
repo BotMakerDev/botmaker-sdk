@@ -60,14 +60,14 @@ final class ExploreTools {
     @Describe("block until the run stops, finds a screen or ends; answers the open stop whole, else the oldest parked")
     record Wait(@Describe(value = "the longest to wait; blank: 600", optional = true) Integer seconds,
                 @Describe(value = RUN_ID, optional = true) String run,
-                @Describe(value = "cartographer or mechanic: only the stops that role takes; blank: every stop",
+                @Describe(value = "cartographer or mechanic: only that role's stops; blank: all but the user's",
                         optional = true) String role)
             implements Action {
     }
 
-    @Describe("hand the open or a parked stop to the user, for a verdict that can spend real money or a call only "
-            + "they can make; the run parks it and goes on, and the Explore tab lists it for them")
-    record Ask(@Describe("the stop's id, as wait names it") String stop,
+    @Describe("hand a stop to the user, for a verdict that can spend real money or a call only they can make; the "
+            + "run parks it and goes on")
+    record Ask(@Describe("the stop's id, from wait") String stop,
                @Describe("one line: what the user is to decide") String question) implements Action {
     }
 
@@ -82,8 +82,8 @@ final class ExploreTools {
     }
 
     @Describe("load the fixed bot and go on from a stop; answers once the run reloaded, or why it refused")
-    record Resume(@Describe("the stop's id, as wait names it") String stop,
-                  @Describe(value = "true: what it stopped on is fine as it is, never raised again", optional = true)
+    record Resume(@Describe("the stop's id, from wait") String stop,
+                  @Describe(value = "true: what it stopped on is fine, never raised again", optional = true)
                   Boolean ignore) implements Action {
     }
 
@@ -91,23 +91,21 @@ final class ExploreTools {
     record Stop() implements Action {
     }
 
-    @Describe("dev mode: hold the open stop as a Discover fault, Discover's own mistake rather than the site's, until "
+    @Describe("dev mode: hold the open stop as a Discover fault, Discover's own mistake, not the site's, until "
             + "the SDK is fixed")
-    record Fault(@Describe("the open stop's id, as wait names it") String stop,
+    record Fault(@Describe("the open stop's id, from wait") String stop,
                  @Describe("one line: what Discover got wrong") String why) implements Action {
     }
 
     @Describe("dev mode, once the SDK's fix is installed: stop the run, reload the plugins at the rebuilt -SNAPSHOT "
             + "and start the run again from its memory, which replays the held fault; wait answers the replay")
-    record ReloadSdk(@Describe("the held fault's id, as wait names it") String stop) implements Action {
+    record ReloadSdk(@Describe("the held fault's id, from wait") String stop) implements Action {
     }
 
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
-                    + SdkRuns.KEEP_EXPLORING + "\" starts it. A verdict that can spend real money, or a call only "
-                    + "the user makes: ask hands the stop to them. Dev mode: Discover's own mistake is held as a "
-                    + "fault; fix and install the SDK, then reload_sdk replays it")
+                    + SdkRuns.KEEP_EXPLORING + "\" starts it. Leave the user's stops: they answer them")
             .takesOneOf(Action.class).handledBy(ExploreTools::handle));
 
     private ExploreTools() {}
@@ -209,6 +207,7 @@ final class ExploreTools {
                         + "fault. " + ids(view));
             }
             if (view.held(open.get())) return AgentReply.text(id + " is held as a Discover fault already.");
+            if (view.roleOf(open.get()) == StopRole.USER) return AgentReply.refused(id + " is the user's: " + USERS_STOP);
             int seen = view.all().size();
             claude(journal, "fault " + id);
             journal.command("fault " + id + " " + line);
@@ -239,6 +238,9 @@ final class ExploreTools {
         }
     }
 
+    /** Why Claude leaves a stop whose role is the user's. */
+    private static final String USERS_STOP = "the user decides it from the Explore tab. Leave it.";
+
     /** What Claude does with a held fault. */
     private static final String FIX_THE_SDK = "Fix the SDK with its test and install it; explore reload_sdk then "
             + "replays the stop on the new build.";
@@ -265,8 +267,12 @@ final class ExploreTools {
         int seen = view.all().size();
         while (true) {
             if (!changed(journal, seen, deadline)) {
-                return AgentReply.text("Still running after " + within.toSeconds() + " s: "
-                        + counts(JournalView.of(journal)));
+                JournalView last = JournalView.of(journal);
+                // A run waiting on the user's stop is said, so Claude knows why nothing comes.
+                String user = last.open().filter(s -> last.roleOf(s) == StopRole.USER)
+                        .map(s -> " It waits on " + s.id() + ", the user's: they answer it from the Explore tab.")
+                        .orElse("");
+                return AgentReply.text("Still running after " + within.toSeconds() + " s: " + counts(last) + user);
             }
             view = JournalView.of(journal);
             seen = view.all().size();
@@ -283,7 +289,9 @@ final class ExploreTools {
     private static Optional<AgentReply> answer(JournalView view, StopRole role) {
         List<String> screens = view.newScreensSinceWait();
         String found = screens.isEmpty() ? "" : "\nNew screens since the last wait: " + String.join(", ", screens) + ".";
-        Predicate<com.botmaker.sdk.internal.explore.Stop> takes = s -> role == null || view.roleOf(s) == role;
+        // A wait with no role takes every stop but the user's, which Claude never answers.
+        Predicate<com.botmaker.sdk.internal.explore.Stop> takes = s -> role == null
+                ? view.roleOf(s) != StopRole.USER : view.roleOf(s) == role;
         // A stop the run settled off the page's tree is written and resumed by the plugin side, not by Claude; a held
         // fault being replayed is answered by its replay.
         if (view.open().filter(takes).isPresent() && !view.settled(view.open().get())
@@ -373,6 +381,11 @@ final class ExploreTools {
                 Optional<ExploreEvent.Reloaded> done = view.reloadOf(id).filter(r -> !r.refused());
                 if (done.isPresent()) return AgentReply.text("Already resumed: " + took(done.get()));
                 return AgentReply.refused("No stop " + id + " is open or parked. " + ids(view));
+            }
+            // The user's stop is theirs alone: the Explore tab's buttons write its command, never Claude.
+            if (view.open().filter(s -> s.id().equals(id)).or(() -> view.parked(id))
+                    .filter(s -> view.roleOf(s) == StopRole.USER).isPresent()) {
+                return AgentReply.refused(id + " is the user's: " + USERS_STOP);
             }
             int seen = view.all().size();
             claude(journal, "resume " + id + (ignore ? " ignore" : ""));

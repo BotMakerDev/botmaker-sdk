@@ -111,6 +111,35 @@ class GenerationTest {
     }
 
     @Test
+    void anOldLoaderIsClosed() throws Exception {
+        Generation next = assertInstanceOf(Generation.Ok.class, first.next(project, 1)).generation();
+        Class<?> shop = next.loader().loadClass("demo.Shop");
+        next.close();
+
+        assertEquals("demo.Shop", shop.getName(), "a class it loaded already keeps working");
+        assertThrows(ClassNotFoundException.class, () -> next.loader().loadClass("demo.Gone"),
+                "a closed loader loads nothing more of its own");
+    }
+
+    @Test
+    void ignoreCompilesNothing() throws Exception {
+        Generation next = assertInstanceOf(Generation.Ok.class, first.next(project, 1)).generation();
+        Path folder = project.resolve("target/botmaker-explore/gen-2");
+
+        assertInstanceOf(Generation.Unchanged.class, next.next(project, 2), "no source changed since gen-1");
+        assertFalse(Files.exists(folder), "nothing was compiled");
+
+        write("demo/Shop.java", SHOP.formatted(ADDED));
+        assertInstanceOf(Generation.Ok.class, next.next(project, 2), "a changed source compiles again");
+    }
+
+    @Test
+    void theFirstResumeAlwaysCompiles() {
+        assertInstanceOf(Generation.Ok.class, first.next(project, 1),
+                "the run's own classes were never compiled here: nothing says they match the sources");
+    }
+
+    @Test
     void aNumberInUseIsRefused() {
         Generation next = assertInstanceOf(Generation.Ok.class, first.next(project, 1)).generation();
 

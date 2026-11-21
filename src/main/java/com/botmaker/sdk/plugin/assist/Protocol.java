@@ -7,7 +7,6 @@ import com.botmaker.sdk.api.screens.Reached;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
-import com.botmaker.sdk.plugin.map.MapReport;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -311,7 +310,7 @@ final class Protocol {
                     owed);
         }
         if (!owed.isEmpty()) {
-            String next = MapReport.next(graph, live);
+            String next = graph.nextWorkSaid(live);
             return new Where(Stage.DISCOVERY, owed.size() + (owed.size() == 1 ? " thing is" : " things are")
                     + " still owed: Discovery is done when none is." + (next.isEmpty() ? "" : " " + next), screens,
                     owed);

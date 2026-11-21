@@ -6,21 +6,19 @@ package com.botmaker.sdk.internal.explore;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
-import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
-import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.bot.InstalledRun;
+import com.botmaker.sdk.internal.explore.ScreenClock.Spent;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.FormRules;
 import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.RouteGuess;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
-import com.botmaker.sdk.internal.screens.Conditions;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk;
@@ -41,7 +39,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -58,6 +55,10 @@ import java.util.function.LongSupplier;
  * guarded, pressed and judged. What the bot does not know stops the run and hands the game to Claude through the
  * {@link Journal}; a resume reloads the bot and checks the stop is gone, and a stop nobody takes up in time is parked
  * and its place avoided.
+ *
+ * <p>The loop holds the round and what it reads; what to press next is {@link Chooser}'s, each screen's clock and
+ * budget {@link ScreenClock}'s, a fault's replay {@link Replay}'s, and the waits on stops and the parked queue
+ * {@link Pauses}' (2026-11-21).
  *
  * <p>Pure over a {@link Play} and a clock, as {@link MapWalk} is over its moves: tests script both. Only a stop of the
  * run ({@code Bot.stop()}) leaves it by an exception.
@@ -331,17 +332,6 @@ public final class ExploreLoop {
     /** How a stop the loop paused on ended. */
     enum Paused { RESUMED, BACK, PARKED, END }
 
-    /** What a screen's clock went to, as a low-yield stop says it. */
-    private enum Spent {
-        PRESSING("pressing"), SETTLING("settling"), WALKING("walking"), CLAUDE("waiting on Claude"), IDLE("idle");
-
-        private final String label;
-
-        Spent(String label) {
-            this.label = label;
-        }
-    }
-
     /** A resume of a fault without ignore is answered with this, and the fault stays held. */
     public static final String FAULT_RESUMES = "a fault resumes through reload_sdk; resume ignore drops it as a misreading";
 
@@ -354,33 +344,22 @@ public final class ExploreLoop {
     private final Settings settings;
     private final LongSupplier nowMs;
     private ScreenGraph map;
+    private final Pauses pauses;
+    private final Chooser chooser;
+    private final ScreenClock clock;
+    private final Replay replay;
 
     private final Set<String> seen = new HashSet<>();
     /** The screens whose inputs made twice this process looked for; never restored from a run's memory. */
     private final Set<String> merged = new HashSet<>();
-    private final Set<String> tried = new HashSet<>();
-    /**
-     * The ways whose button was not on their screen when the run looked, this run: absent is not tried, so each is
-     * looked for again once the run reaches its screen again, and is tried only when absent that second time too.
-     * Never restored: a restarted run looks again.
-     */
-    private final Set<String> notSeen = new HashSet<>();
-    /** The ways of {@link #notSeen} looked for on this visit of the screen the run is on: not looked for again on it. */
-    private final Set<String> notSeenHere = new HashSet<>();
-    /** The last screen of the map a round was on, a frame no screen matched skipped; null before the first. */
-    private String lastScreen;
     /** The places a guard refused this run, way or input, with the guard's kind: each said once, never restored. */
     private final Set<String> refused = new HashSet<>();
     private final Set<String> worked = new HashSet<>();
-    /** The parked stops, by kind and place ({@link #key(Stop)}): never pressed, never stopped on again until fixed. */
-    private final Map<String, Stop> parked = new LinkedHashMap<>();
     /** The text places a missing-fact stop was raised on: once each. */
     private final Set<String> answered = new HashSet<>();
     private final Deque<String> presses = new ArrayDeque<>();
     /** How many times in a row the server answered an error page after each place: a way, an input or a page. */
     private final Map<String, Integer> errorPages = new HashMap<>();
-    /** Whether the run ends because a stop that cannot park waited past {@link Settings#stuckAfter}. */
-    private boolean stuck;
     private long began;
     private long lastPress;
     private int stops;
@@ -390,6 +369,8 @@ public final class ExploreLoop {
     private String pressing;
     private String from;
     private String by;
+    /** The last walk, {@code from→to}, until a press: a set-aside screen a walk came back to does not walk again. */
+    private String lastWalk;
     /** The stop resumed last, until the next round says whether the fix took. */
     private Stop resumed;
     private int generation;
@@ -404,67 +385,48 @@ public final class ExploreLoop {
     /** What presses of inputs that are no way did, not yet handed on: they go with the next settled stop. */
     private final List<TreeAnswer> notes = new ArrayList<>();
     private int settledNotes;
-    /** Each screen's own clock, in ms: the time the run spent on it, charged at each round. */
-    private final Map<String, Long> clock = new HashMap<>();
-    /** The screens nothing is open about any more, said once each. */
-    private final Set<String> built = new HashSet<>();
-    /** What was open on each screen when the run last said it building. */
-    private final Map<String, List<String>> leftOpen = new HashMap<>();
-    /** Screens over their budget unbuilt: the run works another open screen first, and these once none is. */
-    private final Set<String> aside = new HashSet<>();
-    /** The last walk, {@code from→to}, until a press: a set-aside screen a walk came back to does not walk again. */
-    private String lastWalk;
-    /** Each set-aside screen's clock when it was set aside: a second budget past it is a low-yield stop. */
-    private final Map<String, Long> asideAt = new HashMap<>();
-    /** The screens a low-yield stop was resumed with ignore on: left as they are for the run. */
-    private final Set<String> leftAsIs = new HashSet<>();
-    /** The low-yield stop resumed with a fresh clock on each screen, by screen: fixed once the screen is built. */
-    private final Map<String, String> yieldResumed = new HashMap<>();
-    /** What each screen's clock went to, in ms. */
-    private final Map<String, EnumMap<Spent, Long>> spentOn = new HashMap<>();
-    /** The presses this run made on each screen, ways and inputs: the work its budget counts beside what is left. */
-    private final Map<String, Integer> pressedOn = new HashMap<>();
-    /** The run's presses, and the ms their presses took: its measured press time. */
-    private int pressCount;
-    private long pressingMs;
-    /** Each screen's largest budget so far, in ms. */
-    private final Map<String, Long> budgets = new HashMap<>();
-    /** The clock each open screen had when this run restarted, in ms: its budget counts from there. */
-    private final Map<String, Long> restoredMs = new HashMap<>();
-    /** What the last round did, which the time to the next one is charged to, but what it waited on a stop. */
-    private Spent doing = Spent.PRESSING;
-    /** What the run waited on at stops since the last round's charge, in ms. */
-    private final EnumMap<Spent, Long> waited = new EnumMap<>(Spent.class);
     /** Whether the stop raised next hands what the run settled on: its wait is settling, not Claude's. */
     private boolean settling;
     /** The inputs this run took a picture of ({@code SCREEN.field}), before the map it plays holds them. */
     private final Set<String> pictures = new HashSet<>();
-    /** The screen the last round was on, null when on none; since when, epoch ms. */
-    private String onScreen;
-    private long onSince;
     /** The screens whose forms were tried: once each. */
     private final Set<String> probed = new HashSet<>();
     /** What the run settled at each stop, by its id: the evidence when the plugin side's write of it falls short. */
     private final Map<String, List<TreeAnswer>> settledAt = new HashMap<>();
-    /**
-     * What the plugin side left out of each settled stop, by its id, kept until a resume of it takes: a refused reload
-     * loses none of it, and a resume with ignore drops it.
-     */
-    private final Map<String, List<String>> leftOut = new HashMap<>();
     /** Settled stops resumed with answers the plugin side left out, raised again at the next round's start. */
     private final Deque<Skip> skips = new ArrayDeque<>();
 
     /** The settled stop {@code stop}, resumed with {@code lines} left out of what it settled. */
     private record Skip(Stop stop, List<String> lines) {}
 
-    /**
-     * The fault a run restarted on the rebuilt SDK replays, until it passes the fault's place or meets it again; null
-     * for a run started fresh, or once the replay said.
-     */
-    private ResumeFile replay;
-    /** The arguments the run was started with, kept in its memory for a restart started with none. */
-    private ExploreBudget startedBudget = ExploreBudget.NONE;
-    private DiscoverArgs startedDiscover;
+    /** What a command taken while paused on a stop does to the run. */
+    private final Pauses.Answers answers = new Pauses.Answers() {
+        @Override
+        public Optional<Paused> resume(Stop open, String stopId, boolean ignore) {
+            return ExploreLoop.this.resume(open, stopId, ignore);
+        }
+
+        @Override
+        public void held(Stop stop, String why) {
+            emit(new ExploreEvent.Faulted(stop.id(), "claude", why, "", play.sdkVersion(), nowMs.getAsLong()));
+            memory(stop, stop.kind(), "claude").write(journal);
+        }
+
+        @Override
+        public void refusedFault(String stopId) {
+            emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
+        }
+
+        @Override
+        public void stale(String stopId) {
+            ExploreLoop.this.stale(stopId);
+        }
+
+        @Override
+        public boolean spent() {
+            return ExploreLoop.this.spent();
+        }
+    };
 
     public ExploreLoop(ScreenGraph map, Play play, Reload reload, Guards guards, Journal journal, Settings settings,
                        LongSupplier nowMs) {
@@ -476,9 +438,13 @@ public final class ExploreLoop {
         this.settings = settings;
         this.nowMs = nowMs;
         this.dev = play.dev();
-        // A queue a run before left is avoided too; stop numbers go on past the journal's and the queue's, so a stop
-        // this run raises never takes the id of one a run before parked.
-        for (Stop stop : journal.queue()) parked.put(key(stop), stop);
+        this.pauses = new Pauses(journal, play, settings, nowMs, this::emit, dev);
+        this.chooser = new Chooser(map, play, this::readsTrees, pauses::avoided);
+        this.clock = new ScreenClock(settings.screenBudget(), nowMs, this::emit, this::open, chooser::left,
+                pauses::built);
+        this.replay = new Replay(journal, nowMs, this::emit);
+        // Stop numbers go on past the journal's and the queue's, so a stop this run raises never takes the id of one a
+        // run before parked.
         int raised = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
         stops = Math.max(raised, journal.queue().stream().mapToInt(s -> number(s.id())).max().orElse(0));
     }
@@ -508,7 +474,7 @@ public final class ExploreLoop {
      * {@link #run}.
      */
     public ExploreLoop resuming(Optional<ResumeFile> file) {
-        replay = file.orElse(null);
+        replay.from(file);
         return this;
     }
 
@@ -517,8 +483,7 @@ public final class ExploreLoop {
      * with, in the memory a held fault writes. Called before {@link #run}.
      */
     public ExploreLoop startedWith(ExploreBudget budget, DiscoverArgs discover) {
-        startedBudget = budget;
-        startedDiscover = discover;
+        replay.startedWith(budget, discover);
         return this;
     }
 
@@ -530,10 +495,10 @@ public final class ExploreLoop {
         journal.dropCommands();
         End end = End.BROKE;
         try {
-            if (replay != null) {
+            if (replay.on()) {
                 emit(new ExploreEvent.Restarted(replay.fault().id(), dev, began));
                 restore();
-                restoreClocks();
+                clock.restore(journal);
             } else {
                 emit(new ExploreEvent.Began(dev, began));
             }
@@ -546,28 +511,29 @@ public final class ExploreLoop {
     }
 
     /**
-     * Takes back the memory of {@link #replay} and sets up its replay: the fault's place free to be met again, and the
-     * game walked to the fault's screen. Passing the place says it is fixed and meeting it says the fix did not take;
-     * other stops met meanwhile leave the replay waiting. A screen the map no longer has (the fix renamed it) is said,
-     * and the run explores on. The file stays until the replay says, so a run restarted again before still replays.
+     * Takes back the memory of the fault being replayed and sets up its replay: the fault's place free to be met again,
+     * and the game walked to the fault's screen. Passing the place says it is fixed and meeting it says the fix did not
+     * take; other stops met meanwhile leave the replay waiting. A screen the map no longer has (the fix renamed it) is
+     * said, and the run explores on. The file stays until the replay says, so a run restarted again before still
+     * replays.
      */
     private void restore() {
-        ResumeFile file = replay;
+        ResumeFile file = replay.file().orElseThrow();
         seen.addAll(file.seen());
-        tried.addAll(file.tried());
+        chooser.triedBefore(file.tried());
         worked.addAll(file.worked());
         answered.addAll(file.answered());
         Stop fault = file.fault();
-        retry(file.replays(), fault.place());
+        chooser.retry(file.replays(), fault.place());
         answered.remove(fault.place());
         String screen = fault.screen();
         if (screen != null && map.screen(screen).isEmpty()) {
-            replayed("its screen " + screen + " is no longer in the map: nothing to replay, the run explores on");
+            replay.fixed("its screen " + screen + " is no longer in the map: nothing to replay, the run explores on");
             return;
         }
         String press = file.replays() == StopKind.CRASH ? pressOf(fault.place()) : null;
         if (press != null && !mapped(press)) {
-            replayed(press + " is no longer in the map: nothing to replay, the run explores on");
+            replay.fixed(press + " is no longer in the map: nothing to replay, the run explores on");
             return;
         }
         if (screen == null) return;
@@ -576,43 +542,6 @@ public final class ExploreLoop {
         } catch (RuntimeException e) {
             // The first round finds where the game is, as after any walk that fell short.
             rethrowStop(e);
-        }
-    }
-
-    /** Whether {@code kind} on {@code place} is the stop the fault being replayed was. */
-    private boolean replays(StopKind kind, String place) {
-        return replay != null && replay.replays() == kind && replay.fault().place().equals(place);
-    }
-
-    /** Closes the fault being replayed, fixed for {@code why}: its memory is no longer needed. */
-    private void replayed(String why) {
-        emit(new ExploreEvent.Fixed(replay.fault().id(), why, nowMs.getAsLong()));
-        ResumeFile.delete(journal);
-        replay = null;
-    }
-
-    /**
-     * The replay of the fault can no longer happen: a stop of another kind met its place first and set it aside. Said,
-     * and its memory deleted, so the next start does not replay it.
-     */
-    private void replayLost(String why) {
-        emit(new ExploreEvent.ReplayLost(replay.fault().id(), why, nowMs.getAsLong()));
-        ResumeFile.delete(journal);
-        replay = null;
-    }
-
-    /**
-     * Frees {@code place} to be pressed again: the place itself and, for a crash, the way or input it names, so a fix
-     * shows only once that press is made again.
-     */
-    private void retry(StopKind kind, String place) {
-        tried.remove(place);
-        notSeen.remove(place);
-        // A fault's place is the crash's when a crash raised it.
-        String press = kind == StopKind.CRASH || kind == StopKind.FAULT ? pressOf(place) : null;
-        if (press != null) {
-            tried.removeIf(t -> t.equals(press) || t.startsWith(press + "→"));
-            notSeen.removeIf(t -> t.startsWith(press + "→"));
         }
     }
 
@@ -641,15 +570,12 @@ public final class ExploreLoop {
         if (resumed != null && resumed.kind() == StopKind.CRASH && Objects.equals(pressOf(resumed.place()), press)) {
             passed(StopKind.CRASH, resumed.place());
         }
-        if (replay != null && replay.replays() == StopKind.CRASH
-                && Objects.equals(pressOf(replay.fault().place()), press)) {
-            passed(StopKind.CRASH, replay.fault().place());
-        }
+        if (replay.crashedIn(press)) passed(StopKind.CRASH, replay.fault().place());
     }
 
     /** The run's memory, for a restart on the rebuilt SDK to go on from the fault {@code fault}. */
     private ResumeFile memory(Stop fault, StopKind replays, String source) {
-        return new ResumeFile(fault, replays, source, seen, tried, worked, answered, startedBudget, startedDiscover);
+        return replay.memory(fault, replays, source, seen, chooser.tried(), worked, answered);
     }
 
     private End rounds() {
@@ -660,20 +586,20 @@ public final class ExploreLoop {
             // Between stops only a parked stop can be resumed: its fix is loaded and its place tried again.
             if (command instanceof Journal.Command.Resume(String stopId, boolean ignore, List<String> skipped)) {
                 // The fault being replayed is still held: only ignore lets it go, as while the run paused on it.
-                if (replay != null && replay.fault().id().equals(stopId)) {
+                if (replay.of(stopId)) {
                     if (ignore) {
-                        replayed("ignored");
+                        replay.fixed("ignored");
                     } else {
                         emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
                     }
-                } else if (parked(stopId)) {
-                    keepLeftOut(stopId, skipped);
+                } else if (pauses.holds(stopId)) {
+                    pauses.keepLeftOut(stopId, skipped);
                     resume(null, stopId, ignore);
                 } else {
                     stale(stopId);
                 }
             }
-            if (!round()) return spent() ? End.BUDGET : stuck ? End.STUCK : End.STOPPED;
+            if (!round()) return spent() ? End.BUDGET : pauses.stuck() ? End.STUCK : End.STOPPED;
         }
     }
 
@@ -802,7 +728,7 @@ public final class ExploreLoop {
         if (resumed != null) passed(StopKind.ERROR_PAGE, resumed.place());
         if (lastEdge != null) errorPages.remove(lastEdge);
         // A page settled as unknown before is passed once a screen of the map matches it.
-        if (replay != null && readsTrees()) play.state().map(ExploreLoop::pagePlace)
+        if (replay.on() && readsTrees()) play.state().map(ExploreLoop::pagePlace)
                 .ifPresent(page -> passed(StopKind.UNKNOWN_SCREEN, page));
         if (seen.add(screen)) {
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
@@ -817,14 +743,18 @@ public final class ExploreLoop {
         // Exploring builds the map only: no value read here raises a missing fact (spec 2026-11-20, § Out of exploring).
         Look look = play.look(screen);
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
-        if (replay != null && screen.equals(replay.fault().screen())) passed(StopKind.MISSING_FACT, replay.fault().place());
-        if (overBudget(screen)) {
+        if (replay.onScreen(screen)) passed(StopKind.MISSING_FACT, replay.fault().place());
+        if (clock.overBudget(screen)) {
             // Its own work waits while another screen has some: that one is walked to first.
             // A walk that came back here does its own work instead of walking again.
-            Optional<String> other = next(screen, true);
+            Optional<String> other = chooser.next(screen, to -> !clock.aside(to));
             if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
-            Paused low = lowYield(screen, look);
-            if (low != null) return low != Paused.END;
+            Optional<String> lowYield = clock.lowYield(screen);
+            if (lowYield.isPresent()) {
+                Paused low = stop(StopKind.LOW_YIELD, screen, screen, look, lowYield.get(), false);
+                // Parked already: the screen does its own work meanwhile.
+                if (low != null) return low != Paused.END;
+            }
         }
         // The screen is finished before it is left: its inputs left, which mostly stay, before its ways, which leave.
         if (readsTrees()) {
@@ -833,31 +763,33 @@ public final class ExploreLoop {
                 probed.add(screen);
                 notes.addAll(rules(screen));
             }
-            Optional<String> input = inputsLeft(screen).stream().findFirst();
+            Optional<String> input = chooser.inputsLeft(screen).stream().findFirst();
             if (input.isPresent()) return pressInput(screen, input.get(), look);
         }
-        Optional<Edge> untried = untried(screen);
+        Optional<Edge> untried = chooser.untried(screen);
         if (untried.isPresent()) return press(screen, untried.get(), Mode.UNTRIED, look);
         if (readsTrees() && !notes.isEmpty()) {
             return settle(StopKind.SETTLED, screen, "notes " + screen + "#" + ++settledNotes, List.of(),
                     settledWhy(screen)) != Paused.END;
         }
         // Nothing left here the run presses itself: the nearest screen not done, a set-aside one last.
-        Optional<String> next = next(screen, true).or(() -> next(screen, false));
+        Optional<String> next = chooser.next(screen, to -> !clock.aside(to)).or(() -> chooser.next(screen, to -> true));
         if (next.isPresent()) return walk(screen, next.get());
         // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
-        if (!notSeenHere.isEmpty()) {
-            tried.addAll(notSeenHere);
-            notSeenHere.clear();
-            return true;
-        }
-        doing = Spent.IDLE;
+        if (chooser.giveUpNotSeen()) return true;
+        clock.doing(Spent.IDLE);
         play.idle(settings.poll());
         return true;
     }
 
+    /** The run is on {@code screen} now (null: on none of the map): its clock and what is looked for there move. */
+    private void clock(String screen) {
+        clock.moveTo(screen);
+        chooser.visit(screen);
+    }
+
     private boolean walk(String screen, String to) {
-        doing = Spent.WALKING;
+        clock.doing(Spent.WALKING);
         lastWalk = screen + "→" + to;
         lastEdge = null;
         from = screen;
@@ -866,74 +798,9 @@ public final class ExploreLoop {
         return true;
     }
 
-    /**
-     * Whether {@code screen} is set aside: unbuilt past its {@link #budget} on its own clock. Said once, when its clock
-     * first runs over, with what is still open on it.
-     */
-    private boolean overBudget(String screen) {
-        if (settings.screenBudget() == null) return false;
-        if (aside.contains(screen)) return true;
-        long ms = clock.getOrDefault(screen, 0L);
-        if (built.contains(screen) || ms < budget(screen).toMillis()) return false;
-        List<String> open = open(screen);
-        if (open.isEmpty()) return false;
-        aside.add(screen);
-        asideAt.put(screen, ms);
-        emit(new ExploreEvent.SetAside(screen, ms, open, nowMs.getAsLong()));
-        return true;
-    }
-
-    /**
-     * The low-yield stop on {@code screen}, set aside and back on its own work: raised once a second budget ran on its
-     * clock since it was set aside with it still open; null while not, once it was ignored, or while it is parked.
-     */
-    private Paused lowYield(String screen, Look look) {
-        if (leftAsIs.contains(screen)) return null;
-        long ms = clock.getOrDefault(screen, 0L);
-        // A screen a restarted run found aside gets its second budget from now.
-        long since = asideAt.computeIfAbsent(screen, s -> ms);
-        // The second budget is the screen's work alone: the clock a restart found is behind {@code since} already.
-        if (ms - since < budget(screen).toMillis() - restoredMs.getOrDefault(screen, 0L)) return null;
-        List<String> open = open(screen);
-        if (open.isEmpty()) return null;
-        // A fresh clock that ran out too did not take.
-        yieldResumed.remove(screen);
-        List<String> left = left(screen);
-        return stop(StopKind.LOW_YIELD, screen, screen, look, screen + " is still unbuilt after "
-                + JournalView.took(ms) + " on its clock, " + JournalView.took(ms - since) + " since it was set aside: "
-                + String.join(", ", open) + (left.isEmpty() ? "" : " (left: " + String.join(", ", left) + ")")
-                + "; its clock went to " + spent(screen)
-                + ". Fix what is open and resume for a fresh clock, or resume with ignore to leave it as it is", false);
-    }
-
-    /** Where {@code screen}'s clock went, one part a kind ({@code "pressing 3m2s, walking 18s"}). */
-    private String spent(String screen) {
-        List<String> parts = new ArrayList<>();
-        spentOn.getOrDefault(screen, new EnumMap<>(Spent.class)).forEach((kind, ms) -> {
-            if (ms >= 1000) parts.add(kind.label + " " + JournalView.took(ms));
-        });
-        // Kept in memory only: a restarted run times from its restart.
-        return parts.isEmpty() ? "nothing timed since the run started" : String.join(", ", parts);
-    }
-
-    /**
-     * What a resume of the low-yield stop on {@code screen} does: a fresh clock, the screen no longer aside, or with
-     * {@code ignore} the screen left as it is for the run, never stopped on for its yield again.
-     */
-    private void yielded(String screen, boolean ignore) {
-        if (ignore) {
-            leftAsIs.add(screen);
-            return;
-        }
-        clock.put(screen, 0L);
-        spentOn.remove(screen);
-        aside.remove(screen);
-        asideAt.remove(screen);
-        // The wait on the stop itself is not charged to the fresh clock.
-        if (screen.equals(onScreen)) {
-            onSince = nowMs.getAsLong();
-            waited.clear();
-        }
+    /** {@code screen}'s budget ({@link ScreenClock#budget}). */
+    Duration budget(String screen) {
+        return clock.budget(screen);
     }
 
     /**
@@ -942,7 +809,7 @@ public final class ExploreLoop {
      * a screen read with no value outside its readouts, a way pressed that arrived, a press after a stuck stop.
      */
     private void passed(StopKind kind, String place) {
-        if (replays(kind, place)) replayed("replayed");
+        if (replay.replays(kind, place)) replay.fixed("replayed");
         if (resumed == null || resumed.kind() != kind || !resumed.place().equals(place)) return;
         emit(new ExploreEvent.Fixed(resumed.id(), "reloaded as generation " + generation, nowMs.getAsLong()));
         // Its fix took: what it settled is evidence of nothing any more.
@@ -961,7 +828,7 @@ public final class ExploreLoop {
         if (refusal.kind() == Guards.Kind.FOREIGN_WINDOW || refusal.kind() == Guards.Kind.SYSTEM_DIALOG) {
             return Optional.of(stop(StopKind.GUARD, screen, screen, look, refusal.why(), true) != Paused.END);
         }
-        tried.add(key);
+        chooser.tryOnce(key);
         return Optional.of(refusal.kind() != Guards.Kind.NO_VERDICT
                 || stop(StopKind.NO_VERDICT, screen, key, look, label + ": " + refusal.why(), false) != Paused.END);
     }
@@ -972,14 +839,14 @@ public final class ExploreLoop {
         Guards.Refusal refusal = edge.via() == null ? guards.front(around) : guards.check(edge.via(), around);
         Optional<Boolean> refused = refused(screen, key, edge.label(), refusal, look);
         if (refused.isPresent()) return refused.get();
-        tried.add(key);
+        chooser.tryOnce(key);
         lastEdge = key;
-        doing = Spent.PRESSING;
+        clock.doing(Spent.PRESSING);
         pressed(screen, edge.label());
         long before = nowMs.getAsLong();
         pressing = screen + "." + edge.label();
         Took took = play.take(edge, settings.edge().toMillis());
-        pressingMs += nowMs.getAsLong() - before;
+        clock.took(nowMs.getAsLong() - before);
         pressing = null;
         Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > settings.edge().toMillis()
                 ? Arrival.TIMED_OUT : took.arrival();
@@ -1025,11 +892,10 @@ public final class ExploreLoop {
 
     private void pressed(String screen, String what) {
         if (resumed != null) passed(StopKind.STUCK, resumed.place());
-        if (replay != null) passed(StopKind.STUCK, replay.fault().place());
+        if (replay.on()) passed(StopKind.STUCK, replay.fault().place());
         lastPress = nowMs.getAsLong();
         lastWalk = null;
-        pressedOn.merge(screen, 1, Integer::sum);
-        pressCount++;
+        clock.pressed(screen);
         presses.addLast(screen + ": " + what);
         while (presses.size() > Stop.PRESSES) presses.removeFirst();
     }
@@ -1080,143 +946,6 @@ public final class ExploreLoop {
     }
 
     /**
-     * The inputs of {@code screen} the run presses itself, in the map's order ({@link ScreenGraph#left}: untried or
-     * failed, information last): no way, free, found in its tree, not pressed yet this run. One the bot's code presses
-     * ({@code Custom}) or one found by a picture is Claude's. A failed one is pressed again once a run: what failed may
-     * have been the page's, or an older run's judging.
-     */
-    private List<String> inputsLeft(String screen) {
-        MapScreen on = map.screen(screen).orElse(null);
-        if (on == null) return List.of();
-        Set<String> ways = new HashSet<>();
-        for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
-        List<String> left = new ArrayList<>();
-        for (String field : map.left(screen)) {
-            if (!(on.inputs().get(field) instanceof Button button) || button.element() == null) continue;
-            if (!(button.verdict() instanceof Verdict.Free)) continue;
-            String key = screen + "." + field;
-            if (ways.contains(field) || tried.contains(key) || avoided(key)) continue;
-            left.add(field);
-        }
-        return left;
-    }
-
-    /**
-     * Charges the time since the last round to the screen it was on, and moves the run's clock to {@code screen}
-     * (null: on no screen of the map). A screen the run leaves is said built, or building with what is still open on
-     * it, a built one too, which a stop parked on it while there opens again; a screen it reaches with nothing open
-     * is said built at once.
-     */
-    private void clock(String screen) {
-        long now = nowMs.getAsLong();
-        if (onScreen != null) {
-            long ms = Math.max(0, now - onSince);
-            clock.merge(onScreen, ms, Long::sum);
-            charge(onScreen, ms);
-            if (!onScreen.equals(screen)) {
-                List<String> open = open(onScreen);
-                if (open.isEmpty()) {
-                    if (!built.contains(onScreen)) built(onScreen, now);
-                } else if (built.remove(onScreen) | !open.equals(leftOpen.put(onScreen, open))) {
-                    // Said when what is open changed: a hub passed through again and again says it once.
-                    emit(new ExploreEvent.Building(onScreen, clock.get(onScreen), open, now));
-                }
-            }
-        }
-        waited.clear();
-        // A screen left for another and reached again is looked at afresh: its ways not seen are looked for again. A
-        // frame no screen matched between two of the same one is no visit elsewhere.
-        if (screen != null && !screen.equals(lastScreen)) notSeenHere.clear();
-        if (screen != null) lastScreen = screen;
-        onScreen = screen;
-        onSince = now;
-        if (screen != null && !built.contains(screen) && open(screen).isEmpty()) built(screen, now);
-    }
-
-    /** Splits {@code ms} charged to {@code screen}: what the run waited on at stops, the rest to what it did. */
-    private void charge(String screen, long ms) {
-        EnumMap<Spent, Long> on = spentOn.computeIfAbsent(screen, s -> new EnumMap<>(Spent.class));
-        long rest = ms;
-        for (Map.Entry<Spent, Long> wait : waited.entrySet()) {
-            long part = Math.min(rest, wait.getValue());
-            on.merge(wait.getKey(), part, Long::sum);
-            rest -= part;
-        }
-        if (rest > 0) on.merge(doing, rest, Long::sum);
-    }
-
-    /**
-     * {@code screen}'s budget: each press made on it this run and each input or way left on it, at the run's measured
-     * press time, within {@link Settings#screenBudget}'s floor and cap, the floor before any press is measured; on top
-     * of the clock a restarted run found it at. It never shrinks: a way refused, or a run of quick presses elsewhere,
-     * does not put a screen over.
-     */
-    Duration budget(String screen) {
-        long work = pressedOn.getOrDefault(screen, 0) + left(screen).size();
-        long perPress = pressCount == 0 ? 0 : pressingMs / pressCount;
-        long ms = restoredMs.getOrDefault(screen, 0L)
-                + settings.screenBudget().fit(Duration.ofMillis(work * perPress)).toMillis();
-        return Duration.ofMillis(budgets.merge(screen, ms, Math::max));
-    }
-
-    /** What the run still presses itself on {@code screen}: its ways not tried, then its inputs left, by name. */
-    private List<String> left(String screen) {
-        List<String> left = new ArrayList<>();
-        map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).forEach(e -> left.add(e.label()));
-        if (readsTrees()) left.addAll(inputsLeft(screen));
-        return left;
-    }
-
-    /** A restarted run's clocks go on where the journal left them: its built screens stay built. */
-    private void restoreClocks() {
-        JournalView.Build build = JournalView.of(journal).build();
-        for (ExploreEvent.Built b : build.built()) {
-            built.add(b.screen());
-            clock.put(b.screen(), b.ms());
-        }
-        for (ExploreEvent.Building b : build.open()) {
-            clock.put(b.screen(), b.ms());
-            restoredMs.put(b.screen(), b.ms());
-            leftOpen.put(b.screen(), b.open());
-        }
-        aside.addAll(build.aside());
-        // A low-yield stop resumed with ignore leaves its screen as it is across the restart too.
-        Map<String, String> lowYieldOn = new HashMap<>();
-        for (ExploreEvent event : journal.events()) {
-            if (event instanceof ExploreEvent.Stopped s && s.stop().kind() == StopKind.LOW_YIELD
-                    && s.stop().screen() != null) lowYieldOn.put(s.stop().id(), s.stop().screen());
-            if (event instanceof ExploreEvent.Fixed f && f.why().equals("ignored") && lowYieldOn.containsKey(f.stopId())) {
-                leftAsIs.add(lowYieldOn.get(f.stopId()));
-            }
-        }
-        // A built screen a stop of the last run is still parked on is open again.
-        long now = nowMs.getAsLong();
-        for (String screen : List.copyOf(built)) {
-            List<String> open = open(screen);
-            if (open.isEmpty()) continue;
-            built.remove(screen);
-            leftOpen.put(screen, open);
-            emit(new ExploreEvent.Building(screen, clock.getOrDefault(screen, 0L), open, now));
-        }
-    }
-
-    private void built(String screen, long now) {
-        built.add(screen);
-        aside.remove(screen);
-        asideAt.remove(screen);
-        emit(new ExploreEvent.Built(screen, clock.getOrDefault(screen, 0L), now));
-        // A low-yield stop resumed with a fresh clock took once its screen is built; one parked on it is answered.
-        String resumedId = yieldResumed.remove(screen);
-        if (resumedId != null) emit(new ExploreEvent.Fixed(resumedId, "built on its fresh clock", now));
-        parked.values().stream().filter(s -> s.kind() == StopKind.LOW_YIELD && screen.equals(s.screen()))
-                .findFirst().ifPresent(s -> {
-                    parked.remove(key(s));
-                    journal.queue(List.copyOf(parked.values()));
-                    emit(new ExploreEvent.Fixed(s.id(), "its screen was built", now));
-                });
-    }
-
-    /**
      * What is still to do on {@code screen} before it is built, one line a kind ({@code "3 untried"}): inputs with no
      * picture, ways and inputs not tried yet, inputs with no verdict, ways waiting on their condition, stops parked
      * on it (missing facts, missing conditions, the rest), and, in a run that plays a plan, inputs that spend with no
@@ -1232,17 +961,15 @@ public final class ExploreLoop {
             if (input.getValue() instanceof Button button && !cropped(button, website())
                     && !pictures.contains(screen + "." + input.getKey())) uncropped++;
         }
-        long untried = map.edges().stream().filter(e -> e.from().equals(screen) && untriedEdge(e)).count()
-                + (readsTrees() ? inputsLeft(screen).size() : 0);
+        long untried = map.edges().stream().filter(e -> e.from().equals(screen) && chooser.untriedEdge(e)).count()
+                + (readsTrees() ? chooser.inputsLeft(screen).size() : 0);
         long unjudged = map.untagged().stream().filter(name -> name.screen().equals(screen)).count();
         // A way whose condition says no is not tried yet: the screen waits for it to hold. An unknown one is untried.
-        long waiting = map.edges().stream().filter(e -> e.from().equals(screen) && !e.onItsOwn()
-                && !tried.contains(key(e)) && !avoided(key(e)) && Conditions.answer(e.when()) == Answer.NO).count();
-        long facts = parkedOn(screen, StopKind.MISSING_FACT);
-        long conditions = parkedOn(screen, StopKind.MISSING_CONDITION);
+        long waiting = chooser.waiting(screen);
+        long facts = pauses.on(screen, StopKind.MISSING_FACT);
+        long conditions = pauses.on(screen, StopKind.MISSING_CONDITION);
         // A low-yield stop is about the screen's yield, not something on it: it holds nothing open.
-        long others = parked.values().stream().filter(stop -> screen.equals(stop.screen())).count() - facts - conditions
-                - parkedOn(screen, StopKind.LOW_YIELD);
+        long others = pauses.on(screen) - facts - conditions - pauses.on(screen, StopKind.LOW_YIELD);
         long unplanned = website() ? 0 : unplanned(on);
         List<String> open = new ArrayList<>();
         if (uncropped > 0) open.add(uncropped + " uncropped");
@@ -1254,11 +981,6 @@ public final class ExploreLoop {
         if (others > 0) open.add(others + (others == 1 ? " stop parked" : " stops parked"));
         if (unplanned > 0) open.add(unplanned + " spending for no goal");
         return open;
-    }
-
-    /** How many stops of {@code kind} on {@code screen} are parked: each one Claude has still to answer. */
-    private long parkedOn(String screen, StopKind kind) {
-        return parked.values().stream().filter(stop -> stop.kind() == kind && screen.equals(stop.screen())).count();
     }
 
     /**
@@ -1348,7 +1070,7 @@ public final class ExploreLoop {
         }
         List<TreeAnswer.SameInput> same = TreeAnswer.sameInputs(screen, tree, elements, leads);
         // Gone from what this run presses too, before the notes are written.
-        same.forEach(s -> tried.add(screen + "." + s.field()));
+        same.forEach(s -> chooser.tryOnce(screen + "." + s.field()));
         return same;
     }
 
@@ -1401,17 +1123,17 @@ public final class ExploreLoop {
         Guards.Refusal refusal = input == null ? guards.front(play.around(null)) : guards.check(input, play.around(input));
         Optional<Boolean> refused = refused(screen, key, field, refusal, look);
         if (refused.isPresent()) return refused.get();
-        tried.add(key);
+        chooser.tryOnce(key);
         // What the guard stopped before this press is not its doing.
         play.stopped();
         Effect.State before = play.state().orElse(Effect.State.of(null, ""));
-        doing = Spent.PRESSING;
+        clock.doing(Spent.PRESSING);
         pressed(screen, field);
         lastEdge = null;
         pressing = key;
         long started = nowMs.getAsLong();
         Optional<String> at = play.press(screen, field, settings.edge().toMillis());
-        pressingMs += nowMs.getAsLong() - started;
+        clock.took(nowMs.getAsLong() - started);
         pressing = null;
         Effect.State after = play.state().orElse(Effect.State.of(null, ""));
         Effect effect = Effect.judge(before, after, play.stopped());
@@ -1523,8 +1245,8 @@ public final class ExploreLoop {
      * stop.
      */
     private Paused settle(StopKind kind, String screen, String place, List<TreeAnswer> answers, String missing) {
-        if (parked.containsKey(parkedKey(kind, place))) return null;
-        boolean replayed = replays(kind, place);
+        if (pauses.parked(kind, place)) return null;
+        boolean replayed = replay.replays(kind, place);
         // A resumed UNWRITTEN stop is the same place's answer, refused: settled again, it did not take either.
         if (replayed || resumed != null && (resumed.kind() == kind || resumed.kind() == StopKind.UNWRITTEN)
                 && resumed.place().equals(place)) {
@@ -1552,76 +1274,9 @@ public final class ExploreLoop {
         return edge.when() == null && edge.state() == null && (edge.via() == null || edge.via().locked() == null);
     }
 
-    /**
-     * The first edge out of {@code screen} not tried, not avoided, open now. One the moves cannot press here (a custom
-     * input, a way back with no close button seen) counts as tried, so no walk comes back for it.
-     */
-    private Optional<Edge> untried(String screen) {
-        for (Edge edge : map.edges()) {
-            // One taken by waiting is not pressed: the game takes it by itself (untriedEdge leaves it out).
-            if (!edge.from().equals(screen) || !untriedEdge(edge)) continue;
-            if (notSeenHere.contains(key(edge))) continue;
-            if (open(edge)) return Optional.of(edge);
-            // Not there now: looked for again on the next visit, tried once absent then too.
-            if (notSeen.add(key(edge))) notSeenHere.add(key(edge));
-            else tried.add(key(edge));
-        }
-        return Optional.empty();
-    }
-
-    private boolean untriedEdge(Edge edge) {
-        String key = key(edge);
-        // An unknown never closes a way: one behind a fact not read yet is pressed, as the screen map asks it.
-        return !edge.onItsOwn() && !tried.contains(key) && !avoided(key) && Conditions.holds(edge.when());
-    }
-
-    private boolean open(Edge edge) {
-        try {
-            return play.open(edge);
-        } catch (RuntimeException e) {
-            rethrowStop(e);
-            return true;
-        }
-    }
-
-    /**
-     * The screen the run walks to from {@code screen}: the map's next to explore ({@link ScreenGraph#nextToExplore}),
-     * nearest first, among the screens with work the run does itself there, an input {@link ScreenGraph#left} or a
-     * way not taken this run (a done screen's ways are still taken once a run, which proves them); not {@code screen},
-     * nor, when {@code notAside}, one set aside.
-     */
-    private Optional<String> next(String screen, boolean notAside) {
-        // One no way reaches from here comes last in the map's order: then none is reached, and the run waits here.
-        return map.nextToExplore(Optional.of(screen), to -> !to.equals(screen)
-                && !(notAside && aside.contains(to)) && hasWork(to))
-                // Not through a way not on the screen now.
-                .filter(to -> map.pathTo(screen, to, edge -> !notSeenHere.contains(key(edge))).isPresent());
-    }
-
-    /** Whether the run has work of its own on {@code screen}: a way not taken this run, or an input it presses. */
-    private boolean hasWork(String screen) {
-        // A website's input the run presses itself is work too: a dialog's button is no edge until pressed.
-        return map.edges().stream().anyMatch(e -> e.from().equals(screen) && untriedEdge(e))
-                || readsTrees() && !inputsLeft(screen).isEmpty();
-    }
-
     /** An edge's key: {@code "Home.shop→Shop"}. */
     static String key(Edge edge) {
         return edge.from() + "." + edge.label() + "→" + edge.to();
-    }
-
-    /** A parked stop's key: its kind and place, so two kinds parked on one place are both kept. */
-    private static String key(Stop stop) {
-        return parkedKey(stop.kind(), stop.place());
-    }
-
-    private static String parkedKey(StopKind kind, String place) {
-        return kind.id() + " " + place;
-    }
-
-    /** Whether a stop of any kind is parked on {@code place}: it is not pressed until one is fixed. */
-    private boolean avoided(String place) {
-        return parked.values().stream().anyMatch(stop -> stop.place().equals(place));
     }
 
     /**
@@ -1649,12 +1304,12 @@ public final class ExploreLoop {
 
     private Paused stop(StopKind kind, String screen, String place, Look look, String missing, boolean neverParks,
                         Fault fault) {
-        Spent waits = settling ? Spent.SETTLING : Spent.CLAUDE;
+        boolean settles = settling;
         settling = false;
-        if (parked.containsKey(parkedKey(kind, place))) return null;
+        if (pauses.parked(kind, place)) return null;
         // The stop a replayed fault was came back on the rebuilt SDK: the fault is still there, held again.
-        if (fault == null && dev && replays(kind, place)) {
-            settling = waits == Spent.SETTLING;
+        if (fault == null && dev && replay.replays(kind, place)) {
+            settling = settles;
             return stop(StopKind.FAULT, screen, place, look, missing, true, new Fault(kind, replay.source(),
                     "the stop came back as " + kind.id() + " after the SDK's reload"));
         }
@@ -1662,19 +1317,18 @@ public final class ExploreLoop {
         Shown shown = play.shown(screen);
         Stop stop = new Stop(id, kind, screen, place, play.keep(id), look.texts(), shown.elements(), shown.facts(),
                 List.copyOf(presses), missing, nowMs.getAsLong());
-        boolean again = resumed != null && resumed.same(stop)
-                || replay != null && kind == StopKind.FAULT && place.equals(replay.fault().place());
+        boolean again = resumed != null && resumed.same(stop) || kind == StopKind.FAULT && replay.on(place);
         if (again) stop = new Stop(id, kind, screen, place, stop.framePath(), stop.texts(), stop.elements(),
                 stop.facts(), stop.lastPresses(), "the fix did not take: " + missing, stop.at());
         resumed = null;
         // A stop elsewhere, or one that only pauses on the fault's place, leaves the replay waiting for it. One of
         // another kind that set the place aside as tried means the fault is never met again: the replay is lost, and
         // said. Its own kind there is the fault again.
-        if (replay != null && place.equals(replay.fault().place())) {
-            if (kind == StopKind.FAULT || kind == replay.replays()) {
-                replay = null;
-            } else if (tried.contains(place)) {
-                replayLost(kind.id() + " was met on " + place + " before the fault could be replayed");
+        if (replay.on(place)) {
+            if (kind == StopKind.FAULT || kind == replay.kind()) {
+                replay.met();
+            } else if (chooser.tried(place)) {
+                replay.lost(kind.id() + " was met on " + place + " before the fault could be replayed");
             }
         }
         emit(new ExploreEvent.Stopped(stop, again, nowMs.getAsLong()));
@@ -1685,96 +1339,11 @@ public final class ExploreLoop {
             memory(stop, fault.plain(), fault.source()).write(journal);
         }
         long pausedAt = nowMs.getAsLong();
-        Paused paused = pause(stop, neverParks);
-        // A resume that gave the screen a fresh clock moved its start past the pause: only what follows it is waited.
-        waited.merge(waits, Math.max(0, nowMs.getAsLong() - Math.max(pausedAt, onSince)), Long::sum);
+        Paused paused = pauses.pause(stop, neverParks, answers);
+        clock.waitedAt(pausedAt, settles);
         // The time paused is Claude's, not the run's: it does not count as nothing pressed.
         lastPress = nowMs.getAsLong();
         return paused;
-    }
-
-    /**
-     * Waits on {@code stop} for a command, the game back in front, or its parking time. A fault is held instead: only
-     * the SDK's reload, a resume with ignore, or the run's end lets it go.
-     */
-    private Paused pause(Stop stop, boolean neverParks) {
-        String id = stop.id();
-        boolean held = stop.kind() == StopKind.FAULT;
-        long deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
-        // A stop that cannot park (a window in front) ends the run once nothing could be pressed for the stuck time.
-        long stuckAt = nowMs.getAsLong() + settings.stuckAfter().toMillis();
-        while (true) {
-            Optional<Journal.Command> command = journal.takeCommand();
-            if (command.orElse(null) instanceof Journal.Command.End || spent()) return Paused.END;
-            // Claude calls this stop a fault: held from now on. Out of dev mode, or for another stop, it is dropped.
-            if (command.orElse(null) instanceof Journal.Command.Fault(String stopId, String why)
-                    && dev && !held && id.equals(stopId)) {
-                held = true;
-                emit(new ExploreEvent.Faulted(id, "claude", why, "", play.sdkVersion(), nowMs.getAsLong()));
-                memory(stop, stop.kind(), "claude").write(journal);
-            }
-            // A resume of a stop that is neither this one nor parked is stale: it changes nothing.
-            if (command.orElse(null) instanceof Journal.Command.Resume(String stopId, boolean ignore,
-                                                                        List<String> skipped)) {
-                if (held && !ignore && id.equals(stopId)) {
-                    emit(new ExploreEvent.Reloaded(stopId, generation, List.of(FAULT_RESUMES), nowMs.getAsLong()));
-                } else if (stop.id().equals(stopId) || parked(stopId)) {
-                    keepLeftOut(stopId, skipped);
-                    Optional<Paused> resumedNow = resume(stop, stopId, ignore);
-                    if (resumedNow.isPresent()) {
-                        // A fault dropped as a misreading: no restart goes on from it.
-                        if (held) ResumeFile.delete(journal);
-                        return resumedNow.get();
-                    }
-                    // Claude is on this stop: its parking time starts again. A parked one resumed leaves it be.
-                    if (stop.id().equals(stopId)) {
-                        deadline = nowMs.getAsLong() + settings.parkAfter().toMillis();
-                        stuckAt = nowMs.getAsLong() + settings.stuckAfter().toMillis();
-                    }
-                } else {
-                    stale(stopId);
-                }
-            }
-            // A fault waits for its fix: never parked, never let go by the game coming back.
-            if (held) {
-                play.idle(settings.poll());
-                continue;
-            }
-            if (stop.kind() == StopKind.GUARD && neverParks) {
-                Foreground front = play.front();
-                if (!front.foreign() && front.dialog().isEmpty()) {
-                    emit(new ExploreEvent.Fixed(id, "the game is in front again", nowMs.getAsLong()));
-                    return Paused.BACK;
-                }
-                // Never parked, so no press goes to the window in front: the run ends instead (R3).
-                if (nowMs.getAsLong() >= stuckAt) {
-                    stuck = true;
-                    return Paused.END;
-                }
-            } else if (!neverParks && (nowMs.getAsLong() >= deadline
-                    || command.orElse(null) instanceof Journal.Command.Park(String stopId) && id.equals(stopId))) {
-                // A stop Claude handed to the user waits in the queue for them at once: the run goes on.
-                parked.put(key(stop), stop);
-                journal.queue(List.copyOf(parked.values()));
-                emit(new ExploreEvent.Parked(id, nowMs.getAsLong()));
-                return Paused.PARKED;
-            }
-            play.idle(settings.poll());
-        }
-    }
-
-    /** Keeps {@code lines}, left out of the stop {@code stopId}, until a resume of it takes. */
-    private void keepLeftOut(String stopId, List<String> lines) {
-        if (!lines.isEmpty()) leftOut.merge(stopId, lines, (kept, more) -> {
-            List<String> all = new ArrayList<>(kept);
-            all.addAll(more);
-            return List.copyOf(all);
-        });
-    }
-
-    /** Whether the queue holds the stop {@code stopId}. */
-    private boolean parked(String stopId) {
-        return parked.values().stream().anyMatch(s -> s.id().equals(stopId));
     }
 
     /** A resume of {@code stopId}, neither open nor parked, answered as refused so the tool waiting on it hears. */
@@ -1784,40 +1353,39 @@ public final class ExploreLoop {
     }
 
     /**
-     * A resume of {@code stopId} while paused on {@code open} (null: between stops, a parked one): the bot reloaded.
-     * Refused, the run stays paused (empty).
-     * A parked stop resumed leaves the queue and its place is tried again; the open stop stays open (empty). The open
-     * stop resumed: what the next round meets says whether the fix took.
+     * A resume of {@code stopId} while paused on {@code open} (null: between stops, a parked one): the bot reloaded,
+     * but with {@code ignore}, which changes nothing in the bot and so compiles nothing (R8). Refused, the run stays
+     * paused (empty). A parked stop resumed leaves the queue and its place is tried again; the open stop stays open
+     * (empty). The open stop resumed: what the next round meets says whether the fix took.
      */
     private Optional<Paused> resume(Stop open, String stopId, boolean ignore) {
-        Stop parkedStop = open != null && open.id().equals(stopId) ? null
-                : parked.values().stream().filter(s -> s.id().equals(stopId)).findFirst().orElse(null);
-        Reload.Reloaded done = reload.reload();
-        if (!done.errors().isEmpty()) {
-            emit(new ExploreEvent.Reloaded(stopId, generation, done.errors(), nowMs.getAsLong()));
-            return Optional.empty();
+        Stop parkedStop = open != null && open.id().equals(stopId) ? null : pauses.parked(stopId).orElse(null);
+        if (!ignore) {
+            Reload.Reloaded done = reload.reload();
+            if (!done.errors().isEmpty()) {
+                emit(new ExploreEvent.Reloaded(stopId, generation, done.errors(), nowMs.getAsLong()));
+                return Optional.empty();
+            }
+            generation = done.generation();
+            map = done.map();
+            chooser.use(map);
+            if (done.guards() != null) guards = done.guards();
+            verdictsDue = true;
         }
-        generation = done.generation();
-        map = done.map();
-        if (done.guards() != null) guards = done.guards();
-        verdictsDue = true;
         emit(new ExploreEvent.Reloaded(stopId, generation, List.of(), nowMs.getAsLong()));
         Stop fixed = parkedStop != null ? parkedStop : open;
-        if (fixed.kind() == StopKind.LOW_YIELD && fixed.screen() != null && !built.contains(fixed.screen())) {
-            yielded(fixed.screen(), ignore);
-            if (!ignore && parkedStop == null) yieldResumed.put(fixed.screen(), fixed.id());
+        if (fixed.kind() == StopKind.LOW_YIELD && fixed.screen() != null) {
+            clock.yielded(fixed.screen(), fixed.id(), ignore, parkedStop == null);
         }
-        List<String> lines = leftOut.remove(fixed.id());
+        List<String> lines = pauses.takeLeftOut(fixed.id());
         if (lines != null && !ignore) skips.add(new Skip(fixed, lines));
-        if (parkedStop != null) {
-            parked.remove(key(parkedStop));
-            journal.queue(List.copyOf(parked.values()));
-        }
+        if (parkedStop != null) pauses.unpark(parkedStop);
         // Its place is tried again, so a fix that did not take shows; an ignored value is never raised again.
-        retry(fixed.kind(), fixed.place());
+        chooser.retry(fixed.kind(), fixed.place());
         if (!(ignore && fixed.kind() == StopKind.MISSING_FACT)) answered.remove(fixed.place());
         if (parkedStop != null) {
-            emit(new ExploreEvent.Fixed(parkedStop.id(), "reloaded as generation " + generation, nowMs.getAsLong()));
+            emit(new ExploreEvent.Fixed(parkedStop.id(), ignore ? "ignored" : "reloaded as generation " + generation,
+                    nowMs.getAsLong()));
             return Optional.empty();
         }
         resumed = ignore ? null : open;
@@ -1831,7 +1399,7 @@ public final class ExploreLoop {
     }
 
     /** Rethrows {@code e} when it is a stop of the run, or wraps one. */
-    private static void rethrowStop(RuntimeException e) {
+    static void rethrowStop(RuntimeException e) {
         for (Throwable at = e; at != null; at = at.getCause() == at ? null : at.getCause()) {
             if (InstalledRun.isStop(at)) throw (RuntimeException) at;
         }

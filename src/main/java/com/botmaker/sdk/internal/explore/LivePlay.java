@@ -91,11 +91,22 @@ public final class LivePlay implements ExploreLoop.Play {
         AtomicReference<Generation> current = new AtomicReference<>(first);
         ExploreLoop.Reload reload = () -> switch (current.get().next(project, current.get().number() + 1)) {
             case Generation.Ok(Generation next) -> {
-                next.install();
-                current.set(next);
+                try {
+                    next.install();
+                } catch (RuntimeException | LinkageError e) {
+                    next.close();
+                    throw e;
+                }
+                // Nothing of a reloaded generation runs now: its loader is let go, not kept for the run's length. The
+                // first stays open: the run's entry still holds its holders until the run ends.
+                Generation old = current.getAndSet(next);
+                if (old.number() > 0) old.close();
                 play.use(ScreenMaps.installed(), next.plan());
                 yield new ExploreLoop.Reload.Reloaded(next.number(), ScreenMaps.installed(), guards(next), List.of());
             }
+            // No source changed: the generation serving goes on, nothing compiled.
+            case Generation.Unchanged() -> new ExploreLoop.Reload.Reloaded(current.get().number(),
+                    ScreenMaps.installed(), guards(current.get()), List.of());
             case Generation.Refused(List<String> errors) ->
                     new ExploreLoop.Reload.Reloaded(current.get().number(), ScreenMaps.installed(), null, errors);
         };

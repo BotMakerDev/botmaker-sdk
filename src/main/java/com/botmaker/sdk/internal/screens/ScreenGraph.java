@@ -585,6 +585,25 @@ public final class ScreenGraph {
     }
 
     /**
+     * The screen exploring works on next as the assistant and the Screens window both name it, from {@code live}, the
+     * screen a live run stands on: while it runs, among the screens with inputs left to press, the run's work, a
+     * screen only not all cut being cutting work it never goes to. Empty when nothing is left.
+     */
+    public Optional<String> nextWork(Optional<String> live) {
+        Optional<String> at = live.filter(screens()::containsKey);
+        return at.isPresent() ? nextToExplore(at, c -> !left(c).isEmpty()) : nextToExplore(at);
+    }
+
+    /** {@link #nextWork} in words, as read_map, read_guide and ▶▶ say it; empty when nothing is left. */
+    public String nextWorkSaid(Optional<String> live) {
+        Optional<String> at = live.filter(screens()::containsKey);
+        return nextWork(live).map(c -> "Next to explore: " + shown(c) + (at.filter(c::equals).isPresent()
+                ? ", where the run is: it finishes a screen before it leaves it."
+                : at.isPresent() ? ", the nearest screen not done from " + shown(at.get()) + ", where the run is."
+                : ", the shallowest screen not done.")).orElse("");
+    }
+
+    /**
      * As {@link #nextToExplore(Optional)}, among the screens {@code open} keeps in place of those not {@link #done}: a
      * run keeps those it has work of its own on, set-aside ones in a second call.
      */

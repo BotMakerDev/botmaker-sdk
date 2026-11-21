@@ -131,22 +131,15 @@ public final class MapReport {
 
     /** The screen {@link #next} names, ▶▶'s too. */
     static Optional<String> nextScreen(ScreenGraph graph, Optional<String> live) {
-        Optional<String> at = live.filter(graph.screens()::containsKey);
-        return at.isPresent() ? graph.nextToExplore(at, c -> !graph.left(c).isEmpty()) : graph.nextToExplore(at);
+        return graph.nextWork(live);
     }
 
     /**
-     * The screen exploring works on next, in words, as read_map, read_guide and ▶▶ name it: from {@code live}, the
-     * screen a live run stands on ({@link Journal#liveAt}), so the assistant and the window name the run's own next
-     * screen: while it runs, among the screens with inputs left to press, the run's work, a screen only not all cut
-     * being cutting work it never goes to; empty when nothing is left.
+     * The screen exploring works on next, in words ({@link ScreenGraph#nextWorkSaid}), from {@code live}, the screen a
+     * live run stands on ({@link Journal#liveAt}).
      */
-    public static String next(ScreenGraph graph, Optional<String> live) {
-        Optional<String> at = live.filter(graph.screens()::containsKey);
-        return nextScreen(graph, live).map(c -> "Next to explore: " + graph.shown(c) + (at.filter(c::equals).isPresent()
-                ? ", where the run is: it finishes a screen before it leaves it."
-                : at.isPresent() ? ", the nearest screen not done from " + graph.shown(at.get()) + ", where the run is."
-                : ", the shallowest screen not done.")).orElse("");
+    static String next(ScreenGraph graph, Optional<String> live) {
+        return graph.nextWorkSaid(live);
     }
 
     /**

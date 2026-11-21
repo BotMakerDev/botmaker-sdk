@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A Keep exploring resume compiles only when the bot changed.** A resume that finds the bot's sources and
+  resources as the running generation was compiled from goes on with that generation, and a resume with `ignore`
+  reloads nothing at all. Each new generation closes the one before it, so a long run's reloads no longer keep
+  every old class folder open. Claude can no longer resume or fault a stop that is the user's: `wait` passes over
+  it and says the run waits on the user, who answers it from the Explore tab. Inside, `ExploreLoop` hands what to
+  press next, each screen's clock, a fault's replay and the waits on stops to four classes of their own, and
+  Keep exploring and Discover start through one entry.
 - **Each stop of Keep exploring says who takes it.** A stop's line in the journal carries its `role`: the
   Cartographer (what the map lacks), the Mechanic (Discover's own fault or a crash), the user (a guard, a stuck
   run) or the settler (answered by itself). `botmaker_sdk_explore` `wait` takes a `role`, so a session waits on its

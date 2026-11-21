@@ -4,22 +4,10 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.run.RunArguments;
-import com.botmaker.sdk.api.console.Debug;
-import com.botmaker.sdk.api.time.Wait;
-import com.botmaker.sdk.internal.explore.DiscoverArgs;
 import com.botmaker.sdk.internal.explore.ExploreBudget;
-import com.botmaker.sdk.internal.explore.ExploreLoop;
-import com.botmaker.sdk.internal.explore.Generation;
-import com.botmaker.sdk.internal.explore.LivePlay;
 import com.botmaker.sdk.internal.explore.ResumeFile;
-import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
-import com.botmaker.sdk.internal.trace.Say;
 
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Studio's <em>Keep exploring</em> run (spec 2026-11-09): plays and explores the game for hours on its own, and stops
@@ -37,54 +25,8 @@ public final class KeepExploring {
      */
     @Hidden("Studio's Keep exploring run")
     public static void main(String[] args) {
-        ExploreBudget budget;
-        try {
-            budget = RunArguments.read(ExploreBudget.class);
-        } catch (IllegalArgumentException e) {
-            Debug.error("Keep exploring cannot read its arguments: " + e.getMessage());
-            return;
-        }
-        Generation first;
-        try {
-            first = Generation.first(List.of(args));
-        } catch (RuntimeException | LinkageError e) {
-            Debug.error("Keep exploring cannot load the bot's classes: " + e);
-            return;
-        }
-        Bot.trial(() -> {
-            first.install();
-            Optional<ResumeFile> pending = LivePlay.pending(project());
-            // A restart (a dev reload, a crash) is handed no arguments: it takes those the run kept.
-            // A Discover's arguments a restart through this entry keeps on for the next.
-            explore(first, ResumeFile.budgetOf(budget, pending), pending.map(ResumeFile::discover).orElse(null),
-                    List.of(), pending);
-        }, first.holders());
-    }
-
-    /** The bot's folder, the run's working directory. */
-    static Path project() {
-        return Path.of(System.getProperty("user.dir", "."));
-    }
-
-    /**
-     * Starts the game as a run's cold start does, then explores until stopped or past {@code budget}, {@code settled}
-     * handed on with the first stop it settles, going on from {@code pending}; {@code discover} is what a
-     * <em>Discover</em> run was started with (null: none). {@code first} is installed already.
-     */
-    static void explore(Generation first, ExploreBudget budget, DiscoverArgs discover, List<TreeAnswer> settled,
-                        Optional<ResumeFile> pending) {
-        Bot.launchConfiguredTarget(Bot.StartMode.COLD);
-        AtomicInteger restarts = new AtomicInteger();
-        Runnable restart = () -> {
-            // Restarts in a row wait longer each time, as a run's recoveries do.
-            Wait.time(Bot.backOff(restarts.incrementAndGet()));
-            Bot.launchConfiguredTarget(Bot.StartMode.RESTART);
-        };
-        ExploreLoop.End end = LivePlay.explore(first, project(), restart, budget, discover, settled, pending);
-        Say.info(switch (end) {
-            case BUDGET -> "Keep exploring ended: its budget is spent.";
-            case STUCK -> "Keep exploring ended: another window stayed in front of the game, nothing could be pressed.";
-            default -> "Keep exploring ended.";
-        });
+        // A Discover's arguments a restart through this entry keeps on for the next.
+        ExploreEntry.main("Keep exploring", args, ExploreBudget.class, (budget, pending) -> new ExploreEntry.Start(
+                ResumeFile.budgetOf(budget, pending), pending.map(ResumeFile::discover).orElse(null), List.of()));
     }
 }

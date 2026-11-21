@@ -4,13 +4,10 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.palette.Hidden;
-import com.botmaker.plugin.api.run.RunArguments;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.explore.DiscoverArgs;
-import com.botmaker.sdk.internal.explore.Generation;
-import com.botmaker.sdk.internal.explore.LivePlay;
 import com.botmaker.sdk.internal.explore.ResumeFile;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.launch.LaunchTarget;
@@ -22,7 +19,6 @@ import com.botmaker.shared.launch.LaunchSpec;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * The SDK's <em>Discover</em> run (web discovery phase 6c): maps a game or a website into the bot's screen map by
@@ -37,29 +33,11 @@ public final class Discover {
     /** The run's main: {@code args} are the binary names of the bot's value holders, as for {@link KeepExploring}. */
     @Hidden("Studio's Discover run")
     public static void main(String[] args) {
-        DiscoverArgs given;
-        try {
-            given = RunArguments.read(DiscoverArgs.class);
-        } catch (IllegalArgumentException e) {
-            Debug.error("Discover cannot read its arguments: " + e.getMessage());
-            return;
-        }
-        Generation first;
-        try {
-            first = Generation.first(List.of(args));
-        } catch (RuntimeException | LinkageError e) {
-            Debug.error("Discover cannot load the bot's classes: " + e);
-            return;
-        }
-        Bot.trial(() -> {
-            first.install();
-            Optional<ResumeFile> pending = LivePlay.pending(KeepExploring.project());
-            // A restart (a dev reload, a crash) is handed no arguments: it takes those the run kept.
+        ExploreEntry.main("Discover", args, DiscoverArgs.class, (given, pending) -> {
             DiscoverArgs started = ResumeFile.discoverOf(given, pending);
             List<TreeAnswer> settled = target(started);
-            if (settled == null) return;
-            KeepExploring.explore(first, started.budget(), started, settled, pending);
-        }, first.holders());
+            return settled == null ? null : new ExploreEntry.Start(started.budget(), started, settled);
+        });
     }
 
     /**

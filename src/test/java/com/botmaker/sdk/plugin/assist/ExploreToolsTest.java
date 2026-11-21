@@ -200,6 +200,34 @@ class ExploreToolsTest {
         assertFalse(journal.commandWaiting(), "and no park is written for it");
     }
 
+    /**
+     * The user's stops are theirs alone: Claude can neither resume nor fault one, open or parked, and a wait with no
+     * role passes over it, saying the run waits on the user.
+     */
+    @Test
+    void claudeLeavesTheUsersStops() {
+        Journal journal = journal();
+        Stop asked = stop("no_verdict-1");
+        journal.append(new ExploreEvent.Began(true, 1));
+        journal.append(new ExploreEvent.Stopped(asked, false, 2));
+        journal.append(new ExploreEvent.Asked(asked.id(), "free, spends or never?", 3));
+        journal.append(new ExploreEvent.Parked(asked.id(), 4));
+        journal.queue(List.of(asked));
+        Stop guard = new Stop("guard-2", StopKind.GUARD, "Shop", "Shop", "", List.of(), List.of(), Map.of(), List.of(),
+                "another window is in front", 5);
+        journal.append(new ExploreEvent.Stopped(guard, false, 5));
+
+        AgentReply parked = ExploreTools.resume(journal, asked.id(), false, Duration.ofSeconds(1));
+        assertTrue(parked.isRefused() && text(parked).contains("the user decides it from the Explore tab"),
+                text(parked));
+        assertTrue(ExploreTools.resume(journal, guard.id(), true, Duration.ofSeconds(1)).isRefused());
+        assertTrue(ExploreTools.fault(journal, guard.id(), "misread", Duration.ofSeconds(1)).isRefused());
+        assertFalse(journal.commandWaiting(), "nothing asked of the run");
+
+        String waited = text(ExploreTools.waitFor(journal, Duration.ofMillis(300)));
+        assertTrue(waited.startsWith("Still running") && waited.contains("It waits on guard-2, the user's"), waited);
+    }
+
     @Test
     void waitTimesOutWithCounts() {
         Journal journal = journal();
