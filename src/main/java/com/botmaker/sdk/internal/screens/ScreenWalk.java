@@ -291,6 +291,7 @@ public final class ScreenWalk {
         Set<String> marks = graph.markers(under).keys();
         Set<String> its = graph.markers(over).keys();
         if (its.size() > marks.size() && its.containsAll(marks)) return true;
+        if (overPage(over, under)) return true;
         if (graph.panelOf(over).filter(under::equals).isPresent()) return true;
         for (String from : graph.opensFrom(over)) {
             if (from.equals(over)) continue;
@@ -302,10 +303,26 @@ public final class ScreenWalk {
         return false;
     }
 
+    /**
+     * Whether {@code over} is opened over {@code under}, a website's page that its route tells and that is still at it
+     * under a dialog: {@code over} is at no route and its markers hold the page's others and more. It is so over
+     * whichever page it was met first: nunu.ai's Book a Demo, met over Home, was written again as a new screen over
+     * Case Studies (2026-11-21).
+     */
+    private boolean overPage(String over, String under) {
+        String route = graph.markers(under).route();
+        if (route == null || graph.markers(over).route() != null) return false;
+        Set<String> rest = new HashSet<>(graph.markers(under).keys());
+        rest.remove("route " + route);
+        Set<String> its = graph.markers(over).keys();
+        return its.size() > rest.size() && its.containsAll(rest);
+    }
+
     /** Of {@code shown}, the screen nothing else shown hides, as {@link #whereOn} picks it. */
     private Optional<String> shownTop(List<String> shown) {
         Set<String> under = new HashSet<>();
         for (String c : shown) {
+            for (String page : shown) if (overPage(c, page)) under.add(page);
             // A panel hides the screen it is in, however it was opened.
             graph.panelOf(c).ifPresent(under::add);
             for (String from : graph.opensFrom(c)) {

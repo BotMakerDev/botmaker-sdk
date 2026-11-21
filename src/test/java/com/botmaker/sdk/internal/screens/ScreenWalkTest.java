@@ -1223,6 +1223,35 @@ class ScreenWalkTest {
     }
 
     /**
+     * A website's page told by its route alone is still at it under a dialog: the dialog, met first over another page,
+     * is where the game is, not the page under it (nunu.ai's Book a Demo over Case Studies, 2026-11-21).
+     */
+    @Test
+    void aDialogMetOverOnePageStandsAboveAnotherPageToldByItsRoute() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").route("/"), click("cases"), click("talk")));
+        screens.put("CASES", screen(Setup.named("Cases").route("/case-studies").from(ref("HOME", "cases")),
+                click("talk")));
+        screens.put("DEMO", screen(named("Demo", "demo_title", "HOME", "talk")));
+        Reach onCases = new Shows("demo_title") {
+            @Override
+            public Optional<String> path() {
+                return Optional.of("/case-studies");
+            }
+        };
+        BufferedImage frame = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+
+        assertEquals(Optional.of("DEMO"), new ScreenWalk(ScreenGraph.of(screens), onCases, STEP_MS, null)
+                .whereOn(frame, "CASES"));
+        assertEquals(Optional.of("CASES"), new ScreenWalk(ScreenGraph.of(screens), new Shows() {
+            @Override
+            public Optional<String> path() {
+                return Optional.of("/case-studies");
+            }
+        }, STEP_MS, null).whereOn(frame, "CASES"), "no dialog: the page");
+    }
+
+    /**
      * A window of another shape shows its titles away from where they were cut: none shows near, so the screens one
      * step from where the game was are looked for over the whole frame; with nothing known, no screen is.
      */

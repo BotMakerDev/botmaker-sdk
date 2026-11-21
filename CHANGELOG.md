@@ -27,6 +27,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A dialog of a website is found over every page, not only the ones it was first opened from: a page told by its
+  address alone still is at it under the dialog, so a walk took the page for where it was. nunu.ai's Book a Demo,
+  opened from Case Studies, was written again as a second screen.
 - Exploring a website: a press is no longer marked failed for a console error about a request the page made on its
   own (a fetch CORS refused, a resource that did not load). On nunu.ai every link was marked failed by the sign-in
   prefetch's CORS error.
