@@ -187,13 +187,14 @@ public final class ScreenShots {
     }
 
     /**
-     * As {@link #save}, as the screen's own shot, when it has none or one shorter at the same width: a website's whole
-     * page over a shot of its viewport alone (2026-11-21).
+     * As {@link #save}, as the screen's own shot, when it has none or one no taller at the same width: a website's whole
+     * page over a shot of its viewport alone, and over an older one of the same page (2026-11-21: one rendered below
+     * the viewport left blank what shows only once scrolled to).
      */
     static void saveIfShorter(StudioServices services, ScreenGraph graph, String constant, BufferedImage frame) {
         if (services == null || frame == null) return;
         Size had = size(file(services.resourcesDir(), graph, constant).orElse(null));
-        if (had.empty() || had.width() == frame.getWidth() && had.height() < frame.getHeight()) {
+        if (had.empty() || had.width() == frame.getWidth() && had.height() <= frame.getHeight()) {
             save(services, graph, constant, null, frame);
         }
     }
