@@ -138,6 +138,29 @@ class MapAuditTest {
         assertEquals(Where.MISSING, audit.of("gone").orElseThrow().where());
     }
 
+    /** nunu.ai: "home" in the bar and again in the footer; the footer's, the page's second, is boxed on the footer. */
+    @Test
+    void anElementShownTwiceAlikeIsBoxedAtItsOwnIndex() throws IOException {
+        BufferedImage link = noise(SIZE, SIZE, 52);
+        writeShot(SHOT, Map.of(link, new Rect(120, 10, SIZE, SIZE)));
+        BufferedImage shot = ImageIO.read(resources.resolve(SHOT).toFile());
+        shot.getGraphics().drawImage(link, 40, 200, null);
+        ImageIO.write(shot, "png", resources.resolve(SHOT).toFile());
+        Path file = resources.resolve("elements/home.png");
+        Files.createDirectories(file.getParent());
+        ImageIO.write(link, "png", file.toFile());
+        Path again = resources.resolve("elements/home_3.png");
+        ImageIO.write(link, "png", again.toFile());
+        MapScreen screen = MapFixtures.screen(Setup.named("Home").shot(SHOT),
+                Button.of(Element.byId("home").shot("elements/home.png")),
+                Button.of(Element.byId("home").index(1).shot("elements/home_3.png")));
+
+        Audit audit = MapAudit.of(resources, 0.9, Map.of(), "HOME", screen).orElseThrow();
+
+        assertEquals(new Rect(120, 10, SIZE, SIZE), audit.of("home").orElseThrow().at(), "the bar's, the first");
+        assertEquals(new Rect(40, 200, SIZE, SIZE), audit.of("home_3").orElseThrow().at(), "the footer's, below it");
+    }
+
     /** Hades II: the Options skull crowns Save slots too, whose shot came after the skull was cut. */
     @Test
     void aMarkerAnotherScreensShotShowsIsSaid() throws IOException {

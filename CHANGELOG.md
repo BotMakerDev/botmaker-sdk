@@ -29,6 +29,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A website's link shown twice alike, in its bar and its footer, is boxed on a screen's shot once each: the footer's,
+  `Element.index(1)`, at the page's second match in reading order, no longer on the bar's beside it.
 - A dialog of a website is found over every page, not only the ones it was first opened from: a page told by its
   address alone still is at it under the dialog, so a walk took the page for where it was. nunu.ai's Book a Demo,
   opened from Case Studies, was written again as a second screen.

@@ -48,6 +48,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -303,7 +305,8 @@ public final class MapAudit {
         if (shot == null) return Optional.empty();
         List<String> names = List.copyOf(checks.keySet());
         // The card's audit alone reads element shots: a run's fit of a screen matches the bot's pictures only.
-        List<Fit> fits = fits(name -> fileOf(resources, name), confidence, cuts, names, shot);
+        List<Fit> fits = nth(resources, confidence, nths(screen),
+                fits(name -> fileOf(resources, name), confidence, cuts, names, shot), shot);
         Size live = new Size(shot.getWidth(), shot.getHeight());
         List<Spot> spots = new ArrayList<>();
         for (Fit fit : fits) {
@@ -673,6 +676,51 @@ public final class MapAudit {
             if (its.locked() != null) add(checks, resources, its.locked(), false, false, null);
         }
         return checks;
+    }
+
+    /**
+     * The element shots of {@code screen}'s inputs whose element is not the page's first of its kind, by the index it
+     * takes ({@code Element.index(1)}: a footer's "home" link below the bar's).
+     */
+    private static Map<String, Integer> nths(MapScreen screen) {
+        Map<String, Integer> nths = new HashMap<>();
+        for (Input input : screen.inputs().values()) {
+            if (input instanceof Button button && button.isElement() && button.picture() != null
+                    && button.element() != null && button.element().index() != null
+                    && button.element().index() > 0) {
+                nths.put(button.picture().id(), button.element().index());
+            }
+        }
+        return nths;
+    }
+
+    /**
+     * {@code fits}, each element shot of {@code nths} boxed at its own match in reading order rather than its best: a
+     * link shown twice alike, as a site's bar and its footer, was boxed twice on the bar (2026-11-21). Missing when the
+     * shot shows fewer.
+     */
+    private static List<Fit> nth(Path resources, double confidence, Map<String, Integer> nths, List<Fit> fits,
+                                 BufferedImage shot) {
+        if (nths.isEmpty()) return fits;
+        List<Fit> placed = new ArrayList<>();
+        for (Fit fit : fits) {
+            Integer n = nths.get(fit.picture());
+            if (n == null) {
+                placed.add(fit);
+                continue;
+            }
+            List<Rect> all;
+            try (ImageTemplate file = new ImageTemplate(fileOf(resources, fit.picture()).toString())) {
+                all = ImageFinder.allMatches(file, new StillSource(shot), confidence).stream()
+                        .map(MatchResult::rect)
+                        .sorted(Comparator.comparingInt(Rect::y).thenComparingInt(Rect::x)).toList();
+            } catch (RuntimeException unmatched) {
+                all = List.of();
+            }
+            placed.add(all.size() > n ? new Fit(fit.picture(), Where.AT_PLACE, all.get(n))
+                    : new Fit(fit.picture(), Where.MISSING, null));
+        }
+        return placed;
     }
 
     /**
