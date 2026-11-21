@@ -219,15 +219,28 @@ final class ScreenCanvas {
 
     private Map<String, Point> corners(Map<String, Pt> moved) {
         Map<String, Pt> kept = new LinkedHashMap<>();
-        if (pins().isEmpty()) {
-            laid.at().forEach((id, at) -> {
-                if (!laid.hidden().contains(id)) kept.put(id, at);
-            });
-        }
+        if (pins().isEmpty()) kept.putAll(spread(laid));
         kept.putAll(moved);
         Map<String, Point> corners = new LinkedHashMap<>();
         kept.forEach((id, at) -> corners.put(id, new Point((int) Math.round(at.x()), (int) Math.round(at.y()))));
         return corners;
+    }
+
+    /**
+     * The corners of {@code laid}'s shown cards that no other card shares: a layout never puts two cards on one
+     * corner, so a shared one is a layout that collapsed, and pinned it would stack them there for good (SwordXStaff,
+     * 2026-11-12: 48 screens kept at one corner, the map showing a handful). Those stay to the layout.
+     */
+    static Map<String, Pt> spread(Placement laid) {
+        Map<Pt, Integer> uses = new HashMap<>();
+        laid.at().forEach((id, at) -> {
+            if (!laid.hidden().contains(id)) uses.merge(at, 1, Integer::sum);
+        });
+        Map<String, Pt> kept = new LinkedHashMap<>();
+        laid.at().forEach((id, at) -> {
+            if (!laid.hidden().contains(id) && uses.get(at) == 1) kept.put(id, at);
+        });
+        return kept;
     }
 
     /** The corners the cards were moved to, by constant. */

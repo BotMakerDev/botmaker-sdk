@@ -17,6 +17,14 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- 🗺 Screens: the first card dragged no longer pins every screen a collapsed layout put on one corner there, which
+  stacked them for good and left the map showing a handful of screens. A map already stacked so: ⋯ ▸ Tidy. Screens
+  added after the map was pinned now come beside it rather than far off (toolkit `Placement.beside`).
+
 ## [1.12.0] — 2026-11-21
 
 ### Added
