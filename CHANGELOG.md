@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.12.0] — 2026-11-21
 
 ### Added
 
@@ -242,6 +242,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   a picture Chromium renders of it, below the fold too, as its element's shot. A screen the map already holds is
   pictured the same way when the run reaches it, for whatever it lacks: a map made before fills itself in. An input
   a note says fails is pressed again once a run, and what it does now replaces that note.
+- Built against botmaker-shared 0.10.0 (was 0.9.0).
+- Built against botmaker-session 0.9.0 (was 0.8.0).
+- Built against botmaker-studio-api 0.19.0 (was 0.18.0).
+- Built against botmaker-plugin-toolkit 0.17.0 (was 0.16.0).
+- Built against botmaker-plugin-host 0.14.0 (was 0.13.0).
+- Built against botmaker-plugin-basics 0.11.0 (was 0.10.0).
+- Built against botmaker-java 0.4.0 (was 0.3.0).
 
 ### Fixed
 
