@@ -38,7 +38,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
@@ -309,8 +308,7 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     public synchronized void type(String text, boolean clears, boolean submits) {
         act(() -> {
             if (clears) {
-                page().session().call("Runtime.evaluate", Map.of("expression",
-                        "(() => { const e = document.activeElement; if (e && e.select) e.select(); })()"));
+                page().evaluate("(() => { const e = document.activeElement; if (e && e.select) e.select(); })()");
             }
             guard.insert(text);
             if (submits) guard.key("Enter");
