@@ -62,6 +62,8 @@ final class ScreenBoard {
     private boolean live;
     /** Whether a drag draws on the cover, a cut, rather than moving it. */
     private boolean held;
+    /** Whether the screen shown is a website's page, its shot drawn at the board's width and scrolled. */
+    private boolean wholePage;
     private String constant;
     /** What the board shows, so a poll that changed nothing draws nothing. */
     private Object drawn;
@@ -202,6 +204,14 @@ final class ScreenBoard {
         if (cover == null) holder.getChildren().forEach(drawn -> ScreenCanvas.repick(drawn, picked));
     }
 
+    /**
+     * {@code whole}: the next screen shown is a website's page, its shot as tall as the page, drawn at the board's width
+     * and scrolled down rather than drawn narrow enough to show whole.
+     */
+    void wholePage(boolean whole) {
+        wholePage = whole;
+    }
+
     /** Draws the shot again; {@code resized} only when its width changed. */
     private void draw(boolean resized) {
         double width = width();
@@ -226,7 +236,7 @@ final class ScreenBoard {
      * frame), drawn again narrow enough to show whole: the width alone assumed a landscape one.
      */
     private Node fitted(Node node, double width, DoubleFunction<? extends Node> again) {
-        if (zoom != 1 || scroller.getViewportBounds() == null) return node;
+        if (zoom != 1 || scroller.getViewportBounds() == null || (wholePage && cover == null)) return node;
         double room = scroller.getViewportBounds().getHeight() - 2 * PADDING;
         double height = node instanceof Region region ? region.prefHeight(-1) : 0;
         if (room <= 0 || height <= room) return node;

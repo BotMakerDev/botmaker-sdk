@@ -391,6 +391,8 @@ final class ScreenPanel {
         List<ScreenCards.Strip> strips = ScreenCards.strips(graph, constant, rows);
         Audit audit = audits.get(constant);
         List<String> markers = markerIds(constant);
+        // A website's shot is its whole page: read down it, never shrunk to show it whole.
+        board.wholePage(graph.screen(constant).map(s -> s.setup().route() != null).orElse(false));
         // The input picked when it is drawn: a pick since restyles the drawing, and a zoom draws it picked.
         board.show(constant, graph.shown(constant), shown, width -> canvas.shotWithInputs(constant, width, rows,
                 markers, strips, cuts, audit, picked, row -> go(constant, row), row -> picked(row), null));
