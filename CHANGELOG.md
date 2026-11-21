@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A goal can apply only at times, and is a condition.** `Goal.of(…).when(condition)` and
+  `Goal.done(…).when(condition)`: while the condition says no, the plan skips the goal as it does one met, and an
+  action that needs it does not wait on it; an unknown answer still applies. The Goals view says *does not apply
+  now*. A `Goal` is now a `Condition` answering its own check, so goals combine with `Condition.all`/`any` and can
+  be named in any `.when(…)`, where they are only checked, never worked towards (`Do.needs(Goal…)` still is).
+
 - **A Keep exploring resume compiles only when the bot changed.** A resume that finds the bot's sources and
   resources as the running generation was compiled from goes on with that generation, and a resume with `ignore`
   reloads nothing at all. Each new generation closes the one before it, so a long run's reloads no longer keep

@@ -141,9 +141,12 @@ public final class PlanModel {
         return assumedMet;
     }
 
-    /** What {@code goal} says: yes when it is {@link #assumedMet}, else as {@link #read} has it. */
+    /**
+     * What {@code goal} says to the plan: yes when it is {@link #assumedMet} or does not {@link Goal#applies} now (it
+     * is skipped as one met is), else as {@link #read} has it.
+     */
     public Answer answer(Goal goal) {
-        return assumedMet.contains(goal) ? Answer.YES : read(goal);
+        return assumedMet.contains(goal) || goal.applies() == Answer.NO ? Answer.YES : read(goal);
     }
 
     /** What {@code goal}'s own check says, a done-goal from this model's map and records rather than the run's. */

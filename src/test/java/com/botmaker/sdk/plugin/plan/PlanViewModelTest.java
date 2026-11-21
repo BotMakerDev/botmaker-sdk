@@ -58,6 +58,7 @@ class PlanViewModelTest {
         goals.put("GOLD", answering(Answer.NO));
         goals.put("FULL", answering(Answer.YES));
         goals.put("GUILD", answering(Answer.NO));
+        goals.put("EVENT", answering(Answer.NO).when(() -> Answer.NO));
         Do selling = Do.press(BotConstants.input("SHOP", "sell")).serves(BotConstants.goal("GOLD"))
                 .every(Duration.ofHours(1));
         Do joining = Do.press(BotConstants.input("HOME", "guild")).serves(BotConstants.goal("GUILD"));
@@ -67,7 +68,7 @@ class PlanViewModelTest {
         screens.put("SHOP", screen(Setup.named("SHOP").from(ref("HOME", "shop")), Map.of("sell", click("sell")),
                 Map.of("selling", selling)));
         Plan plan = Plan.of(Plan.tier(BotConstants.goal("GOLD"), BotConstants.goal("FULL")),
-                Plan.tier(BotConstants.goal("GUILD")));
+                Plan.tier(BotConstants.goal("GUILD"), BotConstants.goal("EVENT")));
         Path file = dir.resolve("done.json");
         DoneStores.at(file, Clock.fixed(NOON.minus(Duration.ofMinutes(10)), ZoneOffset.UTC))
                 .done(DoneRecords.key("SHOP", "selling"), true);
@@ -87,6 +88,7 @@ class PlanViewModelTest {
         assertEquals("⏳ 12:50", gold.said());
         assertEquals(State.MET, view.chip("FULL").orElseThrow().state());
         assertEquals(State.OPEN, view.chip("GUILD").orElseThrow().state(), "its action is ready");
+        assertEquals(State.NOT_NOW, view.chip("EVENT").orElseThrow().state(), "its .when says no");
     }
 
     private static MapScreen screen(Setup setup, Map<String, Input> inputs, Map<String, Do> actions) {

@@ -514,8 +514,10 @@ public final class GoalsView {
             case YES -> "met";
             case NO -> "not met";
             case UNKNOWN -> "known in a run";
+            case NOT_NOW -> "does not apply now";
         });
-        met.getStyleClass().add(card.met() == GoalsViewModel.Met.YES ? "goals-met" : "goals-unmet");
+        met.getStyleClass().add(card.met() == GoalsViewModel.Met.YES ? "goals-met"
+                : card.met() == GoalsViewModel.Met.NOT_NOW ? "goals-fill" : "goals-unmet");
         Region space = new Region();
         HBox.setHgrow(space, Priority.ALWAYS);
         HBox head = new HBox(8, name, tier, fill, space, met, drop("★ first", Mark.FIRST), drop("⤓ last", Mark.LAST),

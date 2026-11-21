@@ -144,6 +144,17 @@ class PlanTypesTest {
     }
 
     @Test
+    void aGoalsWhenIsReadAndWrittenBackTheSame() {
+        Goal.Of of = (Goal.Of) read(Goal.class, PLAN + "Goal.of(Progress::rich).when(Firestone::eventOn)");
+        assertEquals("Firestone::eventOn", ScreenTypes.sourceOf(of.when()));
+        assertEquals(of, again(Goal.class, of));
+        Goal.Done done = (Goal.Done) read(Goal.class, PLAN + "Goal.done(() -> Screens.ARENA.fight)"
+                + ".when(Firestone::eventOn)");
+        assertEquals("Firestone::eventOn", ScreenTypes.sourceOf(done.when()));
+        assertEquals(done.when(), ((Goal.Done) again(Goal.class, done)).when());
+    }
+
+    @Test
     void aDoneGoalReadsItsActionLazily() {
         Goal.Done goal = (Goal.Done) read(Goal.class, PLAN + "Goal.done(() -> Screens.ARENA.fight)");
         assertEquals(BotConstants.input("ARENA", "fight"), goal.action().get());

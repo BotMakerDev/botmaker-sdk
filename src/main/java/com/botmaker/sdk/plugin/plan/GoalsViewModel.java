@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.plan;
 
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Reset;
+import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.internal.params.ParamCheck;
 import com.botmaker.sdk.internal.plan.PlanModel;
@@ -47,7 +48,7 @@ public final class GoalsViewModel {
     public record Card(Goal goal, String name, int tier, String fill, Met met, List<Row> rows) {}
 
     /** Whether a goal is met, as far as Studio can tell: a fact is a run's, so most read unknown here. */
-    public enum Met { YES, NO, UNKNOWN }
+    public enum Met { YES, NO, UNKNOWN, NOT_NOW }
 
     /** Where an action is put first or last, or neither: the ★ and ⤓ of a row. */
     public enum Mark { FIRST, LAST, NONE }
@@ -155,6 +156,7 @@ public final class GoalsViewModel {
     }
 
     private Met met(Goal goal) {
+        if (goal.applies() == Answer.NO) return Met.NOT_NOW;
         return switch (model.answer(goal)) {
             case YES -> Met.YES;
             case NO -> Met.NO;
@@ -193,6 +195,10 @@ public final class GoalsViewModel {
 
     /** What {@code goal} asks, as its card says it: {@code gold ≥ 100}, {@code ARENA.fight within 1h}. */
     String fill(Goal goal) {
+        return check(goal) + (goal.when() != null ? ", when " + condition(goal.when()) : "");
+    }
+
+    private String check(Goal goal) {
         return switch (goal) {
             case Goal.Done done -> {
                 String action = Optional.ofNullable(done.action().get())

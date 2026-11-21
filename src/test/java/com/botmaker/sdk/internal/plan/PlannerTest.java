@@ -139,6 +139,37 @@ class PlannerTest {
     }
 
     @Test
+    void aGoalThatDoesNotApplyIsSkippedAsOneMet() {
+        Goal offSeason = unmet().when((Condition) () -> Answer.NO);
+        Goal below = unmet();
+        on("ARENA", "fight", press("fight").serves(offSeason));
+        on("SHOP", "sell", press("sell").serves(below));
+
+        Round round = round(Plan.of(Plan.tier(offSeason), Plan.tier(below)));
+
+        assertEquals(OptionalInt.of(1), round.tier(), "its tier is passed over, not held");
+        assertEquals(List.of("SHOP.sell"), keys(round.route()));
+    }
+
+    @Test
+    void aGoalWhoseWhenIsUnknownStillApplies() {
+        Goal maybe = unmet().when((Condition) () -> Answer.UNKNOWN);
+        on("ARENA", "fight", press("fight").serves(maybe));
+
+        assertEquals(List.of("ARENA.fight"), keys(round(Plan.of(Plan.tier(maybe))).route()));
+    }
+
+    @Test
+    void aNeedThatDoesNotApplyCountsAsMet() {
+        Goal goal = unmet();
+        Goal gold = unmet().when((Condition) () -> Answer.NO);
+        on("SHOP", "buy", press("buy").serves(goal).needs(gold));
+        on("VAULT", "loot", press("loot").serves(gold));
+
+        assertEquals(List.of("SHOP.buy"), keys(round(Plan.of(Plan.tier(goal))).route()), "nothing done for gold first");
+    }
+
+    @Test
     void aGoalNothingCanDoHoldsItsTier() {
         Goal served = unmet();
         Goal below = unmet();

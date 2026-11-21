@@ -25,7 +25,7 @@ public final class PlanViewModel {
     private static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("HH:mm");
 
     /** How a goal stands. */
-    public enum State { MET, WAITING, OPEN, UNKNOWN }
+    public enum State { MET, WAITING, OPEN, UNKNOWN, NOT_NOW }
 
     /**
      * One goal of a tier.
@@ -70,6 +70,9 @@ public final class PlanViewModel {
 
     private static Chip chip(Card card, ZoneId zone) {
         if (card.met() == GoalsViewModel.Met.YES) return new Chip(card.name(), State.MET, Optional.empty(), "met");
+        if (card.met() == GoalsViewModel.Met.NOT_NOW) {
+            return new Chip(card.name(), State.NOT_NOW, Optional.empty(), "does not apply now");
+        }
         Optional<Instant> due = due(card.rows());
         if (due.isPresent()) {
             return new Chip(card.name(), State.WAITING, due, "⏳ " + AT.format(due.get().atZone(zone)));

@@ -70,6 +70,8 @@ public final class PlanTypes implements TypeHolder {
     /** The parts held as something the factory or the link does not take: a condition as its text, a fact as its. */
     private static final class Parts {
         static final Held<Goal.Of, Object> CHECK = Held.as(Object.class, goal -> held(goal.check()));
+        static final Held<Goal.Of, Object> OF_WHEN = Held.as(Object.class, goal -> held(goal.when()));
+        static final Held<Goal.Done, Object> DONE_WHEN = Held.as(Object.class, goal -> held(goal.when()));
         static final Held<Do, Object> UNTIL = Held.as(Object.class, action -> held(action.until()));
         static final Held<Do, Object> CHECKS = Held.as(Object.class, action -> held(action.checks()));
         static final Held<Do, List<Object>> NEEDS = Held.list(Object.class,
@@ -97,16 +99,18 @@ public final class PlanTypes implements TypeHolder {
     public static final DeclaredCall<Plan.Tier> TIER_SHAPE = ComponentType.part(Plan.Tier.class)
             .writtenAsEach(Plan::tier, Plan.Tier::goals);
 
-    /** {@code Goal.of(check)}: a method reference's text, or the test of a fact. */
+    /** {@code Goal.of(check)}: a method reference's text, or the test of a fact; {@code .when(…)} as its text too. */
     public static final DeclaredCall<Goal.Of> GOAL_OF_SHAPE = ComponentType.part(Goal.Of.class)
-            .<BooleanSupplier, Goal>writtenAs(Goal::of, Parts.CHECK.part(PlanTypes::condition));
+            .<BooleanSupplier, Goal>writtenAs(Goal::of, Parts.CHECK.part(PlanTypes::condition))
+            .<Condition>with(Goal.Of::when, Parts.OF_WHEN.part(PlanTypes::condition));
 
     /**
      * {@code Goal.done(() -> Screens.ARENA.fight)}, and {@code .within(Duration)} or {@code .since(Reset)} when its last
-     * time is bounded.
+     * time is bounded; {@code .when(…)} as its text.
      */
     public static final DeclaredCall<Goal.Done> GOAL_DONE_SHAPE = ComponentType.part(Goal.Done.class)
-            .writtenAs(Goal::done);
+            .writtenAs(Goal::done)
+            .<Condition>with(Goal.Done::when, Parts.DONE_WHEN.part(PlanTypes::condition));
 
     // ---- an action -------------------------------------------------------------------------------------
 

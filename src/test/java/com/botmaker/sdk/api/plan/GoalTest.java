@@ -141,11 +141,36 @@ class GoalTest {
         assertThrows(IllegalArgumentException.class, () -> Goal.done(() -> HOME.claim).within(Duration.ofDays(-1)));
         assertThrows(NullPointerException.class, () -> Goal.done(() -> HOME.claim).within(null));
         assertThrows(NullPointerException.class, () -> Goal.of((BooleanSupplier) null));
-        assertThrows(NullPointerException.class, () -> new Goal.Of(null), "else its check would always say yes");
-        assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ZERO, null));
+        assertThrows(NullPointerException.class, () -> new Goal.Of(null, null), "else its check would always say yes");
+        assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ZERO, null, null));
         assertThrows(IllegalArgumentException.class, () -> new Goal.Done(() -> HOME.claim, Duration.ofDays(1),
-                Reset.daily(LocalTime.of(5, 0))), "a time or a reset, not both");
+                Reset.daily(LocalTime.of(5, 0)), null), "a time or a reset, not both");
         assertThrows(NullPointerException.class, () -> Goal.done(() -> HOME.claim).since(null));
+        assertThrows(NullPointerException.class, () -> Goal.of(GoalTest::yes).when(null));
+    }
+
+    @Test
+    void aGoalIsAConditionAnsweringItsCheck() {
+        Goal met = Goal.of(GoalTest::yes);
+        Goal unmet = Goal.of(GoalTest::no);
+        Goal unknown = Goal.of(GoalTest::boom);
+        assertEquals(Answer.NO, Condition.all(met, unmet).answer());
+        assertEquals(Answer.YES, Condition.any(met, unmet).answer());
+        assertEquals(Answer.UNKNOWN, Condition.all(met, unknown).answer());
+        assertEquals(Answer.YES, Goal.of(Condition.not(unmet)).answer(), "a goal of another goal's negation");
+        assertEquals(Answer.YES, Goal.of(GoalTest::yes).when(Condition.of(GoalTest::no)).answer(),
+                "as a condition a goal says its check, whether or not it applies");
+    }
+
+    @Test
+    void whenSaysWhetherAGoalApplies() {
+        assertEquals(Answer.YES, Goal.of(GoalTest::no).applies(), "no when: always");
+        assertEquals(Answer.NO, Goal.of(GoalTest::no).when(Condition.of(GoalTest::no)).applies());
+        assertEquals(Answer.UNKNOWN, Goal.of(GoalTest::no).when(Condition.of(GoalTest::boom)).applies());
+        Condition eventOn = Condition.of(GoalTest::yes);
+        Goal.Done daily = Goal.done(() -> HOME.claim).when(eventOn).since(Reset.daily(LocalTime.of(5, 0)));
+        assertSame(eventOn, daily.when(), "within and since keep the when");
+        assertSame(eventOn, daily.within(Duration.ofHours(1)).when());
     }
 
     /**

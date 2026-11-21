@@ -126,7 +126,13 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   `Navigate.press(Do)` presses whatever is due or not, and records it: the plan says when.
 - **`api.plan`** holds what is wanted (2026-11-06): a `Goal` is a constant holding a check, `Goal.of(BooleanSupplier)`, which
   a `Condition` is, or `Goal.done(Supplier<Do>)`, optionally `.within(Duration)`, which reads the done-record
-  (`Readiness.met`) and answers unknown for an action no screen holds. `Need` builds a `Condition` on a fact through
+  (`Readiness.met`) and answers unknown for an action no screen holds. **A goal's `.when(Condition)`** (2026-11-21,
+  the user's ask; the semantics are the builder's call, no case yet) says when it applies: while it says no
+  (`Goal.applies`), `PlanModel.answer` gives yes, so the planner skips the goal as one met, its tier is passed over and
+  an action's need of it counts as met; an unknown applies. The Goals view says *does not apply now*. **A goal is a
+  `Condition`** too, its answer its check's whatever its `when`: `Condition.all(Goals.A, Goals.B)` or a goal in any
+  `.when(…)` is only asked, never worked towards; `Do.needs(Goal…)` stays the need the planner works to meet. Studio
+  reads a goal's `.when` as any condition slot, a method reference's text or a fact's test. `Need` builds a `Condition` on a fact through
   `Params.when`, refusing a lambda or a method of no `@Param` class at once; `above` and `below` are the `not` of
   `atMost` and `atLeast`. A `Plan` is tiers of goals; `Plan.NONE` has none and runs nothing. A bot's plans are the `Plans` open set
   (`SdkValue.Id.PLANS`, `Plans.java` beside `Goals.java`, which holds goals only), read by name through

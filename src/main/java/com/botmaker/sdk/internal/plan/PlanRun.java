@@ -347,7 +347,8 @@ public final class PlanRun {
         idling = null;
         if (round.tier().isEmpty()) {
             // A plan is done on what the game says, never on what a press was assumed to do: plan again from that.
-            List<Goal> doubted = assumed.keySet().stream().filter(goal -> model.read(goal) != Answer.YES).toList();
+            List<Goal> doubted = assumed.keySet().stream()
+                    .filter(goal -> goal.applies() != Answer.NO && model.read(goal) != Answer.YES).toList();
             assumed.clear();
             if (!doubted.isEmpty()) {
                 say("Every goal is met or waiting, " + doubted.stream().map(this::name).collect(Collectors.joining(", "))
@@ -402,15 +403,22 @@ public final class PlanRun {
      * Goes to read an unknown fact first, when a screen whose readout feeds it is on the route or one step off it: one
      * the next action, a goal of its tier or one of its needs reads. False when there is none to go to.
      */
+    /** What an unknown {@code goal} reads: its check's facts, and its {@code .when}'s while that is unknown too. */
+    private static Set<Method> unknownOf(Goal goal) {
+        Set<Method> read = new LinkedHashSet<>(FactsRead.of(goal));
+        if (goal.applies() == Answer.UNKNOWN) read.addAll(FactsRead.ofWhen(goal));
+        return read;
+    }
+
     private boolean goneToRead(PlanModel model, Round round, Step next) {
         Set<Method> unread = new LinkedHashSet<>(FactsRead.of(next.action()));
         if (round.tier().isPresent()) {
             for (Goal goal : plan.tiers().get(round.tier().getAsInt()).goals()) {
-                if (model.answer(goal) == Answer.UNKNOWN) unread.addAll(FactsRead.of(goal));
+                if (model.answer(goal) == Answer.UNKNOWN) unread.addAll(unknownOf(goal));
             }
         }
         for (Goal need : next.action().goalNeeds()) {
-            if (model.answer(need) == Answer.UNKNOWN) unread.addAll(FactsRead.of(need));
+            if (model.answer(need) == Answer.UNKNOWN) unread.addAll(unknownOf(need));
         }
         Instant now = records.clock().instant();
         for (Method fact : unread) {
@@ -599,10 +607,11 @@ public final class PlanRun {
         Do action = next.action();
         PlanModel after = model(game.where().orElse(null));
         Optional<Goal> blind = action.serves().stream()
-                .filter(g -> g instanceof Goal.Of && FactsRead.of(g).isEmpty() && after.read(g) != Answer.YES)
+                .filter(g -> g instanceof Goal.Of && FactsRead.of(g).isEmpty() && g.applies() != Answer.NO
+                        && after.read(g) != Answer.YES)
                 .findFirst();
-        // What the game says, never what an earlier press's light effect assumes.
-        boolean anyMet = action.serves().stream().anyMatch(g -> after.read(g) == Answer.YES);
+        // What the game says, never what an earlier press's light effect assumes; a goal that stopped applying is done.
+        boolean anyMet = action.serves().stream().anyMatch(g -> g.applies() == Answer.NO || after.read(g) == Answer.YES);
         if (blind.isEmpty() || anyMet) {
             fruitless = null;
             return;

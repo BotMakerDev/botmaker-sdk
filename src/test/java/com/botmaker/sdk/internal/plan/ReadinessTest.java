@@ -152,6 +152,8 @@ class ReadinessTest {
     void onlyANoHoldsItBack() {
         assertFalse(ready(CLAIM.needs(Goal.of((Condition) () -> Answer.NO)), Optional.empty()));
         assertTrue(ready(CLAIM.needs(Goal.of((Condition) () -> Answer.UNKNOWN)), Optional.empty()));
+        assertTrue(ready(CLAIM.needs(Goal.of((Condition) () -> Answer.NO).when(() -> Answer.NO)), Optional.empty()),
+                "a need that does not apply now holds nothing back");
         assertFalse(ready(CLAIM.needs(() -> Answer.NO), Optional.empty()));
         assertTrue(ready(CLAIM.needs(() -> Answer.UNKNOWN), Optional.empty()));
         assertFalse(ready(CLAIM.until(() -> Answer.YES), Optional.empty()));

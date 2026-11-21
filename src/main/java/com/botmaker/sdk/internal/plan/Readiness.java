@@ -33,7 +33,7 @@ public final class Readiness {
     public static boolean ready(Do action, Input input, Optional<Done> last, Clock clock) {
         if (canPress(input) == Answer.NO) return false;
         for (Goal goal : action.goalNeeds()) {
-            if (goal.answer() == Answer.NO) return false;
+            if (goal.applies() != Answer.NO && goal.answer() == Answer.NO) return false;
         }
         for (Condition condition : action.conditionNeeds()) {
             if (!Conditions.holds(condition)) return false;

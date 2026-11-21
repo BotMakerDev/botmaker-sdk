@@ -28,6 +28,11 @@ final class FactsRead {
         return goal instanceof Goal.Of of ? of(of.check()) : Set.of();
     }
 
+    /** What {@code goal}'s {@code .when} reads, to tell whether it applies; none when it always does. */
+    static Set<Method> ofWhen(Goal goal) {
+        return goal.when() == null ? Set.of() : of(goal.when());
+    }
+
     /** What {@code action} needs read: its conditions' facts, its {@code .until}'s and its check's. */
     static Set<Method> of(Do action) {
         Set<Method> read = new LinkedHashSet<>();
@@ -47,6 +52,7 @@ final class FactsRead {
     private static void add(BooleanSupplier check, Set<Method> read) {
         switch (check) {
             case null -> { }
+            case Goal goal -> read.addAll(of(goal));
             case ParamCheck param -> {
                 try {
                     read.add(RunParams.parameterOf(param.when().parameter()));

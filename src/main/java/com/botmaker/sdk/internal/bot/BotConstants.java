@@ -102,7 +102,7 @@ public final class BotConstants {
 
     /** The constant {@code goal} names when it is a {@link #goal} reference; empty otherwise. */
     public static Optional<String> goalName(Goal goal) {
-        return goal instanceof Goal.Of(GoalReference(String name)) ? Optional.of(name) : Optional.empty();
+        return goal instanceof Goal.Of(GoalReference(String name), var when) && when == null ? Optional.of(name) : Optional.empty();
     }
 
     /** The check of a {@link #goal} reference: a name, which nothing can answer. */
