@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
+import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.tools.Downloads;
 import com.botmaker.shared.web.Budget;
@@ -34,6 +35,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +44,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * A website as a run sees and acts on it: one page of BotMaker's own Chromium, under the read-only {@link Guard}
@@ -55,29 +59,37 @@ import java.util.function.BooleanSupplier;
  * answered on each look ({@link Consent}): rejected when it offers a way to, else the run stops naming it.
  *
  * <p>The browser starts at the first look or press, not when the source is made, and closes when the source is
- * closed or the run's JVM ends.
+ * closed or the run's JVM ends. A run's page is recorded: its video is {@code recording/raw.webm} in the run's folder
+ * once the page closes.
  */
 public final class WebSource implements CaptureSource, ReadableSource, AutoCloseable {
 
     /**
      * What a source is built with: what installs Chromium (whether it is there now) and its extra switches, the rules
-     * it reads {@code robots.txt} by, its pace and budget, and what ends the run. A test gives its own; a run takes
-     * {@link #defaults}.
+     * it reads {@code robots.txt} by, its pace and budget, what ends the run, and the folder its page's video is saved
+     * into as {@value #VIDEO}, asked each time the browser starts (null: none). A test gives its own; a run takes {@link #defaults}.
      */
     public record Options(BooleanSupplier chromium, List<String> switches, Robots robots, Pace pace,
-                          Budget budget, Consumer<String> stop) {
+                          Budget budget, Consumer<String> stop, Supplier<Path> recordTo) {
 
         public Options {
             switches = List.copyOf(switches);
         }
 
-        /** Chromium installed into the cache, robots read over HTTP, the guard's own pace and budget. */
+        /**
+         * Chromium installed into the cache, robots read over HTTP, the guard's own pace and budget, recorded into the
+         * run's folder's {@code recording/} when a run keeps one.
+         */
         public static Options defaults() {
             String version = WebSource.class.getPackage().getImplementationVersion();
             return new Options(() -> ChromiumInstall.install(Downloads.Progress.IGNORED), List.of(),
-                    Robots.over(version), new Pace(), new Budget(), Bot::stop);
+                    Robots.over(version), new Pace(), new Budget(), Bot::stop,
+                    () -> MissFrames.folder().map(run -> run.resolve("recording")).orElse(null));
         }
     }
+
+    /** The name of the page's video in {@link Options#recordTo}. */
+    public static final String VIDEO = "raw.webm";
 
     /** The run property showing the browser in a window rather than headless ({@code Discover --show}). */
     public static final String SHOW = "botmaker.web.show";
@@ -100,6 +112,8 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     private final Options options;
     private Chromium chromium;
     private WebPage page;
+    /** The folder the open page records into; null when it records nothing. */
+    private Path recording;
     private Guard guard;
     private String lastUrl;
     private boolean loadedLast;
@@ -462,7 +476,9 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         }
         URI start = URI.create(url);
         try {
-            page = chromium.newPage();
+            // Asked when the page opens, not when the source was made: a reloaded bot's next run has its own folder.
+            recording = options.recordTo().get();
+            page = chromium.newPage(recording);
             guard = Guard.on(page, Scope.of(start), options.robots());
         } catch (RuntimeException e) {
             closeBrowser();    // never a browser left running with no page to reach it by
@@ -508,12 +524,34 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     /** Closes the guard, the page and the browser, each that is up. */
     private void closeBrowser() {
         if (guard != null) guard.close();
-        if (page != null) page.close();
+        if (page != null) {
+            page.close();
+            keepVideo(page);
+        }
         if (chromium != null) chromium.close();
         guard = null;
         page = null;
         chromium = null;
         looked = null;
+    }
+
+    /**
+     * Moves the closed page's video, when it was recorded, to {@value #VIDEO} in the folder it was recorded into; a
+     * later page of the run (a browser started again) to {@code raw-2.webm} and on, never over an earlier one.
+     */
+    private void keepVideo(WebPage closed) {
+        Path folder = recording;
+        recording = null;
+        if (folder == null) return;
+        closed.video().ifPresent(video -> {
+            Path kept = folder.resolve(VIDEO);
+            for (int n = 2; Files.exists(kept); n++) kept = folder.resolve("raw-" + n + ".webm");
+            try {
+                Files.move(video, kept);
+            } catch (IOException e) {
+                Debug.log("the page's video was not kept: " + e.getMessage());
+            }
+        });
     }
 
     private void act(Runnable action) {

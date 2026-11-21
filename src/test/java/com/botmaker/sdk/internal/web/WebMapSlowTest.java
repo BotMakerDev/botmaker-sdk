@@ -23,6 +23,7 @@ import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.tools.Downloads;
 import com.botmaker.shared.web.Budget;
 import com.botmaker.shared.web.ChromiumInstall;
+import com.botmaker.shared.web.Guard;
 import com.botmaker.shared.web.Pace;
 import com.botmaker.shared.web.Robots;
 import com.sun.net.httpserver.HttpServer;
@@ -30,12 +31,15 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.Rectangle;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -60,6 +64,7 @@ class WebMapSlowTest {
     private static Site site;
     private static Site other;
     private static WebSource web;
+    private static WebSource.Options options;
     private static final List<String> stops = new ArrayList<>();
 
     @BeforeAll
@@ -82,9 +87,9 @@ class WebMapSlowTest {
             public void sleep(Duration duration) {
             }
         };
-        WebSource.Options options = new WebSource.Options(() -> ChromiumInstall.install(Downloads.Progress.IGNORED),
+        options = new WebSource.Options(() -> ChromiumInstall.install(Downloads.Progress.IGNORED),
                 List.of("--host-resolver-rules=MAP site.test 127.0.0.1, MAP elsewhere.test 127.0.0.1"), robots,
-                new Pace(quick), new Budget(), stops::add);
+                new Pace(quick), new Budget(), stops::add, () -> null);
         web = new WebSource("http://site.test:" + site.port() + "/", options);
         Source.set(web);
     }
@@ -127,6 +132,33 @@ class WebMapSlowTest {
         assertEquals(0, other.total(), "nothing reached the other site");
         assertEquals(0, site.writes());
         assertEquals(List.of(), stops, "the run was never stopped");
+    }
+
+    /** An address the guard refuses, off the site, is stopped before its request leaves: the other site sees none. */
+    @Test
+    void anAddressTheGuardRefusesIsNotLoaded() {
+        web.openPath("/");
+        web.stopped();
+        int before = other.total();
+        String away = "http://elsewhere.test:" + other.port() + "/jobs";
+        web.openPath(away);
+        assertEquals(before, other.total(), "nothing reached the other site");
+        List<Guard.Stopped> stopped = web.stopped();
+        assertTrue(stopped.stream().anyMatch(s -> s.url().startsWith(away)), stopped.toString());
+        web.openPath("/");
+    }
+
+    /** A recorded source leaves its page's video in the folder it records into, once it closes. */
+    @Test
+    void aRecordedSourceLeavesItsVideo(@TempDir Path dir) throws IOException {
+        WebSource.Options recorded = new WebSource.Options(options.chromium(), options.switches(), options.robots(),
+                options.pace(), new Budget(), stops::add, () -> dir);
+        try (WebSource source = new WebSource("http://site.test:" + site.port() + "/", recorded)) {
+            assertTrue(source.capture().getWidth() > 0);
+        }
+        Path video = dir.resolve(WebSource.VIDEO);
+        assertTrue(Files.exists(video), "no video kept in " + dir);
+        assertTrue(Files.size(video) > 1_000, "size " + Files.size(video));
     }
 
     /** A link far below the fold, as a site's footer holds, is pressed as one on view is: its page is reached. */

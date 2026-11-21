@@ -480,6 +480,19 @@ public final class ScreenWalk {
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
                             known.and(edge -> open(edge, from, seen, false)))
                     .or(() -> graph.pathTo(from, target, known.and(edge -> open(edge, from, seen, true))));
+            // A website's page two presses away or more is opened by its address: one load, no slower than one press.
+            // A dialog has no route, so it is pressed to; once only, so a page that shows another screen is pressed to.
+            // Presses only: what the site does on its own between them (a page loading) costs no press.
+            if (reach.isWeb() && path.map(p -> p.stream().filter(edge -> !edge.onItsOwn()).count() >= 2).orElse(true)
+                    && graph.markers(target).route() != null
+                    && !opened.contains(target)) {
+                Optional<String> own = graph.screen(target).map(s -> s.setup().examples())
+                        .filter(e -> !e.isEmpty()).map(List::getFirst);
+                if (own.isPresent()) {
+                    opened.add(target);
+                    if (reach.openPath(own.get())) continue;
+                }
+            }
             if (path.isEmpty()) {
                 // On a website a page is opened by its address: the target's example, else one of a screen it is
                 // reached from, then the rest walked. Each once, so a page that shows another screen is not looped.

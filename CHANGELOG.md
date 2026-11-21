@@ -26,6 +26,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - Exploring a website with the browser shown (`botmaker.web.show`): each page's inputs are outlined in blue with
   their names when the run first presses on it, then the part it presses in red, so someone watching (or a recording)
   sees what the run found and what it tries. The outlines come off before the press and every read.
+- A walk on a website opens a page two presses away or more by its address, its screen's first example, in one
+  load through the guard; one press away is still pressed, and a dialog, which has no address, is pressed to. Once a
+  walk per page: an address that shows another screen is walked from there.
+- A run on a website records its tab: the video is `recording/raw.webm` in the run's folder once the browser closes,
+  a browser started again in the same run `raw-2.webm` and on (`WebSource.Options.recordTo`, asked when the browser
+  starts).
 
 ### Changed
 

@@ -465,6 +465,11 @@ public interface Reach {
         return false;
     }
 
+    /** Whether the target is a website, whose pages a walk may open by address ({@link #openPath}). */
+    default boolean isWeb() {
+        return false;
+    }
+
     /**
      * The tree of the app as {@code frame} shows it, ready to find elements in: read once for that frame, so every
      * element a look names is found in one read, and never in a tree read for another frame. Empty when it could not

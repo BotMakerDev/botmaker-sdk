@@ -89,7 +89,7 @@ class DiscoverSlowTest {
         };
         WebSource.Options options = new WebSource.Options(() -> ChromiumInstall.install(Downloads.Progress.IGNORED),
                 List.of("--host-resolver-rules=MAP site.test 127.0.0.1, MAP elsewhere.test 127.0.0.1"), robots,
-                new Pace(quick), new Budget(), stops::add);
+                new Pace(quick), new Budget(), stops::add, () -> null);
         web = new WebSource("http://site.test:" + site.port() + "/", options);
         Source.set(web);
     }

@@ -80,6 +80,11 @@ public final class RunReach implements Reach {
         return web.isPresent();
     }
 
+    @Override
+    public boolean isWeb() {
+        return WebSource.of(Source.current()).isPresent();
+    }
+
     /** The run ends, {@code why} its error: retrying cannot change what the bot says. */
     @Override
     public void stop(String why) {

@@ -1251,6 +1251,95 @@ class ScreenWalkTest {
         }, STEP_MS, null).whereOn(frame, "CASES"), "no dialog: the page");
     }
 
+    /** A website: Home, Plans one press away, Pricing two, and a Demo dialog over Plans; each page at its route. */
+    private static class Site extends Game {
+        final Map<String, String> routes = new HashMap<>(Map.of("HOME", "/", "PLANS", "/plans", "PRICING",
+                "/pricing", "DEMO", "/plans"));
+        final List<String> addresses = new ArrayList<>();
+
+        Site(Map<String, MapScreen> screens) {
+            super("HOME", ScreenGraph.of(screens));
+            leads.put("HOME click plans", "PLANS");
+            leads.put("PLANS click pricing", "PRICING");
+            leads.put("PLANS click talk", "DEMO");
+        }
+
+        @Override
+        public Optional<String> path() {
+            return Optional.ofNullable(routes.get(screen));
+        }
+
+        @Override
+        public boolean openPath(String path) {
+            addresses.add(path);
+            routes.entrySet().stream().filter(e -> e.getValue().equals(path) && !e.getKey().equals("DEMO"))
+                    .findFirst().ifPresent(e -> screen = e.getKey());
+            return true;
+        }
+
+        @Override
+        public boolean isWeb() {
+            return true;
+        }
+    }
+
+    private static Map<String, MapScreen> siteScreens(List<String> demoExamples) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen(Setup.named("Home").route("/"), click("plans")));
+        screens.put("PLANS", screen(Setup.named("Plans").route("/plans").examples(List.of("/plans"))
+                .from(ref("HOME", "plans")), click("pricing"), click("talk")));
+        screens.put("PRICING", screen(Setup.named("Pricing").route("/pricing").examples(List.of("/pricing"))
+                .from(ref("PLANS", "pricing"))));
+        screens.put("DEMO", screen(named("Demo", "demo_title", "PLANS", "talk").examples(demoExamples)));
+        return screens;
+    }
+
+    /** A page two presses away is opened by its address: one load, nothing pressed. */
+    @Test
+    void aWebPageTwoPressesAwayIsOpenedByItsAddress() {
+        Site site = new Site(siteScreens(List.of()));
+        ScreenWalk.Result result = go(site, "PRICING", new ArrayList<>());
+        assertEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
+        assertEquals(List.of("/pricing"), site.addresses);
+        assertEquals(List.of(), site.done, "nothing pressed");
+    }
+
+    /** An address that shows another page (a redirect home) is opened once: the walk presses on from there. */
+    @Test
+    void anAddressThatLandsElsewhereIsOpenedOnceThenPressed() {
+        Site site = new Site(siteScreens(List.of())) {
+            @Override
+            public boolean openPath(String path) {
+                addresses.add(path);
+                screen = "HOME";
+                return true;
+            }
+        };
+        ScreenWalk.Result result = go(site, "PRICING", new ArrayList<>());
+        assertEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
+        assertEquals(List.of("/pricing"), site.addresses);
+        assertEquals(List.of("click plans", "click pricing"), site.done);
+    }
+
+    /** One press away is pressed: no slower than a load. */
+    @Test
+    void aWebPageOnePressAwayIsPressed() {
+        Site site = new Site(siteScreens(List.of()));
+        assertEquals(ScreenWalk.Outcome.ARRIVED, go(site, "PLANS", new ArrayList<>()).outcome());
+        assertEquals(List.of(), site.addresses);
+        assertEquals(List.of("click plans"), site.done);
+    }
+
+    /** A dialog over a page has no address of its own: its presses are taken, whatever example it carries. */
+    @Test
+    void aDialogOverAPageIsStillReachedByItsPress() {
+        Site site = new Site(siteScreens(List.of("/plans")));
+        ScreenWalk.Result result = go(site, "DEMO", new ArrayList<>());
+        assertEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
+        assertEquals(List.of(), site.addresses);
+        assertEquals(List.of("click plans", "click talk"), site.done);
+    }
+
     /**
      * A window of another shape shows its titles away from where they were cut: none shows near, so the screens one
      * step from where the game was are looked for over the whole frame; with nothing known, no screen is.
