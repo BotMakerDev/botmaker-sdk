@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -105,6 +106,8 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     private boolean loadedLast;
     /** The tree the last frame's look read, for {@link #tree} to hand on once instead of reading it again. */
     private WebTree looked;
+    /** The page a shown browser last outlined every input of. */
+    private String outlined;
     /** What the guard stopped since {@link #stopped()} was last asked. */
     private final List<Guard.Stopped> stoppedSince = new ArrayList<>();
 
@@ -199,7 +202,9 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     public synchronized void click(Point p) {
         java.awt.Point at = new java.awt.Point(p.x(), p.y());
         act(() -> {
-            Optional<WebNode> node = page().tree().pressedAt(at);
+            WebTree tree = page().tree();
+            Optional<WebNode> node = tree.pressedAt(at);
+            if (Boolean.getBoolean(SHOW)) show(tree, node);
             if (node.isEmpty()) {
                 guard.pressAt(at);
                 return;
@@ -207,6 +212,55 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
             guard.press(node.get()).ifPresent(refused -> Debug.log("not pressed, " + node.get().line() + ": "
                     + refused.line()));
         });
+    }
+
+    /** How long a shown browser outlines a page's every input when it first comes, and then the part pressed. */
+    static final Duration SHOWN_INPUTS = Duration.ofMillis(1500);
+    static final Duration SHOWN_PRESS = Duration.ofMillis(800);
+
+    /**
+     * For a person watching a shown browser: on a page first pressed on, its every input outlined with its name, then
+     * the part about to be pressed outlined red, scrolled into view. Taken off before the press, so nothing the run
+     * reads after it holds the outlines.
+     */
+    private void show(WebTree tree, Optional<WebNode> pressed) {
+        try {
+            String now = page.url();
+            if (!now.equals(outlined)) {
+                outlined = now;
+                page.mark(marks(tree, null, null));
+                Thread.sleep(SHOWN_INPUTS);
+            }
+            if (pressed.isPresent()) {
+                Optional<Rectangle> box = page.inView(pressed.get());
+                if (box.isPresent()) {
+                    page.mark(marks(page.tree(), pressed.get(), box.get()));
+                    Thread.sleep(SHOWN_PRESS);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException unshown) {
+            Debug.log("the press was not outlined: " + unshown);
+        } finally {
+            page.unmark();
+        }
+    }
+
+    /** {@code tree}'s laid-out inputs as marks, {@code pressed} red at {@code box} and the rest blue. */
+    private static List<WebPage.Mark> marks(WebTree tree, WebNode pressed, Rectangle box) {
+        List<WebPage.Mark> marks = new ArrayList<>();
+        for (WebNode input : tree.interactive()) {
+            if (!input.laidOut() || pressed != null && input.backendId() == pressed.backendId()) continue;
+            marks.add(new WebPage.Mark(input.box(), label(input), false));
+        }
+        if (pressed != null) marks.add(new WebPage.Mark(box, label(pressed), true));
+        return marks;
+    }
+
+    private static String label(WebNode node) {
+        String role = node.role().name().toLowerCase(Locale.ROOT);
+        return node.name().isBlank() ? role : role + " “" + node.name().strip() + "”";
     }
 
     /** A hold, the same point twice, is a press there; a page is not dragged. */
