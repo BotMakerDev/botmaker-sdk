@@ -330,6 +330,21 @@ public final class LivePlay implements ExploreLoop.Play {
     }
 
     @Override
+    public String keepWhole(String name) {
+        Optional<Path> folder = MissFrames.folder();
+        Optional<BufferedImage> page = folder.isEmpty() ? Optional.empty()
+                : WebSource.of(Source.current()).flatMap(WebSource::whole);
+        if (page.isEmpty()) return keep(name);
+        try {
+            Path file = Files.createDirectories(folder.get()).resolve(name + ".png");
+            ImageIO.write(page.get(), "png", file.toFile());
+            return file.toString();
+        } catch (IOException | RuntimeException unsaved) {
+            return keep(name);
+        }
+    }
+
+    @Override
     public void idle(Duration time) {
         Wait.time(time);
     }

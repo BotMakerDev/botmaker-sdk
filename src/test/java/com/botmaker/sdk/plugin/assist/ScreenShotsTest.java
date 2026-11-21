@@ -66,6 +66,18 @@ class ScreenShotsTest {
     }
 
     @Test
+    void aWebsitesShotIsItsWholePageAndReplacesOneOfItsViewportAlone(@TempDir Path resources) {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapScreen.of(Setup.named("Home").route("/").shot("screens/HOME.png")));
+        ScreenGraph graph = graph(screens);
+        ScreenShots.write(resources.resolve("screens/HOME.png"), new BufferedImage(144, 3000, BufferedImage.TYPE_INT_RGB));
+        assertEquals(List.of(), ScreenShots.offSize(resources, graph, null, new Size(144, 90)),
+                "a website's page as tall as it is, at the bot's width");
+        ScreenShots.write(resources.resolve("screens/HOME.png"), new BufferedImage(200, 3000, BufferedImage.TYPE_INT_RGB));
+        assertEquals(1, ScreenShots.offSize(resources, graph, null, new Size(144, 90)).size(), "another width is off");
+    }
+
+    @Test
     void aFileNamedAfterTheConstantIsNoShotWhileTheJavaNamesNone(@TempDir Path resources) {
         ScreenGraph graph = graph(Map.of("HOME", MapScreen.of(Setup.named("Home"))));
         ScreenShots.write(resources.resolve("screens/HOME.png"), new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB));

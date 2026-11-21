@@ -82,6 +82,7 @@ public final class ScreenShots {
     public static List<String> offSize(Path resources, ScreenGraph graph, String only, Size bot) {
         if (resources == null || bot == null || bot.empty()) return List.of();
         List<String> off = new ArrayList<>();
+        boolean website = graph.screens().values().stream().anyMatch(s -> s.setup().route() != null);
         for (Map.Entry<String, MapScreen> entry : graph.screens().entrySet()) {
             if (only != null && !only.equals(entry.getKey())) continue;
             List<String> named = new ArrayList<>();
@@ -91,7 +92,9 @@ public final class ScreenShots {
             }
             for (String path : named) {
                 Size size = size(resources.resolve(path));
-                if (size.empty() || size.equals(bot)) continue;
+                // A website's shot is its whole page: the bot's width, as tall as the page (2026-11-21).
+                if (size.empty() || size.equals(bot)
+                        || website && size.width() == bot.width() && size.height() > bot.height()) continue;
                 off.add(graph.shown(entry.getKey()) + "'s shot " + path + " is " + size.width() + "×" + size.height()
                         + ", not the bot's " + bot.width() + "×" + bot.height() + " (Sdk.screen()): the game showed"
                         + " another size when it was taken. Set the game to the bot's size and take it again.");
@@ -179,6 +182,18 @@ public final class ScreenShots {
     /** As {@link #save}, as the screen's own shot, only when it has none yet. */
     static void saveIfMissing(StudioServices services, ScreenGraph graph, String constant, BufferedImage frame) {
         if (services != null && !has(services.resourcesDir(), graph, constant)) {
+            save(services, graph, constant, null, frame);
+        }
+    }
+
+    /**
+     * As {@link #save}, as the screen's own shot, when it has none or one shorter at the same width: a website's whole
+     * page over a shot of its viewport alone (2026-11-21).
+     */
+    static void saveIfShorter(StudioServices services, ScreenGraph graph, String constant, BufferedImage frame) {
+        if (services == null || frame == null) return;
+        Size had = size(file(services.resourcesDir(), graph, constant).orElse(null));
+        if (had.empty() || had.width() == frame.getWidth() && had.height() < frame.getHeight()) {
             save(services, graph, constant, null, frame);
         }
     }

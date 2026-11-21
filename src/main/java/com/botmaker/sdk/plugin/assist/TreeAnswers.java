@@ -405,7 +405,7 @@ final class TreeAnswers {
         if (!pictured.frame().isEmpty()) {
             try {
                 BufferedImage frame = ImageIO.read(Path.of(pictured.frame()).toFile());
-                if (frame != null) ScreenShots.saveIfMissing(services, graph, constant.get(), frame);
+                if (frame != null) ScreenShots.saveIfShorter(services, graph, constant.get(), frame);
             } catch (IOException | RuntimeException unread) {
                 // The screen keeps showing its marker.
             }

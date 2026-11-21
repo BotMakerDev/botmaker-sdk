@@ -21,6 +21,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- A website's screen shot is its whole page, below the viewport too: Explore takes it once a run per screen and
+  replaces a shot of the viewport alone, and the map no longer says a page's taller shot is off the bot's size.
 - Exploring a website with the browser shown (`botmaker.web.show`): each page's inputs are outlined in blue with
   their names when the run first presses on it, then the part it presses in red, so someone watching (or a recording)
   sees what the run found and what it tries. The outlines come off before the press and every read.

@@ -241,6 +241,14 @@ public final class ExploreLoop {
         /** Saves the frame the game shows now as {@code name}; where it is, or {@code ""} when it was not saved. */
         String keep(String name);
 
+        /**
+         * Saves the screen shown now as {@code name}, for its shot: a website's whole page, below the viewport too, and
+         * an app's frame as {@link #keep} saves it.
+         */
+        default String keepWhole(String name) {
+            return keep(name);
+        }
+
         /** The bot's plan, whose goals say which spending inputs have a use; {@link Plan#NONE} for none. */
         default Plan plan() {
             return Plan.NONE;
@@ -389,6 +397,11 @@ public final class ExploreLoop {
     private boolean settling;
     /** The inputs this run took a picture of ({@code SCREEN.field}), before the map it plays holds them. */
     private final Set<String> pictures = new HashSet<>();
+    /**
+     * The screens whose whole page this run took for their shot: once each, so a shot taken before it was whole, of
+     * the viewport alone, is taken again (2026-11-21).
+     */
+    private final Set<String> shot = new HashSet<>();
     /** The screens whose forms were tried: once each. */
     private final Set<String> probed = new HashSet<>();
     /** What the run settled at each stop, by its id: the evidence when the plugin side's write of it falls short. */
@@ -939,7 +952,8 @@ public final class ExploreLoop {
             play.picture(screen + "." + field, found.getFirst().bounds()).ifPresent(file -> inputs.put(field, file));
         }
         inputs.keySet().forEach(field -> pictures.add(screen + "." + field));
-        String frame = on.setup().shot() == null ? play.keep("shot-" + screen) : "";
+        // pictured runs on a website only: its shot is the whole page, taken again once a run.
+        String frame = shot.add(screen) ? play.keepWhole("shot-" + screen) : "";
         if (!frame.isEmpty() || !inputs.isEmpty()) {
             emit(new ExploreEvent.Pictured(screen, frame, inputs, nowMs.getAsLong()));
         }

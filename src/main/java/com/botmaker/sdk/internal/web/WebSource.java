@@ -197,6 +197,16 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
         }
     }
 
+    /** The whole page from its top, below the viewport too: a screen's shot. Empty with no page up, or unrendered. */
+    public synchronized Optional<BufferedImage> whole() {
+        if (page == null) return Optional.empty();
+        try {
+            return Optional.ofNullable(ImageIO.read(new ByteArrayInputStream(page.whole())));
+        } catch (IOException | RuntimeException unrendered) {
+            return Optional.empty();
+        }
+    }
+
     /** Presses the node under {@code p} through the guard; one it refuses is not pressed, and the refusal is said. */
     @Override
     public synchronized void click(Point p) {
