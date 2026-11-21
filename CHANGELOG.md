@@ -30,7 +30,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 ### Fixed
 
 - A website's screen is drawn on the Screens tab at the board's width and scrolled down its whole page, no longer
-  shrunk to a sliver to show whole.
+  shrunk to a sliver to show whole. The board's wheel scrolls; Ctrl+wheel zooms.
 - A website's link shown twice alike, in its bar and its footer, is boxed on a screen's shot once each: the footer's,
   `Element.index(1)`, at the page's second match in reading order, no longer on the bar's beside it.
 - A dialog of a website is found over every page, not only the ones it was first opened from: a page told by its

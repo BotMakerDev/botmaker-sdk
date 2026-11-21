@@ -29,8 +29,8 @@ import java.util.function.DoubleFunction;
 /**
  * The 🗺 Screens window's Screen tab: the picked screen's shot as big as the tab, each input boxed where it is, the
  * picked one drawn picked (the user's call, 2026-10-18). A box clicked goes to the screen its input opens;
- * right-clicked, it picks its input, which the side panel then shows (2026-11-02). The wheel zooms, a drag moves
- * it; Fit draws it as wide as the tab again.
+ * right-clicked, it picks its input, which the side panel then shows (2026-11-02). The wheel scrolls, Ctrl+wheel
+ * zooms, a drag moves it; Fit draws it as wide as the tab again.
  *
  * <p>A cover ({@link #cover}) is drawn in the shot's place: the game live, which takes the wheel and the drag itself,
  * or a frame frozen off it, which zooms as the shot does.
@@ -82,7 +82,8 @@ final class ScreenBoard {
                 : scroller.getViewportBounds().getWidth(), scroller.viewportBoundsProperty()));
         scroller.getStyleClass().add("screen-panel-scroller");
         scroller.addEventFilter(ScrollEvent.SCROLL, e -> {
-            if (e.getDeltaY() == 0 || live || shotAt == null && cover == null) return;
+            // The wheel scrolls a tall page down; Ctrl with it zooms (the user's call, 2026-11-21).
+            if (e.getDeltaY() == 0 || live || shotAt == null && cover == null || !e.isShortcutDown()) return;
             // The wheel over a strip drawn on the shot scrolls the strip.
             for (Node at = e.getTarget() instanceof Node n ? n : null; at != null && at != scroller;
                  at = at.getParent()) {
@@ -105,8 +106,8 @@ final class ScreenBoard {
             zoom = 1;
             draw(true);
         });
-        Label hint = new Label("Click a box: go where it leads · right-click: pick it · the wheel zooms · a drag "
-                + "moves it");
+        Label hint = new Label("Click a box: go where it leads · right-click: pick it · the wheel scrolls, "
+                + "Ctrl+wheel zooms · a drag moves it");
         hint.getStyleClass().add("screen-panel-path");
         hint.setMinWidth(0);
         bar = new HBox(10, title, hint, fit);
@@ -179,7 +180,7 @@ final class ScreenBoard {
         draw(false);
     }
 
-    /** {@code held}: a drag on the cover draws a cut there, and moves nothing; the wheel still zooms. */
+    /** {@code held}: a drag on the cover draws a cut there, and moves nothing; Ctrl+wheel still zooms. */
     void holdStill(boolean held) {
         this.held = held;
         scroller.setPannable(!live && !held);
