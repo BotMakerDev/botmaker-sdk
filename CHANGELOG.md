@@ -24,6 +24,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - 🗺 Screens: the first card dragged no longer pins every screen a collapsed layout put on one corner there, which
   stacked them for good and left the map showing a handful of screens. A map already stacked so: ⋯ ▸ Tidy. Screens
   added after the map was pinned now come beside it rather than far off (toolkit `Placement.beside`).
+- 🗺 Screens: ⋯ ▸ Tidy, and a drag of many cards, read the map once rather than once per card: Tidy on a 63-screen
+  map took half a minute with Studio frozen, now a moment.
 
 ## [1.12.0] — 2026-11-21
 

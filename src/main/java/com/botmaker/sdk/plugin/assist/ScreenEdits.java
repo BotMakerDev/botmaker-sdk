@@ -1249,35 +1249,22 @@ public final class ScreenEdits {
         // One step of Studio's undo for the whole drag, however many cards it pinned.
         String label = moving.size() == 1 ? "Move " + graph.shown(moving.keySet().iterator().next())
                 : "Move " + moving.size() + " cards";
-        String[] answer = {moving.size() == 1 ? "Moved 1 screen." : "Moved " + moving.size() + " screens."};
-        services.history().batch(label, () -> {
-            for (Map.Entry<String, Point> corner : moving.entrySet()) {
-                Optional<String> failed = ScreenBook.update(services, corner.getKey(),
-                        s -> s.setup(x -> x.at(corner.getValue())));
-                if (failed.isPresent()) {
-                    answer[0] = said(failed, "");
-                    return;
-                }
-            }
-        });
-        return answer[0];
+        // The map read once for every card: one read per card took Tidy half a minute on 63 screens (2026-11-21).
+        Map<String, UnaryOperator<MapScreen>> changes = new LinkedHashMap<>();
+        moving.forEach((constant, corner) -> changes.put(constant, s -> s.setup(x -> x.at(corner))));
+        return said(ScreenBook.updateAll(services, label, changes),
+                moving.size() == 1 ? "Moved 1 screen." : "Moved " + moving.size() + " screens.");
     }
 
     /** Puts every card of 🗺 Screens' map back where the layout puts it: no screen keeps a corner of its own. */
     public static String tidy(StudioServices services) {
         ScreenGraph graph = ScreenBook.read(services);
-        String[] answer = {"Every card is where the layout puts it."};
-        services.history().batch("Tidy the map", () -> {
-            for (Map.Entry<String, MapScreen> screen : graph.screens().entrySet()) {
-                if (screen.getValue().at() == null) continue;
-                Optional<String> failed = ScreenBook.update(services, screen.getKey(), s -> s.setup(x -> x.at(null)));
-                if (failed.isPresent()) {
-                    answer[0] = said(failed, "");
-                    return;
-                }
-            }
+        Map<String, UnaryOperator<MapScreen>> changes = new LinkedHashMap<>();
+        graph.screens().forEach((constant, screen) -> {
+            if (screen.at() != null) changes.put(constant, s -> s.setup(x -> x.at(null)));
         });
-        return answer[0];
+        if (changes.isEmpty()) return "Every card is where the layout puts it.";
+        return said(ScreenBook.updateAll(services, "Tidy the map", changes), "Every card is where the layout puts it.");
     }
 
     /** The bot's picture {@code name}, as its constant holds it. */
