@@ -318,11 +318,24 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   behind an `occasional` input shows at times, one behind a `locked` input is locked: read off the edges, never
   flagged), shape, the pictures each screen uses, and what each screen owes (`owed`; an `owes` entry
   "marker — why" stands for the marker).
-- **Discovery's order** is breadth first (the user's call, 2026-10-16, in place of 2026-10-14's finish-each-opened-
-  screen-first): cut every input of a screen an input opens at once, then try on the screen it came from.
-  `nextToExplore` is the shallowest unfinished screen, the ones behind an information input (`isInfo`: kind INFO,
-  or help, rules, a leaderboard by name) or a way in that comes and goes last; `untried` lists information inputs
-  last. Popups are never gone to.
+- **Done-ness is the graph's** (2026-11-20, spec `../docs/superpowers/specs/2026-11-20-explore-screen-done-design.md`
+  in the umbrella; one meaning for the run, the MCP and the window). `status(screen, field)` is an `InputStatus`:
+  `LINKED` (a way from it is mapped, or it is the way back), `STAYS` (pressed, no screen change, its effect typed on
+  the input), `NOT_PRESSED` (a verdict other than free, or locked), `FAILED` (pressed, the press did not take) or
+  `UNTRIED`; an input that comes and goes is left aside. `left(screen)` lists the `UNTRIED` and `FAILED` ones, the
+  screen's own work first and information inputs (`isInfo`: kind INFO, or help, rules, a leaderboard by name) last.
+  `done(screen)` is all cut and nothing left. All cut is the screen's `Setup.isAllCut()`: a screen read off a tree
+  gets it from its `TreeAnswer` (`allCut`, written by `TreeAnswers`), a picture-only screen from the Cartographer
+  (`write_notes allCut`, at the screen's `UNKNOWN_SCREEN` stop), so a screen nobody marked is never done. Popups and start screens keep the
+  exceptions `noneCut` had.
+- **The next screen** is `nextToExplore(at)` (2026-11-20, in place of 2026-10-16's breadth first): `at` itself while
+  it is not done (finish here), else the not-done screen nearest `at` by the map's ways; ties, and a call with no
+  `at` (no run live), go by presence, information last, depth, then declared order; a locked screen or a popup is
+  never next. A
+  walk on the web costs about 12.6 s a press, so a run never crosses the map back to a shallow screen. The run
+  passes a predicate that leaves out its set-aside screens and the ways it found missing this visit
+  (`notSeenHere`); the MCP (`Protocol`, `NotesTools`, `read_map`'s `MapReport`) and 🗺 Screens ask `ScreenGraph.nextWork(live)`, with the live
+  run's screen when the journal has one (`Journal.liveAt`). Popups are never gone to.
 - **`ScreenWalk`** finds where the game is (`whereOn`: a screen opened from another, by any way in, hides it; of two
   shown that neither hides, the one told by more markers wins; the screens one step from where the game was first,
   every screen only when none of them shows; markers looked for near their cut place, `Reach.findEachNear`, the
@@ -395,7 +408,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
 The rate that counts is how fast the map gets built, screen by screen, on every target (a PC game, an Android app, a
 website), not how fast one press goes: a whole screen should be built in a minute or two.
 
-- **A screen's clock** (`ExploreLoop.clock`) is the time the run spent on it since it first reached it, charged each
+- **A screen's clock** (`internal/explore/ScreenClock`) is the time the run spent on it since it first reached it, charged each
   round to the screen the run was on. It is split by what the time went to (`Spent`): pressing, settling, walking,
   waiting on Claude.
 - **Built** means nothing on it is open (`ExploreLoop.open`, one line a kind): every input the run pictures has its
@@ -404,7 +417,9 @@ website), not how fast one press goes: a whole screen should be built in a minut
   counts by name), and, in a run that plays a plan, no input spends a fact with no action of the plan's goals pressing
   it. Leaving a screen writes `ExploreEvent.Built` or `ExploreEvent.Building` with what is open, the latter only when
   that changed, so a hub passed again and again says it once. A parked stop arriving on a built screen opens it again.
-- **The budget** (`Settings.screenBudget`, 2 minutes): a screen whose clock runs past it unbuilt is set aside
+- **The budget** (`Settings.screenBudget`, a `ScreenBudget`, 2026-11-20): the presses the screen has had and still has left, times the press
+  call's time measured this run, never below 2 minutes nor above 15, never shrinking; a screen whose clock runs past
+  it unbuilt is set aside
   (`ExploreEvent.SetAside`). The run walks to the nearest other open screen and comes back once no other is open.
   Back and still unbuilt after a second budget, the run stops as `StopKind.LOW_YIELD`, saying what is open and where
   the clock went. A `resume` gives the screen a fresh clock, answered once it builds; `resume ignore` leaves it as it
@@ -449,6 +464,35 @@ fixed and rebuilt, and the run restarts on the new jar and replays it.
   longer declares the run. Then, off the call's thread, it stops the run, reloads the plugins and starts the entry
   with no arguments, so the budget is the default. What fails after that is on the status line and in the core's log
   only; `explore wait` answers the replay.
+- **A resume reloads the bot only when it changed** (`Generation`, 2026-11-21): a SHA-256 of `src/main/java` and
+  `src/main/resources` equal to the last generation's compiles nothing (`Unchanged`, same generation number); a
+  resume with `ignore` reloads nothing at all. Each new generation closes the loader of the one it replaces, except
+  generation 0, whose classes the run's entry holds to its end. A changed bot is compiled whole: one class may have
+  inlined another's constant, and a deleted class would linger.
+
+## Who takes a stop: the agents and the run companion (2026-11-21, audit `../docs/audits/2026-11-20-sdk-explore-audit.md` §2.3 in the umbrella)
+
+A run exploring on its own hands each stop to one role, so no agent sees a stop it cannot fix. Each `StopKind` has
+its `StopRole`, which every stop line of the journal carries as `role`.
+
+- **Settler**: the run's own side. What a page's tree answers (`TreeAnswer`) is written into the bot by the run's
+  companion, `plugin/assist/SdkCompanions` → `TreeAnswerWatch`, declared by the SDK's `companions(…)` step: the core
+  starts it with a Keep exploring or Discover run and stops it at the run's end, once however many clients are
+  connected (contract `run.RunCompanion`). Its code stays in the SDK.
+- **Cartographer**: a Claude session with the map tools only. It takes stops about the map, its pictures,
+  conditions and verdicts: `explore wait role cartographer`, fix, `resume`. A verdict that can spend real money, or a
+  call only the user makes, it hands on with `explore ask <id> <why>`, which parks the stop for the user (`park <id>`
+  in the journal).
+- **Mechanic** (`--dev` only): a session in a worktree lane of botmaker-sdk, on a Discover fault or the bot's code
+  throwing. It turns the fault into a failing test, fixes it, commits in its lane, installs the lane's SDK and calls
+  `explore reload_sdk`. The lane's branch is the user's to merge.
+- **User**: the guard, stuck and asked stops, and what only they decide. The Explore tab lists them under *For you*,
+  with resume and ignore. Claude never takes one: `resume` and `fault` refuse a user's stop, open or parked, and a
+  `wait` with no role passes over them ("Still running … It waits on <id>, the user's").
+- **The watcher** (`tools/explore-watch.sh <bot> [--stops N] [--dev]` in the umbrella) runs the agents headless: a
+  fresh interactive `claude` per batch of N stops in the tmux session `explore`, each ending its last reply with
+  `EXPLORE: done` (`tools/hooks/explore-mark.sh`), `cswap switch` on a usage limit, subscription only. `--dry-run`
+  prints what it would hand to whom from the latest run.
 
 ## The window (`plugin/map`)
 
