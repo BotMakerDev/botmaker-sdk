@@ -34,7 +34,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 
 /**
  * A website as a run sees and acts on it: one page of BotMaker's own Chromium, under the read-only {@link Guard}
@@ -62,10 +61,11 @@ import java.util.function.Supplier;
 public final class WebSource implements CaptureSource, ReadableSource, AutoCloseable {
 
     /**
-     * What a source is built with: Chromium's binary and extra switches, the rules it reads {@code robots.txt} by, its
-     * pace and budget, and what ends the run. A test gives its own; a run takes {@link #defaults}.
+     * What a source is built with: what installs Chromium (whether it is there now) and its extra switches, the rules
+     * it reads {@code robots.txt} by, its pace and budget, and what ends the run. A test gives its own; a run takes
+     * {@link #defaults}.
      */
-    public record Options(Supplier<Optional<Path>> chromium, List<String> switches, Robots robots, Pace pace,
+    public record Options(BooleanSupplier chromium, List<String> switches, Robots robots, Pace pace,
                           Budget budget, Consumer<String> stop) {
 
         public Options {
@@ -453,10 +453,12 @@ public final class WebSource implements CaptureSource, ReadableSource, AutoClose
     }
 
     private void start() {
-        Path binary = options.chromium().get().orElseThrow(() -> new IllegalStateException(
-                "no Chromium for this computer, or its download failed: a website cannot be opened"));
+        if (!options.chromium().getAsBoolean()) {
+            throw new IllegalStateException(
+                    "no Chromium for this computer, or its download failed: a website cannot be opened");
+        }
         try {
-            chromium = Chromium.start(binary, Boolean.getBoolean(SHOW), options.switches());
+            chromium = Chromium.start(Boolean.getBoolean(SHOW), options.switches());
         } catch (IOException e) {
             throw new UncheckedIOException("Chromium did not start", e);
         }

@@ -27,6 +27,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   their names when the run first presses on it, then the part it presses in red, so someone watching (or a recording)
   sees what the run found and what it tries. The outlines come off before the press and every read.
 
+### Changed
+
+- Exploring a website runs in Playwright's Chromium, downloaded once under the cache on first use; a run whose
+  download fails stops with that said, instead of looking for a Chromium of its own.
+
 ### Fixed
 
 - A website's screen is drawn on the Screens tab at the board's width and scrolled down its whole page, no longer
