@@ -8,13 +8,11 @@ import java.time.Duration;
 public final class Parameters {
 
     /** How long {@link samplebot.Rest} waits before the loop starts again. */
-    @Param(visibility = Param.PUBLIC,
-            description = "How long the bot rests before going round again")
+    @Param(description = "How long the bot rests before going round again")
     public static Duration restBetween = java.time.Duration.ofMillis(60000L);
 
     /** How many times an activity polls for a picture before it gives up. */
-    @Param(visibility = Param.PUBLIC,
-            description = "How many times an activity looks for a picture before giving up")
+    @Param(description = "How many times an activity looks for a picture before giving up")
     public static int maxAttempts = 20;
 
     private Parameters() {}
