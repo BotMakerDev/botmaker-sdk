@@ -119,30 +119,6 @@ public sealed interface Input extends ScreenPart permits Button, TextButton, Hot
     /** This input, occasional, there while {@code condition} answers true: {@code Firestone::eventOn}. */
     Input when(BooleanSupplier condition);
 
-    /** Whether it shows only at times. */
-    @Deprecated(forRemoval = true)
-    default boolean comesAndGoes() {
-        return isOccasional();
-    }
-
-    /** The picture proving it locked on this account; null when it is not. */
-    @Deprecated(forRemoval = true)
-    default ImageTemplate lock() {
-        return locked();
-    }
-
-    /** This input, going to a screen mapped already that it is no way into. */
-    @Deprecated(forRemoval = true)
-    default Input leaves() {
-        return leaving();
-    }
-
-    /** This input, showing only at times. */
-    @Deprecated(forRemoval = true)
-    default Input sometimes() {
-        return occasional();
-    }
-
     /** Whether it was tried, or needs no trying: tried, leaving, never done, or locked. One that opens a screen is too. */
     default boolean settled() {
         return isTried() || isLeaving() || never() != null || locked() != null;

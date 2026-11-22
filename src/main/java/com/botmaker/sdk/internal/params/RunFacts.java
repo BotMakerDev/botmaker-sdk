@@ -6,9 +6,6 @@ package com.botmaker.sdk.internal.params;
 import com.botmaker.plugin.api.params.Param;
 import com.botmaker.sdk.api.console.Debug;
 import com.botmaker.sdk.api.params.Facts;
-import com.botmaker.sdk.api.params.GameState;
-import com.botmaker.sdk.api.params.ReadOn;
-import com.botmaker.sdk.api.params.StaleAfter;
 import com.botmaker.sdk.api.screens.Navigate;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
@@ -38,11 +35,9 @@ import java.util.function.Function;
 /**
  * The running bot's {@link Facts} read off the app (2026-11-04, renamed from {@code GameFacts} on 2026-11-06: a bot
  * need not be a game): each fact a screen's readout names, {@code Readout.into(Progress::gold)}, read on the frame
- * its screen is seen, when its value is unknown or stale. A fact still marked with the deprecated {@link ReadOn} is
- * read where that says, unless a readout names it, which wins. Each value read is a parameter's value like any other
+ * its screen is seen, when its value is unknown or stale. Each value read is a parameter's value like any other
  * ({@link RunParams}). A fact that cannot be read is left as it was; only a stop goes on.
  */
-@SuppressWarnings("removal")
 public final class RunFacts {
 
     /** Reads readouts of the screen the app shows now. */
@@ -78,18 +73,11 @@ public final class RunFacts {
 
     /** Uses the facts among {@code groups}, fed by the installed map's readouts and read by {@code reader}. Tests too. */
     static void use(List<Class<?>> groups, Reader reader) {
-        List<Fact> found = new ArrayList<>(fedByReadouts(Set.copyOf(groups)));
-        Set<Method> fed = new HashSet<>();
-        found.forEach(fact -> fed.add(fact.parameter()));
+        List<Fact> found = fedByReadouts(Set.copyOf(groups));
         for (Class<?> group : groups) {
             try {
-                if (!isFactsGroup(group)) continue;
-                if (!group.isAnnotationPresent(Param.class)) {
+                if (isFactsGroup(group) && !group.isAnnotationPresent(Param.class)) {
                     Say.warn(group.getSimpleName() + " is marked @Facts without @Param: its facts are not kept.");
-                    continue;
-                }
-                for (Method method : group.getDeclaredMethods()) {
-                    if (!fed.contains(method)) readOn(method).ifPresent(found::add);
                 }
             } catch (RuntimeException | LinkageError unreadable) {
                 Say.warn(group.getSimpleName() + "'s facts cannot be read: " + unreadable);
@@ -103,9 +91,9 @@ public final class RunFacts {
         ScreenMaps.onSeen(found.isEmpty() ? null : RunFacts::seen);
     }
 
-    /** Whether {@code group} is a group of facts: marked {@link Facts}, or the deprecated {@link GameState}. */
+    /** Whether {@code group} is a group of facts: marked {@link Facts}. */
     static boolean isFactsGroup(Class<?> group) {
-        return group.isAnnotationPresent(Facts.class) || group.isAnnotationPresent(GameState.class);
+        return group.isAnnotationPresent(Facts.class);
     }
 
     /** How long a reading of {@code parameter} holds, by the readouts that feed it (the shortest); empty when none. */
@@ -149,30 +137,11 @@ public final class RunFacts {
                 return Optional.empty();
             }
             return readable(parameter)
-                    ? Optional.of(new Fact(parameter, screen.getClass(), field, holds(readout.staleAfter(), parameter)))
+                    ? Optional.of(new Fact(parameter, screen.getClass(), field,
+                            readout.staleAfter() != null ? readout.staleAfter() : Readout.READING_HOLDS))
                     : Optional.empty();
         } catch (RuntimeException | LinkageError unreadable) {
             Say.warn(where + " is read into something that cannot be read: " + unreadable + " It is not read.");
-            return Optional.empty();
-        }
-    }
-
-    /** How long a reading holds: what its readout {@code said}, else {@code parameter}'s deprecated {@link StaleAfter}, else an hour. */
-    private static Duration holds(Duration said, Method parameter) {
-        if (said != null) return said;
-        StaleAfter after = parameter.getAnnotation(StaleAfter.class);
-        return after != null ? Duration.ofMinutes(after.minutes()) : Readout.READING_HOLDS;
-    }
-
-    /** The fact {@code method} is, read where its deprecated {@link ReadOn} says; empty when it has none. */
-    private static Optional<Fact> readOn(Method method) {
-        try {
-            ReadOn on = method.getAnnotation(ReadOn.class);
-            if (on == null || !readable(method)) return Optional.empty();
-            return Optional.of(new Fact(method, on.screen(), on.field(), holds(null, method)));
-        } catch (RuntimeException | LinkageError unreadable) {
-            Say.warn(method.getDeclaringClass().getSimpleName() + "." + method.getName()
-                    + "'s @ReadOn cannot be read: " + unreadable);
             return Optional.empty();
         }
     }

@@ -76,12 +76,6 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     }
 
     @Override
-    @Deprecated(forRemoval = true)
-    public TextButton leaves() {
-        return leaving();
-    }
-
-    @Override
     public TextButton info() {
         return new TextButton(caption, isTried, isLeaving, true, verdict, isOccasional, locked, when, gesture, hold,
                 isMarking, isAbsent, failed);
@@ -112,12 +106,6 @@ public record TextButton(Caption caption, boolean isTried, boolean isLeaving, bo
     public TextButton occasional() {
         return new TextButton(caption, isTried, isLeaving, isInfo, verdict, true, locked, when, gesture, hold,
                 isMarking, isAbsent, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public TextButton sometimes() {
-        return occasional();
     }
 
     @Override

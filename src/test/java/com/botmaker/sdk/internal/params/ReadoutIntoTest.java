@@ -49,6 +49,7 @@ class ReadoutIntoTest {
     void noMapLeft() {
         RunFacts.use(List.of(), (constant, fields) -> Optional.empty());
         ScreenMaps.use(null);
+        RunParams.startOver(bot);
     }
 
     @Test

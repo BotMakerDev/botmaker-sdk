@@ -36,7 +36,7 @@ author's starting values in `starting-params/` at the same paths; `ParamGroups` 
 method above, in the committed holder. A fact is a method of the bot's own `@Facts` group in `params/bot/`,
 `@Param.Shown(changes = DURING_RUN)`, holding its value only; a screen's readout says where it is read and how long a
 reading holds, `Readout.into(Progress::gold).staleAfter(…)` (2026-11-06; `@GameState`, `@ReadOn`, `@StaleAfter` and
-`@Assumed` are deprecated, read by `RunFacts` until removed, a readout winning over `@ReadOn`): a run writes it (`Params.set`) and keeps its time
+`@Assumed` were deleted on 2026-11-22): a run writes it (`Params.set`) and keeps its time
 in `@Param.Kept`, `Params.when(Progress::gold).atLeast(5)` tests it, and the assistant adds, lists and forgets it
 through `edit_map` `add_fact` and `setup` `game_facts`/`forget`. The assistant never sees a parameter changed outside
 a run. A game account is plain user data, with nothing here around it.

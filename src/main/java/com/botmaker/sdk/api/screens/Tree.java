@@ -80,12 +80,6 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
         return new Tree(nodes, isDragged, notches, isTried, isLeaving, isInfo, verdict, isOccasional, locked, when, failed);
     }
 
-    /** How many notches one wheel scroll turns; 0 when the wheel does not scroll it. */
-    @Deprecated(forRemoval = true)
-    public int notches() {
-        return wheel;
-    }
-
     @Override
     public Tree tried() {
         return new Tree(nodes, isDragged, wheel, true, isLeaving, isInfo, verdict, isOccasional, locked, when, null);
@@ -99,12 +93,6 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
     @Override
     public Tree leaving() {
         return new Tree(nodes, isDragged, wheel, isTried, true, isInfo, verdict, isOccasional, locked, when, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public Tree leaves() {
-        return leaving();
     }
 
     @Override
@@ -135,12 +123,6 @@ public record Tree(List<Node> nodes, boolean isDragged, int wheel, boolean isTri
     @Override
     public Tree occasional() {
         return new Tree(nodes, isDragged, wheel, isTried, isLeaving, isInfo, verdict, true, locked, when, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public Tree sometimes() {
-        return occasional();
     }
 
     @Override

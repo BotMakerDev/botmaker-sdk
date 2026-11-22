@@ -17,6 +17,20 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Removed
+
+- The elements deprecated two releases ago, with their migration rules: `@GameState`, `@ReadOn`, `@StaleAfter`
+  and `@Assumed` (a fact is a method of a `@Facts` group, fed by a screen's `Readout.into(…).staleAfter(…)`);
+  an input's `leaves()`, `sometimes()`, `comesAndGoes()` and `lock()`, a button's `submits()`, `clears()`,
+  `text()` and `typedByBody()`, a tree's `notches()` (use `leaving()`, `occasional()`, `isOccasional()`,
+  `locked()`, `submitting()`, `clearing()`, `types()`, `isTyped()`, `wheel()`); `OcrOptions`' `withX(…)` (use `x(…)`);
+  `State.BADGE`, `LOCKED`, `DONE` and `BUSY` and `Pressed.Result.LOCKED`, `FINISHED` and `BUSY` (a bot's own
+  `States` and `Result.BLOCKED`). A bot that skipped the release that deprecated them has its uses repaired
+  by Studio's upgrade like any code that no longer compiles; a group still marked `@GameState` loses the mark and
+  must be marked `@Facts` again by hand.
+
 ## [1.12.1] — 2026-11-22
 
 ### Added

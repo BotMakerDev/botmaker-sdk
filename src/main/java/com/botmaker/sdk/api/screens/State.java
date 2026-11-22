@@ -3,8 +3,6 @@
 
 package com.botmaker.sdk.api.screens;
 
-import com.botmaker.plugin.api.meta.Migrate;
-
 import java.util.Locale;
 
 /**
@@ -15,26 +13,10 @@ import java.util.Locale;
 public enum State implements ButtonState {
     /** As it usually looks: the picture the input was cut as. */
     NORMAL("Normal"),
-    /** With a badge, a dot or a glow: something waits behind it. */
-    @Deprecated(forRemoval = true)
-    @Migrate.Dropped("a bot names its own state in its States class: States.Presses.BADGE")
-    BADGE("Badge"),
     /** Greyed out or dimmed: pressing it does nothing now, so a run never presses it. */
     DISABLED("Disabled"),
     /** Picked: the tab or toggle that is on. */
-    SELECTED("Selected"),
-    /** Not open yet: a node whose parents are not done, so a run never presses it. */
-    @Deprecated(forRemoval = true)
-    @Migrate.Dropped("a bot names its own state in its States class: States.Blocks.LOCKED")
-    LOCKED("Locked"),
-    /** Finished for good: maxed, learnt, so a run never presses it. */
-    @Deprecated(forRemoval = true)
-    @Migrate.Dropped("a bot names its own state in its States class: States.Blocks.DONE")
-    DONE("Done"),
-    /** In progress: upgrading or on its way, so a run never presses it now. */
-    @Deprecated(forRemoval = true)
-    @Migrate.Dropped("a bot names its own state in its States class: States.Blocks.BUSY")
-    BUSY("Busy");
+    SELECTED("Selected");
 
     private final String displayName;
 
@@ -42,11 +24,10 @@ public enum State implements ButtonState {
         this.displayName = displayName;
     }
 
-    /** Whether a button showing it is never pressed: disabled (and, until they go, locked, done or busy). */
+    /** Whether a button showing it is never pressed: disabled. */
     @Override
-    @SuppressWarnings("removal")
     public boolean blocks() {
-        return this == DISABLED || this == LOCKED || this == DONE || this == BUSY;
+        return this == DISABLED;
     }
 
     /** How a tool names it: {@code disabled}. */

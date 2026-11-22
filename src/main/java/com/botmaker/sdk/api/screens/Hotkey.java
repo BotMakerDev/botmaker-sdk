@@ -75,12 +75,6 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
     }
 
     @Override
-    @Deprecated(forRemoval = true)
-    public Hotkey leaves() {
-        return leaving();
-    }
-
-    @Override
     public Hotkey info() {
         return new Hotkey(combo, isTried, isLeaving, true, verdict, isOccasional, locked, when, failed);
     }
@@ -108,12 +102,6 @@ public record Hotkey(Combo combo, boolean isTried, boolean isLeaving, boolean is
     @Override
     public Hotkey occasional() {
         return new Hotkey(combo, isTried, isLeaving, isInfo, verdict, true, locked, when, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public Hotkey sometimes() {
-        return occasional();
     }
 
     @Override

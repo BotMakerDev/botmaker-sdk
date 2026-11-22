@@ -417,7 +417,7 @@ final class MapEdits {
             readField = field;
             read = "read off " + readScreen + "." + readField;
         }
-        // A fact that is already there only needs its readout: an earlier add that stopped halfway, or an old @ReadOn.
+        // A fact that is already there only needs its readout: an earlier add that stopped halfway.
         boolean there = feeding != null && services.pluginValues().runParameters().stream()
                 .anyMatch(parameter -> parameter.group().equals(group) && parameter.name().equals(name));
         if (!there) {

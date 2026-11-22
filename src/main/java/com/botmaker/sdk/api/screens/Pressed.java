@@ -37,15 +37,6 @@ public record Pressed(Result result, Screen landed, int times, ButtonState state
          * {@link #state()} carries: nothing was pressed.
          */
         BLOCKED,
-        /** Its button showed its locked look: nothing was pressed. */
-        @Deprecated(forRemoval = true)
-        LOCKED,
-        /** Its button showed its done look, finished for good: nothing was pressed. */
-        @Deprecated(forRemoval = true)
-        FINISHED,
-        /** Its button showed its busy look, in progress: nothing was pressed. */
-        @Deprecated(forRemoval = true)
-        BUSY,
         /** It was not on its screen, its strip scrolled both ways: nothing was pressed. */
         ABSENT,
         /** Its screen could not be reached now, or it is locked or its method says no: nothing was pressed. */

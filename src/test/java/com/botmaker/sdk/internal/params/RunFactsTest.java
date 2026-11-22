@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Facts are unknown until written, read on their screen when stale, and kept with their time (2026-11-04); a readout
- * that names a fact says where and how long, and wins over a deprecated {@code @ReadOn} (2026-11-06).
+ * that names a fact says where and how long (2026-11-06).
  */
 class RunFactsTest {
 
@@ -75,6 +75,7 @@ class RunFactsTest {
     void noMapLeft() {
         RunFacts.use(List.of(), (constant, fields) -> Optional.empty());
         ScreenMaps.use(null);
+        RunParams.startOver(bot);
     }
 
     private void showing(Optional<Map<String, String>> look) {
@@ -96,15 +97,6 @@ class RunFactsTest {
 
         assertEquals(Optional.of(5), Params.known(Hero::level));
         assertEquals(Answer.YES, atLeastOne.answer());
-    }
-
-    @Test
-    void anAssumedFactAnswersUntilRead() {
-        assertEquals(Optional.of(3), Params.known(Hero::gold));
-
-        Params.set(Hero::gold, 9);
-
-        assertEquals(Optional.of(9), Params.known(Hero::gold));
     }
 
     @Test
@@ -168,10 +160,6 @@ class RunFactsTest {
         assertFalse(forgotten.contains("return 9;"), forgotten);
         assertFalse(forgotten.contains("Param.Kept"), forgotten);
         assertEquals(Optional.empty(), Params.known(Hero::level));
-
-        Params.set(Hero::gold, 8);
-        Params.forget(Hero::gold);
-        assertEquals(Optional.of(3), Params.known(Hero::gold), "assumed again");
     }
 
     @Test
@@ -218,6 +206,8 @@ class RunFactsTest {
 
     @Test
     void aFactKeptLongAgoIsStaleAndAFlagIsNot() {
+        RunFacts.use(List.of(Hero.class, Veteran.class), (constant, fields) -> Optional.empty());
+
         assertEquals(Optional.empty(), Params.known(Veteran::read), "read in 2020");
         assertEquals(Optional.of(true), Params.known(Veteran::flagged), "nothing makes a flag stale");
     }
@@ -232,16 +222,16 @@ class RunFactsTest {
         assertTrue(written.contains("Kind.FIRE_MAGE"), written);
     }
 
-    /** Wallet's coins is fed by the shop's readout and marked @ReadOn the home screen: the readout wins. */
+    /** Wallet's coins is fed by the shop's readout: it is read there, never on the home screen. */
     @Test
-    void readoutWinsOverReadOn() {
+    void aFactIsReadWhereItsReadoutIs() {
         RunFacts.use(List.of(Hero.class, Wallet.class), (constant, fields) -> {
             reads.add(fields);
             return Optional.of(Map.of("level", "Lv 12", "coins", "40"));
         });
 
         RunFacts.seen("HOME");
-        assertEquals(Optional.empty(), Params.known(Wallet::coins), "not read where @ReadOn says");
+        assertEquals(Optional.empty(), Params.known(Wallet::coins), "not its readout's screen");
         assertFalse(reads.getFirst().contains("coins"), reads.toString());
 
         RunFacts.seen("SHOP");
@@ -262,18 +252,6 @@ class RunFactsTest {
         assertEquals(Optional.of("Ann"), Params.known(Wallet::owner), "an hour by default");
         now.addAndGet(50 * 60_000L);
         assertEquals(Optional.empty(), Params.known(Wallet::owner), "past the hour");
-    }
-
-    /** A readout that says no time leaves the fact's deprecated {@code @StaleAfter} in force, not the hour. */
-    @Test
-    void aReadoutWithNoTimeKeepsTheOldStaleAfter() {
-        RunFacts.use(List.of(Wallet.class), (constant, fields) -> Optional.of(Map.of("tips", "7")));
-        RunFacts.seen("SHOP");
-        assertEquals(Optional.of(7), Params.known(Wallet::tips));
-
-        now.addAndGet(6 * 60_000L);
-
-        assertEquals(Optional.empty(), Params.known(Wallet::tips), "past its five minutes");
     }
 
     /** One screen feeds a fact once: a second readout's absence must not overwrite the first's reading. */

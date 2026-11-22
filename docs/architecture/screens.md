@@ -304,8 +304,7 @@ The game's structure lives in the bot, as Java: the `Screens` class beside `Sdk.
   enum's name, so a bot's enum needs no body. Studio holds a constant it read as `BotConstants.StateConstant(group,
   name)` and writes it back by the open set; `BotStates` (`plugin/assist`) offers, parses (`disabled`,
   `Blocks.MAXED`) and declares one, adding it to the bot's enum before the look naming it is written. A press on a
-  blocking look is `Pressed.blockedBy`: DISABLED for disabled, BLOCKED for a bot's (`Pressed.Result.LOCKED`,
-  `FINISHED` and `BUSY` migrate to BLOCKED), and `Pressed.state()` says which look stopped or carried it.
+  blocking look is `Pressed.blockedBy`: DISABLED for disabled, BLOCKED for a bot's, and `Pressed.state()` says which look stopped or carried it.
 - **The walk** (`TreeWalk`, from `Reach.perform`): anchors are the nodes seen once on the frame; it moves the view
   toward the target's predicted place (drag or wheel), carries the anchors across by how far the view moved
   (`Reach.shift`, `FrameShift`; else the drag asked for), and clicks the target once it shows.

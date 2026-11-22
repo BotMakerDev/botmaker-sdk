@@ -10,10 +10,6 @@ import com.botmaker.java.grammar.ParamValues;
 import com.botmaker.java.grammar.ParamsFitter;
 import com.botmaker.java.grammar.ValueGrammar;
 import com.botmaker.java.parse.JavaLevel;
-import com.botmaker.sdk.api.params.Assumed;
-import com.botmaker.sdk.api.params.ReadOn;
-import com.botmaker.sdk.api.params.StaleAfter;
-import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.internal.trace.Say;
 
 import java.io.File;
@@ -173,14 +169,8 @@ public final class RunParams {
             return Optional.ofNullable(get(reference, method));
         }
         OptionalLong at = keptAt(parameter);
-        boolean answers = at.isPresent() ? !stale(parameter, at.getAsLong()) : assumed(parameter);
+        boolean answers = at.isPresent() && !stale(parameter, at.getAsLong());
         return answers ? Optional.ofNullable(get(reference, method)) : Optional.empty();
-    }
-
-    /** An assumed value answers until read, but a forgotten one compiled from a read is that read, not the assumption. */
-    private static synchronized boolean assumed(Method parameter) {
-        return parameter.isAnnotationPresent(Assumed.class)
-                && !(FORGOTTEN.contains(parameter) && parameter.isAnnotationPresent(Param.Kept.class));
     }
 
     /**
@@ -201,18 +191,11 @@ public final class RunParams {
 
     /**
      * Whether a value written at {@code at} is past what holds for {@code parameter}: what the readouts feeding it say
-     * ({@code Readout.staleAfter}), else its deprecated {@code @StaleAfter}, else an hour when it is read on a screen.
-     * A fact nothing reads never goes stale.
+     * ({@code Readout.staleAfter}, else an hour). A fact nothing reads never goes stale.
      */
     static synchronized boolean stale(Method parameter, long at) {
         OptionalLong fed = RunFacts.holdsMs(parameter);
-        StaleAfter after = parameter.getAnnotation(StaleAfter.class);
-        long holds;
-        if (fed.isPresent()) holds = fed.getAsLong();
-        else if (after != null) holds = after.minutes() * 60_000L;
-        else if (parameter.isAnnotationPresent(ReadOn.class)) holds = Readout.READING_HOLDS.toMillis();
-        else return false;
-        return clock.getAsLong() - at > holds;
+        return fed.isPresent() && clock.getAsLong() - at > fed.getAsLong();
     }
 
     /**

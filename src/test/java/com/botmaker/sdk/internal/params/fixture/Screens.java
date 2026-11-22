@@ -6,19 +6,23 @@ package com.botmaker.sdk.internal.params.fixture;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.internal.params.fixture.params.bot.Hero;
+import com.botmaker.sdk.internal.params.fixture.params.bot.Veteran;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Wallet;
 import com.botmaker.sdk.internal.screens.MapFixtures;
 
 import java.time.Duration;
 
-/** A bot's map, for {@code RunFactsTest} and {@code ReadoutIntoTest}. */
+/** A bot's map, for {@code RunFactsTest}, {@code NeedTest} and {@code ReadoutIntoTest}. */
 public final class Screens {
 
     private Screens() {}
 
     public static final class Home extends Screen {
-        public final Readout level = Readout.text(MapFixtures.area(0, 0, 40, 20));
-        public final Readout player = Readout.text(MapFixtures.area(0, 20, 80, 20));
+        public final Readout level = Readout.text(MapFixtures.area(0, 0, 40, 20)).into(Hero::level);
+        public final Readout player = Readout.text(MapFixtures.area(0, 20, 80, 20)).into(Hero::kind);
+        public final Readout badge = Readout.text(MapFixtures.area(0, 40, 80, 20)).into(Hero::badge);
+        public final Readout veteran = Readout.text(MapFixtures.area(0, 60, 80, 20)).into(Veteran::read);
 
         @Override
         public Setup setup() {

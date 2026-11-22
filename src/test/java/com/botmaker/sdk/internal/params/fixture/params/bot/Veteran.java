@@ -4,18 +4,16 @@
 package com.botmaker.sdk.internal.params.fixture.params.bot;
 
 import com.botmaker.plugin.api.params.Param;
-import com.botmaker.sdk.api.params.GameState;
-import com.botmaker.sdk.api.params.ReadOn;
-import com.botmaker.sdk.internal.params.fixture.Screens;
+import com.botmaker.sdk.api.params.Facts;
 
-/** Game facts a run wrote long ago, as the next run compiles them, for {@code GameFactsTest}. */
+/** Game facts a run wrote long ago, as the next run compiles them, for {@code RunFactsTest}. */
 @Param
-@GameState
+@Facts
 public class Veteran {
 
+    /** Fed by the home screen's readout. */
     @Param.Kept(at = "2020-01-01T00:00:00Z")
     @Param.Shown(changes = Param.Changes.DURING_RUN)
-    @ReadOn(screen = Screens.Home.class, field = "level")
     public int read() { return 7; }
 
     @Param.Kept(at = "2020-01-01T00:00:00Z")

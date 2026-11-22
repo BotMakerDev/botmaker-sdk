@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.internal.params.fixture.Screens;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Hero;
+import com.botmaker.sdk.internal.params.fixture.params.bot.Veteran;
 import com.botmaker.sdk.internal.params.fixture.params.bot.Progress;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
@@ -23,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,12 +53,14 @@ class NeedTest {
         RunParams.startOver(bot);
         RunParams.clock(now::get);
         ScreenMaps.use(ScreenGraph.ofScreens(Map.of("HOME", new Screens.Home())));
+        RunFacts.use(List.of(Hero.class, Veteran.class), (constant, fields) -> Optional.empty());
     }
 
     @AfterEach
     void noMapLeft() {
+        RunFacts.use(List.of(), (constant, fields) -> Optional.empty());
         ScreenMaps.use(null);
-        RunParams.clock(System::currentTimeMillis);
+        RunParams.startOver(bot);
     }
 
     @Test
@@ -100,7 +104,7 @@ class NeedTest {
 
         now.addAndGet(61 * 60_000L);
 
-        assertEquals(Answer.UNKNOWN, Need.above(Hero::level, 1).answer(), "past its @StaleAfter");
+        assertEquals(Answer.UNKNOWN, Need.above(Hero::level, 1).answer(), "past the hour its readout holds");
         assertEquals(Answer.UNKNOWN, Need.atLeast(Hero::level, 1).answer());
     }
 

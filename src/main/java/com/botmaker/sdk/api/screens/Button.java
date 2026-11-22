@@ -215,12 +215,6 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     }
 
     @Override
-    @Deprecated(forRemoval = true)
-    public Button leaves() {
-        return leaving();
-    }
-
-    @Override
     public Button info() {
         return new Button(picture, isTried, isLeaving, true, verdict, isOccasional, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element, keeps, isMarking, isAbsent, failed);
@@ -251,12 +245,6 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     public Button occasional() {
         return new Button(picture, isTried, isLeaving, isInfo, verdict, true, locked, looks, when, repeats, cycles,
                 gesture, hold, typing, drag, place, beside, grid, element, keeps, isMarking, isAbsent, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public Button sometimes() {
-        return occasional();
     }
 
     @Override
@@ -392,22 +380,10 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return typing(typing == null ? new Typing(null, true, false) : typing.with(true, typing.clears()));
     }
 
-    /** Was {@link #submitting()}, named as its reader {@link #isSubmitting()} is. */
-    @Deprecated(forRemoval = true)
-    public Button submits() {
-        return submitting();
-    }
-
     /** This button, a text field emptied before its text is typed. */
     @Link
     public Button clearing() {
         return typing(typing == null ? new Typing(null, false, true) : typing.with(typing.submits(), true));
-    }
-
-    /** Was {@link #clearing()}, named as its reader {@link #isClearing()} is. */
-    @Deprecated(forRemoval = true)
-    public Button clears() {
-        return clearing();
     }
 
     /** This button, typing as {@code typing} says once clicked, a drag clicked again; null: typing nothing. */
@@ -467,12 +443,6 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
         return typing == null ? null : typing.text();
     }
 
-    /** Was {@link #types()}, named as its link {@link #types(Words)} is. */
-    @Deprecated(forRemoval = true)
-    public Words text() {
-        return types();
-    }
-
     /** Whether it is a text field whose text only a body gives ({@link #typed()}): no walk goes through it. */
     public boolean isTyped() {
         return typing != null && typing.text() == null && typing.parameter() == null;
@@ -486,12 +456,6 @@ public record Button(ImageTemplate picture, boolean isTried, boolean isLeaving, 
     /** Whether its parameter is a {@link Secret} BotMaker types, never the run ({@link #typesSecret}). */
     public boolean isSecret() {
         return typing != null && typing.secret();
-    }
-
-    /** Was {@link #isTyped()}, named as its link {@link #typed()} is. */
-    @Deprecated(forRemoval = true)
-    public boolean typedByBody() {
-        return isTyped();
     }
 
     /** Whether Enter is pressed once its text is typed. */

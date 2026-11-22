@@ -72,12 +72,6 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried,
     }
 
     @Override
-    @Deprecated(forRemoval = true)
-    public Strip leaves() {
-        return leaving();
-    }
-
-    @Override
     public Strip info() {
         return new Strip(scroll, members, isTried, isLeaving, true, verdict, isOccasional, locked, when, failed);
     }
@@ -105,12 +99,6 @@ public record Strip(Scroll scroll, List<ImageTemplate> members, boolean isTried,
     @Override
     public Strip occasional() {
         return new Strip(scroll, members, isTried, isLeaving, isInfo, verdict, true, locked, when, failed);
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    public Strip sometimes() {
-        return occasional();
     }
 
     @Override
