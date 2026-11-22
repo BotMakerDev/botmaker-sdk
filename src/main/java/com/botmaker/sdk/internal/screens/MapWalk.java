@@ -8,9 +8,8 @@ import com.botmaker.sdk.api.screens.Answer;
 import com.botmaker.sdk.internal.bot.InstalledRun;
 
 import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -19,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.stream.IntStream;
 
 /**
  * A walk over a whole screen map, independent of the bot's {@code main}: every screen reached breadth first from
@@ -200,12 +200,8 @@ public final class MapWalk {
             found.accept(none);
             return new Summary(screens, 0, edges.size(), 0, edges.size(), List.of(none));
         }
-        Map<String, List<ScreenGraph.Edge>> out = new LinkedHashMap<>();
         Map<String, List<ScreenGraph.Edge>> in = new LinkedHashMap<>();
-        for (ScreenGraph.Edge edge : edges) {
-            out.computeIfAbsent(edge.from(), k -> new ArrayList<>()).add(edge);
-            in.computeIfAbsent(edge.to(), k -> new ArrayList<>()).add(edge);
-        }
+        for (ScreenGraph.Edge edge : edges) in.computeIfAbsent(edge.to(), k -> new ArrayList<>()).add(edge);
 
         long began = nowMs.getAsLong();
         long whole = budgets.whole().toMillis();
@@ -219,7 +215,11 @@ public final class MapWalk {
             else lost = moves.lost();
         }
         Set<String> reached = new LinkedHashSet<>(List.of(first));
-        Deque<String> queue = new ArrayDeque<>(reached);
+        // The screens whose edges are walked from, and the edges not taken up yet, by their index in edges().
+        Set<String> open = new LinkedHashSet<>(reached);
+        Set<Integer> left = new LinkedHashSet<>(IntStream.range(0, edges.size()).boxed().toList());
+        Map<String, Map<String, Long>> costs = new HashMap<>();
+        String here = lost == null ? first : null;
         Set<String> jumped = new LinkedHashSet<>();
         Set<ScreenGraph.Edge> tried = new LinkedHashSet<>();
         Map<String, String> unknown = new LinkedHashMap<>();
@@ -233,7 +233,24 @@ public final class MapWalk {
 
         walk:
         while (true) {
-            if (queue.isEmpty()) {
+            // The next edge is the untried one nearest where the game is, so the walk finishes a screen's
+            // neighbourhood before it travels back; of equal cost, one to a screen not reached yet (a way back
+            // waits until the screens ahead are done), then the earliest in edges(). The cost is the map's, every
+            // way open; goTo finds the way the game allows now.
+            Map<String, Long> away = here == null ? Map.of() : costs.computeIfAbsent(here, graph::costsFrom);
+            Integer pick = null;
+            long best = Long.MAX_VALUE;
+            for (Integer i : left) {
+                ScreenGraph.Edge edge = edges.get(i);
+                if (!open.contains(edge.from())) continue;
+                long cost = Math.min(away.getOrDefault(edge.from(), Long.MAX_VALUE / 2), Long.MAX_VALUE / 2) * 2
+                        + (reached.contains(edge.to()) ? 1 : 0);
+                if (pick == null || cost < best) {
+                    pick = i;
+                    best = cost;
+                }
+            }
+            if (pick == null) {
                 // Nothing left behind the screens reached: one not reached yet may be, by the map, from where the
                 // game is now (the screens behind a start the game skips). Each is tried once; never one whose
                 // pictures did not show, nor one whose every way in is closed now.
@@ -250,64 +267,76 @@ public final class MapWalk {
                 }
                 if (next == null) break;
                 reached.add(next);
-                queue.add(next);
+                open.add(next);
+                here = next;
+                continue;
             }
-            String screen = queue.poll();
-            for (ScreenGraph.Edge edge : out.getOrDefault(screen, List.of())) {
-                if (nowMs.getAsLong() - began > whole) break walk;
-                // An edge that leads elsewhere now, by its own method, is not taken: no finding of a healthy map.
-                if (!leadsNow(edge)) continue;
-                if (!goTo(moves, screen) && !(recover(moves) && goTo(moves, screen))) {
-                    boolean back = false;
-                    if (restarts < budgets.restarts()) {
-                        restarts++;
-                        restart(moves);
-                        back = goTo(moves, screen);
-                    }
-                    if (!back) {
-                        // The last restart allowed is spent and the game still lost: the walk ends on this screen.
-                        if (restarts >= budgets.restarts()) {
-                            note.accept(new Finding(Finding.Kind.UNREACHED, screen, null,
-                                    "gave up after " + restarts + " restarts"
-                                            + (lost != null && screen.equals(start.get()) ? "; " + lost : "")));
-                            break walk;
-                        }
-                        // Its edges are left untried: said, or a start the game never shows ends the walk silently.
+            if (nowMs.getAsLong() - began > whole) break;
+            left.remove(pick);
+            ScreenGraph.Edge edge = edges.get(pick);
+            String screen = edge.from();
+            // An edge that leads elsewhere now, by its own method, is not taken: no finding of a healthy map.
+            if (!leadsNow(edge)) continue;
+            if (!goTo(moves, screen) && !(recover(moves) && goTo(moves, screen))) {
+                boolean back = false;
+                if (restarts < budgets.restarts()) {
+                    restarts++;
+                    restart(moves);
+                    back = goTo(moves, screen);
+                }
+                if (!back) {
+                    here = null;
+                    // The last restart allowed is spent and the game still lost: the walk ends on this screen.
+                    if (restarts >= budgets.restarts()) {
                         note.accept(new Finding(Finding.Kind.UNREACHED, screen, null,
-                                lost != null && screen.equals(start.get()) ? lost : NOT_GOT_TO));
-                        continue walk;
+                                "gave up after " + restarts + " restarts"
+                                        + (lost != null && screen.equals(start.get()) ? "; " + lost : "")));
+                        break;
                     }
+                    // Its edges are left untried: said, or a start the game never shows ends the walk silently.
+                    note.accept(new Finding(Finding.Kind.UNREACHED, screen, null,
+                            lost != null && screen.equals(start.get()) ? lost : NOT_GOT_TO));
+                    open.remove(screen);
+                    continue;
                 }
-                if (!open(moves, edge)) continue;
-                tried.add(edge);
-                long before = nowMs.getAsLong();
-                Took took;
-                String crash = null;
-                try {
-                    took = moves.take(edge, perEdge);
-                } catch (RuntimeException e) {
-                    rethrowStop(e);
-                    took = null;
-                    crash = e.toString();
+            }
+            here = screen;
+            if (!open(moves, edge)) continue;
+            tried.add(edge);
+            long before = nowMs.getAsLong();
+            Took took;
+            String crash = null;
+            try {
+                took = moves.take(edge, perEdge);
+            } catch (RuntimeException e) {
+                rethrowStop(e);
+                took = null;
+                crash = e.toString();
+            }
+            Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > perEdge
+                    ? Arrival.TIMED_OUT : took.arrival();
+            // A popup is left by its own rules, back to where it opened, as the walk counts it.
+            here = switch (arrival) {
+                case AT_TARGET -> graph.screen(edge.to()).map(MapScreen::isPopup).orElse(false) ? screen : edge.to();
+                case NOT_NOW, UNCHANGED -> screen;
+                case ELSEWHERE -> took.at();
+                case TIMED_OUT, UNKNOWN -> null;
+            };
+            switch (arrival) {
+                case AT_TARGET -> {
+                    ok++;
+                    // A popup is left by its own rules, never walked to: its edges are not taken.
+                    boolean popup = graph.screen(edge.to()).map(MapScreen::isPopup).orElse(false);
+                    if (reached.add(edge.to()) && !popup) open.add(edge.to());
                 }
-                Arrival arrival = took == null || took.arrival() == null || nowMs.getAsLong() - before > perEdge
-                        ? Arrival.TIMED_OUT : took.arrival();
-                switch (arrival) {
-                    case AT_TARGET -> {
-                        ok++;
-                        // A popup is left by its own rules, never walked to: its edges are not taken.
-                        boolean popup = graph.screen(edge.to()).map(MapScreen::isPopup).orElse(false);
-                        if (reached.add(edge.to()) && !popup) queue.add(edge.to());
-                    }
-                    // Nothing pressed, its way closed now (locked, its method, a disabled look): as one not tried.
-                    case NOT_NOW -> tried.remove(edge);
-                    case ELSEWHERE -> note.accept(missed(edge, took.at() == null ? "arrived elsewhere"
-                            : "arrived at " + graph.shown(took.at())));
-                    case UNCHANGED -> note.accept(missed(edge, took.why() != null ? took.why() : "nothing happened"));
-                    case TIMED_OUT -> note.accept(missed(edge, crash != null ? "failed: " + crash
-                            : "no screen after " + budgets.edge().toSeconds() + " s"));
-                    case UNKNOWN -> unknown.putIfAbsent(edge.to(), edge.from());
-                }
+                // Nothing pressed, its way closed now (locked, its method, a disabled look): as one not tried.
+                case NOT_NOW -> tried.remove(edge);
+                case ELSEWHERE -> note.accept(missed(edge, took.at() == null ? "arrived elsewhere"
+                        : "arrived at " + graph.shown(took.at())));
+                case UNCHANGED -> note.accept(missed(edge, took.why() != null ? took.why() : "nothing happened"));
+                case TIMED_OUT -> note.accept(missed(edge, crash != null ? "failed: " + crash
+                        : "no screen after " + budgets.edge().toSeconds() + " s"));
+                case UNKNOWN -> unknown.putIfAbsent(edge.to(), edge.from());
             }
         }
 

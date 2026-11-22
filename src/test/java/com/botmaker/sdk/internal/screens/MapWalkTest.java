@@ -105,6 +105,20 @@ class MapWalkTest {
     }
 
     @Test
+    void takesTheNearestUntriedEdge() {
+        // A, the start, opens B and D; B opens C: once at B, the walk takes B's way to C before it goes back for D.
+        ScreenGraph graph = map();
+        Game game = new Game();
+
+        Summary summary = walk(graph, game);
+
+        List<String> order = game.taken.stream().map(e -> e.from() + ">" + e.to()).toList();
+        assertTrue(order.indexOf("B>C") < order.indexOf("A>D"), "B's edge before going back for D: " + order);
+        assertEquals(summary.edges(), summary.ok());
+        assertEquals(List.of(), summary.findings());
+    }
+
+    @Test
     void anEdgeArrivingElsewhereIsMissed() {
         Game game = new Game();
         game.arrival = e -> when(e, "A", "B", Arrival.ELSEWHERE, "D");
