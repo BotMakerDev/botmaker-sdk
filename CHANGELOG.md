@@ -52,6 +52,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   screen not done from one search instead of one per screen. A screen's presence (always there, at times, locked),
   the screens that follow one on its own and the screens one is reached through are read off the same graphs, a
   map's presences worked out once.
+- The map check walks each turn the untried way nearest where the game is, and of two as near the one to a screen
+  not reached yet, so it finishes the ways around one screen before it travels back home for the next.
 - Exploring a website runs in Playwright's Chromium, downloaded once under the cache on first use; a run whose
   download fails stops with that said, instead of looking for a Chromium of its own.
 

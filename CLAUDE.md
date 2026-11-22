@@ -17,6 +17,9 @@ this repository. Search there before re-deriving a decision.
 
 The architecture is in `docs/architecture/`, one file per section (moved there unchanged on 2026-10-05).
 
+Graph algorithms over the screen map (paths, costs, presence, followers, traps) live in
+`internal.screens.MapGraph`, on JGraphT, and nowhere else (2026-11-22).
+
 ## Read before touching
 
 | Touching | Read (`docs/architecture/`) |
