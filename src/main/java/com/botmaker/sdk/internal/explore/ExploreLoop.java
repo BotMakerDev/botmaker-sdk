@@ -20,6 +20,8 @@ import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.RouteGuess;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.ElementMatch;
+import com.botmaker.sdk.internal.vision.Images;
+import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
@@ -33,7 +35,11 @@ import com.botmaker.shared.web.FormRule;
 import com.botmaker.shared.web.Guard;
 import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
 
+import javax.imageio.ImageIO;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -945,7 +951,7 @@ public final class ExploreLoop {
         Map<String, String> inputs = new LinkedHashMap<>();
         for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
             if (!(input.getValue() instanceof Button button) || button.element() == null
-                    || button.element().shot() != null) continue;
+                    || pictures.contains(screen + "." + input.getKey()) || shown(button.element())) continue;
             List<UiNode> found = ElementMatch.matches(button.element(), state.get().tree());
             if (found.size() != 1) continue;
             String field = input.getKey();
@@ -956,6 +962,22 @@ public final class ExploreLoop {
         String frame = shot.add(screen) ? play.keepWhole("shot-" + screen) : "";
         if (!frame.isEmpty() || !inputs.isEmpty()) {
             emit(new ExploreEvent.Pictured(screen, frame, inputs, nowMs.getAsLong()));
+        }
+    }
+
+    /**
+     * Whether {@code element}'s picture shows it: one it has and that is not {@link Images#flat}, a crop cut before its
+     * section showed (nunu.ai's, 2026-11-22), which this run takes again. One unread is left as it is.
+     */
+    private static boolean shown(Element element) {
+        if (element.shot() == null) return false;
+        try {
+            Optional<TemplateSource.Found> found = TemplateSource.read(element.shot(), new ArrayList<>());
+            if (found.isEmpty()) return true;
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(found.get().bytes()));
+            return image == null || !Images.flat(image);
+        } catch (IOException unread) {
+            return true;
         }
     }
 

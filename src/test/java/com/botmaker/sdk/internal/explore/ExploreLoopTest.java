@@ -29,7 +29,9 @@ import com.botmaker.shared.web.Guard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
 import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -508,6 +510,27 @@ class ExploreLoopTest {
         assertEquals(List.of(new ExploreEvent.Pictured("A", "/run/shot-A.png",
                 Map.of("toggle", "/run/inputs/A.toggle.png"), events(ExploreEvent.Pictured.class).getFirst().at())),
                 events(ExploreEvent.Pictured.class), "the docs link has its picture already");
+    }
+
+    /** nunu.ai, 2026-11-22: a picture cut before its section faded in is its background, so the run takes it again. */
+    @Test
+    void anInputWhosePictureIsFlatIsPicturedAgain(@TempDir Path dir) throws Exception {
+        Path flat = dir.resolve("docs.png");
+        ImageIO.write(new BufferedImage(40, 20, BufferedImage.TYPE_INT_RGB), "png", flat.toFile());
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("docs", Button.of(new Locator(Role.LINK, "Docs", null, null, null).element()
+                .shot(flat.toString())).free());
+        screens.put("A", new MapScreen(Setup.named("A").start().route("/"), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.keptIn = "/run";
+        game.state = Effect.State.of(page(web("link", "Docs", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(Map.of("docs", "/run/inputs/A.docs.png"),
+                events(ExploreEvent.Pictured.class).getFirst().inputs());
     }
 
     /**

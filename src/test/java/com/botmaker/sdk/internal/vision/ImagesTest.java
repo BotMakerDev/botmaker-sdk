@@ -11,6 +11,8 @@ import java.awt.image.BufferedImage;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A part of a frame cut as its own image, an image resized, and a colour as a person writes it. */
 class ImagesTest {
@@ -40,6 +42,19 @@ class ImagesTest {
         assertEquals(Optional.empty(), ColorText.parse("red"));
         assertEquals(Optional.empty(), ColorText.parse(null));
         assertEquals("#FF8000", ColorText.hex(new Color(255, 128, 0)));
+    }
+
+    /** nunu.ai's crops cut before their section faded in: its background, a grain of noise and nothing else. */
+    @Test
+    void aPictureOfOneColourWithItsGrainIsFlatAndOneWithAWordIsNot() {
+        BufferedImage background = new BufferedImage(78, 30, BufferedImage.TYPE_INT_RGB);
+        for (int x = 0; x < 78; x++) {
+            for (int y = 0; y < 30; y++) background.setRGB(x, y, (x + y) % 3 == 0 ? 0x3A2A80 : 0x382878);
+        }
+        assertTrue(Images.flat(background), "the background's grain is no detail");
+        BufferedImage word = Images.cut(background, Images.bounds(background));
+        for (int x = 20; x < 50; x++) for (int y = 10; y < 18; y++) word.setRGB(x, y, 0xFFFFFF);
+        assertFalse(Images.flat(word), "a word on it is");
     }
 
     @Test

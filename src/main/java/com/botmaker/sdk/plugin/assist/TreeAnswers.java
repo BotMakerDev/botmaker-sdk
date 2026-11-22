@@ -22,6 +22,7 @@ import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 
@@ -393,9 +394,22 @@ final class TreeAnswers {
         }
     }
 
+    /** Whether the bot's picture {@code shot} shows no detail ({@link Images#flat}); one unread is not. */
+    private static boolean flat(StudioServices services, String shot) {
+        Path resources = services.resourcesDir();
+        if (resources == null) return false;
+        try {
+            BufferedImage image = ImageIO.read(resources.resolve(shot).toFile());
+            return image != null && Images.flat(image);
+        } catch (IOException | RuntimeException unread) {
+            return false;
+        }
+    }
+
     /**
      * Fills in what a screen the map holds lacked, from the pictures the run took as it reached it: the page as the
-     * screen's shot when it has none, and each input's picture as its element's shot when that shows none. One step
+     * screen's shot when it has none, and each input's picture as its element's shot when that shows none or a flat
+     * one, cut before its section showed. One step
      * of Studio's history; what has a picture keeps it, and what fails is said and left.
      */
     static void pictured(StudioServices services, ExploreEvent.Pictured pictured) {
@@ -430,8 +444,12 @@ final class TreeAnswers {
             for (Member member : ELEMENTS.members(values)) {
                 Optional<ValueContext> ctx = ELEMENTS.open(values, member);
                 Optional<Element> held = ctx.flatMap(ELEMENTS::read);
-                if (held.isEmpty() || held.get().shot() != null
-                        || !ElementSaves.sameClues(held.get(), button.element())) continue;
+                if (held.isEmpty() || !ElementSaves.sameClues(held.get(), button.element())) continue;
+                // A flat shot, cut before its section showed, is taken again in its own file.
+                if (held.get().shot() != null) {
+                    if (flat(services, held.get().shot())) copy(services, held.get().shot(), picture.getValue());
+                    break;
+                }
                 String shot = ElementSaves.FOLDER + "/" + member.name().toLowerCase(Locale.ROOT) + ".png";
                 if (!copy(services, shot, picture.getValue())) break;
                 Optional<String> refused = ctx.get().write(held.get().shot(shot));

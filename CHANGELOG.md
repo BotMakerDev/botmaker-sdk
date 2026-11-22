@@ -32,6 +32,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - A run on a website records its tab: the video is `recording/raw.webm` in the run's folder once the browser closes,
   a browser started again in the same run `raw-2.webm` and on (`WebSource.Options.recordTo`, asked when the browser
   starts).
+- An element whose saved picture is flat (one colour and its grain: cut before its section showed) is pictured
+  again when Explore reaches its screen, once a run, and Studio writes the new picture over the flat one. A walk on
+  a website says each page it opens by its address.
+
+### Fixed
+
+- The Screens window no longer stalls while its cards read a website's whole-page shots: each card's thumb is read
+  on its own thread (1.2 s for NunuSite's 18 pages). Zooming a screen's shot no longer reads it again at each notch
+  of the wheel (110–170 ms for a website's 1440 × 6000 page): the last shot read whole is kept.
 
 ### Changed
 

@@ -23,6 +23,7 @@ import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.sdk.internal.plan.Readiness;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.runlog.api.Level;
 
 import java.awt.image.BufferedImage;
@@ -490,14 +491,22 @@ public final class ScreenWalk {
                         .filter(e -> !e.isEmpty()).map(List::getFirst);
                 if (own.isPresent()) {
                     opened.add(target);
-                    if (reach.openPath(own.get())) continue;
+                    if (reach.openPath(own.get())) {
+                        Say.info("Opened " + graph.shown(target) + " by its address " + own.get() + ".",
+                                Map.of("screen", target, "path", own.get()));
+                        continue;
+                    }
                 }
             }
             if (path.isEmpty()) {
                 // On a website a page is opened by its address: the target's example, else one of a screen it is
                 // reached from, then the rest walked. Each once, so a page that shows another screen is not looped.
                 Optional<String> page = examplePage(target, known, opened);
-                if (page.isPresent() && reach.openPath(page.get())) continue;
+                if (page.isPresent() && reach.openPath(page.get())) {
+                    Say.info("Opened " + page.get() + " by its address, on the way to " + graph.shown(target) + ".",
+                            Map.of("screen", target, "path", page.get()));
+                    continue;
+                }
                 return blocked(at, target, missed, strayed, walked);
             }
             ScreenGraph.Edge next = path.get().getFirst();

@@ -45,4 +45,28 @@ public final class Images {
         }
         return small;
     }
+
+    /**
+     * Whether {@code image} shows no detail: its brightness spread less than {@link #FLAT} of the full range, one
+     * colour and its grain. A picture cut from a section not shown yet is its background, which matches anywhere.
+     */
+    public static boolean flat(BufferedImage image) {
+        long n = (long) image.getWidth() * image.getHeight();
+        if (n == 0) return true;
+        double sum = 0;
+        double squares = 0;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int rgb = image.getRGB(x, y);
+                double grey = (0.299 * (rgb >> 16 & 0xFF) + 0.587 * (rgb >> 8 & 0xFF) + 0.114 * (rgb & 0xFF)) / 255;
+                sum += grey;
+                squares += grey * grey;
+            }
+        }
+        double mean = sum / n;
+        return Math.sqrt(Math.max(0, squares / n - mean * mean)) < FLAT;
+    }
+
+    /** {@link #flat}'s spread: nunu.ai's blank crops spread under 0.02, its least detailed real one 0.11. */
+    private static final double FLAT = 0.03;
 }

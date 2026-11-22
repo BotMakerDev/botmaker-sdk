@@ -130,6 +130,16 @@ final class ScreenCanvas {
             return size() > MOST_IMAGES;
         }
     };
+    /**
+     * The last shot the viewer read whole, by its file's name and time: one only, since a whole frame is megabytes,
+     * but kept, so a zoom draws it again without reading it (a website's 1440 × 6000 page, NunuSite, 2026-11-22).
+     */
+    private final Map<String, Image> whole = new LinkedHashMap<>(2, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Image> eldest) {
+            return size() > 1;
+        }
+    };
     /** When each card's shot and each picture drawn was written, as the cards last drew them: a newer one redraws. */
     private final Map<String, Long> drawnTimes = new HashMap<>();
     /** The look each screen is shown in, by constant, as the side panel picked it; none: its plain look. */
@@ -674,7 +684,9 @@ final class ScreenCanvas {
      */
     Node screenThumb(Card card, double size, String style) {
         if (card.marker() != null) return thumb(card.marker(), size, style);
-        Optional<Image> shot = image(card.constant(), size, false);
+        // Read on its own thread: a website's whole page is up to 1440 × 6000, and 18 of them read at once held the
+        // Screens window 1.2 s (NunuSite, 2026-11-22); the box is square whatever the shot, so nothing moves when it shows.
+        Optional<Image> shot = image(card.constant(), size, true);
         if (shot.isEmpty()) return thumb(null, size, style);
         StackPane box = new StackPane();
         box.getStyleClass().add(style);
@@ -794,8 +806,9 @@ final class ScreenCanvas {
         if (time == 0) return Optional.empty();
         // A card loads the game's frame at twice its width, crisp and small; the viewer loads it whole.
         double loaded = width < CARD_LOAD_LIMIT ? width * 2 : 0;
-        // A whole frame is megabytes: read for the viewer each time, never kept.
-        if (loaded == 0) return Optional.of(new Image(file.toUri().toString(), 0, 0, true, true));
+        // A whole frame is megabytes: the viewer's last one only is kept.
+        if (loaded == 0) return Optional.of(whole.computeIfAbsent(file.getFileName() + "@" + time,
+                key -> new Image(file.toUri().toString(), 0, 0, true, true)));
         // Keyed by how it reads too: the panel's boxes need a shot read whole, not a card's still loading.
         return Optional.of(thumbs.computeIfAbsent(SHOT_KEY + file.getFileName() + "@" + time + ":" + loaded
                         + (background ? "~" : ""),
