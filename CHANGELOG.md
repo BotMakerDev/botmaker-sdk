@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The map says its traps: a screen a run reaches from the game's home and that no way leads back home from is a
+  line in `read_map` and the map report (`<Screen>: no way leads back to <Home> from it, …`). A popup, and a
+  screen the game leaves on its own, is never one.
 - A website's screen shot is its whole page, below the viewport too: Explore takes it once a run per screen and
   replaces a shot of the viewport alone, and the map no longer says a page's taller shot is off the bot's size.
 - Exploring a website with the browser shown (`botmaker.web.show`): each page's inputs are outlined in blue with

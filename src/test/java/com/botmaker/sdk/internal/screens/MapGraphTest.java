@@ -5,6 +5,7 @@ package com.botmaker.sdk.internal.screens;
 
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -178,6 +179,60 @@ class MapGraphTest {
         assertEquals(List.of("CAMP", "HOME"), List.copyOf(graph.dependsOn("SHOP", 2)));
         assertEquals(List.of("CAMP", "HOME", "VAULT", "ROOT"), List.copyOf(graph.dependsOn("SHOP", 64)));
         assertEquals(Set.of(), graph.dependsOn("NOWHERE", 64));
+    }
+
+    /** Home opens Shop, which has a way back, and Pit, which has none: Pit is a trap, and Ledge behind it too. */
+    @Test
+    void screenWithNoWayOutIsATrap() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("shop"), click("pit")));
+        screens.put("SHOP", screen(Setup.named("Shop").from(ref("HOME", "shop")).back(click("close"))));
+        screens.put("PIT", screen(Setup.named("Pit").from(ref("HOME", "pit")), click("ledge")));
+        screens.put("LEDGE", screen(Setup.named("Ledge").from(ref("PIT", "ledge")).back(click("down"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("PIT", "LEDGE"), graph.traps(), "Ledge's way back leads only to Pit");
+        assertEquals(List.of(), MapGraph.of(graph).traps("NOWHERE"));
+    }
+
+    /** Hall's way back has no input of its own: the game's close button takes it home, and without one nothing does. */
+    @Test
+    void wayBackOfNoInputNeedsTheCloseButton() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("hall")));
+        screens.put("HALL", screen(Setup.named("Hall").from(ref("HOME", "hall"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("HALL"), graph.traps());
+        assertEquals(List.of(), graph.withClose(click("close_x")).traps());
+    }
+
+    @Test
+    void popupIsNeverATrap() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("offer")));
+        screens.put("OFFER", screen(Setup.named("Offer").from(ref("HOME", "offer")).popup()));
+        assertEquals(List.of(), ScreenGraph.of(screens).traps());
+    }
+
+    /** Battle's end follows it on its own: the game leaves it by itself, so it is no trap. */
+    @Test
+    void screenLeftOnItsOwnIsNoTrap() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("fight")));
+        screens.put("BATTLE", screen(Setup.named("Battle").from(ref("HOME", "fight"))));
+        screens.put("RESULT", screen(Setup.named("Result").after(BotConstants.screen("BATTLE")).back(click("ok"))));
+        assertEquals(List.of(), ScreenGraph.of(screens).traps());
+    }
+
+    /** Loading opens on its own onto Home, and Home's shop has a way back: nothing leads to Loading, and none is due. */
+    @Test
+    void screenWithBackIsNoTrap() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("LOADING", screen(Setup.named("Loading").start()));
+        screens.put("HOME", screen(Setup.named("Home").after(BotConstants.screen("LOADING")), click("shop")));
+        screens.put("SHOP", screen(Setup.named("Shop").from(ref("HOME", "shop")).back(click("close"))));
+        assertEquals(List.of(), ScreenGraph.of(screens).traps());
     }
 
     @Test

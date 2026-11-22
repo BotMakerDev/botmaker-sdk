@@ -133,7 +133,8 @@ class MapReportTest {
 
     @Test
     void whatTheMapCannotDoIsSaid() {
-        List<String> problems = MapReport.problems(map(), NAMED::contains, id -> !id.equals("market_title"), null);
+        List<String> problems = MapReport.problems(map().withClose(click("close_x")), NAMED::contains,
+                id -> !id.equals("market_title"), null);
         assertEquals(List.of(
                 "Home: tavern, event have no verdict, so a run exploring alone will not press them: set_verdict "
                         + "free, spends:<fact> or never:<why>.",
@@ -222,6 +223,15 @@ class MapReportTest {
     }
 
     @Test
+    void aTrapIsSaid() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", MapFixtures.screen("Home", click("pit")));
+        screens.put("PIT", MapFixtures.screen(Setup.named("Pit").from(ref("HOME", "pit"))));
+        assertEquals(List.of("Pit: no way leads back to Home from it, so a run that goes there is stuck: map its way "
+                + "back."), MapReport.problems(ScreenGraph.of(screens), id -> true, id -> true, "PIT"));
+    }
+
+    @Test
     void aScreenNoWayReachesIsSaid() {
         Map<String, MapScreen> screens = screens();
         screens.put("LOST", screen(Setup.named("Lost").markers(marks("gems")).from(ref("NOWHERE", "tavern"))));
@@ -239,7 +249,7 @@ class MapReportTest {
         screens.put("RESEARCH", screen(Setup.named("Research").markers(marks("research")).from(ref("HOME", "tavern")),
                 click("damage"), click("health").looks(List.of(Look.of(picture("health_max"), MapFixtures.MAXED))),
                 click("speed"), tree));
-        ScreenGraph graph = ScreenGraph.of(screens);
+        ScreenGraph graph = ScreenGraph.of(screens).withClose(click("close_x"));
 
         String text = MapReport.text(graph, Map.of(), id -> true, id -> true, id -> true, "RESEARCH");
         assertTrue(text.contains("  damage_tree nodes:\n"

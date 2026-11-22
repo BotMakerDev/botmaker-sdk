@@ -802,6 +802,14 @@ public final class ScreenGraph {
         return mapGraph().costsFrom(from, edge -> true);
     }
 
+    /**
+     * The screens a run reaches from the {@link #home} and cannot come back from: no way leads home from them. Never a
+     * popup, nor a screen the game leaves on its own; empty for a map with no home.
+     */
+    public List<String> traps() {
+        return home().map(h -> mapGraph().traps(h)).orElse(List.of());
+    }
+
     /** The map's search graph, built on first use; the map never changes, so neither does it. */
     private MapGraph mapGraph() {
         MapGraph built = mapGraph;

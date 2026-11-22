@@ -86,8 +86,12 @@ public final class MapReport {
         StudioServices services = context.services();
         record Read(ScreenGraph graph, Map<String, String> stages, Set<String> pictures, List<String> plan) {}
         Read read = FxCall.call(() -> {
-            ScreenGraph graph = ScreenDesk.read(services);
-            return new Read(graph, ScreenDesk.stages(graph), Set.copyOf(ScreenEdits.pictures(services)),
+            ScreenGraph map = ScreenDesk.read(services);
+            // Its way back of no input presses the usual close button: without it the screen may be a trap.
+            Set<String> names = Set.copyOf(ScreenEdits.pictures(services));
+            ScreenGraph graph = names.contains(ScreenGraph.CLOSE)
+                    ? map.withClose(Button.of(ScreenEdits.picture(services, ScreenGraph.CLOSE))) : map;
+            return new Read(graph, ScreenDesk.stages(graph), names,
                     MapAudit.planWarnings(services, graph));
         });
         if (read.graph().screens().isEmpty()) return AgentReply.text("The bot has no Screens yet.");
@@ -384,6 +388,8 @@ public final class MapReport {
         Optional<String> root = ScreenCards.root(graph);
         List<InputName> unjudged = graph.untagged();
         Set<String> reached = root.map(r -> graph.costsFrom(r).keySet()).orElse(Set.of());
+        Optional<String> home = graph.home();
+        Set<String> traps = Set.copyOf(graph.traps());
         for (String c : graph.screens().keySet()) {
             if (only != null && !only.equals(c)) continue;
             MapScreen screen = graph.screens().get(c);
@@ -391,6 +397,10 @@ public final class MapReport {
             if (!screen.isPopup() && root.isPresent() && !reached.contains(c)) {
                 problems.add(name + ": no way from " + graph.shown(root.get()) + " reaches it, so a run cannot go "
                         + "there.");
+            }
+            if (traps.contains(c) && home.isPresent()) {
+                problems.add(name + ": no way leads back to " + graph.shown(home.get()) + " from it, so a run that "
+                        + "goes there is stuck: map its way back.");
             }
             // A walk closes a popup by its way out, else the usual close button, and stops where neither shows
             // (Logging in, a loading popup, 2026-11-09). A key or the bot's own code is never pressed to close one.

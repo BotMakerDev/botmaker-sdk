@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -233,6 +234,35 @@ final class MapGraph {
             found.add(s);
         }
         return found;
+    }
+
+    /**
+     * The screens a run reaches from {@code home} by the map's {@link ScreenGraph#edges} and cannot come back from, in
+     * declared order: no way out of them, nor out of where they lead, leads to {@code home} again. A popup is never
+     * one, the game closes it, nor a screen a way on its own leaves, which the game leaves by itself. A way back of no
+     * input of its own presses the game's usual close button, so it leads nowhere when the map has none. Empty when
+     * {@code home} is not on the map.
+     */
+    List<String> traps(String home) {
+        if (!screens.contains(home)) return List.of();
+        List<ScreenGraph.Edge> edges = map.edges();
+        Graph<String, Integer> every = new DirectedPseudograph<>(Integer.class);
+        every.addVertex(home);
+        Set<String> leftOnItsOwn = new HashSet<>();
+        for (int i = 0; i < edges.size(); i++) {
+            ScreenGraph.Edge edge = edges.get(i);
+            if (edge.via() == null && !edge.onItsOwn() && map.close() == null) continue;
+            every.addVertex(edge.from());
+            every.addVertex(edge.to());
+            every.addEdge(edge.from(), edge.to(), i);
+            if (edge.onItsOwn()) leftOnItsOwn.add(edge.from());
+        }
+        Set<String> there = reached(every, List.of(home));
+        Set<String> back = reached(new EdgeReversedGraph<>(every), List.of(home));
+        return map.screens().entrySet().stream()
+                .filter(e -> there.contains(e.getKey()) && !back.contains(e.getKey()))
+                .filter(e -> !e.getValue().isPopup() && !leftOnItsOwn.contains(e.getKey()))
+                .map(Map.Entry::getKey).toList();
     }
 
     /**
