@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
@@ -113,6 +112,8 @@ public final class ScreenGraph {
      * clicks. Null when the bot has none, so such a way is never taken.
      */
     private final Button close;
+    /** {@link #mapGraph}, once built: a cache of what the fields above decide, so a race only builds it twice. */
+    private MapGraph mapGraph;
 
     /** The picture name of the game's usual close button, the one a way back with no input clicks: Firestone's. */
     public static final String CLOSE = "close_x";
@@ -619,11 +620,7 @@ public final class ScreenGraph {
         Optional<String> here = at.filter(screens::containsKey);
         if (here.isEmpty()) return left.stream().min(breadthFirst);
         if (left.contains(here.get())) return here;
-        Map<String, Long> away = new HashMap<>();
-        for (String c : left) {
-            pathTo(here.get(), c, edge -> true)
-                    .ifPresent(path -> away.put(c, path.stream().mapToLong(this::cost).sum()));
-        }
+        Map<String, Long> away = costsFrom(here.get());
         // A screen no way reaches from here comes after every one that is, in the breadth-first order.
         return left.stream().min(Comparator.<String>comparingLong(c -> away.getOrDefault(c, Long.MAX_VALUE))
                 .thenComparing(breadthFirst));
@@ -813,50 +810,24 @@ public final class ScreenGraph {
 
     /**
      * The quickest edges {@code usable} allows from {@code from} to {@code to}, by each edge's {@link #cost}; empty
-     * when none leads there. Of paths that cost the same, the one a search by fewest edges finds first, edges in their
-     * map order (2026-10-22). A way back follows no way in from a screen other than the one it leads to.
+     * when none leads there. Of paths that cost the same, the one of fewest edges, then the one whose edges come first
+     * in map order, step by step (2026-10-22). A way back follows no way in from a screen other than the one it leads
+     * to.
      */
     public Optional<List<Edge>> pathTo(String from, String to, Predicate<Edge> usable) {
-        if (!screens.containsKey(from) || !screens.containsKey(to)) return Optional.empty();
-        if (from.equals(to)) return Optional.of(List.of());
-        List<Edge> edges = edges().stream().filter(usable).toList();
-        Map<String, Edge> reachedBy = new HashMap<>();
-        Map<String, Long> costs = new HashMap<>(Map.of(from, 0L));
-        Map<String, Long> found = new HashMap<>(Map.of(from, 0L));
-        // By cost, then by when it was first found: with every cost alike, the queue a search by fewest edges keeps.
-        PriorityQueue<String> queue = new PriorityQueue<>(Comparator.<String>comparingLong(costs::get)
-                .thenComparingLong(found::get));
-        queue.add(from);
-        Set<String> done = new HashSet<>();
-        while (!queue.isEmpty()) {
-            String at = queue.poll();
-            if (!done.add(at)) continue;
-            if (at.equals(to)) {
-                List<Edge> path = new ArrayList<>();
-                for (String step = to; !step.equals(from); step = reachedBy.get(step).from()) {
-                    path.addFirst(reachedBy.get(step));
-                }
-                return Optional.of(path);
-            }
-            Edge cameBy = reachedBy.get(at);
-            for (Edge edge : edges) {
-                if (!edge.from().equals(at) || done.contains(edge.to())) continue;
-                // A way back returns where the game came from: after a way in from elsewhere it leads there again.
-                if (edge.back() && cameBy != null && !cameBy.back() && !cameBy.onItsOwn()
-                        && !cameBy.from().equals(edge.to())) {
-                    continue;
-                }
-                long cost = costs.get(at) + cost(edge);
-                Long now = costs.get(edge.to());
-                if (now != null && now <= cost) continue;
-                queue.remove(edge.to());
-                costs.put(edge.to(), cost);
-                found.putIfAbsent(edge.to(), (long) found.size());
-                reachedBy.put(edge.to(), edge);
-                queue.add(edge.to());
-            }
-        }
-        return Optional.empty();
+        return mapGraph().pathTo(from, to, usable);
+    }
+
+    /** What the quickest path from {@code from} costs to each screen it reaches, by {@link #cost}; itself at 0. */
+    public Map<String, Long> costsFrom(String from) {
+        return mapGraph().costsFrom(from, edge -> true);
+    }
+
+    /** The map's search graph, built on first use; the map never changes, so neither does it. */
+    private MapGraph mapGraph() {
+        MapGraph built = mapGraph;
+        if (built == null) mapGraph = built = MapGraph.of(this);
+        return built;
     }
 
     /**

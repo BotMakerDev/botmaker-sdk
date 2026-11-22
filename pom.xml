@@ -65,6 +65,8 @@
         <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
              together — javafx-controls is compiled against one exact javafx-graphics. -->
         <javafx.version>27</javafx.version>
+        <!-- JGraphT, the screen map's graph algorithms (internal.screens.MapGraph). -->
+        <jgrapht.version>1.5.2</jgrapht.version>
 
         <!--
           The OCR stack's three versions move TOGETHER. Tess4J pins a lept4j, and lept4j's generated
@@ -105,6 +107,12 @@
     </repositories>
 
     <dependencies>
+        <!-- The screen map's graph algorithms (internal.screens.MapGraph, 2026-11-22); on Central, brings jheaps. -->
+        <dependency>
+            <groupId>org.jgrapht</groupId>
+            <artifactId>jgrapht-core</artifactId>
+            <version>${jgrapht.version}</version>
+        </dependency>
         <!-- Shared cross-platform native window plumbing (enumerate / capture / focus / input).
              com.github.BotMakerDev coordinate + version property so this resolves from the umbrella
              reactor locally and from JitPack when published (see the property comment above). -->

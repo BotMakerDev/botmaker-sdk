@@ -383,12 +383,12 @@ public final class MapReport {
         List<String> problems = new ArrayList<>();
         Optional<String> root = ScreenCards.root(graph);
         List<InputName> unjudged = graph.untagged();
+        Set<String> reached = root.map(r -> graph.costsFrom(r).keySet()).orElse(Set.of());
         for (String c : graph.screens().keySet()) {
             if (only != null && !only.equals(c)) continue;
             MapScreen screen = graph.screens().get(c);
             String name = graph.shown(c);
-            if (!screen.isPopup() && root.isPresent() && !root.get().equals(c)
-                    && graph.pathTo(root.get(), c, e -> true).isEmpty()) {
+            if (!screen.isPopup() && root.isPresent() && !reached.contains(c)) {
                 problems.add(name + ": no way from " + graph.shown(root.get()) + " reaches it, so a run cannot go "
                         + "there.");
             }
