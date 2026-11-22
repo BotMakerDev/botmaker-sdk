@@ -12,10 +12,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.botmaker.sdk.internal.screens.MapFixtures.click;
+import static com.botmaker.sdk.internal.screens.MapFixtures.picture;
 import static com.botmaker.sdk.internal.screens.MapFixtures.ref;
 import static com.botmaker.sdk.internal.screens.MapFixtures.screen;
+import static com.botmaker.sdk.internal.screens.ScreenGraph.Presence.ALWAYS;
+import static com.botmaker.sdk.internal.screens.ScreenGraph.Presence.LOCKED;
+import static com.botmaker.sdk.internal.screens.ScreenGraph.Presence.SOMETIMES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -116,5 +121,88 @@ class MapGraphTest {
         }
         assertEquals(0L, costs.get("FAST"));
         assertTrue(costs.get("SLOW") > costs.get("TARGET"), "Slow lies back through Root");
+    }
+
+    /**
+     * A screen is as present as the best of its ways in, each as bad as its worst step: Camp is reached at times by
+     * Home's occasional button, and only behind a lock the other way, so it comes and goes.
+     */
+    @Test
+    void presenceMatchesTheFixedPoint() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("event").occasional(), click("vault"), click("tower")));
+        screens.put("EVENT", screen(Setup.named("Event").from(ref("HOME", "event")), click("camp")));
+        screens.put("VAULT", screen(Setup.named("Vault").from(ref("HOME", "vault")),
+                click("camp").locked(picture("padlock"))));
+        screens.put("CAMP", screen(Setup.named("Camp").from(ref("VAULT", "camp"))
+                .alsoFrom(List.of(Way.of(ref("EVENT", "camp"))))));
+        screens.put("TOWER", screen(Setup.named("Tower").from(ref("HOME", "tower"))));
+        screens.put("OFFER", screen(Setup.named("Offer").back(click("close_x")).popup()));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(ALWAYS, graph.presence("HOME"));
+        assertEquals(ALWAYS, graph.presence("VAULT"));
+        assertEquals(ALWAYS, graph.presence("TOWER"));
+        assertEquals(SOMETIMES, graph.presence("EVENT"));
+        assertEquals(SOMETIMES, graph.presence("CAMP"), "the occasional way beats the locked one");
+        assertEquals(ALWAYS, graph.presence("OFFER"), "a popup is always there");
+        assertEquals(LOCKED, graph.presence("NOWHERE"));
+    }
+
+    /** A and B open each other, and the only way into the pair is locked: the loop makes neither better. */
+    @Test
+    void loopOfWaysAddsNothing() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("to_a").locked(picture("padlock"))));
+        screens.put("A", screen(Setup.named("A").from(ref("HOME", "to_a"))
+                .alsoFrom(List.of(Way.of(ref("B", "to_a")))), click("to_b")));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "to_b")), click("to_a")));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(LOCKED, graph.presence("A"));
+        assertEquals(LOCKED, graph.presence("B"));
+    }
+
+    /** Shop opens from Camp and from Home, Camp from Home and Vault: a cap keeps the nearest, both ways in first. */
+    @Test
+    void dependsOnTakesTheNearestOfEveryWayIn() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("ROOT", screen("Root", click("vault")));
+        screens.put("VAULT", screen(Setup.named("Vault").from(ref("ROOT", "vault")), click("camp")));
+        screens.put("CAMP", screen(Setup.named("Camp").from(ref("VAULT", "camp")), click("shop")));
+        screens.put("HOME", screen("Home", click("shop")));
+        screens.put("SHOP", screen(Setup.named("Shop").from(ref("CAMP", "shop"))
+                .alsoFrom(List.of(Way.of(ref("HOME", "shop"))))));
+        MapGraph graph = MapGraph.of(ScreenGraph.of(screens));
+
+        assertEquals(List.of("CAMP", "HOME"), List.copyOf(graph.dependsOn("SHOP", 2)));
+        assertEquals(List.of("CAMP", "HOME", "VAULT", "ROOT"), List.copyOf(graph.dependsOn("SHOP", 64)));
+        assertEquals(Set.of(), graph.dependsOn("NOWHERE", 64));
+    }
+
+    @Test
+    void lockedBehindLockedInput() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("guild").locked(picture("padlock"))));
+        screens.put("GUILD", screen(Setup.named("Guild").from(ref("HOME", "guild")), click("hall")));
+        screens.put("HALL", screen(Setup.named("Hall").from(ref("GUILD", "hall"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(LOCKED, graph.presence("GUILD"));
+        assertEquals(LOCKED, graph.presence("HALL"), "an open button behind a locked one is locked");
+    }
+
+    @Test
+    void sometimesBehindOccasionalInput() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", screen("Home", click("event").occasional()));
+        screens.put("EVENT", screen(Setup.named("Event").from(ref("HOME", "event")), click("shop"),
+                click("boss").locked(picture("padlock"))));
+        screens.put("SHOP", screen(Setup.named("Shop").from(ref("EVENT", "shop"))));
+        screens.put("BOSS", screen(Setup.named("Boss").from(ref("EVENT", "boss"))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(SOMETIMES, graph.presence("SHOP"), "an open button behind an occasional one comes and goes");
+        assertEquals(LOCKED, graph.presence("BOSS"), "a lock is worse than coming and going");
     }
 }

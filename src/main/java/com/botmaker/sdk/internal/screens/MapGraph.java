@@ -3,18 +3,27 @@
 
 package com.botmaker.sdk.internal.screens;
 
+import com.botmaker.sdk.internal.screens.ScreenGraph.Presence;
 import org.jgrapht.Graph;
+import org.jgrapht.Graphs;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
+import org.jgrapht.graph.DirectedPseudograph;
 import org.jgrapht.graph.DirectedWeightedPseudograph;
 import org.jgrapht.graph.EdgeReversedGraph;
 import org.jgrapht.graph.MaskSubgraph;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -48,19 +57,49 @@ final class MapGraph {
     /** Arriving: from a state to its screen's arrival node. */
     private record Arrive(State from) implements Link {}
 
+    /** The search graph of {@link ScreenGraph#edges}, each its number in {@code edges}. */
+    private record Search(List<ScreenGraph.Edge> edges, Graph<Node, Link> graph) {}
+
+    private final ScreenGraph map;
     /** The map's screens: a path begins and ends on one, though an edge may lead to a screen of no map. */
     private final Set<String> screens;
-    private final List<ScreenGraph.Edge> edges;
-    private final Graph<Node, Link> graph;
+    /** The map's ways in, {@link ScreenGraph#ways}, no way back: the screen each is on to the one it opens. */
+    private final List<ScreenGraph.Edge> ways;
+    /** The screens and their ways in, each edge its number in {@link #ways}. */
+    private final Graph<String, Integer> plain;
+    /** {@link #search}, once built: only a path or a cost needs it, so a race only builds it twice. */
+    private Search search;
 
-    private MapGraph(Set<String> screens, List<ScreenGraph.Edge> edges, Graph<Node, Link> graph) {
+    private MapGraph(ScreenGraph map, Set<String> screens, List<ScreenGraph.Edge> ways, Graph<String, Integer> plain) {
+        this.map = map;
         this.screens = screens;
-        this.edges = edges;
-        this.graph = graph;
+        this.ways = ways;
+        this.plain = plain;
     }
 
-    /** The search graph of {@code map}'s {@link ScreenGraph#edges}, each weighted by {@link ScreenGraph#cost}. */
+    /**
+     * The graphs of {@code map}: the screens and their ways in, built now, and the search graph of its
+     * {@link ScreenGraph#edges}, each weighted by {@link ScreenGraph#cost}, built when a path or a cost is first asked.
+     */
     static MapGraph of(ScreenGraph map) {
+        List<ScreenGraph.Edge> ways = List.copyOf(map.ways());
+        Graph<String, Integer> plain = new DirectedPseudograph<>(Integer.class);
+        map.screens().keySet().forEach(plain::addVertex);
+        for (int i = 0; i < ways.size(); i++) {
+            plain.addVertex(ways.get(i).from());
+            plain.addVertex(ways.get(i).to());
+            plain.addEdge(ways.get(i).from(), ways.get(i).to(), i);
+        }
+        return new MapGraph(map, Set.copyOf(map.screens().keySet()), ways, plain);
+    }
+
+    private Search search() {
+        Search built = search;
+        if (built == null) search = built = search(map);
+        return built;
+    }
+
+    private static Search search(ScreenGraph map) {
         List<ScreenGraph.Edge> edges = List.copyOf(map.edges());
         Graph<Node, Link> graph = new DirectedWeightedPseudograph<>(Link.class);
         Map<String, List<State>> states = new LinkedHashMap<>();
@@ -80,7 +119,7 @@ final class MapGraph {
                 }
             }
         }
-        return new MapGraph(Set.copyOf(map.screens().keySet()), edges, graph);
+        return new Search(edges, graph);
     }
 
     private static void state(Graph<Node, Link> graph, Map<String, List<State>> states, State state) {
@@ -115,7 +154,8 @@ final class MapGraph {
         State start = new State(from, null);
         Arrival end = new Arrival(to);
         if (from.equals(to)) return Optional.of(List.of());
-        Graph<Node, Link> open = usableOnly(usable);
+        Search search = search();
+        Graph<Node, Link> open = usableOnly(search, usable);
         // Searched backward from the screen, so each state knows what is left to it, and the path is chosen forward
         // from the start, the first edge in map order at each step that keeps to the least.
         DijkstraShortestPath.SingleSourcePaths<Node, Link> left =
@@ -132,7 +172,7 @@ final class MapGraph {
                 }
             }
             if (best == null) return Optional.empty();
-            path.add(edges.get(best.index()));
+            path.add(search.edges().get(best.index()));
             at = (State) open.getEdgeTarget(best);
         }
         return Optional.of(List.copyOf(path));
@@ -144,10 +184,11 @@ final class MapGraph {
      */
     Map<String, Long> costsFrom(String from, Predicate<ScreenGraph.Edge> usable) {
         if (!screens.contains(from)) return Map.of();
+        Search search = search();
         DijkstraShortestPath.SingleSourcePaths<Node, Link> paths =
-                new DijkstraShortestPath<>(usableOnly(usable)).getPaths(new State(from, null));
+                new DijkstraShortestPath<>(usableOnly(search, usable)).getPaths(new State(from, null));
         Map<String, Long> costs = new LinkedHashMap<>();
-        for (Node node : graph.vertexSet()) {
+        for (Node node : search.graph().vertexSet()) {
             if (!(node instanceof Arrival(String screen)) || !screens.contains(screen)) continue;
             double weight = paths.getWeight(node);
             if (weight != Double.POSITIVE_INFINITY) costs.put(screen, (long) weight / PER_STEP);
@@ -156,12 +197,66 @@ final class MapGraph {
     }
 
     /**
+     * Every screen's presence: {@link Presence#ALWAYS} for one reached from {@code sources} through ways in that
+     * {@code through} says are always there, else {@link Presence#SOMETIMES} for one reached through ways that are at
+     * least at times, else {@link Presence#LOCKED}. A loop of ways reaches nothing new, so it adds nothing.
+     */
+    Map<String, Presence> presences(Set<String> sources, Function<ScreenGraph.Edge, Presence> through) {
+        Presence[] each = ways.stream().map(through).toArray(Presence[]::new);
+        Map<String, Presence> known = new HashMap<>();
+        screens.forEach(screen -> known.put(screen, Presence.LOCKED));
+        // The worse level first, so the better overwrites what it also reaches.
+        for (Presence level : List.of(Presence.SOMETIMES, Presence.ALWAYS)) {
+            Graph<String, Integer> open = new MaskSubgraph<>(plain, screen -> false,
+                    way -> each[way].ordinal() > level.ordinal());
+            reached(open, sources).stream().filter(screens::contains).forEach(screen -> known.put(screen, level));
+        }
+        return known;
+    }
+
+    /**
+     * The screens that follow {@code screen} on its own, and those that follow them in turn, nearest first and, of
+     * equal distance, in declared order; at most {@code most}.
+     */
+    List<String> followers(String screen, int most) {
+        if (!plain.containsVertex(screen)) return List.of();
+        Graph<String, Integer> onItsOwn = new MaskSubgraph<>(plain, s -> false, way -> !ways.get(way).onItsOwn());
+        return reached(onItsOwn, List.of(screen)).stream().filter(s -> !s.equals(screen)).limit(most).toList();
+    }
+
+    /** The screens {@code screen}'s ways in are on, and theirs in turn, at most {@code most}. */
+    Set<String> dependsOn(String screen, int most) {
+        if (!plain.containsVertex(screen)) return Set.of();
+        Set<String> found = new LinkedHashSet<>();
+        for (String s : reached(new EdgeReversedGraph<>(plain), Graphs.predecessorListOf(plain, screen))) {
+            if (found.size() >= most) break;
+            found.add(s);
+        }
+        return found;
+    }
+
+    /**
+     * What {@code graph} reaches from {@code starts}, the starts included, breadth first from all of them at once:
+     * nearest first, so a cap keeps the nearest of every start's. JGraphT's iterator of several starts goes through
+     * all one start reaches before the next.
+     */
+    private static Set<String> reached(Graph<String, Integer> graph, Collection<String> starts) {
+        Set<String> found = new LinkedHashSet<>(starts);
+        Deque<String> next = new ArrayDeque<>(found);
+        while (!next.isEmpty()) {
+            for (String to : Graphs.successorListOf(graph, next.poll())) if (found.add(to)) next.add(to);
+        }
+        return found;
+    }
+
+    /**
      * The graph of the edges {@code usable} allows. It is asked once per edge, before the search: a walk's test may
      * match a picture or read a condition that changes, and the search reads each edge many times.
      */
-    private Graph<Node, Link> usableOnly(Predicate<ScreenGraph.Edge> usable) {
-        boolean[] open = new boolean[edges.size()];
-        for (int i = 0; i < open.length; i++) open[i] = usable.test(edges.get(i));
-        return new MaskSubgraph<>(graph, node -> false, link -> link instanceof Move move && !open[move.index()]);
+    private static Graph<Node, Link> usableOnly(Search search, Predicate<ScreenGraph.Edge> usable) {
+        boolean[] open = new boolean[search.edges().size()];
+        for (int i = 0; i < open.length; i++) open[i] = usable.test(search.edges().get(i));
+        return new MaskSubgraph<>(search.graph(), node -> false,
+                link -> link instanceof Move move && !open[move.index()]);
     }
 }

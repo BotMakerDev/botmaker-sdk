@@ -26,12 +26,9 @@ import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 
 import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -114,6 +111,8 @@ public final class ScreenGraph {
     private final Button close;
     /** {@link #mapGraph}, once built: a cache of what the fields above decide, so a race only builds it twice. */
     private MapGraph mapGraph;
+    /** {@link #presences}, once worked out, the same way. */
+    private Map<String, Presence> presences;
 
     /** The picture name of the game's usual close button, the one a way back with no input clicks: Firestone's. */
     public static final String CLOSE = "close_x";
@@ -377,27 +376,12 @@ public final class ScreenGraph {
      * game shows once a transition is done, Battle after Entering battle (the user's call, 2026-10-18).
      */
     public List<String> followers(String constant) {
-        Set<String> found = new LinkedHashSet<>();
-        Deque<String> next = new ArrayDeque<>(List.of(constant));
-        while (!next.isEmpty() && found.size() < DEEPEST) {
-            String at = next.poll();
-            screens.forEach((c, screen) -> {
-                boolean follows = screen.ways().stream()
-                        .anyMatch(way -> way.isOnItsOwn() && onScreen(way).filter(at::equals).isPresent());
-                if (follows && !c.equals(constant) && found.add(c)) next.add(c);
-            });
-        }
-        return List.copyOf(found);
+        return mapGraph().followers(constant, DEEPEST);
     }
 
     /** The screens {@code constant}'s ways in are on, and theirs in turn: every screen it is reached through. */
     public Set<String> dependsOn(String constant) {
-        Set<String> found = new LinkedHashSet<>();
-        Deque<String> next = new ArrayDeque<>(List.of(constant));
-        while (!next.isEmpty() && found.size() < DEEPEST * DEEPEST) {
-            for (String from : opensFrom(next.poll())) if (found.add(from)) next.add(from);
-        }
-        return found;
+        return mapGraph().dependsOn(constant, DEEPEST * DEEPEST);
     }
 
     /** The screens above {@code constant} in the tree: its parent, the parent's, and so on to the first screen. */
@@ -686,41 +670,22 @@ public final class ScreenGraph {
     }
 
     /**
-     * Every screen's presence, from the first screens and popups outward: each starts LOCKED and only gets better
-     * through a way in, until nothing changes, so a loop of ways adds nothing and ends.
+     * Every screen's presence, reached from the first screens and popups outward through ways in, each as bad as its
+     * input: a way on its own is as good as the screen it follows.
      */
     private Map<String, Presence> presences() {
-        Map<String, Presence> known = new HashMap<>();
-        screens.forEach((c, screen) ->
-                known.put(c, screen.isPopup() || screen.ways().isEmpty() ? Presence.ALWAYS : Presence.LOCKED));
-        for (boolean changed = true; changed; ) {
-            changed = false;
-            for (Map.Entry<String, MapScreen> e : screens.entrySet()) {
-                if (e.getValue().isPopup()) continue;
-                for (Way way : e.getValue().ways()) {
-                    Optional<String> on = onScreen(way);
-                    if (on.isEmpty()) continue;
-                    Optional<InputName> via = nameOf(way.via());
-                    // A way on its own is as good as the screen it follows.
-                    Presence through = worst(of(via.flatMap(v -> input(v.screen(), v.field())).orElse(null)),
-                            known.get(on.get()));
-                    if (through.ordinal() < known.get(e.getKey()).ordinal()) {
-                        known.put(e.getKey(), through);
-                        changed = true;
-                    }
-                }
-            }
-        }
-        return known;
+        Map<String, Presence> known = presences;
+        if (known != null) return known;
+        Set<String> sources = new LinkedHashSet<>();
+        screens.forEach((c, screen) -> {
+            if (screen.isPopup() || screen.ways().isEmpty()) sources.add(c);
+        });
+        return presences = Map.copyOf(mapGraph().presences(sources, edge -> of(edge.via())));
     }
 
     private static Presence of(Input input) {
         if (input == null) return Presence.ALWAYS;
         return input.locked() != null ? Presence.LOCKED : input.isOccasional() ? Presence.SOMETIMES : Presence.ALWAYS;
-    }
-
-    private static Presence worst(Presence a, Presence b) {
-        return a.ordinal() >= b.ordinal() ? a : b;
     }
 
     /**
@@ -732,15 +697,7 @@ public final class ScreenGraph {
     public List<Edge> edges() {
         List<Edge> edges = new ArrayList<>();
         screens.forEach((c, screen) -> {
-            for (Way way : screen.ways()) {
-                if (way.isOnItsOwn()) {
-                    onScreen(way).ifPresent(after -> edges.add(new Edge(after, c, null, null, false, null, null,
-                            way.when())));
-                    continue;
-                }
-                nameOf(way.via()).ifPresent(via -> edges.add(new Edge(via.screen(), c, via.field(),
-                        input(via.screen(), via.field()).orElseThrow(), false, way.pick(), way.state(), way.when())));
-            }
+            edges.addAll(waysInto(c, screen));
             // A tab is left as the screen it is in is: its way back is that screen's.
             if (!screen.isPopup() && !screen.isTab()) backTo(c).ifPresent(p -> edges.add(back(c, p)));
         });
@@ -758,6 +715,28 @@ public final class ScreenGraph {
             }
         }
         return edges;
+    }
+
+    /** Every screen's ways in as edges, in declared order: {@link #edges} without the ways back and the tabs' copies. */
+    List<Edge> ways() {
+        List<Edge> ways = new ArrayList<>();
+        screens.forEach((c, screen) -> ways.addAll(waysInto(c, screen)));
+        return ways;
+    }
+
+    /** {@code screen}'s ways in, {@code constant} the screen: one on its own an edge with no input. */
+    private List<Edge> waysInto(String constant, MapScreen screen) {
+        List<Edge> ways = new ArrayList<>();
+        for (Way way : screen.ways()) {
+            if (way.isOnItsOwn()) {
+                onScreen(way).ifPresent(after -> ways.add(new Edge(after, constant, null, null, false, null, null,
+                        way.when())));
+                continue;
+            }
+            nameOf(way.via()).ifPresent(via -> ways.add(new Edge(via.screen(), constant, via.field(),
+                    input(via.screen(), via.field()).orElseThrow(), false, way.pick(), way.state(), way.when())));
+        }
+        return ways;
     }
 
     /** Where {@code constant}'s way back leads: its parent, past each screen it followed on its own. */
