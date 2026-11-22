@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.12.1] — 2026-11-22
 
 ### Added
 
@@ -56,6 +56,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   not reached yet, so it finishes the ways around one screen before it travels back home for the next.
 - Exploring a website runs in Playwright's Chromium, downloaded once under the cache on first use; a run whose
   download fails stops with that said, instead of looking for a Chromium of its own.
+- Built against botmaker-shared 0.10.1 (was 0.10.0).
+- Built against botmaker-session 0.9.1 (was 0.9.0).
+- Built against botmaker-studio-api 0.19.1 (was 0.19.0).
+- Built against botmaker-plugin-toolkit 0.17.1 (was 0.17.0).
+- Built against botmaker-plugin-host 0.14.1 (was 0.14.0).
+- Built against botmaker-plugin-basics 0.11.1 (was 0.11.0).
+- Built against botmaker-java 0.4.1 (was 0.4.0).
 
 ### Fixed
 
