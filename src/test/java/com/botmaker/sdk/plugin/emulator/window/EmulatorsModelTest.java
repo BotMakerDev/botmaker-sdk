@@ -21,6 +21,7 @@ import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Layer;
 import com.botmaker.shared.emulator.config.SavedFilters;
 import com.botmaker.shared.emulator.google.PasswordStore;
+import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -286,5 +287,12 @@ class EmulatorsModelTest {
                 ApplyPlan.lines(test, remembered).getFirst());
         assertEquals(0, ApplyPlan.asked(items, remembered));
         assertEquals(1, ApplyPlan.asked(List.of(test, test), Set.of()), "one account asked once");
+    }
+
+    @Test
+    void eachOsListsOnlyTheEmulatorThatRunsOnIt() {
+        assertEquals(Set.of(PlatformId.LDPLAYER), EmulatorsModel.shownOn(Os.WINDOWS));
+        assertEquals(Set.of(PlatformId.WAYDROID), EmulatorsModel.shownOn(Os.LINUX));
+        assertEquals(Set.of(), EmulatorsModel.shownOn(Os.MAC));
     }
 }

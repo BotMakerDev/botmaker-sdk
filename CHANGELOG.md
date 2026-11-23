@@ -55,6 +55,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The Emulators and Accounts windows list the emulator that runs on this computer: LDPlayer on Windows, Waydroid on
+  Linux (they listed LDPlayer alone everywhere, so a Linux PC saw a product it cannot run and not its Waydroid).
 - The Screens window no longer stalls while its cards read a website's whole-page shots: each card's thumb is read
   on its own thread (1.2 s for NunuSite's 18 pages). Zooming a screen's shot no longer reads it again at each notch
   of the wheel (110–170 ms for a website's 1440 × 6000 page): the last shot read whole is kept.

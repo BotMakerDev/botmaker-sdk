@@ -22,6 +22,7 @@ import com.botmaker.shared.emulator.config.Layer;
 import com.botmaker.shared.emulator.config.SavedFilters;
 import com.botmaker.shared.emulator.config.Sourced;
 import com.botmaker.shared.emulator.config.Wanted;
+import com.botmaker.shared.platform.Os;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -112,11 +113,22 @@ public final class EmulatorsModel {
         }
     }
 
+    /** The products the windows list on this computer: {@link #shownOn} its OS. */
+    public static final Set<PlatformId> SHOWN = shownOn(Os.current());
+
     /**
-     * The products the windows list (2026-11-14, the user's call): LDPlayer alone, the one that numbers its instances'
-     * ports itself and whose console makes and copies them. The code for the others stays.
+     * The products the windows list on {@code os} (2026-11-23, the user's call; LDPlayer alone everywhere since
+     * 2026-11-14): on Windows LDPlayer, the one that numbers its instances' ports itself and whose console makes and
+     * copies them; on Linux Waydroid, the one container of the machine; elsewhere none yet. The code for the others
+     * stays.
      */
-    public static final Set<PlatformId> SHOWN = Set.of(PlatformId.LDPLAYER);
+    static Set<PlatformId> shownOn(Os os) {
+        return switch (os) {
+            case WINDOWS -> Set.of(PlatformId.LDPLAYER);
+            case LINUX -> Set.of(PlatformId.WAYDROID);
+            case MAC, UNKNOWN -> Set.of();
+        };
+    }
 
     /** One product, installed or not. */
     public record EmulatorRow(PlatformId platform, boolean installed, String status, int instances, int running,
