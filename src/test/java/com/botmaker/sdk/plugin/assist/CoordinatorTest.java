@@ -247,6 +247,97 @@ class CoordinatorTest {
                 new CoordinatorHost().serves().stream().map(RunEntry::title).toList());
     }
 
+    /** A worker's lease starts it on the stop until the lease runs out, and its end releases the stop. */
+    @Test
+    void aWorkersLeaseRunsItAndItsEndReleasesTheStop(@TempDir Path folder) {
+        Journal journal = running(folder, stop("unknown-1", StopKind.UNKNOWN_SCREEN));
+        List<Object> ran = new ArrayList<>();
+        CoordinatorHost.Worker worker = (on, role, stop, limit) -> {
+            ran.addAll(List.of(role, stop.id(), limit));
+            return new WorkerRunner.Result(true, "");
+        };
+
+        CoordinatorHost.round(journal, JournalView.of(journal), coordinator(CARTOGRAPHERS), () -> 50, refusingWriter(),
+                Runnable::run, worker);
+
+        assertEquals(List.of(StopRole.CARTOGRAPHER, "unknown-1", Duration.ofMillis(100)), ran);
+        List<ExploreEvent.Released> released = JournalView.of(journal).events().stream()
+                .filter(ExploreEvent.Released.class::isInstance).map(ExploreEvent.Released.class::cast).toList();
+        assertEquals(1, released.size());
+        assertTrue(released.getFirst().ok());
+    }
+
+    /** A worker killed at its lease's end writes nothing: the Coordinator's requeue releases it. */
+    @Test
+    void aWorkerThatRanOutIsReleasedOnlyByTheRequeue(@TempDir Path folder) {
+        Journal journal = running(folder, stop("unknown-1", StopKind.UNKNOWN_SCREEN));
+
+        CoordinatorHost.round(journal, JournalView.of(journal), coordinator(CARTOGRAPHERS), () -> 50, refusingWriter(),
+                Runnable::run, (on, role, stop, limit) -> new WorkerRunner.Result(false, "timeout"));
+
+        assertTrue(JournalView.of(journal).events().stream().noneMatch(ExploreEvent.Released.class::isInstance));
+    }
+
+    /** A worker that ends past its lease writes nothing: the requeue released that try already. */
+    @Test
+    void aWorkerEndingPastItsLeaseWritesNoSecondRelease(@TempDir Path folder) {
+        Journal journal = running(folder, stop("unknown-1", StopKind.UNKNOWN_SCREEN));
+        long[] now = {50};
+
+        CoordinatorHost.round(journal, JournalView.of(journal), coordinator(CARTOGRAPHERS), () -> now[0],
+                refusingWriter(), Runnable::run, (on, role, stop, limit) -> {
+                    now[0] = 151;
+                    return new WorkerRunner.Result(true, "");
+                });
+
+        assertTrue(JournalView.of(journal).events().stream().noneMatch(ExploreEvent.Released.class::isInstance));
+    }
+
+    /** A lease on a stop the view no longer holds is given back at once, not held with nobody on it. */
+    @Test
+    void aLeaseOnAStopGoneIsReleasedAtOnce(@TempDir Path folder) {
+        Journal journal = running(folder, stop("unknown-1", StopKind.UNKNOWN_SCREEN));
+        List<Coordinator.Action> lease = List.of(new Coordinator.Action.Lease("gone-1", StopRole.CARTOGRAPHER, 1, 150));
+
+        CoordinatorHost.carryOut(journal, JournalView.of(journal), lease, () -> 50, refusingWriter(), Runnable::run,
+                (on, role, stop, limit) -> {
+                    throw new AssertionError("no worker for a stop that is gone");
+                });
+
+        assertTrue(JournalView.of(journal).events().stream().anyMatch(e -> e instanceof ExploreEvent.Released r
+                && r.stopId().equals("gone-1") && !r.ok() && r.why().equals("stop not found")));
+    }
+
+    /** Signed in, the workers' roles are present; signed out, their stops are parked; no client, the Settler alone. */
+    @Test
+    void theCrewFollowsTheUsersSignIn() {
+        assertEquals(Coordinator.Crew.SETTLER_ONLY, CoordinatorHost.crewOf(null));
+        assertEquals(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER, StopRole.MECHANIC),
+                CoordinatorHost.crewOf(client(true)).present());
+        Coordinator.Crew out = CoordinatorHost.crewOf(client(false));
+        assertEquals(Set.of(StopRole.SETTLER), out.present());
+        assertEquals(Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC), out.absent());
+    }
+
+    private static AgentClient client(boolean signedIn) {
+        return new AgentClient() {
+            @Override
+            public String id() {
+                return "fake";
+            }
+
+            @Override
+            public boolean available() {
+                return signedIn;
+            }
+
+            @Override
+            public List<String> command(String prompt, WorkerRole role, Path mcpConfig) {
+                return List.of("true");
+            }
+        };
+    }
+
     private static Coordinator coordinator(Coordinator.Crew crew) {
         return new Coordinator(SETTINGS, crew);
     }

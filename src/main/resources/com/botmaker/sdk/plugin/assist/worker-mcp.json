@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "botmaker": {
+      "command": "botmaker",
+      "args": ["mcp-bridge"]
+    }
+  }
+}

@@ -43,9 +43,18 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   parked. The Coordinator writes a heartbeat a few times a minute, even while the Settler writes; a watchdog ends the run
   *Stuck: coordinator silent* when it stops, and a run whose journal says nothing for 20 minutes ends *Stuck: no
   progress*. No other worker is started yet, so other stops go on as before.
+- The explore crew's worker runner: a stop leased to the Reader or the Mechanic starts one headless session of the
+  user's own `claude`, signed in by claude.ai, killed when the lease runs out and released with how it ended. It runs
+  lean (no settings, skills or built-in tools, only the bot's explore tools by a worker-only MCP config), always names
+  its model and never takes an API key: the key and cloud-provider variables are taken out of its environment. Signed
+  out, the workers' stops are parked so the run goes on. The core does not start workers yet; the Reader's job comes
+  next.
 
 ### Fixed
 
+- A walk of an explore run never goes through a press nobody watching may make (sign out, delete, buy, or one waiting
+  on you): such a way is left out of its path and of the screens it walks to, and a screen only such a press reaches is
+  left for you instead of stopping the run.
 - Keep exploring no longer stops on a package under the app's own: `com.android.settings.intelligence`, the Settings
   app's search, is the app `com.android.settings`, not another window in front of it. An unrelated app, and a name that
   only starts with the app's letters, still stop it.

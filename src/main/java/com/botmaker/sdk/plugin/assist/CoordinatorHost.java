@@ -12,6 +12,7 @@ import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.FindingKind;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
+import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopRole;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.run.SdkRuns;
@@ -22,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,19 +44,49 @@ public final class CoordinatorHost implements RunCompanion {
     /** How often the journal is read. */
     static final long POLL_MS = 500;
 
+    /** One worker's try at a stop, by {@code limit}: a {@link WorkerRunner} on the user's own client. */
+    @FunctionalInterface
+    interface Worker {
+        WorkerRunner.Result run(Journal journal, StopRole role, Stop stop, Duration limit);
+    }
+
     private final Coordinator.Settings settings;
+    /** The client the crew's workers run on; null while no worker is started (the Settler alone). */
+    private final AgentClient client;
+    /** The threads of the workers running now, each waiting on its process. */
+    private final Set<Thread> workers = ConcurrentHashMap.newKeySet();
     private Thread thread;
     private ScheduledExecutorService watchdog;
     /** The project the run is of, once started: where its journal is when the run ends. */
     private Path project;
 
-    /** A host not started yet, at the plan's start values: the core builds one for each run. */
+    /**
+     * A host not started yet, at the plan's start values: the core builds one for each run. No worker is started yet:
+     * none has its job until the Reader's (plan 2026-11-24-explore-agents, phase 5).
+     */
     public CoordinatorHost() {
-        this(Coordinator.Settings.DEFAULT);
+        this(Coordinator.Settings.DEFAULT, null);
     }
 
-    CoordinatorHost(Coordinator.Settings settings) {
+    CoordinatorHost(Coordinator.Settings settings, AgentClient client) {
         this.settings = settings;
+        this.client = client;
+    }
+
+    /**
+     * Who takes stops when the workers run on {@code client}: the Settler always; each worker's role while the user is
+     * signed in to it, else none of them, their stops parked so the run goes on. Null: the Settler alone, nobody
+     * parked.
+     */
+    static Coordinator.Crew crewOf(AgentClient client) {
+        if (client == null) return Coordinator.Crew.SETTLER_ONLY;
+        Set<StopRole> workers = Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC);
+        if (client.available()) {
+            Set<StopRole> present = new HashSet<>(workers);
+            present.add(StopRole.SETTLER);
+            return new Coordinator.Crew(present, Set.of());
+        }
+        return new Coordinator.Crew(Set.of(StopRole.SETTLER), workers);
     }
 
     @Override
@@ -70,7 +102,17 @@ public final class CoordinatorHost implements RunCompanion {
         Path project = services == null ? null : services.projectDir();
         if (project == null || thread != null) return;
         this.project = project;
-        Coordinator coordinator = new Coordinator(settings, Coordinator.Crew.SETTLER_ONLY);
+        Coordinator coordinator = new Coordinator(settings, crewOf(client));
+        Worker worker = client == null ? null : (journal, role, stop, limit) -> {
+            // Kept so that stop() ends it: a worker never outlives the run it works for.
+            Thread own = Thread.currentThread();
+            workers.add(own);
+            try {
+                return new WorkerRunner(journal.folder()).run(client, role, stop, limit);
+            } finally {
+                workers.remove(own);
+            }
+        };
         TreeAnswerWatch.Writer writer = TreeAnswerWatch.into(services);
         // The latest run's journal, read again each round: the run begins its own once its process is up.
         Supplier<Optional<Journal>> latest = () -> Journal.latest(project);
@@ -86,7 +128,7 @@ public final class CoordinatorHost implements RunCompanion {
             }
         }, every, every, TimeUnit.MILLISECONDS);
         thread = Thread.ofPlatform().daemon().name("explore-coordinator").start(() -> coordinate(latest, coordinator,
-                writer, pictured -> TreeAnswers.pictured(services, pictured)));
+                writer, worker, pictured -> TreeAnswers.pictured(services, pictured)));
     }
 
     /**
@@ -97,10 +139,14 @@ public final class CoordinatorHost implements RunCompanion {
     public synchronized void stop() {
         if (watchdog != null) watchdog.shutdownNow();
         if (thread != null) thread.interrupt();
+        // A stopped worker kills its process and writes nothing.
+        List<Thread> running = List.copyOf(workers);
+        running.forEach(Thread::interrupt);
         // Their last writes land before the end is, never after it.
         try {
             if (watchdog != null) watchdog.awaitTermination(2, TimeUnit.SECONDS);
             if (thread != null) thread.join(Duration.ofSeconds(2));
+            for (Thread worker : running) worker.join(Duration.ofSeconds(2));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -113,12 +159,12 @@ public final class CoordinatorHost implements RunCompanion {
     }
 
     private void coordinate(Supplier<Optional<Journal>> latest, Coordinator coordinator, TreeAnswerWatch.Writer writer,
-                            Consumer<ExploreEvent.Pictured> picture) {
+                            Worker worker, Consumer<ExploreEvent.Pictured> picture) {
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
         String failedLast = null;
         JournalView.Reader reader = null;
-        // The Settler writes into the bot off this thread, which goes on beating while a long write blocks.
-        Executor settlers = command -> Thread.ofVirtual().name("explore-settler").start(command);
+        // The Settler writes into the bot off this thread, and a worker runs off it, which goes on beating meanwhile.
+        Executor settlers = command -> Thread.ofVirtual().name("explore-worker").start(command);
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
@@ -129,7 +175,7 @@ public final class CoordinatorHost implements RunCompanion {
                             reader = new JournalView.Reader(journal.get());
                         }
                         Journal now = reader.journal();
-                        round(now, reader.view(), coordinator, System::currentTimeMillis, writer, settlers);
+                        round(now, reader.view(), coordinator, System::currentTimeMillis, writer, settlers, worker);
                         TreeAnswerWatch.pictures(reader.view(), pictured, picture);
                     }
                     failedLast = null;
@@ -150,16 +196,26 @@ public final class CoordinatorHost implements RunCompanion {
     /** One round: what {@code coordinator} decides on {@code view} at the clock's time, carried out on {@code journal}. */
     static void round(Journal journal, JournalView view, Coordinator coordinator, LongSupplier clock,
                       TreeAnswerWatch.Writer writer, Executor settlers) {
+        round(journal, view, coordinator, clock, writer, settlers, null);
+    }
+
+    static void round(Journal journal, JournalView view, Coordinator coordinator, LongSupplier clock,
+                      TreeAnswerWatch.Writer writer, Executor settlers, Worker worker) {
         long now = clock.getAsLong();
-        carryOut(journal, view, coordinator.step(view, now, journal.commandWaiting()), clock, writer, settlers);
+        carryOut(journal, view, coordinator.step(view, now, journal.commandWaiting()), clock, writer, settlers, worker);
+    }
+
+    static void carryOut(Journal journal, JournalView view, List<Coordinator.Action> actions, LongSupplier clock,
+                         TreeAnswerWatch.Writer writer, Executor settlers) {
+        carryOut(journal, view, actions, clock, writer, settlers, null);
     }
 
     /**
-     * Does each of {@code actions} on {@code journal}, at the clock's time, and writes it down; the Settler's work runs on
-     * {@code settlers}, and says it finished when it did.
+     * Does each of {@code actions} on {@code journal}, at the clock's time, and writes it down; the Settler's work and
+     * each {@code worker}'s try (null: none is started) run on {@code settlers}, and say they finished when they did.
      */
     static void carryOut(Journal journal, JournalView view, List<Coordinator.Action> actions, LongSupplier clock,
-                         TreeAnswerWatch.Writer writer, Executor settlers) {
+                         TreeAnswerWatch.Writer writer, Executor settlers, Worker worker) {
         long nowMs = clock.getAsLong();
         for (Coordinator.Action action : actions) {
             switch (action) {
@@ -167,9 +223,20 @@ public final class CoordinatorHost implements RunCompanion {
                 case Coordinator.Action.Lease lease -> {
                     journal.append(new ExploreEvent.Leased(lease.stopId(), lease.role(), lease.attempt(),
                             lease.expiresAt(), nowMs));
-                    // The Settler works in this process; a worker of another role starts here once there is one.
-                    if (lease.role() == StopRole.SETTLER) settlers.execute(() -> settle(journal, view, lease, clock,
-                            writer));
+                    // The Settler works in this process; a worker of another role is a process of its own.
+                    if (lease.role() == StopRole.SETTLER) {
+                        settlers.execute(() -> settle(journal, view, lease, clock, writer));
+                    } else if (worker != null) {
+                        Optional<Stop> stop = stopOf(view, lease.stopId());
+                        if (stop.isPresent()) {
+                            settlers.execute(() -> work(journal, lease, stop.get(), worker,
+                                    Duration.ofMillis(Math.max(0, lease.expiresAt() - nowMs)), clock));
+                        } else {
+                            // A stop gone since the step: the lease is given back now, not held with nobody on it.
+                            journal.append(new ExploreEvent.Released(lease.stopId(), lease.attempt(), false,
+                                    "stop not found", nowMs));
+                        }
+                    }
                 }
                 case Coordinator.Action.Requeue requeue -> journal.append(new ExploreEvent.Released(requeue.stopId(),
                         requeue.attempt(), false, "timeout", nowMs));
@@ -180,6 +247,31 @@ public final class CoordinatorHost implements RunCompanion {
                 case Coordinator.Action.End end -> end(journal, end.end(), end.why(), nowMs);
             }
         }
+    }
+
+    /** The stop {@code stopId} of {@code view}: the open one, or one queued. */
+    private static Optional<Stop> stopOf(JournalView view, String stopId) {
+        return view.open().filter(stop -> stop.id().equals(stopId))
+                .or(() -> view.queue().stream().filter(stop -> stop.id().equals(stopId)).findFirst());
+    }
+
+    /**
+     * {@code worker}'s try at {@code lease}, killed when the lease runs out at {@code limit}; released with how it
+     * ended. What it found is what it wrote through the explore tools meanwhile.
+     */
+    private static void work(Journal journal, Coordinator.Action.Lease lease, Stop stop, Worker worker, Duration limit,
+                             LongSupplier clock) {
+        WorkerRunner.Result result;
+        try {
+            result = worker.run(journal, lease.role(), stop, limit);
+        } catch (RuntimeException failed) {
+            result = new WorkerRunner.Result(false, String.valueOf(failed.getMessage()));
+        }
+        // A try that ran out is released by the Coordinator's requeue already, even one that ended just past its lease
+        // (the process started a little after the lease did); a stopped one belongs to a run that is ending.
+        long now = clock.getAsLong();
+        if (now >= lease.expiresAt() || result.why().equals("timeout") || result.why().equals("stopped")) return;
+        journal.append(new ExploreEvent.Released(lease.stopId(), lease.attempt(), result.ok(), result.why(), now));
     }
 
     /**
