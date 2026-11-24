@@ -988,6 +988,61 @@ class ExploreLoopTest {
         assertEquals("A.d→D", game.taken.getFirst(), game.taken.toString());
     }
 
+    /**
+     * The Reader ranks a tree input by the words it shows, the map names it by its field: the best is pressed by its
+     * words, and one tagged risky is never pressed, whatever it is called.
+     */
+    @Test
+    void aRankBySaidWordsReachesTheInputAndARiskyOneIsNeverPressed() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("pairNewDevice", Button.of(new Locator(Role.BUTTON, "Pair new device", null, null, null).element())
+                .free());
+        inputs.put("passwordsAccounts", Button.of(new Locator(Role.BUTTON, "Passwords & accounts", null, null, null)
+                .element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        journal().append(new ExploreEvent.Ranked("A", "Pair new device", 1, PressTag.RISKY, 0));
+        journal().append(new ExploreEvent.Ranked("A", "Passwords & accounts", 10, PressTag.SAFE, 0));
+        Game game = new Game();
+        game.state = Effect.State.of(page(
+                web("button", "Pair new device", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("button", "Passwords & accounts", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+
+        toward(map, game, new ExploreGoal("add a Google account", null), s -> s).run();
+
+        assertEquals("A.passwordsAccounts", game.pressed.getFirst(), game.pressed.toString());
+        assertFalse(game.pressed.contains("A.pairNewDevice"), "tagged risky: " + game.pressed);
+    }
+
+    /**
+     * A way ranked by its words is that way: a risky one is never pressed, and the best, once pressed, leaves the
+     * frontier, so no walk comes back for it.
+     */
+    @Test
+    void aWayRankedByItsWordsIsHeldOrPressedOnce() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("pair", Button.of(new Locator(Role.BUTTON, "Pair new device", null, null, null).element()).free());
+        inputs.put("accounts", Button.of(new Locator(Role.BUTTON, "Passwords & accounts", null, null, null).element())
+                .free());
+        inputs.put("d", click("d").free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        screens.put("P", screen(Setup.named("P").from(ref("A", "pair"))));
+        screens.put("C", screen(Setup.named("C").from(ref("A", "accounts"))));
+        screens.put("D", screen(Setup.named("D").from(ref("A", "d"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+        journal().append(new ExploreEvent.Ranked("A", "Pair new device", 9, PressTag.RISKY, 0));
+        journal().append(new ExploreEvent.Ranked("A", "Passwords & accounts", 10, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        toward(map, game, new ExploreGoal("add a Google account", null), s -> s).run();
+
+        assertEquals("A.accounts→C", game.taken.getFirst(), game.taken.toString());
+        assertTrue(game.taken.stream().noneMatch(t -> t.startsWith("A.pair")), "tagged risky: " + game.taken);
+        assertEquals(1, game.taken.stream().filter(t -> t.startsWith("A.accounts")).count(), game.taken.toString());
+    }
+
     /** Reaching the goal's screen is a witness by code: said, and the run ends done. */
     @Test
     void theGoalScreenReachedEndsTheRunDone() {

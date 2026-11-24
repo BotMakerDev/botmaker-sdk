@@ -19,6 +19,7 @@ import com.botmaker.sdk.internal.explore.tree.Locator;
 import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.RouteGuess;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
+import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.internal.screens.ElementMatch;
 import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.Images;
@@ -483,6 +484,8 @@ public final class ExploreLoop {
     private ExploreGoal goal = ExploreGoal.NONE;
     /** The presses the Reader ranked and the run has not made, best first. */
     private final Frontier frontier;
+    /** Ranks whose words no input of the map says yet, named again after each reload. */
+    private final List<ExploreEvent.Ranked> unnamed = new ArrayList<>();
     /** Where the next read of the journal starts: the ranks and leases the plugin side wrote meanwhile. */
     private long journalRead;
     /** The presses this run made, and the agent sessions the crew started for it: its budget counts both. */
@@ -735,11 +738,39 @@ public final class ExploreLoop {
         Journal.Read read = journal.events(journalRead);
         journalRead = read.next();
         for (ExploreEvent event : read.events()) {
-            frontier.take(event);
-            if (event instanceof ExploreEvent.Ranked ranked && !Frontier.tagOf(ranked.press(), ranked.tag()).unattended()) {
-                hold(ranked.screen(), ranked.press());
-            }
+            if (event instanceof ExploreEvent.Ranked ranked) rank(ranked);
+            else frontier.take(event);
             if (event instanceof ExploreEvent.Leased leased && leased.role() != StopRole.SETTLER) calls++;
+        }
+    }
+
+    /**
+     * Takes {@code ranked} in by the field its words name, so the frontier, a try and a hold all speak of one press: the
+     * Reader ranks a press by the words it shows ("Pair new device"), the map by its field ({@code pairNewDevice}).
+     * Words no input of the map says yet (a screen the Reader just added) are kept by their words and named again
+     * after the next reload ({@link #renameRanks}). One nobody watching may make is held either way.
+     */
+    private void rank(ExploreEvent.Ranked ranked) {
+        PressTag tag = Frontier.tagOf(ranked.press(), ranked.tag());
+        Optional<String> field = fieldOf(ranked.screen(), ranked.press());
+        if (field.isEmpty()) unnamed.add(ranked);
+        ExploreEvent.Ranked named = new ExploreEvent.Ranked(ranked.screen(), field.orElse(ranked.press()),
+                ranked.rank(), tag, ranked.at());
+        frontier.take(named);
+        if (!tag.unattended()) hold(named.screen(), named.press());
+    }
+
+    /** The ranks kept by their words, named again on the reloaded map: each one an input now says moves to its field. */
+    private void renameRanks() {
+        List<ExploreEvent.Ranked> waiting = List.copyOf(unnamed);
+        unnamed.clear();
+        for (ExploreEvent.Ranked ranked : waiting) {
+            if (fieldOf(ranked.screen(), ranked.press()).isEmpty()) {
+                unnamed.add(ranked);
+                continue;
+            }
+            frontier.pressed(ranked.screen(), ranked.press());
+            rank(ranked);
         }
     }
 
@@ -748,6 +779,32 @@ public final class ExploreLoop {
         chooser.tryOnce(Frontier.keyOf(screen, press));
         map.edges().stream().filter(e -> e.from().equals(screen) && e.label().equals(press))
                 .forEach(e -> chooser.tryOnce(key(e)));
+    }
+
+    /**
+     * The field of {@code screen} {@code press} names: itself when it is one, else the one button whose element says
+     * those words. Empty when none does, or when several do: a hold or a rank never lands on a look-alike.
+     */
+    private Optional<String> fieldOf(String screen, String press) {
+        MapScreen on = map.screen(screen).orElse(null);
+        if (on == null) return Optional.empty();
+        if (on.inputs().containsKey(press)) return Optional.of(press);
+        List<String> saying = new ArrayList<>();
+        for (var input : on.inputs().entrySet()) {
+            if (input.getValue() instanceof Button button && button.element() != null && says(button.element(), press)) {
+                saying.add(input.getKey());
+            }
+        }
+        return saying.size() == 1 ? Optional.of(saying.getFirst()) : Optional.empty();
+    }
+
+    /** Whether {@code element}'s label, own text or held text reads {@code words}, case and spacing aside. */
+    private static boolean says(Element element, String words) {
+        String wanted = words.strip();
+        for (Words said : new Words[] {element.label(), element.text(), element.holding()}) {
+            if (said != null && said.text().strip().equalsIgnoreCase(wanted)) return true;
+        }
+        return false;
     }
 
     /** How many edges {@code screen} is from the map's home; {@link Integer#MAX_VALUE} when no way reaches it. */
@@ -1708,7 +1765,8 @@ public final class ExploreLoop {
             generation = done.generation();
             map = done.map();
             chooser.use(map);
-            // The reloaded map can hold the way a parked press lacked.
+            // The reloaded map can hold the way a parked press lacked, and the input a rank's words name.
+            renameRanks();
             frontier.resume();
             if (done.guards() != null) guards = done.guards();
             verdictsDue = true;

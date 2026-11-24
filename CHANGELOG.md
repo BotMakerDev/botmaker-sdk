@@ -129,6 +129,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A press the Reader ranks by the words it shows ("Passwords & accounts") reaches the input the map names by its
+  field (`passwordsAccounts`): a goal run presses its best tree input first, and one the Reader tagged risky or
+  destructive is never pressed unattended. Before, the words matched no input, so the best was dropped as gone and a
+  risky one (*Pair new device*) was pressed like any other.
 - Keep exploring maps every row of an app's list: a row a person taps whose words are its children's (each row of
   Android's Settings: a clickable layout with no id, label or text of its own) is an input found by the first text it
   holds (`holding`), as the element picker finds it. Only the parts with a clue of their own were mapped before, so
