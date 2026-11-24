@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- A Keep exploring or Discover run killed from outside (the JVM, Studio quit, a core restart) is ended in its journal
+  (*Crashed or stopped from Studio*) by the run's companion once the run's process is gone; before, `status` said it
+  still ran and `wait` blocked to its timeout.
 - Keep exploring no longer idles when nothing is left to press: after a few rounds with nothing pressable, a run whose
   map is built ends (*Done: nothing left to try*), and one with a screen still open stops at once on it, naming what is
   open, instead of sitting silent for 15 minutes. A way waiting for its condition still waits.

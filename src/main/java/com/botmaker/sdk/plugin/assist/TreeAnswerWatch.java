@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.run.RunCompanion;
 import com.botmaker.plugin.api.run.RunContext;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
+import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -41,6 +42,8 @@ public final class TreeAnswerWatch implements RunCompanion {
     static final long POLL_MS = 500;
 
     private Thread thread;
+    /** The project the run is of, once started: where its journal is when the run ends. */
+    private Path project;
 
     /** A watch not started yet: the core builds one for each run. */
     public TreeAnswerWatch() {}
@@ -57,6 +60,7 @@ public final class TreeAnswerWatch implements RunCompanion {
         StudioServices services = run.services();
         Path project = services == null ? null : services.projectDir();
         if (project == null || thread != null) return;
+        this.project = project;
         // The latest run's journal, read again each round: the run begins its own once its process is up.
         thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(() -> Journal.latest(project),
                 (journal, id, answers) -> {
@@ -71,11 +75,28 @@ public final class TreeAnswerWatch implements RunCompanion {
         TreeAnswers.Written write(Journal journal, String id, List<TreeAnswer> answers);
     }
 
-    /** Stops watching. */
+    /**
+     * Stops watching, and says the run ended when it could not: a run whose process was killed (the JVM, Studio quit, a
+     * core restart) writes no end of its own, so its journal would say it still runs.
+     */
     @Override
     public synchronized void stop() {
         if (thread != null) thread.interrupt();
         thread = null;
+        if (project != null) Journal.latest(project).ifPresent(journal -> endIfKilled(journal, System.currentTimeMillis()));
+    }
+
+    /**
+     * Writes {@link ExploreLoop.End#BROKE} at {@code nowMs} to a run's journal that began and never ended: the
+     * host calls {@link #stop} once the run's process is gone, so a run that ended itself has said so already.
+     *
+     * @return whether an end was written
+     */
+    static boolean endIfKilled(Journal journal, long nowMs) {
+        JournalView view = JournalView.of(journal);
+        if (!view.began() || view.ended().isPresent()) return false;
+        journal.append(new ExploreEvent.Ended(ExploreLoop.End.BROKE, nowMs));
+        return true;
     }
 
     /**
