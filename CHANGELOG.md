@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🔭 A run toward a goal that runs out of presses asks the Reader first (plan `2026-11-24-explore-drive-fixes`
+  phase 6): its STUCK stop goes to the Reader, which cuts the presses the frame shows toward the goal with
+  `crop_pictures` on that screen, ranks them and resumes, so the run presses what the map lacked. A resume that added
+  nothing is refused; a Reader with nothing to add ends without resuming and the stop is yours, as is a second stuck
+  there before the run pressed anything. A run with no goal still hands its stuck to you.
 - 🔭 Explore in tabs (plan `2026-11-24-explore-drive-fixes` phase 4): the bar, the goal line and one chip per agent
   of the crew (its name and state, a dot while it works) stay on top, and the rest is in four tabs. **Run** has the
   game's frame, drawn whole by width and height so a tall phone frame is no longer cropped, then the screen and its

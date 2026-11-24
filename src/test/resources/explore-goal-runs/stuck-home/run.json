@@ -1,0 +1,17 @@
+{
+  "goal": "open the accounts settings",
+  "goalScreen": "Accounts",
+  "pressCeiling": 4,
+  "witness": "screen_on_map",
+  "evaluations": {"k": 8, "every": 25},
+  "screens": [
+    {"name": "Home", "start": true, "drawn": true, "texts": ["Settings", "Search settings", "Passwords & accounts"],
+      "ways": {}, "unmapped": {"accounts": "Accounts"}},
+    {"name": "Page", "drawn": true, "texts": ["Results"], "ways": {"result": "Accounts"}},
+    {"name": "Accounts", "drawn": true, "texts": ["Passwords & accounts", "Add account"], "ways": {}}
+  ],
+  "reader": {
+    "Home": {"adds": ["accounts"], "ranks": [{"press": "accounts", "rank": 10, "tag": "safe"}]}
+  },
+  "evaluator": {}
+}

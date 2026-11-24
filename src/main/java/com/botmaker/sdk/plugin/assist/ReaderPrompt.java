@@ -15,15 +15,19 @@ import java.nio.charset.StandardCharsets;
  * The one prompt a Reader session is started with (spec 2026-11-24-explore-agents-design § The crew): the stop and the
  * run's goal in, its answer written through the explore tool's {@code look}, {@code apply_edit}, {@code rank_presses}
  * and {@code resume}. The text is the resource {@value #RESOURCE}; a wrong map the Evaluator found
- * ({@link StopKind#BAD_MAP}) is {@value #BAD_MAP_RESOURCE}, which redraws a screen's marks and resumes nothing.
+ * ({@link StopKind#BAD_MAP}) is {@value #BAD_MAP_RESOURCE}, which redraws a screen's marks and resumes nothing; a run
+ * given a goal stuck with nothing to press ({@link StopKind#STUCK}) is {@value #STUCK_RESOURCE}, which adds the
+ * frame's presses toward the goal.
  */
 final class ReaderPrompt {
 
     static final String RESOURCE = "reader-prompt.md";
     static final String BAD_MAP_RESOURCE = "reader-bad-map-prompt.md";
+    static final String STUCK_RESOURCE = "reader-stuck-prompt.md";
 
     private static final String TEXT = read(RESOURCE);
     private static final String BAD_MAP_TEXT = read(BAD_MAP_RESOURCE);
+    private static final String STUCK_TEXT = read(STUCK_RESOURCE);
 
     private ReaderPrompt() {}
 
@@ -31,7 +35,12 @@ final class ReaderPrompt {
     static String of(Stop stop, String goal) {
         boolean badMap = stop.kind() == StopKind.BAD_MAP;
         String on = stop.screen() == null || stop.screen().isBlank() ? "" : stop.screen();
-        return (badMap ? BAD_MAP_TEXT : TEXT).replace("{stop}", stop.id())
+        String text = switch (stop.kind()) {
+            case BAD_MAP -> BAD_MAP_TEXT;
+            case STUCK -> STUCK_TEXT;
+            default -> TEXT;
+        };
+        return text.replace("{stop}", stop.id())
                 .replace("{kind}", stop.kind().displayName())
                 .replace("{on}", badMap ? on : on.isEmpty() ? " on a screen the map lacks" : " on " + on)
                 .replace("{why}", stop.missing())

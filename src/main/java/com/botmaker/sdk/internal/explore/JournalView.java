@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -492,11 +493,61 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
 
     /**
      * Who takes {@code stop} now: the user once Claude handed it to them, the Mechanic once Claude called it a Discover
-     * fault, else its kind's role.
+     * fault, the Reader a {@link StopKind#STUCK} of a run given a goal until it had its try there, else its kind's role.
      */
     public StopRole roleOf(Stop stop) {
         if (asked(stop.id()).isPresent()) return StopRole.USER;
-        return fault(stop.id()).isPresent() ? StopRole.MECHANIC : stop.role();
+        if (fault(stop.id()).isPresent()) return StopRole.MECHANIC;
+        // Nothing left to press toward a goal is often a press the map lacks (device drive 2026-11-24): the Reader maps
+        // the frame's first; only what it cannot add is the user's.
+        // A stuck before the map has a screen gives the Reader none to add a press to.
+        if (stop.kind() == StopKind.STUCK && crewed() && stop.screen() != null && !stop.screen().isBlank()
+                && !readerTried(stop)) {
+            return StopRole.CARTOGRAPHER;
+        }
+        return stop.role();
+    }
+
+    /**
+     * Whether the Reader's try at a {@link StopKind#STUCK} on {@code stop}'s screen is spent: it ended and the run
+     * pressed nothing since. A try that added a press ({@link EditTool#changesMap}) still holds its own stop until the
+     * resume it sends; a bare cut adds nothing to press, and nor do ranks. A later stuck there with no press between is
+     * the user's, whatever the try added, so a press the run cannot take is never added again and again.
+     */
+    boolean readerTried(Stop stop) {
+        Set<String> stuck = new HashSet<>();
+        Set<String> changing = new HashSet<>();
+        Set<String> reading = new HashSet<>();
+        String lastRead = null;
+        boolean tried = false;
+        boolean added = false;
+        for (ExploreEvent event : events) {
+            switch (event) {
+                case ExploreEvent.Stopped stopped when stopped.stop().kind() == StopKind.STUCK
+                        && Objects.equals(stopped.stop().screen(), stop.screen()) -> stuck.add(stopped.stop().id());
+                case ExploreEvent.Leased leased when leased.role() == StopRole.CARTOGRAPHER
+                        && stuck.contains(leased.stopId()) -> {
+                    reading.add(leased.stopId());
+                    added = false;
+                }
+                // A try that failed to start or ran out of time is no try: the Coordinator's attempts cap bounds those.
+                case ExploreEvent.Released released when reading.remove(released.stopId()) && released.ok() -> {
+                    tried = true;
+                    lastRead = released.stopId();
+                }
+                // Only the stuck Reader's own edits count, not another stop's at the same time.
+                case ExploreEvent.EditQueued queued when reading.contains(queued.stopId())
+                        && EditTool.fromId(queued.tool()).changesMap(queued.edit(), stop.screen()) ->
+                        changing.add(queued.editId());
+                case ExploreEvent.EditApplied applied when applied.ok() && changing.contains(applied.editId()) ->
+                        added = true;
+                // A press: the run moved on, so a stuck after it is a new one.
+                case ExploreEvent.Tried ignored -> tried = false;
+                default -> {
+                }
+            }
+        }
+        return tried && !(added && stop.id().equals(lastRead));
     }
 
     /** The question Claude handed the stop {@code stopId} to the user with, since the run last stopped on it. */

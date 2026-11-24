@@ -248,6 +248,31 @@ class EditWriterTest {
                 && c.call().equals("resume unknown_screen-1 ignore")), "once drawn, the ignore is sent");
     }
 
+    /** A Reader that added no press may not resume a goal run stuck there, ignored or not: it would stop again. */
+    @Test
+    void aReadersResumeOfAStuckRunWithNothingAddedIsRefused() {
+        Journal journal = new Journal(folder);
+        journal.append(new ExploreEvent.Began(false, "reach Accounts", 1));
+        journal.append(new ExploreEvent.Stopped(new Stop("stuck-1", StopKind.STUCK, "HOME", "HOME", "", List.of(),
+                List.of(), Map.of(), List.of(), "nothing is left the run can press itself", 2), false, 2));
+        journal.append(new ExploreEvent.Leased("stuck-1", StopRole.CARTOGRAPHER, 1, Long.MAX_VALUE, 2));
+        journal.append(new ExploreEvent.EditQueued("e-1", "stuck-1", "crop_pictures", "{\"boxes\":[]}", 3));
+        journal.append(new ExploreEvent.EditApplied("e-1", true, "cut accounts_row", 3));
+
+        for (boolean ignore : new boolean[]{false, true}) {
+            AgentReply refused = ExploreTools.resume(journal, "stuck-1", ignore, Duration.ofMillis(100));
+            assertTrue(refused.isRefused());
+            assertEquals(ExploreTools.NOTHING_ADDED, refused.parts().getFirst().text());
+        }
+
+        journal.append(new ExploreEvent.EditQueued("e-2", "stuck-1", "crop_pictures",
+                "{\"screen\":\"HOME\",\"boxes\":[]}", 4));
+        journal.append(new ExploreEvent.EditApplied("e-2", true, "cut accounts_row on HOME", 4));
+        ExploreTools.resume(journal, "stuck-1", false, Duration.ofMillis(100));
+        assertTrue(journal.events().stream().anyMatch(e -> e instanceof ExploreEvent.Claude c
+                && c.call().equals("resume stuck-1")), "once a press is added, the resume is sent");
+    }
+
     /** The FX thread, where edit_map writes, sees the writer's frame: a scoped frame is carried to it. */
     @Test
     void theStopsFrameIsCarriedToTheThreadThatWrites() throws Exception {

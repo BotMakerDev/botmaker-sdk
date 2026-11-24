@@ -10,7 +10,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,6 +130,99 @@ class JournalViewCrewTest {
         assertEquals(0, view.attempts("s-1"));
         assertEquals(Optional.empty(), view.leaseOf("s-1"));
         assertFalse(view.applied("edit-1"));
+    }
+
+    /**
+     * Device drive 2026-11-24: a goal run stuck on a screen whose presses it all tried is the Reader's, which maps the
+     * frame's; once its try added nothing, that stop and the next stuck there are the user's; a run with no goal keeps
+     * its stuck the user's.
+     */
+    @Test
+    void aGoalRunsStuckIsTheReadersUntilItsTryAddsNothing() {
+        Stop first = stuck("stuck-1");
+        assertEquals(StopRole.USER, view(new ExploreEvent.Began(false, 1),
+                new ExploreEvent.Stopped(first, false, 2)).roleOf(first), "no goal, no crew: the user's");
+
+        List<ExploreEvent> events = new ArrayList<>(List.of(new ExploreEvent.Began(false, "reach Accounts", 1),
+                new ExploreEvent.Stopped(first, false, 2)));
+        assertEquals(StopRole.CARTOGRAPHER, view(events).roleOf(first));
+        events.add(new ExploreEvent.Leased("stuck-1", StopRole.CARTOGRAPHER, 1, 100, 3));
+        assertEquals(StopRole.CARTOGRAPHER, view(events).roleOf(first), "the Reader's while it works");
+        // A bare cut and a rank give the run nothing new to press.
+        events.add(new ExploreEvent.EditQueued("stuck-1-1", "stuck-1", "crop_pictures", "{\"boxes\":[]}", 4));
+        events.add(new ExploreEvent.EditApplied("stuck-1-1", true, "cut", 4));
+        events.add(new ExploreEvent.Ranked("HOME", "search", 2, PressTag.SAFE, 4));
+        events.add(new ExploreEvent.Released("stuck-1", 1, true, "", 5));
+        assertEquals(StopRole.USER, view(events).roleOf(first), "its try added nothing: the user's");
+        Stop again = stuck("stuck-2");
+        events.add(new ExploreEvent.Stopped(again, false, 6));
+        assertEquals(StopRole.USER, view(events).roleOf(again), "nothing added since: no second try");
+
+        // A press since: the run moved on, the next stuck there is the Reader's again.
+        events.add(new ExploreEvent.Tried("HOME", "back", ExploreLoop.Mode.UNTRIED, null, 7));
+        assertEquals(StopRole.CARTOGRAPHER, view(events).roleOf(again));
+    }
+
+    /**
+     * A try that added a press keeps its stop until its resume; a stuck after it with no press between is the user's,
+     * so a press the run cannot take is not added again and again.
+     */
+    @Test
+    void aTryThatAddedAPressHoldsItsStopButNotTheNextStuck() {
+        Stop first = stuck("stuck-1");
+        List<ExploreEvent> events = new ArrayList<>(List.of(new ExploreEvent.Began(false, "reach Accounts", 1),
+                new ExploreEvent.Stopped(first, false, 2),
+                new ExploreEvent.Leased("stuck-1", StopRole.CARTOGRAPHER, 1, 100, 3),
+                new ExploreEvent.EditQueued("stuck-1-1", "stuck-1", "crop_pictures", "{\"screen\":\"HOME\"}", 4),
+                new ExploreEvent.EditApplied("stuck-1-1", true, "cut", 4),
+                new ExploreEvent.Released("stuck-1", 1, true, "", 5)));
+        assertEquals(StopRole.CARTOGRAPHER, view(events).roleOf(first), "its resume is on its way");
+
+        Stop again = stuck("stuck-2");
+        events.add(new ExploreEvent.Stopped(again, true, 6));
+        assertEquals(StopRole.USER, view(events).roleOf(again), "the run could not press what it added");
+    }
+
+    /** Review 2026-11-24: a try that failed to start, or another stop's edit meanwhile, says nothing of this try. */
+    @Test
+    void aFailedTryOrAnotherStopsEditIsNotTheReadersTry() {
+        Stop first = stuck("stuck-1");
+        List<ExploreEvent> events = new ArrayList<>(List.of(new ExploreEvent.Began(false, "reach Accounts", 1),
+                new ExploreEvent.Stopped(first, false, 2),
+                new ExploreEvent.Leased("stuck-1", StopRole.CARTOGRAPHER, 1, 100, 3),
+                new ExploreEvent.Released("stuck-1", 1, false, "timeout", 4)));
+        assertEquals(StopRole.CARTOGRAPHER, view(events).roleOf(first), "a timeout is no try");
+
+        events.add(new ExploreEvent.Leased("stuck-1", StopRole.CARTOGRAPHER, 2, 200, 5));
+        events.add(new ExploreEvent.EditQueued("u-1", "unknown_screen-2", "edit_map", "{\"action\":\"new_screen\"}", 6));
+        events.add(new ExploreEvent.EditApplied("u-1", true, "new SETTINGS", 6));
+        events.add(new ExploreEvent.Released("stuck-1", 2, true, "", 7));
+        assertEquals(StopRole.USER, view(events).roleOf(first), "another stop's edit adds nothing to this one");
+
+        Stop early = new Stop("stuck-9", StopKind.STUCK, null, "", "", List.of(), List.of(), Map.of(), List.of(),
+                "nothing pressed for 20m", 8);
+        assertEquals(StopRole.USER, view(new ExploreEvent.Began(false, "reach Accounts", 1),
+                new ExploreEvent.Stopped(early, false, 8)).roleOf(early), "no screen to add a press to");
+    }
+
+    @Test
+    void onlyAMapEditOrACutOnTheStuckScreenChangesTheMap() {
+        assertTrue(EditTool.EDIT_MAP.changesMap("{\"action\":\"new_screen\"}", "HOME"));
+        assertTrue(EditTool.CROP_PICTURES.changesMap("{\"screen\":\"HOME\",\"boxes\":[]}", "HOME"));
+        assertFalse(EditTool.CROP_PICTURES.changesMap("{\"screen\":\"SETTINGS\"}", "HOME"));
+        assertFalse(EditTool.CROP_PICTURES.changesMap("{\"boxes\":[]}", "HOME"));
+        assertFalse(EditTool.CROP_PICTURES.changesMap("{\"screen\":\" \"}", " "));
+        assertFalse(EditTool.CROP_PICTURES.changesMap("not json", "HOME"));
+        assertFalse(EditTool.UNKNOWN.changesMap("{\"screen\":\"HOME\"}", "HOME"));
+    }
+
+    private static Stop stuck(String id) {
+        return new Stop(id, StopKind.STUCK, "HOME", "HOME", "", List.of(), List.of(), Map.of(), List.of(),
+                "nothing is left the run can press itself", 2);
+    }
+
+    private static JournalView view(List<ExploreEvent> events) {
+        return view(events.toArray(ExploreEvent[]::new));
     }
 
     private static JournalView view(ExploreEvent... events) {

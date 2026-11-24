@@ -53,7 +53,8 @@ public enum StopRole {
                  FAILED_INPUT, LOW_YIELD, UNWRITTEN, BAD_MAP -> CARTOGRAPHER;
             case FAULT, CRASH -> MECHANIC;
             case SETTLED -> SETTLER;
-            // A window not the game's in front, nothing left to press, or a kind a newer SDK raised: the user's call.
+            // A window not the game's in front, nothing left to press, or a kind a newer SDK raised: the user's call. A
+            // run given a goal hands its STUCK to the Reader first (JournalView.roleOf), which this kind alone cannot say.
             case GUARD, STUCK, UNKNOWN -> USER;
         };
     }

@@ -10,6 +10,7 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.plugin.api.run.DevReload;
 import com.botmaker.plugin.api.run.RunEntry;
+import com.botmaker.sdk.internal.explore.EditTool;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.FindingKind;
@@ -325,6 +326,10 @@ final class ExploreTools {
             + "(crop_pictures a marker, then new_screen with it), or end your session without resuming: the stop is "
             + "tried again, then handed to the user.";
 
+    static final String NOTHING_ADDED = "Nothing was added to press: the run would stop here again. Add the press "
+            + "toward the goal (crop_pictures it with the screen it is on), or end your session without "
+            + "resuming: the stop goes to the user.";
+
     /** What Claude does with a held fault. */
     private static final String FIX_THE_SDK = "Fix the SDK with its test and install it; explore reload_sdk then "
             + "replays the stop on the new build.";
@@ -432,7 +437,7 @@ final class ExploreTools {
             }
             Optional<com.botmaker.sdk.internal.explore.Stop> stop = open ? view.open() : view.parked(id);
             if (stop.isEmpty()) return AgentReply.refused("No stop " + id + " is open or parked. " + ids(view));
-            if (stop.get().role() == StopRole.USER) {
+            if (view.roleOf(stop.get()) == StopRole.USER) {
                 return AgentReply.refused(id + " is the user's already: the Explore tab lists it for them.");
             }
             if (view.settled(stop.get())) return AgentReply.refused(id + " is settled off the page's tree: leave it.");
@@ -472,7 +477,11 @@ final class ExploreTools {
                 return AgentReply.refused(id + " is the user's: " + USERS_STOP);
             }
             // A Reader that drew nothing and ignores the screen meets it again at once: the run would loop on it.
-            if (ignore && undrawn(view, id)) return AgentReply.refused(NOTHING_DRAWN);
+            // So does one that resumes a run stuck there without adding a press: nothing new is pressable.
+            if (undrawn(view, id, ignore)) {
+                return AgentReply.refused(stopOf(view, id).filter(s -> s.kind() == StopKind.STUCK).isPresent()
+                        ? NOTHING_ADDED : NOTHING_DRAWN);
+            }
             int seen = view.all().size();
             claude(journal, "resume " + id + (ignore ? " ignore" : ""));
             journal.command("resume " + id + (ignore ? " ignore" : ""));
@@ -583,20 +592,25 @@ final class ExploreTools {
     }
 
     /**
-     * Whether {@code id} is a screen the map lacks, held by the Reader, and none of its map edits was written (a cut
-     * alone draws nothing): an ignore of it would meet the same screen again at once (device drive 2026-11-24, F1).
+     * Whether the Reader holds {@code id} and none of its map edits was written (a cut alone draws nothing), while
+     * {@code id} is a screen the map lacks it would {@code ignore} (it would meet the same screen again at once, device
+     * drive 2026-11-24, F1), or a run stuck with nothing to press (it would stop there again, resumed or ignored).
      */
-    private static boolean undrawn(JournalView view, String id) {
-        boolean unknown = stopOf(view, id).filter(s -> s.kind() == StopKind.UNKNOWN_SCREEN).isPresent();
+    private static boolean undrawn(JournalView view, String id, boolean ignore) {
+        boolean unknown = ignore && stopOf(view, id).filter(s -> s.kind() == StopKind.UNKNOWN_SCREEN).isPresent();
+        String stuckOn = stopOf(view, id).filter(s -> s.kind() == StopKind.STUCK).map(s -> s.screen()).orElse(null);
+        boolean stuck = stopOf(view, id).filter(s -> s.kind() == StopKind.STUCK).isPresent();
         boolean reader = view.leaseOf(id).filter(l -> l.role() == StopRole.CARTOGRAPHER)
                 .filter(l -> !l.expired(System.currentTimeMillis())).isPresent();
-        if (!unknown || !reader) return false;
+        if (!(unknown || stuck) || !reader) return false;
         Set<String> written = new HashSet<>();
         Set<String> drawing = new HashSet<>();
         for (ExploreEvent event : view.events()) {
             if (event instanceof ExploreEvent.EditApplied applied && applied.ok()) written.add(applied.editId());
+            // A screen is drawn by a map edit; a stuck run is given a press by one, or by a cut noted on its screen.
             if (event instanceof ExploreEvent.EditQueued queued && queued.stopId().equals(id)
-                    && EditTool.fromId(queued.tool()) == EditTool.EDIT_MAP) {
+                    && (stuck ? EditTool.fromId(queued.tool()).changesMap(queued.edit(), stuckOn)
+                    : EditTool.fromId(queued.tool()) == EditTool.EDIT_MAP)) {
                 drawing.add(queued.editId());
             }
         }

@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.assist.AgentReply;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Setup;
+import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreGoal;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
@@ -31,8 +32,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -72,7 +76,7 @@ class ExploreRegressionTest {
     Path folder;
 
     @ParameterizedTest
-    @ValueSource(strings = {"google-sign-in", "hotspot", "dark-theme"})
+    @ValueSource(strings = {"google-sign-in", "hotspot", "dark-theme", "stuck-home"})
     void eachGoalRunEndsDoneWithItsWitnessWithinItsCeiling(String goal) throws IOException {
         Replay replay = new Replay(load(goal), folder);
 
@@ -85,6 +89,38 @@ class ExploreRegressionTest {
                 replay.game.taken + " is over " + replay.run.pressCeiling() + " presses");
         assertFalse(replay.applied.isEmpty(), "the Reader drew the screen the map could not tell");
         assertEquals(1, replay.events(ExploreEvent.Summary.class).size(), "the run's summary is written at its end");
+    }
+
+    /**
+     * Device drive 2026-11-24: the run starts on a screen whose every press it knows was tried, the way on a row the
+     * map lacks. Its STUCK goes to the Reader, which adds the row; the run presses it and reaches the goal.
+     */
+    @Test
+    void aGoalRunStuckAtItsStartIsTheReadersWhichAddsThePressOn() throws IOException {
+        Replay replay = new Replay(load("stuck-home"), folder);
+
+        assertEquals(ExploreLoop.End.DONE, replay.run(s -> s), replay.journal.events().toString());
+
+        assertTrue(replay.reads.getFirst().startsWith("stuck-"), replay.reads.toString());
+        assertEquals(List.of("Home.accounts"), replay.applied);
+        assertEquals(List.of("Home.accounts→Accounts"), replay.game.taken);
+    }
+
+    /** A Reader that adds nothing ends its try without resuming: the stuck is the user's, and no Reader tries again. */
+    @Test
+    void aReaderThatAddsNothingHandsTheStuckToTheUser() throws IOException {
+        Run run = load("stuck-home");
+        Replay replay = new Replay(run.withReader(Map.of("Home", new ReaderAnswer(null, null, null))), folder);
+
+        replay.run(s -> s);
+
+        List<ExploreEvent.Leased> leases = replay.events(ExploreEvent.Leased.class).stream()
+                .filter(l -> l.role() == StopRole.CARTOGRAPHER).toList();
+        assertEquals(1, leases.size(), leases.toString());
+        JournalView view = JournalView.of(replay.journal);
+        Stop stuck = view.stopOf(leases.getFirst().stopId()).orElseThrow();
+        assertEquals(StopRole.USER, view.roleOf(stuck));
+        assertTrue(replay.game.taken.isEmpty(), replay.game.taken.toString());
     }
 
     @Test
@@ -134,7 +170,7 @@ class ExploreRegressionTest {
         Run run = load("google-sign-in");
         Map<String, ReaderAnswer> reader = new LinkedHashMap<>(run.reader());
         ReaderAnswer signIn = reader.get("SignIn");
-        reader.put("SignIn", new ReaderAnswer(List.of("SignIn", "Account"), signIn.ranks()));
+        reader.put("SignIn", new ReaderAnswer(List.of("SignIn", "Account"), List.of(), signIn.ranks()));
         Replay replay = new Replay(run.withReader(reader), folder);
         replay.crashOnApply = 2;
 
@@ -200,18 +236,24 @@ class ExploreRegressionTest {
             return screens.stream().filter(Screen::start).map(Screen::name).findFirst().orElseThrow();
         }
 
-        /** The map: every screen with the ways into it, an undrawn one too, so a press can reach it. */
-        ScreenGraph map() {
+        /**
+         * The map: every screen with the ways into it, an undrawn one too, so a press can reach it; a press the map
+         * lacks only once the Reader added it ({@code added}, {@code Screen.press}).
+         */
+        ScreenGraph map(Set<String> added) {
             Map<String, MapScreen> map = new LinkedHashMap<>();
             for (Screen shown : screens) {
                 Setup setup = Setup.named(shown.name());
                 if (shown.start()) setup = setup.start();
+                // The first way in is its from, any other one alsoFrom: a second from would replace the first.
+                List<Way> into = new ArrayList<>();
                 for (Screen from : screens) {
-                    for (Map.Entry<String, String> way : from.ways().entrySet()) {
-                        if (way.getValue().equals(shown.name())) setup = setup.from(ref(from.name(), way.getKey()));
+                    for (Map.Entry<String, String> way : from.mapped(added).entrySet()) {
+                        if (way.getValue().equals(shown.name())) into.add(Way.of(ref(from.name(), way.getKey())));
                     }
                 }
-                Input[] ways = shown.ways().keySet().stream().map(press -> (Input) click(press).free())
+                if (!into.isEmpty()) setup = setup.fromWay(into.getFirst()).alsoFrom(into.subList(1, into.size()));
+                Input[] ways = shown.mapped(added).keySet().stream().map(press -> (Input) click(press).free())
                         .toArray(Input[]::new);
                 map.put(shown.name(), screen(setup, ways));
             }
@@ -222,11 +264,42 @@ class ExploreRegressionTest {
     /** When the Coordinator starts an evaluation: its stall count and its safety net. */
     record Evaluations(int k, int every) {}
 
-    /** One screen of the game: whether the map tells it at the start, what its frame reads, where each press leads. */
-    record Screen(String name, boolean start, boolean drawn, List<String> texts, Map<String, String> ways) {}
+    /**
+     * One screen of the game: whether the map tells it at the start, what its frame reads, where each press leads;
+     * {@code unmapped} the presses it shows that the map lacks until the Reader adds them.
+     */
+    record Screen(String name, boolean start, boolean drawn, List<String> texts, Map<String, String> ways,
+                  Map<String, String> unmapped) {
+        Screen {
+            unmapped = unmapped == null ? Map.of() : unmapped;
+        }
 
-    /** What the Reader answers on a screen the map cannot tell: the screens it draws, the presses it ranks. */
-    record ReaderAnswer(List<String> draws, List<Rank> ranks) {}
+        /** The presses the map holds of it once {@code added} were added. */
+        Map<String, String> mapped(Set<String> added) {
+            Map<String, String> mapped = new LinkedHashMap<>(ways);
+            unmapped.forEach((press, to) -> {
+                if (added.contains(name + "." + press)) mapped.put(press, to);
+            });
+            return mapped;
+        }
+
+        /** Where {@code press} leads, mapped or not. */
+        String leads(String press, String otherwise) {
+            return ways.getOrDefault(press, unmapped.getOrDefault(press, otherwise));
+        }
+    }
+
+    /**
+     * What the Reader answers on a screen: the screens it draws, the presses the map lacks it adds there, the presses
+     * it ranks. One that draws and adds nothing ends its session without resuming.
+     */
+    record ReaderAnswer(List<String> draws, List<String> adds, List<Rank> ranks) {
+        ReaderAnswer {
+            draws = draws == null ? List.of() : draws;
+            adds = adds == null ? List.of() : adds;
+            ranks = ranks == null ? List.of() : ranks;
+        }
+    }
 
     record Rank(String press, int rank, String tag) {}
 
@@ -256,7 +329,7 @@ class ExploreRegressionTest {
         Replay(Run run, Path folder) {
             this.run = run;
             this.journal = new Journal(folder);
-            this.game = new Game(run, this::tick);
+            this.game = new Game(run, this::tick, folder);
             this.coordinator = coordinator();
         }
 
@@ -267,7 +340,9 @@ class ExploreRegressionTest {
 
         ExploreLoop.End run(Function<ExploreLoop.Settings, ExploreLoop.Settings> settings) {
             ScreenGraph map = game.map;
-            ExploreLoop.Reload reload = () -> new ExploreLoop.Reload.Reloaded(1, map, null, List.of());
+            // A resume reloads the bot: the map holds what the Reader added by then.
+            ExploreLoop.Reload reload = () -> new ExploreLoop.Reload.Reloaded(1, game.map = run.map(game.added), null,
+                    List.of());
             ExploreLoop.End end = new ExploreLoop(map, game, reload, Guards.with(List.of()), journal,
                     settings.apply(ExploreLoop.Settings.DEFAULT.within(Duration.ofHours(1))), () -> game.nowMs)
                     .toward(new ExploreGoal(run.goal(), run.goalScreen())).run();
@@ -310,10 +385,16 @@ class ExploreRegressionTest {
             String screen = arrow < 0 ? game.at : stop.place().substring(arrow + 1);
             ReaderAnswer answer = run.reader().get(screen);
             if (answer == null) return new WorkerRunner.Result(false, "nothing recorded for " + screen);
+            // Nothing to draw or add: the session ends without resuming, as the prompt says.
+            if (answer.draws().isEmpty() && answer.adds().isEmpty()) return new WorkerRunner.Result(true, "");
             int n = 0;
             for (String draw : answer.draws()) {
                 journal.append(new ExploreEvent.EditQueued(stop.id() + "-" + ++n, stop.id(), "edit_map",
                         "{\"draw\":\"" + draw + "\"}", game.nowMs));
+            }
+            for (String add : answer.adds()) {
+                journal.append(new ExploreEvent.EditQueued(stop.id() + "-" + ++n, stop.id(), "crop_pictures",
+                        "{\"screen\":\"" + screen + "\",\"add\":\"" + add + "\"}", game.nowMs));
             }
             // apply_edit waits for its edits to be written before the Reader goes on.
             EditWriter.drain(journal, JournalView.of(journal), this::apply, () -> game.nowMs);
@@ -327,6 +408,12 @@ class ExploreRegressionTest {
 
         private AgentReply apply(String tool, Map<String, Object> arguments) {
             if (++applies == crashOnApply) throw new Crash();
+            if (arguments.get("add") != null) {
+                String press = arguments.get("screen") + "." + arguments.get("add");
+                game.added.add(press);
+                applied.add(press);
+                return AgentReply.text("cut " + press);
+            }
             String draw = String.valueOf(arguments.get("draw"));
             game.drawn.add(draw);
             applied.add(draw);
@@ -350,16 +437,21 @@ class ExploreRegressionTest {
     static final class Game implements ExploreLoop.Play {
 
         final Run run;
-        final ScreenGraph map;
+        final Path frames;
+        /** The map as the bot holds it now: a reload brings what the Reader added. */
+        ScreenGraph map;
         final Runnable crew;
         final Set<String> drawn = new HashSet<>();
+        /** The presses the Reader added, {@code Screen.press}. */
+        final Set<String> added = new HashSet<>();
         final List<String> taken = new ArrayList<>();
         String at;
         long nowMs = 1_000;
 
-        Game(Run run, Runnable crew) {
+        Game(Run run, Runnable crew, Path frames) {
             this.run = run;
-            this.map = run.map();
+            this.frames = frames;
+            this.map = run.map(Set.of());
             this.crew = crew;
             run.screens().stream().filter(Screen::drawn).forEach(s -> drawn.add(s.name()));
             at = run.start();
@@ -384,7 +476,14 @@ class ExploreRegressionTest {
 
         @Override
         public String keep(String name) {
-            return "/frames/" + name + ".png";
+            // A real file: the edit writer cuts a Reader's pictures from it.
+            Path frame = frames.resolve(name + ".png");
+            try {
+                ImageIO.write(new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB), "png", frame.toFile());
+            } catch (IOException failed) {
+                throw new UncheckedIOException(failed);
+            }
+            return frame.toString();
         }
 
         @Override
@@ -428,7 +527,7 @@ class ExploreRegressionTest {
             taken.add(edge.from() + "." + edge.label() + "→" + edge.to());
             nowMs += 500;
             // A way the recording does not name is one the map adds, a way back: it leads where the map says.
-            at = run.named(edge.from()).ways().getOrDefault(edge.label(), edge.to());
+            at = run.named(edge.from()).leads(edge.label(), edge.to());
             return drawn.contains(at) ? new Took(Arrival.AT_TARGET, at) : new Took(Arrival.UNKNOWN, null);
         }
 
