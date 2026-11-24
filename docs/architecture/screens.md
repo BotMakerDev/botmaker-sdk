@@ -520,7 +520,13 @@ only channel.
   (`EditWriter`): each id once, so a host restarted with edits queued writes none twice. It cuts its pictures on the
   stop's own frame (`crop_pictures` through `apply_edit`, 2026-11-24), never a fresh screenshot, and may not resume
   with `ignore` a frame it drew nothing of. A screen the Evaluator flags as wrongly mapped (`MapFlagged`) comes back
-  to it as a stop `bad_map-N` holding that screen's frame only.
+  to it as a stop `bad_map-N` holding that screen's frame only. **A STUCK stop on a goal run is the Reader's first**
+  (2026-11-24, `JournalView.roleOf`, not `StopRole.of`: a kind alone cannot know the run's goal, so the journal's
+  `role` still says user): its prompt gives the goal, the frame's texts and the presses the map holds; it adds a
+  press toward the goal by `crop_pictures` with `screen` (an untried input; `edit_map set_input` refuses an input the
+  screen lacks), ranks and resumes. Ranks alone add nothing, and a resume with nothing added is refused
+  (`NOTHING_ADDED`). Its try is spent until the run presses something: a later stuck there before any press is the
+  user's, so a press the run cannot take is never added in a loop. A run with no goal keeps STUCK the user's.
 - **Each worker's session streams** (2026-11-24): `claude` runs with `--output-format stream-json`, each line written
   as it comes to `Journal.workerLog(stopId)` (`explore/<run>/workers/<stopId>.log`), every session of a stop one
   after the other; `WorkerLog.read(path, from)` reads on from an offset as typed lines (start, thinking, said, tool
@@ -550,7 +556,13 @@ Coordinator, a restart with edits queued, done without a witness, a destructive 
 - **🔭 Explore** (`ExploreView`, 2026-11-09; continuous-explore spec §7, layout A) starts and watches a run
   exploring the game. Both explore runs are `SdkRuns` entries off the bar (`RunEntry.offBar`): ▶ Keep exploring
   starts the long one, its ▾ *Explore map* the single pass, through `services.runs().start(entry)`; ■ Stop is the
-  host's stop. Once a second, while the view is in a scene, a virtual thread reads the run's `Journal` as a
+  host's stop. **The goal field** beside ▶ (`ExploreAim`, 2026-11-24): filled, ▶ or Enter starts Keep exploring with
+  that `goal` (`services.runs().start(entry, arguments)`, which the core checks against the entry's `takes`), so the
+  run has its crew; empty, with no goal. `ExploreBudget.toward(kept)` turns the goal into the Discover arguments the
+  crew and a restart read, a pending Discover's website and browser kept, its goal screen only for the same goal. The
+  text is kept per bot in `explore-goal.txt` in the SDK's state folder (`StudioServices.stateDir()`), cleared with
+  the field, and the field is locked while a run goes. An empty field while a held fault's memory is pending still
+  resumes that run's goal. Once a second, while the view is in a scene, a virtual thread reads the run's `Journal` as a
   `JournalView`, parsed again only when `events.jsonl`'s or `queue.json`'s size or time changed. The status line
   gives the time run, the screens known (+ new), the stops fixed and *running*, *⏸ waiting on Claude* or *ended*.
   A run is live only while the journal has no Ended line **and** the host runs it: a run killed from Studio reads
