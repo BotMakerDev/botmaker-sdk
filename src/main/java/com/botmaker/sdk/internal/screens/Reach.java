@@ -331,10 +331,13 @@ public interface Reach {
     }
 
     /**
-     * Whether the platform has a Back of its own, Android's: a way back with no input presses it when the map has no
-     * close button. A desktop game and a website have none (Escape quit games, 2026-11-03).
+     * Whether Android's own Back closes a window now: a popup or a dialog has the focus over the page
+     * ({@link #windowOverPage}). A way back with no input presses it then, when the map has no close button. On a page
+     * it is never pressed: Back on an app's first page sends the whole app behind the launcher, and a two-pane app
+     * (Waydroid's Settings) gives no way to tell that page beforehand (2026-11-25). A desktop game and a website have
+     * no such key (Escape quit games, 2026-11-03).
      */
-    default boolean hasSystemBack() {
+    default boolean backClosesWindow() {
         return false;
     }
 

@@ -129,9 +129,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
-- On an Android emulator a way back with no input is Android's own Back, sent as a key event, when the map has
-  no close button: a run left on Settings' search page under its open overflow menu had no way out and stopped
-  STUCK. Back is never pressed to explore, only to take a way back the map holds or to close a popup. A stop's
+- On an Android emulator a popup or a dialog that has the focus over the page (read from `dumpsys window`) is
+  closed by Android's own Back, sent as a key event, when the map has no close button: a run left on Settings'
+  search page under its open overflow menu had no way out and stopped STUCK. On a page Back is never pressed: on
+  Settings' first page it sent the whole app behind the launcher, and a two-pane app gives no way to tell that page
+  beforehand. Keep exploring now brings an Android app back in front at once when a press left it for the launcher
+  or another app, says so once, and goes on: the Reader had mapped the launcher as a screen. A stop's
   elements now open with the window in focus over the page when there is one ("PopupWindow:… has focus over the
   page: the tree holds only it; Android's Back closes it"), so the Reader and the Evaluator know the page under it
   is not in the tree. Desktop games and websites still press no key.

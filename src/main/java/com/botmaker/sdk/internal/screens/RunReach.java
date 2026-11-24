@@ -327,24 +327,35 @@ public final class RunReach implements Reach {
         }
     }
 
-    /** An Android emulator's: Back is how every Android screen is left, never a game's quit key. */
+    /** An Android emulator's while a popup or a dialog has the focus: Back closes it and nothing else. */
     @Override
-    public boolean hasSystemBack() {
-        return Source.current() != null && Source.current().base() instanceof EmulatorSource;
+    public boolean backClosesWindow() {
+        return !windowOverPage().isEmpty();
     }
 
     @Override
     public boolean systemBack() {
         if (Source.current() == null || !(Source.current().base() instanceof EmulatorSource device)) return false;
         device.back();
+        overAt = 0;
         return true;
     }
 
+    /** Asked once a second at most: a walk plans by it for each way back, and each ask is a shell call. */
     @Override
     public String windowOverPage() {
-        return Source.current() != null && Source.current().base() instanceof EmulatorSource device
-                ? device.windowOverPage() : "";
+        if (Source.current() == null || !(Source.current().base() instanceof EmulatorSource device)) return "";
+        long now = System.nanoTime();
+        if (overAt == 0 || now - overAt > OVER_FRESH_NS) {
+            over = device.windowOverPage();
+            overAt = now;
+        }
+        return over;
     }
+
+    private static final long OVER_FRESH_NS = 1_000_000_000L;
+    private long overAt;
+    private String over = "";
 
     @Override
     public void keys(Combo combo) {

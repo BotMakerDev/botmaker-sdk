@@ -174,6 +174,16 @@ class ExploreLoopTest {
             return front;
         }
 
+        /** Whether {@link #bringBack} brings the app back in front, as an Android emulator's does. */
+        boolean bringsBack;
+
+        @Override
+        public boolean bringBack() {
+            if (!bringsBack) return false;
+            front = new Foreground(front.target(), front.target());
+            return true;
+        }
+
         /** Where {@link #keep} saves a frame, blank for nowhere. */
         String keptIn = "";
 
@@ -1331,6 +1341,25 @@ class ExploreLoopTest {
         assertTrue(events(ExploreEvent.Parked.class).isEmpty(), "never parked, 12 min in front");
         assertEquals(guard.id(), events(ExploreEvent.Fixed.class).getFirst().stopId());
         assertTrue(game.taken.contains("A.b→B"), "pressed once the game was back");
+    }
+
+    /**
+     * A press that left the app for the launcher is no screen to map: the app is brought back at once, said once, and
+     * the run goes on with no stop (the Reader made the launcher a screen, 2026-11-25).
+     */
+    @Test
+    void anAppLeftForTheLauncherIsBroughtBackWithNoStop() {
+        Game game = new Game();
+        game.front = new Foreground("com.android.launcher3", "com.game");
+        game.bringsBack = true;
+
+        loop(map(), game, same(map()), Duration.ofMinutes(35)).run();
+
+        assertTrue(stops().isEmpty(), stops().toString());
+        List<ExploreEvent.Refused> left = events(ExploreEvent.Refused.class);
+        assertEquals(1, left.size(), left.toString());
+        assertTrue(left.getFirst().why().contains("com.android.launcher3 came in front of com.game"), left.toString());
+        assertTrue(game.taken.contains("A.b→B"), "pressed once the app was back");
     }
 
     /** A window that stays in front past the stuck time ends the run: never parked, nothing pressed into it. */

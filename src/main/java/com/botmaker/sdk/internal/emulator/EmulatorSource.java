@@ -137,6 +137,15 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
     }
 
     /**
+     * Brings {@code packageName}'s task back in front as its launcher icon would, where it was left, with no restart;
+     * whether Android started its activity.
+     */
+    public boolean bringToFront(String packageName) {
+        Emulator emu = resolve();
+        return emu != null && emu.device().bringToFront(packageName);
+    }
+
+    /**
      * The package of the window in focus on the instance — a dialog's over the app while one is up — or {@code ""}
      * when it is not connected or none is known.
      */

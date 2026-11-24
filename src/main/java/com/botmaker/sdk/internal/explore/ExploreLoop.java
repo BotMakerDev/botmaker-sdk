@@ -287,6 +287,14 @@ public final class ExploreLoop {
         /** What is in front of the bot now. */
         Foreground front();
 
+        /**
+         * Brings the app the run plays back in front of the other app that covers it, its task where it was left;
+         * false when it cannot (no Android app, or Android started nothing).
+         */
+        default boolean bringBack() {
+            return false;
+        }
+
         /** Saves the frame the game shows now as {@code name}; where it is, or {@code ""} when it was not saved. */
         String keep(String name);
 
@@ -973,6 +981,31 @@ public final class ExploreLoop {
                 + settledEvidence(stop.id()), false);
     }
 
+    /**
+     * Whether another app came in front of the app the run plays and was sent back behind it: a press that leaves the
+     * app (a link out, a Back on its first page) lands on the launcher or another app, which is no screen of the map
+     * and never mapped (the Reader once made the launcher a screen, 2026-11-25). Android's own dialogs, an unread front
+     * and a desktop window are the guards' and a stop's. Tried {@value #BRING_BACKS} times in a row, then left to them.
+     */
+    private boolean leftTheApp() {
+        Foreground front = play.front();
+        if (!front.foreign() || front.inFront().isEmpty() || !front.dialog().isEmpty()
+                || Guards.SYSTEM_PACKAGES.contains(front.inFront())) {
+            broughtBack = 0;
+            return false;
+        }
+        if (broughtBack >= BRING_BACKS || !play.bringBack()) return false;
+        broughtBack++;
+        emit(new ExploreEvent.Refused(lastEdge == null ? "unknown" : lastEdge, "the app left", Guards.Kind.FOREIGN_WINDOW,
+                front.inFront() + " came in front of " + front.target()
+                        + (lastEdge == null ? "" : " after " + lastEdge) + ": brought " + front.target() + " back",
+                nowMs.getAsLong()));
+        return true;
+    }
+
+    private static final int BRING_BACKS = 3;
+    private int broughtBack;
+
     /** The answers the run settled at {@code stopId}, as a fault's evidence; blank when none are known. */
     private String settledEvidence(String stopId) {
         List<TreeAnswer> answers = settledAt.getOrDefault(stopId, List.of());
@@ -980,6 +1013,7 @@ public final class ExploreLoop {
     }
 
     private boolean play() {
+        if (leftTheApp()) return true;
         Optional<String> where = play.where();
         // A page the tree reads is added by the run itself; a frame alone is Claude's to cut.
         Optional<Effect.State> unknown = where.isEmpty() && readsTrees() ? play.state() : Optional.empty();

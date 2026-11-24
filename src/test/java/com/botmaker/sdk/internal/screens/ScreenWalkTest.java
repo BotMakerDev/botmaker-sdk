@@ -122,8 +122,11 @@ class ScreenWalkTest {
         String greyed;
         /** How many clicks in a row the game misses: lag. */
         int deaf;
-        /** Whether it is an Android app, whose own Back leaves a screen ({@code "<SCREEN> back"} in {@link #leads}). */
-        boolean androidBack;
+        /**
+         * Whether an Android popup has the focus over the page, which Android's Back closes ({@code "<SCREEN> back"} in
+         * {@link #leads}).
+         */
+        boolean windowOverPage;
         /** A picture drawn only from a time on, after its screen's marker: a menu fading in. */
         final Map<String, Long> drawnAt = new HashMap<>();
 
@@ -195,14 +198,14 @@ class ScreenWalkTest {
         }
 
         @Override
-        public boolean hasSystemBack() {
-            return androidBack;
+        public boolean backClosesWindow() {
+            return windowOverPage;
         }
 
         @Override
         public boolean systemBack() {
-            if (!androidBack) return false;
             did("back");
+            windowOverPage = false;
             return true;
         }
 
@@ -662,19 +665,31 @@ class ScreenWalkTest {
     }
 
     /**
-     * On Android a way back with no input is the system's own Back, as every Android screen is left: a run left on a
-     * search page under its open menu walked nowhere (2026-11-25).
+     * A popup that has the focus over the page is closed by Android's own Back, the way back with no input: a run left
+     * on a search page under its open menu walked nowhere (2026-11-25).
      */
     @Test
-    void aWayBackWithNoInputOnAndroidPressesItsBack() {
+    void aWayBackWithNoInputUnderAPopupPressesAndroidsBack() {
         Game game = new Game("CAMPAIGN", campaignWithNoBack());
-        game.androidBack = true;
+        game.windowOverPage = true;
         game.leads.put("CAMPAIGN back", "HOME");
 
         ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
 
         assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
         assertEquals(List.of("back", "click engineer"), game.done);
+    }
+
+    /** On a page Android's Back is never pressed: on Settings' first page it sent the app behind the launcher. */
+    @Test
+    void aWayBackWithNoInputOnAPageNeverPressesAndroidsBack() {
+        Game game = new Game("CAMPAIGN", campaignWithNoBack());
+        game.leads.put("CAMPAIGN back", "HOME");
+
+        ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome(), walked.why());
+        assertEquals(List.of(), game.done);
     }
 
     @Test

@@ -15,6 +15,7 @@ import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.time.Wait;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
@@ -341,6 +342,14 @@ public final class LivePlay implements ExploreLoop.Play {
     @Override
     public Foreground front() {
         return Foreground.now();
+    }
+
+    @Override
+    public boolean bringBack() {
+        String target = Foreground.now().target();
+        CaptureSource source = Source.current();
+        return !target.isEmpty() && source != null && source.base() instanceof EmulatorSource emulator
+                && emulator.bringToFront(target);
     }
 
     @Override
