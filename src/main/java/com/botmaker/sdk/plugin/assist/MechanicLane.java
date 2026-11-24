@@ -158,8 +158,16 @@ final class MechanicLane {
         git(lane, own, "add", "-A");
         // A test's picture too: the SDK ignores *.png.
         if (Files.isDirectory(lane.resolve("src"))) git(lane, own, "add", "-A", "-f", "--", "src");
-        // Its desk and Claude's folder taken out again, whatever a .gitignore of the lane's says.
-        git(lane, own, "rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", ":(top)" + DESK, ":(top).claude");
+        // Its desk and Claude's folder taken out again, whatever a .gitignore of the lane's says or a name's case.
+        git(lane, own, "rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", ":(top,icase)" + DESK,
+                ":(top,icase).claude");
+        // One made while the lane was read: a repository staged is a gitlink, and nothing of it is committed.
+        nested = nestedRepository(lane);
+        boolean gitlink = git(lane, own, "ls-files", "-s").lines().anyMatch(line -> line.startsWith("160000 "));
+        if (nested.isPresent() || gitlink) {
+            git(lane, own, "reset", "-q");
+            throw new IOException("a git repository inside the lane, " + nested.map(Path::toString).orElse("staged"));
+        }
         boolean changed = !git(lane, own, "diff", "--cached", "--name-only").isBlank();
         if (changed) {
             git(lane, own, "-c", "user.name=BotMaker Mechanic", "-c", "user.email=mechanic@botmaker.invalid",
@@ -170,11 +178,15 @@ final class MechanicLane {
         drop(lane, changed ? null : branch);
     }
 
-    /** The first {@code .git} below {@code lane}'s own, link or not, links never followed; empty for none. */
+    /**
+     * The first {@code .git} below {@code lane}'s own, link or not, its case aside (a Mac's disk ignores it), links never
+     * followed; empty for none.
+     */
     static Optional<Path> nestedRepository(Path lane) throws IOException {
         Path own = lane.resolve(".git");
         try (Stream<Path> walk = Files.walk(lane)) {
-            return walk.filter(path -> path.getFileName() != null && path.getFileName().toString().equals(".git"))
+            return walk.filter(path -> path.getFileName() != null
+                            && path.getFileName().toString().equalsIgnoreCase(".git"))
                     .filter(path -> !path.equals(own)).findFirst().map(lane::relativize);
         } catch (UncheckedIOException unread) {
             throw unread.getCause();
@@ -254,7 +266,8 @@ final class MechanicLane {
     private static String git(Path folder, String[] own, String... args) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>(List.of("git"));
         command.addAll(List.of(own));
-        command.addAll(List.of("-c", "core.hooksPath=" + File.separator + "nonexistent", "-c", "core.fsmonitor=false"));
+        command.addAll(List.of("-c", "core.hooksPath=" + File.separator + "nonexistent", "-c", "core.fsmonitor=false",
+                "-c", "protocol.file.allow=never", "-c", "submodule.recurse=false"));
         command.addAll(List.of(args));
         Path out = Files.createTempFile("mechanic-git", ".txt");
         try {

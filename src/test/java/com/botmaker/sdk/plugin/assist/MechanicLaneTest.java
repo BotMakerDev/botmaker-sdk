@@ -163,8 +163,8 @@ class MechanicLaneTest {
         Path checkout = checkout();
         Journal journal = began();
 
-        lane(checkout).run(client("printf '!/.mechanic/\\n!/.claude/\\n' > .gitignore; mkdir -p .claude; "
-                        + "echo x > .claude/x; echo fixed > Code.java"),
+        lane(checkout).run(client("printf '!/.mechanic/\\n!/.claude/\\n' > .gitignore; mkdir -p .claude .CLAUDE; "
+                        + "echo x > .claude/x; echo x > .CLAUDE/y; echo fixed > Code.java"),
                 journal, stop("finding-1", StopKind.FAULT), Duration.ofSeconds(20), () -> 7);
 
         assertEquals(".gitignore\nCode.java", git(checkout, "diff", "--name-only", "HEAD", left(journal).branch()));
@@ -176,11 +176,11 @@ class MechanicLaneTest {
         String head = git(checkout, "rev-parse", "HEAD");
         Journal journal = began();
 
-        lane(checkout).run(client("echo fixed > Code.java; mkdir -p src/x; git init -q src/x"),
+        lane(checkout).run(client("echo fixed > Code.java; mkdir -p src/x; git init -q src/x; mv src/x/.git src/x/.Git"),
                 journal, stop("finding-1", StopKind.FAULT), Duration.ofSeconds(20), () -> 7);
 
         assertTrue(left(journal).note().startsWith("not committed"), left(journal).note());
-        assertTrue(left(journal).note().contains("src/x/.git"), left(journal).note());
+        assertTrue(left(journal).note().contains("src/x/.Git"), left(journal).note());
         assertEquals(head, git(checkout, "rev-parse", left(journal).branch()));
     }
 
