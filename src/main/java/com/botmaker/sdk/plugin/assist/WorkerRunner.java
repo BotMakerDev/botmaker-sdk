@@ -3,15 +3,22 @@
 
 package com.botmaker.sdk.plugin.assist;
 
+import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopRole;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +28,9 @@ import java.util.function.Consumer;
 
 /**
  * Starts one worker of the explore crew for one stop (spec 2026-11-24-explore-agents-design § Workers): one process per
- * lease, killed when the lease runs out. Its output is read for nothing: what it found is the journal records it wrote
- * through the explore tools. The process gets none of the environment's credentials, so the client runs on the user's
+ * lease, killed when the lease runs out. What it found is the journal records it wrote through the explore tools; its
+ * output is its session streamed line by line into its log, which the Explore page reads live ({@link WorkerLog}). The
+ * process gets none of the environment's credentials, so the client runs on the user's
  * own sign-in or not at all; its standard input is closed, its folder the run's.
  */
 public final class WorkerRunner {
@@ -84,28 +92,68 @@ public final class WorkerRunner {
     /** As {@link #run(List, String, Duration)}, in the folder {@code in}, its environment what {@code scrub} leaves. */
     Result run(List<String> command, String stopId, Duration limit, Path in, Consumer<Map<String, String>> scrub) {
         Process process;
+        Thread writer;
         try {
-            Path log = Files.createDirectories(folder.resolve("workers")).resolve(stopId + ".log");
-            ProcessBuilder builder = new ProcessBuilder(command).directory(in.toFile())
-                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
+            Path log = new Journal(folder).workerLog(stopId);
+            Files.createDirectories(log.getParent());
+            endLine(log);
+            ProcessBuilder builder = new ProcessBuilder(command).directory(in.toFile()).redirectErrorStream(true);
             scrub.accept(builder.environment());
             process = builder.start();
             // No one answers it: a worker that waits on its input reads its end at once.
             process.getOutputStream().close();
+            writer = Thread.ofVirtual().start(() -> copy(process.getInputStream(), log));
         } catch (IOException notStarted) {
             return new Result(false, "not started: " + notStarted.getMessage());
         }
+        Result result;
         try {
             if (!process.waitFor(limit.toMillis(), TimeUnit.MILLISECONDS)) {
                 kill(process);
-                return new Result(false, "timeout");
+                result = new Result(false, "timeout");
+            } else {
+                int exit = process.exitValue();
+                result = exit == 0 ? new Result(true, "") : new Result(false, "exit " + exit);
             }
-            int exit = process.exitValue();
-            return exit == 0 ? new Result(true, "") : new Result(false, "exit " + exit);
         } catch (InterruptedException stopped) {
             kill(process);
             Thread.currentThread().interrupt();
             return new Result(false, "stopped");
+        }
+        try {
+            // The pipe closes with the process: what it printed last is in the log before its result is given.
+            writer.join(Duration.ofSeconds(5));
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+        }
+        return result;
+    }
+
+    /**
+     * Appends what a worker prints to {@code log} line by line, as it comes: whole lines only, a picture's data left
+     * out ({@link WorkerLog#slim}), and a last line cut by a kill ended, so the next session of the stop starts on a
+     * line of its own.
+     */
+    private static void copy(InputStream printed, Path log) {
+        try (BufferedReader lines = new BufferedReader(new InputStreamReader(printed, StandardCharsets.UTF_8));
+             Writer out = Files.newBufferedWriter(log, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                     StandardOpenOption.APPEND)) {
+            for (String line = lines.readLine(); line != null; line = lines.readLine()) {
+                out.write(WorkerLog.slim(line));
+                out.write('\n');
+                out.flush();
+            }
+        } catch (IOException closed) {
+            // The process was killed under the read: what was written stays.
+        }
+    }
+
+    /** Ends {@code log}'s last line when something (a Studio that died mid-write) left it cut. */
+    private static void endLine(Path log) throws IOException {
+        if (!Files.isRegularFile(log) || Files.size(log) == 0) return;
+        try (RandomAccessFile file = new RandomAccessFile(log.toFile(), "rw")) {
+            file.seek(file.length() - 1);
+            if (file.read() != '\n') file.write('\n');
         }
     }
 

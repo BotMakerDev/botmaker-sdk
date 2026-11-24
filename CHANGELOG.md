@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Each explore worker's session is logged as it goes (plan `2026-11-24-explore-drive-fixes` phase 3; the Explore
+  page shows it from phase 4): the Reader, the Evaluator (during the run and at its end) and the Mechanic run
+  `claude -p --output-format stream-json --verbose`, and `explore/<run>/workers/<stop>.log` grows one event per line,
+  whole lines only, a picture's data left out, each session of a stop starting on a line of its own even after a
+  kill. `WorkerLog.read(log, from)` turns the whole lines from an offset into what a person reads (started,
+  thinking, said, called, answered, ended with its error, and the client's own printing), at most 4 MB a call,
+  leaving a half-written last line for the next read. `--output-format json` is gone.
 - A wrong map goes back to the explore crew's Reader (plan `2026-11-24-explore-drive-fixes` phase 2): the Evaluator's
   `record_finding` `bad_map` names its `screen` while the run goes on and is journalled as `map_flagged` with the
   latest frame the run saved of that screen (none rather than another screen's), which becomes the Reader's stop

@@ -69,7 +69,8 @@ public final class ClaudeCli implements AgentClient {
     @Override
     public List<String> command(String prompt, WorkerRole role, Path mcpConfig) {
         List<String> command = new ArrayList<>(List.of(executable, "-p", prompt,
-                "--output-format", "json",
+                // One event per line as the session goes, so its log is read live (WorkerLog).
+                "--output-format", "stream-json", "--verbose",
                 "--model", role.model(),
                 // The user's settings, hooks, memory and skills stay out: ten times the tokens, and not the worker's.
                 "--setting-sources", "",
@@ -99,7 +100,7 @@ public final class ClaudeCli implements AgentClient {
         String config = System.getenv("CLAUDE_CONFIG_DIR");
         if (config != null && !config.isBlank()) kept.add(Path.of(config));
         return List.of(executable, "-p", prompt,
-                "--output-format", "json",
+                "--output-format", "stream-json", "--verbose",
                 "--model", role.model(),
                 "--setting-sources", "",
                 "--disable-slash-commands",

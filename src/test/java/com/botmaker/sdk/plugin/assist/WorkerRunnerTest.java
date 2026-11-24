@@ -73,6 +73,18 @@ class WorkerRunnerTest {
     }
 
     @Test
+    void aSessionCutMidLineLeavesTheNextOneItsOwnLine() throws IOException {
+        Path log = folder.resolve("workers/s1.log");
+        Files.createDirectories(log.getParent());
+        Files.writeString(log, "{\"type\":\"assistant\",\"mess");
+
+        new WorkerRunner(folder).run(worker("printf 'half'; sleep 30"), "s1", Duration.ofMillis(500));
+        new WorkerRunner(folder).run(worker("echo second"), "s1", Duration.ofSeconds(10));
+
+        assertEquals(List.of("{\"type\":\"assistant\",\"mess", "half", "second"), Files.readAllLines(log));
+    }
+
+    @Test
     void noCredentialReachesTheWorker() throws IOException {
         Map<String, String> environment = new HashMap<>(Map.of("PATH", "/bin", "ANTHROPIC_API_KEY", "x",
                 "ANTHROPIC_AUTH_TOKEN", "x", "CLAUDE_CODE_USE_BEDROCK", "1", "CLAUDE_CODE_USE_VERTEX", "1",

@@ -214,6 +214,14 @@ public final class Journal {
         return folder;
     }
 
+    /**
+     * The log of the workers of the stop or evaluation {@code id}: every session of it, one after the other, as its
+     * client streamed them ({@code WorkerLog} reads it).
+     */
+    public Path workerLog(String id) {
+        return folder.resolve("workers").resolve(id + ".log");
+    }
+
     /** The run's id: its folder's name. */
     public String runId() {
         return folder.getFileName().toString();

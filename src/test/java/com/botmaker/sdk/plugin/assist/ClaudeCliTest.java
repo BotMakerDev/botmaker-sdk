@@ -28,7 +28,8 @@ class ClaudeCliTest {
 
             assertEquals(List.of("claude", "-p", "rank it"), command.subList(0, 3));
             assertEquals(role.model(), after(command, "--model"));
-            assertEquals("json", after(command, "--output-format"));
+            assertEquals("stream-json", after(command, "--output-format"));
+            assertTrue(command.contains("--verbose"), "print mode streams only with --verbose");
             assertEquals("", after(command, "--setting-sources"));
             assertEquals("", after(command, "--tools"));
             assertEquals("/run/worker-mcp.json", after(command, "--mcp-config"));
@@ -37,6 +38,15 @@ class ClaudeCliTest {
             assertFalse(command.contains("--bare"), "--bare reads only an API key");
             assertTrue(after(command, "--allowedTools").startsWith("mcp__botmaker__botmaker_sdk_explore"));
         }
+    }
+
+    @Test
+    void theMechanicsSessionStreamsToo() {
+        List<String> command = new ClaudeCli().laneCommand("fix it", WorkerRole.MECHANIC, Path.of("/lane"),
+                List.of(), List.of());
+
+        assertEquals("stream-json", after(command, "--output-format"));
+        assertTrue(command.contains("--verbose"));
     }
 
     @Test
