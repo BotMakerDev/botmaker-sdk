@@ -13,6 +13,7 @@ import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * {@link MapWalk}'s moves on the game, by a run's {@link ScreenWalk}: walks as {@code Navigate.to} does (an overlay the
@@ -39,6 +40,11 @@ public final class LiveMoves implements MapWalk.Moves {
     @Override
     public boolean goTo(String screen) {
         return went(walk().uncovering().go(screen, ScreenMaps.lastSeen())).arrived();
+    }
+
+    /** Walks to {@code screen} as {@link #goTo(String)} does, never by a way {@code refused} names. */
+    public boolean goTo(String screen, Predicate<ScreenGraph.Edge> refused) {
+        return went(walk().uncovering().avoiding(refused).go(screen, ScreenMaps.lastSeen())).arrived();
     }
 
     /**

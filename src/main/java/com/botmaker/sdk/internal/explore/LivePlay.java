@@ -55,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 /**
  * {@link ExploreLoop}'s play on the running bot's game: the map's walk and presses by {@link LiveMoves}, the frame read
@@ -408,6 +409,11 @@ public final class LivePlay implements ExploreLoop.Play {
     @Override
     public boolean goTo(String screen) {
         return moves.goTo(screen);
+    }
+
+    @Override
+    public boolean goTo(String screen, Predicate<Edge> refused) {
+        return moves.goTo(screen, refused);
     }
 
     @Override

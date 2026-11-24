@@ -56,6 +56,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 
 /**
  * <em>Keep exploring</em>'s loop (spec §1–3): each round, where the game is, everything read on it, one press chosen,
@@ -338,6 +339,12 @@ public final class ExploreLoop {
         default List<FormProbe.Result> forms() {
             return List.of();
         }
+
+        /**
+         * Walks to {@code screen} as {@link #goTo(String)} does, never by a way {@code refused} names: the run's own
+         * walks keep off a press nobody watching may make. Whether the game shows {@code screen} now.
+         */
+        boolean goTo(String screen, Predicate<Edge> refused);
 
         /**
          * Brings the page back as it loads, after a press left something open on it (a list, a menu) that would
@@ -635,7 +642,7 @@ public final class ExploreLoop {
         }
         if (screen == null) return;
         try {
-            play.goTo(screen);
+            play.goTo(screen, this::refused);
         } catch (RuntimeException e) {
             // The first round finds where the game is, as after any walk that fell short.
             rethrowStop(e);
@@ -747,7 +754,15 @@ public final class ExploreLoop {
     private int depth(String screen) {
         Optional<String> home = map.home();
         if (home.isEmpty() || home.get().equals(screen)) return 0;
-        return map.pathTo(home.get(), screen, edge -> true).map(List::size).orElse(Integer.MAX_VALUE);
+        return map.pathTo(home.get(), screen, edge -> !refused(edge)).map(List::size).orElse(Integer.MAX_VALUE);
+    }
+
+    /**
+     * Whether a walk of the run keeps off {@code edge}: a press nobody watching may make, waiting on the user or
+     * denied by its label, is never made on the way to another screen either.
+     */
+    private boolean refused(Edge edge) {
+        return frontier.held(edge.from(), edge.label()) || Frontier.denied(edge.label());
     }
 
     /**
@@ -932,7 +947,7 @@ public final class ExploreLoop {
         if (clock.overBudget(screen)) {
             // Its own work waits while another screen has some: that one is walked to first.
             // A walk that came back here does its own work instead of walking again.
-            Optional<String> other = chooser.next(screen, to -> !clock.aside(to));
+            Optional<String> other = chooser.next(screen, to -> !clock.aside(to), this::refused);
             if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
             Optional<String> lowYield = clock.lowYield(screen);
             if (lowYield.isPresent()) {
@@ -961,7 +976,8 @@ public final class ExploreLoop {
                     settledWhy(screen)) != Paused.END;
         }
         // Nothing left here the run presses itself: the nearest screen not done, a set-aside one last.
-        Optional<String> next = chooser.next(screen, to -> !clock.aside(to)).or(() -> chooser.next(screen, to -> true));
+        Optional<String> next = chooser.next(screen, to -> !clock.aside(to), this::refused)
+                .or(() -> chooser.next(screen, to -> true, this::refused));
         if (next.isPresent()) return walk(screen, next.get());
         // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
         if (chooser.giveUpNotSeen()) return true;
@@ -989,14 +1005,23 @@ public final class ExploreLoop {
         }
         if (++idleRounds < IDLE_ROUNDS || replay.on()) return false;
         List<String> open = new ArrayList<>();
+        List<String> heldOff = new ArrayList<>();
         for (String each : map.screens().keySet()) {
             if (chooser.waiting(each) > 0) return false;
             List<String> why = open(each);
-            if (!why.isEmpty()) open.add(map.shown(each) + ": " + String.join(", ", why));
+            if (why.isEmpty()) continue;
+            // Only a press nobody watching may make leads there: not the run's to open, nor a reason to stop.
+            if (!each.equals(screen) && map.pathTo(screen, each, edge -> true).isPresent()
+                    && map.pathTo(screen, each, edge -> !refused(edge)).isEmpty()) {
+                heldOff.add(map.shown(each));
+            } else {
+                open.add(map.shown(each) + ": " + String.join(", ", why));
+            }
         }
         if (open.isEmpty()) {
-            Say.info("Map complete: nothing is left to press on any of its " + map.screens().size() + " screens.",
-                    Map.of());
+            Say.info("Map complete: nothing is left to press on any of its " + map.screens().size() + " screens"
+                    + (heldOff.isEmpty() ? "." : "; only a press you make reaches " + String.join(", ", heldOff)
+                    + "."), Map.of());
             finished = true;
             return true;
         }
@@ -1019,7 +1044,7 @@ public final class ExploreLoop {
         if (next.isEmpty()) return Optional.empty();
         Frontier.Entry entry = next.get();
         if (!entry.screen().equals(screen)) {
-            if (map.pathTo(screen, entry.screen(), edge -> true).isEmpty()) {
+            if (map.pathTo(screen, entry.screen(), edge -> !refused(edge)).isEmpty()) {
                 frontier.park(entry, "no way from " + screen + " to " + entry.screen());
                 return Optional.of(true);
             }
@@ -1053,7 +1078,7 @@ public final class ExploreLoop {
         lastEdge = null;
         from = screen;
         by = Mode.WALK.id();
-        play.goTo(to);
+        play.goTo(to, this::refused);
         return true;
     }
 

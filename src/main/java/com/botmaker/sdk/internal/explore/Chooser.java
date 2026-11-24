@@ -219,13 +219,15 @@ final class Chooser {
      * The screen the run walks to from {@code screen}: the map's next to explore ({@link ScreenGraph#nextToExplore}),
      * nearest first, among the screens {@code also} lets through with work the run does itself there, an input
      * {@link ScreenGraph#left} or a way not taken this run (a done screen's ways are still taken once a run, which
-     * proves them); not {@code screen}.
+     * proves them); not {@code screen}, and never one only a way {@code refused} names reaches.
      */
-    Optional<String> next(String screen, Predicate<String> also) {
+    Optional<String> next(String screen, Predicate<String> also, Predicate<ScreenGraph.Edge> refused) {
         // One no way reaches from here comes last in the map's order: then none is reached, and the run waits here.
-        return map.nextToExplore(Optional.of(screen), to -> !to.equals(screen) && also.test(to) && hasWork(to))
+        return map.nextToExplore(Optional.of(screen), to -> !to.equals(screen) && also.test(to) && hasWork(to)
+                        && map.pathTo(screen, to, edge -> !refused.test(edge)).isPresent())
                 // Not through a way not on the screen now.
-                .filter(to -> map.pathTo(screen, to, edge -> !notSeenHere.contains(ExploreLoop.key(edge))).isPresent());
+                .filter(to -> map.pathTo(screen, to, edge -> !notSeenHere.contains(ExploreLoop.key(edge))
+                        && !refused.test(edge)).isPresent());
     }
 
     /** Whether the run has work of its own on {@code screen}: a way not taken this run, or an input it presses. */

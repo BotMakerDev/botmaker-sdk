@@ -275,6 +275,18 @@ class ScreenWalkTest {
         assertEquals(List.of("click back", "click engineer"), game.done);
     }
 
+    /** A way the walk avoids is never pressed: a target only it reaches is not reached. */
+    @Test
+    void aWalkAvoidingAWayNeverPressesIt() {
+        Game game = new Game("CAMPAIGN");
+
+        ScreenWalk.Result result = new ScreenWalk(game.map, game, STEP_MS, null)
+                .avoiding(edge -> edge.label().equals("engineer")).go("ENGINEER", "CAMPAIGN");
+
+        assertNotEquals(ScreenWalk.Outcome.ARRIVED, result.outcome(), result.why());
+        assertFalse(game.done.contains("click engineer"), game.done.toString());
+    }
+
     /** Home with a Claim the game shows, greyed as claim_off once it runs out. */
     private static ScreenGraph withClaim() {
         Map<String, MapScreen> screens = screens();

@@ -204,6 +204,18 @@ class ExploreLoopTest {
             return true;
         }
 
+        /** Each screen the run walked to, in order. */
+        final List<String> walkedTo = new ArrayList<>();
+        /** The ways the run's last walk kept off. */
+        Predicate<Edge> refused = edge -> false;
+
+        @Override
+        public boolean goTo(String screen, Predicate<Edge> refused) {
+            walkedTo.add(screen);
+            this.refused = refused;
+            return goTo(screen);
+        }
+
         /** Whether a way's button is on the screen when the run looks for it; every one by default. */
         Predicate<Edge> shown = edge -> true;
         /** Each way the run looked for, by key, in order. */
@@ -1052,6 +1064,26 @@ class ExploreLoopTest {
         assertFalse(game.taken.contains("A.delete→X"), game.taken.toString());
         assertTrue(events(ExploreEvent.Ranked.class).stream()
                 .anyMatch(r -> r.press().equals("delete") && r.tag() == PressTag.DESTRUCTIVE));
+    }
+
+    /** A screen only a denied way reaches is never walked to: its ranked press is parked, the way never pressed. */
+    @Test
+    void aWalkNeverGoesThroughADeniedWay() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free(), click("delete").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b"))));
+        screens.put("X", screen(Setup.named("X").from(ref("A", "delete")), click("y").free()));
+        screens.put("Y", screen(Setup.named("Y").from(ref("X", "y"))));
+        journal().append(new ExploreEvent.Ranked("X", "y", 9, PressTag.SAFE, 0));
+        Game game = new Game();
+        ScreenGraph map = ScreenGraph.of(screens);
+
+        toward(map, game, new ExploreGoal("the shop", null), s -> s).run();
+
+        assertFalse(game.walkedTo.contains("X"), game.walkedTo.toString());
+        assertFalse(game.taken.contains("A.delete→X"), game.taken.toString());
+        Edge delete = map.edges().stream().filter(e -> e.label().equals("delete")).findFirst().orElseThrow();
+        assertTrue(game.walkedTo.isEmpty() || game.refused.test(delete), "a walk keeps off the denied way");
     }
 
     /** A press the Reader ranked toward the goal that nobody watching may make leaves the run stuck on it. */

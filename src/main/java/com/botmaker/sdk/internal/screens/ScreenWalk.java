@@ -121,6 +121,8 @@ public final class ScreenWalk {
     private final DoneRecords records;
     /** When every wait of this walk ends, on {@link Reach#nowMs}: {@link Long#MAX_VALUE} for none ({@link #by}). */
     private final long deadline;
+    /** The ways {@link #go} may take: every way but those {@link #avoiding} refuses. */
+    private final Predicate<ScreenGraph.Edge> allowed;
 
     /** How long a screen of the map is given to show once an overlay's close was pressed: short, a wait timed out. */
     static final long UNCOVER_MS = 2_000;
@@ -131,11 +133,11 @@ public final class ScreenWalk {
      * input clicks the map's own close button ({@link ScreenGraph#close}), while it shows.
      */
     public ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached) {
-        this(graph, reach, stepMs, reached, graph.close(), false, null, Long.MAX_VALUE);
+        this(graph, reach, stepMs, reached, graph.close(), false, null, Long.MAX_VALUE, edge -> true);
     }
 
     private ScreenWalk(ScreenGraph graph, Reach reach, long stepMs, Consumer<String> reached, Button close,
-                       boolean uncovers, DoneRecords records, long deadline) {
+                       boolean uncovers, DoneRecords records, long deadline, Predicate<ScreenGraph.Edge> allowed) {
         this.graph = graph;
         this.reach = reach;
         this.stepMs = stepMs;
@@ -144,6 +146,7 @@ public final class ScreenWalk {
         this.uncovers = uncovers;
         this.records = records;
         this.deadline = deadline;
+        this.allowed = allowed;
     }
 
     /**
@@ -151,7 +154,16 @@ public final class ScreenWalk {
      * {@code records}: a run's {@code Navigate}. The assistant's walks and ExploreMap do none.
      */
     public ScreenWalk doing(DoneRecords records) {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, deadline);
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, deadline, allowed);
+    }
+
+    /**
+     * This walk, never taking a way {@code refused} names: an unattended explore run's walk keeps off a press nobody
+     * watching may make (sign out, buy), as its own presses do. A target only such ways reach is not reached.
+     */
+    public ScreenWalk avoiding(Predicate<ScreenGraph.Edge> refused) {
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, deadline,
+                allowed.and(refused.negate()));
     }
 
     /**
@@ -160,7 +172,7 @@ public final class ScreenWalk {
      * assistant's do while the screen it explores is not mapped yet.
      */
     public ScreenWalk uncovering() {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, true, records, deadline);
+        return new ScreenWalk(graph, reach, stepMs, reached, close, true, records, deadline, allowed);
     }
 
     /**
@@ -169,7 +181,8 @@ public final class ScreenWalk {
      * {@link #go} past it ends {@link Outcome#STUCK}.
      */
     public ScreenWalk by(long deadlineMs) {
-        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, Math.min(deadline, deadlineMs));
+        return new ScreenWalk(graph, reach, stepMs, reached, close, uncovers, records, Math.min(deadline, deadlineMs),
+                allowed);
     }
 
     /** When a wait of {@code ms} from now ends: then, or at this walk's deadline when that is sooner. */
@@ -477,7 +490,7 @@ public final class ScreenWalk {
             String from = at;
             BufferedImage seen = frame.get();
             Predicate<ScreenGraph.Edge> known = edge -> !missed.contains(edge) && !strayed.contains(edge)
-                    && keyless(edge);
+                    && allowed.test(edge) && keyless(edge);
             Optional<List<ScreenGraph.Edge>> path = graph.pathTo(at, target,
                             known.and(edge -> open(edge, from, seen, false)))
                     .or(() -> graph.pathTo(from, target, known.and(edge -> open(edge, from, seen, true))));
@@ -971,7 +984,8 @@ public final class ScreenWalk {
     /** Why no way is open from {@code at} to {@code target}: what the ways there would take. */
     private Result blocked(String at, String target, Set<ScreenGraph.Edge> missed, Set<ScreenGraph.Edge> strayed,
                            List<String> walked) {
-        Predicate<ScreenGraph.Edge> tried = edge -> !missed.contains(edge) && !strayed.contains(edge);
+        Predicate<ScreenGraph.Edge> tried = edge -> !missed.contains(edge) && !strayed.contains(edge)
+                && allowed.test(edge);
         Predicate<ScreenGraph.Edge> known = tried.and(this::keyless);
         String to = graph.shown(target);
         if (graph.pathTo(at, target, known).isEmpty() && graph.pathTo(at, target, tried).isPresent()) {
