@@ -1,0 +1,23 @@
+{
+  "goal": "sign in to a Google account",
+  "goalScreen": null,
+  "pressCeiling": 7,
+  "witness": "text",
+  "evaluations": {"k": 8, "every": 1},
+  "screens": [
+    {"name": "Settings", "start": true, "drawn": true, "texts": ["Settings", "Google", "Network & internet"],
+      "ways": {"google": "Google", "network": "Network"}},
+    {"name": "Google", "drawn": true, "texts": ["Google", "Sign in to your Google Account"],
+      "ways": {"signIn": "SignIn"}},
+    {"name": "Network", "drawn": true, "texts": ["Network & internet", "Wi-Fi"], "ways": {}},
+    {"name": "SignIn", "drawn": false, "texts": ["Choose an account", "ann@example.com"],
+      "ways": {"account": "Account"}},
+    {"name": "Account", "drawn": true, "texts": ["Google Account", "Signed in as ann@example.com"], "ways": {}}
+  ],
+  "reader": {
+    "SignIn": {"draws": ["SignIn"], "ranks": [{"press": "account", "rank": 9, "tag": "safe"}]}
+  },
+  "evaluator": {
+    "Account": "Signed in as"
+  }
+}

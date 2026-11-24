@@ -499,6 +499,34 @@ its `StopRole`, which every stop line of the journal carries as `role`.
   `EXPLORE: done` (`tools/hooks/explore-mark.sh`), `cswap switch` on a usage limit, subscription only. `--dry-run`
   prints what it would hand to whom from the latest run.
 
+## A run given a goal: the crew (2026-11-24, spec `../docs/superpowers/specs/2026-11-24-explore-agents-design.md` in the umbrella)
+
+A Keep exploring run started with a goal (`ExploreGoal`: what to reach in words, and optionally the screen whose
+reaching is the goal) is worked by a crew the core hosts, each member a role of `StopRole`, and the journal is their
+only channel.
+
+- **Explorer**: `ExploreLoop` itself, deterministic. Toward a goal it presses the frontier's best-ranked press first,
+  never one ranked destructive or risky, never a label on the denylist (`Frontier.denied`), and counts a press and an
+  agent session against the budget (`Settings.spending(presses, calls)`, `End.BUDGET`). It ends `DONE` only on a
+  witness (`Witnessed`): the goal's screen reached, or a proposed done whose mark the frame shown now reads; a done
+  with no witness is a `Finding(NO_WITNESS)` and the run goes on.
+- **Coordinator** (`plugin/assist/Coordinator`, stepped by `CoordinatorHost` in the core's run companion): a pure step
+  over the journal that beats, leases a stop to its role's worker with an expiry, takes back a lease that ran out
+  (`Released(false, "timeout")`) and leases it again up to its attempts, parks a stop whose role is absent, and ends a
+  run with no progress for its quiet time. A watchdog ends the run `STUCK: coordinator silent` when its beat is older
+  than the heartbeat.
+- **Reader** (the Cartographer's role): a Claude session per stop that looks, queues map edits (`EditQueued`, ids
+  `<stop>-N`), ranks the screen's presses (`Ranked`, 0 to 10, tagged) and resumes. One writer carries the edits out
+  (`EditWriter`): each id once, so a host restarted with edits queued writes none twice.
+- **Evaluator**: a session started after K presses with no progress, after a safety net of presses, and at the run's
+  end. It records findings (drift, stuck, bad map, SDK fault) and proposes done with a mark; its stuck ends the run.
+- **Mechanic** (dev mode): one bounded try per SDK fault in a sandboxed worktree lane, its branch the user's to merge.
+
+`ExploreRegressionTest` replays goal runs recorded under `src/test/resources/explore-goal-runs/<goal>/run.json`
+(screens, the text each frame reads, which screens the map tells at the start, the Reader's and the Evaluator's
+answers) against the real loop and Coordinator, with fake workers, and pins the faults: a hung Reader, a silent
+Coordinator, a restart with edits queued, done without a witness, a destructive press.
+
 ## The window (`plugin/map`)
 
 - **`ScreenMap`**: one window per project (and a narrow copy in the overlay editor). Every 1.5 s it reads the map

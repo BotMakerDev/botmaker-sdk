@@ -1,0 +1,19 @@
+{
+  "goal": "open the hotspot settings",
+  "goalScreen": "Hotspot",
+  "pressCeiling": 6,
+  "witness": "screen_on_map",
+  "evaluations": {"k": 8, "every": 25},
+  "screens": [
+    {"name": "Settings", "start": true, "drawn": true, "texts": ["Settings", "Network & internet", "Display"],
+      "ways": {"network": "Network", "display": "Display"}},
+    {"name": "Network", "drawn": true, "texts": ["Network & internet", "Hotspot & tethering"],
+      "ways": {"hotspot": "Hotspot"}},
+    {"name": "Display", "drawn": true, "texts": ["Display", "Brightness"], "ways": {}},
+    {"name": "Hotspot", "drawn": false, "texts": ["Hotspot & tethering", "Wi-Fi hotspot"], "ways": {}}
+  ],
+  "reader": {
+    "Hotspot": {"draws": ["Hotspot"], "ranks": []}
+  },
+  "evaluator": {}
+}

@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Goal runs replayed offline (`ExploreRegressionTest`, plan `2026-11-24-explore-agents` phase 9): Android Settings to a
+  Google sign-in, to the hotspot screen and to the dark theme, each recorded under
+  `src/test/resources/explore-goal-runs/<goal>/` as its screens, the text each frame reads and the Reader's and the
+  Evaluator's answers, played by the real explore loop and Coordinator with fake workers. Each ends done with its
+  witness within its press ceiling; a starved budget ends on its budget; a hung Reader, a silent Coordinator, a restart
+  with edits queued, a done without a witness and a destructive press each have their test.
 - 🔭 Explore shows the crew of a run given a goal (spec `2026-11-24-explore-agents-design`, layout A): a goal bar under
   the status line with the goal, the way the run came to where it is and how deep that is; one card per agent
   (Explorer, Reader, Evaluator, Coordinator, Mechanic) with its state, the stop it is on, a thumbnail of the frame it
