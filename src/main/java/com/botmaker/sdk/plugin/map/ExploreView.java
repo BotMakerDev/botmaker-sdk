@@ -8,8 +8,6 @@ import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Readout;
-import com.botmaker.sdk.internal.explore.ExploreEvent;
-import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -48,9 +46,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,7 +72,6 @@ final class ExploreView {
 
     /** How often the journal and the frame are read again. */
     private static final Duration TICK = Duration.seconds(1);
-    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss");
     /** How often, and how many times, a row's buttons look whether the run took the user's answer: two minutes. */
     private static final int ANSWER_POLL_MS = 250, ANSWER_POLLS = 480;
 
@@ -394,14 +388,13 @@ final class ExploreView {
         boolean changed = read != last;
         last = read;
         boolean live = live(read);
-        status.setText(statusLine(read, graph.get().screens().size(), nowMs.getAsLong(), live));
+        status.setText(ExploreLines.statusLine(read, graph.get().screens().size(), nowMs.getAsLong(), live));
         Optional<Stop> open = live ? read.open() : Optional.empty();
         pinned.setVisible(open.isPresent());
         pinned.setManaged(open.isPresent());
         open.ifPresent(waiting -> {
-            pinnedStop.setText("⏸ " + waiting.id() + " — " + waiting.kind().displayName() + " on "
-                    + (waiting.screen() == null ? "an unknown screen" : waiting.screen()) + ": " + waiting.missing());
-            pinnedClaude.setText(claudeSince(read, waiting).map(call -> "Claude: " + call)
+            pinnedStop.setText(ExploreLines.pinnedLine(waiting));
+            pinnedClaude.setText(ExploreLines.claudeSince(read, waiting).map(call -> "Claude: " + call)
                     .orElse("Claude: not on it yet"));
         });
         List<JournalView.ForUser> mine = live ? read.forUser() : List.of();
@@ -412,7 +405,7 @@ final class ExploreView {
             yoursBox.setManaged(!mine.isEmpty());
         }
         if (changed) {
-            List<String> lines = feedLines(read);
+            List<String> lines = ExploreLines.feedLines(read);
             if (!lines.equals(feed.getItems())) feed.getItems().setAll(lines);
         }
         String on = liveScreen != null ? liveScreen : read.where().orElse(null);
@@ -426,7 +419,7 @@ final class ExploreView {
     /** One stop of the user's queue: what to decide, then resume and ignore, which the run takes at its next round. */
     private Node yourRow(JournalView.ForUser item) {
         Stop stop = item.stop();
-        Label what = new Label(yourLine(item));
+        Label what = new Label(ExploreLines.yourLine(item));
         what.setWrapText(true);
         what.setMinWidth(0);
         HBox.setHgrow(what, Priority.ALWAYS);
@@ -440,12 +433,6 @@ final class ExploreView {
         HBox row = new HBox(6, what, resume, ignore);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
-    }
-
-    private static String yourLine(JournalView.ForUser item) {
-        Stop stop = item.stop();
-        return "❓ " + stop.id() + " — " + stop.kind().displayName() + " on "
-                + (stop.screen() == null ? "an unknown screen" : stop.screen()) + ": " + item.question();
     }
 
     /**
@@ -472,7 +459,7 @@ final class ExploreView {
 
     /** The user's queue shown, one line each. */
     List<String> yourLines() {
-        return yoursShown.stream().map(ExploreView::yourLine).toList();
+        return yoursShown.stream().map(ExploreLines::yourLine).toList();
     }
 
     /** The feed shown, newest first. */
@@ -495,99 +482,6 @@ final class ExploreView {
 
     Button stopButton() {
         return stop;
-    }
-
-    /** The status line: how long, how many screens, how many stops fixed, and whether it runs or waits on Claude. */
-    static String statusLine(JournalView read, int screensKnown, long nowMs, boolean live) {
-        if (!read.began()) return "No explore run yet · " + screensKnown + " screens known";
-        long fresh = read.events().stream()
-                .filter(e -> e instanceof ExploreEvent.NewScreen(String s, String from, String by, long at) && from != null)
-                .count();
-        // A run that never wrote its end ran until its last event.
-        long until = live || read.ended().isPresent() || read.events().isEmpty() ? nowMs
-                : read.events().getLast().at();
-        java.time.Duration ran = read.ranFor(until);
-        String took = String.format("%d:%02d:%02d", ran.toHours(), ran.toMinutesPart(), ran.toSecondsPart());
-        String state = read.ended().map(end -> "ended: " + end.displayName())
-                .orElse(!live ? "ended" : read.open().filter(read::settled).isPresent() ? "✎ writing what the page settled"
-                        : read.open().isPresent() ? "⏸ waiting on Claude" : "running");
-        return took + " · " + screensKnown + " screens known (+" + fresh + " new) · "
-                + read.count(ExploreEvent.Fixed.class) + " stops fixed · " + state;
-    }
-
-    /** The latest run's events as feed lines, newest first; Claude's calls are the pinned stop's, not the feed's. */
-    static List<String> feedLines(JournalView read) {
-        List<String> lines = new ArrayList<>();
-        for (ExploreEvent event : read.events()) {
-            String line = line(event);
-            if (line != null) lines.add(clock(event.at()) + "  " + line);
-        }
-        return lines.reversed();
-    }
-
-    private static String line(ExploreEvent event) {
-        return switch (event) {
-            case ExploreEvent.Began e -> "▶ Began";
-            case ExploreEvent.Ended e -> "■ Ended: " + (e.end() == null ? "unknown" : e.end().displayName());
-            case ExploreEvent.Claude e -> null;
-            case ExploreEvent.Pictured e -> "📷 " + e.screen() + " pictured";
-            case ExploreEvent.Settled e -> "✎ " + e.stopId() + ": the page settles " + e.answers().size()
-                    + (e.answers().size() == 1 ? " change" : " changes");
-            case ExploreEvent.NewScreen e -> "✚ " + e.screen()
-                    + (e.from() == null ? ", where it began" : ", from " + e.from() + " by " + e.by());
-            case ExploreEvent.Tried e -> "→ " + e.screen() + "." + e.by()
-                    + (e.mode() == null ? "" : " (" + e.mode().displayName() + ")")
-                    + (e.arrival() == null ? "" : ": " + e.arrival().name().toLowerCase().replace('_', ' '));
-            case ExploreEvent.Refused e -> "🛡 " + e.screen() + "." + e.by() + " refused"
-                    + (e.guard() == null ? "" : " by " + e.guard().name().toLowerCase().replace('_', ' '))
-                    + (e.why() == null || e.why().isBlank() ? "" : ": " + e.why());
-            case ExploreEvent.GoalMet e -> "🎯 " + e.goal() + " met";
-            case ExploreEvent.Built e -> "✅ " + e.screen() + " built in " + JournalView.took(e.ms());
-            case ExploreEvent.Building e -> "… " + e.screen() + " left after " + JournalView.took(e.ms()) + ": "
-                    + String.join(", ", e.open());
-            case ExploreEvent.SetAside e -> "⏭ " + e.screen() + " set aside after " + JournalView.took(e.ms()) + ": "
-                    + String.join(", ", e.open());
-            case ExploreEvent.Stopped e -> "⏸ " + e.stop().id() + (e.again() ? " again" : "") + " — "
-                    + e.stop().kind().displayName() + ": " + e.stop().missing();
-            case ExploreEvent.Fixed e -> "✔ " + e.stopId() + " fixed" + (e.why() == null ? "" : ": " + e.why());
-            case ExploreEvent.Parked e -> "⏸ " + e.stopId() + " parked: the run goes on elsewhere";
-            case ExploreEvent.Asked e -> "❓ " + e.stopId() + " for you: " + e.question();
-            case ExploreEvent.Faulted e -> "🛠 " + e.stopId() + " Discover fault: " + e.why();
-            case ExploreEvent.ReplayLost e -> "⚠ " + e.faultId() + " not replayed: " + e.why();
-            case ExploreEvent.Restarted e -> "↻ Restarted on the rebuilt SDK, replaying " + e.faultId();
-            case ExploreEvent.Leased e -> "⇢ " + e.stopId() + " to " + e.role().displayName()
-                    + (e.attempt() > 1 ? " (try " + e.attempt() + ")" : "");
-            case ExploreEvent.Released e -> e.ok() ? null : "↺ " + e.stopId() + " taken back: " + e.why();
-            case ExploreEvent.Heartbeat e -> null;
-            case ExploreEvent.Finding e -> "⚑ " + e.kind().displayName() + ": " + e.why();
-            case ExploreEvent.Witnessed e -> "🎯 Goal reached: " + e.goal() + " (" + e.check().displayName()
-                    + (e.mark().isBlank() ? "" : ": " + e.mark()) + ")";
-            case ExploreEvent.Ranked e -> null;
-            case ExploreEvent.EditQueued e -> null;
-            case ExploreEvent.EditApplied e -> e.ok() ? null : "⚠ " + e.editId() + " not written: " + e.said().lines().findFirst().orElse("");
-            case ExploreEvent.Branched e -> "🔧 " + e.stopId() + ": " + (e.branch().isBlank() ? "no change" : e.branch())
-                    + e.note().lines().findFirst().map(line -> " — " + line).orElse("");
-            case ExploreEvent.Summary e -> e.unresolved().isEmpty() ? "📋 No finding left open"
-                    : "📋 " + e.unresolved().size() + " finding(s) left open";
-            case ExploreEvent.Reloaded e -> e.refused()
-                    ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
-                    ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()
-                    : "✔ " + e.stopId() + ": the bot reloaded, generation " + e.generation();
-        };
-    }
-
-    /** The last tool Claude called since the run last stopped on {@code open}; empty when none since. */
-    private static Optional<String> claudeSince(JournalView read, Stop open) {
-        String call = null;
-        for (ExploreEvent event : read.events()) {
-            if (event instanceof ExploreEvent.Stopped stopped && stopped.stop().id().equals(open.id())) call = null;
-            else if (event instanceof ExploreEvent.Claude claude) call = claude.call();
-        }
-        return Optional.ofNullable(call);
-    }
-
-    private static String clock(long atMs) {
-        return LocalTime.ofInstant(Instant.ofEpochMilli(atMs), ZoneId.systemDefault()).format(CLOCK);
     }
 
     /** The facts {@code constant}'s readouts read into, each with its value kept now; none off the map. */
