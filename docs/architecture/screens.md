@@ -517,7 +517,14 @@ only channel.
   than the heartbeat.
 - **Reader** (the Cartographer's role): a Claude session per stop that looks, queues map edits (`EditQueued`, ids
   `<stop>-N`), ranks the screen's presses (`Ranked`, 0 to 10, tagged) and resumes. One writer carries the edits out
-  (`EditWriter`): each id once, so a host restarted with edits queued writes none twice.
+  (`EditWriter`): each id once, so a host restarted with edits queued writes none twice. It cuts its pictures on the
+  stop's own frame (`crop_pictures` through `apply_edit`, 2026-11-24), never a fresh screenshot, and may not resume
+  with `ignore` a frame it drew nothing of. A screen the Evaluator flags as wrongly mapped (`MapFlagged`) comes back
+  to it as a stop `bad_map-N` holding that screen's frame only.
+- **Each worker's session streams** (2026-11-24): `claude` runs with `--output-format stream-json`, each line written
+  as it comes to `Journal.workerLog(stopId)` (`explore/<run>/workers/<stopId>.log`), every session of a stop one
+  after the other; `WorkerLog.read(path, from)` reads on from an offset as typed lines (start, thinking, said, tool
+  call and answer, end), picture data slimmed to its size.
 - **Evaluator**: a session started after K presses with no progress, after a safety net of presses, and at the run's
   end. It records findings (drift, stuck, bad map, SDK fault) and proposes done with a mark; its stuck ends the run.
 - **Mechanic** (dev mode): one bounded try per SDK fault in a sandboxed worktree lane, its branch the user's to merge.
@@ -547,11 +554,19 @@ Coordinator, a restart with edits queued, done without a witness, a destructive 
   `JournalView`, parsed again only when `events.jsonl`'s or `queue.json`'s size or time changed. The status line
   gives the time run, the screens known (+ new), the stops fixed and *running*, *⏸ waiting on Claude* or *ended*.
   A run is live only while the journal has no Ended line **and** the host runs it: a run killed from Studio reads
-  *ended*, its time counted to its last event, and pins nothing. Left, the frame now (`ScreenDesk.here`) with its
-  screen's name, its areas boxed (`FrameBoxes`, shared with the live board) and the facts it reads
-  (`pluginValues().runParameters()`); right, the feed newest first, with the open stop and Claude's last tool call
-  pinned above it while the run is live. The frame is grabbed by the window, beside the run's own capture; the
-  run's telemetry could carry it instead (deferred).
+  *ended*, its time counted to its last event, and pins nothing. Under the bar and the goal line, a strip of chips,
+  one per agent (`AgentCards`), each its state with a dot while it works; a click opens Crew on that agent. Four tabs
+  (2026-11-24):
+  - **Run** (`ExploreRunTab`): the frame now (`ScreenDesk.here`), fitted whole in its box by width and height
+    (`FramePane`), its areas boxed (`FrameBoxes`, shared with the live board), its screen's name and the facts it
+    reads (`pluginValues().runParameters()`); right, the feed newest first, with the open stop and Claude's last tool
+    call pinned above it while the run is live. The frame is grabbed by the window, beside the run's own capture.
+  - **Crew** (`ExploreCrewTab`): an agent picked, its sessions read off its workers' logs (`CrewSessions`, the stops
+    `JournalView.leased(role)` names), only while the tab shows, the newest followed and the others in a picker, each
+    keeping its newest 2,000 lines. The Explorer and the Coordinator are the run's own code and have no log.
+  - **For you (n)** (`ExploreYoursTab`): the stops waiting on the user, with Resume and Ignore.
+  - **Summary**: how the run ended or that it goes on, the findings left open with their evidence, the goal's
+    witness and the Mechanic's branches (`ExploreLines.summaryLines`).
 - **Reads on the FX thread** go through `ScreenMapRead.orEmpty` (`plugin/pictures`): one read per FX event, shared
   by every card and editor drawn in it, dropped after it; a write calls `forget()`. A picture opens on its own cut
   (`TemplateUses.cut`), never on every picture constant's. A read after a step is skipped while the files beside
