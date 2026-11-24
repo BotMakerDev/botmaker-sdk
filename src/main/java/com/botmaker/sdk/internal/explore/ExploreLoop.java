@@ -1155,6 +1155,11 @@ public final class ExploreLoop {
      * delete, buy, …): then it is set aside as tried and ranked destructive, so it waits on the user, never pressed.
      */
     private boolean denied(String screen, String key, String label) {
+        // Checked at each press, not only once: a reload or a retry that forgets a try never makes a held press.
+        if (frontier.held(screen, label)) {
+            chooser.tryOnce(key);
+            return true;
+        }
         if (!Frontier.denied(label)) return false;
         chooser.tryOnce(key);
         emit(new ExploreEvent.Ranked(screen, label, 0, PressTag.DESTRUCTIVE, nowMs.getAsLong()));

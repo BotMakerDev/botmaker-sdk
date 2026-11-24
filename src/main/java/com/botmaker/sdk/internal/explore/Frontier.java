@@ -176,6 +176,12 @@ final class Frontier {
         return parked.values().stream().filter(p -> p.hold() == Hold.NEEDS_YOU).toList();
     }
 
+    /** Whether {@code press} of {@code screen} waits on the user: the run never makes it, whatever was retried. */
+    boolean held(String screen, String press) {
+        Parked p = parked.get(keyOf(screen, press));
+        return p != null && p.hold() == Hold.NEEDS_YOU;
+    }
+
     /** Every parked press, in the order it was parked. */
     List<Parked> parked() {
         return List.copyOf(parked.values());

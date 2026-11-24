@@ -82,6 +82,8 @@ class FrontierTest {
         assertEquals(Optional.empty(), frontier.next(6));
         assertEquals(3, frontier.needsYou().size());
         assertTrue(frontier.resume().isEmpty(), "resume never takes back what needs the user");
+        assertTrue(frontier.held("A", "risky"));
+        assertFalse(frontier.held("A", "other"));
         assertTrue(frontier.isEmpty());
     }
 
