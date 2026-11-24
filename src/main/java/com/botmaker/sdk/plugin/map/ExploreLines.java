@@ -172,6 +172,33 @@ final class ExploreLines {
                 + (waiting.screen() == null ? "an unknown screen" : waiting.screen()) + ": " + waiting.missing();
     }
 
+    /**
+     * The Summary tab's lines: how the run ended or that it goes on, the findings nothing acted on with their evidence,
+     * then the goal's witness and the Mechanic's branches, oldest first; none before any run. {@code live}: the run
+     * still goes, which a killed run's journal alone would say for ever.
+     */
+    static List<String> summaryLines(JournalView read, boolean live) {
+        if (read.events().isEmpty()) return List.of();
+        List<ExploreEvent.Finding> open = read.unresolved();
+        List<String> lines = new ArrayList<>();
+        if (read.summed()) {
+            lines.add(open.isEmpty() ? "📋 The run ended with no finding left open"
+                    : "📋 The run ended with " + open.size() + (open.size() == 1 ? " finding" : " findings")
+                            + " left open");
+        } else {
+            lines.add(live ? "The run goes on: its summary is written at its end"
+                    : "The run ended without its summary");
+        }
+        for (ExploreEvent.Finding finding : open) {
+            lines.add("⚑ " + finding.kind().displayName() + ": " + finding.why()
+                    + (finding.evidence().isBlank() ? "" : " (" + finding.evidence() + ")"));
+        }
+        for (ExploreEvent event : read.events()) {
+            if (event instanceof ExploreEvent.Witnessed || event instanceof ExploreEvent.Branched) lines.add(line(event));
+        }
+        return lines;
+    }
+
     /** The last tool Claude called since the run last stopped on {@code open}; empty when none since. */
     static Optional<String> claudeSince(JournalView read, Stop open) {
         String call = null;

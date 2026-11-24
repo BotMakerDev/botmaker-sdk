@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🔭 Explore in tabs (plan `2026-11-24-explore-drive-fixes` phase 4): the bar, the goal line and one chip per agent
+  of the crew (its name and state, a dot while it works) stay on top, and the rest is in four tabs. **Run** has the
+  game's frame, drawn whole by width and height so a tall phone frame is no longer cropped, then the screen and its
+  facts, with the waiting stop pinned above the feed. **Crew** lists each agent with its sessions, time and last line;
+  the selected one's log shows as its worker writes it (thinking, said, called, answered, ended), following the
+  newest session, with earlier sessions in a picker. **For you** holds the user's stops with Resume and Ignore, its
+  count in the tab's title. **Summary** has the findings left open with their evidence, the goal's witness and the
+  Mechanic's branches. Clicking a chip opens the Crew tab on that agent. The five agent cards are gone.
 - Each explore worker's session is logged as it goes (plan `2026-11-24-explore-drive-fixes` phase 3; the Explore
   page shows it from phase 4): the Reader, the Evaluator (during the run and at its end) and the Mechanic run
   `claude -p --output-format stream-json --verbose`, and `explore/<run>/workers/<stop>.log` grows one event per line,

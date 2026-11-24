@@ -232,6 +232,15 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 .mapToInt(e -> ((ExploreEvent.Leased) e).attempt()).max().orElse(0);
     }
 
+    /**
+     * The latest run's stops leased to {@code role}, each once, in the order first leased: the stops whose worker logs
+     * ({@code Journal.workerLog}) that role's sessions wrote.
+     */
+    public List<String> leased(StopRole role) {
+        return events.stream().filter(e -> e instanceof ExploreEvent.Leased leased && leased.role() == role)
+                .map(e -> ((ExploreEvent.Leased) e).stopId()).distinct().toList();
+    }
+
     /** The latest run's findings, oldest first. */
     public List<ExploreEvent.Finding> findings() {
         return events.stream().filter(ExploreEvent.Finding.class::isInstance).map(ExploreEvent.Finding.class::cast)

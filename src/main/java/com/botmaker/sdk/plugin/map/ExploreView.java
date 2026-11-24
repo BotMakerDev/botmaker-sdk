@@ -9,9 +9,9 @@ import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.internal.explore.Agent;
+import com.botmaker.sdk.internal.explore.AgentSummary;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
-import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.assist.Coordinator;
@@ -28,20 +28,16 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitMenuButton;
-import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
@@ -63,24 +59,26 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * 🔭 Explore, the view 🗺 Screens' rail shows (2026-11-09, spec screens-rail goal 9; continuous-explore spec §7,
- * layout A): a run exploring the game, watched and started from here. A status line; on the left <em>Now</em>, the
- * game's frame with its readouts' areas drawn as the live board draws them, the screen's name and the facts it reads;
- * on the right the feed, newest first, with the stop the run waits on pinned above it and the last tool Claude called.
+ * 🔭 Explore, the view 🗺 Screens' rail shows (2026-11-09, spec screens-rail goal 9; in tabs since plan
+ * 2026-11-24-explore-drive-fixes, phase 4): a run exploring the game, watched and started from here. On top the bar
+ * (status, ▶ Keep exploring, Stop), the goal line and a chip per agent of the crew; below, tabs: <em>Run</em> (the
+ * game's frame and the feed, {@link ExploreRunTab}), <em>Crew</em> (each agent's live log, {@link ExploreCrewTab}),
+ * <em>For you</em> (the user's stops, {@link ExploreYoursTab}) and <em>Summary</em> (findings left open, the goal's
+ * witness, the Mechanic's branches).
  *
- * <p>The latest run's journal ({@link Journal}, {@code events.jsonl}) and, while a run goes, a frame of the game are
- * read once a second off the FX thread, only while the view is shown; the journal only its lines added since. <b>Start</b> starts <em>Keep exploring</em> (its menu:
- * <em>Explore map</em>) through {@link com.botmaker.plugin.api.Runs#start(RunEntry)}, while no run goes; <b>Stop</b>
- * ends the run going.
+ * <p>The latest run's journal ({@link Journal}, {@code events.jsonl}), the selected agent's worker logs and, while a
+ * run goes, a frame of the game are read once a second off the FX thread, only while the view is shown; the journal
+ * and the logs only what was added since. <b>Start</b> starts <em>Keep exploring</em> (its menu: <em>Explore
+ * map</em>) through {@link com.botmaker.plugin.api.Runs#start(RunEntry)}, while no run goes; <b>Stop</b> ends the run
+ * going.
  */
 final class ExploreView {
 
     /** How often the journal and the frame are read again. */
     private static final Duration TICK = Duration.seconds(1);
-    /** How often, and how many times, a row's buttons look whether the run took the user's answer: two minutes. */
-    private static final int ANSWER_POLL_MS = 250, ANSWER_POLLS = 480;
-    /** How old the Coordinator's heartbeat may be before its card says it went silent: its own limit. */
+    /** How old the Coordinator's heartbeat may be before its chip says it went silent: its own limit. */
     private static final java.time.Duration HEARTBEAT = Coordinator.Settings.DEFAULT.heartbeat();
+    private static final String YOURS = "For you";
 
     private final StudioServices services;
     private final Supplier<ScreenGraph> graph;
@@ -88,27 +86,26 @@ final class ExploreView {
     private final Supplier<Optional<Journal>> journals;
     /** Reads the latest run's journal on from where it left off; the reading thread's, one read at a time. */
     private JournalView.Reader reader;
+    /** The selected agent's sessions read so far; the reading thread's, one read at a time. */
+    private final CrewSessions crewSessions = new CrewSessions();
     private final LongSupplier nowMs;
 
     private final BorderPane root = new BorderPane();
     private final Label status = new Label();
     private final SplitMenuButton start = new SplitMenuButton();
     private final Button stop = new Button("■ Stop");
-    private final ImageView frame = new ImageView();
-    private final Pane boxes = new Pane();
-    private final Label screenName = new Label();
-    private final VBox facts = new VBox(2);
-    private final Label pinnedStop = new Label();
-    private final Label pinnedClaude = new Label();
-    private final VBox pinned = new VBox(2, pinnedStop, pinnedClaude);
-    /** The user's queue (2026-11-21): the stops only they decide, each with resume and ignore. */
-    private final VBox yours = new VBox(4);
-    private final VBox yoursBox = new VBox(4);
-    private final ListView<ExploreLines.FeedRow> feed = new ListView<>();
     /** The goal bar's line: the goal, the way so far and its depth. */
     private final Label goal = new Label();
-    /** One card per agent of the crew; shown for a run given a goal only, the one run that has a crew. */
-    private final AgentCards cards = new AgentCards(this::frameFile);
+    /** One chip per agent of the crew; shown for a run given a goal only, the one run that has a crew. */
+    private final AgentCards chips = new AgentCards(this::pick);
+    private final TabPane tabs = new TabPane();
+    private final ExploreRunTab runTab = new ExploreRunTab(new Thumbnails(this::frameFile));
+    private final ExploreCrewTab crewTab = new ExploreCrewTab(this::tick);
+    private final ExploreYoursTab yoursTab;
+    private final ListView<String> summary = new ListView<>();
+    private final Tab run = new Tab("Run");
+    private final Tab crew = new Tab("Crew");
+    private final Tab yours = new Tab(YOURS);
     /** The folder of the journal last read, which a frame named relative to it is in; the reading thread sets it. */
     private volatile Path journalFolder;
     private final Timeline ticker = new Timeline(new KeyFrame(TICK, e -> tick()));
@@ -118,18 +115,16 @@ final class ExploreView {
     // On the FX thread from here.
     /** The screen the last frame read shows, by its markers; null for none, or no frame read. */
     private String liveScreen;
-    private int frameWidth;
     /** The frame drawn now: a website's page held from tick to tick is not drawn again. FX thread only. */
     private Seen showing;
     /** A website run's page as last read off the journal, and when it was written; read on the reading thread only. */
     private volatile Seen lastPage;
     private volatile long lastPageAt;
-    private Map<String, Rect> areas = Map.of();
     private boolean closed;
-    /** The user's queue as last shown, so its buttons are built again only when it changes. */
-    private List<JournalView.ForUser> yoursShown = List.of();
     /** The journal as last shown. */
     private JournalView last = new JournalView(List.of(), List.of(), List.of());
+    /** Whether the run went when the Summary tab was last written. */
+    private boolean summedLive;
     /** The journal as last read, with its files' sizes and times then; the reading thread's, one at a time. */
     private volatile Read lastRead = new Read("", last);
 
@@ -142,6 +137,7 @@ final class ExploreView {
         this.graph = graph;
         this.journals = journals;
         this.nowMs = nowMs;
+        yoursTab = new ExploreYoursTab(journals == null ? Optional::empty : journals);
         root.getStylesheets().add(ScreenCanvas.SHEET);
         // The map's colour tokens are published on .screen-map.
         root.getStyleClass().addAll("screen-map", "explore-view");
@@ -167,55 +163,24 @@ final class ExploreView {
         goal.getStyleClass().add("explore-goal");
         goal.setMinWidth(0);
         goal.setPadding(new Insets(4, 8, 0, 8));
-        Node crew = cards.node();
-        VBox.setMargin(crew, new Insets(4, 8, 6, 8));
-        VBox top = new VBox(bar, goal, crew);
+        Node strip = chips.node();
+        VBox.setMargin(strip, new Insets(4, 8, 6, 8));
+        VBox top = new VBox(bar, goal, strip);
         top.getStyleClass().add("explore-bar");
         root.setTop(top);
 
-        frame.setPreserveRatio(true);
-        frame.setFitWidth(420);
-        boxes.setMouseTransparent(true);
-        StackPane game = new StackPane(frame, boxes);
-        game.setAlignment(Pos.TOP_LEFT);
-        game.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-        Label nowTitle = new Label("Now");
-        nowTitle.getStyleClass().add("explore-heading");
-        screenName.getStyleClass().add("explore-screen");
-        VBox now = new VBox(6, nowTitle, game, screenName, facts);
-        now.setPadding(new Insets(8));
-        now.setMinWidth(0);
-        // The frame follows the column's width.
-        now.widthProperty().addListener((o, was, is) -> {
-            frame.setFitWidth(Math.max(120, is.doubleValue() - 16));
-            drawAreas();
+        run.setContent(runTab.node());
+        crew.setContent(crewTab.node());
+        yours.setContent(yoursTab.node());
+        summary.setPlaceholder(new Label("No explore run yet."));
+        Tab summed = new Tab("Summary", summary);
+        tabs.getTabs().setAll(run, crew, yours, summed);
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        // The Crew tab's logs are read while it shows: read them at once when it is opened.
+        tabs.getSelectionModel().selectedItemProperty().addListener((o, was, is) -> {
+            if (is == crew) tick();
         });
-
-        pinned.getStyleClass().add("explore-pinned");
-        pinned.setPadding(new Insets(6));
-        pinnedStop.setWrapText(true);
-        pinnedClaude.setWrapText(true);
-        pinnedClaude.getStyleClass().add("explore-claude");
-        feed.setPlaceholder(new Label("Nothing yet: ▶ " + SdkRuns.KEEP_EXPLORING
-                + " explores the game, and what it finds shows here."));
-        feed.setCellFactory(list -> new FeedCell());
-        Label feedTitle = new Label("Feed");
-        feedTitle.getStyleClass().add("explore-heading");
-        Label yoursTitle = new Label("For you");
-        yoursTitle.getStyleClass().add("explore-heading");
-        yoursBox.getChildren().setAll(yoursTitle, yours);
-        yoursBox.getStyleClass().add("explore-pinned");
-        yoursBox.setPadding(new Insets(6));
-        yoursBox.setVisible(false);
-        yoursBox.setManaged(false);
-        VBox right = new VBox(6, feedTitle, pinned, yoursBox, feed);
-        VBox.setVgrow(feed, Priority.ALWAYS);
-        right.setPadding(new Insets(8));
-        right.setMinWidth(0);
-
-        SplitPane split = new SplitPane(now, right);
-        split.setDividerPositions(0.45);
-        root.setCenter(split);
+        root.setCenter(tabs);
 
         runState = services.runs().onStateChanged(running -> Platform.runLater(this::buttons));
         ticker.setCycleCount(Timeline.INDEFINITE);
@@ -254,6 +219,13 @@ final class ExploreView {
         }
     }
 
+    /** A chip's click: the Crew tab, on {@code agent}. */
+    private void pick(Agent agent) {
+        crewTab.select(agent);
+        tabs.getSelectionModel().select(crew);
+        tick();
+    }
+
     private void startRun(String title) {
         if (services.runs().isRunning()) {
             services.status("A run is going: stop it first.");
@@ -283,7 +255,10 @@ final class ExploreView {
         return started.isEmpty() || read.playingSince() >= started.get().toEpochMilli() - 1_000;
     }
 
-    /** Reads the journal, and a frame while an explore run goes, off the FX thread; one read at a time. */
+    /**
+     * Reads the journal, the selected agent's logs while the Crew tab shows, and a frame while an explore run goes, off
+     * the FX thread; one read at a time.
+     */
     private void tick() {
         buttons();
         if (journals == null || closed || !reading.compareAndSet(false, true)) return;
@@ -291,36 +266,49 @@ final class ExploreView {
         boolean running = live(last);
         PanelContext context = running ? context() : null;
         if (context == null) forgetFrame();
+        Agent agent = tabs.getSelectionModel().getSelectedItem() == crew ? crewTab.selected() : null;
+        boolean whole = !crewTab.filled();
         Thread.ofVirtual().name("explore-view").start(() -> {
             try {
                 Journal journal = journals.get().orElse(null);
                 if (journal == null) return;
                 journalFolder = journal.folder();
-                // A run of hours writes thousands of lines: read again only when the files changed, and then only
-                // the lines added since; a newer run's journal is read from its start.
-                String stamp = journal.folder() + " " + stamp(journal);
-                Read before = lastRead;
-                JournalView read;
-                if (stamp.equals(before.stamp())) {
-                    read = before.view();
-                } else {
-                    if (reader == null || !reader.journal().folder().equals(journal.folder())) {
-                        reader = new JournalView.Reader(journal);
-                    }
-                    read = reader.view();
-                }
-                lastRead = new Read(stamp, read);
+                JournalView read = read(journal);
                 Seen seen = !running ? null : page(journal, read)
                         .orElseGet(() -> context == null ? null : look(context, map));
+                Optional<List<CrewSessions.Session>> sessions = agent == null ? Optional.empty()
+                        : crewSessions.read(journal, read, agent, whole);
                 Platform.runLater(() -> {
                     if (closed) return;
                     if (seen != null) shown(seen);
                     show(read);
+                    // A read for an agent no longer selected is dropped: the next tick reads the one that is.
+                    if (sessions.isPresent() && agent == crewTab.selected()) crewTab.sessions(sessions.get());
                 });
             } finally {
                 reading.set(false);
             }
         });
+    }
+
+    /**
+     * {@code journal} read: again only when its files changed, and then only the lines added since (a run of hours
+     * writes thousands); a newer run's journal is read from its start. The reading thread's.
+     */
+    private JournalView read(Journal journal) {
+        String stamp = journal.folder() + " " + stamp(journal);
+        Read before = lastRead;
+        JournalView read;
+        if (stamp.equals(before.stamp())) {
+            read = before.view();
+        } else {
+            if (reader == null || !reader.journal().folder().equals(journal.folder())) {
+                reader = new JournalView.Reader(journal);
+            }
+            read = reader.view();
+        }
+        lastRead = new Read(stamp, read);
+        return read;
     }
 
     /** The journal's files as their sizes and last changes: equal while neither was written. */
@@ -340,10 +328,12 @@ final class ExploreView {
 
     /** No run goes: the screen a frame showed is not where the game is any more. The frame stays, as last seen. */
     private void forgetFrame() {
-        if (liveScreen == null && areas.isEmpty()) return;
+        if (liveScreen == null && (showing == null || showing.areas().isEmpty())) return;
         liveScreen = null;
-        areas = Map.of();
-        drawAreas();
+        if (showing != null) {
+            showing = new Seen(showing.image(), null, Map.of());
+            runTab.areas(Map.of());
+        }
     }
 
     private PanelContext context() {
@@ -391,21 +381,14 @@ final class ExploreView {
 
     private void shown(Seen seen) {
         if (seen == showing) return;
+        boolean sameImage = showing != null && showing.image() == seen.image();
         showing = seen;
-        frame.setImage(ScreenCapture.toFxImage(seen.image()));
-        frameWidth = seen.image().getWidth();
         liveScreen = seen.screen();
-        areas = seen.areas();
-        drawAreas();
+        if (sameImage) runTab.areas(seen.areas());
+        else runTab.frame(ScreenCapture.toFxImage(seen.image()), seen.areas());
     }
 
-    private void drawAreas() {
-        boxes.getChildren().clear();
-        if (frameWidth == 0) return;
-        FrameBoxes.areas(boxes, areas, frame.getFitWidth() / frameWidth);
-    }
-
-    /** {@code read} drawn: the status line, the stop pinned, the feed and the facts of the screen it is on. */
+    /** {@code read} drawn: the bar, the chips, and each tab. */
     void show(JournalView read) {
         boolean changed = read != last;
         last = read;
@@ -417,102 +400,117 @@ final class ExploreView {
         goal.setVisible(!goalLine.isEmpty());
         goal.setManaged(!goalLine.isEmpty());
         boolean crewed = read.crewed();
-        cards.node().setVisible(crewed);
-        cards.node().setManaged(crewed);
-        if (crewed) {
-            cards.show(Agent.CREW.stream().map(agent -> read.agentSummary(agent, now, HEARTBEAT))
-                    .map(summary -> live ? summary : summary.ended()).toList());
+        chips.node().setVisible(crewed);
+        chips.node().setManaged(crewed);
+        List<AgentSummary> summaries = !crewed ? List.of() : Agent.CREW.stream()
+                .map(agent -> read.agentSummary(agent, now, HEARTBEAT))
+                .map(summary -> live ? summary : summary.ended()).toList();
+        if (crewed) chips.show(summaries);
+        crewTab.crew(summaries);
+        runTab.show(read, live, changed);
+        if (yoursTab.show(live ? read.forUser() : List.of())) {
+            yours.setText(yoursTab.count() == 0 ? YOURS : YOURS + " (" + yoursTab.count() + ")");
         }
-        Optional<Stop> open = live ? read.open() : Optional.empty();
-        pinned.setVisible(open.isPresent());
-        pinned.setManaged(open.isPresent());
-        open.ifPresent(waiting -> {
-            pinnedStop.setText(ExploreLines.pinnedLine(waiting));
-            pinnedClaude.setText(ExploreLines.claudeSince(read, waiting).map(call -> "Claude: " + call)
-                    .orElse("Claude: not on it yet"));
-        });
-        List<JournalView.ForUser> mine = live ? read.forUser() : List.of();
-        if (!mine.equals(yoursShown)) {
-            yoursShown = mine;
-            yours.getChildren().setAll(mine.stream().map(this::yourRow).toList());
-            yoursBox.setVisible(!mine.isEmpty());
-            yoursBox.setManaged(!mine.isEmpty());
-        }
-        if (changed) {
-            List<ExploreLines.FeedRow> rows = ExploreLines.feedRows(read);
-            if (!rows.equals(feed.getItems())) feed.getItems().setAll(rows);
+        // A killed run writes no end: the summary follows whether the run still goes, not the journal alone.
+        if (changed || live != summedLive) {
+            summedLive = live;
+            List<String> lines = ExploreLines.summaryLines(read, live);
+            if (!lines.equals(summary.getItems())) summary.getItems().setAll(lines);
         }
         String on = liveScreen != null ? liveScreen : read.where().orElse(null);
-        screenName.setText(on == null ? "No screen of the map" : on);
-        List<String> factLines = factLines(on);
-        List<String> factsShown = facts.getChildren().stream().map(n -> ((Label) n).getText()).toList();
-        if (!factLines.equals(factsShown)) facts.getChildren().setAll(factLines.stream().map(Label::new).toList());
+        runTab.screen(on, factLines(on));
         buttons();
-    }
-
-    /** One stop of the user's queue: what to decide, then resume and ignore, which the run takes at its next round. */
-    private Node yourRow(JournalView.ForUser item) {
-        Stop stop = item.stop();
-        Label what = new Label(ExploreLines.yourLine(item));
-        what.setWrapText(true);
-        what.setMinWidth(0);
-        HBox.setHgrow(what, Priority.ALWAYS);
-        if (!item.resumable()) return new HBox(6, what);
-        Button resume = new Button("Resume");
-        resume.setTooltip(new Tooltip("Goes on from it with the bot as it is now: fix it first, by hand or with Claude."));
-        Button ignore = new Button("Ignore");
-        ignore.setTooltip(new Tooltip("It is fine as it is: the run never raises it again."));
-        resume.setOnAction(e -> answer(stop.id(), false, resume, ignore));
-        ignore.setOnAction(e -> answer(stop.id(), true, resume, ignore));
-        HBox row = new HBox(6, what, resume, ignore);
-        row.setAlignment(Pos.CENTER_LEFT);
-        return row;
-    }
-
-    /**
-     * Writes the user's resume of {@code stopId} for the run, off the FX thread. The row's buttons wait until the run
-     * took it, then come back: a resume the run refused (the bot does not compile) leaves the stop listed, to try again.
-     */
-    private void answer(String stopId, boolean ignore, Button... buttons) {
-        for (Button button : buttons) button.setDisable(true);
-        Thread.ofVirtual().name("explore-answer").start(() -> {
-            try {
-                Optional<Journal> journal = journals.get();
-                if (journal.isEmpty()) return;
-                journal.get().command("resume " + stopId + (ignore ? " ignore" : ""));
-                for (int i = 0; i < ANSWER_POLLS && journal.get().commandWaiting(); i++) Thread.sleep(ANSWER_POLL_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } finally {
-                Platform.runLater(() -> {
-                    for (Button button : buttons) button.setDisable(false);
-                });
-            }
-        });
     }
 
     /** The user's queue shown, one line each. */
     List<String> yourLines() {
-        return yoursShown.stream().map(ExploreLines::yourLine).toList();
+        return yoursTab.lines();
+    }
+
+    /** The For you tab's title. */
+    String yoursTitle() {
+        return yours.getText();
     }
 
     /** The feed shown, newest first. */
     List<String> feedLines() {
-        return feed.getItems().stream().map(ExploreLines.FeedRow::text).toList();
+        return runTab.feedRows().stream().map(ExploreLines.FeedRow::text).toList();
     }
 
     /** The feed's rows shown, newest first, with their chips and frames. */
     List<ExploreLines.FeedRow> feedRows() {
-        return List.copyOf(feed.getItems());
+        return runTab.feedRows();
     }
 
-    /** The agent cards shown, one line each; empty for a run without a crew. */
-    List<String> cardLines() {
-        return cards.node().isVisible() ? cards.lines() : List.of();
+    /** The crew's chips shown, one line each; empty for a run without a crew. */
+    List<String> chipLines() {
+        return chips.node().isVisible() ? chips.lines() : List.of();
+    }
+
+    /** The Crew tab's list, one line per agent; empty for a run without a crew. */
+    List<String> crewLines() {
+        return crewTab.crewLines();
+    }
+
+    /** The Crew tab's log as shown, and the sessions its picker offers. */
+    ExploreCrewTab crewTab() {
+        return crewTab;
+    }
+
+    /** The tab shown now, by its title. */
+    String tabShown() {
+        return tabs.getSelectionModel().getSelectedItem().getText();
+    }
+
+    /** Clicks {@code agent}'s chip. */
+    void pickChip(Agent agent) {
+        pick(agent);
+    }
+
+    /**
+     * Reads the Crew tab's selected agent's logs now, on the calling thread, and shows them: what a tick does off the
+     * FX thread.
+     */
+    void readCrew() {
+        Journal journal = journals.get().orElseThrow();
+        crewSessions.read(journal, JournalView.of(journal), crewTab.selected(), !crewTab.filled())
+                .ifPresent(crewTab::sessions);
+    }
+
+    /** Whether a read is under way off the FX thread. */
+    boolean reading() {
+        return reading.get();
+    }
+
+    /** The Summary tab's lines. */
+    List<String> summaryLines() {
+        return List.copyOf(summary.getItems());
+    }
+
+    /** The Run tab, its frame's fit for one. */
+    ExploreRunTab runTab() {
+        return runTab;
     }
 
     String goalText() {
         return goal.getText();
+    }
+
+    /** The stop pinned and what Claude did last, one line each; empty while nothing is pinned. */
+    List<String> pinnedLines() {
+        return runTab.pinnedLines();
+    }
+
+    String statusText() {
+        return status.getText();
+    }
+
+    SplitMenuButton startButton() {
+        return start;
+    }
+
+    Button stopButton() {
+        return stop;
     }
 
     /**
@@ -529,63 +527,6 @@ final class ExploreView {
         } catch (InvalidPathException unnamed) {
             return Optional.empty();
         }
-    }
-
-    /** A feed row: the agent's chip, a thumbnail of the frame its record names, and its line. */
-    private final class FeedCell extends ListCell<ExploreLines.FeedRow> {
-
-        private static final double THUMB_WIDTH = 48;
-
-        private final Label chip = new Label();
-        private final ImageView thumb = new ImageView();
-        private final Label text = new Label();
-        private final HBox box = new HBox(6, chip, thumb, text);
-
-        FeedCell() {
-            chip.getStyleClass().add("explore-chip");
-            thumb.setPreserveRatio(true);
-            thumb.setFitWidth(THUMB_WIDTH);
-            text.setMinWidth(0);
-            box.setAlignment(Pos.CENTER_LEFT);
-        }
-
-        @Override
-        protected void updateItem(ExploreLines.FeedRow row, boolean empty) {
-            super.updateItem(row, empty);
-            if (empty || row == null) {
-                setGraphic(null);
-                setText(null);
-                return;
-            }
-            boolean named = row.agent() != Agent.UNKNOWN;
-            chip.setText(named ? row.agent().displayName() : "");
-            chip.setVisible(named);
-            chip.setManaged(named);
-            Image image = cards.thumbnail(row.frame(), THUMB_WIDTH).orElse(null);
-            thumb.setImage(image);
-            thumb.setVisible(image != null);
-            thumb.setManaged(image != null);
-            text.setText(row.text());
-            setText(null);
-            setGraphic(box);
-        }
-    }
-
-    /** The stop pinned and what Claude did last, one line each; empty while nothing is pinned. */
-    List<String> pinnedLines() {
-        return pinned.isVisible() ? List.of(pinnedStop.getText(), pinnedClaude.getText()) : List.of();
-    }
-
-    String statusText() {
-        return status.getText();
-    }
-
-    SplitMenuButton startButton() {
-        return start;
-    }
-
-    Button stopButton() {
-        return stop;
     }
 
     /** The facts {@code constant}'s readouts read into, each with its value kept now; none off the map. */

@@ -13,6 +13,7 @@ import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.internal.explore.Agent;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
+import com.botmaker.sdk.internal.explore.FindingKind;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
@@ -21,6 +22,7 @@ import com.botmaker.sdk.internal.explore.StopRole;
 import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.run.SdkRuns;
+import com.botmaker.sdk.plugin.screen.ScreenCapture;
 import javafx.scene.Scene;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
@@ -30,7 +32,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.testfx.framework.junit5.ApplicationTest;
 import org.testfx.util.WaitForAsyncUtils;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -142,6 +148,7 @@ class ExploreViewTest extends ApplicationTest {
                 view.yourLines());
         assertTrue(view.feedLines().getFirst().endsWith("❓ no_verdict-1 for you: Buy costs real money: spends or never?"),
                 view.feedLines().getFirst());
+        clickOn("For you (1)");
         clickOn("Ignore");
         for (int i = 0; i < 50 && !journal.commandWaiting(); i++) Thread.sleep(20);
         assertEquals(Optional.of(new Journal.Command.Resume(buy.id(), true)), journal.takeCommand());
@@ -168,24 +175,111 @@ class ExploreViewTest extends ApplicationTest {
 
         assertEquals("🎯 reach the shop · HOME › ? (depth 1)", view.goalText(), "off the map, one step past HOME");
         assertTrue(view.statusText().endsWith("last press 7 s ago · ⏸ waiting on Reader"), view.statusText());
-        List<String> cards = view.cardLines();
-        assertEquals(5, cards.size(), cards.toString());
-        assertTrue(cards.get(0).startsWith("Explorer · Waiting · on unknown-1"), cards.get(0));
-        assertTrue(cards.get(1).startsWith("Reader · Working · on unknown-1"), cards.get(1));
-        assertTrue(cards.get(3).startsWith("Coordinator · Idle"), cards.get(3));
+        assertEquals(List.of("Explorer · Waiting", "● Reader · Working", "Evaluator · Idle", "Coordinator · Idle",
+                "Mechanic · Idle"), view.chipLines(), "a dot on the one working");
+        List<String> crew = view.crewLines();
+        assertEquals(5, crew.size(), crew.toString());
+        assertTrue(crew.get(0).startsWith("Explorer · Waiting · on unknown-1"), crew.get(0));
+        assertTrue(crew.get(1).startsWith("Reader · Working · on unknown-1"), crew.get(1));
+        assertTrue(crew.get(3).startsWith("Coordinator · Idle"), crew.get(3));
         assertEquals(Agent.COORDINATOR, view.feedRows().getFirst().agent(), "the lease is the Coordinator's line");
         assertEquals("/gone/unknown-1.png", view.feedRows().get(1).frame(), "the stop's row names its frame");
     }
 
     @Test
-    void aRunWithoutAGoalShowsNoCards() {
+    void aRunWithoutAGoalShowsNoChips() {
         running = true;
         journal.append(new ExploreEvent.Began(false, 1_000));
 
         interact(() -> view.show(JournalView.of(journal)));
 
-        assertEquals(List.of(), view.cardLines());
+        assertEquals(List.of(), view.chipLines());
+        assertEquals(List.of(), view.crewLines());
         assertEquals("No goal: Claude works the stops · on no screen of the map yet", view.goalText());
+    }
+
+    /** A chip's click opens the Crew tab on its agent, which shows that worker's log as it was written. */
+    @Test
+    void aChipOpensTheCrewTabOnItsAgentsLiveLog() throws IOException, InterruptedException {
+        running = true;
+        Stop unknown = new Stop("unknown-1", StopKind.UNKNOWN_SCREEN, "", "HOME.shop→?", "", List.of(), List.of(),
+                Map.of(), List.of("shop"), "a screen not on the map", 2_000);
+        journal.append(new ExploreEvent.Began(false, "reach the shop", 1_000));
+        journal.append(new ExploreEvent.Stopped(unknown, false, 2_000));
+        journal.append(new ExploreEvent.Leased("unknown-1", StopRole.CARTOGRAPHER, 1, 124_000, 2_000));
+        Path log = journal.workerLog("unknown-1");
+        Files.createDirectories(log.getParent());
+        Files.writeString(log, String.join("\n",
+                "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"claude-sonnet-5-5\"}",
+                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"The frame "
+                        + "shows Settings.\"}]}}",
+                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":"
+                        + "\"mcp__botmaker__botmaker_sdk_read_map\",\"input\":{}}]}}",
+                "{\"type\":\"result\",\"subtype\":\"success\",\"num_turns\":2,\"duration_ms\":4000}",
+                "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"claude-sonnet-5-5\"}",
+                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Trying again"));
+        interact(() -> view.show(JournalView.of(journal)));
+
+        interact(() -> view.pickChip(Agent.READER));
+        // The click's own read, off the FX thread, is over before the one read here.
+        for (int i = 0; i < 100 && view.reading(); i++) Thread.sleep(20);
+        WaitForAsyncUtils.waitForFxEvents();
+        interact(view::readCrew);
+
+        assertEquals("Crew", view.tabShown());
+        assertEquals(Agent.READER, view.crewTab().selected());
+        assertEquals(List.of("unknown-1", "unknown-1 · try 2"), view.crewTab().sessionTitles());
+        assertEquals(List.of("Started: claude-sonnet-5-5"), view.crewTab().logLines(),
+                "the newest session followed; its half-written line not shown yet");
+
+        Files.writeString(log, ".\"}]}}\n", StandardOpenOption.APPEND);
+        interact(view::readCrew);
+        assertEquals(List.of("Started: claude-sonnet-5-5", "Said: Trying again."), view.crewTab().logLines());
+
+        // Away and back before any read of the other agent: nothing new in the Reader's log, yet it shows again.
+        interact(() -> {
+            view.crewTab().select(Agent.EVALUATOR);
+            view.crewTab().select(Agent.READER);
+        });
+        interact(view::readCrew);
+        assertEquals(List.of("Started: claude-sonnet-5-5", "Said: Trying again."), view.crewTab().logLines());
+
+        interact(() -> view.pickChip(Agent.EXPLORER));
+        assertEquals(List.of(), view.crewTab().logLines(), "the run's own code writes no session");
+    }
+
+    @Test
+    void theFrameFitsWholeByWidthAndHeight() {
+        assertEquals(500.0 / 2400, ExploreRunTab.fit(1080, 2400, 600, 500), 1e-9, "a tall frame by its height");
+        assertEquals(600.0 / 1920, ExploreRunTab.fit(1920, 1080, 600, 500), 1e-9, "a wide frame by its width");
+        assertEquals(0, ExploreRunTab.fit(1080, 2400, 0, 500));
+
+        BufferedImage tall = new BufferedImage(1080, 2400, BufferedImage.TYPE_INT_RGB);
+        interact(() -> {
+            view.runTab().frame(ScreenCapture.toFxImage(tall), Map.of());
+            stage.getScene().getRoot().layout();
+        });
+        double scale = view.runTab().frameScale();
+        assertTrue(scale > 0 && 2400 * scale <= 600, "drawn whole in a 900×600 window: " + scale);
+    }
+
+    @Test
+    void theUsersCountIsInItsTabsTitleAndTheSummarySaysWhatIsLeftOpen() {
+        running = true;
+        Stop buy = new Stop("no_verdict-1", StopKind.NO_VERDICT, "SHOP", "SHOP", "", List.of(), List.of(), Map.of(),
+                List.of(), "Buy has no verdict", 2_000);
+        journal.append(new ExploreEvent.Began(false, 1_000));
+        journal.append(new ExploreEvent.Stopped(buy, false, 2_000));
+        journal.append(new ExploreEvent.Asked(buy.id(), "Buy costs real money: spends or never?", 3_000));
+        journal.append(new ExploreEvent.Finding(FindingKind.BAD_MAP, "frame 3", "Home is marked by Private DNS",
+                3_500));
+
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertEquals("For you (1)", view.yoursTitle());
+        assertEquals(List.of("The run goes on: its summary is written at its end",
+                "⚑ " + FindingKind.BAD_MAP.displayName() + ": Home is marked by Private DNS (frame 3)"),
+                view.summaryLines());
     }
 
     @Test
@@ -200,6 +294,7 @@ class ExploreViewTest extends ApplicationTest {
 
         assertEquals("0:00:03 · 0 screens known (+0 new) · 0 stops fixed · ended", view.statusText());
         assertEquals(List.of(), view.pinnedLines(), "nothing waits on Claude");
+        assertEquals(List.of("The run ended without its summary"), view.summaryLines());
     }
 
     @Test
