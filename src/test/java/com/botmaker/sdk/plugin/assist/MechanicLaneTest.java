@@ -159,6 +159,32 @@ class MechanicLaneTest {
     }
 
     @Test
+    void aGitignoreOfTheLanesCannotCommitItsDesk() throws Exception {
+        Path checkout = checkout();
+        Journal journal = began();
+
+        lane(checkout).run(client("printf '!/.mechanic/\\n!/.claude/\\n' > .gitignore; mkdir -p .claude; "
+                        + "echo x > .claude/x; echo fixed > Code.java"),
+                journal, stop("finding-1", StopKind.FAULT), Duration.ofSeconds(20), () -> 7);
+
+        assertEquals(".gitignore\nCode.java", git(checkout, "diff", "--name-only", "HEAD", left(journal).branch()));
+    }
+
+    @Test
+    void aRepositoryMadeInsideTheLaneIsNeverCommitted() throws Exception {
+        Path checkout = checkout();
+        String head = git(checkout, "rev-parse", "HEAD");
+        Journal journal = began();
+
+        lane(checkout).run(client("echo fixed > Code.java; mkdir -p src/x; git init -q src/x"),
+                journal, stop("finding-1", StopKind.FAULT), Duration.ofSeconds(20), () -> 7);
+
+        assertTrue(left(journal).note().startsWith("not committed"), left(journal).note());
+        assertTrue(left(journal).note().contains("src/x/.git"), left(journal).note());
+        assertEquals(head, git(checkout, "rev-parse", left(journal).branch()));
+    }
+
+    @Test
     void aClientThatWorksInNoLaneLeavesNothingBehind() throws Exception {
         Path checkout = checkout();
 

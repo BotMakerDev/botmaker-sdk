@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The Mechanic's lane (spec 2026-11-24-explore-agents-design § Findings and hand-off): a git worktree of the SDK's
@@ -151,15 +152,14 @@ final class MechanicLane {
                        LongSupplier clock) throws IOException, InterruptedException {
         String note = note(lane).orElse(result.ok() ? "it left no note" : "it ended early: " + result.why());
         String[] own = {"--git-dir=" + gitDir, "--work-tree=" + lane};
-        Path excludes = Files.createTempFile("mechanic-excludes", ".txt");
-        try {
-            Files.writeString(excludes, "/" + DESK + "/\n/.claude/\n");
-            git(lane, own, "-c", "core.excludesFile=" + excludes, "add", "-A");
-            // A test's picture too: the SDK ignores *.png.
-            if (Files.isDirectory(lane.resolve("src"))) git(lane, own, "add", "-A", "-f", "--", "src");
-        } finally {
-            Files.deleteIfExists(excludes);
-        }
+        // A repository the Mechanic made inside the lane has a config of its own, which git run here would read.
+        Optional<Path> nested = nestedRepository(lane);
+        if (nested.isPresent()) throw new IOException("a git repository inside the lane, " + nested.get());
+        git(lane, own, "add", "-A");
+        // A test's picture too: the SDK ignores *.png.
+        if (Files.isDirectory(lane.resolve("src"))) git(lane, own, "add", "-A", "-f", "--", "src");
+        // Its desk and Claude's folder taken out again, whatever a .gitignore of the lane's says.
+        git(lane, own, "rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", ":(top)" + DESK, ":(top).claude");
         boolean changed = !git(lane, own, "diff", "--cached", "--name-only").isBlank();
         if (changed) {
             git(lane, own, "-c", "user.name=BotMaker Mechanic", "-c", "user.email=mechanic@botmaker.invalid",
@@ -168,6 +168,17 @@ final class MechanicLane {
         }
         journal.append(new ExploreEvent.Branched(stop.id(), changed ? branch : "", note, clock.getAsLong()));
         drop(lane, changed ? null : branch);
+    }
+
+    /** The first {@code .git} below {@code lane}'s own, link or not, links never followed; empty for none. */
+    static Optional<Path> nestedRepository(Path lane) throws IOException {
+        Path own = lane.resolve(".git");
+        try (Stream<Path> walk = Files.walk(lane)) {
+            return walk.filter(path -> path.getFileName() != null && path.getFileName().toString().equals(".git"))
+                    .filter(path -> !path.equals(own)).findFirst().map(lane::relativize);
+        } catch (UncheckedIOException unread) {
+            throw unread.getCause();
+        }
     }
 
     /** Removes the worktree {@code lane}, and {@code branch} (null: it holds work, and stays). */
