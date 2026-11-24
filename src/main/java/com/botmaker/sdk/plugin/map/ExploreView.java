@@ -564,6 +564,8 @@ final class ExploreView {
             case ExploreEvent.Ranked e -> null;
             case ExploreEvent.EditQueued e -> null;
             case ExploreEvent.EditApplied e -> e.ok() ? null : "⚠ " + e.editId() + " not written: " + e.said().lines().findFirst().orElse("");
+            case ExploreEvent.Summary e -> e.unresolved().isEmpty() ? "📋 No finding left open"
+                    : "📋 " + e.unresolved().size() + " finding(s) left open";
             case ExploreEvent.Reloaded e -> e.refused()
                     ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
                     ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()

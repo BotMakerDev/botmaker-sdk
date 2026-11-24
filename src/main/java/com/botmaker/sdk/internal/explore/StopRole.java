@@ -21,6 +21,11 @@ public enum StopRole {
     MECHANIC("mechanic", "Mechanic"),
     /** The bot's user, in the Explore tab: what only they can decide. No agent's wait answers such a stop. */
     USER("user", "You"),
+    /**
+     * The crew's judge of the run's progress (spec 2026-11-24-explore-agents-design): it takes no stop of a kind, only
+     * the Coordinator's evaluations, leased by an id of their own ({@code evaluation-1}).
+     */
+    EVALUATOR("evaluator", "Evaluator"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

@@ -74,14 +74,23 @@ public final class Coordinator {
 
         /** Write a heartbeat. */
         record Beat() implements Action {}
+
+        /** Start the Evaluator, leased by {@code id}, {@code why} it is due, until {@code expiresAt}. */
+        record Evaluate(String id, EvaluatorTrigger.Why why, long expiresAt) implements Action {}
     }
 
     private final Settings settings;
     private final Crew crew;
+    private final EvaluatorTrigger.Settings evaluations;
 
     public Coordinator(Settings settings, Crew crew) {
+        this(settings, crew, EvaluatorTrigger.Settings.DEFAULT);
+    }
+
+    Coordinator(Settings settings, Crew crew, EvaluatorTrigger.Settings evaluations) {
         this.settings = settings;
         this.crew = crew;
+        this.evaluations = evaluations;
     }
 
     /**
@@ -100,6 +109,22 @@ public final class Coordinator {
             actions.add(new Action.End(ExploreLoop.End.STUCK, "no progress for "
                     + JournalView.took(settings.quiet().toMillis())));
             return actions;
+        }
+        if (crew.present().contains(StopRole.EVALUATOR)) {
+            // The Evaluator's STUCK is its verdict on the run: the run ends on it.
+            Optional<ExploreEvent.Finding> stuck = view.stuckSaid();
+            if (stuck.isPresent()) {
+                actions.add(new Action.End(ExploreLoop.End.STUCK, stuck.get().why()));
+                return actions;
+            }
+            Optional<ExploreEvent.Leased> held = EvaluatorTrigger.held(view);
+            if (held.isPresent()) {
+                // A late evaluation is taken back, not tried again: the next one is due by the presses since.
+                if (held.get().expired(nowMs)) actions.add(new Action.Requeue(held.get().stopId(), held.get().attempt()));
+            } else {
+                EvaluatorTrigger.due(view, evaluations).ifPresent(why -> actions.add(new Action.Evaluate(
+                        EvaluatorTrigger.nextId(view), why, nowMs + settings.lease().toMillis())));
+            }
         }
         Optional<Stop> open = view.open();
         List<Stop> waiting = new ArrayList<>();

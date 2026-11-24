@@ -66,6 +66,15 @@ public final class WorkerRunner {
         return run(client.command(prompt(worker.get(), stop, goal), worker.get(), mcpConfig()), stop.id(), limit);
     }
 
+    /**
+     * The Evaluator's try at the evaluation {@code id} of the run {@code run}, exploring toward {@code goal}, started
+     * {@code why}: its result by {@code limit}. What it judged is what it wrote through the explore tools meanwhile.
+     */
+    Result evaluate(AgentClient client, String id, String run, String goal, EvaluatorTrigger.Why why, Duration limit) {
+        return run(client.command(EvaluatorPrompt.of(id, run, goal, why), WorkerRole.EVALUATOR, mcpConfig()), id,
+                limit);
+    }
+
     /** Runs {@code command} as a worker of {@code stopId}: its result by {@code limit}. */
     Result run(List<String> command, String stopId, Duration limit) {
         Process process;

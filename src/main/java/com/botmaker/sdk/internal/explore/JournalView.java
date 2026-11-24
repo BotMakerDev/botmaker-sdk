@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -282,6 +283,86 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     public String goal() {
         return events.stream().filter(ExploreEvent.Began.class::isInstance).map(ExploreEvent.Began.class::cast)
                 .map(ExploreEvent.Began::goal).findFirst().orElse("");
+    }
+
+    /**
+     * The presses the latest run ranked and has not made since, each by its latest rank, in the order first ranked: the
+     * run's frontier as the journal says it (parking aside, which only the run knows).
+     */
+    public List<ExploreEvent.Ranked> openRanks() {
+        Map<String, ExploreEvent.Ranked> open = new LinkedHashMap<>();
+        for (ExploreEvent event : events) {
+            switch (event) {
+                case ExploreEvent.Ranked r -> open.put(r.screen() + "." + r.press(), r);
+                case ExploreEvent.Tried t -> open.remove(t.screen() + "." + t.by());
+                default -> {}
+            }
+        }
+        return List.copyOf(open.values());
+    }
+
+    /**
+     * {@code screen} and every screen the latest run first reached from one of them: the part of the map a press of
+     * {@code screen} leads into, as this run found it.
+     */
+    public Set<String> under(String screen) {
+        Set<String> under = new LinkedHashSet<>();
+        if (screen == null || screen.isBlank()) return under;
+        under.add(screen);
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (ExploreEvent event : events) {
+                if (event instanceof ExploreEvent.NewScreen found && found.from() != null
+                        && under.contains(found.from())) {
+                    grew |= under.add(found.screen());
+                }
+            }
+        }
+        return under;
+    }
+
+    /**
+     * The latest {@link FindingKind#STUCK} finding of the run since it last restarted that an agent said through the
+     * explore tool's {@code record_finding}: the call it wrote just before is the last of Claude's before the finding.
+     * The run's own STUCK, which it ends on itself, is not one.
+     */
+    public Optional<ExploreEvent.Finding> stuckSaid() {
+        ExploreEvent.Finding said = null;
+        String lastCall = "";
+        for (ExploreEvent event : sinceRestart()) {
+            if (event instanceof ExploreEvent.Claude claude) lastCall = claude.call();
+            if (event instanceof ExploreEvent.Finding f && f.kind() == FindingKind.STUCK) {
+                if (lastCall.equals(STUCK_CALL)) said = f;
+                lastCall = "";
+            }
+        }
+        return Optional.ofNullable(said);
+    }
+
+    /** The call the explore tool writes before an agent's STUCK finding. */
+    public static final String STUCK_CALL = "record_finding " + FindingKind.STUCK.id();
+
+    /**
+     * The latest run's findings nothing acted on, oldest first, each said once: all but a drift (its ranks were lowered
+     * when it was said) and, once the goal was witnessed, a done proposed without a witness before it.
+     */
+    public List<ExploreEvent.Finding> unresolved() {
+        boolean witnessed = events.stream().anyMatch(ExploreEvent.Witnessed.class::isInstance);
+        Set<String> said = new HashSet<>();
+        return findings().stream().filter(f -> f.kind() != FindingKind.DRIFT)
+                .filter(f -> !(witnessed && f.kind() == FindingKind.NO_WITNESS))
+                .filter(f -> said.add(f.kind().id() + "\n" + f.why())).toList();
+    }
+
+    /** Whether the latest run's summary is written: once it ended, after its end. */
+    public boolean summed() {
+        List<ExploreEvent> since = sinceRestart();
+        for (int i = since.size() - 1; i >= 0; i--) {
+            if (since.get(i) instanceof ExploreEvent.Summary) return true;
+            if (since.get(i) instanceof ExploreEvent.Ended) return false;
+        }
+        return false;
     }
 
     /**

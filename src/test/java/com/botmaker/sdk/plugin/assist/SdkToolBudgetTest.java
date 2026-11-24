@@ -35,9 +35,11 @@ class SdkToolBudgetTest {
      * boxes, try_input inputs, edit_map one of its actions), 61 tools where there were 63; 39,790 once the flow,
      * picture, tag and setup tools were merged, 37 tools. The ceiling leaves about a tenth over that. Raised by
      * 500 on 2026-11-04, to 43,918, when way_when, input_when and look_when took a fact, its test and its value as
-     * fields in place of Java text: three fields on each of three actions.
+     * fields in place of Java text: three fields on each of three actions. Raised to 46,500 on 2026-11-24, at
+     * 46,142, when the explore crew's workers took their actions on the explore tool: the Reader's look, rank_presses
+     * and apply_edit, the Evaluator's progress, record_finding and propose_done.
      */
-    static final int CEILING = 44_000;
+    static final int CEILING = 46_500;
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String FROM = " (from BotMaker SDK)";

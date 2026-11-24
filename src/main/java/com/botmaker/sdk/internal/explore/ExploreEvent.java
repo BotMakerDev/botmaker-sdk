@@ -48,6 +48,7 @@ public sealed interface ExploreEvent {
             case Ranked ignored -> "ranked";
             case EditQueued ignored -> "edit_queued";
             case EditApplied ignored -> "edit_applied";
+            case Summary ignored -> "summary";
         };
     }
 
@@ -82,6 +83,7 @@ public sealed interface ExploreEvent {
             case "ranked" -> Ranked.class;
             case "edit_queued" -> EditQueued.class;
             case "edit_applied" -> EditApplied.class;
+            case "summary" -> Summary.class;
             default -> null;
         };
     }
@@ -326,6 +328,16 @@ public sealed interface ExploreEvent {
 
         public EditApplied(String editId, long at) {
             this(editId, true, "", at);
+        }
+    }
+
+    /**
+     * The run is over, and these findings are left for the next run or the user to read (spec § Findings and
+     * hand-off): written once, after the end and the Evaluator's grade of the map.
+     */
+    record Summary(List<Finding> unresolved, long at) implements ExploreEvent {
+        public Summary {
+            unresolved = unresolved == null ? List.of() : List.copyOf(unresolved);
         }
     }
 }

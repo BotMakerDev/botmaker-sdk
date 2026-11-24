@@ -1,0 +1,2 @@
+4. The run has ended: grade the map it leaves. For each screen of `read_map` that is wrong, a `bad_map` finding with
+   the screen as `evidence`. Do not record `stuck` or propose done: the run is over.

@@ -312,11 +312,11 @@ class CoordinatorTest {
     @Test
     void theCrewFollowsTheUsersSignIn() {
         assertEquals(Coordinator.Crew.SETTLER_ONLY, CoordinatorHost.crewOf(null));
-        assertEquals(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER, StopRole.MECHANIC),
+        assertEquals(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR),
                 CoordinatorHost.crewOf(client(true)).present());
         Coordinator.Crew out = CoordinatorHost.crewOf(client(false));
         assertEquals(Set.of(StopRole.SETTLER), out.present());
-        assertEquals(Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC), out.absent());
+        assertEquals(Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR), out.absent());
     }
 
     private static AgentClient client(boolean signedIn) {

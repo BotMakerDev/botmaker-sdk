@@ -59,6 +59,7 @@ public enum WorkerRole {
         return switch (role == null ? StopRole.UNKNOWN : role) {
             case CARTOGRAPHER -> Optional.of(READER);
             case MECHANIC -> Optional.of(MECHANIC);
+            case EVALUATOR -> Optional.of(EVALUATOR);
             case SETTLER, USER, UNKNOWN -> Optional.empty();
         };
     }

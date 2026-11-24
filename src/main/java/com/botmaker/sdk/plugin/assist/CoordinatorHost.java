@@ -53,6 +53,12 @@ public final class CoordinatorHost implements RunCompanion {
         WorkerRunner.Result run(Journal journal, StopRole role, Stop stop, Duration limit);
     }
 
+    /** One evaluation of the run, leased by {@code id}, started {@code why}, by {@code limit}. */
+    @FunctionalInterface
+    interface Evaluator {
+        WorkerRunner.Result run(Journal journal, String id, EvaluatorTrigger.Why why, Duration limit);
+    }
+
     private final Coordinator.Settings settings;
     /** The client the crew's workers run on; null while no worker is started (the Settler alone). */
     private final AgentClient client;
@@ -62,6 +68,8 @@ public final class CoordinatorHost implements RunCompanion {
     private ScheduledExecutorService watchdog;
     /** The project the run is of, once started: where its journal is when the run ends. */
     private Path project;
+    /** The latest run's id when this companion started (null: none): a run before this one, never closed by it. */
+    private String before;
 
     /**
      * A host not started yet, at the plan's start values: the core builds one for each run. Its workers run on the
@@ -83,7 +91,7 @@ public final class CoordinatorHost implements RunCompanion {
      */
     static Coordinator.Crew crewOf(AgentClient client) {
         if (client == null) return Coordinator.Crew.SETTLER_ONLY;
-        Set<StopRole> workers = Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC);
+        Set<StopRole> workers = Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR);
         if (client.available()) {
             Set<StopRole> present = new HashSet<>(workers);
             present.add(StopRole.SETTLER);
@@ -114,16 +122,10 @@ public final class CoordinatorHost implements RunCompanion {
         Path project = services == null ? null : services.projectDir();
         if (project == null || thread != null) return;
         this.project = project;
-        Worker worker = client == null ? null : (journal, role, stop, limit) -> {
-            // Kept so that stop() ends it: a worker never outlives the run it works for.
-            Thread own = Thread.currentThread();
-            workers.add(own);
-            try {
-                return new WorkerRunner(journal.folder()).run(client, role, stop, JournalView.of(journal).goal(), limit);
-            } finally {
-                workers.remove(own);
-            }
-        };
+        this.before = Journal.latest(project).map(Journal::runId).orElse(null);
+        Worker worker = client == null ? null : (journal, role, stop, limit) -> tracked(() ->
+                new WorkerRunner(journal.folder()).run(client, role, stop, JournalView.of(journal).goal(), limit));
+        Evaluator evaluator = evaluator();
         TreeAnswerWatch.Writer writer = TreeAnswerWatch.into(services);
         // The latest run's journal, read again each round: the run begins its own once its process is up.
         Supplier<Optional<Journal>> latest = () -> Journal.latest(project);
@@ -140,8 +142,26 @@ public final class CoordinatorHost implements RunCompanion {
         }, every, every, TimeUnit.MILLISECONDS);
         EditWriter.Apply edits = EditWriter.into(services);
         thread = Thread.ofPlatform().daemon().name("explore-coordinator").start(() -> coordinate(latest,
-                view -> new Coordinator(settings, crewFor(view, client)), writer, worker, edits,
+                view -> new Coordinator(settings, crewFor(view, client)), writer, worker, evaluator, edits,
                 pictured -> TreeAnswers.pictured(services, pictured)));
+    }
+
+    /** The Evaluator on the user's own client; null while no worker is started. */
+    private Evaluator evaluator() {
+        return client == null ? null : (journal, id, why, limit) -> tracked(() ->
+                new WorkerRunner(journal.folder()).evaluate(client, id, journal.runId(), JournalView.of(journal).goal(),
+                        why, limit));
+    }
+
+    /** Runs {@code work} on this thread, kept so that {@link #stop()} ends it: a worker never outlives its run. */
+    private WorkerRunner.Result tracked(Supplier<WorkerRunner.Result> work) {
+        Thread own = Thread.currentThread();
+        workers.add(own);
+        try {
+            return work.get();
+        } finally {
+            workers.remove(own);
+        }
     }
 
     /**
@@ -166,13 +186,75 @@ public final class CoordinatorHost implements RunCompanion {
         thread = null;
         watchdog = null;
         if (project != null) {
-            Journal.latest(project).ifPresent(journal -> TreeAnswerWatch.endIfKilled(journal,
-                    System.currentTimeMillis()));
+            Journal.latest(project).ifPresent(journal -> {
+                TreeAnswerWatch.endIfKilled(journal, System.currentTimeMillis());
+                // A run that never began leaves an older one latest: that one is not this companion's to close.
+                if (journal.runId().equals(before)) return;
+                // The end's evaluation is a worker of its own: off the core's thread, bounded by its lease.
+                Evaluator grader = crewFor(JournalView.of(journal), client).present().contains(StopRole.EVALUATOR)
+                        ? evaluator() : null;
+                Thread.ofPlatform().daemon().name("explore-summary").start(() ->
+                        close(journal, grader, settings.lease(), System::currentTimeMillis));
+            });
         }
     }
 
+    /**
+     * Closes the ended run of {@code journal}: its end evaluation by {@code evaluator} (null: none), once, by
+     * {@code limit}, then its {@link ExploreEvent.Summary}, once. A run still running is left as it is.
+     */
+    static void close(Journal journal, Evaluator evaluator, Duration limit, LongSupplier clock) {
+        JournalView view = JournalView.of(journal);
+        if (view.ended().isEmpty()) return;
+        if (evaluator != null && EvaluatorTrigger.atEnd(view)) {
+            String id = EvaluatorTrigger.nextId(view);
+            long now = clock.getAsLong();
+            Coordinator.Action.Evaluate evaluate = new Coordinator.Action.Evaluate(id, EvaluatorTrigger.Why.END,
+                    now + limit.toMillis());
+            journal.append(new ExploreEvent.Leased(id, StopRole.EVALUATOR, 1, evaluate.expiresAt(), now));
+            Thread grading = Thread.ofPlatform().daemon().name("explore-evaluator").start(() ->
+                    evaluate(journal, evaluate, evaluator, clock));
+            try {
+                // The worker kills its own process at the limit; a grace past it, then it is stopped.
+                if (!grading.join(limit.plusSeconds(5))) {
+                    grading.interrupt();
+                    // Its last write lands before the summary, never after it.
+                    grading.join(Duration.ofSeconds(2));
+                }
+            } catch (InterruptedException stopped) {
+                grading.interrupt();
+                Thread.currentThread().interrupt();
+            }
+            if (EvaluatorTrigger.held(JournalView.of(journal)).isPresent()) {
+                journal.append(new ExploreEvent.Released(id, 1, false, "timeout", clock.getAsLong()));
+            }
+        }
+        synchronized (ENDING) {
+            JournalView after = JournalView.of(journal);
+            if (!after.summed()) journal.append(new ExploreEvent.Summary(after.unresolved(), clock.getAsLong()));
+        }
+    }
+
+    /**
+     * {@code evaluator}'s try at {@code evaluate}, released with how it ended, unless it ran out (the Coordinator's
+     * requeue releases it) or was stopped with its run.
+     */
+    private static void evaluate(Journal journal, Coordinator.Action.Evaluate evaluate, Evaluator evaluator,
+                                 LongSupplier clock) {
+        WorkerRunner.Result result;
+        try {
+            result = evaluator.run(journal, evaluate.id(), evaluate.why(),
+                    Duration.ofMillis(Math.max(0, evaluate.expiresAt() - clock.getAsLong())));
+        } catch (RuntimeException failed) {
+            result = new WorkerRunner.Result(false, String.valueOf(failed.getMessage()));
+        }
+        long now = clock.getAsLong();
+        if (now >= evaluate.expiresAt() || result.why().equals("timeout") || result.why().equals("stopped")) return;
+        journal.append(new ExploreEvent.Released(evaluate.id(), 1, result.ok(), result.why(), now));
+    }
+
     private void coordinate(Supplier<Optional<Journal>> latest, Function<JournalView, Coordinator> coordinators,
-                            TreeAnswerWatch.Writer writer, Worker worker, EditWriter.Apply edits,
+                            TreeAnswerWatch.Writer writer, Worker worker, Evaluator evaluator, EditWriter.Apply edits,
                             Consumer<ExploreEvent.Pictured> picture) {
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
         String failedLast = null;
@@ -196,7 +278,8 @@ public final class CoordinatorHost implements RunCompanion {
                         // Its crew is known once the run said its goal: a journal before its start has none yet.
                         if (coordinator == null && view.began()) coordinator = coordinators.apply(view);
                         if (coordinator != null) {
-                            round(now, view, coordinator, System::currentTimeMillis, writer, settlers, worker);
+                            round(now, view, coordinator, System::currentTimeMillis, writer, settlers, worker,
+                                    evaluator);
                         }
                         writeEdits(now, view, edits, settlers, writing, System::currentTimeMillis);
                         TreeAnswerWatch.pictures(reader.view(), pictured, picture);
@@ -219,26 +302,38 @@ public final class CoordinatorHost implements RunCompanion {
     /** One round: what {@code coordinator} decides on {@code view} at the clock's time, carried out on {@code journal}. */
     static void round(Journal journal, JournalView view, Coordinator coordinator, LongSupplier clock,
                       TreeAnswerWatch.Writer writer, Executor settlers) {
-        round(journal, view, coordinator, clock, writer, settlers, null);
+        round(journal, view, coordinator, clock, writer, settlers, null, null);
     }
 
     static void round(Journal journal, JournalView view, Coordinator coordinator, LongSupplier clock,
                       TreeAnswerWatch.Writer writer, Executor settlers, Worker worker) {
+        round(journal, view, coordinator, clock, writer, settlers, worker, null);
+    }
+
+    static void round(Journal journal, JournalView view, Coordinator coordinator, LongSupplier clock,
+                      TreeAnswerWatch.Writer writer, Executor settlers, Worker worker, Evaluator evaluator) {
         long now = clock.getAsLong();
-        carryOut(journal, view, coordinator.step(view, now, journal.commandWaiting()), clock, writer, settlers, worker);
+        carryOut(journal, view, coordinator.step(view, now, journal.commandWaiting()), clock, writer, settlers, worker,
+                evaluator);
     }
 
     static void carryOut(Journal journal, JournalView view, List<Coordinator.Action> actions, LongSupplier clock,
                          TreeAnswerWatch.Writer writer, Executor settlers) {
-        carryOut(journal, view, actions, clock, writer, settlers, null);
+        carryOut(journal, view, actions, clock, writer, settlers, null, null);
+    }
+
+    static void carryOut(Journal journal, JournalView view, List<Coordinator.Action> actions, LongSupplier clock,
+                         TreeAnswerWatch.Writer writer, Executor settlers, Worker worker) {
+        carryOut(journal, view, actions, clock, writer, settlers, worker, null);
     }
 
     /**
-     * Does each of {@code actions} on {@code journal}, at the clock's time, and writes it down; the Settler's work and
-     * each {@code worker}'s try (null: none is started) run on {@code settlers}, and say they finished when they did.
+     * Does each of {@code actions} on {@code journal}, at the clock's time, and writes it down; the Settler's work,
+     * each {@code worker}'s try and each {@code evaluator}'s (null: none is started) run on {@code settlers}, and say
+     * they finished when they did.
      */
     static void carryOut(Journal journal, JournalView view, List<Coordinator.Action> actions, LongSupplier clock,
-                         TreeAnswerWatch.Writer writer, Executor settlers, Worker worker) {
+                         TreeAnswerWatch.Writer writer, Executor settlers, Worker worker, Evaluator evaluator) {
         long nowMs = clock.getAsLong();
         for (Coordinator.Action action : actions) {
             switch (action) {
@@ -268,6 +363,15 @@ public final class CoordinatorHost implements RunCompanion {
                     journal.command("park " + park.stopId());
                 }
                 case Coordinator.Action.End end -> end(journal, end.end(), end.why(), nowMs);
+                case Coordinator.Action.Evaluate evaluate -> {
+                    journal.append(new ExploreEvent.Leased(evaluate.id(), StopRole.EVALUATOR, 1, evaluate.expiresAt(),
+                            nowMs));
+                    if (evaluator != null) {
+                        settlers.execute(() -> evaluate(journal, evaluate, evaluator, clock));
+                    } else {
+                        journal.append(new ExploreEvent.Released(evaluate.id(), 1, false, "no evaluator", nowMs));
+                    }
+                }
             }
         }
     }
@@ -377,8 +481,12 @@ public final class CoordinatorHost implements RunCompanion {
     private static void end(Journal journal, ExploreLoop.End end, String why, long nowMs) {
         // The watchdog and the Coordinator may both end a run: the first does, the other finds it ended.
         synchronized (ENDING) {
-            if (!JournalView.of(journal).running()) return;
-            journal.append(new ExploreEvent.Finding(FindingKind.STUCK, "", why, nowMs));
+            JournalView view = JournalView.of(journal);
+            if (!view.running()) return;
+            // An end the Evaluator said is said once: its finding is the run's. Only the latest finding can be it.
+            boolean said = !view.findings().isEmpty() && view.stuckSaid().filter(view.findings().getLast()::equals)
+                    .map(f -> f.why().equals(why)).orElse(false);
+            if (!said) journal.append(new ExploreEvent.Finding(FindingKind.STUCK, "", why, nowMs));
             journal.append(new ExploreEvent.Ended(end, nowMs));
             journal.command("stop");
         }

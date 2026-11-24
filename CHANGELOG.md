@@ -21,6 +21,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The explore crew's Evaluator (spec `2026-11-24-explore-agents-design`): in a run given a goal, with the user signed
+  in to `claude`, a Sonnet session judges the run after 8 presses that found no new screen and ranked nothing better,
+  at least every 25 presses, and once when the run ends. It reads the run through the explore tool's `progress` and
+  writes through `record_finding` (a drift lowers by 3 every open press under its screen, a stuck ends the run, a
+  wrong map or an SDK fault is recorded) and `propose_done` (the run checks the mark and answers whether it held).
+  At the end it grades the map, and the run's journal closes with a summary of the findings left open.
 - Discover takes a goal (spec `2026-11-24-explore-agents-design`): `goal`, in plain words, and optionally `goalScreen`,
   the screen whose reaching ends the run, plus `maxPresses`; the budget also counts the crew's agent sessions. A run
   toward a goal presses the frontier's best first, the presses the Reader ranked, wherever they are, walking there;

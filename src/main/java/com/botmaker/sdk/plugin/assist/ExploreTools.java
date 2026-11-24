@@ -12,6 +12,7 @@ import com.botmaker.plugin.api.run.DevReload;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
+import com.botmaker.sdk.internal.explore.FindingKind;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.PressTag;
@@ -30,8 +31,13 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -135,6 +141,31 @@ final class ExploreTools {
             implements Action {
     }
 
+    @Describe("the run's presses, ranks, next presses and findings")
+    record Progress(@Describe(value = RUN_ID, optional = true) String run) implements Action {
+    }
+
+    @Describe("say what is wrong: drift lowers the screen's presses, stuck ends the run")
+    record RecordFinding(@Describe("drift, stuck, bad_map or sdk_fault") String kind,
+                         @Describe("what is wrong") String why,
+                         @Describe(value = "a screen, frame or press", optional = true) String evidence,
+                         @Describe(value = "drift: the screen lost under", optional = true) String screen,
+                         @Describe(value = RUN_ID, optional = true) String run)
+            implements Action {
+    }
+
+    @Describe("the goal looks reached: the run checks mark and ends done if it holds")
+    record ProposeDone(@Describe("a text shown once the goal is reached") String mark) implements Action {
+    }
+
+    /** The finding kinds the Evaluator says; a done without a witness is the run's own. */
+    private static final Set<FindingKind> SAID = EnumSet.of(FindingKind.DRIFT, FindingKind.STUCK, FindingKind.BAD_MAP,
+            FindingKind.SDK_FAULT);
+    /** How much a drift lowers each open press under its screen. */
+    static final int DRIFT_DROP = 3;
+    /** How long a {@code propose_done} waits for the run to check its mark. */
+    static final Duration DONE_WITHIN = Duration.ofSeconds(30);
+
     /** How long an {@code apply_edit} waits for the run's writer to carry it out. */
     static final Duration EDIT_WITHIN = Duration.ofSeconds(60);
 
@@ -152,6 +183,8 @@ final class ExploreTools {
         String run = switch (action) {
             case Wait wait -> wait.run();
             case Status status -> status.run();
+            case Progress progress -> progress.run();
+            case RecordFinding finding -> finding.run();
             default -> null;
         };
         Optional<Journal> journal = run == null || run.isBlank() ? Journal.latest(project)
@@ -185,6 +218,10 @@ final class ExploreTools {
             case Look look -> look(journal, look.stop());
             case RankPresses rank -> rank(journal, rank.stop(), rank.screen(), rank.presses());
             case ApplyEdit edit -> applyEdit(journal, edit.stop(), edit.editId(), edit.edit(), EDIT_WITHIN);
+            case Progress ignored -> progress(journal);
+            case RecordFinding finding -> recordFinding(journal, finding.kind(), finding.why(), finding.evidence(),
+                    finding.screen());
+            case ProposeDone done -> proposeDone(journal, done.mark(), DONE_WITHIN);
             // Reached only without the host's services: handle(Action, AgentContext) sends a reload to reloadSdk.
             case ReloadSdk ignored -> AgentReply.refused("A reload needs the host's services, which this call has not.");
         };
@@ -550,6 +587,129 @@ final class ExploreTools {
         AgentReply text = AgentReply.text(goal + "\n" + whole(stop.get(), view));
         return frame(stop.get().framePath()).map(image -> text.and(AgentReply.image(Images.scaled(image,
                 Frames.fit(image.getWidth(), image.getHeight(), Frames.LOOK_EDGE))))).orElse(text);
+    }
+
+    /**
+     * What the Evaluator judges the run by: its goal, where it is, its latest presses with their ranks, the presses it
+     * may make next, best first, and the findings said so far.
+     */
+    static AgentReply progress(Journal journal) {
+        JournalView view = JournalView.of(journal);
+        if (!view.began()) return AgentReply.refused(noRun());
+        claude(journal, "progress");
+        StringBuilder text = new StringBuilder(view.goal().isBlank() ? "Goal: none." : "Goal: " + view.goal() + ".")
+                .append('\n').append(view.ended().map(end -> "Ended (" + end.displayName() + "). ").orElse("Running. "))
+                .append(counts(view)).append(view.where().map(w -> " On " + w + ".").orElse(""));
+        Map<String, ExploreEvent.Ranked> ranks = new HashMap<>();
+        List<ExploreEvent.Tried> presses = new ArrayList<>();
+        for (ExploreEvent event : view.events()) {
+            if (event instanceof ExploreEvent.Ranked r) ranks.put(r.screen() + "." + r.press(), r);
+            if (event instanceof ExploreEvent.Tried t) presses.add(t);
+        }
+        text.append("\n\nLatest presses, oldest first:");
+        presses.subList(Math.max(0, presses.size() - PROGRESS_PRESSES), presses.size()).forEach(t -> text.append("\n- ")
+                .append(t.screen()).append(" › ").append(t.by())
+                .append(Optional.ofNullable(ranks.get(t.screen() + "." + t.by())).map(r -> " (rank " + r.rank() + ")")
+                        .orElse(""))
+                .append(t.arrival() == null ? "" : " → " + t.arrival()));
+        if (presses.isEmpty()) text.append(" none yet.");
+        List<ExploreEvent.Ranked> next = view.openRanks().stream()
+                .sorted(Comparator.comparingInt(ExploreEvent.Ranked::rank).reversed()).limit(PROGRESS_PRESSES).toList();
+        text.append("\n\nMay press next, best first:");
+        next.forEach(r -> text.append("\n- ").append(r.screen()).append(" › ").append(r.press()).append(" (rank ")
+                .append(r.rank()).append(", ").append(r.tag().id()).append(')'));
+        if (next.isEmpty()) text.append(" nothing ranked.");
+        List<ExploreEvent.Finding> findings = view.findings();
+        text.append("\n\nFindings:");
+        findings.forEach(f -> text.append("\n- ").append(f.kind().id()).append(": ").append(f.why())
+                .append(f.evidence().isBlank() ? "" : " (" + f.evidence() + ")"));
+        if (findings.isEmpty()) text.append(" none.");
+        return AgentReply.text(text.toString());
+    }
+
+    /** How many presses {@code progress} lists, of those made and of those to make. */
+    private static final int PROGRESS_PRESSES = 15;
+
+    /**
+     * Writes the Evaluator's finding of {@code kind}: a {@link FindingKind#DRIFT} lowers by {@value #DRIFT_DROP} each
+     * open press of {@code screen} and of the screens the run reached from it, so the run turns elsewhere; a
+     * {@link FindingKind#STUCK} ends the run (the Coordinator's). An ended run takes one only from its end's evaluation.
+     */
+    static AgentReply recordFinding(Journal journal, String kind, String why, String evidence, String screen) {
+        FindingKind said = FindingKind.fromId(kind);
+        if (!SAID.contains(said)) return AgentReply.refused("A finding is drift, stuck, bad_map or sdk_fault.");
+        if (why == null || why.isBlank()) return AgentReply.refused("Say in one line what is wrong.");
+        String lost = screen == null ? "" : screen.strip();
+        if (said == FindingKind.DRIFT && lost.isEmpty()) {
+            return AgentReply.refused("A drift names the screen the run is lost under, as screen.");
+        }
+        JournalView view = JournalView.of(journal);
+        if (!view.began()) return AgentReply.refused(noRun());
+        // The Evaluator's alone: only an evaluation under way acts on it, a stuck above all.
+        if (EvaluatorTrigger.held(view).isEmpty()) {
+            return AgentReply.refused(view.running() ? "record_finding is the Evaluator's, and no evaluation is under "
+                    + "way." : "The run has ended.");
+        }
+        if (said == FindingKind.STUCK && !view.running()) {
+            return AgentReply.refused("The run has ended already: a stuck ends nothing now.");
+        }
+        claude(journal, "record_finding " + said.id());
+        long at = System.currentTimeMillis();
+        String shown = evidence == null || evidence.isBlank() ? lost : evidence.strip();
+        journal.append(new ExploreEvent.Finding(said, shown, why.strip(), at));
+        if (said != FindingKind.DRIFT) {
+            return AgentReply.text("Recorded " + said.id() + (said == FindingKind.STUCK ? ": the run ends on it." : "."));
+        }
+        Set<String> under = view.under(lost);
+        int lowered = 0;
+        for (ExploreEvent.Ranked r : view.openRanks()) {
+            if (!under.contains(r.screen())) continue;
+            // A press ranked toward the goal stays ranked toward it (1 at least); one that would not move is left.
+            int rank = r.rank() > 0 ? Math.max(1, r.rank() - DRIFT_DROP) : r.rank();
+            if (rank == r.rank()) continue;
+            journal.append(new ExploreEvent.Ranked(r.screen(), r.press(), rank, r.tag(), at));
+            lowered++;
+        }
+        return AgentReply.text("Recorded drift: " + lowered + " press(es) under " + lost + " rank lower; the run "
+                + "goes on.");
+    }
+
+    /**
+     * Asks the run to check {@code mark} on its screen, its goal's witness, and answers what it found within
+     * {@code within}: a witness ends the run done, none is a {@link FindingKind#NO_WITNESS} finding and the run goes on.
+     */
+    static AgentReply proposeDone(Journal journal, String mark, Duration within) {
+        JournalView view = JournalView.of(journal);
+        if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended." : noRun());
+        // A paused run reads no done: it would be dropped, never checked.
+        Optional<String> waitsOn = view.open().map(stop -> stop.id());
+        if (waitsOn.isPresent()) {
+            return AgentReply.refused("The run waits on " + waitsOn.get() + ": propose done once it goes on.");
+        }
+        String shown = mark == null ? "" : mark.strip();
+        long witnessed = view.count(ExploreEvent.Witnessed.class);
+        long refused = view.findings().stream().filter(f -> f.kind() == FindingKind.NO_WITNESS).count();
+        claude(journal, "propose_done");
+        journal.command(shown.isEmpty() ? "done" : "done " + shown);
+        long deadline = System.nanoTime() + within.toNanos();
+        while (System.nanoTime() < deadline) {
+            JournalView now = JournalView.of(journal);
+            if (now.count(ExploreEvent.Witnessed.class) > witnessed) {
+                return AgentReply.text("Witnessed: the run ends done.");
+            }
+            List<ExploreEvent.Finding> missed = now.findings().stream()
+                    .filter(f -> f.kind() == FindingKind.NO_WITNESS).toList();
+            if (missed.size() > refused) {
+                return AgentReply.text("Not witnessed: " + missed.getLast().why() + ". The run goes on.");
+            }
+            try {
+                Thread.sleep(Math.min(100, Math.max(1, (deadline - System.nanoTime()) / 1_000_000)));
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return AgentReply.text("Sent; not checked yet: the run checks the mark at its next press.");
     }
 
     /** The frame saved at {@code path}; empty when there is none or it cannot be read. */
