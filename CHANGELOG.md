@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring no longer stops on a package under the app's own: `com.android.settings.intelligence`, the Settings
+  app's search, is the app `com.android.settings`, not another window in front of it. An unrelated app, and a name that
+  only starts with the app's letters, still stop it.
 - A Keep exploring or Discover run killed from outside (the JVM, Studio quit, a core restart) is ended in its journal
   (*Crashed or stopped from Studio*) by the run's companion once the run's process is gone; before, `status` said it
   still ran and `wait` blocked to its timeout.

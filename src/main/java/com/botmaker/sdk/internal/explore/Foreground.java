@@ -36,9 +36,18 @@ public record Foreground(String inFront, String target, String dialog) {
     /** Nothing to compare against: every foreground is the game's. */
     public static final Foreground UNKNOWN = new Foreground("", "");
 
-    /** Whether something other than the target is in front. Unread, with a target to compare, is not the target. */
+    /**
+     * Whether something other than the target is in front. Unread, with a target to compare, is not the target. A
+     * package under the target's ({@code com.android.settings.intelligence} for {@code com.android.settings}, the
+     * Settings app's own search) is the target's app, not a window in its way (2026-11-24).
+     */
     public boolean foreign() {
-        return !target.isEmpty() && !target.equals(inFront);
+        return !target.isEmpty() && !target.equals(inFront) && !(isPackage(target) && inFront.startsWith(target + "."));
+    }
+
+    /** Whether {@code name} is a package name, not a window's label: dotted, with no space. */
+    private static boolean isPackage(String name) {
+        return name.indexOf('.') > 0 && name.indexOf(' ') < 0;
     }
 
     /** What is in front of the bot's capture source now; read again once when the first read finds nothing. */
