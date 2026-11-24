@@ -451,6 +451,11 @@ public final class ExploreLoop {
     private String by;
     /** The last walk, {@code from→to}, until a press: a set-aside screen a walk came back to does not walk again. */
     private String lastWalk;
+    /**
+     * Each walk, {@code from→to}, that came back to where it began, until the map changes: never walked again, so a
+     * run cannot go to and fro between two that both fail.
+     */
+    private final Set<String> walkedBack = new HashSet<>();
     /** The stop resumed last, until the next round says whether the fix took. */
     private Stop resumed;
     private int generation;
@@ -1029,8 +1034,8 @@ public final class ExploreLoop {
         if (clock.overBudget(screen)) {
             // Its own work waits while another screen has some: that one is walked to first.
             // A walk that came back here does its own work instead of walking again.
-            Optional<String> other = chooser.next(screen, to -> !clock.aside(to), this::refused);
-            if (other.isPresent() && !(screen + "→" + other.get()).equals(lastWalk)) return walk(screen, other.get());
+            Optional<String> other = chooser.next(screen, to -> !clock.aside(to) && walks(screen, to), this::refused);
+            if (other.isPresent()) return walk(screen, other.get());
             Optional<String> lowYield = clock.lowYield(screen);
             if (lowYield.isPresent()) {
                 Paused low = stop(StopKind.LOW_YIELD, screen, screen, look, lowYield.get(), false);
@@ -1058,8 +1063,8 @@ public final class ExploreLoop {
                     settledWhy(screen)) != Paused.END;
         }
         // Nothing left here the run presses itself: the nearest screen not done, a set-aside one last.
-        Optional<String> next = chooser.next(screen, to -> !clock.aside(to), this::refused)
-                .or(() -> chooser.next(screen, to -> true, this::refused));
+        Optional<String> next = chooser.next(screen, to -> !clock.aside(to) && walks(screen, to), this::refused)
+                .or(() -> chooser.next(screen, to -> walks(screen, to), this::refused));
         if (next.isPresent()) return walk(screen, next.get());
         // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
         if (chooser.giveUpNotSeen()) return true;
@@ -1131,7 +1136,7 @@ public final class ExploreLoop {
                 return Optional.of(true);
             }
             // A walk there that came back here did not arrive: the entry waits for the map to change.
-            if ((screen + "→" + entry.screen()).equals(lastWalk)) {
+            if (!walks(screen, entry.screen())) {
                 frontier.park(entry, "the walk from " + screen + " to " + entry.screen() + " did not arrive");
                 return Optional.of(true);
             }
@@ -1152,6 +1157,15 @@ public final class ExploreLoop {
     private void clock(String screen) {
         clock.moveTo(screen);
         chooser.visit(screen);
+    }
+
+    /**
+     * Whether the run may walk from {@code screen} to {@code to}: not when that walk came back here since the map last
+     * changed. The last walk is counted as come back once the run stands where it began.
+     */
+    private boolean walks(String screen, String to) {
+        if (lastWalk != null && lastWalk.startsWith(screen + "→")) walkedBack.add(lastWalk);
+        return !walkedBack.contains(screen + "→" + to);
     }
 
     private boolean walk(String screen, String to) {
@@ -1792,6 +1806,7 @@ public final class ExploreLoop {
             chooser.use(map);
             // The reloaded map can hold the way a parked press lacked, and the input a rank's words name.
             renameRanks();
+            walkedBack.clear();
             frontier.resume();
             if (done.guards() != null) guards = done.guards();
             verdictsDue = true;

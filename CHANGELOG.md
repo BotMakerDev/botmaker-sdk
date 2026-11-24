@@ -134,6 +134,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   destructive is never pressed unattended. Before, the words matched no input, so the best was dropped as gone and a
   risky one (*Pair new device*) was pressed like any other. A rank by a picture's name (`add_account_button`) reaches
   the one row whose field or words read the same, spelling and a trailing *button*/*title* aside (`addAccount`).
+- Keep exploring no longer walks to and fro without a word: a walk that came back where it began is not walked again
+  until the map changes, so a run with nowhere it can reach stops stuck instead (a live run spent 12 minutes on
+  Settings' search page walking toward screens it never reached).
 - Keep exploring maps every row of an app's list: a row a person taps whose words are its children's (each row of
   Android's Settings: a clickable layout with no id, label or text of its own) is an input found by the first text it
   holds (`holding`), as the element picker finds it. Only the parts with a clue of their own were mapped before, so
