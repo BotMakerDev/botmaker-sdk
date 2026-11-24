@@ -50,8 +50,9 @@ import java.util.stream.Collectors;
  * popup of the map that shows is closed first ({@link #closePopups}, which the run's {@code PopupGuard} calls too),
  * and an overlay the map lacks cleared once ({@link #uncover}); a step that lands elsewhere is read again and the way
  * planned anew from there.
- * A way back with no input is the game's usual close button when the walk is given one. A walk presses no key: a
- * way that is a key, and a way back with no input and no close button, are never taken (Escape asked to quit the
+ * A way back with no input is the game's usual close button when the walk is given one, else, on Android, the
+ * system's own Back, as every Android screen is left (2026-11-25). Otherwise a walk presses no key: a way that is a
+ * key, and a way back with no input and no close button off Android, are never taken (Escape asked to quit the
  * game or closed the wrong screen too often, 2026-11-03).
  *
  * <p>A way on its own presses nothing: the walk waits for the screen after a loading screen or a transition, up to the
@@ -385,7 +386,8 @@ public final class ScreenWalk {
             if (frame.isEmpty()) return new Result(Outcome.STUCK, null, List.of(), "The game shows no frame.");
             if (!perform(edge, frame.get())) {
                 return new Result(Outcome.MISSING, edge.from(), List.of(), edge.label() + " is not on "
-                        + graph.shown(edge.from()) + (edge.via() == null && close == null ? ": no close button is "
+                        + graph.shown(edge.from()) + (edge.via() == null && close == null && !reach.hasSystemBack()
+                        ? ": no close button is "
                         + "mapped for a way back with none." : "."));
             }
             if (arrives(edge, frame.get())) {
@@ -954,7 +956,12 @@ public final class ScreenWalk {
     /** Whether {@code edge} is taken without a key: no key way, and a way back with no input only by the close button. */
     private boolean keyless(ScreenGraph.Edge edge) {
         if (edge.onItsOwn()) return true;
-        return edge.via() == null ? close != null : !(edge.via() instanceof Hotkey);
+        return edge.via() == null ? close != null || reach.hasSystemBack() : !(edge.via() instanceof Hotkey);
+    }
+
+    /** A way back with no input: the usual close button while it shows, else the platform's own Back (Android's). */
+    private boolean backWithNone(BufferedImage frame) {
+        return close != null ? reach.perform(close, frame) : reach.systemBack();
     }
 
     /** Whether {@code edge} goes through a text field whose text only a body gives: no walk types it. */
@@ -1023,7 +1030,7 @@ public final class ScreenWalk {
      */
     private boolean perform(ScreenGraph.Edge edge, BufferedImage frame) {
         if (edge.onItsOwn()) return true;    // nothing to press: arrives waits for it
-        if (edge.via() == null) return close != null && reach.perform(close, frame);
+        if (edge.via() == null) return backWithNone(frame);
         Optional<Tree> tree = treeOf(edge);
         if (edge.via() instanceof Button button && tree.isPresent()) {
             Map<String, Button> buttons = graph.screen(graph.holder(edge)).map(from -> from.nodeButtons(tree.get()))
@@ -1224,6 +1231,8 @@ public final class ScreenWalk {
                 .filter(via -> !(via instanceof Hotkey || via instanceof Custom)).orElse(null);
         Input pressed = way != null && reach.perform(way, frame) ? way
                 : close != null && reach.perform(close, frame) ? close : null;
+        // Android's own Back closes any popup or dialog: pressed when the map has nothing of its own for it.
+        if (pressed == null && close == null && reach.systemBack()) return reach.look();
         if (pressed == null) {
             throw new Stayed(graph.shown(popup) + " shows no way out of the map (" + (way == null ? "none mapped"
                     : way.label() + " not found") + "): map its close button.");

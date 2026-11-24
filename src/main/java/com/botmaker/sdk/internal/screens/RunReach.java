@@ -327,6 +327,25 @@ public final class RunReach implements Reach {
         }
     }
 
+    /** An Android emulator's: Back is how every Android screen is left, never a game's quit key. */
+    @Override
+    public boolean hasSystemBack() {
+        return Source.current() != null && Source.current().base() instanceof EmulatorSource;
+    }
+
+    @Override
+    public boolean systemBack() {
+        if (Source.current() == null || !(Source.current().base() instanceof EmulatorSource device)) return false;
+        device.back();
+        return true;
+    }
+
+    @Override
+    public String windowOverPage() {
+        return Source.current() != null && Source.current().base() instanceof EmulatorSource device
+                ? device.windowOverPage() : "";
+    }
+
     @Override
     public void keys(Combo combo) {
         if (Source.current().base() instanceof WebSource web) {

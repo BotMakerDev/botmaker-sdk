@@ -129,6 +129,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- On an Android emulator a way back with no input is Android's own Back, sent as a key event, when the map has
+  no close button: a run left on Settings' search page under its open overflow menu had no way out and stopped
+  STUCK. Back is never pressed to explore, only to take a way back the map holds or to close a popup. A stop's
+  elements now open with the window in focus over the page when there is one ("PopupWindow:… has focus over the
+  page: the tree holds only it; Android's Back closes it"), so the Reader and the Evaluator know the page under it
+  is not in the tree. Desktop games and websites still press no key.
 - A press the Reader ranks by the words it shows ("Passwords & accounts") reaches the input the map names by its
   field (`passwordsAccounts`): a goal run presses its best tree input first, and one the Reader tagged risky or
   destructive is never pressed unattended. Before, the words matched no input, so the best was dropped as gone and a

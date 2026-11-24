@@ -264,6 +264,11 @@ public final class Emulator implements CaptureSource {
         return device.systemDialog().map(shown -> shown.dialog().said()).orElse("");
     }
 
+    /** The window in focus over the app's page, a popup or a dialog ({@code PopupWindow:3d4a864}), or {@code ""}. */
+    public String windowOverPage() {
+        return device.windowOverPage().orElse("");
+    }
+
     /** Reboots the Android guest ({@code adb reboot}); the ADB connection drops until it comes back up. */
     public void reboot() {
         Debug.log("reboot " + name());

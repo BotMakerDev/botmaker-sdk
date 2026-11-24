@@ -331,6 +331,27 @@ public interface Reach {
     }
 
     /**
+     * Whether the platform has a Back of its own, Android's: a way back with no input presses it when the map has no
+     * close button. A desktop game and a website have none (Escape quit games, 2026-11-03).
+     */
+    default boolean hasSystemBack() {
+        return false;
+    }
+
+    /** Presses the platform's own Back; false, and nothing pressed, where there is none. */
+    default boolean systemBack() {
+        return false;
+    }
+
+    /**
+     * The window in focus over the app's page, Android's popup or dialog ({@code PopupWindow:3d4a864}), or {@code ""}:
+     * the tree then holds only that window, since a tap outside it only closes it.
+     */
+    default String windowOverPage() {
+        return "";
+    }
+
+    /**
      * Types {@code text} into the field just clicked: what it holds selected first when {@code clears}, so the text
      * takes its place, and Enter pressed after when {@code submits}.
      */

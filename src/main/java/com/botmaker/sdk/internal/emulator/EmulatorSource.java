@@ -130,6 +130,12 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
         if (emu != null) emu.key(keyCode);
     }
 
+    /** Presses Android's own Back: a popup or a dialog closes, a page goes back to the one it was opened from. */
+    public void back() {
+        Emulator emu = resolve();
+        if (emu != null) emu.back();
+    }
+
     /**
      * The package of the window in focus on the instance — a dialog's over the app while one is up — or {@code ""}
      * when it is not connected or none is known.
@@ -143,6 +149,12 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
     public String systemDialog() {
         Emulator emu = resolve();
         return emu == null ? "" : emu.systemDialog();
+    }
+
+    /** The window in focus over the app's page, a popup or a dialog, or {@code ""}: {@link Emulator#windowOverPage}. */
+    public String windowOverPage() {
+        Emulator emu = resolve();
+        return emu == null ? "" : emu.windowOverPage();
     }
 
     /**

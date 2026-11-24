@@ -55,7 +55,7 @@ public final class LiveMoves implements MapWalk.Moves {
      */
     @Override
     public boolean open(ScreenGraph.Edge edge) {
-        if (edge.via() == null) return edge.onItsOwn() || graph.close() != null;
+        if (edge.via() == null) return edge.onItsOwn() || graph.close() != null || reach.hasSystemBack();
         if (edge.via() instanceof Custom) return false;
         // A field typing a parameter the run was not dealt is not pressed with no text: left untried, never failed.
         if (edge.via() instanceof Button field && ParamTyping.typesParameter(field)

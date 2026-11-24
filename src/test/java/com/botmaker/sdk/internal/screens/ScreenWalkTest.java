@@ -122,6 +122,8 @@ class ScreenWalkTest {
         String greyed;
         /** How many clicks in a row the game misses: lag. */
         int deaf;
+        /** Whether it is an Android app, whose own Back leaves a screen ({@code "<SCREEN> back"} in {@link #leads}). */
+        boolean androidBack;
         /** A picture drawn only from a time on, after its screen's marker: a menu fading in. */
         final Map<String, Long> drawnAt = new HashMap<>();
 
@@ -173,7 +175,7 @@ class ScreenWalkTest {
                 return;
             }
             if (popup != null) {
-                if (what.equals("click close_x") && closes) popup = null;
+                if (what.equals("click close_x") && closes || what.equals("back")) popup = null;
                 return;
             }
             String shown = reveals.get(key);
@@ -190,6 +192,18 @@ class ScreenWalkTest {
         @Override
         public Optional<BufferedImage> look() {
             return Optional.of(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB));
+        }
+
+        @Override
+        public boolean hasSystemBack() {
+            return androidBack;
+        }
+
+        @Override
+        public boolean systemBack() {
+            if (!androidBack) return false;
+            did("back");
+            return true;
         }
 
         @Override
@@ -645,6 +659,22 @@ class ScreenWalkTest {
         assertEquals(ScreenWalk.Outcome.MISSING, walked.outcome(), walked.why());
         assertTrue(walked.why().contains("a walk presses no key: map the button that does it"), walked.why());
         assertEquals(List.of(), game.done);
+    }
+
+    /**
+     * On Android a way back with no input is the system's own Back, as every Android screen is left: a run left on a
+     * search page under its open menu walked nowhere (2026-11-25).
+     */
+    @Test
+    void aWayBackWithNoInputOnAndroidPressesItsBack() {
+        Game game = new Game("CAMPAIGN", campaignWithNoBack());
+        game.androidBack = true;
+        game.leads.put("CAMPAIGN back", "HOME");
+
+        ScreenWalk.Result walked = go(game, "ENGINEER", new ArrayList<>());
+
+        assertEquals(ScreenWalk.Outcome.ARRIVED, walked.outcome(), walked.why());
+        assertEquals(List.of("back", "click engineer"), game.done);
     }
 
     @Test

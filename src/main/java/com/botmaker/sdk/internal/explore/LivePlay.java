@@ -243,6 +243,14 @@ public final class LivePlay implements ExploreLoop.Play {
             } catch (RuntimeException unread) {
                 elements = List.of();
             }
+            // The tree is then only that window's: the page under it is not in it, and Android's Back closes it.
+            String over = reach.windowOverPage();
+            if (!over.isEmpty()) {
+                List<String> said = new ArrayList<>();
+                said.add(over + " has focus over the page: the tree holds only it; Android's Back closes it");
+                said.addAll(elements);
+                elements = List.copyOf(said);
+            }
         }
         Map<String, String> facts = new LinkedHashMap<>();
         mapped.map(MapScreen::readouts).orElse(Map.of()).forEach((field, readout) -> {
