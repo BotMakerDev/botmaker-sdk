@@ -32,14 +32,25 @@ import java.util.Set;
  * @param id    its test id or DOM id, an app's resource id; null when not a clue
  * @param text  its own text; null when not a clue
  * @param index which of what the other clues find, from 0; null when they find it alone
+ * @param holding the first text an app's part holds when it has no clue of its own: an Android row, a clickable
+ *                layout whose title is a child's text; null when not a clue
  */
-public record Locator(Role role, String name, String id, String text, Integer index) {
+public record Locator(Role role, String name, String id, String text, Integer index, String holding) {
+
+    /** The id Android gives a row's title, which names the row before any other text it holds. */
+    private static final String TITLE = "title";
 
     public Locator {
         name = blankToNull(name);
         id = blankToNull(id);
         text = blankToNull(text);
+        holding = blankToNull(holding);
         if (role == Role.UNKNOWN) role = null;
+    }
+
+    /** A locator by its own clues, holding nothing. */
+    public Locator(Role role, String name, String id, String text, Integer index) {
+        this(role, name, id, text, index, null);
     }
 
     /** A part found and the node it is in the tree it was read from. */
@@ -49,7 +60,8 @@ public record Locator(Role role, String name, String id, String text, Integer in
     public Element element() {
         Words label = name == null ? null : Words.of(name);
         Words own = text == null ? null : Words.of(text);
-        return new Element(id, label, own, null, null, false, false, null, null, index, null, role);
+        Words held = holding == null ? null : Words.of(holding);
+        return new Element(id, label, own, held, null, false, false, null, null, index, null, role);
     }
 
     /** The locator as a tester reads it: {@code button "Get started"}, {@code #email}, {@code link [2]}. */
@@ -59,6 +71,7 @@ public record Locator(Role role, String name, String id, String text, Integer in
         if (name != null) line.append(line.isEmpty() ? "" : " ").append('"').append(name).append('"');
         if (id != null) line.append(line.isEmpty() ? "" : " ").append('#').append(id);
         if (text != null) line.append(line.isEmpty() ? "" : " ").append("text \"").append(text).append('"');
+        if (holding != null) line.append(line.isEmpty() ? "" : " ").append("holding \"").append(holding).append('"');
         if (index != null) line.append(" [").append(index).append(']');
         return line.toString();
     }
@@ -148,7 +161,24 @@ public record Locator(Role role, String name, String id, String text, Integer in
         if (!node.className().endsWith("EditText") && !node.text().isBlank()) {
             return Optional.of(new Locator(null, null, null, node.text(), null));
         }
-        return Optional.empty();
+        // A row a person taps, its words its children's: found by the text it holds, as the picker finds it.
+        List<UiNode> held = new ArrayList<>();
+        heldTexts(node.children(), held);
+        return held.stream().filter(child -> TITLE.equals(child.shortId())).findFirst()
+                .or(() -> held.stream().findFirst())
+                .map(child -> new Locator(null, null, null, null, null, child.text().strip()));
+    }
+
+    /**
+     * The texts under {@code nodes}, in reading order, into {@code into}: none of a field (what was typed is no clue),
+     * none of a part a person presses on its own (its words are its own input's).
+     */
+    private static void heldTexts(List<UiNode> nodes, List<UiNode> into) {
+        for (UiNode child : nodes) {
+            if (acted(child) || child.has(Trait.PASSWORD)) continue;
+            if (!child.text().isBlank()) into.add(child);
+            heldTexts(child.children(), into);
+        }
     }
 
     /**
@@ -159,7 +189,8 @@ public record Locator(Role role, String name, String id, String text, Integer in
         List<UiNode> hits = matcher.matches(bare.element());
         for (int i = 0; i < hits.size(); i++) {
             if (hits.get(i) != node) continue;
-            return Optional.of(hits.size() == 1 ? bare : new Locator(bare.role, bare.name, bare.id, bare.text, i));
+            return Optional.of(hits.size() == 1 ? bare
+                    : new Locator(bare.role, bare.name, bare.id, bare.text, i, bare.holding));
         }
         return Optional.empty();
     }

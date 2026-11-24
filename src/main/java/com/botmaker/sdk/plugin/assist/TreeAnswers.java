@@ -473,7 +473,9 @@ final class TreeAnswers {
     private static Element kept(Element element, Map<String, Element> known, Map<String, Element> made,
                                 Set<Words> words) {
         for (Element held : known.values()) if (ElementSaves.sameClues(held, element)) return held;
-        for (Words said : new Words[] {element.label(), element.text()}) if (said != null) words.add(said);
+        for (Words said : new Words[] {element.label(), element.text(), element.holding(), element.containing()}) {
+            if (said != null) words.add(said);
+        }
         String name = ElementSaves.constantName(element, known.keySet());
         known.put(name, element);
         made.put(name, element);

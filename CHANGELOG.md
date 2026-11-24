@@ -129,6 +129,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring maps every row of an app's list: a row a person taps whose words are its children's (each row of
+  Android's Settings: a clickable layout with no id, label or text of its own) is an input found by the first text it
+  holds (`holding`), as the element picker finds it. Only the parts with a clue of their own were mapped before, so
+  Settings' home kept its search bar alone and every run stopped stuck there.
 - A walk of an explore run never goes through a press nobody watching may make (sign out, delete, buy, or one waiting
   on you): such a way is left out of its path and of the screens it walks to, and a screen only such a press reaches is
   left for you instead of stopping the run.

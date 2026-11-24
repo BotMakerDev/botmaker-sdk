@@ -192,6 +192,7 @@ final class ElementsView {
         if (element.role() != null) parts.add(element.role().id());
         if (element.label() != null) parts.add("\"" + element.label().text() + "\"");
         else if (element.text() != null) parts.add("text \"" + element.text().text() + "\"");
+        else if (element.holding() != null) parts.add("holding \"" + element.holding().text() + "\"");
         if (element.id() != null) parts.add("#" + element.id());
         if (parts.isEmpty()) parts.add(element.isPassword() ? "a password field" : element.isField() ? "a text field"
                 : "by its place");

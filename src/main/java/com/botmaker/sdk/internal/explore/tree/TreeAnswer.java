@@ -341,6 +341,7 @@ public sealed interface TreeAnswer {
     private static String said(Locator locator) {
         if (locator.name() != null) return locator.name();
         if (locator.text() != null) return locator.text();
+        if (locator.holding() != null) return locator.holding();
         if (locator.id() != null) return locator.id();
         return locator.role() == null ? "input" : locator.role().id() + (locator.index() == null ? "" : " " + locator.index());
     }

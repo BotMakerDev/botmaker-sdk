@@ -77,6 +77,16 @@ class TreeAnswersTest {
         assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
     }
 
+    @Test
+    void aRowFoundByTheTextItHoldsKeepsThoseWords() {
+        Locator row = new Locator(null, null, null, null, null, "Passwords & accounts");
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(Map.of()), List.of(
+                new TreeAnswer.NewScreen("Settings", null, List.of(), List.of(HEADING), null),
+                new TreeAnswer.NewInput("Settings", "passwordsAccounts", row, null)), Map.of());
+
+        assertTrue(planned.words().contains(Words.of("Passwords & accounts")), planned.words().toString());
+    }
+
     /** A new input's rendered picture becomes its element's shot, copied in by the write; a held element keeps its own. */
     @Test
     void aRenderedPictureIsTheNewElementsShot() {
