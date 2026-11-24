@@ -375,11 +375,55 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     }
 
     /** A stop the user's queue lists (2026-11-21): the stop, and what the user is to decide on it. */
-    public record ForUser(Stop stop, String question) {}
+    public record ForUser(Stop stop, String question) {
+
+        /** Whether the run can resume it: a stop of the run's, not a fault found by the Evaluator. */
+        public boolean resumable() {
+            return !stop.id().startsWith(FOUND);
+        }
+    }
+
+    /** What the id of a {@linkplain #foundFaults() found fault}'s stop begins with; no stop of the run's does. */
+    private static final String FOUND = "finding-";
+
+    /**
+     * The latest run's {@link FindingKind#SDK_FAULT} findings as the Mechanic's stops, oldest first, each said once.
+     * The run never stopped on one: it goes on meanwhile. Their ids count from 1 and never move, as the journal only
+     * grows.
+     */
+    public List<Stop> foundFaults() {
+        Set<String> said = new HashSet<>();
+        List<Stop> faults = new ArrayList<>();
+        for (ExploreEvent.Finding f : findings()) {
+            if (f.kind() != FindingKind.SDK_FAULT || !said.add(f.why())) continue;
+            String id = FOUND + (faults.size() + 1);
+            faults.add(new Stop(id, StopKind.FAULT, null, id, "", List.of(), List.of(), Map.of(), List.of(),
+                    f.why() + (f.evidence().isBlank() ? "" : " (evidence: " + f.evidence() + ")"), f.at()));
+        }
+        return List.copyOf(faults);
+    }
+
+    /** What the Mechanic left of the stop {@code stopId} in the latest run; empty before it tried. */
+    public Optional<ExploreEvent.Branched> branchOf(String stopId) {
+        return events.stream().filter(e -> e instanceof ExploreEvent.Branched b && b.stopId().equals(stopId))
+                .map(ExploreEvent.Branched.class::cast).reduce((first, last) -> last);
+    }
+
+    /** What the user's queue says of the found fault {@code fault}: how far the Mechanic is with it. */
+    private String mechanicSaid(Stop fault) {
+        Optional<ExploreEvent.Branched> left = branchOf(fault.id());
+        if (left.isPresent()) {
+            return fault.missing() + " — " + (left.get().branch().isBlank() ? "the Mechanic changed nothing: "
+                    : "on branch " + left.get().branch() + ", yours to merge: ") + left.get().note();
+        }
+        if (leaseOf(fault.id()).isPresent()) return fault.missing() + " — the Mechanic is on it";
+        return fault.missing() + (attempts(fault.id()) > 0 ? " — the Mechanic's try left nothing" : "");
+    }
 
     /**
      * The user's queue: the parked stops that are the user's or that Claude handed them, oldest first, then the open
-     * stop when it is the user's; none once the run ended, as nothing can be resumed then.
+     * stop when it is the user's, then the SDK faults the Evaluator found, which the Mechanic may have left a branch
+     * for; none once the run ended, as nothing can be resumed then.
      */
     public List<ForUser> forUser() {
         if (!running()) return List.of();
@@ -389,6 +433,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         }
         open().filter(s -> roleOf(s) == StopRole.USER && parked(s.id()).isEmpty())
                 .ifPresent(s -> mine.add(new ForUser(s, asked(s.id()).orElse(s.missing()))));
+        foundFaults().forEach(fault -> mine.add(new ForUser(fault, mechanicSaid(fault))));
         return List.copyOf(mine);
     }
 

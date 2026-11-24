@@ -545,7 +545,7 @@ final class ExploreTools {
     }
 
     /** {@code stop} whole, ending with {@code end}: how Claude goes on from it. */
-    private static String whole(com.botmaker.sdk.internal.explore.Stop stop, List<String> end) {
+    static String whole(com.botmaker.sdk.internal.explore.Stop stop, List<String> end) {
         List<String> lines = new ArrayList<>();
         lines.add(stop.id() + ": " + stop.kind().displayName() + " on " + (stop.screen() == null ? "a screen the map "
                 + "lacks" : stop.screen()) + (stop.place().isEmpty() ? "" : " (" + stop.place() + ")"));

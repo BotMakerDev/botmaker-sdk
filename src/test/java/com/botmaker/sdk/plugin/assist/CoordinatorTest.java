@@ -311,10 +311,12 @@ class CoordinatorTest {
     /** Signed in, the workers' roles are present; signed out, their stops are parked; no client, the Settler alone. */
     @Test
     void theCrewFollowsTheUsersSignIn() {
-        assertEquals(Coordinator.Crew.SETTLER_ONLY, CoordinatorHost.crewOf(null));
+        assertEquals(Coordinator.Crew.SETTLER_ONLY, CoordinatorHost.crewOf(null, true));
         assertEquals(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR),
-                CoordinatorHost.crewOf(client(true)).present());
-        Coordinator.Crew out = CoordinatorHost.crewOf(client(false));
+                CoordinatorHost.crewOf(client(true), true).present());
+        assertEquals(new Coordinator.Crew(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER, StopRole.EVALUATOR),
+                Set.of(StopRole.MECHANIC)), CoordinatorHost.crewOf(client(true), false), "no lane, no Mechanic");
+        Coordinator.Crew out = CoordinatorHost.crewOf(client(false), true);
         assertEquals(Set.of(StopRole.SETTLER), out.present());
         assertEquals(Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR), out.absent());
     }

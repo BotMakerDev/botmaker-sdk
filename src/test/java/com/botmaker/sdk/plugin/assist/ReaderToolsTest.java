@@ -163,10 +163,11 @@ class ReaderToolsTest {
             }
         };
 
-        assertEquals(Coordinator.Crew.SETTLER_ONLY, CoordinatorHost.crewFor(JournalView.of(journal("")), signedIn));
+        assertEquals(Coordinator.Crew.SETTLER_ONLY,
+                CoordinatorHost.crewFor(JournalView.of(journal("")), signedIn, null));
         Journal aimed = new Journal(folder.resolve("aimed"));
         aimed.append(new ExploreEvent.Began(false, "sign in to Google", 1));
-        Coordinator.Crew crew = CoordinatorHost.crewFor(JournalView.of(aimed), signedIn);
+        Coordinator.Crew crew = CoordinatorHost.crewFor(JournalView.of(aimed), signedIn, null);
         assertTrue(crew.present().containsAll(Set.of(StopRole.SETTLER, StopRole.CARTOGRAPHER)), crew.toString());
     }
 }

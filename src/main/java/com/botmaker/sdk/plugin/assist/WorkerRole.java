@@ -19,8 +19,8 @@ public enum WorkerRole {
     READER("reader", "Reader", "sonnet", List.of("botmaker_sdk_explore", "botmaker_sdk_read_map")),
     /** Judges the run's progress toward the goal, and grades the map at the end. */
     EVALUATOR("evaluator", "Evaluator", "sonnet", List.of("botmaker_sdk_explore", "botmaker_sdk_read_map")),
-    /** Fixes Discover's own faults and the bot's code throwing, in a worktree lane. */
-    MECHANIC("mechanic", "Mechanic", "opus", List.of("botmaker_sdk_explore")),
+    /** Fixes Discover's own faults in a worktree lane ({@link MechanicLane}): no tool of the bot's, only the lane. */
+    MECHANIC("mechanic", "Mechanic", "opus", List.of()),
     /** A role this SDK does not know; no stop is handed to it. */
     UNKNOWN("unknown", "Unknown", "sonnet", List.of());
 

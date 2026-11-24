@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The explore crew's Mechanic (spec `2026-11-24-explore-agents-design`), for who develops the SDK: with
+  `BOTMAKER_SDK_CHECKOUT` naming a checkout of it, a run given a goal on a `-SNAPSHOT` SDK hands a fault of Discover's
+  own, a crash, or an SDK fault the Evaluator found to a Claude session, once each, one at a time, for 30 minutes at
+  most, the run going on meanwhile (a fault that holds the run still waits on the reload). It works in a git worktree
+  of its own, sandboxed with no network, no token and none of the home folder; what it leaves is committed on
+  `explore/<run>/<stop>`, yours to merge. The *For you* list shows an SDK fault that was found, and the branch and note
+  left for it.
 - The explore crew's Evaluator (spec `2026-11-24-explore-agents-design`): in a run given a goal, with the user signed
   in to `claude`, a Sonnet session judges the run after 8 presses that found no new screen and ranked nothing better,
   at least every 25 presses, and once when the run ends. It reads the run through the explore tool's `progress` and

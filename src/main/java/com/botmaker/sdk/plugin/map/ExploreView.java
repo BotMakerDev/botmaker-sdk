@@ -430,6 +430,7 @@ final class ExploreView {
         what.setWrapText(true);
         what.setMinWidth(0);
         HBox.setHgrow(what, Priority.ALWAYS);
+        if (!item.resumable()) return new HBox(6, what);
         Button resume = new Button("Resume");
         resume.setTooltip(new Tooltip("Goes on from it with the bot as it is now: fix it first, by hand or with Claude."));
         Button ignore = new Button("Ignore");
@@ -564,6 +565,8 @@ final class ExploreView {
             case ExploreEvent.Ranked e -> null;
             case ExploreEvent.EditQueued e -> null;
             case ExploreEvent.EditApplied e -> e.ok() ? null : "⚠ " + e.editId() + " not written: " + e.said().lines().findFirst().orElse("");
+            case ExploreEvent.Branched e -> "🔧 " + e.stopId() + ": " + (e.branch().isBlank() ? "no change" : e.branch())
+                    + e.note().lines().findFirst().map(line -> " — " + line).orElse("");
             case ExploreEvent.Summary e -> e.unresolved().isEmpty() ? "📋 No finding left open"
                     : "📋 " + e.unresolved().size() + " finding(s) left open";
             case ExploreEvent.Reloaded e -> e.refused()

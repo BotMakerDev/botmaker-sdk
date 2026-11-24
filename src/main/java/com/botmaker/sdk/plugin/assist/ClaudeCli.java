@@ -5,6 +5,8 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -83,6 +85,55 @@ public final class ClaudeCli implements AgentClient {
                     .collect(Collectors.joining(",")));
         }
         return command;
+    }
+
+    /**
+     * A restricted session: its file tools see the lane only, whatever a command asks outside it is refused, not asked
+     * ({@code dontAsk}), and its commands run in Claude's sandbox or it does not start. No MCP server.
+     */
+    @Override
+    public List<String> laneCommand(String prompt, WorkerRole role, Path lane, List<Path> readable,
+                                    List<Path> hidden) {
+        List<Path> kept = new ArrayList<>(hidden);
+        // Its sign-in, where it is not in the home.
+        String config = System.getenv("CLAUDE_CONFIG_DIR");
+        if (config != null && !config.isBlank()) kept.add(Path.of(config));
+        return List.of(executable, "-p", prompt,
+                "--output-format", "json",
+                "--model", role.model(),
+                "--setting-sources", "",
+                "--disable-slash-commands",
+                "--no-session-persistence",
+                "--restricted",
+                "--permission-mode", "dontAsk",
+                "--tools", "Read,Edit,Write,Glob,Grep,Bash",
+                "--allowedTools", "Bash,Read(./**),Edit(./**)",
+                "--strict-mcp-config",
+                "--settings", sandbox(lane, readable, kept));
+    }
+
+    /**
+     * The sandbox's settings: no network, none of the home but {@code lane} and {@code readable}, none of
+     * {@code hidden}, no way out of it.
+     */
+    private static String sandbox(Path lane, List<Path> readable, List<Path> hidden) {
+        ObjectNode settings = JSON.createObjectNode();
+        ObjectNode sandbox = settings.putObject("sandbox");
+        sandbox.put("enabled", true).put("failIfUnavailable", true).put("autoAllowBashIfSandboxed", true)
+                .put("allowUnsandboxedCommands", false);
+        ObjectNode network = sandbox.putObject("network");
+        network.putArray("allowedDomains");
+        network.put("strictAllowlist", true);
+        ObjectNode files = sandbox.putObject("filesystem");
+        ArrayNode unread = files.putArray("denyRead").add("~/");
+        ArrayNode unwritten = files.putArray("denyWrite");
+        hidden.forEach(path -> {
+            unread.add(path.toString());
+            unwritten.add(path.toString());
+        });
+        ArrayNode allowed = files.putArray("allowRead").add(lane.toString());
+        readable.forEach(path -> allowed.add(path.toString()));
+        return settings.toString();
     }
 
     /** Runs {@code command} as a worker is run, within ten seconds: its standard output, empty when it failed. */

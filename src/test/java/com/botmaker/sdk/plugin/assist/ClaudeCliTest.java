@@ -23,7 +23,7 @@ class ClaudeCliTest {
 
     @Test
     void aWorkerIsLeanHeadlessAndAlwaysNamesItsModel() {
-        for (WorkerRole role : List.of(WorkerRole.READER, WorkerRole.EVALUATOR, WorkerRole.MECHANIC)) {
+        for (WorkerRole role : List.of(WorkerRole.READER, WorkerRole.EVALUATOR)) {
             List<String> command = new ClaudeCli().command("rank it", role, Path.of("/run/worker-mcp.json"));
 
             assertEquals(List.of("claude", "-p", "rank it"), command.subList(0, 3));

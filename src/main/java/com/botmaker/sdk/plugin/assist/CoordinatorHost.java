@@ -86,16 +86,17 @@ public final class CoordinatorHost implements RunCompanion {
 
     /**
      * Who takes stops when the workers run on {@code client}: the Settler always; each worker's role while the user is
-     * signed in to it, else none of them, their stops parked so the run goes on. Null: the Settler alone, nobody
-     * parked.
+     * signed in to it, else none of them, their stops parked so the run goes on; the Mechanic only where there is a
+     * lane for it ({@code mechanic}). Null: the Settler alone, nobody parked.
      */
-    static Coordinator.Crew crewOf(AgentClient client) {
+    static Coordinator.Crew crewOf(AgentClient client, boolean mechanic) {
         if (client == null) return Coordinator.Crew.SETTLER_ONLY;
         Set<StopRole> workers = Set.of(StopRole.CARTOGRAPHER, StopRole.MECHANIC, StopRole.EVALUATOR);
         if (client.available()) {
             Set<StopRole> present = new HashSet<>(workers);
             present.add(StopRole.SETTLER);
-            return new Coordinator.Crew(present, Set.of());
+            if (!mechanic) present.remove(StopRole.MECHANIC);
+            return new Coordinator.Crew(present, mechanic ? Set.of() : Set.of(StopRole.MECHANIC));
         }
         return new Coordinator.Crew(Set.of(StopRole.SETTLER), workers);
     }
@@ -103,10 +104,10 @@ public final class CoordinatorHost implements RunCompanion {
     /**
      * Who takes the stops of the run {@code view} is of: the crew on {@code client} when the run was given a goal, the
      * Settler alone when not, so a run started without one is answered as before, by a Claude session that waits on
-     * it.
+     * it. Its Mechanic works on an SDK under development only, in {@code lane} (null: there is none).
      */
-    static Coordinator.Crew crewFor(JournalView view, AgentClient client) {
-        return view.goal().isBlank() ? Coordinator.Crew.SETTLER_ONLY : crewOf(client);
+    static Coordinator.Crew crewFor(JournalView view, AgentClient client, MechanicLane lane) {
+        return view.goal().isBlank() ? Coordinator.Crew.SETTLER_ONLY : crewOf(client, lane != null && view.dev());
     }
 
     @Override
@@ -123,8 +124,12 @@ public final class CoordinatorHost implements RunCompanion {
         if (project == null || thread != null) return;
         this.project = project;
         this.before = Journal.latest(project).map(Journal::runId).orElse(null);
+        MechanicLane lane = lane();
         Worker worker = client == null ? null : (journal, role, stop, limit) -> tracked(() ->
-                new WorkerRunner(journal.folder()).run(client, role, stop, JournalView.of(journal).goal(), limit));
+                role == StopRole.MECHANIC && lane != null
+                        ? lane.run(client, journal, stop, limit, System::currentTimeMillis)
+                        : new WorkerRunner(journal.folder()).run(client, role, stop, JournalView.of(journal).goal(),
+                        limit));
         Evaluator evaluator = evaluator();
         TreeAnswerWatch.Writer writer = TreeAnswerWatch.into(services);
         // The latest run's journal, read again each round: the run begins its own once its process is up.
@@ -142,8 +147,13 @@ public final class CoordinatorHost implements RunCompanion {
         }, every, every, TimeUnit.MILLISECONDS);
         EditWriter.Apply edits = EditWriter.into(services);
         thread = Thread.ofPlatform().daemon().name("explore-coordinator").start(() -> coordinate(latest,
-                view -> new Coordinator(settings, crewFor(view, client)), writer, worker, evaluator, edits,
+                view -> new Coordinator(settings, crewFor(view, client, lane)), writer, worker, evaluator, edits,
                 pictured -> TreeAnswers.pictured(services, pictured)));
+    }
+
+    /** The Mechanic's lane on this machine; null where there is none. */
+    private static MechanicLane lane() {
+        return MechanicLane.ofThisMachine().orElse(null);
     }
 
     /** The Evaluator on the user's own client; null while no worker is started. */
@@ -179,7 +189,8 @@ public final class CoordinatorHost implements RunCompanion {
         try {
             if (watchdog != null) watchdog.awaitTermination(2, TimeUnit.SECONDS);
             if (thread != null) thread.join(Duration.ofSeconds(2));
-            for (Thread worker : running) worker.join(Duration.ofSeconds(2));
+            // A Mechanic's work is committed first: past it, the lane stays in the cache, uncommitted.
+            for (Thread worker : running) worker.join(Duration.ofSeconds(10));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
@@ -191,7 +202,7 @@ public final class CoordinatorHost implements RunCompanion {
                 // A run that never began leaves an older one latest: that one is not this companion's to close.
                 if (journal.runId().equals(before)) return;
                 // The end's evaluation is a worker of its own: off the core's thread, bounded by its lease.
-                Evaluator grader = crewFor(JournalView.of(journal), client).present().contains(StopRole.EVALUATOR)
+                Evaluator grader = crewFor(JournalView.of(journal), client, null).present().contains(StopRole.EVALUATOR)
                         ? evaluator() : null;
                 Thread.ofPlatform().daemon().name("explore-summary").start(() ->
                         close(journal, grader, settings.lease(), System::currentTimeMillis));
@@ -408,10 +419,11 @@ public final class CoordinatorHost implements RunCompanion {
         return WRITING.computeIfAbsent(bot, b -> new ReentrantLock());
     }
 
-    /** The stop {@code stopId} of {@code view}: the open one, or one queued. */
+    /** The stop {@code stopId} of {@code view}: the open one, one queued, or a fault the Evaluator found. */
     private static Optional<Stop> stopOf(JournalView view, String stopId) {
         return view.open().filter(stop -> stop.id().equals(stopId))
-                .or(() -> view.queue().stream().filter(stop -> stop.id().equals(stopId)).findFirst());
+                .or(() -> view.queue().stream().filter(stop -> stop.id().equals(stopId)).findFirst())
+                .or(() -> view.foundFaults().stream().filter(stop -> stop.id().equals(stopId)).findFirst());
     }
 
     /**

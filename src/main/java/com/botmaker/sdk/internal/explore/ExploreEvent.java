@@ -48,6 +48,7 @@ public sealed interface ExploreEvent {
             case Ranked ignored -> "ranked";
             case EditQueued ignored -> "edit_queued";
             case EditApplied ignored -> "edit_applied";
+            case Branched ignored -> "branched";
             case Summary ignored -> "summary";
         };
     }
@@ -83,6 +84,7 @@ public sealed interface ExploreEvent {
             case "ranked" -> Ranked.class;
             case "edit_queued" -> EditQueued.class;
             case "edit_applied" -> EditApplied.class;
+            case "branched" -> Branched.class;
             case "summary" -> Summary.class;
             default -> null;
         };
@@ -328,6 +330,17 @@ public sealed interface ExploreEvent {
 
         public EditApplied(String editId, long at) {
             this(editId, true, "", at);
+        }
+    }
+
+    /**
+     * The Mechanic's one try at {@code stopId} is over: its work is on {@code branch} of the SDK's checkout (blank when
+     * it changed nothing), the user's to merge, and {@code note} is what it said of it.
+     */
+    record Branched(String stopId, String branch, String note, long at) implements ExploreEvent {
+        public Branched {
+            branch = branch == null ? "" : branch;
+            note = note == null ? "" : note;
         }
     }
 

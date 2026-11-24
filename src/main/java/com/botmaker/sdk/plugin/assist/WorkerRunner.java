@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Starts one worker of the explore crew for one stop (spec 2026-11-24-explore-agents-design § Workers): one process per
@@ -77,12 +78,17 @@ public final class WorkerRunner {
 
     /** Runs {@code command} as a worker of {@code stopId}: its result by {@code limit}. */
     Result run(List<String> command, String stopId, Duration limit) {
+        return run(command, stopId, limit, folder, WorkerRunner::scrub);
+    }
+
+    /** As {@link #run(List, String, Duration)}, in the folder {@code in}, its environment what {@code scrub} leaves. */
+    Result run(List<String> command, String stopId, Duration limit, Path in, Consumer<Map<String, String>> scrub) {
         Process process;
         try {
             Path log = Files.createDirectories(folder.resolve("workers")).resolve(stopId + ".log");
-            ProcessBuilder builder = new ProcessBuilder(command).directory(folder.toFile())
+            ProcessBuilder builder = new ProcessBuilder(command).directory(in.toFile())
                     .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
-            scrub(builder.environment());
+            scrub.accept(builder.environment());
             process = builder.start();
             // No one answers it: a worker that waits on its input reads its end at once.
             process.getOutputStream().close();

@@ -24,4 +24,16 @@ public interface AgentClient {
      * {@code mcpConfig}. {@link WorkerRunner} starts it with a scrubbed environment.
      */
     List<String> command(String prompt, WorkerRole role, Path mcpConfig);
+
+    /**
+     * The command line of one headless session of {@code role} given {@code prompt} that edits and builds in the folder
+     * {@code lane}, where it is started: its file tools kept to the lane, its commands sandboxed with no network and no
+     * view of the user's home but {@code readable}, nor of {@code hidden}, the client's own sign-in or anything outside
+     * the lane to write. It refuses to start when it cannot sandbox. Empty for a client that cannot: no such worker
+     * starts.
+     */
+    default List<String> laneCommand(String prompt, WorkerRole role, Path lane, List<Path> readable,
+                                     List<Path> hidden) {
+        return List.of();
+    }
 }

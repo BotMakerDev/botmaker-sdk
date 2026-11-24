@@ -21,8 +21,8 @@ import java.util.Set;
  * ({@link CoordinatorHost}) carries the actions out and writes them down; the journal is the only state.
  *
  * <p>A stop's role is <em>present</em> (its stops are leased to it, one try at a time, up to {@link Settings#attempts}),
- * <em>absent</em> (its open stop is parked at once, so the run goes on to what code can still do) or neither: left to
- * whoever takes it today, Claude's explore tool or the run's own park timeout.
+ * <em>absent</em> (its open stop is parked at once, so the run goes on to what code can still do, unless it is a held
+ * fault, which only a reload or an ignore releases and the quiet time ends) or neither: left to whoever takes it today, Claude's explore tool or the run's own park timeout.
  */
 public final class Coordinator {
 
@@ -79,6 +79,9 @@ public final class Coordinator {
         record Evaluate(String id, EvaluatorTrigger.Why why, long expiresAt) implements Action {}
     }
 
+    /** How long the Mechanic has for its one try at a fault: a build and its tests, beside the run. */
+    static final Duration MECHANIC_LEASE = Duration.ofMinutes(30);
+
     private final Settings settings;
     private final Crew crew;
     private final EvaluatorTrigger.Settings evaluations;
@@ -106,8 +109,9 @@ public final class Coordinator {
             actions.add(new Action.Beat());
         }
         if (quiet(view, nowMs)) {
+            String held = view.open().filter(view::held).map(stop -> ", held on " + stop.id()).orElse("");
             actions.add(new Action.End(ExploreLoop.End.STUCK, "no progress for "
-                    + JournalView.took(settings.quiet().toMillis())));
+                    + JournalView.took(settings.quiet().toMillis()) + held));
             return actions;
         }
         if (crew.present().contains(StopRole.EVALUATOR)) {
@@ -130,6 +134,16 @@ public final class Coordinator {
         List<Stop> waiting = new ArrayList<>();
         open.ifPresent(waiting::add);
         waiting.addAll(view.queue());
+        // The Mechanic takes the faults the Evaluator found too; the run never stopped on one.
+        waiting.addAll(view.foundFaults());
+        boolean mechanicBusy = mechanicWorks(view, nowMs);
+        // Its stop may be over long before it is (an SDK reload): a try nobody waits on is closed all the same.
+        view.events().stream().filter(e -> e instanceof ExploreEvent.Leased leased
+                        && leased.role() == StopRole.MECHANIC && leased.expired(nowMs)
+                        && view.leaseOf(leased.stopId()).filter(leased::equals).isPresent()
+                        && waiting.stream().noneMatch(stop -> stop.id().equals(leased.stopId())))
+                .map(ExploreEvent.Leased.class::cast)
+                .forEach(leased -> actions.add(new Action.Requeue(leased.stopId(), leased.attempt())));
         // The Settler's work ends in a resume, a command: one at a time, none while one of its leases is held.
         boolean commandGiven = commandWaiting || view.events().stream()
                 .anyMatch(e -> e instanceof ExploreEvent.Leased leased && leased.role() == StopRole.SETTLER
@@ -138,17 +152,25 @@ public final class Coordinator {
             String id = stop.id();
             StopRole role = view.roleOf(stop);
             boolean isOpen = open.map(o -> o.id().equals(id)).orElse(false);
+            // A held fault never parks: it waits on the SDK's reload, and the quiet time ends a run nobody reloads.
+            boolean parks = isOpen && !view.held(stop);
+            // The Mechanic's work takes longer than a run should wait: it goes on elsewhere meanwhile, and after.
+            if (role == StopRole.MECHANIC && crew.present().contains(role) && parks && !commandGiven
+                    && (view.attempts(id) > 0 || mechanicBusy)) {
+                actions.add(new Action.Park(id, view.attempts(id) > 0 ? "the Mechanic has it" : "the Mechanic is busy"));
+                commandGiven = true;
+            }
             // A held lease is closed when it runs out, whatever became of its stop since.
-            Optional<ExploreEvent.Leased> lease = view.leaseOf(id);
-            if (lease.isPresent()) {
-                if (lease.get().expired(nowMs)) actions.add(new Action.Requeue(id, lease.get().attempt()));
+            Optional<ExploreEvent.Leased> leased = view.leaseOf(id);
+            if (leased.isPresent()) {
+                if (leased.get().expired(nowMs)) actions.add(new Action.Requeue(id, leased.get().attempt()));
                 continue;
             }
             if (role == StopRole.SETTLER && !settlerTakes(view, stop)) continue;
             if (done(view, id)) continue;
             if (crew.absent().contains(role)) {
                 // A queued stop is parked already; only the open one holds the run.
-                if (isOpen && !commandGiven) {
+                if (parks && !commandGiven) {
                     actions.add(new Action.Park(id, "no " + role.displayName() + " available"));
                     commandGiven = true;
                 }
@@ -156,10 +178,11 @@ public final class Coordinator {
             }
             if (!crew.present().contains(role)) continue;
             int tries = view.attempts(id);
-            // The Settler tries once: a write that may have partly landed is never written again.
-            int cap = role == StopRole.SETTLER ? 1 : settings.attempts();
+            // The Settler tries once: a write that may have partly landed is never written again. So does the Mechanic,
+            // whose branch is there already.
+            int cap = role == StopRole.SETTLER || role == StopRole.MECHANIC ? 1 : settings.attempts();
             if (tries >= cap) {
-                if (isOpen && !commandGiven) {
+                if (parks && !commandGiven) {
                     actions.add(new Action.Park(id, "tried " + tries + (tries == 1 ? " time" : " times")));
                     commandGiven = true;
                 }
@@ -169,7 +192,12 @@ public final class Coordinator {
                 if (commandGiven) continue;
                 commandGiven = true;
             }
-            actions.add(new Action.Lease(id, role, tries + 1, nowMs + settings.lease().toMillis()));
+            if (role == StopRole.MECHANIC) {
+                if (mechanicBusy) continue;
+                mechanicBusy = true;
+            }
+            Duration lease = role == StopRole.MECHANIC ? MECHANIC_LEASE : settings.lease();
+            actions.add(new Action.Lease(id, role, tries + 1, nowMs + lease.toMillis()));
         }
         return actions;
     }
@@ -186,17 +214,27 @@ public final class Coordinator {
 
     /** Whether the running journal said nothing but heartbeats for {@link Settings#quiet}, no lease being worked. */
     private boolean quiet(JournalView view, long nowMs) {
+        // A held fault waits for the Mechanic, on it or on one before it, however long nothing else is written.
+        if (view.open().filter(view::held).isPresent() && mechanicWorks(view, nowMs)) return false;
         List<ExploreEvent> events = view.events();
         for (int i = events.size() - 1; i >= 0; i--) {
             ExploreEvent event = events.get(i);
             if (event instanceof ExploreEvent.Heartbeat) continue;
             if (event instanceof ExploreEvent.Leased leased && !leased.expired(nowMs)
-                    && view.leaseOf(leased.stopId()).isPresent()) {
+                    // The Mechanic works beside the run, which is to go on meanwhile.
+                    && leased.role() != StopRole.MECHANIC && view.leaseOf(leased.stopId()).isPresent()) {
                 return false;
             }
             return nowMs - event.at() >= settings.quiet().toMillis();
         }
         return false;
+    }
+
+    /** Whether a Mechanic has a try of some stop now, its stop waiting still or not. */
+    private static boolean mechanicWorks(JournalView view, long nowMs) {
+        return view.events().stream().anyMatch(e -> e instanceof ExploreEvent.Leased leased
+                && leased.role() == StopRole.MECHANIC && !leased.expired(nowMs)
+                && view.leaseOf(leased.stopId()).filter(leased::equals).isPresent());
     }
 
     /** Whether the Settler has work at {@code stop}: answers the run settled, and no reload for it yet. */
