@@ -7,10 +7,12 @@ import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.screen.ScreenCapture;
+import com.botmaker.shared.Executables;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.AdbDevice;
+import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.InstanceKey;
 import com.botmaker.shared.emulator.config.Operation;
@@ -36,6 +38,9 @@ import javafx.util.StringConverter;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,6 +76,12 @@ final class RunningTab {
     private volatile List<RunningModel.Card> watched = List.of();
     /** Each running instance's connection, kept across passes; the reader's thread alone touches it. */
     private final Map<InstanceKey, AdbDevice> connections = new HashMap<>();
+    /** The scrcpy windows Show opened, by instance; touched on Show's loader thread only. */
+    private final Map<InstanceKey, Process> mirrors = new ConcurrentHashMap<>();
+    /** The longest side of a mirror window, in pixels: a portrait 1080×1920 screen fits a 1080p desktop. */
+    private static final int MIRROR_MAX_SIZE = 1000;
+    /** How long Show waits to see a mirror stay up. */
+    private static final long MIRROR_SETTLE_MS = 1500;
     /** What Windows could still give at the last reading, or -1. */
     private long lastAvailable = -1;
 
@@ -186,6 +197,7 @@ final class RunningTab {
             Set<InstanceKey> gone = new HashSet<>(connections.keySet());
             cards.forEach(card -> gone.remove(card.key()));
             closeAll(gone);
+            closeMirrorsOfStopped(cards);
             for (RunningModel.Card card : cards) readOne(card);
         } catch (Throwable unexpected) {
             // the next pass tries again
@@ -260,8 +272,13 @@ final class RunningTab {
                 List<GenericWindow> windows = controller.getAllWindows();
                 Optional<String> title = RunningModel.windowTitle(name,
                         windows.stream().map(GenericWindow::getTitle).toList());
-                if (title.isEmpty()) return "No window titled \"" + name + "\" was found: show it from "
-                        + row.key().platform().displayName() + "'s own manager.";
+                if (title.isEmpty()) {
+                    // A headless instance (Waydroid in its private gamescope) has no window of its own to raise.
+                    Optional<String> mirrored = mirror(row);
+                    if (mirrored.isPresent()) return mirrored.get();
+                    return "No window titled \"" + name + "\" was found: show it from "
+                            + row.key().platform().displayName() + "'s own manager, or install scrcpy to mirror it.";
+                }
                 windows.stream().filter(w -> title.get().equals(w.getTitle())).findFirst()
                         .ifPresent(controller::focusWindow);
                 return "";
@@ -269,6 +286,60 @@ final class RunningTab {
                 return name + "'s window could not be shown: " + failed.getMessage();
             }
         }, window::say);
+    }
+
+    /**
+     * Mirrors the instance's screen in a scrcpy window scaled to fit a desktop, when scrcpy is installed: the
+     * instance keeps its own size, only the window is scaled. Empty when scrcpy is missing; a message when it
+     * runs already or would not start. One mirror per instance.
+     */
+    private synchronized Optional<String> mirror(EmulatorsModel.InstanceRow row) {
+        if (row.key().platform() != PlatformId.WAYDROID) return Optional.empty();
+        Optional<File> scrcpy = Executables.find("scrcpy");
+        if (scrcpy.isEmpty()) return Optional.empty();
+        InstanceKey key = row.key();
+        Process running = mirrors.get(key);
+        // A live mirror's window is titled with the instance's name, so Show found and raised it before this.
+        if (running != null && running.isAlive()) return Optional.of("");
+        try {
+            File log = File.createTempFile("scrcpy-", ".log");
+            log.deleteOnExit();
+            Process started = new ProcessBuilder(scrcpy.get().getPath(), "-s", row.instance().endpoint(),
+                    "--max-size", String.valueOf(MIRROR_MAX_SIZE), "--window-title", row.instance().name())
+                    .redirectErrorStream(true).redirectOutput(log).start();
+            mirrors.put(key, started);
+            // One that dies at once (an adb it cannot reach, no display) says why instead of showing nothing.
+            if (started.waitFor(MIRROR_SETTLE_MS, TimeUnit.MILLISECONDS)) {
+                return Optional.of("scrcpy stopped at once: " + lastLine(log));
+            }
+            return Optional.of("");
+        } catch (IOException failed) {
+            return Optional.of("scrcpy would not start: " + failed.getMessage());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return Optional.of("");
+        }
+    }
+
+    /** Ends the mirror of every instance that is no longer among {@code cards}: its screen is gone. */
+    private synchronized void closeMirrorsOfStopped(List<RunningModel.Card> cards) {
+        Set<InstanceKey> running = new HashSet<>();
+        cards.forEach(card -> running.add(card.key()));
+        mirrors.entrySet().removeIf(entry -> {
+            if (running.contains(entry.getKey())) return false;
+            entry.getValue().destroy();
+            return true;
+        });
+    }
+
+    /** The last line of {@code log}, or a dash when it cannot be read or is empty. */
+    private static String lastLine(File log) {
+        try {
+            List<String> lines = Files.readAllLines(log.toPath());
+            return lines.isEmpty() ? "–" : lines.getLast();
+        } catch (IOException | RuntimeException unreadable) {
+            return "–";
+        }
     }
 
     // ---- a card ----

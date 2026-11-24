@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- The Emulators window's Show opens a scrcpy window scaled to fit the desktop for an instance with no window of its
+  own (Waydroid in its private gamescope), when scrcpy is installed; the instance keeps its size.
+
 ### Removed
 
 - The elements deprecated two releases ago, with their migration rules: `@GameState`, `@ReadOn`, `@StaleAfter`
