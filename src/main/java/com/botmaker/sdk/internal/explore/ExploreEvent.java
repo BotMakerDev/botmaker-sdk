@@ -46,6 +46,7 @@ public sealed interface ExploreEvent {
             case Finding ignored -> "finding";
             case Witnessed ignored -> "witnessed";
             case Ranked ignored -> "ranked";
+            case EditQueued ignored -> "edit_queued";
             case EditApplied ignored -> "edit_applied";
         };
     }
@@ -79,6 +80,7 @@ public sealed interface ExploreEvent {
             case "finding" -> Finding.class;
             case "witnessed" -> Witnessed.class;
             case "ranked" -> Ranked.class;
+            case "edit_queued" -> EditQueued.class;
             case "edit_applied" -> EditApplied.class;
             default -> null;
         };
@@ -86,9 +88,18 @@ public sealed interface ExploreEvent {
 
     /**
      * A run started: what the journal held before it is an earlier run's. {@code dev}: it plays on a {@code -SNAPSHOT}
-     * SDK, so it raises and holds Discover faults (false when an older SDK wrote the line).
+     * SDK, so it raises and holds Discover faults (false when an older SDK wrote the line). {@code goal}: what the run
+     * explores toward, in plain words or a screen's name; blank for none.
      */
-    record Began(boolean dev, long at) implements ExploreEvent {}
+    record Began(boolean dev, String goal, long at) implements ExploreEvent {
+        public Began {
+            goal = goal == null ? "" : goal;
+        }
+
+        public Began(boolean dev, long at) {
+            this(dev, "", at);
+        }
+    }
 
     /**
      * The stop {@code stopId} is a Discover fault, held until the SDK is fixed and reloaded (2026-11-19): {@code source}
@@ -292,6 +303,29 @@ public sealed interface ExploreEvent {
         }
     }
 
-    /** The edit {@code editId} reached the bot: one applied again after a restart is skipped. */
-    record EditApplied(String editId, long at) implements ExploreEvent {}
+    /**
+     * A worker's edit of the bot, queued for the one writer of the run (spec § Coordination rules): {@code edit} the
+     * arguments of the map tool {@code tool}, as JSON, made for the stop {@code stopId}. The writer applies each id once.
+     */
+    record EditQueued(String editId, String stopId, String tool, String edit, long at) implements ExploreEvent {
+        public EditQueued {
+            stopId = stopId == null ? "" : stopId;
+            tool = tool == null ? "" : tool;
+            edit = edit == null ? "" : edit;
+        }
+    }
+
+    /**
+     * The edit {@code editId} was carried out: {@code ok} when the bot took it, {@code said} the tool's answer. One
+     * applied again after a restart is skipped, a refused one too: it would be refused again.
+     */
+    record EditApplied(String editId, boolean ok, String said, long at) implements ExploreEvent {
+        public EditApplied {
+            said = said == null ? "" : said;
+        }
+
+        public EditApplied(String editId, long at) {
+            this(editId, true, "", at);
+        }
+    }
 }

@@ -14,9 +14,13 @@ import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
+import com.botmaker.sdk.internal.explore.PressTag;
 import com.botmaker.sdk.internal.explore.StopRole;
+import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.run.SdkRuns;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -102,6 +106,38 @@ final class ExploreTools {
     record ReloadSdk(@Describe("the held fault's id, from wait") String stop) implements Action {
     }
 
+    @Describe("a stop whole by its id, open or parked, with the run's goal and the frame it was met on")
+    record Look(@Describe("the stop's id") String stop) implements Action {
+    }
+
+    @Describe("rank the presses of a stop's screen by how likely each leads to the goal, and tag how safe each is; "
+            + "the run presses the best first, and never presses a risky or destructive one alone")
+    record RankPresses(@Describe("the stop's id") String stop,
+                       @Describe("the screen's name, only for a stop on a screen the map lacked, once apply_edit named "
+                               + "it; leave it out otherwise") String screen,
+                       @Describe("each press of the screen, with its rank and tag") List<Rank> presses)
+            implements Action {
+    }
+
+    /** One press ranked by the Reader. */
+    record Rank(@Describe("the press: an input's name, or the label read on it") String press,
+                @Describe("0 to 10: how likely it leads to the goal, 10 the likeliest") Integer rank,
+                @Describe("safe, risky (an ad, an outside link, a permission) or destructive (sign out, delete, "
+                        + "reset, a purchase)") String tag) {
+    }
+
+    @Describe("write an edit of the map through the run's one writer, applied once by its id however often it is sent; "
+            + "answers once it was written, or why not")
+    record ApplyEdit(@Describe("the stop's id the edit is for") String stop,
+                     @Describe("an id of your own for this edit, unique in the run: the same id is written once")
+                     String editId,
+                     @Describe("the edit_map call's arguments as a JSON object, with its action") String edit)
+            implements Action {
+    }
+
+    /** How long an {@code apply_edit} waits for the run's writer to carry it out. */
+    static final Duration EDIT_WITHIN = Duration.ofSeconds(60);
+
     static final List<AssistantTool<?>> TOOLS = List.of(AssistantTool.named("explore")
             .describedAs("Keep exploring, the run that plays the game on its own and stops on what the bot does not "
                     + "know: wait on it, fix the stop with the map tools, resume. run_bot entry \""
@@ -146,6 +182,9 @@ final class ExploreTools {
             case Resume resume -> resume(journal, resume.stop(), Boolean.TRUE.equals(resume.ignore()), RESUME_WITHIN);
             case Stop ignored -> stop(journal, STOP_WITHIN);
             case Fault fault -> fault(journal, fault.stop(), fault.why(), STOP_WITHIN);
+            case Look look -> look(journal, look.stop());
+            case RankPresses rank -> rank(journal, rank.stop(), rank.screen(), rank.presses());
+            case ApplyEdit edit -> applyEdit(journal, edit.stop(), edit.editId(), edit.edit(), EDIT_WITHIN);
             // Reached only without the host's services: handle(Action, AgentContext) sends a reload to reloadSdk.
             case ReloadSdk ignored -> AgentReply.refused("A reload needs the host's services, which this call has not.");
         };
@@ -488,6 +527,123 @@ final class ExploreTools {
         if (!stop.lastPresses().isEmpty()) lines.add("Last presses: " + String.join(", ", stop.lastPresses()));
         lines.addAll(end);
         return String.join("\n", lines);
+    }
+
+    /** The stop {@code id} of {@code view}: the open one, or one parked. */
+    private static Optional<com.botmaker.sdk.internal.explore.Stop> stopOf(JournalView view, String id) {
+        return view.open().filter(s -> s.id().equals(id)).or(() -> view.parked(id));
+    }
+
+    /**
+     * The stop {@code stopId} whole, open or parked, with the run's goal, and the frame it was met on as a picture: what
+     * a Reader works from (spec 2026-11-24-explore-agents-design § The crew).
+     */
+    static AgentReply look(Journal journal, String stopId) {
+        if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the stop to look at.");
+        String id = stopId.strip();
+        JournalView view = JournalView.of(journal);
+        if (!view.began()) return AgentReply.refused(noRun());
+        Optional<com.botmaker.sdk.internal.explore.Stop> stop = stopOf(view, id);
+        if (stop.isEmpty()) return AgentReply.refused("No stop " + id + " is open or parked. " + ids(view));
+        claude(journal, "look " + id);
+        String goal = view.goal().isBlank() ? "Goal: none; map what the screen is." : "Goal: " + view.goal() + ".";
+        AgentReply text = AgentReply.text(goal + "\n" + whole(stop.get(), view));
+        return frame(stop.get().framePath()).map(image -> text.and(AgentReply.image(Images.scaled(image,
+                Frames.fit(image.getWidth(), image.getHeight(), Frames.LOOK_EDGE))))).orElse(text);
+    }
+
+    /** The frame saved at {@code path}; empty when there is none or it cannot be read. */
+    private static Optional<BufferedImage> frame(String path) {
+        if (path == null || path.isBlank()) return Optional.empty();
+        try {
+            return Optional.ofNullable(ImageIO.read(Path.of(path).toFile()));
+        } catch (IOException | RuntimeException unread) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Writes one {@link ExploreEvent.Ranked} per press of {@code presses}, on the screen of the stop {@code stopId}:
+     * the Explorer takes them into its frontier. A stop met on a screen the map lacked takes {@code named}, the name
+     * the Reader gave it; a mapped one keeps its own. Nothing is written when one press is not said whole.
+     */
+    static AgentReply rank(Journal journal, String stopId, String named, List<Rank> presses) {
+        if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the stop whose presses these are.");
+        if (presses == null || presses.isEmpty()) return AgentReply.refused("Give at least one press.");
+        String id = stopId.strip();
+        JournalView view = JournalView.of(journal);
+        if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended." : noRun());
+        Optional<com.botmaker.sdk.internal.explore.Stop> stop = stopOf(view, id);
+        if (stop.isEmpty()) return AgentReply.refused("No stop " + id + " is open or parked. " + ids(view));
+        String screen = stop.get().screen();
+        if (screen == null || screen.isBlank()) {
+            if (named == null || named.isBlank()) {
+                return AgentReply.refused(id + " is on a screen the map lacked: name it with apply_edit first, then "
+                        + "give that name as screen.");
+            }
+            screen = named.strip();
+        }
+        List<String> wrong = new ArrayList<>();
+        for (Rank rank : presses) {
+            if (rank == null || rank.press() == null || rank.press().isBlank()) wrong.add("a press with no name");
+            else if (rank.rank() == null || rank.rank() < 0 || rank.rank() > 10) wrong.add(rank.press() + ": rank 0 to 10");
+            else if (PressTag.fromId(rank.tag()) == PressTag.UNKNOWN) wrong.add(rank.press() + ": tag safe, risky or destructive");
+        }
+        if (!wrong.isEmpty()) return AgentReply.refused("Nothing was written: " + String.join("; ", wrong) + ".");
+        claude(journal, "rank_presses " + id);
+        long at = System.currentTimeMillis();
+        for (Rank rank : presses) {
+            journal.append(new ExploreEvent.Ranked(screen, rank.press().strip(), rank.rank(), PressTag.fromId(rank.tag()), at));
+        }
+        return AgentReply.text("Ranked " + presses.size() + " press(es) of " + screen + "; the run presses the best "
+                + "first.");
+    }
+
+    /**
+     * Queues {@code edit}, the arguments of an {@code edit_map} call, as the edit {@code editId} of the stop
+     * {@code stopId}, and answers once the run's one writer ({@link EditWriter}) carried it out, within {@code within}.
+     * An id queued already is not queued again: its first answer is given.
+     */
+    static AgentReply applyEdit(Journal journal, String stopId, String editId, String edit, Duration within) {
+        if (editId == null || editId.isBlank()) return AgentReply.refused("Give the edit an id of your own.");
+        String id = editId.strip();
+        JournalView view = JournalView.of(journal);
+        Optional<ExploreEvent.EditQueued> known = view.queuedOf(id);
+        if (known.isPresent()) {
+            // One id is one edit: another edit sent by it would hear the first one's answer and never be written.
+            if (edit != null && !edit.strip().equals(known.get().edit().strip())) {
+                return AgentReply.refused("The id " + id + " is another edit's already: give this one an id of its own.");
+            }
+            if (!view.applied(id) && !view.running()) {
+                return AgentReply.refused("The run has ended; " + id + " was never written.");
+            }
+        } else {
+            if (!view.running()) return AgentReply.refused(view.began() ? "The run has ended." : noRun());
+            if (stopId == null || stopId.isBlank()) return AgentReply.refused("Name the stop the edit is for.");
+            if (stopOf(view, stopId.strip()).isEmpty()) {
+                return AgentReply.refused("No stop " + stopId.strip() + " is open or parked. " + ids(view));
+            }
+            if (edit == null || EditWriter.arguments(edit).filter(a -> a.containsKey(AssistantTool.ACTION)).isEmpty()) {
+                return AgentReply.refused("The edit is edit_map's arguments as a JSON object, its action among them.");
+            }
+            claude(journal, "apply_edit " + id);
+            journal.append(new ExploreEvent.EditQueued(id, stopId.strip(), "edit_map", edit, System.currentTimeMillis()));
+        }
+        long deadline = System.nanoTime() + within.toNanos();
+        while (true) {
+            // Counted before the look, so a write landing between the two still wakes the wait.
+            JournalView now = JournalView.of(journal);
+            Optional<ExploreEvent.EditApplied> done = now.appliedOf(id);
+            if (done.isPresent()) {
+                String said = done.get().said().isBlank() ? "" : ": " + done.get().said();
+                return done.get().ok() ? AgentReply.text("Written " + id + said)
+                        : AgentReply.refused("Not written " + id + said);
+            }
+            if (!changed(journal, now.all().size(), deadline)) {
+                return AgentReply.text("Queued " + id + "; the run's writer has not written it in " + within.toSeconds()
+                        + " s. Send it again by its id to hear how it went.");
+            }
+        }
     }
 
     /** The latest run's counts and where it is. */

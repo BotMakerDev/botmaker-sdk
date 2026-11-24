@@ -56,9 +56,14 @@ public final class WorkerRunner {
      * A role no worker takes is not started.
      */
     public Result run(AgentClient client, StopRole role, Stop stop, Duration limit) {
+        return run(client, role, stop, "", limit);
+    }
+
+    /** As {@link #run(AgentClient, StopRole, Stop, Duration)}, for a run exploring toward {@code goal} (blank: none). */
+    public Result run(AgentClient client, StopRole role, Stop stop, String goal, Duration limit) {
         Optional<WorkerRole> worker = WorkerRole.of(role);
         if (worker.isEmpty()) return new Result(false, "no worker takes this stop");
-        return run(client.command(prompt(worker.get(), stop), worker.get(), mcpConfig()), stop.id(), limit);
+        return run(client.command(prompt(worker.get(), stop, goal), worker.get(), mcpConfig()), stop.id(), limit);
     }
 
     /** Runs {@code command} as a worker of {@code stopId}: its result by {@code limit}. */
@@ -109,6 +114,15 @@ public final class WorkerRunner {
         } catch (IOException failed) {
             throw new UncheckedIOException(failed);
         }
+    }
+
+    /**
+     * What {@code role} is asked about {@code stop} of a run toward {@code goal}: the Reader's own prompt, else which
+     * stop, and that its answer goes through the tools.
+     */
+    static String prompt(WorkerRole role, Stop stop, String goal) {
+        if (role == WorkerRole.READER) return ReaderPrompt.of(stop, goal);
+        return prompt(role, stop);
     }
 
     /** What {@code role} is asked about {@code stop}: which stop, and that its answer goes through the tools. */

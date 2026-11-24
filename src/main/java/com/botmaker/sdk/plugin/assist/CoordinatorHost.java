@@ -28,7 +28,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -61,11 +64,11 @@ public final class CoordinatorHost implements RunCompanion {
     private Path project;
 
     /**
-     * A host not started yet, at the plan's start values: the core builds one for each run. No worker is started yet:
-     * none has its job until the Reader's (plan 2026-11-24-explore-agents, phase 5).
+     * A host not started yet, at the plan's start values: the core builds one for each run. Its workers run on the
+     * user's own {@code claude}, signed in by claude.ai, for a run given a goal (see {@link #crewFor}).
      */
     public CoordinatorHost() {
-        this(Coordinator.Settings.DEFAULT, null);
+        this(Coordinator.Settings.DEFAULT, new ClaudeCli());
     }
 
     CoordinatorHost(Coordinator.Settings settings, AgentClient client) {
@@ -89,6 +92,15 @@ public final class CoordinatorHost implements RunCompanion {
         return new Coordinator.Crew(Set.of(StopRole.SETTLER), workers);
     }
 
+    /**
+     * Who takes the stops of the run {@code view} is of: the crew on {@code client} when the run was given a goal, the
+     * Settler alone when not, so a run started without one is answered as before, by a Claude session that waits on
+     * it.
+     */
+    static Coordinator.Crew crewFor(JournalView view, AgentClient client) {
+        return view.goal().isBlank() ? Coordinator.Crew.SETTLER_ONLY : crewOf(client);
+    }
+
     @Override
     public List<RunEntry> serves() {
         return new SdkRuns().runs().stream().filter(entry -> entry.title().equals(SdkRuns.KEEP_EXPLORING)
@@ -102,13 +114,12 @@ public final class CoordinatorHost implements RunCompanion {
         Path project = services == null ? null : services.projectDir();
         if (project == null || thread != null) return;
         this.project = project;
-        Coordinator coordinator = new Coordinator(settings, crewOf(client));
         Worker worker = client == null ? null : (journal, role, stop, limit) -> {
             // Kept so that stop() ends it: a worker never outlives the run it works for.
             Thread own = Thread.currentThread();
             workers.add(own);
             try {
-                return new WorkerRunner(journal.folder()).run(client, role, stop, limit);
+                return new WorkerRunner(journal.folder()).run(client, role, stop, JournalView.of(journal).goal(), limit);
             } finally {
                 workers.remove(own);
             }
@@ -127,8 +138,10 @@ public final class CoordinatorHost implements RunCompanion {
                 SdkLog.warn("The explore run's watchdog failed a look: " + failed.getMessage());
             }
         }, every, every, TimeUnit.MILLISECONDS);
-        thread = Thread.ofPlatform().daemon().name("explore-coordinator").start(() -> coordinate(latest, coordinator,
-                writer, worker, pictured -> TreeAnswers.pictured(services, pictured)));
+        EditWriter.Apply edits = EditWriter.into(services);
+        thread = Thread.ofPlatform().daemon().name("explore-coordinator").start(() -> coordinate(latest,
+                view -> new Coordinator(settings, crewFor(view, client)), writer, worker, edits,
+                pictured -> TreeAnswers.pictured(services, pictured)));
     }
 
     /**
@@ -158,11 +171,14 @@ public final class CoordinatorHost implements RunCompanion {
         }
     }
 
-    private void coordinate(Supplier<Optional<Journal>> latest, Coordinator coordinator, TreeAnswerWatch.Writer writer,
-                            Worker worker, Consumer<ExploreEvent.Pictured> picture) {
+    private void coordinate(Supplier<Optional<Journal>> latest, Function<JournalView, Coordinator> coordinators,
+                            TreeAnswerWatch.Writer writer, Worker worker, EditWriter.Apply edits,
+                            Consumer<ExploreEvent.Pictured> picture) {
         Set<ExploreEvent.Pictured> pictured = new HashSet<>();
         String failedLast = null;
         JournalView.Reader reader = null;
+        Coordinator coordinator = null;
+        AtomicBoolean writing = new AtomicBoolean();
         // The Settler writes into the bot off this thread, and a worker runs off it, which goes on beating meanwhile.
         Executor settlers = command -> Thread.ofVirtual().name("explore-worker").start(command);
         try {
@@ -173,9 +189,16 @@ public final class CoordinatorHost implements RunCompanion {
                         // Read on from where the last round left off, unless a newer run began its own journal.
                         if (reader == null || !reader.journal().folder().equals(journal.get().folder())) {
                             reader = new JournalView.Reader(journal.get());
+                            coordinator = null;
                         }
                         Journal now = reader.journal();
-                        round(now, reader.view(), coordinator, System::currentTimeMillis, writer, settlers, worker);
+                        JournalView view = reader.view();
+                        // Its crew is known once the run said its goal: a journal before its start has none yet.
+                        if (coordinator == null && view.began()) coordinator = coordinators.apply(view);
+                        if (coordinator != null) {
+                            round(now, view, coordinator, System::currentTimeMillis, writer, settlers, worker);
+                        }
+                        writeEdits(now, view, edits, settlers, writing, System::currentTimeMillis);
                         TreeAnswerWatch.pictures(reader.view(), pictured, picture);
                     }
                     failedLast = null;
@@ -249,6 +272,38 @@ public final class CoordinatorHost implements RunCompanion {
         }
     }
 
+    /**
+     * Carries out the edits {@code view} holds queued, by {@code edits}, off this thread on {@code settlers}: one drain
+     * at a time ({@code writing}), and never while the Settler writes, so the run has one writer of the bot.
+     */
+    static void writeEdits(Journal journal, JournalView view, EditWriter.Apply edits, Executor settlers,
+                           AtomicBoolean writing, LongSupplier clock) {
+        if (view.unapplied().isEmpty() || !writing.compareAndSet(false, true)) return;
+        settlers.execute(() -> {
+            ReentrantLock lock = writing(journal);
+            lock.lock();
+            try {
+                // Read again: what an earlier drain wrote since the round's look is not written twice.
+                EditWriter.drain(journal, JournalView.of(journal), edits, clock);
+            } catch (RuntimeException failed) {
+                SdkLog.warn("The explore run's edits were not written: " + failed.getMessage());
+            } finally {
+                lock.unlock();
+                writing.set(false);
+            }
+        });
+    }
+
+    /** By the folder of a bot's runs: held by whoever writes that bot, a Settler or the edit writer, one at a time. */
+    private static final ConcurrentHashMap<Path, ReentrantLock> WRITING = new ConcurrentHashMap<>();
+
+    /** The lock of the bot {@code journal}'s run writes: one per bot, so runs of other bots never wait on it. */
+    private static ReentrantLock writing(Journal journal) {
+        Path runs = journal.folder().toAbsolutePath().normalize();
+        Path bot = runs.getParent() == null ? runs : runs.getParent();
+        return WRITING.computeIfAbsent(bot, b -> new ReentrantLock());
+    }
+
     /** The stop {@code stopId} of {@code view}: the open one, or one queued. */
     private static Optional<Stop> stopOf(JournalView view, String stopId) {
         return view.open().filter(stop -> stop.id().equals(stopId))
@@ -280,6 +335,15 @@ public final class CoordinatorHost implements RunCompanion {
      */
     private static void settle(Journal journal, JournalView view, Coordinator.Action.Lease lease, LongSupplier clock,
                                TreeAnswerWatch.Writer writer) {
+        ReentrantLock lock = writing(journal);
+        // Waited for within the lease only: a lease run out meanwhile is the Coordinator's requeue already, and the
+        // next try writes it; this one must not write it too.
+        try {
+            if (!lock.tryLock(Math.max(0, lease.expiresAt() - clock.getAsLong()), TimeUnit.MILLISECONDS)) return;
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+            return;
+        }
         try {
             Optional<String> failed = TreeAnswerWatch.settle(journal, view, lease.stopId(),
                     (id, answers) -> writer.write(journal, id, answers));
@@ -289,6 +353,8 @@ public final class CoordinatorHost implements RunCompanion {
             SdkLog.warn("What the explore run settled at " + lease.stopId() + " was not written: " + failed.getMessage());
             journal.append(new ExploreEvent.Released(lease.stopId(), lease.attempt(), false,
                     String.valueOf(failed.getMessage()), clock.getAsLong()));
+        } finally {
+            lock.unlock();
         }
     }
 

@@ -604,7 +604,7 @@ public final class ExploreLoop {
                 restore();
                 clock.restore(journal);
             } else {
-                emit(new ExploreEvent.Began(dev, began));
+                emit(new ExploreEvent.Began(dev, goal.said(), began));
             }
             end = rounds();
             return end;

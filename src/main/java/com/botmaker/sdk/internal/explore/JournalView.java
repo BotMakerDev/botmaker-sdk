@@ -247,9 +247,41 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return Optional.empty();
     }
 
-    /** Whether the edit {@code editId} reached the bot in the latest run. */
+    /** Whether the edit {@code editId} was carried out in the latest run, taken or refused. */
     public boolean applied(String editId) {
-        return events.stream().anyMatch(e -> e instanceof ExploreEvent.EditApplied edit && edit.editId().equals(editId));
+        return appliedOf(editId).isPresent();
+    }
+
+    /** How the edit {@code editId} was carried out in the latest run; empty while it was not. */
+    public Optional<ExploreEvent.EditApplied> appliedOf(String editId) {
+        return events.stream().filter(e -> e instanceof ExploreEvent.EditApplied edit && edit.editId().equals(editId))
+                .map(ExploreEvent.EditApplied.class::cast).findFirst();
+    }
+
+    /** Whether the edit {@code editId} is queued in the latest run, carried out or not. */
+    public boolean queued(String editId) {
+        return queuedOf(editId).isPresent();
+    }
+
+    /** The edit {@code editId} as first queued in the latest run; empty while it was not. */
+    public Optional<ExploreEvent.EditQueued> queuedOf(String editId) {
+        return events.stream().filter(e -> e instanceof ExploreEvent.EditQueued edit && edit.editId().equals(editId))
+                .map(ExploreEvent.EditQueued.class::cast).findFirst();
+    }
+
+    /** The edits queued in the latest run and not carried out yet, oldest first, each id once. */
+    public List<ExploreEvent.EditQueued> unapplied() {
+        Set<String> seen = new HashSet<>();
+        events.stream().filter(ExploreEvent.EditApplied.class::isInstance)
+                .forEach(e -> seen.add(((ExploreEvent.EditApplied) e).editId()));
+        return events.stream().filter(ExploreEvent.EditQueued.class::isInstance).map(ExploreEvent.EditQueued.class::cast)
+                .filter(edit -> seen.add(edit.editId())).toList();
+    }
+
+    /** What the latest run explores toward, in plain words or a screen's name; blank for none. */
+    public String goal() {
+        return events.stream().filter(ExploreEvent.Began.class::isInstance).map(ExploreEvent.Began.class::cast)
+                .map(ExploreEvent.Began::goal).findFirst().orElse("");
     }
 
     /**

@@ -562,7 +562,8 @@ final class ExploreView {
             case ExploreEvent.Witnessed e -> "🎯 Goal reached: " + e.goal() + " (" + e.check().displayName()
                     + (e.mark().isBlank() ? "" : ": " + e.mark()) + ")";
             case ExploreEvent.Ranked e -> null;
-            case ExploreEvent.EditApplied e -> null;
+            case ExploreEvent.EditQueued e -> null;
+            case ExploreEvent.EditApplied e -> e.ok() ? null : "⚠ " + e.editId() + " not written: " + e.said().lines().findFirst().orElse("");
             case ExploreEvent.Reloaded e -> e.refused()
                     ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
                     ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()

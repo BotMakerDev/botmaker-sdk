@@ -47,8 +47,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   user's own `claude`, signed in by claude.ai, killed when the lease runs out and released with how it ended. It runs
   lean (no settings, skills or built-in tools, only the bot's explore tools by a worker-only MCP config), always names
   its model and never takes an API key: the key and cloud-provider variables are taken out of its environment. Signed
-  out, the workers' stops are parked so the run goes on. The core does not start workers yet; the Reader's job comes
-  next.
+  out, the workers' stops are parked so the run goes on.
+- The Reader: an explore run given a goal hands each stop the map cannot answer to a Reader session, which looks at the
+  stop's frame (`explore look`), names and writes what is missing (`explore apply_edit`, an `edit_map` call queued in
+  the journal), ranks the screen's presses toward the goal and tags each safe, risky or destructive (`explore
+  rank_presses`), then resumes the stop. The run presses the best first and never a risky or destructive press alone.
+  Edits go through one writer, each id written once, also after a core restart. A run with no goal is answered as
+  before.
 
 ### Fixed
 
