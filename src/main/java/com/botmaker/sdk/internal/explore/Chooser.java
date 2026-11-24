@@ -178,6 +178,35 @@ final class Chooser {
         return left;
     }
 
+    /**
+     * Why the run presses no input on {@code screen}: each input the map still counts as left, with what rules it out,
+     * for the line a run that idles there says once.
+     */
+    String whyNoInput(String screen) {
+        MapScreen on = map.screen(screen).orElse(null);
+        if (on == null) return "the map holds no such screen";
+        List<String> fields = map.left(screen);
+        if (fields.isEmpty()) {
+            List<String> all = new ArrayList<>();
+            for (String field : map.fields(screen)) all.add(field + " " + map.status(screen, field));
+            return "the map counts no input left on it; its fields: " + (all.isEmpty() ? "none" : all);
+        }
+        Set<String> ways = new HashSet<>();
+        for (Edge edge : map.edges()) if (edge.from().equals(screen) && edge.input() != null) ways.add(edge.input());
+        List<String> why = new ArrayList<>();
+        for (String field : fields) {
+            String key = screen + "." + field;
+            String reason = !(on.inputs().get(field) instanceof Button button) ? "not a button"
+                    : button.element() == null ? "a button with no element"
+                    : !(button.verdict() instanceof Verdict.Free) ? "verdict " + button.verdict()
+                    : ways.contains(field) ? "already a way"
+                    : tried.contains(key) ? "tried this run"
+                    : avoided.test(key) ? "avoided" : "pressable";
+            why.add(field + ": " + reason);
+        }
+        return String.join("; ", why);
+    }
+
     /** What the run still presses itself on {@code screen}: its ways not tried, then its inputs left, by name. */
     List<String> left(String screen) {
         List<String> left = new ArrayList<>();

@@ -20,6 +20,7 @@ import com.botmaker.sdk.internal.explore.tree.Overlay;
 import com.botmaker.sdk.internal.explore.tree.RouteGuess;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.ElementMatch;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.internal.vision.TemplateSource;
 import com.botmaker.sdk.internal.screens.MapScreen;
@@ -410,6 +411,8 @@ public final class ExploreLoop {
     private final Set<String> shot = new HashSet<>();
     /** The screens whose forms were tried: once each. */
     private final Set<String> probed = new HashSet<>();
+    /** The screens a run has said once that it has nothing to press on. */
+    private final Set<String> idleSaid = new HashSet<>();
     /** What the run settled at each stop, by its id: the evidence when the plugin side's write of it falls short. */
     private final Map<String, List<TreeAnswer>> settledAt = new HashMap<>();
     /** Settled stops resumed with answers the plugin side left out, raised again at the next round's start. */
@@ -796,6 +799,10 @@ public final class ExploreLoop {
         if (next.isPresent()) return walk(screen, next.get());
         // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
         if (chooser.giveUpNotSeen()) return true;
+        if (idleSaid.add(screen)) {
+            Say.info("Nothing to press on " + screen + ": the tree is " + (readsTrees() ? "read" : "not read") + "; "
+                    + chooser.whyNoInput(screen), Map.of());
+        }
         clock.doing(Spent.IDLE);
         play.idle(settings.poll());
         return true;

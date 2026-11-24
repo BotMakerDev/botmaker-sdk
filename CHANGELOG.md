@@ -17,7 +17,7 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
-## [Unreleased]
+## [1.12.2] — 2026-11-24
 
 ### Added
 
@@ -36,6 +36,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `States` and `Result.BLOCKED`). A bot that skipped the release that deprecated them has its uses repaired
   by Studio's upgrade like any code that no longer compiles; a group still marked `@GameState` loses the mark and
   must be marked `@Facts` again by hand.
+
+### Changed
+
+- Built against botmaker-studio-api 0.20.0 (was 0.19.1).
+- Built against botmaker-plugin-toolkit 0.17.2 (was 0.17.1).
+- Built against botmaker-plugin-host 0.14.2 (was 0.14.1).
+- Built against botmaker-plugin-basics 0.11.2 (was 0.11.1).
+- Built against botmaker-java 0.4.2 (was 0.4.1).
 
 ## [1.12.1] — 2026-11-22
 

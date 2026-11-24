@@ -49,8 +49,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -157,6 +159,10 @@ public final class LivePlay implements ExploreLoop.Play {
     private volatile ScreenGraph map;
     private volatile LiveMoves moves;
     private volatile Plan plan = Plan.NONE;
+    /** The last look's screen, pixels and answer: a screen that did not change is not read by OCR again. */
+    private String lookedScreen;
+    private int[] lookedPixels;
+    private ExploreLoop.Look looked;
 
     /**
      * Plays {@code map} with {@code plan} (null: none); {@code restart} restarts the game; a website's page goes to
@@ -186,14 +192,27 @@ public final class LivePlay implements ExploreLoop.Play {
         Optional<BufferedImage> frame = reach.look();
         if (frame.isEmpty()) return ExploreLoop.Look.NOTHING;
         showPage(frame.get());
-        List<Stop.Text> texts = read(reach, frame.get()).stream()
+        BufferedImage image = frame.get();
+        int[] pixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+        synchronized (this) {
+            if (looked != null && Objects.equals(screen, lookedScreen) && Arrays.equals(pixels, lookedPixels)) {
+                return looked;
+            }
+        }
+        List<Stop.Text> texts = read(reach, image).stream()
                 .map(text -> new Stop.Text(text.text(), text.bounds())).toList();
         List<Rect> covered = new ArrayList<>();
         for (Readout readout : mapped(screen).map(s -> s.readouts().values()).orElse(List.of())) {
             if (readout.area() == null) continue;
-            reach.find(readout.area().anchor(), frame.get()).map(readout.area()::place).ifPresent(covered::add);
+            reach.find(readout.area().anchor(), image).map(readout.area()::place).ifPresent(covered::add);
         }
-        return new ExploreLoop.Look(texts, covered);
+        ExploreLoop.Look read = new ExploreLoop.Look(texts, covered);
+        synchronized (this) {
+            lookedScreen = screen;
+            lookedPixels = pixels;
+            looked = read;
+        }
+        return read;
     }
 
     @Override
