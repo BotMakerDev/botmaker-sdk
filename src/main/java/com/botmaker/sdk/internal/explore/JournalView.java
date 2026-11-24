@@ -15,7 +15,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A {@link Journal} read as the plugin side needs it: the latest run's events, its open stop, its parked stops, its
@@ -507,7 +509,23 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 case ExploreEvent.Stopped e -> e.stop().screen();
                 default -> null;
             };
-            if (screen != null) return Optional.of(screen);
+            // A stop on a screen not on the map names none: the run is on no screen of it.
+            if (screen != null) return screen.isBlank() ? Optional.empty() : Optional.of(screen);
+        }
+        return Optional.empty();
+    }
+
+    /** The latest screen of the map the latest run was on, even when it is off the map now; empty before any. */
+    private Optional<String> lastScreen() {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            String screen = switch (events.get(i)) {
+                case ExploreEvent.NewScreen e -> e.screen();
+                case ExploreEvent.Tried e -> e.screen();
+                case ExploreEvent.Refused e -> e.screen();
+                case ExploreEvent.Stopped e -> e.stop().screen();
+                default -> null;
+            };
+            if (screen != null && !screen.isBlank()) return Optional.of(screen);
         }
         return Optional.empty();
     }
@@ -557,6 +575,186 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     /** The call a wait as {@code role} writes: {@link #WAIT}, then the role's id when it keeps to one. */
     public static String waitCall(StopRole role) {
         return role == null ? WAIT : WAIT + " " + role.id();
+    }
+
+    /** When the latest run last pressed, epoch milliseconds; empty before it pressed. */
+    public OptionalLong lastPress() {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Tried tried) return OptionalLong.of(tried.at());
+        }
+        return OptionalLong.empty();
+    }
+
+    /** The stop {@code stopId} as the latest run last stopped on it, or a found fault; empty for neither. */
+    public Optional<Stop> stopOf(String stopId) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Stopped(Stop stop, boolean again, long at)
+                    && stop.id().equals(stopId)) {
+                return Optional.of(stop);
+            }
+        }
+        return foundFaults().stream().filter(f -> f.id().equals(stopId)).findFirst();
+    }
+
+    /** Whether the latest run has a crew: only a run given a goal does (the Coordinator and its workers). */
+    public boolean crewed() {
+        return !goal().isBlank();
+    }
+
+    /**
+     * What {@code agent} is doing in the latest run at {@code nowMs}, for its card on the Explore page; the Coordinator
+     * is silent once its heartbeat is older than {@code silentAfter}.
+     */
+    public AgentSummary agentSummary(Agent agent, long nowMs, Duration silentAfter) {
+        return switch (agent == null ? Agent.UNKNOWN : agent) {
+            case EXPLORER -> explorer(nowMs);
+            case COORDINATOR -> coordinator(nowMs, silentAfter);
+            case READER -> worker(Agent.READER, StopRole.CARTOGRAPHER, nowMs);
+            case EVALUATOR -> worker(Agent.EVALUATOR, StopRole.EVALUATOR, nowMs);
+            case MECHANIC -> worker(Agent.MECHANIC, StopRole.MECHANIC, nowMs);
+            case UNKNOWN -> new AgentSummary(Agent.UNKNOWN, AgentSummary.State.UNKNOWN, "", "", Optional.empty(), 0,
+                    Duration.ZERO);
+        };
+    }
+
+    private AgentSummary explorer(long nowMs) {
+        Optional<Stop> open = open();
+        AgentSummary.State state = !running() ? AgentSummary.State.ENDED
+                : open.isPresent() && !settled(open.get()) ? AgentSummary.State.WAITING : AgentSummary.State.WORKING;
+        String frame = open.map(Stop::framePath).filter(f -> !f.isBlank()).orElseGet(this::lastFrame);
+        return new AgentSummary(Agent.EXPLORER, state, open.map(Stop::id).orElse(""), frame,
+                latest(e -> author(e) == Agent.EXPLORER), (int) count(ExploreEvent.Tried.class), ranFor(nowMs));
+    }
+
+    /**
+     * Who wrote {@code event}, as the feed's chip says it: the run's own records the Explorer's, leases the
+     * Coordinator's, findings the Evaluator's (a STUCK the run or the watchdog says too), branches the Mechanic's, and
+     * ranks, edits and questions handed to the user the Reader's. {@link Agent#UNKNOWN} for Claude's calls and
+     * heartbeats.
+     */
+    public static Agent author(ExploreEvent event) {
+        return switch (event) {
+            case ExploreEvent.Began e -> Agent.EXPLORER;
+            case ExploreEvent.Ended e -> Agent.EXPLORER;
+            case ExploreEvent.Pictured e -> Agent.EXPLORER;
+            case ExploreEvent.Settled e -> Agent.EXPLORER;
+            case ExploreEvent.NewScreen e -> Agent.EXPLORER;
+            case ExploreEvent.Tried e -> Agent.EXPLORER;
+            case ExploreEvent.Refused e -> Agent.EXPLORER;
+            case ExploreEvent.GoalMet e -> Agent.EXPLORER;
+            case ExploreEvent.Built e -> Agent.EXPLORER;
+            case ExploreEvent.Building e -> Agent.EXPLORER;
+            case ExploreEvent.SetAside e -> Agent.EXPLORER;
+            case ExploreEvent.Stopped e -> Agent.EXPLORER;
+            case ExploreEvent.Fixed e -> Agent.EXPLORER;
+            case ExploreEvent.Parked e -> Agent.EXPLORER;
+            case ExploreEvent.Faulted e -> Agent.EXPLORER;
+            case ExploreEvent.ReplayLost e -> Agent.EXPLORER;
+            case ExploreEvent.Restarted e -> Agent.EXPLORER;
+            case ExploreEvent.Reloaded e -> Agent.EXPLORER;
+            case ExploreEvent.Witnessed e -> Agent.EXPLORER;
+            case ExploreEvent.Leased e -> Agent.COORDINATOR;
+            case ExploreEvent.Released e -> Agent.COORDINATOR;
+            case ExploreEvent.Finding e -> Agent.EVALUATOR;
+            case ExploreEvent.Summary e -> Agent.EVALUATOR;
+            case ExploreEvent.Branched e -> Agent.MECHANIC;
+            case ExploreEvent.Ranked e -> Agent.READER;
+            case ExploreEvent.EditQueued e -> Agent.READER;
+            case ExploreEvent.EditApplied e -> Agent.READER;
+            case ExploreEvent.Asked e -> Agent.READER;
+            case ExploreEvent.Claude e -> Agent.UNKNOWN;
+            case ExploreEvent.Heartbeat e -> Agent.UNKNOWN;
+        };
+    }
+
+    /** The frame {@code event} names: a stop's, a page's shot, a witness's; {@code ""} for none. */
+    public static String frameOf(ExploreEvent event) {
+        return switch (event) {
+            case ExploreEvent.Stopped e -> e.stop().framePath();
+            case ExploreEvent.Pictured e -> e.frame();
+            case ExploreEvent.Witnessed e -> e.frame();
+            default -> "";
+        };
+    }
+
+    /** The latest frame a record of the run's names; {@code ""} for none. */
+    private String lastFrame() {
+        return latest(e -> !frameOf(e).isBlank()).map(JournalView::frameOf).orElse("");
+    }
+
+    /**
+     * The way the latest run first came to the last screen of the map it was on, from where it began: each screen by
+     * the one it was first found from, oldest first; empty before it reached one. Off the map now, {@link #where()}
+     * is empty and this ends where it left the map.
+     */
+    public List<String> path() {
+        Map<String, String> from = new LinkedHashMap<>();
+        for (ExploreEvent event : events) {
+            if (event instanceof ExploreEvent.NewScreen found) from.putIfAbsent(found.screen(), found.from());
+        }
+        List<String> path = new ArrayList<>();
+        String screen = lastScreen().orElse(null);
+        Set<String> seen = new HashSet<>();
+        while (screen != null && seen.add(screen)) {
+            path.add(screen);
+            screen = from.get(screen);
+        }
+        return List.copyOf(path.reversed());
+    }
+
+    private AgentSummary coordinator(long nowMs, Duration silentAfter) {
+        Optional<Instant> beat = lastHeartbeat();
+        AgentSummary.State state = !running() ? AgentSummary.State.ENDED
+                : beat.isEmpty() ? (crewed() ? AgentSummary.State.IDLE : AgentSummary.State.ABSENT)
+                : nowMs - beat.get().toEpochMilli() > silentAfter.toMillis() ? AgentSummary.State.SILENT
+                : AgentSummary.State.WORKING;
+        return new AgentSummary(Agent.COORDINATOR, state, "", "",
+                latest(e -> e instanceof ExploreEvent.Leased || e instanceof ExploreEvent.Released),
+                (int) count(ExploreEvent.Leased.class), beat.isEmpty() ? Duration.ZERO : ranFor(nowMs));
+    }
+
+    /** A worker's card: the leases of {@code role}, the one open now, and what it last wrote. */
+    private AgentSummary worker(Agent agent, StopRole role, long nowMs) {
+        List<ExploreEvent.Leased> leases = events.stream().filter(e -> e instanceof ExploreEvent.Leased l
+                && l.role() == role).map(ExploreEvent.Leased.class::cast).toList();
+        Set<String> tries = new HashSet<>();
+        leases.forEach(l -> tries.add(l.stopId() + "#" + l.attempt()));
+        // A lease past its time is the Coordinator's to take back: its worker is gone, not working.
+        Optional<ExploreEvent.Leased> open = leases.reversed().stream().filter(l -> !l.expired(nowMs))
+                .filter(l -> leaseOf(l.stopId()).filter(l::equals).isPresent()).findFirst();
+        long worked = 0;
+        for (ExploreEvent.Leased lease : leases) {
+            long until = events.stream().filter(e -> e instanceof ExploreEvent.Released r
+                            && r.stopId().equals(lease.stopId()) && r.attempt() == lease.attempt())
+                    .mapToLong(ExploreEvent::at).findFirst().orElse(Math.min(lease.expiresAt(), nowMs));
+            worked += Math.max(0, until - lease.at());
+        }
+        AgentSummary.State state = open.isPresent() ? AgentSummary.State.WORKING
+                : !crewed() && leases.isEmpty() ? AgentSummary.State.ABSENT
+                : !running() ? AgentSummary.State.ENDED : AgentSummary.State.IDLE;
+        String stopId = open.map(ExploreEvent.Leased::stopId).orElse("");
+        String frame = open.flatMap(l -> stopOf(l.stopId())).map(Stop::framePath).orElse("");
+        Optional<ExploreEvent> last = latest(e -> switch (e) {
+            // A session that ended well said its piece in its own record; only a failed one's release says more.
+            case ExploreEvent.Released r -> !r.ok() && tries.contains(r.stopId() + "#" + r.attempt());
+            case ExploreEvent.Ranked r -> role == StopRole.CARTOGRAPHER;
+            case ExploreEvent.EditQueued q -> role == StopRole.CARTOGRAPHER;
+            case ExploreEvent.EditApplied a -> role == StopRole.CARTOGRAPHER;
+            case ExploreEvent.Asked a -> role == StopRole.CARTOGRAPHER;
+            case ExploreEvent.Finding f -> role == StopRole.EVALUATOR;
+            case ExploreEvent.Summary s -> role == StopRole.EVALUATOR;
+            case ExploreEvent.Branched b -> role == StopRole.MECHANIC;
+            default -> false;
+        });
+        return new AgentSummary(agent, state, stopId, frame, last, leases.size(), Duration.ofMillis(worked));
+    }
+
+    /** The latest run's latest event {@code test} holds for; empty for none. */
+    private Optional<ExploreEvent> latest(Predicate<ExploreEvent> test) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (test.test(events.get(i))) return Optional.of(events.get(i));
+        }
+        return Optional.empty();
     }
 
     /** How many of the latest run's events are {@code type}. */

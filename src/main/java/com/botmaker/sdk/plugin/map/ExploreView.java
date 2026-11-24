@@ -8,11 +8,13 @@ import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.plugin.api.source.RunParameter;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Readout;
+import com.botmaker.sdk.internal.explore.Agent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.plugin.assist.Coordinator;
 import com.botmaker.sdk.plugin.assist.ScreenDesk;
 import com.botmaker.sdk.plugin.run.SdkRuns;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
@@ -26,11 +28,13 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitMenuButton;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -44,6 +48,7 @@ import javafx.util.Duration;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -74,6 +79,8 @@ final class ExploreView {
     private static final Duration TICK = Duration.seconds(1);
     /** How often, and how many times, a row's buttons look whether the run took the user's answer: two minutes. */
     private static final int ANSWER_POLL_MS = 250, ANSWER_POLLS = 480;
+    /** How old the Coordinator's heartbeat may be before its card says it went silent: its own limit. */
+    private static final java.time.Duration HEARTBEAT = Coordinator.Settings.DEFAULT.heartbeat();
 
     private final StudioServices services;
     private final Supplier<ScreenGraph> graph;
@@ -97,7 +104,13 @@ final class ExploreView {
     /** The user's queue (2026-11-21): the stops only they decide, each with resume and ignore. */
     private final VBox yours = new VBox(4);
     private final VBox yoursBox = new VBox(4);
-    private final ListView<String> feed = new ListView<>();
+    private final ListView<ExploreLines.FeedRow> feed = new ListView<>();
+    /** The goal bar's line: the goal, the way so far and its depth. */
+    private final Label goal = new Label();
+    /** One card per agent of the crew; shown for a run given a goal only, the one run that has a crew. */
+    private final AgentCards cards = new AgentCards(this::frameFile);
+    /** The folder of the journal last read, which a frame named relative to it is in; the reading thread sets it. */
+    private volatile Path journalFolder;
     private final Timeline ticker = new Timeline(new KeyFrame(TICK, e -> tick()));
     private final AtomicBoolean reading = new AtomicBoolean();
     private final AutoCloseable runState;
@@ -130,7 +143,8 @@ final class ExploreView {
         this.journals = journals;
         this.nowMs = nowMs;
         root.getStylesheets().add(ScreenCanvas.SHEET);
-        root.getStyleClass().add("explore-view");
+        // The map's colour tokens are published on .screen-map.
+        root.getStyleClass().addAll("screen-map", "explore-view");
 
         start.setText("▶ " + SdkRuns.KEEP_EXPLORING);
         start.setTooltip(new Tooltip("Starts a run that explores the game until stopped, and stops for Claude on what "
@@ -150,8 +164,14 @@ final class ExploreView {
         HBox bar = new HBox(8, status, gap, start, stop);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(6, 8, 6, 8));
-        bar.getStyleClass().add("explore-bar");
-        root.setTop(bar);
+        goal.getStyleClass().add("explore-goal");
+        goal.setMinWidth(0);
+        goal.setPadding(new Insets(4, 8, 0, 8));
+        Node crew = cards.node();
+        VBox.setMargin(crew, new Insets(4, 8, 6, 8));
+        VBox top = new VBox(bar, goal, crew);
+        top.getStyleClass().add("explore-bar");
+        root.setTop(top);
 
         frame.setPreserveRatio(true);
         frame.setFitWidth(420);
@@ -178,6 +198,7 @@ final class ExploreView {
         pinnedClaude.getStyleClass().add("explore-claude");
         feed.setPlaceholder(new Label("Nothing yet: ▶ " + SdkRuns.KEEP_EXPLORING
                 + " explores the game, and what it finds shows here."));
+        feed.setCellFactory(list -> new FeedCell());
         Label feedTitle = new Label("Feed");
         feedTitle.getStyleClass().add("explore-heading");
         Label yoursTitle = new Label("For you");
@@ -274,6 +295,7 @@ final class ExploreView {
             try {
                 Journal journal = journals.get().orElse(null);
                 if (journal == null) return;
+                journalFolder = journal.folder();
                 // A run of hours writes thousands of lines: read again only when the files changed, and then only
                 // the lines added since; a newer run's journal is read from its start.
                 String stamp = journal.folder() + " " + stamp(journal);
@@ -388,7 +410,19 @@ final class ExploreView {
         boolean changed = read != last;
         last = read;
         boolean live = live(read);
-        status.setText(ExploreLines.statusLine(read, graph.get().screens().size(), nowMs.getAsLong(), live));
+        long now = nowMs.getAsLong();
+        status.setText(ExploreLines.statusLine(read, graph.get().screens().size(), now, live));
+        String goalLine = ExploreLines.goalLine(read);
+        goal.setText(goalLine);
+        goal.setVisible(!goalLine.isEmpty());
+        goal.setManaged(!goalLine.isEmpty());
+        boolean crewed = read.crewed();
+        cards.node().setVisible(crewed);
+        cards.node().setManaged(crewed);
+        if (crewed) {
+            cards.show(Agent.CREW.stream().map(agent -> read.agentSummary(agent, now, HEARTBEAT))
+                    .map(summary -> live ? summary : summary.ended()).toList());
+        }
         Optional<Stop> open = live ? read.open() : Optional.empty();
         pinned.setVisible(open.isPresent());
         pinned.setManaged(open.isPresent());
@@ -405,8 +439,8 @@ final class ExploreView {
             yoursBox.setManaged(!mine.isEmpty());
         }
         if (changed) {
-            List<String> lines = ExploreLines.feedLines(read);
-            if (!lines.equals(feed.getItems())) feed.getItems().setAll(lines);
+            List<ExploreLines.FeedRow> rows = ExploreLines.feedRows(read);
+            if (!rows.equals(feed.getItems())) feed.getItems().setAll(rows);
         }
         String on = liveScreen != null ? liveScreen : read.where().orElse(null);
         screenName.setText(on == null ? "No screen of the map" : on);
@@ -464,7 +498,77 @@ final class ExploreView {
 
     /** The feed shown, newest first. */
     List<String> feedLines() {
+        return feed.getItems().stream().map(ExploreLines.FeedRow::text).toList();
+    }
+
+    /** The feed's rows shown, newest first, with their chips and frames. */
+    List<ExploreLines.FeedRow> feedRows() {
         return List.copyOf(feed.getItems());
+    }
+
+    /** The agent cards shown, one line each; empty for a run without a crew. */
+    List<String> cardLines() {
+        return cards.node().isVisible() ? cards.lines() : List.of();
+    }
+
+    String goalText() {
+        return goal.getText();
+    }
+
+    /**
+     * The file a record's frame names: as it is when absolute ({@code LivePlay.keep} writes them so), else in the
+     * journal's folder; empty for none, or a file gone.
+     */
+    private Optional<Path> frameFile(String named) {
+        if (named == null || named.isBlank()) return Optional.empty();
+        try {
+            Path path = Path.of(named);
+            Path folder = journalFolder;
+            Path file = path.isAbsolute() ? path : folder == null ? null : folder.resolve(path);
+            return file != null && Files.isRegularFile(file) ? Optional.of(file) : Optional.empty();
+        } catch (InvalidPathException unnamed) {
+            return Optional.empty();
+        }
+    }
+
+    /** A feed row: the agent's chip, a thumbnail of the frame its record names, and its line. */
+    private final class FeedCell extends ListCell<ExploreLines.FeedRow> {
+
+        private static final double THUMB_WIDTH = 48;
+
+        private final Label chip = new Label();
+        private final ImageView thumb = new ImageView();
+        private final Label text = new Label();
+        private final HBox box = new HBox(6, chip, thumb, text);
+
+        FeedCell() {
+            chip.getStyleClass().add("explore-chip");
+            thumb.setPreserveRatio(true);
+            thumb.setFitWidth(THUMB_WIDTH);
+            text.setMinWidth(0);
+            box.setAlignment(Pos.CENTER_LEFT);
+        }
+
+        @Override
+        protected void updateItem(ExploreLines.FeedRow row, boolean empty) {
+            super.updateItem(row, empty);
+            if (empty || row == null) {
+                setGraphic(null);
+                setText(null);
+                return;
+            }
+            boolean named = row.agent() != Agent.UNKNOWN;
+            chip.setText(named ? row.agent().displayName() : "");
+            chip.setVisible(named);
+            chip.setManaged(named);
+            Image image = cards.thumbnail(row.frame(), THUMB_WIDTH).orElse(null);
+            thumb.setImage(image);
+            thumb.setVisible(image != null);
+            thumb.setManaged(image != null);
+            text.setText(row.text());
+            setText(null);
+            setGraphic(box);
+        }
     }
 
     /** The stop pinned and what Claude did last, one line each; empty while nothing is pinned. */

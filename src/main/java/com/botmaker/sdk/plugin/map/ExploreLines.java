@@ -3,10 +3,12 @@
 
 package com.botmaker.sdk.plugin.map;
 
+import com.botmaker.sdk.internal.explore.Agent;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
+import com.botmaker.sdk.internal.explore.StopRole;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * What 🔭 Explore ({@link ExploreView}) says of a run, as text: its status line, its feed's lines, the user's queue's
@@ -28,7 +31,10 @@ final class ExploreLines {
     private ExploreLines() {
     }
 
-    /** The status line: how long, how many screens, how many stops fixed, and whether it runs or waits on Claude. */
+    /**
+     * The status line: how long, how many screens, how many stops fixed, and whether it runs or waits, and on whom;
+     * a live run that waits says how long ago its last press was, so a stall shows as a growing number.
+     */
     static String statusLine(JournalView read, int screensKnown, long nowMs, boolean live) {
         if (!read.began()) return "No explore run yet · " + screensKnown + " screens known";
         long fresh = read.events().stream()
@@ -41,19 +47,62 @@ final class ExploreLines {
         String took = String.format("%d:%02d:%02d", ran.toHours(), ran.toMinutesPart(), ran.toSecondsPart());
         String state = read.ended().map(end -> "ended: " + end.displayName())
                 .orElse(!live ? "ended" : read.open().filter(read::settled).isPresent() ? "✎ writing what the page settled"
-                        : read.open().isPresent() ? "⏸ waiting on Claude" : "running");
+                        : read.open().map(stop -> waiting(read, stop, nowMs)).orElse("running"));
         return took + " · " + screensKnown + " screens known (+" + fresh + " new) · "
                 + read.count(ExploreEvent.Fixed.class) + " stops fixed · " + state;
     }
 
-    /** The latest run's events as feed lines, newest first; Claude's calls are the pinned stop's, not the feed's. */
-    static List<String> feedLines(JournalView read) {
-        List<String> lines = new ArrayList<>();
+    /** "last press N s ago · ⏸ waiting on <who>" for the stop the live run waits on. */
+    private static String waiting(JournalView read, Stop stop, long nowMs) {
+        OptionalLong press = read.lastPress();
+        String ago = press.isPresent() ? "last press " + Math.max(0, (nowMs - press.getAsLong()) / 1000) + " s ago · " : "";
+        return ago + "⏸ waiting on " + waitingOn(read, stop);
+    }
+
+    /**
+     * Who a stop waits on: the worker leased it, else the user for one of theirs, else Claude for a run without a crew
+     * (Claude drives it by its tools), else the worker its role names.
+     */
+    static String waitingOn(JournalView read, Stop stop) {
+        Agent leased = read.leaseOf(stop.id()).map(l -> Agent.of(l.role())).orElse(Agent.UNKNOWN);
+        if (leased != Agent.UNKNOWN) return leased.displayName();
+        StopRole role = read.roleOf(stop);
+        if (role == StopRole.USER) return "you";
+        Agent agent = Agent.of(role);
+        return !read.crewed() || agent == Agent.UNKNOWN ? "Claude" : agent.displayName();
+    }
+
+    /**
+     * One row of the feed: its line with its clock, the agent whose record it is (its chip, none for
+     * {@link Agent#UNKNOWN}) and the frame the record names ({@code ""} for none), drawn as a thumbnail.
+     */
+    record FeedRow(String text, Agent agent, String frame) {}
+
+    /** The latest run's events as feed rows, newest first; Claude's calls are the pinned stop's, not the feed's. */
+    static List<FeedRow> feedRows(JournalView read) {
+        List<FeedRow> rows = new ArrayList<>();
         for (ExploreEvent event : read.events()) {
             String line = line(event);
-            if (line != null) lines.add(clock(event.at()) + "  " + line);
+            if (line != null) {
+                rows.add(new FeedRow(clock(event.at()) + "  " + line, JournalView.author(event),
+                        JournalView.frameOf(event)));
+            }
         }
-        return lines.reversed();
+        return rows.reversed();
+    }
+
+    /**
+     * The goal bar's line: the run's goal, or that Claude drives a run without one, then the way it came to where it
+     * is and how deep that is; {@code ""} before any run.
+     */
+    static String goalLine(JournalView read) {
+        if (!read.began()) return "";
+        List<String> path = new ArrayList<>(read.path());
+        // Off the map now: one step past where it left it.
+        if (!path.isEmpty() && read.where().isEmpty()) path.add("?");
+        String way = path.isEmpty() ? "on no screen of the map yet"
+                : String.join(" › ", path) + " (depth " + (path.size() - 1) + ")";
+        return (read.crewed() ? "🎯 " + read.goal() : "No goal: Claude works the stops") + " · " + way;
     }
 
     /** {@code event} as a feed line, without its clock; null for one the feed does not show. */

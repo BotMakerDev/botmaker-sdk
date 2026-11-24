@@ -21,6 +21,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🔭 Explore shows the crew of a run given a goal (spec `2026-11-24-explore-agents-design`, layout A): a goal bar under
+  the status line with the goal, the way the run came to where it is and how deep that is; one card per agent
+  (Explorer, Reader, Evaluator, Coordinator, Mechanic) with its state, the stop it is on, a thumbnail of the frame it
+  looks at, what it last wrote, its calls and its time, all read off the journal; and an agent chip and a thumbnail on
+  each feed row. A run that waits says on whom and how long ago it last pressed (`last press 12 s ago · ⏸ waiting on
+  Reader`), so a stall shows as a growing number. A run without a goal shows no cards and still waits on Claude.
+- The Mechanic's lane commits nothing a session could plant to escape it: a git repository made inside the lane, a
+  gitlink, or a `.gitignore` that un-ignores its desk or `.claude/` refuse the commit, which then says where the work
+  was left.
+
 - The explore crew's Mechanic (spec `2026-11-24-explore-agents-design`), for who develops the SDK: with
   `BOTMAKER_SDK_CHECKOUT` naming a checkout of it, a run given a goal on a `-SNAPSHOT` SDK hands a fault of Discover's
   own, a crash, or an SDK fault the Evaluator found to a Claude session, once each, one at a time, for 30 minutes at

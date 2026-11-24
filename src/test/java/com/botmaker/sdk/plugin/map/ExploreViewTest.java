@@ -10,12 +10,15 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.internal.explore.Agent;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopKind;
+import com.botmaker.sdk.internal.explore.StopRole;
+import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.run.SdkRuns;
 import javafx.scene.Scene;
@@ -147,6 +150,42 @@ class ExploreViewTest extends ApplicationTest {
         running = false;
         interact(() -> view.show(JournalView.of(journal)));
         assertEquals(List.of(), view.yourLines(), "nothing to resume once the run ended");
+    }
+
+    /** A goal run shows its goal bar, a card per agent, chips on the feed and who the stop waits on. */
+    @Test
+    void aGoalRunShowsItsCrew() {
+        running = true;
+        Stop unknown = new Stop("unknown-1", StopKind.UNKNOWN_SCREEN, "", "HOME.shop→?", "/gone/unknown-1.png",
+                List.of(), List.of(), Map.of(), List.of("shop"), "a screen not on the map", 4_000);
+        journal.append(new ExploreEvent.Began(false, "reach the shop", 1_000));
+        journal.append(new ExploreEvent.NewScreen("HOME", null, null, 2_000));
+        journal.append(new ExploreEvent.Tried("HOME", "shop", ExploreLoop.Mode.UNTRIED, MapWalk.Arrival.UNKNOWN, 3_000));
+        journal.append(new ExploreEvent.Stopped(unknown, false, 4_000));
+        journal.append(new ExploreEvent.Leased("unknown-1", StopRole.CARTOGRAPHER, 1, 124_000, 4_000));
+
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertEquals("🎯 reach the shop · HOME › ? (depth 1)", view.goalText(), "off the map, one step past HOME");
+        assertTrue(view.statusText().endsWith("last press 7 s ago · ⏸ waiting on Reader"), view.statusText());
+        List<String> cards = view.cardLines();
+        assertEquals(5, cards.size(), cards.toString());
+        assertTrue(cards.get(0).startsWith("Explorer · Waiting · on unknown-1"), cards.get(0));
+        assertTrue(cards.get(1).startsWith("Reader · Working · on unknown-1"), cards.get(1));
+        assertTrue(cards.get(3).startsWith("Coordinator · Idle"), cards.get(3));
+        assertEquals(Agent.COORDINATOR, view.feedRows().getFirst().agent(), "the lease is the Coordinator's line");
+        assertEquals("/gone/unknown-1.png", view.feedRows().get(1).frame(), "the stop's row names its frame");
+    }
+
+    @Test
+    void aRunWithoutAGoalShowsNoCards() {
+        running = true;
+        journal.append(new ExploreEvent.Began(false, 1_000));
+
+        interact(() -> view.show(JournalView.of(journal)));
+
+        assertEquals(List.of(), view.cardLines());
+        assertEquals("No goal: Claude works the stops · on no screen of the map yet", view.goalText());
     }
 
     @Test

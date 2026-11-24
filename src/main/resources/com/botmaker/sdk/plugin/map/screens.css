@@ -537,3 +537,39 @@
     -fx-text-fill: -bm-screen-plain;
     -fx-font-size: 0.9em;
 }
+
+/* The goal bar and the crew's cards (2026-11-24, explore agents, layout A). */
+.explore-goal {
+    -fx-text-overrun: ellipsis;
+}
+
+.explore-card {
+    -fx-background-color: -bm-screen-card;
+    -fx-background-radius: 8;
+    -fx-border-color: -bm-screen-line;
+    -fx-border-radius: 8;
+    -fx-padding: 6;
+}
+
+.explore-card-name {
+    -fx-font-weight: bold;
+}
+
+/* A state is said by its word, and its colour only repeats it. */
+.explore-card-state {
+    -fx-text-fill: -bm-screen-plain;
+}
+
+.explore-card:working .explore-card-state { -fx-text-fill: -bm-screen-finished; }
+.explore-card:waiting .explore-card-state { -fx-text-fill: -bm-screen-untried; }
+.explore-card:silent .explore-card-state { -fx-text-fill: -bm-screen-owes; }
+.explore-card:working { -fx-border-color: -bm-screen-finished; }
+.explore-card:silent { -fx-border-color: -bm-screen-owes; }
+
+.explore-chip {
+    -fx-background-color: derive(-bm-screen-card, -8%);
+    -fx-background-radius: 6;
+    -fx-padding: 0 5 0 5;
+    -fx-font-size: 0.85em;
+    -fx-text-fill: -bm-screen-plain;
+}
