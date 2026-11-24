@@ -1043,6 +1043,29 @@ class ExploreLoopTest {
         assertEquals(1, game.taken.stream().filter(t -> t.startsWith("A.accounts")).count(), game.taken.toString());
     }
 
+    /**
+     * A rank by a picture's name ({@code add_account_button}) reaches the row the map holds by its words: the goal's
+     * best is pressed first, never dropped for an untried one.
+     */
+    @Test
+    void aRankByAPicturesNameReachesTheRowItShows() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("search", Button.of(new Locator(Role.BUTTON, "Search settings", null, null, null).element()).free());
+        inputs.put("addAccount", Button.of(new Locator(Role.BUTTON, "Add account", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        journal().append(new ExploreEvent.Ranked("A", "add_account_button", 10, PressTag.SAFE, 0));
+        Game game = new Game();
+        game.state = Effect.State.of(page(
+                web("button", "Search settings", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE)),
+                web("button", "Add account", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+
+        toward(map, game, new ExploreGoal("add a Google account", null), s -> s).run();
+
+        assertEquals("A.addAccount", game.pressed.getFirst(), game.pressed.toString());
+    }
+
     /** Reaching the goal's screen is a witness by code: said, and the run ends done. */
     @Test
     void theGoalScreenReachedEndsTheRunDone() {

@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -58,6 +59,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * <em>Keep exploring</em>'s loop (spec §1–3): each round, where the game is, everything read on it, one press chosen,
@@ -783,7 +785,9 @@ public final class ExploreLoop {
 
     /**
      * The field of {@code screen} {@code press} names: itself when it is one, else the one button whose element says
-     * those words. Empty when none does, or when several do: a hold or a rank never lands on a look-alike.
+     * those words, else the one input whose field or words read as {@code press} does once spelling is set aside (a
+     * picture's name, {@code add_account_button}, for the row the map holds as {@code addAccount}). Empty when none
+     * does, or when several do: a hold or a rank never lands on a look-alike.
      */
     private Optional<String> fieldOf(String screen, String press) {
         MapScreen on = map.screen(screen).orElse(null);
@@ -795,16 +799,37 @@ public final class ExploreLoop {
                 saying.add(input.getKey());
             }
         }
+        if (!saying.isEmpty()) return saying.size() == 1 ? Optional.of(saying.getFirst()) : Optional.empty();
+        String wanted = spelled(press);
+        for (var input : on.inputs().entrySet()) {
+            boolean named = spelled(input.getKey()).equals(wanted);
+            boolean said = input.getValue() instanceof Button button && button.element() != null
+                    && Arrays.stream(spoken(button.element())).anyMatch(w -> spelled(w.text()).equals(wanted));
+            if (named || said) saying.add(input.getKey());
+        }
         return saying.size() == 1 ? Optional.of(saying.getFirst()) : Optional.empty();
     }
 
     /** Whether {@code element}'s label, own text or held text reads {@code words}, case and spacing aside. */
     private static boolean says(Element element, String words) {
         String wanted = words.strip();
-        for (Words said : new Words[] {element.label(), element.text(), element.holding()}) {
-            if (said != null && said.text().strip().equalsIgnoreCase(wanted)) return true;
+        for (Words said : spoken(element)) {
+            if (said.text().strip().equalsIgnoreCase(wanted)) return true;
         }
         return false;
+    }
+
+    /** The words {@code element} shows: its label, own text and held text, those it has. */
+    private static Words[] spoken(Element element) {
+        return Stream.of(element.label(), element.text(), element.holding()).filter(Objects::nonNull)
+                .toArray(Words[]::new);
+    }
+
+    /** What a press or field names, its spelling aside: lower-case words, a picture's trailing kind dropped. */
+    private static String spelled(String name) {
+        String words = name.strip().replaceAll("(\\p{Ll})(\\p{Lu})", "$1 $2").replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .strip().toLowerCase(Locale.ROOT);
+        return words.replaceFirst(" (button|title|icon|row|label)$", "");
     }
 
     /** How many edges {@code screen} is from the map's home; {@link Integer#MAX_VALUE} when no way reaches it. */
