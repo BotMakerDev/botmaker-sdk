@@ -25,8 +25,12 @@ public final class KeepExploring {
      */
     @Hidden("Studio's Keep exploring run")
     public static void main(String[] args) {
-        // A Discover's arguments a restart through this entry keeps on for the next.
-        ExploreEntry.main("Keep exploring", args, ExploreBudget.class, (budget, pending) -> new ExploreEntry.Start(
-                ResumeFile.budgetOf(budget, pending), pending.map(ResumeFile::discover).orElse(null), List.of()));
+        // A goal given goes toward it, with its crew; else a Discover's arguments a restart through this entry keeps
+        // on for the next.
+        ExploreEntry.main("Keep exploring", args, ExploreBudget.class, (given, pending) -> {
+            ExploreBudget budget = ResumeFile.budgetOf(given, pending);
+            return new ExploreEntry.Start(budget, budget.toward(pending.map(ResumeFile::discover).orElse(null)),
+                    List.of());
+        });
     }
 }

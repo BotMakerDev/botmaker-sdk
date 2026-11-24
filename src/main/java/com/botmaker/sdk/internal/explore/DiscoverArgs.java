@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.assist.Describe;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Objects;
 
 /**
  * What the SDK's <em>Discover</em> run takes (web discovery phase 6c): the website to map when the bot has no launch
@@ -74,6 +75,15 @@ public record DiscoverArgs(
     /** The budget of the exploring it runs. */
     public ExploreBudget budget() {
         return new ExploreBudget(minutes, maxPages, maxPresses, null);
+    }
+
+    /**
+     * These arguments toward {@code goal} instead: the website, its browser and its ends kept, the goal's screen kept
+     * only while the goal is the same one.
+     */
+    public DiscoverArgs toward(String goal) {
+        return new DiscoverArgs(url, minutes, maxPages, show, goal,
+                Objects.equals(goal, this.goal) ? goalScreen : null, maxPresses);
     }
 
     /** What the exploring it runs goes toward; {@link ExploreGoal#NONE} without a goal. */

@@ -8,9 +8,11 @@ import com.botmaker.plugin.api.History;
 import com.botmaker.plugin.api.Runs;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
+import com.botmaker.plugin.api.run.RunArguments;
 import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.plugin.api.source.PluginValues;
 import com.botmaker.sdk.internal.explore.Agent;
+import com.botmaker.sdk.internal.explore.ExploreBudget;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.FindingKind;
@@ -66,6 +68,8 @@ class ExploreViewTest extends ApplicationTest {
     Path folder;
 
     private final List<RunEntry> started = new ArrayList<>();
+    /** The arguments each start with arguments was handed. */
+    private final List<Map<String, ?>> startedWith = new ArrayList<>();
     /** What the fake host says of a run: the explore run's JVM up or not. */
     private boolean running;
     /** The process the fake host runs; none known by default. */
@@ -366,6 +370,47 @@ class ExploreViewTest extends ApplicationTest {
 
         assertEquals(List.of(SdkRuns.KEEP_EXPLORING), started.stream().map(RunEntry::title).toList());
         assertFalse(started.getFirst().onBar());
+        assertEquals(List.of(Map.of()), startedWith, "an empty goal field starts the run with no goal");
+    }
+
+    @Test
+    void aGoalTypedStartsTheRunTowardItAndIsKeptForTheBot() {
+        interact(() -> {
+            view.aimField().setText("  the Google sign-in page ");
+            view.startButton().fire();
+        });
+
+        assertEquals(List.of(Map.of("goal", "the Google sign-in page")), startedWith);
+        // The entry takes it: its arguments carry the goal to the run.
+        assertEquals(List.of("the Google sign-in page"), startedWith.stream()
+                .map(args -> started.getFirst().arguments(args)).map(text -> {
+                    String before = System.getProperty(RunArguments.PROPERTY);
+                    try {
+                        System.setProperty(RunArguments.PROPERTY, text);
+                        return RunArguments.read(ExploreBudget.class).goal();
+                    } finally {
+                        if (before == null) System.clearProperty(RunArguments.PROPERTY);
+                        else System.setProperty(RunArguments.PROPERTY, before);
+                    }
+                }).toList());
+
+        interact(() -> view.close());
+        interact(() -> view = new ExploreView(services(), () -> ScreenGraph.of(Map.of()), () -> Optional.of(journal),
+                () -> 10_000));
+        assertEquals("the Google sign-in page", view.aimField().getText(), "the field opens on the bot's last goal");
+
+        interact(() -> {
+            view.aimField().clear();
+            view.startButton().fire();
+        });
+        assertEquals(Map.of(), startedWith.getLast(), "emptied, it starts with none");
+        interact(() -> view = new ExploreView(services(), () -> ScreenGraph.of(Map.of()), () -> Optional.of(journal),
+                () -> 10_000));
+        assertEquals("", view.aimField().getText(), "and forgets the last");
+
+        running = true;
+        interact(() -> view.show(JournalView.of(journal)));
+        assertTrue(view.aimField().isDisabled(), "a run's goal is fixed while it goes");
     }
 
     private StudioServices services() {
@@ -377,6 +422,12 @@ class ExploreViewTest extends ApplicationTest {
             @Override
             public void start(RunEntry entry) {
                 started.add(entry);
+            }
+
+            @Override
+            public void start(RunEntry entry, Map<String, ?> arguments) {
+                started.add(entry);
+                startedWith.add(Map.copyOf(arguments));
             }
 
             @Override
@@ -439,6 +490,11 @@ class ExploreViewTest extends ApplicationTest {
             @Override
             public Runs runs() {
                 return runs;
+            }
+
+            @Override
+            public Optional<Path> stateDir() {
+                return Optional.of(folder.resolve("state"));
             }
         };
     }

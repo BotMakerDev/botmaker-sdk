@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- 🔭 A goal field beside ▶ Keep exploring on the Explore page (plan `2026-11-24-explore-drive-fixes` phase 7): type
+  what to reach ("the Google sign-in page") and the run goes toward it with its crew; leave it empty for a run over
+  the whole map, as before. The field opens on the bot's last goal, kept in the SDK's state folder of the bot
+  (`explore-goal.txt`); Enter in it starts the run too. *Keep exploring* takes a `goal` argument for it, so the
+  assistant's and the shell's start can give one as well.
 - 🔭 A run toward a goal that runs out of presses asks the Reader first (plan `2026-11-24-explore-drive-fixes`
   phase 6): its STUCK stop goes to the Reader, which cuts the presses the frame shows toward the goal with
   `crop_pictures` on that screen, ranks them and resumes, so the run presses what the map lacked. A resume that added

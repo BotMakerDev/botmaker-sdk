@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.api.bot.Discover;
 import com.botmaker.sdk.api.bot.ExploreMap;
 import com.botmaker.sdk.api.bot.KeepExploring;
+import com.botmaker.sdk.internal.explore.DiscoverArgs;
 import com.botmaker.sdk.internal.explore.ExploreBudget;
 import com.botmaker.sdk.internal.screens.MapCheckBudget;
 import com.botmaker.sdk.plugin.SdkPlugin;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SdkRunsTest {
@@ -38,7 +40,7 @@ class SdkRunsTest {
     void eachTakesItsBudgetAndNeedsNone() {
         List<RunEntry> entries = new SdkPlugin().runEntries();
 
-        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens", "maxPresses", "maxCalls"),
+        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens", "maxPresses", "maxCalls", "goal"),
                 List.of("url", "minutes", "maxPages", "show", "goal", "goalScreen", "maxPresses")), entries.stream()
                 .map(e -> e.schema().fields().stream().map(ToolSchema.Field::name).toList()).toList());
         assertEquals(List.of(false, false, false), entries.stream().map(RunEntry::needsArguments).toList(),
@@ -48,6 +50,15 @@ class SdkRunsTest {
         try {
             System.setProperty(RunArguments.PROPERTY, entries.get(1).arguments(Map.of("maxScreens", 4)));
             assertEquals(new ExploreBudget(null, 4), RunArguments.read(ExploreBudget.class));
+            System.setProperty(RunArguments.PROPERTY, entries.get(1).arguments(Map.of("goal", " sign in ")));
+            ExploreBudget toward = RunArguments.read(ExploreBudget.class);
+            assertEquals("sign in", toward.goal());
+            assertEquals("sign in", toward.toward(null).goal(), "a goal is carried as a Discover's, for the crew");
+            assertNull(ExploreBudget.NONE.toward(null), "no goal, no Discover");
+            DiscoverArgs site = new DiscoverArgs("https://site.example", 9, null, true, "old", "Old", null);
+            assertEquals(site, ExploreBudget.NONE.toward(site), "no goal: the kept arguments as they are");
+            assertEquals(new DiscoverArgs("https://site.example", 9, null, true, "sign in", null, null),
+                    toward.toward(site), "a goal turns the kept ones toward it: the website kept, the old screen not");
             System.setProperty(RunArguments.PROPERTY, entries.get(0).arguments(Map.of("minutes", 5)));
             assertEquals(Duration.ofMinutes(5), RunArguments.read(MapCheckBudget.class).budgets().whole());
             System.clearProperty(RunArguments.PROPERTY);

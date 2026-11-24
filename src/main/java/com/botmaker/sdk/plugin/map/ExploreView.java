@@ -33,6 +33,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitMenuButton;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -69,8 +70,8 @@ import java.util.function.Supplier;
  * <p>The latest run's journal ({@link Journal}, {@code events.jsonl}), the selected agent's worker logs and, while a
  * run goes, a frame of the game are read once a second off the FX thread, only while the view is shown; the journal
  * and the logs only what was added since. <b>Start</b> starts <em>Keep exploring</em> (its menu: <em>Explore
- * map</em>) through {@link com.botmaker.plugin.api.Runs#start(RunEntry)}, while no run goes; <b>Stop</b> ends the run
- * going.
+ * map</em>) through {@link com.botmaker.plugin.api.Runs#start(RunEntry, Map)}, while no run goes, toward the goal typed
+ * beside it (kept per bot, {@link ExploreAim}; empty: no goal, no crew); <b>Stop</b> ends the run going.
  */
 final class ExploreView {
 
@@ -94,6 +95,10 @@ final class ExploreView {
     private final Label status = new Label();
     private final SplitMenuButton start = new SplitMenuButton();
     private final Button stop = new Button("■ Stop");
+    /** What ▶ Keep exploring goes toward, typed by the user; empty for a run with no goal. */
+    private final TextField aim = new TextField();
+    /** Where the field's last text is kept for this bot. */
+    private final ExploreAim kept;
     /** The goal bar's line: the goal, the way so far and its depth. */
     private final Label goal = new Label();
     /** One chip per agent of the crew; shown for a run given a goal only, the one run that has a crew. */
@@ -153,11 +158,19 @@ final class ExploreView {
         start.getItems().setAll(keep, once);
         stop.setTooltip(new Tooltip("Stops the run going."));
         stop.setOnAction(e -> services.runs().stop());
+        kept = ExploreAim.in(services.stateDir());
+        aim.setText(kept.read());
+        aim.setPromptText("Goal, optional: what to reach");
+        aim.setPrefColumnCount(22);
+        aim.getStyleClass().add("explore-aim");
+        aim.setTooltip(new Tooltip("What ▶ " + SdkRuns.KEEP_EXPLORING + " goes toward, in plain words (\"the Google "
+                + "sign-in page\"): a run with a goal has its crew. Empty, it explores the whole map."));
+        aim.setOnAction(e -> startRun(SdkRuns.KEEP_EXPLORING));
         Region gap = new Region();
         HBox.setHgrow(gap, Priority.ALWAYS);
         status.getStyleClass().add("explore-status");
         status.setMinWidth(0);
-        HBox bar = new HBox(8, status, gap, start, stop);
+        HBox bar = new HBox(8, status, gap, aim, start, stop);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(6, 8, 6, 8));
         goal.getStyleClass().add("explore-goal");
@@ -232,12 +245,27 @@ final class ExploreView {
             return;
         }
         Optional<RunEntry> entry = new SdkRuns().runs().stream().filter(r -> r.title().equals(title)).findFirst();
-        entry.ifPresent(services.runs()::start);
+        if (entry.isEmpty()) return;
+        if (!title.equals(SdkRuns.KEEP_EXPLORING)) {
+            services.runs().start(entry.get());
+            return;
+        }
+        // The field's goal, kept for the next time the page opens.
+        String text = aim.getText();
+        if (!kept.keep(text)) services.status("The goal could not be kept for next time: the run starts all the same.");
+        services.runs().start(entry.get(), ExploreAim.arguments(text));
+    }
+
+    /** The goal field, for tests. */
+    TextField aimField() {
+        return aim;
     }
 
     private void buttons() {
         boolean running = services.runs().isRunning();
         start.setDisable(running || journals == null);
+        // A run's goal is fixed at its start: the goal line above shows the one it goes toward.
+        aim.setDisable(running || journals == null);
         // Only an explore run's: the bot's own run is stopped where it was started.
         stop.setDisable(!live(last));
     }
