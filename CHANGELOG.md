@@ -21,6 +21,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- Discover takes a goal (spec `2026-11-24-explore-agents-design`): `goal`, in plain words, and optionally `goalScreen`,
+  the screen whose reaching ends the run, plus `maxPresses`; the budget also counts the crew's agent sessions. A run
+  toward a goal presses the frontier's best first, the presses the Reader ranked, wherever they are, walking there;
+  an off-goal press keeps its low rank and comes later, a screen deeper than 6 presses from home is parked for later,
+  and what is left is carried to the next run. A press that is risky, destructive, or named sign out, delete, reset,
+  buy, pay or subscribe is never made unattended, in any run: it waits on the user. The goal counts as reached only by
+  a code check, the goal's screen reached or a `done <mark>` whose picture or text the frame shows; a done with no
+  witness is a finding and the run goes on. A goal not reached once nothing is left ends *Unreachable within the caps*,
+  or *Stuck* on the presses waiting on the user.
 - An explore run's journal holds the explore crew's records (spec `2026-11-24-explore-agents-design`): a stop leased to
   a role and released, the Coordinator's heartbeat, a finding (drift, stuck, wrong map, SDK fault, done without a
   witness), the goal reached with what checked it, a press ranked toward the goal and tagged safe, risky or

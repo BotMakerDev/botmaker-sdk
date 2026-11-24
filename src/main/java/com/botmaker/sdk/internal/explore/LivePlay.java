@@ -114,8 +114,10 @@ public final class LivePlay implements ExploreLoop.Play {
         };
         return new ExploreLoop(ScreenMaps.installed(), play, reload, guards(first), journal,
                 ExploreLoop.Settings.DEFAULT.within(budget.time() != null ? budget.time() : hours())
-                        .upTo(budget.screens()), System::currentTimeMillis).handOn(settled)
-                .startedWith(budget, discover).resuming(pending).run();
+                        .upTo(budget.screens()).spending(budget.presses(), budget.calls()),
+                System::currentTimeMillis).handOn(settled)
+                .startedWith(budget, discover).resuming(pending)
+                .toward(discover == null ? ExploreGoal.NONE : discover.explores()).run();
     }
 
     /**

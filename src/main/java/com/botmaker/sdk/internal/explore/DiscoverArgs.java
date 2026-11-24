@@ -17,6 +17,10 @@ import java.net.URISyntaxException;
  * @param minutes  the run's time at most
  * @param maxPages the screens it is on at most, each counted once
  * @param show     whether the website's browser is a window rather than headless
+ * @param goal     what the run explores toward, in plain words (spec 2026-11-24-explore-agents-design); the whole
+ *                 map when not given
+ * @param goalScreen the screen whose reaching ends the run, a code check
+ * @param maxPresses the presses it makes at most
  */
 public record DiscoverArgs(
         @Describe(value = "the website to map (https://…), made the bot's launch target when it has none",
@@ -27,7 +31,19 @@ public record DiscoverArgs(
         @Describe(value = "screens it visits at most, each counted once; no end when not given", optional = true)
         Integer maxPages,
         @Describe(value = "show the website's browser in a window instead of headless", optional = true)
-        Boolean show) {
+        Boolean show,
+        @Describe(value = "what to reach, in plain words (\"the Google sign-in page\"); the whole map when not given",
+                optional = true)
+        String goal,
+        @Describe(value = "the screen's name that ends the run once it is reached", optional = true)
+        String goalScreen,
+        @Describe(value = "presses it makes at most; no end when not given", optional = true)
+        Integer maxPresses) {
+
+    /** Arguments with no goal and no press cap. */
+    public DiscoverArgs(String url, Integer minutes, Integer maxPages, Boolean show) {
+        this(url, minutes, maxPages, show, null, null, null);
+    }
 
     public DiscoverArgs {
         if (url != null && url.isBlank()) url = null;
@@ -45,18 +61,24 @@ public record DiscoverArgs(
                 throw new IllegalArgumentException("url is http or https: " + url);
             }
         }
-        // The budget's own checks say what is wrong with either number.
-        new ExploreBudget(minutes, maxPages);
+        // The budget's own checks say what is wrong with each number.
+        new ExploreBudget(minutes, maxPages, maxPresses, null);
     }
 
     /** Whether any field is given. */
     public boolean given() {
-        return url != null || minutes != null || maxPages != null || show != null;
+        return url != null || minutes != null || maxPages != null || show != null || goal != null
+                || goalScreen != null || maxPresses != null;
     }
 
     /** The budget of the exploring it runs. */
     public ExploreBudget budget() {
-        return new ExploreBudget(minutes, maxPages);
+        return new ExploreBudget(minutes, maxPages, maxPresses, null);
+    }
+
+    /** What the exploring it runs goes toward; {@link ExploreGoal#NONE} without a goal. */
+    public ExploreGoal explores() {
+        return new ExploreGoal(goal, goalScreen);
     }
 
     /** Whether the browser is shown. */

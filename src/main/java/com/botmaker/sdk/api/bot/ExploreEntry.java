@@ -87,7 +87,9 @@ final class ExploreEntry {
                 start.settled(), pending);
         Say.info(switch (end) {
             case BUDGET -> name + " ended: its budget is spent.";
-            case DONE -> name + " ended: the map is complete, nothing is left to press.";
+            case DONE -> start.discover() != null && start.discover().explores().given()
+                    ? name + " ended: its goal is reached, a witness checked it."
+                    : name + " ended: the map is complete, nothing is left to press.";
             case UNREACHABLE -> name + " ended: its goal cannot be reached within its caps.";
             case STUCK -> name + " ended: another window stayed in front of the game, nothing could be pressed.";
             default -> name + " ended.";

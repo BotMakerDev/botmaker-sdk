@@ -38,8 +38,8 @@ class SdkRunsTest {
     void eachTakesItsBudgetAndNeedsNone() {
         List<RunEntry> entries = new SdkPlugin().runEntries();
 
-        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens"),
-                List.of("url", "minutes", "maxPages", "show")), entries.stream()
+        assertEquals(List.of(List.of("minutes"), List.of("minutes", "maxScreens", "maxPresses", "maxCalls"),
+                List.of("url", "minutes", "maxPages", "show", "goal", "goalScreen", "maxPresses")), entries.stream()
                 .map(e -> e.schema().fields().stream().map(ToolSchema.Field::name).toList()).toList());
         assertEquals(List.of(false, false, false), entries.stream().map(RunEntry::needsArguments).toList(),
                 "the window starts them with none");

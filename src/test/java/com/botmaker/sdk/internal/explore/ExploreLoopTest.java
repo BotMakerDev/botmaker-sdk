@@ -956,6 +956,147 @@ class ExploreLoopTest {
         assertEquals(List.of(), loop.open("A"), "a run with no plan asks no goal of a spend");
     }
 
+    /** A loop of an hour toward {@code goal}, with {@code settings} changed as given. */
+    private ExploreLoop toward(ScreenGraph map, Game game, ExploreGoal goal,
+                               Function<ExploreLoop.Settings, ExploreLoop.Settings> settings) {
+        return new ExploreLoop(map, game, same(map), Guards.with(List.of()), journal(),
+                settings.apply(ExploreLoop.Settings.DEFAULT.within(Duration.ofHours(1))), () -> game.nowMs)
+                .toward(goal);
+    }
+
+    /** The frontier's best press is made first, before the one the map lists first. */
+    @Test
+    void theBestRankedPressComesFirst() {
+        journal().append(new ExploreEvent.Ranked("A", "b", 1, PressTag.SAFE, 0));
+        journal().append(new ExploreEvent.Ranked("A", "d", 9, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        toward(map(), game, new ExploreGoal("reach D", null), s -> s).run();
+
+        assertEquals("A.d→D", game.taken.getFirst(), game.taken.toString());
+    }
+
+    /** Reaching the goal's screen is a witness by code: said, and the run ends done. */
+    @Test
+    void theGoalScreenReachedEndsTheRunDone() {
+        journal().append(new ExploreEvent.Ranked("A", "d", 9, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        assertEquals(ExploreLoop.End.DONE, toward(map(), game, new ExploreGoal("", "D"), s -> s).run());
+
+        List<ExploreEvent.Witnessed> witnessed = events(ExploreEvent.Witnessed.class);
+        assertEquals(1, witnessed.size(), witnessed.toString());
+        assertEquals(WitnessCheck.SCREEN_ON_MAP, witnessed.getFirst().check());
+        assertEquals(List.of("A.d→D"), game.taken, "nothing pressed after the goal");
+    }
+
+    /** A done no check holds on is a finding, and the run goes on. */
+    @Test
+    void doneWithoutAWitnessIsAFindingAndTheRunGoesOn() {
+        Game game = new Game();
+        // Written while the run goes, after its first press: what was written before it starts is dropped.
+        game.arrival = edge -> {
+            if (game.taken.size() == 1) journal().command("done Welcome back");
+            return new Took(Arrival.AT_TARGET, edge.to());
+        };
+
+        assertEquals(ExploreLoop.End.DONE, toward(map(), game, ExploreGoal.NONE, s -> s).run());
+
+        List<ExploreEvent.Finding> findings = events(ExploreEvent.Finding.class);
+        assertEquals(FindingKind.NO_WITNESS, findings.getFirst().kind(), findings.toString());
+        assertTrue(events(ExploreEvent.Witnessed.class).isEmpty());
+        assertTrue(game.taken.containsAll(List.of("A.b→B", "A.d→D")), game.taken.toString());
+    }
+
+    /** A done whose mark the frame shows is witnessed by its text, and the run ends done at once. */
+    @Test
+    void doneWithAWitnessEndsTheRunDone() {
+        Game game = new Game();
+        game.arrival = edge -> {
+            journal().command("done welcome back");
+            return new Took(Arrival.AT_TARGET, edge.to());
+        };
+        game.seen.put("B", new ExploreLoop.Look(List.of(new Stop.Text("Welcome  Back, Ann", new Rect(0, 0, 9, 9))),
+                List.of()));
+
+        assertEquals(ExploreLoop.End.DONE, toward(map(), game, new ExploreGoal("sign in", null), s -> s).run());
+
+        assertEquals(WitnessCheck.TEXT, events(ExploreEvent.Witnessed.class).getFirst().check());
+        assertEquals(List.of("A.b→B"), game.taken, "nothing pressed once the goal is witnessed");
+    }
+
+    /** A goal not reached once nothing is left, with nothing waiting on the user, is unreachable. */
+    @Test
+    void aGoalNotReachedWithNothingWaitingIsUnreachable() {
+        assertEquals(ExploreLoop.End.UNREACHABLE,
+                toward(map(), new Game(), new ExploreGoal("the shop", null), s -> s).run());
+    }
+
+    /** A map with a way {@code delete} beside {@code b}. */
+    private static ScreenGraph withDelete() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", screen(Setup.named("A").start(), click("b").free(), click("delete").free()));
+        screens.put("B", screen(Setup.named("B").from(ref("A", "b"))));
+        screens.put("X", screen(Setup.named("X").from(ref("A", "delete"))));
+        return ScreenGraph.of(screens);
+    }
+
+    /** A denied label is never pressed and, met on the way, keeps no goal waiting: unreachable. */
+    @Test
+    void aDeniedPressIsNeverMade() {
+        Game game = new Game();
+
+        assertEquals(ExploreLoop.End.UNREACHABLE,
+                toward(withDelete(), game, new ExploreGoal("the shop", null), s -> s).run());
+
+        assertFalse(game.taken.contains("A.delete→X"), game.taken.toString());
+        assertTrue(events(ExploreEvent.Ranked.class).stream()
+                .anyMatch(r -> r.press().equals("delete") && r.tag() == PressTag.DESTRUCTIVE));
+    }
+
+    /** A press the Reader ranked toward the goal that nobody watching may make leaves the run stuck on it. */
+    @Test
+    void aGoalPressWaitingOnTheUserEndsTheRunStuck() {
+        journal().append(new ExploreEvent.Ranked("A", "delete", 5, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        assertEquals(ExploreLoop.End.STUCK,
+                toward(withDelete(), game, new ExploreGoal("the shop", null), s -> s).run());
+
+        assertFalse(game.taken.contains("A.delete→X"), game.taken.toString());
+        assertEquals(FindingKind.STUCK, events(ExploreEvent.Finding.class).getLast().kind());
+    }
+
+    /** Ranks carried from a run toward a goal are not the order of a run with none. */
+    @Test
+    void aRunWithNoGoalKeepsTheMapsOrder() {
+        journal().append(new ExploreEvent.Ranked("A", "d", 9, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        toward(map(), game, ExploreGoal.NONE, s -> s).run();
+
+        assertEquals("A.b→B", game.taken.getFirst(), game.taken.toString());
+    }
+
+    /** A spent press budget ends the run, and what it ranked and did not press is carried to the next run. */
+    @Test
+    void aSpentPressBudgetEndsTheRunAndTheFrontierCarriesOver(@TempDir Path project) {
+        Journal first = Journal.begin(project, 1_000);
+        first.append(new ExploreEvent.Ranked("A", "d", 9, PressTag.SAFE, 0));
+        first.append(new ExploreEvent.Ranked("A", "b", 1, PressTag.SAFE, 0));
+        Game game = new Game();
+
+        ExploreLoop.End end = new ExploreLoop(map(), game, same(map()), Guards.with(List.of()), first,
+                ExploreLoop.Settings.DEFAULT.within(Duration.ofHours(1)).spending(1, 0), () -> game.nowMs)
+                .toward(new ExploreGoal("reach B", null)).run();
+
+        assertEquals(ExploreLoop.End.BUDGET, end);
+        assertEquals(List.of("A.d→D"), game.taken);
+        List<ExploreEvent.Ranked> carried = Journal.begin(project, 2_000).events().stream()
+                .filter(ExploreEvent.Ranked.class::isInstance).map(ExploreEvent.Ranked.class::cast).toList();
+        assertEquals(List.of("A.b"), carried.stream().map(r -> r.screen() + "." + r.press()).toList());
+    }
+
     /** A fact group of the test's, for an input to spend. */
     private interface Progress {
         int gems();

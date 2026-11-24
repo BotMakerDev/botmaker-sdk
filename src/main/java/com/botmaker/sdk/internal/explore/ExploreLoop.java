@@ -80,6 +80,8 @@ public final class ExploreLoop {
         PLAN("plan", "Plan"),
         /** A walk to the nearest screen with an input not tried yet. */
         WALK("walk", "Walk to untried"),
+        /** The frontier's best press for the run's goal (spec 2026-11-24-explore-agents-design). */
+        BEST("best", "Best for the goal"),
         /** A mode this SDK does not know, read from a journal a newer one wrote. */
         @JsonEnumDefaultValue
         UNKNOWN("unknown", "Unknown");
@@ -165,28 +167,54 @@ public final class ExploreLoop {
      * How long a stop waits before it is parked, how long with no press is stuck, one press's time, the whole run's
      * (null: no end), how often a paused run looks for a command, the screens it is on before it ends, each counted
      * once (0: no end), and the bounds of the time a screen's own clock may run unbuilt before the run sets it aside
-     * for another open one (null: never).
+     * for another open one (null: never). The presses it makes and the agent sessions the crew starts for it before it
+     * ends (0: no end), and how many edges from home the frontier's best press may be (spec
+     * 2026-11-24-explore-agents-design).
      */
     public record Settings(Duration parkAfter, Duration stuckAfter, Duration edge, Duration hours, Duration poll,
-                           int maxScreens, ScreenBudget screenBudget) {
+                           int maxScreens, ScreenBudget screenBudget, int maxPresses, int maxCalls, int depthCap) {
+
+        /** The frontier's depth cap when none is given. */
+        public static final int DEPTH_CAP = 6;
 
         public static final Settings DEFAULT = new Settings(Duration.ofMinutes(10), Duration.ofMinutes(15),
                 Duration.ofSeconds(30), null, Duration.ofSeconds(1), 0,
                 new ScreenBudget(Duration.ofMinutes(2), Duration.ofMinutes(15)));
 
+        /** Settings with no press or call budget and the default depth cap. */
+        public Settings(Duration parkAfter, Duration stuckAfter, Duration edge, Duration hours, Duration poll,
+                        int maxScreens, ScreenBudget screenBudget) {
+            this(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget, 0, 0, DEPTH_CAP);
+        }
+
         /** These settings with {@code budget} for each screen's clock; null for none. */
         public Settings screens(ScreenBudget budget) {
-            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, budget);
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, budget, maxPresses, maxCalls,
+                    depthCap);
         }
 
         /** These settings with a budget of {@code hours}; null for none. */
         public Settings within(Duration hours) {
-            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget);
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget, maxPresses,
+                    maxCalls, depthCap);
         }
 
         /** These settings ending once the run has been on {@code screens} screens; 0 for no end. */
         public Settings upTo(int screens) {
-            return new Settings(parkAfter, stuckAfter, edge, hours, poll, screens, screenBudget);
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, screens, screenBudget, maxPresses, maxCalls,
+                    depthCap);
+        }
+
+        /** These settings ending after {@code presses} presses and {@code calls} agent sessions; 0 for no end. */
+        public Settings spending(int presses, int calls) {
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget, presses, calls,
+                    depthCap);
+        }
+
+        /** These settings with the frontier's best press at most {@code depth} edges from home. */
+        public Settings deep(int depth) {
+            return new Settings(parkAfter, stuckAfter, edge, hours, poll, maxScreens, screenBudget, maxPresses,
+                    maxCalls, depth);
         }
     }
 
@@ -327,6 +355,14 @@ public final class ExploreLoop {
             return Optional.empty();
         }
 
+        /**
+         * Whether a picture called {@code mark} matches what the game shows now: a goal's witness by picture. False
+         * for a game that cannot match one (the picture check is the SDK's own matcher, wired with the crew's marks).
+         */
+        default boolean shows(String mark) {
+            return false;
+        }
+
         /** Whether the run plays on an SDK under development, so it raises and holds Discover faults. */
         default boolean dev() {
             return DevBuild.on();
@@ -436,6 +472,19 @@ public final class ExploreLoop {
     private final Map<String, List<TreeAnswer>> settledAt = new HashMap<>();
     /** Settled stops resumed with answers the plugin side left out, raised again at the next round's start. */
     private final Deque<Skip> skips = new ArrayDeque<>();
+    /** What the run explores toward; {@link ExploreGoal#NONE}: the whole map. */
+    private ExploreGoal goal = ExploreGoal.NONE;
+    /** The presses the Reader ranked and the run has not made, best first. */
+    private final Frontier frontier;
+    /** Where the next read of the journal starts: the ranks and leases the plugin side wrote meanwhile. */
+    private long journalRead;
+    /** The presses this run made, and the agent sessions the crew started for it: its budget counts both. */
+    private int pressCount;
+    private int calls;
+    /** Whether a witness held: the goal was reached. */
+    private boolean reached;
+    /** How many times a done was proposed: each frame kept under its own name. */
+    private int proposals;
 
     /** The settled stop {@code stop}, resumed with {@code lines} left out of what it settled. */
     private record Skip(Stop stop, List<String> lines) {}
@@ -484,6 +533,7 @@ public final class ExploreLoop {
         this.clock = new ScreenClock(settings.screenBudget(), nowMs, this::emit, this::open, chooser::left,
                 pauses::built);
         this.replay = new Replay(journal, nowMs, this::emit);
+        this.frontier = new Frontier(this::depth);
         // Stop numbers go on past the journal's and the queue's, so a stop this run raises never takes the id of one a
         // run before parked.
         int raised = (int) journal.events().stream().filter(ExploreEvent.Stopped.class::isInstance).count();
@@ -525,6 +575,12 @@ public final class ExploreLoop {
      */
     public ExploreLoop startedWith(ExploreBudget budget, DiscoverArgs discover) {
         replay.startedWith(budget, discover);
+        return this;
+    }
+
+    /** Explores toward {@code goal}: best first off the frontier, ending once a witness holds. Called before {@link #run}. */
+    public ExploreLoop toward(ExploreGoal goal) {
+        this.goal = goal == null ? ExploreGoal.NONE : goal;
         return this;
     }
 
@@ -621,9 +677,11 @@ public final class ExploreLoop {
 
     private End rounds() {
         while (true) {
+            absorb();
             if (spent()) return End.BUDGET;
             Journal.Command command = journal.takeCommand().orElse(null);
             if (command instanceof Journal.Command.End) return End.STOPPED;
+            if (command instanceof Journal.Command.Done(String mark) && witnessed(mark)) return End.DONE;
             // Between stops only a parked stop can be resumed: its fix is loaded and its place tried again.
             if (command instanceof Journal.Command.Resume(String stopId, boolean ignore, List<String> skipped)) {
                 // The fault being replayed is still held: only ignore lets it go, as while the run paused on it.
@@ -641,15 +699,91 @@ public final class ExploreLoop {
                 }
             }
             if (!round()) {
-                return spent() ? End.BUDGET : pauses.stuck() ? End.STUCK : finished ? End.DONE : End.STOPPED;
+                return reached ? End.DONE : spent() ? End.BUDGET : pauses.stuck() ? End.STUCK
+                        : finished ? finishedEnd() : End.STOPPED;
             }
         }
     }
 
-    /** Whether the run's budget, of time or of screens, is spent; never, without one. */
+    /**
+     * How a run ends that has nothing left to press: done, with no goal; with one not reached, unreachable when
+     * nothing waits on the user, else stuck on what does, said as a finding.
+     */
+    private End finishedEnd() {
+        if (!goal.given()) return End.DONE;
+        // Only what the Reader ranked toward the goal waits on the user for it: a denied label met on the way does not.
+        List<Frontier.Parked> yours = frontier.needsYou().stream().filter(p -> p.entry().rank() > 0).toList();
+        if (yours.isEmpty()) return End.UNREACHABLE;
+        emit(new ExploreEvent.Finding(FindingKind.STUCK, String.join(", ", yours.stream()
+                .map(p -> p.entry().key()).toList()), "the goal was not reached; " + yours.size()
+                + " press(es) wait on you", nowMs.getAsLong()));
+        return End.STUCK;
+    }
+
+    /**
+     * Reads what the journal gained since the last read: a rank adds a press to the frontier (one nobody watching may
+     * make is never pressed by the run either), a try takes one out, a worker's lease is an agent session spent.
+     */
+    private void absorb() {
+        Journal.Read read = journal.events(journalRead);
+        journalRead = read.next();
+        for (ExploreEvent event : read.events()) {
+            frontier.take(event);
+            if (event instanceof ExploreEvent.Ranked ranked && !Frontier.tagOf(ranked.press(), ranked.tag()).unattended()) {
+                hold(ranked.screen(), ranked.press());
+            }
+            if (event instanceof ExploreEvent.Leased leased && leased.role() != StopRole.SETTLER) calls++;
+        }
+    }
+
+    /** Counts {@code press} of {@code screen}, a way or an input, as tried: the run never makes it unattended. */
+    private void hold(String screen, String press) {
+        chooser.tryOnce(Frontier.keyOf(screen, press));
+        map.edges().stream().filter(e -> e.from().equals(screen) && e.label().equals(press))
+                .forEach(e -> chooser.tryOnce(key(e)));
+    }
+
+    /** How many edges {@code screen} is from the map's home; {@link Integer#MAX_VALUE} when no way reaches it. */
+    private int depth(String screen) {
+        Optional<String> home = map.home();
+        if (home.isEmpty() || home.get().equals(screen)) return 0;
+        return map.pathTo(home.get(), screen, edge -> true).map(List::size).orElse(Integer.MAX_VALUE);
+    }
+
+    /**
+     * A done proposed, {@code mark} what shows it (blank: none): the goal counts as reached only when a witness holds on
+     * the frame shown now (the goal's screen, else the mark by picture or text), then said; else a finding says why
+     * not, and the run goes on.
+     */
+    private boolean witnessed(String mark) {
+        Optional<String> where = play.where();
+        Look look = play.look(where.orElse(null));
+        String frame = play.keep("done-" + ++proposals);
+        Witness.Frame shown = new Witness.Frame(frame, where, name -> map.screen(name).isPresent(),
+                look.texts().stream().map(Stop.Text::text).toList(), play::shows);
+        List<Witness.Check> checks = new ArrayList<>();
+        goal.goalScreen().ifPresent(name -> checks.add(new Witness.Check.ScreenOnMap(name)));
+        if (mark != null && !mark.isBlank()) checks.add(new Witness.Check.PictureOrText(mark));
+        for (Witness.Check check : checks) {
+            Optional<WitnessCheck> how = Witness.how(check, shown);
+            if (how.isEmpty()) continue;
+            String said = check instanceof Witness.Check.ScreenOnMap(String name) ? name : mark;
+            emit(new ExploreEvent.Witnessed(goal.said(), frame, how.get(), said, nowMs.getAsLong()));
+            reached = true;
+            return true;
+        }
+        emit(new ExploreEvent.Finding(FindingKind.NO_WITNESS, frame, checks.isEmpty()
+                ? "done was proposed with no mark and the run has no goal screen: nothing to check"
+                : "done was proposed, but no check held on the frame shown now", nowMs.getAsLong()));
+        return false;
+    }
+
+    /** Whether the run's budget, of time, screens, presses or agent sessions, is spent; never, without one. */
     private boolean spent() {
         return settings.hours() != null && nowMs.getAsLong() - began >= settings.hours().toMillis()
-                || settings.maxScreens() > 0 && seen.size() >= settings.maxScreens();
+                || settings.maxScreens() > 0 && seen.size() >= settings.maxScreens()
+                || settings.maxPresses() > 0 && pressCount >= settings.maxPresses()
+                || settings.maxCalls() > 0 && calls >= settings.maxCalls();
     }
 
     /** One round; false when a command, or the budget, ended the run while it was paused. */
@@ -774,6 +908,8 @@ public final class ExploreLoop {
         if (replay.on() && readsTrees()) play.state().map(ExploreLoop::pagePlace)
                 .ifPresent(page -> passed(StopKind.UNKNOWN_SCREEN, page));
         if (seen.add(screen)) {
+            // A new screen can be the way a parked press lacked: each is tried again.
+            frontier.resume();
             emit(new ExploreEvent.NewScreen(screen, from, by, nowMs.getAsLong()));
             if (readsTrees()) play.state().ifPresent(state -> page(screen, state));
             if (website()) pictured(screen);
@@ -788,6 +924,8 @@ public final class ExploreLoop {
         // After the screen is said found and pictured: one with nothing to do is built once it is reached.
         clock(screen);
         // Exploring builds the map only: no value read here raises a missing fact (spec 2026-11-20, § Out of exploring).
+        // The goal's screen reached is the goal reached, by a code check: the run ends done.
+        if (goal.goalScreen().filter(screen::equals).isPresent() && witnessed("")) return false;
         Look look = play.look(screen);
         if (resumed != null && screen.equals(resumed.screen())) passed(StopKind.MISSING_FACT, resumed.place());
         if (replay.onScreen(screen)) passed(StopKind.MISSING_FACT, replay.fault().place());
@@ -803,6 +941,9 @@ public final class ExploreLoop {
                 if (low != null) return low != Paused.END;
             }
         }
+        // A goal-directed run presses the frontier's best first, wherever it is; with nothing ranked, as below.
+        Optional<Boolean> best = best(screen, look);
+        if (best.isPresent()) return best.get();
         // The screen is finished before it is left: its inputs left, which mostly stay, before its ways, which leave.
         if (readsTrees()) {
             // Once per screen the map holds: its inputs name the fields the tries found.
@@ -866,6 +1007,40 @@ public final class ExploreLoop {
         return true;
     }
 
+    /**
+     * The round spent on the frontier's best press within the depth cap: pressed when it is on {@code screen}, walked
+     * to when it is elsewhere, parked when no way leads there, dropped when it is no longer pressable. Empty when the
+     * frontier has nothing open within the cap: the round goes on as an unranked one.
+     */
+    private Optional<Boolean> best(String screen, Look look) {
+        // Ranks a run with no goal finds (carried from one toward a goal) are not its order.
+        if (!goal.given()) return Optional.empty();
+        Optional<Frontier.Entry> next = frontier.next(settings.depthCap());
+        if (next.isEmpty()) return Optional.empty();
+        Frontier.Entry entry = next.get();
+        if (!entry.screen().equals(screen)) {
+            if (map.pathTo(screen, entry.screen(), edge -> true).isEmpty()) {
+                frontier.park(entry, "no way from " + screen + " to " + entry.screen());
+                return Optional.of(true);
+            }
+            // A walk there that came back here did not arrive: the entry waits for the map to change.
+            if ((screen + "→" + entry.screen()).equals(lastWalk)) {
+                frontier.park(entry, "the walk from " + screen + " to " + entry.screen() + " did not arrive");
+                return Optional.of(true);
+            }
+            return Optional.of(walk(screen, entry.screen()));
+        }
+        Optional<Edge> way = map.edges().stream().filter(e -> e.from().equals(screen)
+                && e.label().equals(entry.press()) && chooser.untriedEdge(e)).findFirst();
+        if (way.isPresent()) return Optional.of(press(screen, way.get(), Mode.BEST, look));
+        if (readsTrees() && chooser.inputsLeft(screen).contains(entry.press())) {
+            return Optional.of(pressInput(screen, entry.press(), look));
+        }
+        // Tried already, or gone from the map: nothing left of it to press.
+        frontier.pressed(screen, entry.press());
+        return Optional.of(true);
+    }
+
     /** The run is on {@code screen} now (null: on none of the map): its clock and what is looked for there move. */
     private void clock(String screen) {
         clock.moveTo(screen);
@@ -923,6 +1098,7 @@ public final class ExploreLoop {
         Guards.Refusal refusal = edge.via() == null ? guards.front(around) : guards.check(edge.via(), around);
         Optional<Boolean> refused = refused(screen, key, edge.label(), refusal, look);
         if (refused.isPresent()) return refused.get();
+        if (denied(screen, key, edge.label())) return true;
         chooser.tryOnce(key);
         lastEdge = key;
         clock.doing(Spent.PRESSING);
@@ -974,7 +1150,19 @@ public final class ExploreLoop {
                 .anyMatch(e -> e.to().equals(screen) && e.from().equals(at) && !e.back() && !e.onItsOwn());
     }
 
+    /**
+     * Whether {@code label} of {@code screen}, its place {@code key}, is a press nobody watching makes (sign out,
+     * delete, buy, …): then it is set aside as tried and ranked destructive, so it waits on the user, never pressed.
+     */
+    private boolean denied(String screen, String key, String label) {
+        if (!Frontier.denied(label)) return false;
+        chooser.tryOnce(key);
+        emit(new ExploreEvent.Ranked(screen, label, 0, PressTag.DESTRUCTIVE, nowMs.getAsLong()));
+        return true;
+    }
+
     private void pressed(String screen, String what) {
+        pressCount++;
         if (resumed != null) passed(StopKind.STUCK, resumed.place());
         if (replay.on()) passed(StopKind.STUCK, replay.fault().place());
         lastPress = nowMs.getAsLong();
@@ -1243,6 +1431,7 @@ public final class ExploreLoop {
         Guards.Refusal refusal = input == null ? guards.front(play.around(null)) : guards.check(input, play.around(input));
         Optional<Boolean> refused = refused(screen, key, field, refusal, look);
         if (refused.isPresent()) return refused.get();
+        if (denied(screen, key, field)) return true;
         chooser.tryOnce(key);
         // What the guard stopped before this press is not its doing.
         play.stopped();
@@ -1489,6 +1678,8 @@ public final class ExploreLoop {
             generation = done.generation();
             map = done.map();
             chooser.use(map);
+            // The reloaded map can hold the way a parked press lacked.
+            frontier.resume();
             if (done.guards() != null) guards = done.guards();
             verdictsDue = true;
         }

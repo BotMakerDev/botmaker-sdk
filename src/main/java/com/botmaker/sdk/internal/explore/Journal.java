@@ -99,9 +99,19 @@ public final class Journal {
         record Park(String stopId) implements Command {}
 
         /**
+         * The goal is proposed reached, {@code mark} what shows it, a picture's name or a text (blank: none): the run
+         * ends only once a witness holds on the frame shown now (spec 2026-11-24-explore-agents-design).
+         */
+        record Done(String mark) implements Command {
+            public Done {
+                mark = mark == null ? "" : mark.strip();
+            }
+        }
+
+        /**
          * {@code text} as a command, read off its first line ({@code resume <id> [ignore]}, {@code fault <id> <why>},
-         * {@code park <id>}, {@code stop}); a resume's further lines are what was skipped. Empty for one this run does
-         * not know.
+         * {@code park <id>}, {@code done [mark]}, {@code stop}); a resume's further lines are what was skipped. Empty
+         * for one this run does not know.
          */
         static Optional<Command> parse(String text) {
             List<String> lines = (text == null ? "" : text).lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
@@ -109,6 +119,7 @@ public final class Journal {
             String[] said = line.split("\\s+");
             if (said.length == 1 && said[0].equals("stop")) return Optional.of(new End());
             if (said.length == 2 && said[0].equals("park")) return Optional.of(new Park(said[1]));
+            if (said[0].equals("done")) return Optional.of(new Done(line.substring("done".length())));
             if (said[0].equals("fault") && said.length >= 3) {
                 String[] parts = line.split("\\s+", 3);
                 return Optional.of(new Fault(parts[1], parts[2].strip()));
@@ -142,7 +153,8 @@ public final class Journal {
     /**
      * Begins the journal of a new run of the bot in {@code project} (2026-11-20): its own folder {@code explore/<id>/},
      * its id added to the index, the latest run's parked stops carried into it, since what a run left for later is the
-     * bot's, not the run's. A run restarted from its {@link ResumeFile} goes on in its own journal ({@link #latest}).
+     * bot's, not the run's, and the presses it ranked and did not make, so the next run resumes its frontier. A run
+     * restarted from its {@link ResumeFile} goes on in its own journal ({@link #latest}).
      */
     public static synchronized Journal begin(Path project, long nowMs) {
         Path root = root(project);
@@ -153,6 +165,8 @@ public final class Journal {
         for (int n = 2; runs.contains(id) || Files.exists(root.resolve(id)); n++) id = base + "-" + n;
         Journal journal = new Journal(root.resolve(id));
         before.map(Journal::queue).filter(q -> !q.isEmpty()).ifPresent(journal::queue);
+        before.map(b -> Frontier.of(b.events(), screen -> 0).saved(nowMs)).orElse(List.of())
+                .forEach(journal::append);
         runs.add(id);
         new Journal(root).write(RUNS, () -> JSON.writeValueAsString(runs));
         return journal;
