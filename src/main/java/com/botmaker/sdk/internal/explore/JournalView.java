@@ -235,10 +235,14 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 .toList();
     }
 
-    /** When the Coordinator last said it was alive in the latest run; empty when it never did. */
+    /**
+     * When the Coordinator last said it was alive in the latest run, since it last restarted (a restarted run has a new
+     * Coordinator); empty when it never did.
+     */
     public Optional<Instant> lastHeartbeat() {
-        for (int i = events.size() - 1; i >= 0; i--) {
-            if (events.get(i) instanceof ExploreEvent.Heartbeat beat) return Optional.of(Instant.ofEpochMilli(beat.at()));
+        List<ExploreEvent> since = sinceRestart();
+        for (int i = since.size() - 1; i >= 0; i--) {
+            if (since.get(i) instanceof ExploreEvent.Heartbeat beat) return Optional.of(Instant.ofEpochMilli(beat.at()));
         }
         return Optional.empty();
     }

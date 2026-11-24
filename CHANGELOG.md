@@ -27,6 +27,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   destructive, and an edit applied, so none is applied twice; and *Unreachable within the caps*, an end of a run toward
   a goal. The Explore tab's feed lists leases taken back, findings and the goal reached. Nothing writes them yet: the
   crew's Coordinator and goal runs come next.
+- Keep exploring and Discover runs are coordinated by the explore crew's Coordinator, the SDK's run companion in the
+  core (it replaces the tree-answer watch). Each settled stop is leased to the Settler, written and resumed once, and
+  the journal says so, so a restarted core does not write it again; a write that fails or outlives its lease is parked,
+  never written twice. A worker's lease that runs out is taken back and tried again, up to 3 tries, then the stop is
+  parked. The Coordinator writes a heartbeat a few times a minute, even while the Settler writes; a watchdog ends the run
+  *Stuck: coordinator silent* when it stops, and a run whose journal says nothing for 20 minutes ends *Stuck: no
+  progress*. No other worker is started yet, so other stops go on as before.
 
 ### Fixed
 

@@ -3,14 +3,12 @@
 
 package com.botmaker.sdk.plugin.assist;
 
-import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.StopKind;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
-import com.botmaker.sdk.plugin.run.SdkRuns;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -76,9 +74,4 @@ class TreeAnswerWatchTest {
         assertFalse(TreeAnswerWatch.endIfKilled(new Journal(folder), 9));
     }
 
-    @Test
-    void itServesKeepExploringAndDiscover() {
-        assertEquals(List.of(SdkRuns.KEEP_EXPLORING, SdkRuns.DISCOVER),
-                new TreeAnswerWatch().serves().stream().map(RunEntry::title).toList());
-    }
 }

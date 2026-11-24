@@ -4,9 +4,6 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.StudioServices;
-import com.botmaker.plugin.api.run.RunCompanion;
-import com.botmaker.plugin.api.run.RunContext;
-import com.botmaker.plugin.api.run.RunEntry;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
@@ -15,80 +12,45 @@ import com.botmaker.sdk.internal.explore.Stop;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.plugin.SdkLog;
-import com.botmaker.sdk.plugin.run.SdkRuns;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
- * Writes what <em>Keep exploring</em> or <em>Discover</em> settled off a screen's tree ({@link ExploreEvent.Settled})
- * into the bot, then resumes its stop, so the run goes on without Claude (web discovery phase 6b). It is the SDK's
- * companion of those runs (2026-11-20): the core starts one with each run and stops it at the run's end, whether or
- * not Studio or a session is open, and Studio's copy of the plugin never runs one, so two never race on one journal.
+ * The Settler's work (spec 2026-11-24-explore-agents-design): writes what <em>Keep exploring</em> or <em>Discover</em>
+ * settled off a screen's tree ({@link ExploreEvent.Settled}) into the bot, then resumes its stop, so the run goes on
+ * without Claude (web discovery phase 6b). The Coordinator's host ({@link CoordinatorHost}), the SDK's companion of
+ * those runs, leases each such stop to it.
  */
-public final class TreeAnswerWatch implements RunCompanion {
+final class TreeAnswerWatch {
 
-    /** How often the journal is read. */
-    static final long POLL_MS = 500;
-
-    private Thread thread;
-    /** The project the run is of, once started: where its journal is when the run ends. */
-    private Path project;
-
-    /** A watch not started yet: the core builds one for each run. */
-    public TreeAnswerWatch() {}
-
-    @Override
-    public List<RunEntry> serves() {
-        return new SdkRuns().runs().stream().filter(entry -> entry.title().equals(SdkRuns.KEEP_EXPLORING)
-                || entry.title().equals(SdkRuns.DISCOVER)).toList();
-    }
-
-    /** Watches the journal of the project the run is of, until {@link #stop()}. */
-    @Override
-    public synchronized void start(RunContext run) {
-        StudioServices services = run.services();
-        Path project = services == null ? null : services.projectDir();
-        if (project == null || thread != null) return;
-        this.project = project;
-        // The latest run's journal, read again each round: the run begins its own once its process is up.
-        thread = Thread.ofPlatform().daemon().name("explore-answers").start(() -> watch(() -> Journal.latest(project),
-                (journal, id, answers) -> {
-                    TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
-                    if (written.failed().isEmpty()) shots(services, journal, id, answers);
-                    return written;
-                }, pictured -> TreeAnswers.pictured(services, pictured)));
-    }
+    private TreeAnswerWatch() {}
 
     /** Writes what the run settled at a stop of {@code journal}'s run. */
-    private interface Writer {
+    interface Writer {
         TreeAnswers.Written write(Journal journal, String id, List<TreeAnswer> answers);
     }
 
-    /**
-     * Stops watching, and says the run ended when it could not: a run whose process was killed (the JVM, Studio quit, a
-     * core restart) writes no end of its own, so its journal would say it still runs.
-     */
-    @Override
-    public synchronized void stop() {
-        if (thread != null) thread.interrupt();
-        thread = null;
-        if (project != null) Journal.latest(project).ifPresent(journal -> endIfKilled(journal, System.currentTimeMillis()));
+    /** The writer into the bot {@code services} has open, frames given to the screens it adds. */
+    static Writer into(StudioServices services) {
+        return (journal, id, answers) -> {
+            TreeAnswers.Written written = TreeAnswers.apply(services, "Explore: " + id, answers);
+            if (written.failed().isEmpty()) shots(services, journal, id, answers);
+            return written;
+        };
     }
 
     /**
      * Writes {@link ExploreLoop.End#BROKE} at {@code nowMs} to a run's journal that began and never ended: the
-     * host calls {@link #stop} once the run's process is gone, so a run that ended itself has said so already.
+     * host calls it once the run's process is gone, so a run that ended itself has said so already.
      *
      * @return whether an end was written
      */
@@ -125,66 +87,26 @@ public final class TreeAnswerWatch implements RunCompanion {
         }
     }
 
-    private static void watch(Supplier<Optional<Journal>> latest, Writer write,
-                              Consumer<ExploreEvent.Pictured> picture) {
-        Set<String> done = new HashSet<>();
-        Set<ExploreEvent.Pictured> pictured = new HashSet<>();
-        String failedLast = null;
-        JournalView.Reader reader = null;
-        try {
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    Optional<Journal> journal = latest.get();
-                    if (journal.isPresent()) {
-                        // Read on from where the last round left off, unless a newer run began its own journal.
-                        if (reader == null || !reader.journal().folder().equals(journal.get().folder())) {
-                            reader = new JournalView.Reader(journal.get());
-                        }
-                        JournalView view = reader.view();
-                        Journal now = reader.journal();
-                        round(now, view, done, (id, answers) -> write.write(now, id, answers));
-                        pictures(view, pictured, picture);
-                    }
-                    failedLast = null;
-                } catch (RuntimeException failed) {
-                    // Said once, then tried again each round: one bad read or slow write stops nothing for good.
-                    if (!String.valueOf(failed.getMessage()).equals(failedLast)) {
-                        SdkLog.warn("What the explore run settled could not be written: " + failed.getMessage());
-                    }
-                    failedLast = String.valueOf(failed.getMessage());
-                }
-                Thread.sleep(POLL_MS);
-            }
-        } catch (InterruptedException stopped) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
     /** The latest run's pictures not yet in {@code done}, each given to {@code picture} once. */
     static void pictures(Journal journal, Set<ExploreEvent.Pictured> done, Consumer<ExploreEvent.Pictured> picture) {
         pictures(JournalView.of(journal), done, picture);
     }
 
-    private static void pictures(JournalView view, Set<ExploreEvent.Pictured> done,
-                                 Consumer<ExploreEvent.Pictured> picture) {
+    static void pictures(JournalView view, Set<ExploreEvent.Pictured> done, Consumer<ExploreEvent.Pictured> picture) {
         for (ExploreEvent event : view.events()) {
             if (event instanceof ExploreEvent.Pictured pictured && done.add(pictured)) picture.accept(pictured);
         }
     }
 
     /**
-     * One look at the journal: the first stop the run settled and nobody resumed yet, open or parked, written by
-     * {@code write} and resumed. One that does not write is resumed too, saying why: the run raises what was left out
-     * as a stop of its own ({@code UNWRITTEN}), Claude's to write. One resume at a time: none while a command waits.
+     * One look at the journal without a Coordinator (tests that drive a run by hand): the first stop the run settled
+     * and nobody resumed yet, open or parked, written by {@code write} and resumed. One resume at a time: none while a
+     * command waits.
      */
     static void round(Journal journal, Set<String> done,
                       BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
-        round(journal, JournalView.of(journal), done, write);
-    }
-
-    private static void round(Journal journal, JournalView view, Set<String> done,
-                              BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
         if (journal.commandWaiting()) return;
+        JournalView view = JournalView.of(journal);
         if (!view.running()) return;
         List<Stop> waiting = new ArrayList<>();
         view.open().ifPresent(waiting::add);
@@ -195,14 +117,26 @@ public final class TreeAnswerWatch implements RunCompanion {
             String key = view.beganAt() + "/" + id;
             if (done.contains(key) || !view.settled(stop) || view.reloadOf(id).isPresent()) continue;
             done.add(key);
-            TreeAnswers.Written written = write.apply(id, view.answers(id));
-            written.failed().ifPresent(why -> SdkLog.warn("What the explore run settled at " + id
-                    + " was not written: " + why));
-            // Nothing written at all is said too: the run raises it, rather than meet the place again unexplained.
-            List<String> leftOut = written.failed().map(why -> List.of("nothing was written: " + why))
-                    .orElse(written.skipped());
-            journal.command(Journal.Command.resume(id, leftOut));
+            settle(journal, view, id, write);
             return;
         }
+    }
+
+    /**
+     * Writes what the run settled at {@code id} by {@code write}, and resumes it. One that does not write is resumed
+     * too, saying why: the run raises what was left out as a stop of its own ({@code UNWRITTEN}), Claude's to write.
+     *
+     * @return why nothing was written, empty when it was
+     */
+    static Optional<String> settle(Journal journal, JournalView view, String id,
+                                   BiFunction<String, List<TreeAnswer>, TreeAnswers.Written> write) {
+        TreeAnswers.Written written = write.apply(id, view.answers(id));
+        written.failed().ifPresent(why -> SdkLog.warn("What the explore run settled at " + id
+                + " was not written: " + why));
+        // Nothing written at all is said too: the run raises it, rather than meet the place again unexplained.
+        List<String> leftOut = written.failed().map(why -> List.of("nothing was written: " + why))
+                .orElse(written.skipped());
+        journal.command(Journal.Command.resume(id, leftOut));
+        return written.failed();
     }
 }

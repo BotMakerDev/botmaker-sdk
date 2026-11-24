@@ -6,11 +6,11 @@ package com.botmaker.sdk.plugin.assist;
 import com.botmaker.plugin.api.CompanionHolder;
 import com.botmaker.plugin.api.run.RunCompanion;
 
-/** The companion of Keep exploring's and Discover's runs: what writes the answers they settle ({@link TreeAnswerWatch}). */
+/** The companion of Keep exploring's and Discover's runs: their explore crew's Coordinator ({@link CoordinatorHost}). */
 public final class SdkCompanions implements CompanionHolder {
 
     @Override
     public RunCompanion companion() {
-        return new TreeAnswerWatch();
+        return new CoordinatorHost();
     }
 }
