@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -139,7 +140,7 @@ class ReaderToolsTest {
                 prompt);
         assertTrue(prompt.contains("The run's goal: sign in to Google."), prompt);
         assertTrue(prompt.contains("rank_presses") && prompt.contains("apply_edit") && prompt.contains("resume"));
-        assertTrue(!prompt.contains("{"), "every slot is filled: " + prompt);
+        assertTrue(!Pattern.compile("\\{[a-z]+}").matcher(prompt).find(), "every slot is filled: " + prompt);
         assertTrue(WorkerRunner.prompt(WorkerRole.READER, stop("s-1", null, ""), "")
                 .contains("none given; map what the screen is"));
     }

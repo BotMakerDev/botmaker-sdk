@@ -32,7 +32,9 @@ public final class FxCall {
     public static <T> T call(Supplier<T> work) {
         if (Platform.isFxApplicationThread()) return work.get();
         // Reading and writing the bot through Studio is a call's part of its own (2026-10-15).
-        return ToolTiming.timed(ToolTiming.Phase.STUDIO, () -> handed(work));
+        // The explore writer's frame goes with the work: the FX thread would otherwise see the assistant's screenshot.
+        Supplier<T> carried = Frames.carried(work);
+        return ToolTiming.timed(ToolTiming.Phase.STUDIO, () -> handed(carried));
     }
 
     private static <T> T handed(Supplier<T> work) {

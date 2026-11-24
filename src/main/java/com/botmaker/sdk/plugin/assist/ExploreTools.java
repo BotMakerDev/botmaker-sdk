@@ -16,6 +16,7 @@ import com.botmaker.sdk.internal.explore.FindingKind;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.PressTag;
+import com.botmaker.sdk.internal.explore.StopKind;
 import com.botmaker.sdk.internal.explore.StopRole;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.run.SdkRuns;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -132,12 +134,14 @@ final class ExploreTools {
                         + "reset, a purchase)") String tag) {
     }
 
-    @Describe("write an edit of the map through the run's one writer, applied once by its id however often it is sent; "
-            + "answers once it was written, or why not")
+    @Describe("write an edit of the map, or cut pictures, through the run's one writer, on the stop's own frame; applied "
+            + "once by its id however often it is sent; answers once it was written, or why not")
     record ApplyEdit(@Describe("the stop's id the edit is for") String stop,
                      @Describe("an id of your own for this edit, unique in the run: the same id is written once")
                      String editId,
-                     @Describe("the edit_map call's arguments as a JSON object, with its action") String edit)
+                     @Describe("the call's arguments as a JSON object: edit_map's with its action, or crop_pictures' "
+                             + "boxes in the stop frame's pixels") String edit,
+                     @Describe(value = "edit_map (the default) or crop_pictures", optional = true) String tool)
             implements Action {
     }
 
@@ -217,7 +221,7 @@ final class ExploreTools {
             case Fault fault -> fault(journal, fault.stop(), fault.why(), STOP_WITHIN);
             case Look look -> look(journal, look.stop());
             case RankPresses rank -> rank(journal, rank.stop(), rank.screen(), rank.presses());
-            case ApplyEdit edit -> applyEdit(journal, edit.stop(), edit.editId(), edit.edit(), EDIT_WITHIN);
+            case ApplyEdit edit -> applyEdit(journal, edit.stop(), edit.editId(), edit.tool(), edit.edit(), EDIT_WITHIN);
             case Progress ignored -> progress(journal);
             case RecordFinding finding -> recordFinding(journal, finding.kind(), finding.why(), finding.evidence(),
                     finding.screen());
@@ -316,6 +320,9 @@ final class ExploreTools {
 
     /** Why Claude leaves a stop whose role is the user's. */
     private static final String USERS_STOP = "the user decides it from the Explore tab. Leave it.";
+    static final String NOTHING_DRAWN = "Nothing was drawn: the run would stop on this screen again. Draw the screen "
+            + "(crop_pictures a marker, then new_screen with it), or end your session without resuming: the stop is "
+            + "tried again, then handed to the user.";
 
     /** What Claude does with a held fault. */
     private static final String FIX_THE_SDK = "Fix the SDK with its test and install it; explore reload_sdk then "
@@ -463,6 +470,8 @@ final class ExploreTools {
                     .filter(s -> view.roleOf(s) == StopRole.USER).isPresent()) {
                 return AgentReply.refused(id + " is the user's: " + USERS_STOP);
             }
+            // A Reader that drew nothing and ignores the screen meets it again at once: the run would loop on it.
+            if (ignore && undrawn(view, id)) return AgentReply.refused(NOTHING_DRAWN);
             int seen = view.all().size();
             claude(journal, "resume " + id + (ignore ? " ignore" : ""));
             journal.command("resume " + id + (ignore ? " ignore" : ""));
@@ -569,6 +578,27 @@ final class ExploreTools {
     /** The stop {@code id} of {@code view}: the open one, or one parked. */
     private static Optional<com.botmaker.sdk.internal.explore.Stop> stopOf(JournalView view, String id) {
         return view.open().filter(s -> s.id().equals(id)).or(() -> view.parked(id));
+    }
+
+    /**
+     * Whether {@code id} is a screen the map lacks, held by the Reader, and none of its map edits was written (a cut
+     * alone draws nothing): an ignore of it would meet the same screen again at once (device drive 2026-11-24, F1).
+     */
+    private static boolean undrawn(JournalView view, String id) {
+        boolean unknown = stopOf(view, id).filter(s -> s.kind() == StopKind.UNKNOWN_SCREEN).isPresent();
+        boolean reader = view.leaseOf(id).filter(l -> l.role() == StopRole.CARTOGRAPHER)
+                .filter(l -> !l.expired(System.currentTimeMillis())).isPresent();
+        if (!unknown || !reader) return false;
+        Set<String> written = new HashSet<>();
+        Set<String> drawing = new HashSet<>();
+        for (ExploreEvent event : view.events()) {
+            if (event instanceof ExploreEvent.EditApplied applied && applied.ok()) written.add(applied.editId());
+            if (event instanceof ExploreEvent.EditQueued queued && queued.stopId().equals(id)
+                    && EditTool.fromId(queued.tool()) == EditTool.EDIT_MAP) {
+                drawing.add(queued.editId());
+            }
+        }
+        return drawing.stream().noneMatch(written::contains);
     }
 
     /**
@@ -765,7 +795,17 @@ final class ExploreTools {
      * An id queued already is not queued again: its first answer is given.
      */
     static AgentReply applyEdit(Journal journal, String stopId, String editId, String edit, Duration within) {
+        return applyEdit(journal, stopId, editId, EditTool.EDIT_MAP.id(), edit, within);
+    }
+
+    /**
+     * As {@link #applyEdit(Journal, String, String, String, Duration)}, {@code edit} the arguments of {@code tool}'s
+     * call: {@code edit_map} (blank) or {@code crop_pictures}, whose boxes are in the stop frame's pixels.
+     */
+    static AgentReply applyEdit(Journal journal, String stopId, String editId, String tool, String edit,
+                                Duration within) {
         if (editId == null || editId.isBlank()) return AgentReply.refused("Give the edit an id of your own.");
+        EditTool by = EditTool.fromId(tool);
         String id = editId.strip();
         JournalView view = JournalView.of(journal);
         Optional<ExploreEvent.EditQueued> known = view.queuedOf(id);
@@ -783,11 +823,20 @@ final class ExploreTools {
             if (stopOf(view, stopId.strip()).isEmpty()) {
                 return AgentReply.refused("No stop " + stopId.strip() + " is open or parked. " + ids(view));
             }
-            if (edit == null || EditWriter.arguments(edit).filter(a -> a.containsKey(AssistantTool.ACTION)).isEmpty()) {
+            if (by == EditTool.UNKNOWN) {
+                return AgentReply.refused("No worker writes by " + tool.strip() + ": tool is edit_map or crop_pictures.");
+            }
+            if (by == EditTool.EDIT_MAP && (edit == null
+                    || EditWriter.arguments(edit).filter(a -> a.containsKey(AssistantTool.ACTION)).isEmpty())) {
                 return AgentReply.refused("The edit is edit_map's arguments as a JSON object, its action among them.");
             }
-            claude(journal, "apply_edit " + id);
-            journal.append(new ExploreEvent.EditQueued(id, stopId.strip(), "edit_map", edit, System.currentTimeMillis()));
+            if (by == EditTool.CROP_PICTURES && (edit == null
+                    || EditWriter.arguments(edit).filter(a -> a.get("boxes") instanceof List<?>).isEmpty())) {
+                return AgentReply.refused("The edit is crop_pictures' arguments as a JSON object, its boxes among "
+                        + "them, each a name and a box in the stop frame's pixels.");
+            }
+            claude(journal, "apply_edit " + id + (by == EditTool.EDIT_MAP ? "" : " " + by.id()));
+            journal.append(new ExploreEvent.EditQueued(id, stopId.strip(), by.id(), edit, System.currentTimeMillis()));
         }
         long deadline = System.nanoTime() + within.toNanos();
         while (true) {

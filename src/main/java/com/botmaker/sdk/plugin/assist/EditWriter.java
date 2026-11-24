@@ -13,25 +13,26 @@ import com.botmaker.sdk.internal.explore.JournalView;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 /**
  * The one writer of a run's edits (spec 2026-11-24-explore-agents-design § Coordination rules): the explore crew's
- * workers queue their map edits in the journal ({@link ExploreEvent.EditQueued}) and this writer, on the Coordinator's
- * thread alone, carries each out once, in order, and records it ({@link ExploreEvent.EditApplied}). Two workers so never
- * race on the bot's map, and a core restarted between a queue and its write writes only what was not written yet.
+ * workers queue their map edits and picture cuts in the journal ({@link ExploreEvent.EditQueued}) and this writer, on the
+ * Coordinator's thread alone, carries each out once, in order, on its stop's saved frame, and records it
+ * ({@link ExploreEvent.EditApplied}). Two workers so never race on the bot's map, and a core restarted between a queue
+ * and its write writes only what was not written yet.
  */
 final class EditWriter {
-
-    /** The map tools whose edits a worker may queue. */
-    static final Set<String> TOOLS = Set.of("edit_map");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -59,25 +60,52 @@ final class EditWriter {
      */
     static int drain(Journal journal, JournalView view, Apply apply, LongSupplier clock) {
         List<ExploreEvent.EditQueued> queued = view.unapplied();
+        // Each stop's frame read once a drain, however many of its edits are queued.
+        Map<String, Optional<BufferedImage>> frames = new HashMap<>();
         for (ExploreEvent.EditQueued edit : queued) {
-            journal.append(write(edit, apply, clock.getAsLong()));
+            Optional<BufferedImage> frame = frames.computeIfAbsent(edit.stopId(),
+                    id -> view.stopOf(id).flatMap(stop -> frame(journal, stop.framePath())));
+            journal.append(write(edit, apply, frame, clock.getAsLong()));
         }
         return queued.size();
     }
 
-    private static ExploreEvent.EditApplied write(ExploreEvent.EditQueued edit, Apply apply, long at) {
-        if (!TOOLS.contains(edit.tool())) {
+    /**
+     * Carries {@code edit} out with {@code frame}, its stop's saved frame, as the shown screenshot: a box of a cut or of
+     * an added text is in that frame's pixels, never the live screen's, which may have moved on since.
+     */
+    private static ExploreEvent.EditApplied write(ExploreEvent.EditQueued edit, Apply apply,
+                                                  Optional<BufferedImage> frame, long at) {
+        EditTool tool = EditTool.fromId(edit.tool());
+        if (tool == EditTool.UNKNOWN) {
             return new ExploreEvent.EditApplied(edit.editId(), false, "no worker writes by " + edit.tool(), at);
+        }
+        if (tool == EditTool.CROP_PICTURES && frame.isEmpty()) {
+            return new ExploreEvent.EditApplied(edit.editId(), false, "no frame to cut from: the stop saved none", at);
         }
         Optional<Map<String, Object>> arguments = arguments(edit.edit());
         if (arguments.isEmpty()) return new ExploreEvent.EditApplied(edit.editId(), false, "the edit is not JSON", at);
         AgentReply reply;
         try {
-            reply = apply.apply(edit.tool(), arguments.get());
+            // Bound even when empty: a box of a stop with no frame is refused, never measured on another screenshot.
+            reply = Frames.showing(frame, () -> apply.apply(tool.id(), arguments.get()));
         } catch (RuntimeException failed) {
             return new ExploreEvent.EditApplied(edit.editId(), false, String.valueOf(failed.getMessage()), at);
         }
         return new ExploreEvent.EditApplied(edit.editId(), !reply.isRefused(), said(reply), at);
+    }
+
+    /** The frame saved at {@code path}, as its stop names it (in the run's folder when relative); empty when unread. */
+    static Optional<BufferedImage> frame(Journal journal, String path) {
+        if (path == null || path.isBlank()) return Optional.empty();
+        Path file = Path.of(path);
+        if (!file.isAbsolute()) file = journal.folder().resolve(file);
+        if (!Files.isRegularFile(file)) return Optional.empty();
+        try {
+            return Optional.ofNullable(ImageIO.read(file.toFile()));
+        } catch (IOException unread) {
+            return Optional.empty();
+        }
     }
 
     /** {@code json} as a tool's arguments: an object; empty when it is not one. */

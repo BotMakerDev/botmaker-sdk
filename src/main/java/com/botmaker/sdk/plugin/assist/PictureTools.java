@@ -359,7 +359,9 @@ final class PictureTools {
      * refuses is said and the rest are cut, and the plain inputs and the way back are noted on the screen together.
      */
     static AgentReply cropPictures(Crops crops, AgentContext context) {
-        return cropPictures(crops, context, Frames.shown(), liveLooks(context));
+        // A stop's saved frame is of the past: the live screen may have moved on, so it never says the cut moves.
+        Supplier<List<BufferedImage>> live = Frames.showingSaved() ? List::of : liveLooks(context);
+        return cropPictures(crops, context, Frames.shown(), live);
     }
 
     /**

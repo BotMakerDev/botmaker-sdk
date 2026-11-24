@@ -21,6 +21,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- The explore crew's Reader cuts pictures (plan `2026-11-24-explore-drive-fixes` phase 1): `explore`'s `apply_edit`
+  takes `tool` `crop_pictures` beside `edit_map`, and the run's one writer carries every edit out on the stop's own
+  saved frame, so a cut's box and an added text's box are that frame's pixels, never the live screen's, and the
+  assistant's last screenshot is left alone (the frame goes with the work to the FX thread; a stop with no frame shows
+  none; a cut of a saved frame is not checked against the live screen, which may have moved on). A Reader's ignore of
+  a screen the map lacks, with no map edit written, is refused: the run would stop on the same screen again (the
+  device drive's loop). Its prompt gives the order on an
+  emulator (cut a marker, `new_screen` from the screen it was reached from, `add_marker`) and tells it never to call
+  `explore` action `stop`, which ends the whole run.
+
 - Goal runs replayed offline (`ExploreRegressionTest`, plan `2026-11-24-explore-agents` phase 9): Android Settings to a
   Google sign-in, to the hotspot screen and to the dark theme, each recorded under
   `src/test/resources/explore-goal-runs/<goal>/` as its screens, the text each frame reads and the Reader's and the

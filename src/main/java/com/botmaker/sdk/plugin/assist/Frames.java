@@ -78,6 +78,13 @@ final class Frames {
      */
     private static volatile BufferedImage shown;
 
+    /**
+     * The frame an explore run's edit writer carries an edit out on ({@link EditWriter}): the stop's own saved frame,
+     * seen by that edit alone, so the assistant's last screenshot is neither read nor replaced by it. Empty when the
+     * stop saved no frame: such an edit sees no screenshot at all.
+     */
+    private static final ScopedValue<Optional<BufferedImage>> SHOWN_HERE = ScopedValue.newInstance();
+
     private Frames() {}
 
     static void show(BufferedImage frame) {
@@ -85,7 +92,24 @@ final class Frames {
     }
 
     static Optional<BufferedImage> shown() {
-        return Optional.ofNullable(shown);
+        return SHOWN_HERE.isBound() ? SHOWN_HERE.get() : Optional.ofNullable(shown);
+    }
+
+    /** {@code work}'s answer, {@link #shown()} being {@code frame} while it runs, on this thread alone. */
+    static <T> T showing(Optional<BufferedImage> frame, Supplier<T> work) {
+        return ScopedValue.where(SHOWN_HERE, frame).call(work::get);
+    }
+
+    /** {@code work} carrying this thread's {@link #showing} frame, if any, to the thread that runs it. */
+    static <T> Supplier<T> carried(Supplier<T> work) {
+        if (!SHOWN_HERE.isBound()) return work;
+        Optional<BufferedImage> frame = SHOWN_HERE.get();
+        return () -> showing(frame, work);
+    }
+
+    /** Whether {@link #shown()} is a stop's saved frame, a still of the past: no live look can confirm a cut of it. */
+    static boolean showingSaved() {
+        return SHOWN_HERE.isBound();
     }
 
     /** Forgets the last screenshot, for a test. */
