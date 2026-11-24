@@ -57,6 +57,12 @@ public enum StopKind {
      * refused it, then resumes.
      */
     UNWRITTEN("unwritten", "Settled, not written"),
+    /**
+     * The Evaluator found the map wrong about a screen (2026-11-24): the run never stopped on it, so it is the Reader's
+     * stop beside the run, on the frame the Evaluator judged, to redraw that screen's marks
+     * ({@link JournalView#foundBadMaps()}).
+     */
+    BAD_MAP("bad_map", "Map is wrong"),
     @JsonEnumDefaultValue
     UNKNOWN("unknown", "Unknown");
 

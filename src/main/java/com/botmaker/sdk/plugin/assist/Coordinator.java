@@ -7,6 +7,7 @@ import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.JournalView;
 import com.botmaker.sdk.internal.explore.Stop;
+import com.botmaker.sdk.internal.explore.StopKind;
 import com.botmaker.sdk.internal.explore.StopRole;
 
 import java.time.Duration;
@@ -134,8 +135,9 @@ public final class Coordinator {
         List<Stop> waiting = new ArrayList<>();
         open.ifPresent(waiting::add);
         waiting.addAll(view.queue());
-        // The Mechanic takes the faults the Evaluator found too; the run never stopped on one.
-        waiting.addAll(view.foundFaults());
+        // The crew takes what the Evaluator found too, the Mechanic its faults, the Reader its wrong maps; the run never
+        // stopped on one.
+        waiting.addAll(view.found());
         boolean mechanicBusy = mechanicWorks(view, nowMs);
         // Its stop may be over long before it is (an SDK reload): a try nobody waits on is closed all the same.
         view.events().stream().filter(e -> e instanceof ExploreEvent.Leased leased
@@ -179,8 +181,9 @@ public final class Coordinator {
             if (!crew.present().contains(role)) continue;
             int tries = view.attempts(id);
             // The Settler tries once: a write that may have partly landed is never written again. So does the Mechanic,
-            // whose branch is there already.
-            int cap = role == StopRole.SETTLER || role == StopRole.MECHANIC ? 1 : settings.attempts();
+            // whose branch is there already, and the Reader on a wrong map, which the Evaluator says again if it stays.
+            int cap = role == StopRole.SETTLER || role == StopRole.MECHANIC || stop.kind() == StopKind.BAD_MAP ? 1
+                    : settings.attempts();
             if (tries >= cap) {
                 if (parks && !commandGiven) {
                     actions.add(new Action.Park(id, "tried " + tries + (tries == 1 ? " time" : " times")));

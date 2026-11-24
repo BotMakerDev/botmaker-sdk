@@ -141,6 +141,8 @@ final class ExploreLines {
             case ExploreEvent.Released e -> e.ok() ? null : "↺ " + e.stopId() + " taken back: " + e.why();
             case ExploreEvent.Heartbeat e -> null;
             case ExploreEvent.Finding e -> "⚑ " + e.kind().displayName() + ": " + e.why();
+            // Its finding is said just before it; the Reader's lease on it is the line that follows.
+            case ExploreEvent.MapFlagged e -> null;
             case ExploreEvent.Witnessed e -> "🎯 Goal reached: " + e.goal() + " (" + e.check().displayName()
                     + (e.mark().isBlank() ? "" : ": " + e.mark()) + ")";
             case ExploreEvent.Ranked e -> null;

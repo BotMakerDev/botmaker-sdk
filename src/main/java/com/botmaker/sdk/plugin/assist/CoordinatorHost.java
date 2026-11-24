@@ -419,11 +419,11 @@ public final class CoordinatorHost implements RunCompanion {
         return WRITING.computeIfAbsent(bot, b -> new ReentrantLock());
     }
 
-    /** The stop {@code stopId} of {@code view}: the open one, one queued, or a fault the Evaluator found. */
+    /** The stop {@code stopId} of {@code view}: the open one, one queued, or a fault or wrong map the Evaluator found. */
     private static Optional<Stop> stopOf(JournalView view, String stopId) {
         return view.open().filter(stop -> stop.id().equals(stopId))
                 .or(() -> view.queue().stream().filter(stop -> stop.id().equals(stopId)).findFirst())
-                .or(() -> view.foundFaults().stream().filter(stop -> stop.id().equals(stopId)).findFirst());
+                .or(() -> view.found().stream().filter(stop -> stop.id().equals(stopId)).findFirst());
     }
 
     /**

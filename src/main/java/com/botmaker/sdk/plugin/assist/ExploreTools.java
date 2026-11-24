@@ -153,7 +153,8 @@ final class ExploreTools {
     record RecordFinding(@Describe("drift, stuck, bad_map or sdk_fault") String kind,
                          @Describe("what is wrong") String why,
                          @Describe(value = "a screen, frame or press", optional = true) String evidence,
-                         @Describe(value = "drift: the screen lost under", optional = true) String screen,
+                         @Describe(value = "drift: the screen lost under; bad_map: the screen the map is wrong about",
+                                 optional = true) String screen,
                          @Describe(value = RUN_ID, optional = true) String run)
             implements Action {
     }
@@ -575,9 +576,10 @@ final class ExploreTools {
         return String.join("\n", lines);
     }
 
-    /** The stop {@code id} of {@code view}: the open one, or one parked. */
+    /** The stop {@code id} of {@code view}: the open one, one parked, or a wrong map the Evaluator found. */
     private static Optional<com.botmaker.sdk.internal.explore.Stop> stopOf(JournalView view, String id) {
-        return view.open().filter(s -> s.id().equals(id)).or(() -> view.parked(id));
+        return view.open().filter(s -> s.id().equals(id)).or(() -> view.parked(id))
+                .or(() -> view.foundBadMaps().stream().filter(s -> s.id().equals(id)).findFirst());
     }
 
     /**
@@ -674,6 +676,10 @@ final class ExploreTools {
             return AgentReply.refused("A drift names the screen the run is lost under, as screen.");
         }
         JournalView view = JournalView.of(journal);
+        // A running run's wrong map is the Reader's to redraw, which needs the screen; the end's grading is only summed.
+        if (said == FindingKind.BAD_MAP && lost.isEmpty() && view.running()) {
+            return AgentReply.refused("A bad_map names the screen the map is wrong about, as screen.");
+        }
         if (!view.began()) return AgentReply.refused(noRun());
         // The Evaluator's alone: only an evaluation under way acts on it, a stuck above all.
         if (EvaluatorTrigger.held(view).isEmpty()) {
@@ -687,6 +693,11 @@ final class ExploreTools {
         long at = System.currentTimeMillis();
         String shown = evidence == null || evidence.isBlank() ? lost : evidence.strip();
         journal.append(new ExploreEvent.Finding(said, shown, why.strip(), at));
+        if (said == FindingKind.BAD_MAP && view.running()) {
+            // The Reader redraws it on the latest frame the run saved of that screen; none when it saved none.
+            journal.append(new ExploreEvent.MapFlagged(lost, why.strip(), view.lastFrameOf(lost), at));
+            return AgentReply.text("Recorded bad_map: the Reader redraws " + lost + "'s marks; the run goes on.");
+        }
         if (said != FindingKind.DRIFT) {
             return AgentReply.text("Recorded " + said.id() + (said == FindingKind.STUCK ? ": the run ends on it." : "."));
         }
@@ -889,6 +900,7 @@ final class ExploreTools {
         List<String> ids = new ArrayList<>();
         view.open().ifPresent(s -> ids.add(s.id() + " (open)"));
         view.queue().forEach(s -> ids.add(s.id() + " (parked)"));
+        view.foundBadMaps().forEach(s -> ids.add(s.id() + " (map is wrong)"));
         return ids.isEmpty() ? "None is." : "There are " + String.join(", ", ids) + ".";
     }
 

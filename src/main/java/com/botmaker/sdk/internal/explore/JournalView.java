@@ -352,8 +352,17 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     public List<ExploreEvent.Finding> unresolved() {
         boolean witnessed = events.stream().anyMatch(ExploreEvent.Witnessed.class::isInstance);
         Set<String> said = new HashSet<>();
+        // A wrong map the Reader redrew: its stop, said at the finding's time and words, was released done.
+        Set<String> redrawn = new HashSet<>();
+        for (Stop flagged : foundBadMaps()) {
+            if (events.stream().anyMatch(e -> e instanceof ExploreEvent.Released r && r.stopId().equals(flagged.id())
+                    && r.ok())) {
+                redrawn.add(flagged.at() + "\n" + flagged.missing());
+            }
+        }
         return findings().stream().filter(f -> f.kind() != FindingKind.DRIFT)
                 .filter(f -> !(witnessed && f.kind() == FindingKind.NO_WITNESS))
+                .filter(f -> !(f.kind() == FindingKind.BAD_MAP && redrawn.contains(f.at() + "\n" + f.why())))
                 .filter(f -> said.add(f.kind().id() + "\n" + f.why())).toList();
     }
 
@@ -403,6 +412,39 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                     f.why() + (f.evidence().isBlank() ? "" : " (evidence: " + f.evidence() + ")"), f.at()));
         }
         return List.copyOf(faults);
+    }
+
+    /** What the id of a {@linkplain #foundBadMaps() wrong map}'s stop begins with; no stop of the run's does. */
+    private static final String FLAGGED = StopKind.BAD_MAP.id() + "-";
+
+    /**
+     * The latest run's wrong maps as the Reader's stops, oldest first (device drive 2026-11-24, F3): one per
+     * {@link ExploreEvent.MapFlagged}, on the frame the Evaluator judged, unless one for the same screen was still
+     * untried or under way when it was said. The run never stopped on one: it goes on meanwhile. Their ids count from
+     * 1 and never move: each is decided by what was written before it, and the journal only grows.
+     */
+    public List<Stop> foundBadMaps() {
+        Set<String> released = new HashSet<>();
+        List<Stop> flagged = new ArrayList<>();
+        for (ExploreEvent event : events) {
+            if (event instanceof ExploreEvent.Released r) released.add(r.stopId());
+            if (!(event instanceof ExploreEvent.MapFlagged f) || f.screen().isBlank()) continue;
+            if (flagged.stream().anyMatch(s -> s.screen().equalsIgnoreCase(f.screen())
+                    && !released.contains(s.id()))) {
+                continue;
+            }
+            String id = FLAGGED + (flagged.size() + 1);
+            flagged.add(new Stop(id, StopKind.BAD_MAP, f.screen(), f.screen(), f.frame(), List.of(), List.of(),
+                    Map.of(), List.of(), f.why(), f.at()));
+        }
+        return List.copyOf(flagged);
+    }
+
+    /** The stops the run never stopped on, which its crew takes beside it: the faults and the wrong maps found. */
+    public List<Stop> found() {
+        List<Stop> found = new ArrayList<>(foundFaults());
+        found.addAll(foundBadMaps());
+        return List.copyOf(found);
     }
 
     /** What the Mechanic left of the stop {@code stopId} in the latest run; empty before it tried. */
@@ -585,7 +627,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
         return OptionalLong.empty();
     }
 
-    /** The stop {@code stopId} as the latest run last stopped on it, or a found fault; empty for neither. */
+    /** The stop {@code stopId} as the latest run last stopped on it, or one {@linkplain #found() found}; else empty. */
     public Optional<Stop> stopOf(String stopId) {
         for (int i = events.size() - 1; i >= 0; i--) {
             if (events.get(i) instanceof ExploreEvent.Stopped(Stop stop, boolean again, long at)
@@ -593,7 +635,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 return Optional.of(stop);
             }
         }
-        return foundFaults().stream().filter(f -> f.id().equals(stopId)).findFirst();
+        return found().stream().filter(f -> f.id().equals(stopId)).findFirst();
     }
 
     /** Whether the latest run has a crew: only a run given a goal does (the Coordinator and its workers). */
@@ -656,6 +698,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
             case ExploreEvent.Leased e -> Agent.COORDINATOR;
             case ExploreEvent.Released e -> Agent.COORDINATOR;
             case ExploreEvent.Finding e -> Agent.EVALUATOR;
+            case ExploreEvent.MapFlagged e -> Agent.EVALUATOR;
             case ExploreEvent.Summary e -> Agent.EVALUATOR;
             case ExploreEvent.Branched e -> Agent.MECHANIC;
             case ExploreEvent.Ranked e -> Agent.READER;
@@ -680,6 +723,18 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     /** The latest frame a record of the run's names; {@code ""} for none. */
     private String lastFrame() {
         return latest(e -> !frameOf(e).isBlank()).map(JournalView::frameOf).orElse("");
+    }
+
+    /**
+     * The latest frame the run saved of {@code screen} (a stop on it or its page's shot), case aside; {@code ""} for
+     * none. Never another screen's: a wrong map is redrawn on its own screen or not cut from at all.
+     */
+    public String lastFrameOf(String screen) {
+        return latest(e -> !frameOf(e).isBlank() && switch (e) {
+            case ExploreEvent.Stopped s -> screen.equalsIgnoreCase(s.stop().screen());
+            case ExploreEvent.Pictured p -> screen.equalsIgnoreCase(p.screen());
+            default -> false;
+        }).map(JournalView::frameOf).orElse("");
     }
 
     /**

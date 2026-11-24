@@ -44,6 +44,7 @@ public sealed interface ExploreEvent {
             case Released ignored -> "released";
             case Heartbeat ignored -> "heartbeat";
             case Finding ignored -> "finding";
+            case MapFlagged ignored -> "map_flagged";
             case Witnessed ignored -> "witnessed";
             case Ranked ignored -> "ranked";
             case EditQueued ignored -> "edit_queued";
@@ -80,6 +81,7 @@ public sealed interface ExploreEvent {
             case "released" -> Released.class;
             case "heartbeat" -> Heartbeat.class;
             case "finding" -> Finding.class;
+            case "map_flagged" -> MapFlagged.class;
             case "witnessed" -> Witnessed.class;
             case "ranked" -> Ranked.class;
             case "edit_queued" -> EditQueued.class;
@@ -280,6 +282,19 @@ public sealed interface ExploreEvent {
             kind = kind == null ? FindingKind.UNKNOWN : kind;
             evidence = evidence == null ? "" : evidence;
             why = why == null ? "" : why;
+        }
+    }
+
+    /**
+     * The Evaluator found the map wrong about {@code screen} ({@link FindingKind#BAD_MAP}), {@code why} in plain words,
+     * judged on {@code frame} (the frame it saw last; blank for none). Written right after its {@link Finding}; it is
+     * the Reader's stop to redraw that screen's marks ({@link JournalView#foundBadMaps()}).
+     */
+    record MapFlagged(String screen, String why, String frame, long at) implements ExploreEvent {
+        public MapFlagged {
+            screen = screen == null ? "" : screen;
+            why = why == null ? "" : why;
+            frame = frame == null ? "" : frame;
         }
     }
 

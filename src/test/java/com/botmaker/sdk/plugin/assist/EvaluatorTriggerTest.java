@@ -224,6 +224,42 @@ class EvaluatorTriggerTest {
         assertEquals(FindingKind.DRIFT, JournalView.of(journal).findings().getLast().kind());
     }
 
+    /** Device drive 2026-11-24, F3: a wrong map is the Reader's stop, on the frame the Evaluator judged. */
+    @Test
+    void aBadMapIsTheReadersStopOnTheFrameJudged() {
+        Journal journal = journal();
+        journal.append(new ExploreEvent.Pictured("HOME", "frames/7.png", Map.of(), 2));
+        journal.append(new ExploreEvent.Leased(EvaluatorTrigger.idOf(1), StopRole.EVALUATOR, 1, Long.MAX_VALUE, 3));
+
+        AgentReply reply = ExploreTools.recordFinding(journal, "bad_map", "PRIVATE_DNS shows on a sub-page", "", "HOME");
+
+        assertFalse(reply.isRefused(), text(reply));
+        Stop flagged = JournalView.of(journal).foundBadMaps().getFirst();
+        assertEquals("bad_map-1", flagged.id());
+        assertEquals(StopKind.BAD_MAP, flagged.kind());
+        assertEquals(StopRole.CARTOGRAPHER, flagged.role());
+        assertEquals("HOME", flagged.screen());
+        assertEquals("frames/7.png", flagged.framePath());
+        assertEquals("PRIVATE_DNS shows on a sub-page", flagged.missing());
+        assertEquals(Optional.of(flagged), JournalView.of(journal).stopOf("bad_map-1"), "the edit writer finds it");
+        assertTrue(ExploreTools.recordFinding(journal, "bad_map", "x", "", " ").isRefused(),
+                "a bad_map names its screen");
+
+        journal.append(new ExploreEvent.Pictured("WIFI", "frames/8.png", Map.of(), 4));
+        assertFalse(ExploreTools.recordFinding(journal, "bad_map", "two screens", "", "ACCOUNTS").isRefused());
+        assertEquals("", JournalView.of(journal).foundBadMaps().getLast().framePath(),
+                "never another screen's frame: the run saved none of ACCOUNTS");
+
+        journal.append(new ExploreEvent.Released("bad_map-1", 1, true, "", 5));
+        assertEquals(List.of("two screens"), JournalView.of(journal).unresolved().stream()
+                .map(ExploreEvent.Finding::why).toList(), "a redrawn map is resolved");
+
+        journal.append(new ExploreEvent.Ended(ExploreLoop.End.BUDGET, 6));
+        assertFalse(ExploreTools.recordFinding(journal, "bad_map", "late", "HOME", "").isRefused(),
+                "the end's grading needs no screen");
+        assertEquals(2, JournalView.of(journal).foundBadMaps().size(), "nobody redraws after the end");
+    }
+
     @Test
     void aFindingIsRefusedUnlessSaidWhole() {
         Journal journal = journal();

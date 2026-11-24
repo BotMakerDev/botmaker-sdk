@@ -146,6 +146,20 @@ class ReaderToolsTest {
     }
 
     @Test
+    void aWrongMapAsksTheReaderToRedrawItsMarksAndResumeNothing() {
+        Stop flagged = new Stop("bad_map-1", StopKind.BAD_MAP, "HOME", "HOME", "frames/7.png", List.of(), List.of(),
+                Map.of(), List.of(), "PRIVATE_DNS shows on a sub-page", 3);
+
+        String prompt = WorkerRunner.prompt(WorkerRole.READER, flagged, "sign in to Google");
+
+        assertTrue(prompt.contains("wrong about the screen HOME (stop bad_map-1): PRIVATE_DNS shows on a sub-page"),
+                prompt);
+        assertTrue(prompt.contains("remove_marker") && prompt.contains("Never rename or delete a screen"), prompt);
+        assertTrue(prompt.contains("never\ncall `explore` action `resume`"), prompt);
+        assertTrue(!Pattern.compile("\\{[a-z]+}").matcher(prompt).find(), "every slot is filled: " + prompt);
+    }
+
+    @Test
     void onlyARunGivenAGoalGetsTheCrew() {
         AgentClient signedIn = new AgentClient() {
             @Override

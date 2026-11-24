@@ -11,7 +11,8 @@ a newer run may begin meanwhile.
    - `drift`, with the `screen` the run is lost under: its presses there are ranked lower, and the run goes on;
    - `stuck`: the run goes round in circles and nothing it may press can reach the goal. The run ends on it, so say
      it only when sure;
-   - `bad_map`: a screen of the map is wrong (two screens as one, a screen named for what it is not);
+   - `bad_map`, with the `screen` of the map that is wrong (two screens as one, a screen named for what it is not, a
+     marker another screen shows too): the Reader redraws its marks, and the run goes on;
    - `sdk_fault`: the run itself misbehaves (a press that never lands, a screen it fails to tell).
    When the run is on its way, record nothing.
 3. When the frame the run is on shows the goal reached, `explore` action `propose_done`, with the `mark` that shows

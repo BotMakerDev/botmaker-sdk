@@ -76,6 +76,44 @@ class CoordinatorTest {
                 leasesAndMore(coordinator(CARTOGRAPHERS).step(JournalView.of(journal), 50, false)));
     }
 
+    /** Device drive 2026-11-24, F3: a wrong map is leased to the Reader once, beside the run, and never parked. */
+    @Test
+    void aWrongMapIsLeasedToTheReaderOnce(@TempDir Path folder) {
+        Journal journal = new Journal(folder);
+        journal.append(new ExploreEvent.Began(false, "sign in", 1));
+        journal.append(new ExploreEvent.MapFlagged("HOME", "its marker shows on a sub-page", "frames/7.png", 2));
+        Coordinator coordinator = coordinator(CARTOGRAPHERS);
+
+        assertEquals(List.of(new Coordinator.Action.Lease("bad_map-1", StopRole.CARTOGRAPHER, 1, 150)),
+                leasesAndMore(coordinator.step(JournalView.of(journal), 50, false)));
+        journal.append(new ExploreEvent.Leased("bad_map-1", StopRole.CARTOGRAPHER, 1, 150, 50));
+        journal.append(new ExploreEvent.Released("bad_map-1", 1, false, "exit 1", 60));
+
+        assertEquals(List.of(), leasesAndMore(coordinator.step(JournalView.of(journal), 70, false)),
+                "one try, and no park: the run never stopped on it");
+    }
+
+    @Test
+    void aSecondFlagOfAScreenWhileOneIsOpenAddsNone(@TempDir Path folder) {
+        Journal journal = new Journal(folder);
+        journal.append(new ExploreEvent.Began(false, "sign in", 1));
+        journal.append(new ExploreEvent.MapFlagged("HOME", "first", "", 2));
+        journal.append(new ExploreEvent.MapFlagged("HOME", "again", "", 3));
+        journal.append(new ExploreEvent.MapFlagged("WIFI", "other", "", 4));
+
+        assertEquals(List.of("bad_map-1 HOME first", "bad_map-2 WIFI other"), said(JournalView.of(journal)));
+
+        journal.append(new ExploreEvent.Released("bad_map-1", 1, true, "", 5));
+        journal.append(new ExploreEvent.MapFlagged("HOME", "still", "", 6));
+
+        assertEquals(List.of("bad_map-1 HOME first", "bad_map-2 WIFI other", "bad_map-3 HOME still"),
+                said(JournalView.of(journal)), "one said after the try is a new stop; the ids never move");
+    }
+
+    private static List<String> said(JournalView view) {
+        return view.foundBadMaps().stream().map(s -> s.id() + " " + s.screen() + " " + s.missing()).toList();
+    }
+
     /** Audit S2: a role with nobody to take its stops parks them at once, and the run goes on to what code can do. */
     @Test
     void anAbsentRoleParksItsOpenStopAtOnce(@TempDir Path folder) {

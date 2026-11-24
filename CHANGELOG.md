@@ -21,6 +21,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- A wrong map goes back to the explore crew's Reader (plan `2026-11-24-explore-drive-fixes` phase 2): the Evaluator's
+  `record_finding` `bad_map` names its `screen` while the run goes on and is journalled as `map_flagged` with the
+  latest frame the run saved of that screen (none rather than another screen's), which becomes the Reader's stop
+  `bad_map-N` (kind *Map is wrong*) beside the run, tried once and never parked; a second one for the same screen
+  while the first waits adds none, and one the Reader redrew is no longer unresolved. The end's grading takes a
+  `bad_map` without a screen and starts no Reader. The Reader's prompt for it redraws the screen's marks on
+  that frame (cut a marker, `add_marker`, then `remove_marker` or `remove_text` of the wrong one), never renames or
+  deletes a screen, and resumes nothing.
 - The explore crew's Reader cuts pictures (plan `2026-11-24-explore-drive-fixes` phase 1): `explore`'s `apply_edit`
   takes `tool` `crop_pictures` beside `edit_map`, and the run's one writer carries every edit out on the stop's own
   saved frame, so a cut's box and an added text's box are that frame's pixels, never the live screen's, and the
