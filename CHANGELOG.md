@@ -21,8 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
-- The Emulators window's Show opens a scrcpy window scaled to fit the desktop for an instance with no window of its
-  own (Waydroid in its private gamescope), when scrcpy is installed; the instance keeps its size.
+- The Emulators window's Show opens a scrcpy window scaled to fit the desktop for Waydroid, which has no window of its
+  own in its private gamescope, when scrcpy is installed: audio off, `adb connect` first, the instance keeps its size,
+  and a scrcpy that stops at once says why. Studio's own "live screen" window no longer counts as the instance's.
 
 ### Removed
 

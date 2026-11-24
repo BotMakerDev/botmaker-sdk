@@ -57,6 +57,8 @@ import java.util.concurrent.TimeUnit;
  */
 final class LiveScreenDialog {
 
+    /** What follows the instance's name in the title of this window: Show must not take it for the instance's own. */
+    static final String TITLE_SUFFIX = " — live screen";
     private static final Map<InstanceKey, LiveScreenDialog> OPEN = new ConcurrentHashMap<>();
     private static final int KEY_BACK = 4;
     private static final int KEY_ENTER = 66;
@@ -227,7 +229,7 @@ final class LiveScreenDialog {
         Rectangle2D visual = visualBounds(window.stage());
         LiveScreenLayout.Size opening = LiveScreenLayout.window(GUESS_W, GUESS_H, CHROME_W, CHROME_H,
                 visual.getWidth(), visual.getHeight(), MIN_W, MIN_H);
-        stage = Modals.window(window.services(), window.stage(), Modals.Frame.modeless(instance.name() + " — live screen",
+        stage = Modals.window(window.services(), window.stage(), Modals.Frame.modeless(instance.name() + TITLE_SUFFIX,
                 opening.width(), opening.height(), MIN_W, MIN_H), root);
         stage.setOnShown(e -> {
             // a size remembered from the last time this window closed is the user's: the first frame keeps it

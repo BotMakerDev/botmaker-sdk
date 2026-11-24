@@ -12,6 +12,7 @@ import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.emulator.AdbDevice;
+import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.checks.WindowsEmulatorChecks;
 import com.botmaker.shared.emulator.config.InstanceKey;
@@ -270,8 +271,8 @@ final class RunningTab {
             try {
                 NativeController controller = NativeControllerFactory.get();
                 List<GenericWindow> windows = controller.getAllWindows();
-                Optional<String> title = RunningModel.windowTitle(name,
-                        windows.stream().map(GenericWindow::getTitle).toList());
+                Optional<String> title = RunningModel.windowTitle(name, windows.stream().map(GenericWindow::getTitle)
+                        .filter(t -> t == null || !t.endsWith(LiveScreenDialog.TITLE_SUFFIX)).toList());
                 if (title.isEmpty()) {
                     // A headless instance (Waydroid in its private gamescope) has no window of its own to raise.
                     Optional<String> mirrored = mirror(row);
@@ -302,10 +303,12 @@ final class RunningTab {
         // A live mirror's window is titled with the instance's name, so Show found and raised it before this.
         if (running != null && running.isAlive()) return Optional.of("");
         try {
+            connectAdb(row.instance().endpoint());
             File log = File.createTempFile("scrcpy-", ".log");
             log.deleteOnExit();
             Process started = new ProcessBuilder(scrcpy.get().getPath(), "-s", row.instance().endpoint(),
-                    "--max-size", String.valueOf(MIRROR_MAX_SIZE), "--window-title", row.instance().name())
+                    "--max-size", String.valueOf(MIRROR_MAX_SIZE), "--no-audio", "--window-title",
+                    row.instance().name())
                     .redirectErrorStream(true).redirectOutput(log).start();
             mirrors.put(key, started);
             // One that dies at once (an adb it cannot reach, no display) says why instead of showing nothing.
@@ -332,11 +335,27 @@ final class RunningTab {
         });
     }
 
-    /** The last line of {@code log}, or a dash when it cannot be read or is empty. */
+    /**
+     * Tells the system adb server about a network instance (a no-op when it knows it already), which scrcpy talks
+     * to; a restarted instance is forgotten by it. Best effort: scrcpy says on its own when it still cannot reach it.
+     */
+    private static void connectAdb(String endpoint) throws InterruptedException {
+        Optional<File> adb = AdbTools.binary();
+        if (adb.isEmpty() || !endpoint.contains(":")) return;
+        try {
+            new ProcessBuilder(adb.get().getPath(), "connect", endpoint).redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start().waitFor(5, TimeUnit.SECONDS);
+        } catch (IOException ignored) {
+            // no adb to ask: scrcpy brings its own
+        }
+    }
+
+    /** The last {@code ERROR} line of {@code log}, else its last line, or a dash when it cannot be read or is empty. */
     private static String lastLine(File log) {
         try {
             List<String> lines = Files.readAllLines(log.toPath());
-            return lines.isEmpty() ? "–" : lines.getLast();
+            return lines.stream().filter(line -> line.contains("ERROR")).reduce((first, last) -> last)
+                    .orElse(lines.isEmpty() ? "–" : lines.getLast());
         } catch (IOException | RuntimeException unreadable) {
             return "–";
         }
