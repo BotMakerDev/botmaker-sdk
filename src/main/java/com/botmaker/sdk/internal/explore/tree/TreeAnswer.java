@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Field;
 import com.botmaker.sdk.internal.screens.ElementMatch;
+import com.botmaker.sdk.internal.screens.ScreenClassNames;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
@@ -206,7 +207,7 @@ public sealed interface TreeAnswer {
         Overlay overlay = Overlay.of(tree);
         boolean page = route != null && overlay.none();
         String said = !overlay.name().isEmpty() ? overlay.name() : page ? lastSegment(route)
-                : firstHeading(tree).orElseGet(() -> route == null ? "Screen" : lastSegment(route));
+                : firstHeading(tree).orElseGet(() -> route == null ? "Page" : lastSegment(route));
         List<Locator> markers = page ? List.of() : markers(tree, overlay);
         boolean anyPage = !overlay.none() && !markers.isEmpty();
         // A part that scrolls holds elements the tree does not show yet: the screen is all cut once it is scrolled.
@@ -239,6 +240,25 @@ public sealed interface TreeAnswer {
                     picture.apply(field, located)));
         }
         return List.copyOf(inputs);
+    }
+
+    /**
+     * The inputs of {@code screen}, a screen the map holds, that its tree shows and none of its {@code elements} (its
+     * mapped inputs, by field) finds: a screen written before its inputs were all read, or one a page grew since.
+     * Each is named after its locator, never one of the screen's own fields, and checked by {@code refusal}. Empty when
+     * every input of the tree is mapped.
+     */
+    public static List<NewInput> missingInputs(String screen, UiTree tree, Map<String, Element> elements,
+                                               Function<Locator.Located, Optional<String>> refusal,
+                                               BiFunction<String, Locator.Located, String> picture) {
+        ElementMatch.Matcher matcher = ElementMatch.in(tree);
+        Set<UiNode> mapped = new HashSet<>();
+        elements.values().forEach(element -> mapped.addAll(matcher.matches(element)));
+        Set<Locator> known = new HashSet<>();
+        for (Locator.Located located : Locator.inputs(tree)) {
+            if (mapped.contains(located.node())) known.add(located.locator());
+        }
+        return inputs(screen, tree, known, elements.keySet(), refusal, picture);
     }
 
     /**
@@ -344,23 +364,14 @@ public sealed interface TreeAnswer {
 
     /** A screen's class name: {@code Screen} after one a bot's code would mistake for {@code java.lang}'s. */
     static String className(String said) {
-        String name = upperCamel(said);
-        return javaLang(name) ? name + "Screen" : name;
+        // One rule for every screen name, an untitled page's included (ScreenClassNames).
+        return ScreenClassNames.className(upperCamel(said));
     }
 
     /** An input's field name: {@code Input} after a Java keyword ({@code new}, {@code default}). */
     static String fieldName(String said) {
         String name = lowerCamel(said);
         return SourceVersion.isKeyword(name) ? name + "Input" : name;
-    }
-
-    private static boolean javaLang(String name) {
-        try {
-            Class.forName("java.lang." + name, false, TreeAnswer.class.getClassLoader());
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
     }
 
     /**

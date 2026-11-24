@@ -17,6 +17,19 @@ bullets per version, and it is read by two things besides you:
 Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from this file predate it; see
 `ROADMAP.md` for those.
 
+## [Unreleased]
+
+### Fixed
+
+- A screen is never given the name of the class it extends, by any way it is named. A screen called *Screen* is
+  `Page` (constant `PAGE`), and a name the `Screens` file imports or `java.lang` holds (`Mark`, `Object`) keeps a
+  `Screen` suffix (`ScreenClassNames`); before, only Discover's naming of an untitled page knew it, and Claude's
+  *new screen* and *rename* wrote `Screen extends Screen`, which does not compile.
+- Keep exploring writes the inputs a known screen's tree shows and no mapped input finds, with the guard's verdict, the
+  first time the run reaches it; before, a screen the map held with few or no inputs counted as done and the rest of
+  the page was never mapped. A run that has nothing to press on a screen says why once, with each input's status, and
+  a screen that did not change between two looks is not read by OCR again.
+
 ## [1.12.2] — 2026-11-24
 
 ### Added

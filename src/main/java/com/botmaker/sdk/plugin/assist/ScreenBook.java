@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MarkParts;
+import com.botmaker.sdk.internal.screens.ScreenClassNames;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.internal.bot.ConstantNames;
@@ -62,7 +63,8 @@ final class ScreenBook {
 
     /** As {@link #constantFor(ScreenGraph, String)}, {@code own} counted free: the constant of the screen renamed. */
     static String constantFor(ScreenGraph graph, String name, String own) {
-        String base = Optional.ofNullable(ConstantNames.constantFor(name)).orElse("SCREEN");
+        // Its class may never be the one it extends: a screen called "Screen" is PAGE, not SCREEN (ScreenClassNames).
+        String base = ScreenClassNames.constant(Optional.ofNullable(ConstantNames.constantFor(name)).orElse("SCREEN"));
         String constant = base;
         for (int n = 2; !constant.equals(own) && graph.screens().containsKey(constant); n++) constant = base + "_" + n;
         return constant;
