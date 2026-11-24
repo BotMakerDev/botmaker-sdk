@@ -6,6 +6,7 @@ package com.botmaker.sdk.internal.explore;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -203,6 +204,48 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
     public Optional<ExploreEvent.Faulted> fault(String stopId) {
         return events.stream().filter(ExploreEvent.Faulted.class::isInstance).map(ExploreEvent.Faulted.class::cast)
                 .filter(f -> f.stopId().equals(stopId)).reduce((first, last) -> last);
+    }
+
+    /**
+     * The latest run's unreleased lease of {@code stopId}: its last {@link ExploreEvent.Leased}, unless a release of
+     * that same attempt follows it. A lease past its time is still returned: {@link ExploreEvent.Leased#expired} says
+     * so, and the Coordinator takes it back.
+     */
+    public Optional<ExploreEvent.Leased> leaseOf(String stopId) {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Leased leased && leased.stopId().equals(stopId)) {
+                boolean released = events.subList(i + 1, events.size()).stream().anyMatch(e ->
+                        e instanceof ExploreEvent.Released r && r.stopId().equals(stopId)
+                                && r.attempt() == leased.attempt());
+                return released ? Optional.empty() : Optional.of(leased);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** How many times the latest run tried {@code stopId}: its highest leased attempt, 0 when never leased. */
+    public int attempts(String stopId) {
+        return events.stream().filter(e -> e instanceof ExploreEvent.Leased leased && leased.stopId().equals(stopId))
+                .mapToInt(e -> ((ExploreEvent.Leased) e).attempt()).max().orElse(0);
+    }
+
+    /** The latest run's findings, oldest first. */
+    public List<ExploreEvent.Finding> findings() {
+        return events.stream().filter(ExploreEvent.Finding.class::isInstance).map(ExploreEvent.Finding.class::cast)
+                .toList();
+    }
+
+    /** When the Coordinator last said it was alive in the latest run; empty when it never did. */
+    public Optional<Instant> lastHeartbeat() {
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof ExploreEvent.Heartbeat beat) return Optional.of(Instant.ofEpochMilli(beat.at()));
+        }
+        return Optional.empty();
+    }
+
+    /** Whether the edit {@code editId} reached the bot in the latest run. */
+    public boolean applied(String editId) {
+        return events.stream().anyMatch(e -> e instanceof ExploreEvent.EditApplied edit && edit.editId().equals(editId));
     }
 
     /**

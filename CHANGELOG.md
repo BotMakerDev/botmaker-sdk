@@ -19,6 +19,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+### Added
+
+- An explore run's journal holds the explore crew's records (spec `2026-11-24-explore-agents-design`): a stop leased to
+  a role and released, the Coordinator's heartbeat, a finding (drift, stuck, wrong map, SDK fault, done without a
+  witness), the goal reached with what checked it, a press ranked toward the goal and tagged safe, risky or
+  destructive, and an edit applied, so none is applied twice; and *Unreachable within the caps*, an end of a run toward
+  a goal. The Explore tab's feed lists leases taken back, findings and the goal reached. Nothing writes them yet: the
+  crew's Coordinator and goal runs come next.
+
 ### Fixed
 
 - Keep exploring no longer stops on a package under the app's own: `com.android.settings.intelligence`, the Settings

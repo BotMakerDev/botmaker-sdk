@@ -125,6 +125,11 @@ public final class ExploreLoop {
          * with nothing it could press (2026-11-20).
          */
         STUCK("stuck", "Stuck: nothing could be pressed"),
+        /**
+         * Its goal cannot be reached within its caps: nothing is left to press within the depth cap and nothing waits
+         * on the user (2026-11-24, spec 2026-11-24-explore-agents-design).
+         */
+        UNREACHABLE("unreachable", "Unreachable within the caps"),
         /** It threw: the bot crashed, or the run was stopped from Studio. Only the journal says it. */
         BROKE("broke", "Crashed or stopped from Studio"),
         /** An end this SDK does not know, read from a journal a newer one wrote. */

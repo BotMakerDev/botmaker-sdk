@@ -554,6 +554,15 @@ final class ExploreView {
             case ExploreEvent.Faulted e -> "🛠 " + e.stopId() + " Discover fault: " + e.why();
             case ExploreEvent.ReplayLost e -> "⚠ " + e.faultId() + " not replayed: " + e.why();
             case ExploreEvent.Restarted e -> "↻ Restarted on the rebuilt SDK, replaying " + e.faultId();
+            case ExploreEvent.Leased e -> "⇢ " + e.stopId() + " to " + e.role().displayName()
+                    + (e.attempt() > 1 ? " (try " + e.attempt() + ")" : "");
+            case ExploreEvent.Released e -> e.ok() ? null : "↺ " + e.stopId() + " taken back: " + e.why();
+            case ExploreEvent.Heartbeat e -> null;
+            case ExploreEvent.Finding e -> "⚑ " + e.kind().displayName() + ": " + e.why();
+            case ExploreEvent.Witnessed e -> "🎯 Goal reached: " + e.goal() + " (" + e.check().displayName()
+                    + (e.mark().isBlank() ? "" : ": " + e.mark()) + ")";
+            case ExploreEvent.Ranked e -> null;
+            case ExploreEvent.EditApplied e -> null;
             case ExploreEvent.Reloaded e -> e.refused()
                     ? "⏸ " + e.stopId() + (e.errors().getFirst().equals(ExploreLoop.FAULT_RESUMES)
                     ? ": resume refused, " : ": the bot did not compile, ") + e.errors().getFirst()

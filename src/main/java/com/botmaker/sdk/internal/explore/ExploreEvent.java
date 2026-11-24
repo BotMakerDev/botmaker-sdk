@@ -40,6 +40,13 @@ public sealed interface ExploreEvent {
             case Built ignored -> "built";
             case Building ignored -> "building";
             case SetAside ignored -> "set_aside";
+            case Leased ignored -> "leased";
+            case Released ignored -> "released";
+            case Heartbeat ignored -> "heartbeat";
+            case Finding ignored -> "finding";
+            case Witnessed ignored -> "witnessed";
+            case Ranked ignored -> "ranked";
+            case EditApplied ignored -> "edit_applied";
         };
     }
 
@@ -66,6 +73,13 @@ public sealed interface ExploreEvent {
             case "built" -> Built.class;
             case "building" -> Building.class;
             case "set_aside" -> SetAside.class;
+            case "leased" -> Leased.class;
+            case "released" -> Released.class;
+            case "heartbeat" -> Heartbeat.class;
+            case "finding" -> Finding.class;
+            case "witnessed" -> Witnessed.class;
+            case "ranked" -> Ranked.class;
+            case "edit_applied" -> EditApplied.class;
             default -> null;
         };
     }
@@ -208,4 +222,76 @@ public sealed interface ExploreEvent {
             return !errors.isEmpty();
         }
     }
+
+    // The explore crew's records (spec 2026-11-24-explore-agents-design): the Coordinator's task queue is this journal.
+
+    /**
+     * The Coordinator handed the stop {@code stopId} to {@code role}'s worker, its {@code attempt}th try (from 1), until
+     * {@code expiresAt} (epoch milliseconds): a lease not {@link Released} by then is taken back and the stop queued again.
+     */
+    record Leased(String stopId, StopRole role, int attempt, long expiresAt, long at) implements ExploreEvent {
+        public Leased {
+            role = role == null ? StopRole.UNKNOWN : role;
+        }
+
+        /** Whether the lease ran out by {@code nowMs}: its worker is to be taken back, released or not. */
+        public boolean expired(long nowMs) {
+            return expiresAt <= nowMs;
+        }
+    }
+
+    /**
+     * The lease of {@code stopId}'s {@code attempt}th try ended: {@code ok} when its worker finished, else {@code why} it
+     * was taken back. A worker of an earlier try finishing late closes its own lease only, never a newer one.
+     */
+    record Released(String stopId, int attempt, boolean ok, String why, long at) implements ExploreEvent {
+        public Released {
+            why = why == null ? "" : why;
+        }
+    }
+
+    /**
+     * The Coordinator is alive, and a run whose last is too old has nobody coordinating it. Written at most every few
+     * seconds, not each round, so a long run's journal does not grow by one line a round.
+     */
+    record Heartbeat(long at) implements ExploreEvent {}
+
+    /**
+     * Something wrong with the run, said by the Evaluator or the Coordinator: {@code evidence} names what shows it
+     * (frame ids, the press, journal lines), {@code why} in plain words. Nobody edits code from one but the Mechanic.
+     */
+    record Finding(FindingKind kind, String evidence, String why, long at) implements ExploreEvent {
+        public Finding {
+            kind = kind == null ? FindingKind.UNKNOWN : kind;
+            evidence = evidence == null ? "" : evidence;
+            why = why == null ? "" : why;
+        }
+    }
+
+    /**
+     * The run's goal was reached on {@code frame}, and code checked it there by {@code check} against {@code mark} (the
+     * screen's name, the picture's or the text itself). Not {@link GoalMet}, which is a goal of the bot's plan.
+     */
+    record Witnessed(String goal, String frame, WitnessCheck check, String mark, long at) implements ExploreEvent {
+        public Witnessed {
+            goal = goal == null ? "" : goal;
+            frame = frame == null ? "" : frame;
+            check = check == null ? WitnessCheck.UNKNOWN : check;
+            mark = mark == null ? "" : mark;
+        }
+    }
+
+    /**
+     * The Reader ranked the press {@code press} of {@code screen} by how likely it leads to the goal ({@code rank}, higher
+     * first) and tagged how dangerous it is. A line with no tag reads as {@link PressTag#UNKNOWN}: never pressed
+     * unattended.
+     */
+    record Ranked(String screen, String press, int rank, PressTag tag, long at) implements ExploreEvent {
+        public Ranked {
+            tag = tag == null ? PressTag.UNKNOWN : tag;
+        }
+    }
+
+    /** The edit {@code editId} reached the bot: one applied again after a restart is skipped. */
+    record EditApplied(String editId, long at) implements ExploreEvent {}
 }
