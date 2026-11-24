@@ -87,6 +87,7 @@ final class ExploreEntry {
                 start.settled(), pending);
         Say.info(switch (end) {
             case BUDGET -> name + " ended: its budget is spent.";
+            case DONE -> name + " ended: the map is complete, nothing is left to press.";
             case STUCK -> name + " ended: another window stayed in front of the game, nothing could be pressed.";
             default -> name + " ended.";
         });

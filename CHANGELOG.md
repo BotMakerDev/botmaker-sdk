@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Keep exploring no longer idles when nothing is left to press: after a few rounds with nothing pressable, a run whose
+  map is built ends (*Done: nothing left to try*), and one with a screen still open stops at once on it, naming what is
+  open, instead of sitting silent for 15 minutes. A way waiting for its condition still waits.
 - A screen is never given the name of the class it extends, by any way it is named. A screen called *Screen* is
   `Page` (constant `PAGE`), and a name the `Screens` file imports or `java.lang` holds (`Mark`, `Object`) keeps a
   `Screen` suffix (`ScreenClassNames`); before, only Discover's naming of an untitled page knew it, and Claude's

@@ -965,7 +965,7 @@ class ExploreLoopTest {
     void newScreenIsAnEventNotAStop() {
         Game game = new Game();
 
-        assertEquals(ExploreLoop.End.BUDGET, loop(map(), game, same(map()), Duration.ofMinutes(5)).run());
+        assertEquals(ExploreLoop.End.DONE, loop(map(), game, same(map()), Duration.ofMinutes(5)).run());
 
         List<ExploreEvent.NewScreen> found = events(ExploreEvent.NewScreen.class);
         assertEquals(List.of("A", "B", "D"), found.stream().map(ExploreEvent.NewScreen::screen).toList());
@@ -1094,6 +1094,33 @@ class ExploreLoopTest {
         assertTrue(game.nowMs < Duration.ofMinutes(20).toMillis(), "ended at the stuck time: " + game.nowMs);
         assertTrue(game.taken.isEmpty(), game.taken.toString());
         assertTrue(events(ExploreEvent.Parked.class).isEmpty());
+    }
+
+    /** A run whose map is built and has nothing left to press ends by itself, not after the stuck time (2026-11-24). */
+    @Test
+    void aMapWithNothingLeftEndsDoneAtOnce() {
+        Game game = new Game();
+
+        ExploreLoop.End end = loop(map(), game, same(map()), Duration.ofMinutes(60)).run();
+
+        assertEquals(ExploreLoop.End.DONE, end);
+        assertTrue(game.nowMs < Duration.ofMinutes(2).toMillis(), "ended at once, not at the stuck time: " + game.nowMs);
+        assertEquals(ExploreLoop.End.DONE, events(ExploreEvent.Ended.class).getLast().end());
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.STUCK), stops().toString());
+    }
+
+    /** What is still open while nothing can be pressed is said in a stop at once, not after the stuck time. */
+    @Test
+    void aRunWithAScreenStillOpenStopsAtOnceNamingIt() {
+        Game game = new Game();
+        game.arrival = edge -> edge.to().equals("B") ? new Took(Arrival.ELSEWHERE, "D") : new Took(Arrival.AT_TARGET, edge.to());
+
+        loop(map(), game, same(map()), Duration.ofMinutes(90)).run();
+
+        Stop stuck = stops().stream().map(ExploreEvent.Stopped::stop).filter(s -> s.kind() == StopKind.STUCK)
+                .findFirst().orElseThrow();
+        assertTrue(stuck.missing().contains("still open"), stuck.missing());
+        assertTrue(stuck.at() < Duration.ofMinutes(12).toMillis(), "raised at once: " + stuck.at());
     }
 
     /** The start-of-run batch of inputs with no verdict parks like any stop nobody answers. */
@@ -1415,8 +1442,12 @@ class ExploreLoopTest {
         game.dev = true;
         Optional<ResumeFile> pending = ResumeFile.pending(journal(), why -> {});
         ExploreBudget budget = ResumeFile.budgetOf(ExploreBudget.NONE, pending);
+        // A way behind a fact that says no keeps the run waiting (a built map would end it done), so its budget ends it.
+        Gold gold = new Gold();
+        gold.read = 0;
+        ScreenGraph waiting = mapBehind(gold);
 
-        ExploreLoop.End end = new ExploreLoop(map(), game, same(map()), Guards.with(List.of()), journal(),
+        ExploreLoop.End end = new ExploreLoop(waiting, game, same(waiting), Guards.with(List.of()), journal(),
                 ExploreLoop.Settings.DEFAULT.within(budget.time()).upTo(budget.screens()), () -> game.nowMs)
                 .startedWith(budget, null).resuming(pending).run();
 
@@ -1709,8 +1740,9 @@ class ExploreLoopTest {
         assertTrue(journal().queue().isEmpty(), "it left the queue");
         assertEquals(2, game.taken.stream().filter("A.b→B"::equals).count(), "its place tried again");
         assertTrue(journal().events().getFirst() instanceof ExploreEvent.Began);
+        // Its place tried again and the map built: nothing is left, so it ends done, not at its budget.
         assertTrue(journal().events().getLast() instanceof ExploreEvent.Ended(ExploreLoop.End end, long at)
-                && end == ExploreLoop.End.BUDGET);
+                && end == ExploreLoop.End.DONE);
     }
 
     @Test

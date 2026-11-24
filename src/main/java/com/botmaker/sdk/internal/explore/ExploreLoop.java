@@ -116,6 +116,11 @@ public final class ExploreLoop {
         /** Its budget ({@link Settings#hours}, {@link Settings#maxScreens}) ran out. */
         BUDGET("budget", "Budget spent"),
         /**
+         * Nothing is left to press and no screen of the map is open: the map is built (2026-11-24; before, such a run
+         * idled until {@link Settings#stuckAfter}).
+         */
+        DONE("done", "Done: nothing left to try"),
+        /**
          * It waited on a stop that cannot park, another window in front of the game, for {@link Settings#stuckAfter}
          * with nothing it could press (2026-11-20).
          */
@@ -377,6 +382,15 @@ public final class ExploreLoop {
     private final Map<String, Integer> errorPages = new HashMap<>();
     private long began;
     private long lastPress;
+    /** How many rounds in a row found nothing to press since the press at {@link #idleMark}; ends the run at {@link #IDLE_ROUNDS}. */
+    private int idleRounds;
+    private long idleMark = -1;
+    /** Whether the stop for what is still open was raised in this idle spell. */
+    private boolean idleStopped;
+    /** Whether the run ended because nothing was left to try. */
+    private boolean finished;
+    /** Idle rounds that must agree before the run ends or stops on them: one read can miss a page still loading. */
+    private static final int IDLE_ROUNDS = 3;
     private int stops;
     /** The edge last pressed, by its key: where an unknown screen came from. */
     private String lastEdge;
@@ -621,7 +635,9 @@ public final class ExploreLoop {
                     stale(stopId);
                 }
             }
-            if (!round()) return spent() ? End.BUDGET : pauses.stuck() ? End.STUCK : End.STOPPED;
+            if (!round()) {
+                return spent() ? End.BUDGET : pauses.stuck() ? End.STUCK : finished ? End.DONE : End.STOPPED;
+            }
         }
     }
 
@@ -759,7 +775,11 @@ public final class ExploreLoop {
         }
         // Before anything on it is pressed: an input an older read made twice is never pressed again. Once a screen
         // per run, a run restarted on its memory included, so a merge an older build could not write is tried again.
-        if (readsTrees() && map.screen(screen).isPresent() && merged.add(screen)) notes.addAll(sameInputs(screen));
+        if (readsTrees() && map.screen(screen).isPresent() && merged.add(screen)) {
+            notes.addAll(sameInputs(screen));
+            // A screen the map holds with inputs its tree shows and no input finds is written out, never skipped.
+            notes.addAll(missingInputs(screen));
+        }
         // After the screen is said found and pictured: one with nothing to do is built once it is reached.
         clock(screen);
         // Exploring builds the map only: no value read here raises a missing fact (spec 2026-11-20, § Out of exploring).
@@ -804,7 +824,40 @@ public final class ExploreLoop {
                     + chooser.whyNoInput(screen), Map.of());
         }
         clock.doing(Spent.IDLE);
+        if (idleEnds(screen, look)) return !finished;
         play.idle(settings.poll());
+        return true;
+    }
+
+    /**
+     * Nothing is pressable on any screen, and a few rounds in a row have said so: the run is done when no screen of the
+     * map is open, else it stops at once on what is open (a role takes it) instead of idling to {@link
+     * Settings#stuckAfter}. A way waiting for its condition, or a fault being replayed, is a reason to wait: those idle
+     * as before. True when this round was spent ending or stopping.
+     */
+    private boolean idleEnds(String screen, Look look) {
+        if (idleMark != lastPress) {
+            idleMark = lastPress;
+            idleRounds = 0;
+            idleStopped = false;
+        }
+        if (++idleRounds < IDLE_ROUNDS || replay.on()) return false;
+        List<String> open = new ArrayList<>();
+        for (String each : map.screens().keySet()) {
+            if (chooser.waiting(each) > 0) return false;
+            List<String> why = open(each);
+            if (!why.isEmpty()) open.add(map.shown(each) + ": " + String.join(", ", why));
+        }
+        if (open.isEmpty()) {
+            Say.info("Map complete: nothing is left to press on any of its " + map.screens().size() + " screens.",
+                    Map.of());
+            finished = true;
+            return true;
+        }
+        if (idleStopped) return false;
+        idleStopped = true;
+        stop(StopKind.STUCK, screen, screen, look, "nothing is left the run can press itself; still open: "
+                + String.join("; ", open), false);
         return true;
     }
 
@@ -1115,6 +1168,25 @@ public final class ExploreLoop {
         // Gone from what this run presses too, before the notes are written.
         same.forEach(s -> chooser.tryOnce(screen + "." + s.field()));
         return same;
+    }
+
+    /**
+     * The inputs {@code screen}'s tree shows that no input of the map finds, as answers handed on with the next
+     * settled stop, each with the guard's verdict: a map built by hand, or before every input was read, would otherwise
+     * leave the screen "done" with its inputs never pressed.
+     */
+    private List<TreeAnswer> missingInputs(String screen) {
+        MapScreen on = map.screen(screen).orElseThrow();
+        UiTree tree = play.state().map(Effect.State::tree).orElse(null);
+        if (tree == null) return List.of();
+        Map<String, Element> elements = new LinkedHashMap<>();
+        for (Map.Entry<String, Input> input : on.inputs().entrySet()) {
+            if (input.getValue() instanceof Button button && button.element() != null) {
+                elements.put(input.getKey(), button.element());
+            }
+        }
+        return new ArrayList<>(TreeAnswer.missingInputs(screen, tree, elements, play::refusal,
+                (field, located) -> play.picture(screen + "." + field, located.node().bounds()).orElse(null)));
     }
 
     /**
