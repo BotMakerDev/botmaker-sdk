@@ -26,9 +26,15 @@ final class WindowWatch {
         return NewWindows.handles(windows);
     }
 
-    /** {@link NewWindows#ranked} with no window of the launch's own process tree. */
+    /** {@link #ranked(Set, List, LongPredicate, String)} with no game class known. */
     static List<Candidate> ranked(Set<Object> before, List<GenericWindow> now, LongPredicate launcherUi) {
-        return NewWindows.ranked(before, now, launcherUi, pid -> false);
+        return ranked(before, now, launcherUi, null);
+    }
+
+    /** {@link NewWindows#ranked} with no window of the launch's own process tree. */
+    static List<Candidate> ranked(Set<Object> before, List<GenericWindow> now, LongPredicate launcherUi,
+                                  String gameClass) {
+        return NewWindows.ranked(before, now, launcherUi, pid -> false, gameClass);
     }
 
     /** Whether two rankings offer the same windows in the same order: nothing to redraw. */

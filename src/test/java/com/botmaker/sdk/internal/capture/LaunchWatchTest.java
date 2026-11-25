@@ -19,6 +19,7 @@ import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A run's watch of its game's launch, on a desktop that plays a script. */
 class LaunchWatchTest {
@@ -164,6 +165,27 @@ class LaunchWatchTest {
                 since -> List.of(window(2, "Game - " + since.toMillis() + " fps", 1280, 8, "wine")), false);
         LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
         assertEquals("wine|" + picked.title(), picked.identity().spec());
+    }
+
+    /** Proton's window titled with its own class, then the game's name: picked as the game, never before. */
+    @Test
+    void protonsPlaceholderIsWaitedOutUnderTheGamesName() {
+        FakeDesktop desktop = new FakeDesktop(List.of(), since -> List.of(window(2,
+                since.compareTo(Duration.ofSeconds(5)) < 0 ? "steam_proton" : "Balatro", 1280, 8, "steam_proton")),
+                false);
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("steam_proton|Balatro", picked.identity().spec());
+    }
+
+    /** A generic window's new name restarts the wait: a name is saved only once it held for the whole wait. */
+    @Test
+    void aWindowThatRenamesItselfIsWaitedOnAgain() {
+        FakeDesktop desktop = new FakeDesktop(List.of(), since -> List.of(window(2,
+                since.compareTo(Duration.ofMillis(2900)) < 0 ? "Loading" : "Balatro", 1280, 8, "wine")), false);
+        assertEquals("wine|Balatro",
+                assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch()).identity().spec());
+        assertTrue(Duration.between(desktop.launchedAt, desktop.clock.now)
+                .compareTo(Duration.ofMillis(2900).plus(LaunchWatch.STABLE_FOR)) >= 0, "picked before its name settled");
     }
 
     @Test

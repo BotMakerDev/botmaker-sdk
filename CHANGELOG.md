@@ -199,6 +199,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- An automatic capture picks a PC game's own window (2026-11-25): a Steam game's `steam_app_<appid>` window ranks
+  first, in a run's watch of its launch and in ▶ Launch and pick. Proton's untitled `steam_proton` window is never
+  picked, and a window that renames itself is waited on again under its new name. Balatro's launch had picked
+  Proton's placeholder, which then read Honkai: Star Rail.
 - On an Android emulator a popup or a dialog that has the focus over the page (read from `dumpsys window`) is
   closed by Android's own Back, sent as a key event, when the map has no close button: a run left on Settings'
   search page under its open overflow menu had no way out and stopped STUCK. On a page Back is never pressed: on

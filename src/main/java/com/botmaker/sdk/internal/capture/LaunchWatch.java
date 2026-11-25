@@ -37,8 +37,9 @@ public final class LaunchWatch {
     /** How long a game asked to close is waited for before it is launched anyway. */
     static final Duration CLOSE_WAIT = Duration.ofSeconds(10);
     /**
-     * How long the recommended window must stay the same one (by handle: a title that counts frames still changes)
-     * before it is picked: a splash of its own class, up for a second or two, is replaced by the game first.
+     * How long the recommended window must stay the same one (by handle, and by game: a title that counts frames
+     * still changes, one that turns from Proton's placeholder into the game's name does not) before it is picked: a
+     * splash of its own class, up for a second or two, is replaced by the game first.
      */
     static final Duration STABLE_FOR = Duration.ofSeconds(3);
 
@@ -106,8 +107,9 @@ public final class LaunchWatch {
 
     /**
      * Closes {@code target} when it runs, launches it and waits up to {@code timeout} for the window it opens: the
-     * recommended one of {@link NewWindows#ranked}, once the same window stayed recommended for {@link #STABLE_FOR};
-     * it is saved as it is titled then.
+     * recommended one of {@link NewWindows#ranked}, a window of the class the target names first, once the same window
+     * stayed recommended for {@link #STABLE_FOR} under the same {@linkplain WindowIdentity#sameGame game}; it is saved
+     * as it is titled then.
      */
     static Result watch(LaunchSpec target, Desktop desktop, Duration timeout, Clock clock) {
         if (desktop.running()) {
@@ -120,18 +122,24 @@ public final class LaunchWatch {
         Set<Object> before = NewWindows.handles(desktop.open());
         long launched = desktop.launch();
         Instant deadline = clock.instant().plus(timeout);
+        String gameClass = NewWindows.gameClass(target);
         Set<String> seen = new LinkedHashSet<>();
         Object last = null;
+        WindowIdentity lastIdentity = null;
         Instant since = null;
         while (clock.instant().isBefore(deadline)) {
             desktop.pause(POLL);
             List<Candidate> ranked = NewWindows.ranked(before, desktop.open(), desktop::launcherUi,
-                    pid -> launched > 0 && desktop.inTree(launched, pid));
+                    pid -> launched > 0 && desktop.inTree(launched, pid), gameClass);
             for (Candidate candidate : ranked) seen.add(candidate.window().getTitle());
             Candidate best = NewWindows.recommended(ranked);
             Object handle = best == null ? null : best.window().getNativeHandle();
-            if (handle == null || !handle.equals(last)) since = clock.instant();
+            // A window that renames itself (Proton's placeholder, then the game's name) is waited on again.
+            if (handle == null || !handle.equals(last) || !best.identity().sameGame(lastIdentity)) {
+                since = clock.instant();
+            }
             last = handle;
+            lastIdentity = best == null ? null : best.identity();
             if (handle != null && !clock.instant().isBefore(since.plus(STABLE_FOR))) {
                 return new Result.Picked(best.identity(), best.window().getTitle());
             }

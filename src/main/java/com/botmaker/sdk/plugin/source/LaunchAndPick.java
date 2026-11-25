@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.capture.NewWindows;
 import com.botmaker.sdk.internal.capture.NewWindows.Candidate;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.launch.GameButton;
@@ -194,7 +195,7 @@ final class LaunchAndPick {
                 NativeController desktop = NativeControllerFactory.get();
                 Set<Object> before = WindowWatch.handles(windows(desktop));
                 QuickLaunch.launchOnDesktop(spec, services, (ok, message) -> status.setText(message), launched -> {
-                    if (launched) watch(desktop, before);
+                    if (launched) watch(desktop, before, NewWindows.gameClass(spec));
                     else failed.run();
                 });
             }
@@ -204,7 +205,7 @@ final class LaunchAndPick {
                         ? SessionHandoff.rejoin(services, BackgroundLauncher.forProject(
                         ResourceMove.resourcesRoot(services.resourcesDir()))) : null;
                 // Everything in a display of the game's own is the game's: no window was there before.
-                if (session != null) watch(session.controller(), Set.of());
+                if (session != null) watch(session.controller(), Set.of(), NewWindows.gameClass(spec));
                 else failed.run();
             });
             case VM -> QuickLaunch.launchInVm(spec, services, (ok, message) -> status.setText(message), launched -> {
@@ -218,15 +219,18 @@ final class LaunchAndPick {
         }
     }
 
-    /** Lists {@code controller}'s windows until the dialog closes or {@link #WATCH_MS} passes, showing the new ones. */
-    private void watch(NativeController controller, Set<Object> before) {
+    /**
+     * Lists {@code controller}'s windows until the dialog closes or {@link #WATCH_MS} passes, showing the new ones, a
+     * window of {@code gameClass} first ({@link NewWindows#gameClass}).
+     */
+    private void watch(NativeController controller, Set<Object> before, String gameClass) {
         watching = true;
         Thread.ofVirtual().name("launch-and-pick").start(() -> {
             long until = System.currentTimeMillis() + WATCH_MS;
             List<Candidate> shown = List.of();
             while (watching && System.currentTimeMillis() < until) {
                 List<Candidate> ranked = WindowWatch.ranked(before, windows(controller),
-                        RunningProbe::launcherUi);
+                        RunningProbe::launcherUi, gameClass);
                 if (!WindowWatch.same(shown, ranked)) {
                     shown = ranked;
                     Platform.runLater(() -> render(ranked));
