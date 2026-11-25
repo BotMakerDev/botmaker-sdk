@@ -42,6 +42,11 @@ public final class LaunchWatch {
      * splash of its own class, up for a second or two, is replaced by the game first.
      */
     static final Duration STABLE_FOR = Duration.ofSeconds(3);
+    /**
+     * How long after the launch a window of the game's class open before it may be the pick, when the launch opened
+     * none: a game {@code isRunning} missed is only refocused, but a game launched anew opens its window by then.
+     */
+    static final Duration REFOCUS_AFTER = Duration.ofSeconds(10);
 
     /** The desktop as the watch sees it; the host's is {@link #host}. */
     interface Desktop {
@@ -67,7 +72,8 @@ public final class LaunchWatch {
      * that runs and could not be closed, whose window would never be a new one.
      */
     sealed interface Result {
-        record Picked(WindowIdentity identity, String title) implements Result {}
+        /** {@code refocused}: no window opened, and the game's own, open before the launch, is the one picked. */
+        record Picked(WindowIdentity identity, String title, boolean refocused) implements Result {}
 
         record NoWindow(List<String> seen) implements Result {}
 
@@ -93,7 +99,8 @@ public final class LaunchWatch {
                 Source.set(watch.around(window));
                 AutoPicks.run().save(target, picked.identity())
                         .ifPresent(refused -> Say.warn("the window is not kept for the next runs: " + refused));
-                Say.info("capture: " + AutoCapture.said(window) + ", the window its launch opened");
+                Say.info("capture: " + AutoCapture.said(window) + (picked.refocused()
+                        ? ", the game's window its launch refocused" : ", the window its launch opened"));
                 return Optional.empty();
             }
             case Result.NoWindow none -> {
@@ -109,7 +116,8 @@ public final class LaunchWatch {
      * Closes {@code target} when it runs, launches it and waits up to {@code timeout} for the window it opens: the
      * recommended one of {@link NewWindows#ranked}, a window of the class the target names first, once the same window
      * stayed recommended for {@link #STABLE_FOR} under the same {@linkplain WindowIdentity#sameGame game}; it is saved
-     * as it is titled then.
+     * as it is titled then. While no new window is recommended, a window of that class open before the launch is
+     * waited on the same way ({@link NewWindows#refocused}): a game {@code isRunning} missed is only refocused.
      */
     static Result watch(LaunchSpec target, Desktop desktop, Duration timeout, Clock clock) {
         if (desktop.running()) {
@@ -127,12 +135,20 @@ public final class LaunchWatch {
         Object last = null;
         WindowIdentity lastIdentity = null;
         Instant since = null;
+        Instant refocusFrom = clock.instant().plus(REFOCUS_AFTER);
+        boolean openedOne = false;
         while (clock.instant().isBefore(deadline)) {
             desktop.pause(POLL);
-            List<Candidate> ranked = NewWindows.ranked(before, desktop.open(), desktop::launcherUi,
+            List<GenericWindow> now = desktop.open();
+            List<Candidate> ranked = NewWindows.ranked(before, now, desktop::launcherUi,
                     pid -> launched > 0 && desktop.inTree(launched, pid), gameClass);
             for (Candidate candidate : ranked) seen.add(candidate.window().getTitle());
             Candidate best = NewWindows.recommended(ranked);
+            openedOne |= best != null;
+            // Only a launch that opened nothing, given time to open one, refocused the game: a window left by a game
+            // that crashed is not picked before the new one is up, nor flipped to when a new one closes.
+            boolean refocused = best == null && !openedOne && !clock.instant().isBefore(refocusFrom);
+            if (refocused) best = NewWindows.refocused(before, now, gameClass);
             Object handle = best == null ? null : best.window().getNativeHandle();
             // A window that renames itself (Proton's placeholder, then the game's name) is waited on again.
             if (handle == null || !handle.equals(last) || !best.identity().sameGame(lastIdentity)) {
@@ -141,7 +157,7 @@ public final class LaunchWatch {
             last = handle;
             lastIdentity = best == null ? null : best.identity();
             if (handle != null && !clock.instant().isBefore(since.plus(STABLE_FOR))) {
-                return new Result.Picked(best.identity(), best.window().getTitle());
+                return new Result.Picked(best.identity(), best.window().getTitle(), refocused);
             }
         }
         return new Result.NoWindow(List.copyOf(seen));
@@ -150,6 +166,12 @@ public final class LaunchWatch {
     static String stillRunning(LaunchSpec target) {
         return target.spec() + " runs and cannot be closed from here: close it, so the window its launch opens can be"
                 + " picked";
+    }
+
+    /** What a run that watches no launch says when {@code target}'s window is not picked yet: it reads the desktop. */
+    public static String unpicked(LaunchSpec target) {
+        return "no window is picked for " + target.spec() + " yet: this reads the whole desktop; a run of the bot"
+                + " launches the game and picks the window it opens";
     }
 
     static String noWindow(LaunchSpec target, List<String> seen) {

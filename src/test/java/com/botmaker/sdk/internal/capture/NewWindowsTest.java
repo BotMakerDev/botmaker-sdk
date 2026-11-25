@@ -73,6 +73,19 @@ class NewWindowsTest {
         assertEquals("hades2.x86_64", NewWindows.recommended(ranked).identity().spec());
     }
 
+    /** A refocused game with a settings dialog open: its biggest window, of the class its target names, is the pick. */
+    @Test
+    void theRefocusedWindowIsTheGamesBiggest() {
+        GenericWindow settings = window(1, "Settings", 400, 7, "steam_app_440");
+        GenericWindow game = window(2, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow other = window(3, "Honkai: Star Rail", 1920, 9, "steam_app_1965");
+        List<GenericWindow> open = List.of(settings, game, other);
+        assertEquals("Team Fortress 2", NewWindows.refocused(NewWindows.handles(open), open, "steam_app_440")
+                .window().getTitle());
+        assertNull(NewWindows.refocused(NewWindows.handles(open), open, null));
+        assertNull(NewWindows.refocused(Set.of(), open, "steam_app_440"), "a new window is no refocus");
+    }
+
     @Test
     void onlyASteamTargetNamesItsClass() {
         assertEquals("steam_app_2379780", NewWindows.gameClass(LaunchSpec.parse("steam:2379780")));

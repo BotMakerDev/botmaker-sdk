@@ -106,6 +106,21 @@ public final class InstalledGame {
         return Optional.ofNullable(pendingWatch);
     }
 
+    /**
+     * The pending watch dropped, for a run that has no start-up step to watch it (▶ Try): what it reads stays the
+     * whole desktop, which the caller says; empty when none was pending.
+     */
+    public static Optional<WatchLaunch> dropPendingWatch() {
+        WatchLaunch dropped = pendingWatch;
+        pendingWatch = null;
+        return Optional.ofNullable(dropped);
+    }
+
+    /** {@code watch} pending, as {@link #install} leaves it: for tests. */
+    static void pend(WatchLaunch watch) {
+        pendingWatch = watch;
+    }
+
     /** The launch's window is picked and read: nothing is pending, and a restart reads that window. */
     public static void watched() {
         pendingWatch = null;

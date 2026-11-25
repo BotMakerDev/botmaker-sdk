@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -197,11 +198,60 @@ class LaunchWatchTest {
                 LaunchWatch.noWindow(STEAM, none.seen()));
     }
 
-    /** A window open before the launch is never the pick, even when it is the game's class. */
+    /** A window open before the launch, of no class the target names, is never the pick. */
     @Test
     void windowOpenBeforeIsNotPicked() {
-        GenericWindow stale = window(1, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow stale = window(1, "Hades II", 1280, 7, "hades2.x86_64");
         FakeDesktop desktop = new FakeDesktop(List.of(stale), List.of(stale), false);
         assertInstanceOf(LaunchWatch.Result.NoWindow.class, desktop.watch());
+    }
+
+    /** The game ran though {@code isRunning} missed it: the launch only refocuses its window, which is picked. */
+    @Test
+    void aLaunchThatOnlyRefocusesPicksTheGamesOpenWindow() {
+        GenericWindow game = window(1, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow other = window(2, "Honkai: Star Rail", 1920, 9, "steam_app_1965");
+        FakeDesktop desktop = new FakeDesktop(List.of(game, other), List.of(game, other), false);
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("steam_app_440", picked.identity().spec());
+        assertTrue(picked.refocused());
+    }
+
+    /** A window the launch opens wins over the game's class open before: it is the launch's. */
+    @Test
+    void aNewWindowWinsOverTheRefocusedOne() {
+        GenericWindow old = window(1, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow fresh = window(3, "Team Fortress 2 - Launcher", 800, 8, "tf_launcher");
+        FakeDesktop desktop = new FakeDesktop(List.of(old), List.of(old, fresh), false);
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("tf_launcher", picked.identity().spec());
+        assertFalse(picked.refocused());
+    }
+
+    /** A crashed game's window is left open; the new game's window comes up 8 s after the launch: that one is picked. */
+    @Test
+    void aWindowLeftByACrashLosesToTheOneTheLaunchOpens() {
+        GenericWindow left = window(1, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow fresh = window(3, "Team Fortress 2", 1280, 8, "steam_app_440");
+        FakeDesktop desktop = new FakeDesktop(List.of(left), since -> since.compareTo(Duration.ofSeconds(8)) < 0
+                ? List.of(left) : List.of(left, fresh), false);
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertFalse(picked.refocused());
+    }
+
+    /** A popup the launch opened, then closed: the watch does not fall back to the old window. */
+    @Test
+    void aNewWindowThatClosedIsNoReasonToRefocus() {
+        GenericWindow old = window(1, "Team Fortress 2", 1280, 7, "steam_app_440");
+        GenericWindow popup = window(3, "Preparing to launch", 400, 8, "steam_popup");
+        FakeDesktop desktop = new FakeDesktop(List.of(old), since -> since.compareTo(Duration.ofSeconds(2)) < 0
+                ? List.of(old, popup) : List.of(old), false);
+        assertInstanceOf(LaunchWatch.Result.NoWindow.class, desktop.watch());
+    }
+
+    @Test
+    void aRunThatWatchesNoLaunchSaysItReadsTheDesktop() {
+        assertEquals("no window is picked for steam:440 yet: this reads the whole desktop; a run of the bot launches"
+                + " the game and picks the window it opens", LaunchWatch.unpicked(STEAM));
     }
 }

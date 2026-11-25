@@ -195,6 +195,9 @@ public class Bot {
         ScreenMaps.install(values);
         RunFacts.install(values);
         RunDetails.start(values);
+        // A try launches nothing: a desktop game whose window no run picked yet is read as the whole desktop, said.
+        InstalledGame.dropPendingWatch().filter(watch -> !SessionBootstrap.isolationRequested())
+                .ifPresent(watch -> Say.warn(LaunchWatch.unpicked(watch.target())));
         SessionBootstrap.joinOffered();
         // Switched back on each run, so a warm JVM keeps no switch a body of the run before left off.
         PopupGuard.enabled(true);

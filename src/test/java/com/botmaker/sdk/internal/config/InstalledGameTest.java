@@ -11,13 +11,16 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -102,6 +105,16 @@ class InstalledGameTest {
         assertEquals(2, ParamGroups.groups(holder).size(), "every @Param group of the plugin's package, Game and Running");
         assertEquals(2, ParamGroups.groups(holder, holder).size(), "each group made once");
         assertTrue(ParamGroups.groups(Sdk.class).isEmpty(), "a class outside plugins/ has no group");
+    }
+
+    /** ▶ Try runs no start-up step: a watch left pending is dropped once, so nothing later watches it unasked. */
+    @Test
+    void aPendingWatchIsDroppedOnce() {
+        WatchLaunch watch = new WatchLaunch(LaunchSpec.parse("steam:440"), List.of());
+        InstalledGame.pend(watch);
+        assertEquals(Optional.of(watch), InstalledGame.dropPendingWatch());
+        assertTrue(InstalledGame.pendingWatch().isEmpty());
+        assertTrue(InstalledGame.dropPendingWatch().isEmpty());
     }
 
     @AfterEach

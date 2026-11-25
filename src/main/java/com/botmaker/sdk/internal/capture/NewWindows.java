@@ -116,6 +116,28 @@ public final class NewWindows {
         return appId.isEmpty() ? null : "steam_app_" + appId;
     }
 
+    /**
+     * The window of {@code gameClass} that was open in {@code before} and still is in {@code now}, or {@code null}: a
+     * launch that only brings the running game to the front opens no window, and its game's own class names the one
+     * it refocused (2026-11-25). The biggest of several, a settings dialog being smaller than the game. Recommended,
+     * so a watch waits on it as on a new one.
+     */
+    public static Candidate refocused(Set<Object> before, List<GenericWindow> now, String gameClass) {
+        if (gameClass == null) return null;
+        Candidate biggest = null;
+        for (GenericWindow window : pickable(now)) {
+            if (!before.contains(window.getNativeHandle()) || window.getWindowClass() == null
+                    || !window.getWindowClass().trim().equalsIgnoreCase(gameClass)) {
+                continue;
+            }
+            WindowIdentity identity = WindowIdentity.of(window);
+            if (identity != null && (biggest == null || area(window) > area(biggest.window()))) {
+                biggest = new Candidate(window, identity, false, false, true);
+            }
+        }
+        return biggest;
+    }
+
     /** The recommended window of {@code ranked}, or {@code null} when only launchers opened one. */
     public static Candidate recommended(List<Candidate> ranked) {
         for (Candidate candidate : ranked) if (candidate.recommended()) return candidate;
