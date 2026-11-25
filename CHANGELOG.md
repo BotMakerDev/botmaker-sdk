@@ -28,7 +28,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   the whole desktop when nothing is launched. A `CaptureSource.desktop()` with a launch target counts as Automatic
   too. A capture set by hand still wins. The trace says what was picked (`capture: Main, from the game's target`).
   A desktop game's window, once a run picks it, is kept by launch target in the SDK's values of this PC (`Runs.java`,
-  `AutoPicks`), and the next run reads it without watching the launch.
+  `AutoPicks`), and the next run reads it without watching the launch. With none kept, the run picks it itself: it
+  closes the game when it runs already (a game it cannot close stops the run, asking you to), launches it and reads
+  the window the launch opened once it stayed the one for 3 s (one of the launched process's own first, never a
+  launcher's library or login), a region of Automatic narrowed to it
+  (`capture: window "Team Fortress 2" (class steam_app_440), the window its launch opened`). A kept window the running
+  game no longer shows is forgotten and the launch watched again; no game window within the launch timeout stops the
+  run, naming the new windows seen. Off the desktop (a private display, a game VM) nothing is watched.
 - **Keep exploring judges an app's inputs before pressing them** (2026-11-25): given a goal, a run leaves each new
   input of an app to the Reader, which gives it a verdict the goal allows (a switch under "change no setting" is never
   pressed); without one, only what toggles waits. An input that was not there to press, or a field whose parameter

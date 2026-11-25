@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.AutoCapture;
+import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.capture.AutoPicks;
 import com.botmaker.sdk.internal.emulator.EmulatorRef;
 import com.botmaker.sdk.internal.emulator.Emulators;
@@ -54,7 +55,9 @@ public final class InstalledGame {
     /** The instance {@code instance()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
     private static volatile String playsOn = "";
     /** The desktop game whose launch's window the run reads, or {@code null}: {@link #pendingWatch}. */
-    private static volatile LaunchSpec pendingWatch;
+    private static volatile WatchLaunch pendingWatch;
+    /** The watch a window picked on an earlier run stands in for, or {@code null}: {@link #rewatch}. */
+    private static volatile WatchLaunch rewatch;
 
     private InstalledGame() {}
 
@@ -67,22 +70,28 @@ public final class InstalledGame {
         settings(values);
         playsOn = "";
         pendingWatch = null;
+        rewatch = null;
         LaunchSpec target = LaunchSpec.parse(launchTarget());
         CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source ? source : null;
+        Optional<CaptureSource> saved = AutoCapture.wantsSavedWindow(capture, target)
+                ? AutoPicks.run().saved(target) : Optional.empty();
         AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR), target, capture,
-                marked(SdkValue.Id.INSTANCE, values),
-                AutoCapture.wantsSavedWindow(capture, target) ? AutoPicks.run().saved(target) : Optional.empty(),
-                InstalledGame::runningInstances);
+                marked(SdkValue.Id.INSTANCE, values), saved, InstalledGame::runningInstances);
         switch (AutoCapture.decide(inputs)) {
             case AutoCapture.Decision.Fixed fixed -> {
                 // The game is launched and restarted where the run plays: the dealt instance, not the author's.
                 playsOn = fixed.playsOn();
                 Source.set(fixed.source());
                 if (fixed.why() != null) Diag.info("Capture", fixed.why());
+                // Read from the pick of an earlier run: what is watched again when that window no longer comes up.
+                if (saved.isPresent() && AutoCapture.decide(new AutoCapture.Inputs(inputs.emulatorProperty(), target,
+                        capture, inputs.dealt(), Optional.empty(), inputs.runningInstances())) instanceof WatchLaunch w) {
+                    rewatch = w;
+                }
             }
-            case AutoCapture.Decision.WatchLaunch watch -> {
+            case WatchLaunch watch -> {
                 // The whole desktop until the launch's window is up (Bot's start-up step watches for it).
-                pendingWatch = watch.target();
+                pendingWatch = watch;
                 Source.set(null);
             }
             case AutoCapture.Decision.Fail fail -> throw new IllegalStateException(fail.message());
@@ -93,8 +102,22 @@ public final class InstalledGame {
      * The launch whose window the run reads once it opens, when the capture is automatic and no window was picked for
      * this desktop game yet; empty otherwise.
      */
-    public static Optional<LaunchSpec> pendingWatch() {
+    public static Optional<WatchLaunch> pendingWatch() {
         return Optional.ofNullable(pendingWatch);
+    }
+
+    /** The launch's window is picked and read: nothing is pending, and a restart reads that window. */
+    public static void watched() {
+        pendingWatch = null;
+        rewatch = null;
+    }
+
+    /**
+     * The launch to watch when the window an earlier run picked for this game does not come up — the game opens
+     * another now — once that pick is forgotten; empty when the capture was not read from such a pick.
+     */
+    public static Optional<WatchLaunch> rewatch() {
+        return Optional.ofNullable(rewatch);
     }
 
     /** The names of the emulator instances and phones running now. */

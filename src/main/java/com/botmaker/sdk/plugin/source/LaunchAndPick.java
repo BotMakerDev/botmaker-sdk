@@ -9,6 +9,7 @@ import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.capture.NewWindows.Candidate;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.QuickLaunch;
@@ -222,9 +223,9 @@ final class LaunchAndPick {
         watching = true;
         Thread.ofVirtual().name("launch-and-pick").start(() -> {
             long until = System.currentTimeMillis() + WATCH_MS;
-            List<WindowWatch.Candidate> shown = List.of();
+            List<Candidate> shown = List.of();
             while (watching && System.currentTimeMillis() < until) {
-                List<WindowWatch.Candidate> ranked = WindowWatch.ranked(before, windows(controller),
+                List<Candidate> ranked = WindowWatch.ranked(before, windows(controller),
                         RunningProbe::launcherUi);
                 if (!WindowWatch.same(shown, ranked)) {
                     shown = ranked;
@@ -250,10 +251,10 @@ final class LaunchAndPick {
     }
 
     /** One row per window the launch opened, the recommended one marked. */
-    private void render(List<WindowWatch.Candidate> ranked) {
+    private void render(List<Candidate> ranked) {
         if (!watching) return;
         rows.getChildren().clear();
-        for (WindowWatch.Candidate candidate : ranked) {
+        for (Candidate candidate : ranked) {
             Label title = Styles.on(new Label((candidate.recommended() ? "★ " : "") + candidate.window().getTitle()),
                     candidate.recommended() ? Styles.STRONG_TEXT : Styles.CAPTION);
             String note = candidate.recommended() ? "Recommended: the newest window the game opened"

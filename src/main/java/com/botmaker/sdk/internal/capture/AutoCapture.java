@@ -14,6 +14,7 @@ import com.botmaker.shared.launch.LaunchSpec;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Where a run reads its pixels (2026-11-25, spec {@code 2026-11-25-auto-capture-design.md}), from what the run is given:
@@ -46,8 +47,23 @@ public final class AutoCapture {
          */
         record Fixed(CaptureSource source, String why, String playsOn) implements Decision {}
 
-        /** Launch {@code target} and read the window it opens. */
-        record WatchLaunch(LaunchSpec target) implements Decision {}
+        /**
+         * Launch {@code target} and read the window it opens, narrowed to {@code regions} (innermost first) when the
+         * capture is a region of automatic.
+         */
+        record WatchLaunch(LaunchSpec target, List<Rect> regions) implements Decision {
+
+            public WatchLaunch {
+                regions = List.copyOf(regions);
+            }
+
+            /** {@code window} as the run reads it: narrowed to the regions the capture names. */
+            public CaptureSource around(CaptureSource window) {
+                CaptureSource source = window;
+                for (Rect sub : regions) source = CaptureSource.region(source, sub);
+                return source;
+            }
+        }
 
         record Fail(String message) implements Decision {}
     }
@@ -59,10 +75,14 @@ public final class AutoCapture {
         if (in.capture() instanceof RegionSource region && unwrapped(region) instanceof AmbientSource) {
             Decision whole = decide(new Inputs(in.emulatorProperty(), in.target(), region.parent(), in.dealt(),
                     in.savedWindow(), in.runningInstances()));
-            return whole instanceof Decision.Fixed fixed
-                    ? new Decision.Fixed(CaptureSource.region(fixed.source() == null ? CaptureSource.desktop()
-                            : fixed.source(), region.sub()), fixed.why(), fixed.playsOn())
-                    : whole;
+            return switch (whole) {
+                case Decision.Fixed fixed -> new Decision.Fixed(CaptureSource.region(fixed.source() == null
+                        ? CaptureSource.desktop() : fixed.source(), region.sub()), fixed.why(), fixed.playsOn());
+                // The window is not up yet: the region waits for it, and is applied once it is picked.
+                case Decision.WatchLaunch watch -> new Decision.WatchLaunch(watch.target(),
+                        Stream.concat(watch.regions().stream(), Stream.of(region.sub())).toList());
+                case Decision.Fail fail -> fail;
+            };
         }
         if (in.emulatorProperty() != null && !in.emulatorProperty().isBlank()) {
             return new Decision.Fixed(CaptureSource.emulator(in.emulatorProperty().strip()), null, "");
@@ -82,7 +102,7 @@ public final class AutoCapture {
         return in.savedWindow()
                 .<Decision>map(window -> new Decision.Fixed(window, "capture: " + said(window)
                         + ", picked on an earlier run", ""))
-                .orElseGet(() -> new Decision.WatchLaunch(target));
+                .orElseGet(() -> new Decision.WatchLaunch(target, List.of()));
     }
 
     /**
@@ -128,7 +148,7 @@ public final class AutoCapture {
     }
 
     /** A window as the trace says it: {@code window "Sword x Staff" (class steam_app_1)}. */
-    static String said(CaptureSource window) {
+    public static String said(CaptureSource window) {
         if (!(window instanceof NamedWindow named)) return String.valueOf(window);
         return "window \"" + named.label() + "\" (class " + named.windowClass() + ")";
     }

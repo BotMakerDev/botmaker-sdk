@@ -125,7 +125,25 @@ class AutoCaptureTest {
         Decision.Fixed fixed = fixed(decide(ON_MAIN, CaptureSource.automatic().region(top)));
         assertEquals("Main", assertInstanceOf(EmulatorSource.class, fixed.source().base()).instanceName());
         assertEquals(top, fixed.source().subRegion());
-        assertInstanceOf(Decision.WatchLaunch.class, decide(STEAM, CaptureSource.automatic().region(top)));
+        Decision.WatchLaunch watch = assertInstanceOf(Decision.WatchLaunch.class,
+                decide(STEAM, CaptureSource.automatic().region(top)));
+        assertEquals(List.of(top), watch.regions(), "the region waits for the window the launch opens");
+        CaptureSource picked = watch.around(CaptureSource.window("steam_app_440", ""));
+        assertEquals(top, picked.subRegion());
+        assertInstanceOf(NamedWindow.class, picked.base());
+    }
+
+    @Test
+    void savedPickMissingWatchesAgain() {
+        // What InstalledGame keeps beside a saved pick: the watch the run falls back on when that window is gone.
+        Rect top = new Rect(0, 0, 100, 40);
+        CaptureSource capture = CaptureSource.automatic().region(top);
+        Decision withSaved = AutoCapture.decide(new AutoCapture.Inputs(null, STEAM, capture, null,
+                Optional.of(CaptureSource.window("steam_app_440", "")), NONE_ASKED));
+        assertInstanceOf(Decision.Fixed.class, withSaved);
+        Decision.WatchLaunch again = assertInstanceOf(Decision.WatchLaunch.class, decide(STEAM, capture));
+        assertEquals(STEAM, again.target());
+        assertEquals(List.of(top), again.regions());
     }
 
     @Test

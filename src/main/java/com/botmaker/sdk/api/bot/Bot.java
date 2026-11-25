@@ -18,6 +18,9 @@ import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.sdk.internal.config.InstalledGame;
+import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
+import com.botmaker.sdk.internal.capture.AutoPicks;
+import com.botmaker.sdk.internal.capture.LaunchWatch;
 import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.params.RunFacts;
@@ -34,6 +37,8 @@ import com.botmaker.sdk.internal.vision.BotScreen;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -288,16 +293,27 @@ public class Bot {
      * game window to appear after launching.
      */
     static void launchConfiguredTarget(StartMode mode) {
-        switch (mode) {
-            case COLD -> {
-                Target.startIfNotRunning();
-                // Always wait for the game window to appear before starting activities
-                Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
-            }
-            case RESTART -> {
-                Target.restart();
-                // Always wait for the game window to appear after restart
-                Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
+        // Automatic capture of a desktop game: the run reads the window its launch opens, on a cold start and on a
+        // restart alike while none is picked (closing the game that runs is the restart). Off the desktop (a private
+        // display, a game VM) the whole screen the game gets is its own already.
+        boolean onDesktop = !SessionBootstrap.isolationRequested();
+        Optional<WatchLaunch> pending = InstalledGame.pendingWatch().filter(watch -> onDesktop);
+        if (pending.isPresent()) {
+            watchLaunch(pending.get());
+        } else {
+            if (mode == StartMode.COLD) Target.startIfNotRunning();
+            else Target.restart();
+            // Always wait for the game window to appear before starting activities
+            boolean up = Target.waitForLaunch(BotSettings.DEFAULT_LAUNCH_WAIT_TIMEOUT);
+            // The game runs but the window an earlier run picked is not among its windows (an update renamed it):
+            // forgotten, and the launch watched again. A game only slow to come up keeps its pick.
+            Optional<WatchLaunch> again = InstalledGame.rewatch()
+                    .filter(watch -> onDesktop && !up && Target.isRunning());
+            if (again.isPresent()) {
+                Debug.log("the window picked on an earlier run did not come up: watching the launch again");
+                AutoPicks.run().forget(again.get().target())
+                        .ifPresent(refused -> Debug.error("the earlier pick is still kept: " + refused));
+                watchLaunch(again.get());
             }
         }
         // The game is up: a window of another size than the pictures were cut at is resized, else the trace says.
@@ -307,6 +323,21 @@ public class Bot {
                 && Target.current() instanceof LaunchTarget.EmulatorApp app) {
             emulator.quiet(app.packageName());
         }
+    }
+
+    /**
+     * Launches the game and reads the window its launch opens ({@link LaunchWatch}); a launch that opens no game
+     * window ends the run saying so, since a restart would watch the same launch again.
+     */
+    private static void watchLaunch(WatchLaunch watch) {
+        Optional<String> missed;
+        try {
+            missed = LaunchWatch.launchAndPick(watch);
+        } catch (CancellationException stopped) {
+            throw new BotStoppedException();
+        }
+        if (missed.isPresent()) stop(missed.get());
+        InstalledGame.watched();
     }
 
     /**
