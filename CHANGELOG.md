@@ -159,6 +159,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `@EmulatorName` slot (`Emulators.use("…")`) is a menu of this computer's instances and phones, with
   Emulators…; it no longer points the bot's launch target at an app. The Games tab's Google Play search went with
   it: Get an app, in the Emulators window's Instances tab, downloads an app.
+- **`edit_map set_kind start` takes the screen's ways in off** (2026-11-25), in the same undo step, and says which:
+  a launch target that now opens on a deeper page (Google's sign-in) makes that page the start screen, and the
+  screens that led to it can then be deleted. It refused before, and a screen's only way in could not be taken off.
 
 ### Fixed
 

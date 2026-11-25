@@ -425,8 +425,10 @@ public final class ScreenEdits {
 
     /**
      * Makes {@code constant} the screen the game opens on, its loading screen ({@code start} true), or no start screen
-     * any more. Refused for one with a way in: the game opens on it, so nothing leads into it. Another start screen
-     * loses its mark in the same step of Studio's undo: the map has one.
+     * any more. The game opens on it, so nothing leads into it: its ways in are taken off the map in the same step
+     * (2026-11-25: a launch target that opens on a deeper page, Google's sign-in, made its way in through Settings
+     * moot, and no other edit could take a screen's only way off). Another start screen loses its mark in the same
+     * step of Studio's undo: the map has one.
      */
     public static String setStart(StudioServices services, String constant, boolean start) {
         ScreenGraph graph = ScreenBook.read(services);
@@ -442,17 +444,24 @@ public final class ScreenEdits {
             return NOT_WRITTEN + graph.shown(constant) + " is a panel, shown inside another screen: make it a screen "
                     + "of its own first.";
         }
-        if (!screen.ways().isEmpty()) {
-            return NOT_WRITTEN + "the game opens on a start screen, so no way leads into it: take "
-                    + graph.shown(constant) + "'s ways in off first.";
-        }
+        List<String> waysOff = screen.ways().stream().map(way -> wayText(graph, way)).toList();
         Optional<String> was = graph.start().filter(c -> !c.equals(constant));
         Optional<String> failed = ScreenBook.step(services, "Make " + graph.shown(constant) + " the start screen",
                 () -> was.flatMap(c -> ScreenBook.update(services, c, s -> s.setup(Setup::notStart)))
-                        .or(() -> ScreenBook.update(services, constant, s -> s.setup(Setup::start))));
+                        .or(() -> ScreenBook.update(services, constant,
+                                s -> s.setup(x -> x.fromWay(null).alsoFrom(List.of()).start()))));
         return said(failed, "The game opens on " + graph.shown(constant) + " now"
+                + (waysOff.isEmpty() ? "" : "; its way" + (waysOff.size() == 1 ? "" : "s") + " in "
+                        + String.join(", ", waysOff) + (waysOff.size() == 1 ? " is" : " are") + " off the map")
                 + was.map(c -> "; " + graph.shown(c) + " is no start screen any more.").orElse(".")
                 + " Give the screen after it a way on its own.");
+    }
+
+    /** A way in as a sentence says it: from Home by gem, or from Loading on its own. */
+    private static String wayText(ScreenGraph graph, Way way) {
+        String from = graph.onScreen(way).map(graph::shown).orElse("another screen");
+        return "from " + from + (way.isOnItsOwn() ? " on its own"
+                : graph.nameOf(way.via()).map(n -> " by " + n.field()).orElse(""));
     }
 
     /**

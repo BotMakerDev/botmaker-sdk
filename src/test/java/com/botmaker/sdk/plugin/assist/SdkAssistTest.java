@@ -1701,9 +1701,6 @@ class SdkAssistTest {
                 "one start screen");
         assertTrue(run("edit_map", "action", "set_kind", "screen", "Splash", "as", "screen").isRefused(),
                 "no screen called so");
-        AgentReply opened = run("edit_map", "screen", "Mine", "action", "set_kind", "as", "start");
-        assertTrue(opened.isRefused() && text(opened).contains("no way leads into it"), text(opened));
-
         assertTrue(run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading").isRefused(),
                 "no input and no seconds: an input left out");
         run("edit_map", "screen", "Home", "action", "add_way", "from", "Loading", "seconds", 0);
@@ -1727,6 +1724,14 @@ class SdkAssistTest {
         assertNull(screen("HOME").from(), "the first screen again");
         run("edit_map", "screen", "Loading", "action", "set_kind", "as", "screen");
         assertFalse(screen("LOADING").isStart());
+
+        // A launch that now opens on a deeper screen (2026-11-25, Google's sign-in page): its ways in go with it.
+        String opened = text(run("edit_map", "screen", "Mine", "action", "set_kind", "as", "start"));
+        assertTrue(opened.startsWith("The game opens on Mine now; its way in from Home by gem is off the map"),
+                opened);
+        assertTrue(screen("MINE").isStart());
+        assertNull(screen("MINE").from());
+        assertTrue(screen("MINE").ways().isEmpty());
     }
 
     /** edit_map set_kind panel: a screen opened by an input of another, shown inside it (2026-10-18). */
