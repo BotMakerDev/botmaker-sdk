@@ -30,7 +30,9 @@ them from the host on bind, from the `ManagedValue`s `SdkValues` declares.
 Runner; `Plan.NONE` runs nothing; it replaced `ROUTINE` and `FLOW` when flows were deleted, 2026-11-09, with no rule
 moving a bot's pick) and `DO_SETUP` are methods of
 `params/com_github_botmakerdev/botmaker_sdk/Running.java`, `LAUNCH_TARGET` and `CAPTURE` of `Game.java` beside it
-(`Holder.RUNNING`, `Holder.GAME`, 2026-11-05; each group is a category), this computer's and never committed, with the
+(`Holder.RUNNING`, `Holder.GAME`, 2026-11-05; each group is a category; `CAPTURE` starts as
+`CaptureSource.automatic()`, 2026-11-25, and the window a run picks for a desktop game is a value of this PC in
+`Runs.java`, never the parameter), this computer's and never committed, with the
 author's starting values in `starting-params/` at the same paths; `ParamGroups` finds the groups from the holder
 (`…plugins.<g>.<a>.Sdk` reads every `@Param` class of `…params.<g>.<a>`). What the author alone sets (`LAUNCH_TARGETS`, `VM`) is a marked
 method above, in the committed holder. A fact is a method of the bot's own `@Facts` group in `params/bot/`,

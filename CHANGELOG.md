@@ -33,7 +33,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   else the target's, else the one running; several running and none named stops the run, none running reads the
   whole desktop), a website's browser, and
   the whole desktop when nothing is launched. A `CaptureSource.desktop()` with a launch target counts as Automatic
-  too. A capture set by hand still wins. The trace says what was picked (`capture: Main, from the game's target`).
+  too, and picking an emulator app's target no longer rewrites it (nor a region of Automatic) to that device. A
+  capture set by hand still wins. The trace says what was picked (`capture: Main, from the game's target`).
   A desktop game's window, once a run picks it, is kept by launch target in the SDK's values of this PC (`Runs.java`,
   `AutoPicks`), and the next run reads it without watching the launch. With none kept, the run picks it itself: it
   closes the game when it runs already (a game it cannot close stops the run, asking you to), launches it and reads

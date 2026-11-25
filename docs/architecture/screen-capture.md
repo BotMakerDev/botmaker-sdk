@@ -7,6 +7,29 @@ it; there is one `getVirtualScreenBounds()` (the AWT all-monitor union). A match
 the backend selection (`RobotCapture` vs `SpectacleCapture`) and the Wayland notes; `../docs/display-pipeline.md`
 before touching `api/capture` or `internal/session`.
 
+### The capture source is Automatic (2026-11-25)
+
+A new bot's `captureSource()` is `CaptureSource.automatic()` (`internal/capture/AutomaticSource`), and
+`AutoCapture.decide` turns it into a source from the launch target (spec `2026-11-25-auto-capture-design.md`). One
+decision serves the run (`Bot`, `InstalledGame`) and Studio's views (`plugin/screen/CaptureValue.resolved`):
+
+- **Fixed**: an emulator or phone app reads its instance (the one the host gave the run,
+  `botmaker.capture.emulator`, else the one `instance()` deals, else the target's, else the one running; several
+  running and none named fails), a website its run's browser, no target the whole desktop, a source set by hand
+  itself (an emulator's moved onto the dealt instance). `desktop()` with a launch target counts as Automatic
+  (`AutoCapture.isAutomatic`).
+- **WatchLaunch**: a desktop game with no window kept. The run closes the game when it runs, launches it and
+  `LaunchWatch` reads the window the launch opened once it stayed the one for 3 s, the launched process's own first.
+  The pick is kept by launch target in the SDK's values of this PC (`HostWindows` in `Runs.java`, through
+  `AutoPicks`), so the next run reads it straight away; a kept window the running game no longer shows is forgotten
+  and the launch watched again. Off the desktop (a private display, a game VM) nothing is watched.
+- **Fail**: the run stops with the reason; Studio's views show nothing.
+
+The trace says what was picked and why (`capture: Waydroid, from the game's target`). Studio's views, which never
+launch and never ask which emulators run, read the whole desktop for a WatchLaunch and for an instance a run would
+have to ask about. The Choose capture source window opens on its Automatic tab, which
+says what Automatic reads and offers *Forget the pick* (`plugin/source/AutomaticTab`).
+
 ### Live frames: a grab kept open (2026-10-22)
 
 `captureWindow` reads one frame and lets go: it finds the window, asks X about it, and allocates a new image, which

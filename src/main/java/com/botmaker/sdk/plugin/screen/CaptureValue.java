@@ -157,8 +157,9 @@ public final class CaptureValue {
     /**
      * Points capture at the device a launch target runs on, when it is an emulator or phone app
      * ({@code emu-app:<package>@<instance>}): there the target says where its pixels are. Any other target leaves
-     * capture alone — its window is picked once it is up (the source picker's ▶ Launch and pick), never guessed
-     * (2026-10-19). Call it on the JavaFX application thread.
+     * capture alone: an automatic capture picks a desktop game's window by watching its launch on the first run
+     * ({@link AutoCapture}, 2026-11-25), and a source set by hand stays. A source set by hand is pointed at an
+     * emulator app's device. Call it on the JavaFX application thread.
      *
      * @return the device's reference when capture now follows it, else empty
      */
@@ -168,9 +169,10 @@ public final class CaptureValue {
             return Optional.empty();
         }
         String instance = spec.emulatorInstance();
-        // Already that device, maybe narrowed to a region of it: kept as written; automatic follows it by itself.
+        // Already that device, maybe narrowed to a region of it: kept as written; automatic (desktop() with a target,
+        // a region of either) follows it by itself.
         CaptureSource now = written(services);
-        if (now instanceof AmbientSource) return Optional.of(instance);
+        if (AutoCapture.followsTarget(now, spec)) return Optional.of(instance);
         if (now != null && now.base() instanceof EmulatorSource already && already.instanceName().equals(instance)) {
             return Optional.of(instance);
         }

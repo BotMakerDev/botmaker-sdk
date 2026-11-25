@@ -123,8 +123,12 @@ public final class AutoCapture {
         if (target == null) return false;
         LaunchKind kind = target.kind();
         if (kind == LaunchKind.UNKNOWN || kind == LaunchKind.WEB || kind == LaunchKind.EMULATOR_APP) return false;
-        CaptureSource whole = capture instanceof RegionSource region ? unwrapped(region) : capture;
-        return isAutomatic(whole, target);
+        return followsTarget(capture, target);
+    }
+
+    /** {@link #isAutomatic} of {@code capture}, or of the source a region of it narrows. */
+    public static boolean followsTarget(CaptureSource capture, LaunchSpec target) {
+        return isAutomatic(capture instanceof RegionSource region ? unwrapped(region) : capture, target);
     }
 
     /**

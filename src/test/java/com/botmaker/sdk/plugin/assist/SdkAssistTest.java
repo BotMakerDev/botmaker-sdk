@@ -49,6 +49,7 @@ import com.botmaker.sdk.api.vision.PictureTag;
 import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.bot.SettingParams;
@@ -669,7 +670,25 @@ class SdkAssistTest {
 
         host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
                 .withValue(List.of(Launcher.of("steam:570"))));
-        assertNull(CaptureValue.current(host), "a desktop game's window not picked yet: the whole desktop");
+        assertTrue(CaptureLabels.isDesktop(CaptureValue.current(host)),
+                "a desktop game's window not picked yet: the whole desktop");
+    }
+
+    @Test
+    void anEmulatorTargetKeepsACaptureThatCountsAsAutomatic() {
+        // desktop() with a target counts as Automatic, a region of Automatic too: neither is pointed at the instance.
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
+                .withValue(List.of(Launcher.of("emu-app:com.foo@Main"))));
+        CaptureSource region = CaptureSource.region(CaptureSource.automatic(), new Rect(0, 0, 10, 10));
+        for (CaptureSource kept : List.of(CaptureSource.desktop(), region)) {
+            host.values.put("capture", TestContexts.row(CaptureSource.class, "").withValue(kept));
+            assertEquals(Optional.of("Main"), CaptureValue.follow(host, "emu-app:com.foo@Main"));
+            assertEquals(kept.toString(), host.values.get("capture").value().toString(), "kept as written");
+        }
+        host.values.put("capture", TestContexts.row(CaptureSource.class, "").withValue(CaptureSource.monitor(1)));
+        CaptureValue.follow(host, "emu-app:com.foo@Main");
+        assertEquals("Main", assertInstanceOf(EmulatorSource.class, host.values.get("capture").value()).instanceName(),
+                "a source set by hand is pointed at the target's instance");
     }
 
     @Test
