@@ -37,6 +37,12 @@ public enum StopKind {
      */
     FAILED_INPUT("failed_input", "Failed input"),
     /**
+     * An app's text field mapped as a plain button (2026-11-25): a tap only focuses it, so its press would be judged
+     * as doing nothing. The Cartographer says what it types (a parameter, a secret, a text) or resumes with ignore to
+     * press it as a button.
+     */
+    UNTYPED_FIELD("untyped_field", "Field nothing types"),
+    /**
      * What presses of a screen's inputs did, read off its tree: ways to screens the bot has, and notes. The run
      * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.
      */

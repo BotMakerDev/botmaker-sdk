@@ -133,7 +133,7 @@ class ExploreToolsTest {
         }
         assertEquals(EnumSet.of(StopKind.UNKNOWN_SCREEN, StopKind.UNMAPPED_INPUT, StopKind.NO_VERDICT,
                 StopKind.MISSING_FACT, StopKind.MISSING_CONDITION, StopKind.WRONG_ARRIVAL, StopKind.ERROR_PAGE,
-                StopKind.FAILED_INPUT, StopKind.LOW_YIELD, StopKind.UNWRITTEN, StopKind.BAD_MAP),
+                StopKind.FAILED_INPUT, StopKind.UNTYPED_FIELD, StopKind.LOW_YIELD, StopKind.UNWRITTEN, StopKind.BAD_MAP),
                 byRole.get(StopRole.CARTOGRAPHER));
         assertEquals(EnumSet.of(StopKind.FAULT, StopKind.CRASH), byRole.get(StopRole.MECHANIC));
         assertEquals(EnumSet.of(StopKind.GUARD, StopKind.STUCK, StopKind.UNKNOWN), byRole.get(StopRole.USER));

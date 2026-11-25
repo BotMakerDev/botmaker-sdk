@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Keep exploring asks what a text field types** (2026-11-25): an app's text field mapped as a plain button is no
+  longer tapped and judged as doing nothing. The run stops for the Cartographer, who says what it types; resume with
+  ignore presses it as a button. `edit_map set_input` takes `typesParameter` (`Login::email`) and `secret` for a
+  password, and the guards let a field that types a Secret press its password field.
 - **Get an app finds a game by its name** (2026-11-25): the Emulators window's Get an app field takes a game's name
   too; once the typing pauses, Google Play's results (name and package) list under it, and picking one fills in its
   package. A package or a Play link works as before.

@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.plan.Goal;
 import com.botmaker.sdk.api.plan.Plan;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
@@ -436,6 +437,8 @@ public final class ExploreLoop {
     private final Set<String> worked = new HashSet<>();
     /** The text places a missing-fact stop was raised on: once each. */
     private final Set<String> answered = new HashSet<>();
+    /** The text fields a resume with ignore said are pressed as buttons: no untyped-field stop on them again. */
+    private final Set<String> plainFields = new HashSet<>();
     private final Deque<String> presses = new ArrayDeque<>();
     /** How many times in a row the server answered an error page after each place: a way, an input or a page. */
     private final Map<String, Integer> errorPages = new HashMap<>();
@@ -1588,7 +1591,21 @@ public final class ExploreLoop {
     private boolean pressInput(String screen, String field, Look look) {
         String key = screen + "." + field;
         Input input = map.screen(screen).map(s -> s.inputs().get(field)).orElse(null);
-        Guards.Refusal refusal = input == null ? guards.front(play.around(null)) : guards.check(input, play.around(input));
+        Guards.Around around = play.around(input);
+        Guards.Refusal front = guards.front(around);
+        // A tap only focuses a text field: pressed as a button, it would be judged as doing nothing (2026-11-25). Asked
+        // before the field guards, so a password field is the Cartographer's to make a secret, not the user's stop.
+        if (!front.refused() && input instanceof Button button && !button.isField()
+                && !(button.verdict() instanceof Verdict.Never) && !plainFields.contains(key)
+                && !around.at().isEmpty() && Guards.textField(around.at().getFirst())) {
+            // Set aside while the stop is open or parked; its resume tries the place again.
+            chooser.tryOnce(key);
+            return stop(StopKind.UNTYPED_FIELD, screen, key, look, field + " is a text field, and a tap only focuses "
+                    + "it: say what it types with set_input, typesParameter a parameter's method reference "
+                    + "(Login::email) with secret for a password, or types a text; or resume with ignore to press it "
+                    + "as a button for the rest of this run", false) != Paused.END;
+        }
+        Guards.Refusal refusal = input == null ? front : guards.check(input, around);
         Optional<Boolean> refused = refused(screen, key, field, refusal, look);
         if (refused.isPresent()) return refused.get();
         if (denied(screen, key, field)) return true;
@@ -1852,6 +1869,7 @@ public final class ExploreLoop {
         }
         List<String> lines = pauses.takeLeftOut(fixed.id());
         if (lines != null && !ignore) skips.add(new Skip(fixed, lines));
+        if (ignore && fixed.kind() == StopKind.UNTYPED_FIELD) plainFields.add(fixed.place());
         if (parkedStop != null) pauses.unpark(parkedStop);
         // Its place is tried again, so a fix that did not take shows; an ignored value is never raised again.
         chooser.retry(fixed.kind(), fixed.place());

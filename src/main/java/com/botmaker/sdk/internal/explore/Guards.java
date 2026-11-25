@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.explore;
 
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.text.TextResult;
@@ -112,7 +113,11 @@ public final class Guards {
     public Refusal check(Input input, Around around) {
         Refusal front = front(around);
         if (front.refused()) return front;
-        Optional<String> field = around.at().stream().map(Guards::sensitive).flatMap(Optional::stream).findFirst();
+        // A field typing a secret is BotMaker's to fill, the run never holding it: the one press a password field takes.
+        // A payment field refuses it still.
+        boolean typesSecret = input instanceof Button button && button.isSecret();
+        Optional<String> field = around.at().stream().filter(node -> !(typesSecret && node.has(Trait.PASSWORD)))
+                .map(Guards::sensitive).flatMap(Optional::stream).findFirst();
         if (field.isPresent()) return new Refusal(Kind.SENSITIVE_FIELD, field.get());
         Verdict verdict = input.verdict();
         switch (verdict) {
@@ -150,11 +155,16 @@ public final class Guards {
                 .findFirst();
     }
 
+    /** Whether {@code node} is an app's text field: one a tap only focuses, filled by what is typed after it. */
+    public static boolean textField(UiNode node) {
+        String type = node.className();
+        return type.endsWith("EditText") || type.endsWith("TextField") || type.endsWith("AutoCompleteTextView");
+    }
+
     /** Why {@code node} is a field nothing presses — a password, or payment details — or empty. */
     static Optional<String> sensitive(UiNode node) {
         if (node.has(Trait.PASSWORD)) return Optional.of("It is a password field.");
-        String type = node.className();
-        boolean field = type.endsWith("EditText") || type.endsWith("TextField") || type.endsWith("AutoCompleteTextView");
+        boolean field = textField(node);
         String said = (node.id() + " " + node.label() + " " + node.text()).toLowerCase(Locale.ROOT);
         return field && PAYMENT.matcher(said).find()
                 ? Optional.of("It is a payment field (" + node.shortId() + ").") : Optional.empty();

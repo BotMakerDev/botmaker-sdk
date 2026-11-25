@@ -50,7 +50,7 @@ public enum StopRole {
     public static StopRole of(StopKind kind) {
         return switch (kind == null ? StopKind.UNKNOWN : kind) {
             case UNKNOWN_SCREEN, UNMAPPED_INPUT, NO_VERDICT, MISSING_FACT, MISSING_CONDITION, WRONG_ARRIVAL, ERROR_PAGE,
-                 FAILED_INPUT, LOW_YIELD, UNWRITTEN, BAD_MAP -> CARTOGRAPHER;
+                 FAILED_INPUT, UNTYPED_FIELD, LOW_YIELD, UNWRITTEN, BAD_MAP -> CARTOGRAPHER;
             case FAULT, CRASH -> MECHANIC;
             case SETTLED -> SETTLER;
             // A window not the game's in front, nothing left to press, or a kind a newer SDK raised: the user's call. A

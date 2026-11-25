@@ -138,6 +138,10 @@ final class MapEdits {
                     @Describe(value = "how a button is pressed", optional = true) Gesture gesture,
                     @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs,
                     @Describe(value = "a text field's text; blank: the body's", optional = true) String types,
+                    @Describe(value = "a text field typing a parameter's value, its method reference: Login::email; "
+                            + "blank: none given", optional = true) String typesParameter,
+                    @Describe(value = "with typesParameter: a Secret BotMaker types, never the run (a password)",
+                            optional = true) Boolean secret,
                     @Describe(value = "a field: Enter after", optional = true) Boolean submits,
                     @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears,
                     @Describe(value = "dragged onto this picture; blank: no drag", optional = true) String dragOnto,
@@ -679,7 +683,8 @@ final class MapEdits {
             return AgentReply.refused("Give one of did, never and locked: each replaces the others. Nothing was "
                     + "written.");
         }
-        boolean typed = edit.types() != null || edit.submits() != null || edit.clears() != null;
+        boolean typed = edit.types() != null || edit.typesParameter() != null || edit.secret() != null
+                || edit.submits() != null || edit.clears() != null;
         boolean drags = edit.dragOnto() != null || edit.dragInto() != null || edit.dragMs() != null
                 || edit.dragBox() != null;
         boolean others = settles > 0 || edit.info() != null || edit.sometimes() != null || edit.repeated() != null
@@ -697,7 +702,8 @@ final class MapEdits {
         }
         if (!others) {
             return AgentReply.refused("Say what to set: did, info, never, locked, sometimes, repeated, gesture, "
-                    + "holdMs, types, submits, clears, dragOnto, dragInto, dragMs or side. Nothing was written.");
+                    + "holdMs, types, typesParameter, secret, submits, clears, dragOnto, dragInto, dragMs or side. "
+                    + "Nothing was written.");
         }
         Input in = on.inputs().get(field);
         if (edit.repeated() != null && !(in instanceof Button)) {
@@ -720,9 +726,25 @@ final class MapEdits {
             return AgentReply.refused(field + " is no button: only a button is a text field. Nothing was written.");
         }
         // Enter and Ctrl+A belong to a field: a plain button made one by them would close every way through it.
-        if (edit.types() == null && typed && !(in instanceof Button b && b.isField())) {
-            return AgentReply.refused(field + " is no text field yet: give types (blank: the body's text) with "
-                    + "submits or clears. Nothing was written.");
+        // A blank typesParameter is none given.
+        String parameter = has(edit.typesParameter()) ? edit.typesParameter().strip() : null;
+        if (edit.types() != null && parameter != null) {
+            return AgentReply.refused("A field types one thing: give types or typesParameter, not both. Nothing was "
+                    + "written.");
+        }
+        if (parameter != null && !ScreenTypes.isMethod(parameter)) {
+            return AgentReply.refused("typesParameter is a parameter's method reference, Login::email, not \""
+                    + parameter + "\". Nothing was written.");
+        }
+        boolean typesParameter = parameter != null
+                || edit.types() == null && in instanceof Button b && b.typedParameter() != null;
+        if (Boolean.TRUE.equals(edit.secret()) && !typesParameter) {
+            return AgentReply.refused("secret goes with typesParameter: a Secret is a parameter's, never a text. "
+                    + "Nothing was written.");
+        }
+        if (edit.types() == null && parameter == null && typed && !(in instanceof Button b && b.isField())) {
+            return AgentReply.refused(field + " is no text field yet: give types (blank: the body's text) or "
+                    + "typesParameter, with submits or clears. Nothing was written.");
         }
         if (edit.types() != null && edit.types().length() > ScreenEdits.LONGEST_TEXT) {
             return AgentReply.refused("A field types at most " + ScreenEdits.LONGEST_TEXT + " characters. Nothing was"
@@ -765,11 +787,18 @@ final class MapEdits {
         if (typed && now instanceof Button b) {
             boolean submits = edit.submits() == null ? b.isSubmitting() : edit.submits();
             boolean clears = edit.clears() == null ? b.isClearing() : edit.clears();
-            // A field typing a parameter keeps it unless a text is given in its place.
-            Typing typing = edit.types() == null && b.typedParameter() != null
-                    ? b.typing().with(submits, clears)
-                    : new Typing(edit.types() == null ? b.types() : edit.types().isBlank() ? null
-                            : Words.of(edit.types()), submits, clears);
+            // A parameter given replaces what it typed; a field typing one keeps it unless a text is given in its place.
+            Typing typing;
+            if (parameter != null) {
+                typing = new Typing(null, ScreenTypes.fact(parameter), Boolean.TRUE.equals(edit.secret()),
+                        submits, clears);
+            } else if (edit.types() == null && b.typedParameter() != null) {
+                boolean secret = edit.secret() == null ? b.isSecret() : edit.secret();
+                typing = new Typing(null, b.typedParameter(), secret, submits, clears);
+            } else {
+                typing = new Typing(edit.types() == null ? b.types() : edit.types().isBlank() ? null
+                        : Words.of(edit.types()), submits, clears);
+            }
             return said(ScreenEdits.setField(context.services(), screen, field, b.typing(typing)));
         }
         return said(ScreenEdits.setInput(context.services(), screen, field, now));

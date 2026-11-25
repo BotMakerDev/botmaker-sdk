@@ -7,6 +7,7 @@ import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
+import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.internal.explore.tree.Locator;
@@ -112,6 +113,18 @@ class GuardsTest {
     void passwordFieldRefuses() {
         assertEquals(Guards.Kind.SENSITIVE_FIELD, GUARDS.check(Button.of(OK).free(),
                 new Guards.Around(List.of(), IN_GAME, List.of(field("pin", Set.of(Trait.PASSWORD))))).kind());
+    }
+
+    /** A field typing a Secret is BotMaker's to fill: the password field under it refuses nothing (2026-11-25). */
+    @Test
+    void aSecretFieldPassesItsPasswordField() {
+        Button secret = Button.of(OK).free().typing(new Typing(null, ScreenTypes.fact("Login::password"), true,
+                false, false));
+        assertEquals(Guards.Kind.NONE, GUARDS.check(secret,
+                new Guards.Around(List.of(), IN_GAME, List.of(field("pin", Set.of(Trait.PASSWORD))))).kind());
+        assertEquals(Guards.Kind.SENSITIVE_FIELD, GUARDS.check(secret,
+                new Guards.Around(List.of(), IN_GAME, List.of(field("card_number", Set.of())))).kind(),
+                "a payment field refuses a secret still");
     }
 
     @Test

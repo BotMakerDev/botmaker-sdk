@@ -11,11 +11,13 @@ import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
 import com.botmaker.sdk.api.screens.Role;
+import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Setup;
 import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.TextResult;
 import com.botmaker.sdk.internal.explore.tree.Effect;
 import com.botmaker.sdk.internal.explore.tree.Locator;
+import com.botmaker.sdk.plugin.types.ScreenTypes;
 import com.botmaker.sdk.internal.explore.tree.TreeAnswer;
 import com.botmaker.sdk.internal.screens.MapScreen;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
@@ -163,10 +165,12 @@ class ExploreLoopTest {
 
         /** The text read around any press. */
         List<TextResult> near = List.of();
+        /** The screen tree's nodes under any press. */
+        List<UiNode> under = List.of();
 
         @Override
         public Guards.Around around(Input input) {
-            return new Guards.Around(near, front, List.of());
+            return new Guards.Around(near, front, under);
         }
 
         @Override
@@ -579,6 +583,92 @@ class ExploreLoopTest {
         assertEquals(StopKind.FAILED_INPUT, stops().getFirst().stop().kind());
         assertEquals("A.toggle", stops().getFirst().stop().place());
         assertFalse(map.done("A"));
+    }
+
+    /**
+     * An app's text field mapped as a plain button is not pressed, a tap only focusing it: the Cartographer's stop
+     * says what it types (2026-11-25).
+     */
+    @Test
+    void aTextFieldNothingTypesStops() {
+        UiNode email = new UiNode("identifierId", "", "", "android.widget.EditText", "com.google.android.gms", BOX,
+                EnumSet.of(Trait.ENABLED, Trait.CLICKABLE), List.of());
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("email", Button.of(new Locator(Role.TEXTBOX, "Email", null, null, null).element()).free());
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        ScreenGraph map = ScreenGraph.of(screens);
+        Game game = new Game();
+        game.state = Effect.State.of(page(web("textbox", "Email", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.under = List.of(email);
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of(), game.pressed, "a blind tap is never judged");
+        assertEquals(StopKind.UNTYPED_FIELD, stops().getFirst().stop().kind());
+        assertEquals("A.email", stops().getFirst().stop().place());
+        assertEquals(StopRole.CARTOGRAPHER, StopRole.of(StopKind.UNTYPED_FIELD));
+    }
+
+    /** A resume with ignore presses the field as a button for the rest of the run, with no stop on it again. */
+    @Test
+    void anIgnoredTextFieldIsPressedAsAButton() {
+        Game game = new Game();
+        ScreenGraph map = fieldScreen(Button.of(new Locator(Role.TEXTBOX, "Email", null, null, null).element()).free(),
+                game, Set.of());
+        boolean[] sent = {false};
+        game.onIdle = () -> {
+            if (!sent[0] && !stops().isEmpty()) {
+                sent[0] = true;
+                journal().command("resume " + openStop() + " ignore");
+            }
+        };
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(sent[0]);
+        assertEquals(List.of("A.email"), game.pressed);
+        assertEquals(1, stops().size(), stops().toString());
+    }
+
+    /** A password field mapped as a button is the Cartographer's to make a secret, not a guard stop. */
+    @Test
+    void aPasswordFieldNothingTypesStopsForTheCartographer() {
+        Game game = new Game();
+        ScreenGraph map = fieldScreen(Button.of(new Locator(Role.TEXTBOX, "Email", null, null, null).element()).free(),
+                game, Set.of(Trait.PASSWORD));
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of(), game.pressed);
+        assertEquals(StopKind.UNTYPED_FIELD, stops().getFirst().stop().kind());
+    }
+
+    /** A field typing a parameter is pressed: it is no button. */
+    @Test
+    void aFieldTypingAParameterIsPressed() {
+        Game game = new Game();
+        Button field = Button.of(new Locator(Role.TEXTBOX, "Email", null, null, null).element()).free()
+                .typing(new Typing(null, ScreenTypes.fact("Login::email"), false, false, false));
+        ScreenGraph map = fieldScreen(field, game, Set.of());
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.UNTYPED_FIELD), stops().toString());
+    }
+
+    /** One start screen A whose input {@code email} sits over an app's EditText with {@code traits} too. */
+    private static ScreenGraph fieldScreen(Button email, Game game, Set<Trait> traits) {
+        Set<Trait> all = EnumSet.of(Trait.ENABLED, Trait.CLICKABLE);
+        all.addAll(traits);
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        inputs.put("email", email);
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        game.state = Effect.State.of(page(web("textbox", "Email", EnumSet.of(Trait.ENABLED, Trait.CLICKABLE))), "/");
+        game.under = List.of(new UiNode("identifierId", "", "", "android.widget.EditText", "com.google.android.gms",
+                BOX, all, List.of()));
+        return ScreenGraph.of(screens);
     }
 
     /** A screen is finished before it is left: both inputs that stay are pressed before the way to the next screen. */

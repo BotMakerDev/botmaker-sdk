@@ -1510,6 +1510,47 @@ class SdkAssistTest {
         assertTrue(tried.contains("only a run of the bot runs it"), tried);
     }
 
+    /**
+     * set_input makes a button a field typing a parameter, or the Secret a parameter names (2026-11-25), and refuses
+     * two sources, a secret with no parameter, and a reference that is no method's.
+     */
+    @Test
+    void aFieldTypesAParameterOrASecret() {
+        ImageTemplate title = new ImageTemplate(TemplateLibrary.pathForName("title"));
+        ImageTemplate email = new ImageTemplate(TemplateLibrary.pathForName("email"));
+        put("HOME", MapFixtures.screen(Setup.named("Home").markers(List.of(title)), Button.of(email).free()));
+
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "types", "x", "typesParameter", "Login::email").isRefused(), "one source");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "secret", true).isRefused(), "a secret is a parameter's");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "typesParameter", "the email").isRefused(), "no method reference");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "typesParameter", "").isRefused(), "a blank one is none: no text field made");
+        assertFalse(((Button) input("HOME", "email")).isField());
+
+        assertFalse(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "typesParameter", "Login::email", "submits", true).isRefused());
+        Button field = assertInstanceOf(Button.class, input("HOME", "email"));
+        assertEquals(ScreenTypes.fact("Login::email"), field.typedParameter());
+        assertTrue(field.isSubmitting());
+        assertFalse(field.isSecret());
+
+        assertFalse(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "typesParameter", "Login::password", "secret", true).isRefused());
+        Button password = assertInstanceOf(Button.class, input("HOME", "email"));
+        assertEquals(ScreenTypes.fact("Login::password"), password.typedParameter());
+        assertTrue(password.isSecret() && password.isSubmitting(), "Enter kept");
+        assertTrue(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "types", "x", "secret", true).isRefused(), "a text is never a secret");
+
+        assertFalse(run("edit_map", "screen", "Home", "action", "set_input", "picture", "email",
+                "types", "").isRefused());
+        Button plain = assertInstanceOf(Button.class, input("HOME", "email"));
+        assertNull(plain.typedParameter(), "a text in its place drops the parameter");
+    }
+
     /** 🗺 Screens' hand tools set what try_input records, and add and remove screens (2026-10-15). */
     @Test
     void theMapIsEditedByHand() {
