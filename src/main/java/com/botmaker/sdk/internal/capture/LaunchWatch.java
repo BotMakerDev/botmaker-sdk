@@ -8,7 +8,7 @@ import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.capture.NewWindows.Candidate;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -91,8 +91,8 @@ public final class LaunchWatch {
                 NamedWindow window = NamedWindow.of(picked.identity());
                 Source.set(watch.around(window));
                 AutoPicks.run().save(target, picked.identity())
-                        .ifPresent(refused -> Diag.warn("Capture", "the window is not kept for the next runs: " + refused));
-                Diag.info("Capture", "capture: " + AutoCapture.said(window) + ", the window its launch opened");
+                        .ifPresent(refused -> Say.warn("the window is not kept for the next runs: " + refused));
+                Say.info("capture: " + AutoCapture.said(window) + ", the window its launch opened");
                 return Optional.empty();
             }
             case Result.NoWindow none -> {
@@ -111,7 +111,7 @@ public final class LaunchWatch {
      */
     static Result watch(LaunchSpec target, Desktop desktop, Duration timeout, Clock clock) {
         if (desktop.running()) {
-            Diag.info("Capture", target.spec() + " runs already: closed, so its window is the launch's");
+            Say.info(target.spec() + " runs already: closed, so its window is the launch's");
             desktop.close();
             Instant closing = clock.instant().plus(CLOSE_WAIT);
             while (desktop.running() && clock.instant().isBefore(closing)) desktop.pause(POLL);
@@ -170,7 +170,7 @@ public final class LaunchWatch {
             @Override
             public void close() {
                 if (!Launcher.stopOnHost(target)) {
-                    Diag.warn("Capture", target.spec() + " cannot be closed from here: close it to pick its window");
+                    Say.warn(target.spec() + " cannot be closed from here: close it to pick its window");
                 }
             }
 

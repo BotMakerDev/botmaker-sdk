@@ -16,7 +16,7 @@ import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.capture.AutoPicks;
 import com.botmaker.sdk.internal.emulator.EmulatorRef;
 import com.botmaker.sdk.internal.emulator.Emulators;
-import com.botmaker.shared.Diag;
+import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -82,7 +82,7 @@ public final class InstalledGame {
                 // The game is launched and restarted where the run plays: the dealt instance, not the author's.
                 playsOn = fixed.playsOn();
                 Source.set(fixed.source());
-                if (fixed.why() != null) Diag.info("Capture", fixed.why());
+                if (fixed.why() != null) Say.info(fixed.why());
                 // Read from the pick of an earlier run: what is watched again when that window no longer comes up.
                 if (saved.isPresent() && AutoCapture.decide(new AutoCapture.Inputs(inputs.emulatorProperty(), target,
                         capture, inputs.dealt(), Optional.empty(), inputs.runningInstances())) instanceof WatchLaunch w) {

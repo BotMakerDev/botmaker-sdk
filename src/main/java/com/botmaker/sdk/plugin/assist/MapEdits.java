@@ -120,7 +120,7 @@ final class MapEdits {
     }
 
     @Describe("screen; popup, the game opens it; start, it opens on it (new if none); panel, in the screen "
-            + "it opens from; tab, told by its button's selected look")
+            + "opening it; tab, its button looks selected")
     record SetKind(String screen, Kind as) implements Edit {
     }
 
@@ -129,23 +129,22 @@ final class MapEdits {
                     @Describe(value = PICTURE, optional = true) String picture,
                     @Describe(value = SCROLL, optional = true) Integer scroll,
                     @Describe(value = KEY, optional = true) String key,
-                    @Describe(value = "what it does, opening nothing (else new_screen)", optional = true) Result did,
-                    @Describe(value = "true: it only tells (help, rules), tried last", optional = true) Boolean info,
+                    @Describe(value = "what it does when it opens nothing", optional = true) Result did,
+                    @Describe(value = "true: only tells (help), tried last", optional = true) Boolean info,
                     @Describe(value = "why never clicked; blank clears", optional = true) String never,
-                    @Describe(value = "the picture proving it locked; blank clears", optional = true) String locked,
-                    @Describe(value = "true: shows only at times", optional = true) Boolean sometimes,
-                    @Describe(value = "true: a button shown more than once", optional = true) Boolean repeated,
+                    @Describe(value = "picture proving the lock; blank clears", optional = true) String locked,
+                    @Describe(value = "true: shown at times", optional = true) Boolean sometimes,
+                    @Describe(value = "true: shown more than once", optional = true) Boolean repeated,
                     @Describe(value = "how a button is pressed", optional = true) Gesture gesture,
-                    @Describe(value = "a hold's time; a hotkey's keys held", optional = true) Integer holdMs,
-                    @Describe(value = "a text field's text; blank: the body's", optional = true) String types,
-                    @Describe(value = "a text field typing a parameter's value, its method reference: Login::email; "
-                            + "blank: none given", optional = true) String typesParameter,
-                    @Describe(value = "with typesParameter: a Secret BotMaker types, never the run (a password)",
-                            optional = true) Boolean secret,
+                    @Describe(value = "hold time; a hotkey's held keys", optional = true) Integer holdMs,
+                    @Describe(value = "a field's text; blank: the body's", optional = true) String types,
+                    @Describe(value = "a field typing a parameter: Login::email; blank: none", optional = true)
+                    String typesParameter,
+                    @Describe(value = "a password: a Secret BotMaker types", optional = true) Boolean secret,
                     @Describe(value = "a field: Enter after", optional = true) Boolean submits,
                     @Describe(value = "a field: Ctrl+A first", optional = true) Boolean clears,
-                    @Describe(value = "dragged onto this picture; blank: no drag", optional = true) String dragOnto,
-                    @Describe(value = "dragged into dragBox beside this picture", optional = true) String dragInto,
+                    @Describe(value = "dropped on this picture; blank: none", optional = true) String dragOnto,
+                    @Describe(value = "dropped in dragBox by this picture", optional = true) String dragInto,
                     @Describe(value = "dragInto's drop area", optional = true) AreaBox dragBox,
                     @Describe(value = "a drag's time", optional = true) Integer dragMs,
                     @Describe(value = "a button found only at this side of anchor; unknown: anywhere", optional = true)
