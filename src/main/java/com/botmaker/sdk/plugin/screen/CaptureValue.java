@@ -69,13 +69,18 @@ public final class CaptureValue {
     /**
      * {@code written} as a run of the bot decides it, the instance {@code dealt} and the window a run picked for the
      * game included; the whole desktop for a desktop game's window not picked yet or an instance that cannot be told.
-     * Never probes the emulators: Studio's views ask it on the FX thread at each refresh.
+     * Never probes the emulators: Studio's views ask it on the FX thread at each refresh. {@code null} only when a run
+     * would stop ({@link AutoCapture.Decision.Fail}): a decision of no source is the whole desktop, which a view grabs.
      */
-    private static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
-                                          Instance dealt) {
+    static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
+                                  Instance dealt) {
         AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, target, written, dealt,
                 savedWindow(services, target, written), List::of));
-        return decision instanceof AutoCapture.Decision.Fixed fixed ? fixed.source() : null;
+        return switch (decision) {
+            case AutoCapture.Decision.Fixed fixed -> fixed.source() == null ? CaptureSource.desktop() : fixed.source();
+            case AutoCapture.Decision.WatchLaunch watch -> CaptureSource.desktop();
+            case AutoCapture.Decision.Fail fail -> null;
+        };
     }
 
     /** The window a run picked for {@code target}, read only when an automatic capture of a desktop game asks it. */

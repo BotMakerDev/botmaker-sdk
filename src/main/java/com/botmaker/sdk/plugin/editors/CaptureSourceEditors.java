@@ -9,7 +9,6 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Slots;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.source.SourcePicker;
 import javafx.scene.Node;
@@ -21,8 +20,8 @@ import java.util.List;
 
 /**
  * The editor for a {@code CaptureSource} — what a bot reads pixels from — in a slot and a Parameters row: a
- * pill naming the source that opens the source tile picker ({@code SourcePicker}), its Project default
- * tile included, since {@code Source.current()} is a value like any other.
+ * pill naming the source that opens the Choose capture source window ({@code SourcePicker}), its Automatic tab
+ * included, since {@code CaptureSource.automatic()} is a value like any other.
  *
  * <p>Values in, values out: the host writes {@code window("G").region(r)} through {@code CaptureTypes}. A value
  * the host could not read (a variable, {@code Sdk.captureSource}) is shown as written and replaced only by a
@@ -34,15 +33,16 @@ public final class CaptureSourceEditors {
 
     public static Node source(ValueContext ctx) {
         CaptureSource current = ctx.value(CaptureSource.class).orElse(null);
-        MenuButton pill = Pills.bare(current != null ? label(current) : Slots.sourceOr(ctx, "Choose…"));
+        MenuButton pill = Pills.bare(current != null
+                ? SourcePicker.label(ctx.services(), current) : Slots.sourceOr(ctx, "Choose…"));
         Pills.onOpen(pill, () -> List.of(Pills.item("Choose a capture source…", () ->
-                new SourcePicker(ctx.services(), Modals.owner(ctx.services()), true)
+                new SourcePicker(ctx.services(), Modals.owner(ctx.services()))
                         .preselect(ctx.value(CaptureSource.class).orElse(null))
                         .showAndWait()
                         .ifPresent(selection -> {
                             CaptureSource picked = valueOf(selection);
                             ctx.set(picked);
-                            pill.setText(label(picked));
+                            pill.setText(SourcePicker.label(ctx.services(), picked));
                         }))));
         return pill;
     }
@@ -52,14 +52,11 @@ public final class CaptureSourceEditors {
         return ctx.value(CaptureSource.class).map(source -> (Node) new Label(label(source))).orElse(null);
     }
 
-    /** What a pick writes: {@code Source.current()}, the source, or the source narrowed to the rectangle. */
+    /** What a pick writes: the source, or the source narrowed to the rectangle. */
     public static CaptureSource valueOf(SourcePicker.Selection selection) {
-        if (selection instanceof SourcePicker.Selection.Concrete concrete) {
-            Rectangle r = concrete.region();
-            return r == null ? concrete.target()
-                    : concrete.target().region(new Rect(r.x, r.y, r.width, r.height));
-        }
-        return new CurrentSource();
+        SourcePicker.Selection.Concrete concrete = (SourcePicker.Selection.Concrete) selection;
+        Rectangle r = concrete.region();
+        return r == null ? concrete.target() : concrete.target().region(new Rect(r.x, r.y, r.width, r.height));
     }
 
     /** The pill's words, {@link CaptureLabels#shortLabel}: the project default and a region included. */

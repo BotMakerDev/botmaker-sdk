@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.editors;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.RegionSource;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
@@ -23,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CaptureSourceEditorsTest {
 
     @Test
-    void theProjectDefaultTileWritesSourceCurrent() {
-        assertInstanceOf(CurrentSource.class,
-                CaptureSourceEditors.valueOf(new SourcePicker.Selection.ProjectDefault()));
+    void theAutomaticTabWritesTheAutomaticSource() {
+        assertInstanceOf(AutomaticSource.class,
+                CaptureSourceEditors.valueOf(new SourcePicker.Selection.Concrete(CaptureSource.automatic())));
+        assertEquals("Automatic", CaptureSourceEditors.label(CaptureSource.automatic()));
     }
 
     @Test

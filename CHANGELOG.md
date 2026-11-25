@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Choose capture source window is reworked like the Game window** (2026-11-25): a top bar says what the bot
+  reads, with ▶ Try to grab it now; tabs Automatic, Windows, Emulators & phones, Screens and Game VM (when the bot
+  has one), opened on the tab of the current value; a strip under them shows the picked source bigger, how the next
+  run finds it, its region (typed, drawn or whole) and Use. The Automatic tab says what Automatic reads for this
+  bot's game and, for a desktop game, the window a run picked, with *Forget the pick* so the next run watches the
+  launch again. A slot's pill reads `Automatic · picked <title>` once a run picked one. The Project default tile is
+  gone: the Automatic tab writes `CaptureSource.automatic()`, which follows the project's source the same way.
 - **The capture source is Automatic** (2026-11-25): a new bot's `captureSource()` is `CaptureSource.automatic()`,
   which reads where the game's launch target says: an emulator or phone app's instance (the one `instance()` deals,
   else the target's, else the one running; several running and none named stops the run, none running reads the
