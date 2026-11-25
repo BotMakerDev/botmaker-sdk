@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **The Game window has tabs** (2026-11-25, spec `2026-11-25-game-window-design.md`): a top bar says what the bot
+  plays, with a ▾ of its other targets to prefer or remove, and Launch; a line under it, only when the target's
+  emulator would stop a launch, opens the Emulators window. Tabs Games, Android apps, Websites and Recent fill the
+  window; a picked tile opens a strip under the grid with ▶ Try (starts it, writes nothing) and Use. The Games tab
+  lists each game once whatever launchers have it, badged with its launcher, chips with counts filtering by
+  launcher; a game two launchers list asks in the strip which one starts it. The emulator checks, the install row,
+  the Google Play search and "This bot supports" left the window.
 - **A start page that no longer opens blocks the launch** (2026-11-25): an emulator app target whose page is gone
   is refused with what to pick again, in Studio's readiness check and in `launch_game`.
 - **A launch target keeps its start page** (2026-11-25): `LaunchTarget.EmulatorApp` carries the page of

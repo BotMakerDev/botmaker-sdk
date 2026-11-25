@@ -10,9 +10,12 @@ import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.ChecksRow;
 import com.botmaker.sdk.plugin.emulator.EmulatorPicker;
+import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorAppCache;
 import com.botmaker.shared.emulator.EmulatorProbe;
+import com.botmaker.shared.emulator.checks.CheckResult;
+import com.botmaker.shared.emulator.checks.EmulatorChecks;
 import com.botmaker.shared.launch.GameLauncher;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -21,67 +24,45 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
-import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * The game dialog: what this computer starts for the open bot, picked from what the launchers and the app menu
- * on this computer already have, and a <b>▶ Launch game</b> that starts it without running the bot.
+ * The Game window: what this computer starts for the open bot, picked from what the launchers, the emulators and
+ * the web offer, and a <b>Launch</b> that starts it without running the bot.
  *
- * <p>Opened from the toolbar's game button. A row of radio buttons picks
- * what the grid of covers shows: <b>All</b> (every game, each once), <b>Recent</b> picks, one per launcher
- * (Lutris alone on Linux; Steam, Epic, Heroic, … elsewhere), one per emulator instance (its apps by name, dimmed while it is
- * stopped), Waydroid's Android apps, the menu's games, and every other app,
- * which All leaves out. A pick becomes the first of the games the bot supports — its {@code launchTargets} in
- * {@code Sdk.java} ({@link LaunchTargetValue}), held once — and is remembered in {@link RecentTargets}. Above the grid
- * those games stand as pills, each with a ✕ that removes it; the person running the bot picks among them in the
- * Runner ({@code LaunchChoice}).
+ * <p>A frame (spec {@code 2026-11-25-game-window-design.md}): a top bar saying what the bot plays, with a ▾ of the
+ * other targets it supports ({@code launchTargets} in {@code Sdk.java}, {@link LaunchTargetValue}) to prefer or
+ * remove, and Launch; under it, only when the target's emulator has a problem, one line linking to the Emulators
+ * window. Then the tabs — {@link GamesTab}, {@link AndroidTab}, {@link WebsitesTab}, {@link RecentTab} — and the
+ * {@link PickStrip} of the picked tile, whose Use makes it the bot's preferred target and remembers it in
+ * {@link RecentTargets}. The emulator checks and installs are not this window's: they run by themselves, and the
+ * Emulators window keeps them.
  *
- * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of
- * its entries, and the launcher already knows how to start it. On Linux <b>Add a game in Lutris…</b> opens Lutris,
- * where a game is added or installed (Faugus's own path went on 2026-10-29). An Android
- * game on no instance yet is searched on Google Play or picked as a file and installed ({@link InstallGame}).
+ * <p>It builds no launch settings of its own (the maintainer's call): a target is which launcher and which of its
+ * entries, and the launcher already knows how to start it.
  */
 public final class GameDialog {
-
-    /** A Steam portrait cover's 2:3; a square icon sits centred in it. */
-    private static final double COVER_WIDTH = 72;
-    private static final double COVER_HEIGHT = 108;
-    /** Two caption lines; a longer name ends in an ellipsis and is whole in the tooltip. */
-    private static final double CAPTION_HEIGHT = 34;
-    /** The tile's own padding (the {@code template-tile} style) on each side, and the cover-to-caption gap. */
-    private static final double TILE_PADDING = 6;
-    private static final double TILE_GAP = 4;
-    private static final double TILE_WIDTH = COVER_WIDTH + 2 * TILE_PADDING;
-    private static final double TILE_HEIGHT = COVER_HEIGHT + TILE_GAP + CAPTION_HEIGHT + 2 * TILE_PADDING;
 
     private static GameDialog active;
 
@@ -89,49 +70,40 @@ public final class GameDialog {
     private final Runnable onChanged;
     /** Set when a launcher editor asked: a pick goes to it and closes the dialog, and nothing is written. */
     private final Consumer<String> picked;
-    private final ToggleGroup picks = new ToggleGroup();
-    private final ToggleGroup groupPicks = new ToggleGroup();
-    /** One tile per target, so a game listed under All, Recent and its launcher is one selection. */
-    private final Map<String, Tile> tiles = new LinkedHashMap<>();
-    private final FlowPane filters = new FlowPane(12, 6);
-    private final FlowPane grid = new FlowPane(10, 10);
-    private final Label notice = Styles.on(new Label(), Styles.DIALOG_HINT);
-    private final Button playSearch = new Button();
-    private Group shown;
-    private String query = "";
+    private final GamesTab games;
+    private final AndroidTab android;
+    private final RecentTab recent;
+    private final WebsitesTab websites;
+    private final PickStrip strip;
+    private final Label plays = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
+    private final MenuButton supported = new MenuButton("▾");
+    private final Button launch;
+    private final Label warning = Styles.on(new Label(), Styles.WARNING_TEXT);
+    private final HBox warningRow;
+    private final Label status = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
     private boolean emulatorsRefreshed;
     /** Set by Add a game in Lutris…: the next time this window is focused, the libraries are read again once. */
     private boolean lutrisOpened;
     private List<GameCatalog.Section> lastScan;
-    private final Label current = Styles.on(new Label(), Styles.DIALOG_SUBHEADING);
-    private final Label status = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
-    /** The games the bot supports, each with its ✕; hidden when picking for an editor. */
-    private final FlowPane supported = new FlowPane(6, 6);
-    private final Button launch;
-    /** The current target's readiness, Install and Update. */
-    private final InstallRow installRow;
-    /** The current target's emulator: what is wrong with it, and Fix. */
-    private final ChecksRow checksRow;
     private Stage stage;
-
-    /** One tile, kept for the search and for marking the current target. */
-    private record Tile(GameCatalog.Item item, ToggleButton button) {}
-
-    /** One radio button's worth of tiles; {@code extra} is the emulator picker's tile, or {@code null}. */
-    private record Group(String title, List<Tile> tiles, Node extra) {}
 
     private GameDialog(StudioServices services, Runnable onChanged, Consumer<String> picked) {
         this.services = services;
         this.onChanged = onChanged == null ? () -> { } : onChanged;
         this.picked = picked;
         this.launch = Styles.on(QuickLaunch.button(services, this::report), Styles.PRIMARY_BUTTON);
-        launch.setText("▶ Launch game");
-        // An install changes the launcher's library or the instance's apps: both are read again.
-        this.installRow = new InstallRow(services, this::report, () -> {
-            rescan();
-            refreshCurrent();
-        });
-        this.checksRow = new ChecksRow(services, QuickLaunch::startAndWait);
+        launch.setText("Launch");
+        this.strip = new PickStrip(services, this::report, this::choose);
+        // A group per tab: each shows the current target's tile picked.
+        this.games = new GamesTab(new ToggleGroup(), strip::show, this::openLutris,
+                () -> InstallGame.fromFile(services, stage, this::report, this::installed));
+        this.android = new AndroidTab(new ToggleGroup(), strip::show, this::otherDevice);
+        this.recent = new RecentTab(new ToggleGroup(), strip::show);
+        this.websites = new WebsitesTab(strip::show, this::report);
+        Hyperlink emulators = new Hyperlink("Emulators…");
+        emulators.setOnAction(e -> EmulatorsWindow.open(services));
+        warningRow = new HBox(6, warning, emulators);
+        warningRow.setAlignment(Pos.CENTER_LEFT);
     }
 
     /** The toolbar's press. */
@@ -159,7 +131,7 @@ public final class GameDialog {
     }
 
     /**
-     * Opens the dialog to pick one game for a launcher editor (the Runner's, the Parameters window's): {@code picked}
+     * Opens the dialog to pick one target for a launcher editor (the Runner's, the Parameters window's): {@code picked}
      * gets its launch spec, on the JavaFX thread, and the dialog closes. Nothing is written to the bot; the editor
      * hands the value back.
      */
@@ -170,87 +142,37 @@ public final class GameDialog {
     }
 
     private void show(Window owner) {
-        Label heading = Styles.on(new Label("Which game does this bot play?"), Styles.DIALOG_HEADING);
-        Label hint = Styles.on(new Label(picked != null
-                ? "Pick it from what this computer's launchers already have — the pick goes into the launcher you "
-                        + "are editing."
-                : "Pick it from what this computer's launchers already have — the pick becomes the bot's preferred "
-                        + "game in Sdk.java. The person running the bot picks among the games it supports in the "
-                        + "Runner. ▶ Launch game starts it without running the bot."), Styles.DIALOG_HINT);
-        hint.setWrapText(true);
-
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox currentRow = new HBox(8, current, spacer, launch);
-        currentRow.setAlignment(Pos.CENTER_LEFT);
-        // Picking for an editor: the bot's games are not what is being chosen, and a ✕ would write them.
-        for (Node own : List.of(currentRow, installRow.node(), checksRow.node(), supported)) {
-            own.setVisible(picked == null);
-            own.setManaged(picked == null);
+        HBox top = new HBox(8, plays, supported, spacer, launch);
+        top.setAlignment(Pos.CENTER_LEFT);
+        // Picking for an editor: the bot's targets are not what is being chosen, and Remove would write them.
+        boolean own = picked == null;
+        for (Node node : List.<Node>of(top, warningRow)) {
+            node.setVisible(own);
+            node.setManaged(own);
         }
+        warningRow.setVisible(false);
+        warningRow.setManaged(false);
 
-        TextField search = new TextField();
-        search.setPromptText("Search…");
-        search.textProperty().addListener((obs, was, typedQuery) -> {
-            query = typedQuery == null ? "" : typedQuery.trim().toLowerCase(Locale.ROOT);
-            applySearch();
-            boolean any = !query.isEmpty();
-            playSearch.setText("Search Google Play for “" + (typedQuery == null ? "" : typedQuery.trim()) + "”…");
-            playSearch.setVisible(any);
-            playSearch.setManaged(any);
-        });
-
-        notice.setWrapText(true);
-        notice.setText("Looking through this computer's launchers…");
-        grid.setRowValignment(javafx.geometry.VPos.TOP);
-        // A game that is on no instance yet: found on Google Play, from this computer, and installed on one.
-        playSearch.setVisible(false);
-        playSearch.setManaged(false);
-        // What was typed, not the lowercased filter: a package name is case-sensitive.
-        playSearch.setOnAction(e -> InstallGame.searchPlay(services, stage, search.getText().strip(), this::installed));
-        VBox listing = new VBox(8, notice, grid, playSearch);
-        listing.setPadding(new Insets(4));
-        ScrollPane scroll = new ScrollPane(listing);
-        scroll.setFitToWidth(true);
-        VBox.setVgrow(scroll, Priority.ALWAYS);
-
-        TextField typed = new TextField();
-        typed.setPromptText("…or type a target: a website's address (https://example.com), steam:620, lutris:3, "
-                + "exe:/path/to/game");
-        HBox.setHgrow(typed, Priority.ALWAYS);
-        Button use = new Button("Use");
-        Runnable useTyped = () -> GameCatalog.typed(typed.getText()).ifPresentOrElse(
-                spec -> choose(new GameCatalog.Item(spec, LaunchSpec.describe(spec), null)),
-                () -> report(false, "\"" + typed.getText().trim() + "\" is not a launch target: write it as "
-                        + "kind:id, where kind is one of " + GameCatalog.kinds() + "."));
-        use.setOnAction(e -> useTyped.run());
-        typed.setOnAction(e -> useTyped.run());
-        HBox bottom = new HBox(8);
-        bottom.setAlignment(Pos.CENTER_LEFT);
-        if (Os.current() == Os.LINUX) {
-            Button addInLutris = new Button("Add a game in Lutris…");
-            addInLutris.setTooltip(new javafx.scene.control.Tooltip("Opens Lutris: add the game there (a store's "
-                    + "tab, an installer, or a Windows program from its .exe) and it is listed here"));
-            addInLutris.setOnAction(e -> openLutris());
-            bottom.getChildren().add(addInLutris);
-        }
-        Button fromFile = new Button("Install from file…");
-        fromFile.setTooltip(new javafx.scene.control.Tooltip("Pick an .apk, .xapk or .apks file and the emulator or "
-                + "phone to install it on; it becomes what this computer launches"));
-        fromFile.setOnAction(e -> InstallGame.fromFile(services, stage, this::report, this::installed));
-        bottom.getChildren().addAll(fromFile, typed, use);
+        TabPane tabs = new TabPane(tab("Games", games.node()), tab("Android apps", android.node()),
+                tab("Websites", websites.node()), tab("Recent", recent.node()));
+        tabs.getSelectionModel().selectedItemProperty().addListener((o, was, is) -> strip.clear());
+        VBox.setVgrow(tabs, Priority.ALWAYS);
 
         status.setWrapText(true);
         Button close = new Button("Close");
         close.setCancelButton(true);
         close.setOnAction(e -> stage.close());
-        HBox closeRow = new HBox(close);
-        closeRow.setAlignment(Pos.CENTER_RIGHT);
+        Region gap = new Region();
+        HBox.setHgrow(gap, Priority.ALWAYS);
+        HBox bottom = new HBox(8, status, gap, close);
+        bottom.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(status, Priority.SOMETIMES);
 
-        VBox root = new VBox(10, heading, hint, currentRow, installRow.node(), checksRow.node(), supported, search, filters, scroll, bottom, status,
-                closeRow);
-        root.setPadding(new Insets(16));
-        stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 760, 640, 520, 420), root);
+        VBox root = new VBox(8, top, warningRow, tabs, strip.node(), bottom);
+        root.setPadding(new Insets(12, 16, 12, 16));
+        stage = Modals.window(services, owner, Modals.Frame.modeless("Game", 820, 680, 560, 460), root);
         stage.setOnHidden(e -> active = null);
         // Back from Lutris with a game added: read the libraries again, once per visit to Lutris.
         stage.focusedProperty().addListener((o, was, is) -> {
@@ -266,8 +188,14 @@ public final class GameDialog {
         });
     }
 
+    private static Tab tab(String title, Node content) {
+        Tab tab = new Tab(title, content);
+        tab.setClosable(false);
+        return tab;
+    }
+
     /**
-     * Re-reads every library off the JavaFX thread; the grid changes only when the libraries did. The saved list is
+     * Re-reads every library off the JavaFX thread; the tabs change only when the libraries did. The saved list is
      * on screen meanwhile, so a game added or removed since appears or goes, and nothing else moves.
      */
     private void rescan() {
@@ -276,88 +204,28 @@ public final class GameDialog {
             // After the scan, not the saved fill: a scan that read the emulator cache before the refresh wrote it
             // would put the old apps back, and a refresh over the saved list would be dropped by the scan's.
             refreshEmulatorsOnce();
-        }, why -> {
-            notice.setText("Couldn't read the libraries: " + why);
-            Styles.pick(notice, Styles.ERROR_TEXT, Styles.DIALOG_HINT);
-            notice.setVisible(true);
-            notice.setManaged(true);
-        });
+        }, why -> report(false, "Couldn't read the libraries: " + why));
     }
 
-    /**
-     * One radio per section after <b>All</b> and <b>Recent</b>. All is every section but the folded one (every
-     * other app in the menu, which can be hundreds), each target once; Recent's pictures come from the scan
-     * when the remembered pick has none.
-     */
+    /** Each tab from {@code scanned}; the recents take a scanned picture when the remembered pick has none. */
     private void fill(List<GameCatalog.Section> scanned) {
         lastScan = scanned;
-        // A tile the libraries still list as it was stays, picture loaded and all; a gone or changed one is made anew.
-        Map<String, GameCatalog.Item> had = new HashMap<>();
-        tiles.forEach((spec, tile) -> had.put(spec, tile.item()));
-        tiles.keySet().removeAll(GameCatalog.outdated(had, scanned));
         Map<String, Path> art = new HashMap<>();
         for (GameCatalog.Section section : scanned) {
             for (GameCatalog.Item item : section.items()) {
                 if (item.artwork() != null) art.putIfAbsent(item.spec(), item.artwork());
             }
         }
-        Node emulator = null;
-        LinkedHashSet<Tile> all = new LinkedHashSet<>();
-        List<Group> launchers = new ArrayList<>();
-        for (GameCatalog.Section section : scanned) {
-            List<Tile> own = section.items().stream().map(this::tileFor).toList();
-            if (section.kind() == GameCatalog.Kind.EMULATOR) {
-                for (Tile tile : own) stopped(tile, section.stopped() ? section.title() : null);
-            }
-            Node extra = null;
-            if (section.note() != null) {
-                Label note = Styles.on(new Label(section.note()), Styles.DIALOG_HINT);
-                note.setWrapText(true);
-                extra = note;
-            }
-            if (section.kind() == GameCatalog.Kind.ANDROID) {
-                emulator = emulatorTile();
-                extra = emulator;
-            }
-            launchers.add(new Group(section.title(), own, extra));
-            if (!section.folded()) all.addAll(own);
-        }
-        List<Tile> recent = RecentTargets.list(services).stream()
-                .map(r -> tileFor(new GameCatalog.Item(r.spec(), r.name(),
-                        r.artwork() != null ? r.artwork() : art.get(r.spec()))))
-                .toList();
-        List<Group> groups = new ArrayList<>();
-        groups.add(new Group("All", List.copyOf(all), emulator));
-        if (!recent.isEmpty()) groups.add(new Group("Recent", recent, null));
-        groups.addAll(launchers);
-
-        notice.setText(Os.current() == Os.LINUX
-                ? "Lutris lists no game on this computer. Press Add a game in Lutris…, or pick an emulator app below."
-                : "No launcher on this computer lists a game: Steam, Epic, Heroic, GOG and the app menu were looked "
-                        + "at. Pick an emulator app below, or type a target.");
-        Styles.pick(notice, Styles.DIALOG_HINT, Styles.ERROR_TEXT);
-        boolean none = GameCatalog.nothingListed(scanned);
-        notice.setVisible(none);
-        notice.setManaged(none);
-
-        // A rescan (after adding a Windows program) keeps the radio that was on.
-        String was = shown == null ? null : shown.title();
-        Group first = groups.stream().filter(g -> g.title().equals(was)).findFirst().orElse(groups.getFirst());
-        filters.getChildren().clear();
-        for (Group group : groups) {
-            RadioButton radio = new RadioButton(group.title() + " (" + group.tiles().size() + ")");
-            radio.setToggleGroup(groupPicks);
-            radio.setSelected(group == first);
-            radio.setOnAction(e -> showGroup(group));
-            filters.getChildren().add(radio);
-        }
-        showGroup(first);
+        List<RecentTargets.Recent> recents = RecentTargets.list(services);
+        games.fill(scanned, recents.stream().map(RecentTargets.Recent::spec).toList());
+        android.fill(scanned);
+        recent.fill(recents, art);
         markCurrent();
     }
 
     /**
      * Once per dialog, after the remembered apps are on screen: asks each running emulator for its apps now, and
-     * rescans if they changed — a game installed since, or an instance never listed before. Reading a new app's
+     * refills if they changed — a game installed since, or an instance never listed before. Reading a new app's
      * name and icon takes a moment, which is why the remembered ones are shown first.
      */
     private void refreshEmulatorsOnce() {
@@ -372,123 +240,28 @@ public final class GameDialog {
         });
     }
 
-    /**
-     * A stopped instance's app is shown dimmed, and says that picking it starts the instance — a launch starts it
-     * before the app ({@code EmulatorAppLauncher}). {@code instance} is its caption, or {@code null} when it runs.
-     */
-    private static void stopped(Tile tile, String instance) {
-        tile.button().setOpacity(instance == null ? 1 : 0.55);
-        tile.button().setTooltip(new javafx.scene.control.Tooltip(tile.item().name() + "\n"
-                + LaunchSpec.describe(tile.item().spec())
-                + (instance == null ? "" : "\n" + instance + " isn't running: launching starts it first")));
-    }
-
-    /** Puts {@code group}'s tiles in the grid, then hides those the search leaves out. */
-    private void showGroup(Group group) {
-        shown = group;
-        List<Node> nodes = new ArrayList<>();
-        for (Tile tile : group.tiles()) nodes.add(tile.button());
-        if (group.extra() != null) nodes.add(group.extra());
-        grid.getChildren().setAll(nodes);
-        applySearch();
-    }
-
-    /** The tile for {@code item}'s target, made the first time the target is seen. */
-    private Tile tileFor(GameCatalog.Item item) {
-        return tiles.computeIfAbsent(item.spec(), spec -> new Tile(item, tile(item)));
-    }
-
-    private ToggleButton tile(GameCatalog.Item item) {
-        ToggleButton button = Styles.on(new ToggleButton(), Styles.TILE);
-        button.setToggleGroup(picks);
-        LaunchSpec spec = LaunchSpec.parse(item.spec());
-        button.setGraphic(cover(item.name(), item.artwork(), initials(item.name()),
-                spec == null ? null : spec.kind().displayName()));
-        fixSize(button);
-        button.setTooltip(new javafx.scene.control.Tooltip(item.name() + "\n" + LaunchSpec.describe(item.spec())));
-        button.setOnAction(e -> {
-            // A toggle clicked twice would deselect; the current target stays picked instead.
-            button.setSelected(true);
-            choose(item);
-        });
-        return button;
-    }
-
-    /** The Android section's way to every other emulator and a phone: the emulator picker. */
-    private Node emulatorTile() {
-        Button other = Styles.on(new Button(), Styles.TILE);
-        other.setGraphic(cover("Other emulator or phone…", null, "+", null));
-        fixSize(other);
-        other.setOnAction(e -> EmulatorPicker.show(services, stage, QuickLaunch::startAndWait).ifPresent(chosen -> {
+    /** The Android tab's way to every other emulator and a phone: the emulator picker. */
+    private void otherDevice() {
+        EmulatorPicker.show(services, stage, QuickLaunch::startAndWait).ifPresent(chosen -> {
             if (!chosen.hasApp()) {
                 report(false, "Pick an app inside " + chosen.instance().name() + ", not only the device.");
                 return;
             }
             String spec = new LaunchSpec(LaunchKind.EMULATOR_APP,
                     chosen.appPackage() + "@" + chosen.instance().reference()).spec();
-            // The app's own name and icon when the picker has seen them, as its card in the instance's section has.
+            // The app's own name and icon when the picker has seen them, as its tile in the instance's chip has.
             EmulatorAppCache cache = EmulatorAppCache.shared();
             String name = cache.packages(chosen.instance()).stream()
                     .filter(app -> app.packageName().equals(chosen.appPackage()))
                     .map(EmulatorProbe.InstalledApp::display).findFirst().orElse(chosen.appPackage());
-            choose(new GameCatalog.Item(spec, name, cache.iconPath(chosen.instance(), chosen.appPackage())));
-        }));
-        return other;
+            strip.show(PickStrip.single(null, new GameCatalog.Item(spec, name,
+                    cache.iconPath(chosen.instance(), chosen.appPackage()))));
+        });
     }
 
     /**
-     * Every tile the same size, whatever its caption. Only a width used to be set, and a wrapping caption's
-     * preferred height is measured before its width is known — a long name made a tile hundreds of pixels tall.
-     */
-    private static void fixSize(javafx.scene.control.ButtonBase tile) {
-        tile.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        tile.setMinSize(TILE_WIDTH, TILE_HEIGHT);
-        tile.setPrefSize(TILE_WIDTH, TILE_HEIGHT);
-        tile.setMaxSize(TILE_WIDTH, TILE_HEIGHT);
-    }
-
-    /**
-     * {@code name}'s cover, or {@code mark} in its place when there is no picture, with {@code launcher} — what starts
-     * it, {@code null} for none — as a badge in its corner, so one game in two launchers reads as two.
-     */
-    private static Node cover(String name, Path artwork, String mark, String launcher) {
-        StackPane frame = new StackPane();
-        frame.setPrefSize(COVER_WIDTH, COVER_HEIGHT);
-        frame.setMinSize(COVER_WIDTH, COVER_HEIGHT);
-        frame.setMaxSize(COVER_WIDTH, COVER_HEIGHT);
-        if (artwork != null) {
-            // Decoded at twice the frame so it stays sharp on a scaled display.
-            ImageView view = new ImageView(new Image(artwork.toUri().toString(), 0, 2 * COVER_HEIGHT, true, true,
-                    true));
-            view.setPreserveRatio(true);
-            view.setSmooth(true);
-            view.setFitWidth(COVER_WIDTH);
-            view.setFitHeight(COVER_HEIGHT);
-            frame.getChildren().add(view);
-        } else {
-            frame.getChildren().add(Styles.on(new Label(mark), Styles.CAPTION_STRONG));
-        }
-        if (launcher != null) {
-            Label badge = Styles.on(new Label(launcher), Styles.CHIP);
-            StackPane.setAlignment(badge, Pos.BOTTOM_LEFT);
-            frame.getChildren().add(badge);
-        }
-        Label caption = Styles.on(new Label(name), Styles.TILE_NAME);
-        caption.setWrapText(true);
-        caption.setTextOverrun(OverrunStyle.ELLIPSIS);
-        caption.setAlignment(Pos.TOP_CENTER);
-        caption.setTextAlignment(TextAlignment.CENTER);
-        caption.setMinSize(COVER_WIDTH, CAPTION_HEIGHT);
-        caption.setPrefSize(COVER_WIDTH, CAPTION_HEIGHT);
-        caption.setMaxSize(COVER_WIDTH, CAPTION_HEIGHT);
-        VBox content = new VBox(TILE_GAP, frame, caption);
-        content.setAlignment(Pos.TOP_CENTER);
-        return content;
-    }
-
-    /**
-     * A game just installed on an emulator: it becomes what this computer launches, and its instance's section is
-     * read again so its card is there. The install already read its name and icon into the cache.
+     * A game just installed on an emulator: it becomes what this computer launches, and the emulators are read
+     * again so its tile is there. The install already read its name and icon into the cache.
      */
     private void installed(GameCatalog.Item item) {
         choose(item);
@@ -508,9 +281,9 @@ public final class GameDialog {
 
     /** Makes {@code item} what this computer launches, remembers it, and says so. */
     private void choose(GameCatalog.Item item) {
-        RecentTargets.Recent recent = new RecentTargets.Recent(item.spec(), item.name(), item.artwork());
+        RecentTargets.Recent remembered = new RecentTargets.Recent(item.spec(), item.name(), item.artwork());
         if (picked != null) {
-            RecentTargets.remember(services, recent);
+            RecentTargets.remember(services, remembered);
             stage.close();
             picked.accept(item.spec());
             return;
@@ -522,49 +295,71 @@ public final class GameDialog {
         }
         // After the write: remembering is a settings change, which relabels the toolbar from the bot's new first
         // launcher — remembered before, it read the old one (2026-10-19).
-        RecentTargets.remember(services, recent);
+        RecentTargets.remember(services, remembered);
         changed("The bot now supports " + item.name() + " and prefers it; this computer launches it.");
     }
 
-    /** The header line, the launch button, and the row of the bot's games. */
+    /** The top bar, its ▾ of the bot's targets, Launch, and the emulator's warning line. */
     private void refreshCurrent() {
         String spec = LaunchTargetValue.current(services);
-        current.setText(spec == null ? "Nothing picked yet." : "Launches here: " + GameButton.caption(services, spec));
+        plays.setText(spec == null ? "Plays nothing yet: pick a game below."
+                : "▶ Plays: " + GameButton.caption(services, spec));
         QuickLaunch.bind(launch, services, this::report);
         if (picked == null) {
             refreshSupported(spec);
-            installRow.show(spec);
-            checksRow.show(spec);
+            refreshWarning(spec);
         }
     }
 
     /**
-     * One pill per game the bot supports, preferred first: pressing it makes it the preferred one, its ✕ removes it.
-     * {@code now} — what this computer launches — is marked ▶; one this system cannot start says so.
+     * The ▾: one entry per target the bot supports, preferred first, each with Prefer and Remove. {@code now} — what
+     * this computer launches — is marked ▶; one this system cannot start says so.
      */
     private void refreshSupported(String now) {
-        List<String> games = LaunchTargetValue.all(services);
-        List<Node> pills = new ArrayList<>();
-        pills.add(Styles.on(new Label(games.isEmpty() ? "This bot supports no game yet: pick one below."
-                : "This bot supports:"), Styles.SMALL_TEXT, Styles.MUTED_TEXT));
+        List<String> targets = LaunchTargetValue.all(services);
+        supported.getItems().clear();
+        supported.setDisable(targets.isEmpty());
         Os os = Os.current();
-        for (String spec : games) {
+        for (String spec : targets) {
             LaunchSpec parsed = LaunchSpec.parse(spec);
             Optional<String> notHere = parsed == null
                     ? Optional.of(spec + " is not a launch target.") : parsed.notHere(os);
-            Button prefer = Styles.on(new Button((spec.equals(now) ? "▶ " : "") + GameButton.caption(services, spec)
-                    + (notHere.isEmpty() ? "" : " (not on " + os.displayName() + ")")), Styles.PILL);
-            prefer.setTooltip(new javafx.scene.control.Tooltip(notHere.orElse("Make it the bot's preferred game")));
+            Menu entry = new Menu((spec.equals(now) ? "▶ " : "") + GameButton.caption(services, spec)
+                    + (notHere.isEmpty() ? "" : " (not on " + os.displayName() + ")"));
+            MenuItem prefer = new MenuItem("Prefer");
+            prefer.setDisable(spec.equals(now));
             prefer.setOnAction(e -> prefer(spec));
-            Button drop = Styles.on(new Button("✕"), Styles.PILL);
-            drop.setTooltip(new javafx.scene.control.Tooltip("Remove it from the games this bot supports"));
+            MenuItem drop = new MenuItem("Remove from this bot");
             drop.setOnAction(e -> drop(spec));
-            pills.add(new HBox(2, prefer, drop));
+            entry.getItems().addAll(prefer, new SeparatorMenuItem(), drop);
+            supported.getItems().add(entry);
         }
-        supported.getChildren().setAll(pills);
     }
 
-    /** Makes {@code spec}, already one of the bot's games, the preferred one. */
+    /** The one line under the top bar when the target's emulator would stop a launch, read off the FX thread. */
+    private void refreshWarning(String spec) {
+        LaunchSpec parsed = spec == null ? null : LaunchSpec.parse(spec);
+        if (parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP || parsed.emulatorInstance() == null) {
+            warningRow.setVisible(false);
+            warningRow.setManaged(false);
+            return;
+        }
+        Async.load("game-dialog-checks", () -> EmulatorChecks.stoppingLaunch(ChecksRow.read(parsed, null).results()),
+                stopping -> {
+                    // A pick made meanwhile has its own read.
+                    if (!spec.equals(LaunchTargetValue.current(services))) return;
+                    warning.setText(stopping.map(failed -> warningOf(parsed, failed)).orElse(""));
+                    warningRow.setVisible(stopping.isPresent());
+                    warningRow.setManaged(stopping.isPresent());
+                }, why -> { });
+    }
+
+    private static String warningOf(LaunchSpec spec, CheckResult failed) {
+        return spec.emulatorInstance() + ": " + failed.check().displayName()
+                + (failed.reason() == null || failed.reason().isBlank() ? "" : " — " + failed.reason());
+    }
+
+    /** Makes {@code spec}, already one of the bot's targets, the preferred one. */
     private void prefer(String spec) {
         Optional<String> refused = LaunchTargetValue.set(services, spec);
         if (refused.isPresent()) {
@@ -574,7 +369,7 @@ public final class GameDialog {
         changed("The bot now prefers " + GameButton.nameOf(services, spec) + ".");
     }
 
-    /** Takes {@code spec} out of the bot's games. */
+    /** Takes {@code spec} out of the bot's targets. */
     private void drop(String spec) {
         Optional<String> refused = LaunchTargetValue.remove(services, spec);
         if (refused.isPresent()) {
@@ -587,7 +382,7 @@ public final class GameDialog {
                 + GameButton.nameOf(services, next) + "."));
     }
 
-    /** After a write: the header, the bot's games and the picked tile follow, and the status says {@code what}. */
+    /** After a write: the top bar and the picked tile follow, and the status says {@code what}. */
     private void changed(String what) {
         refreshCurrent();
         markCurrent();
@@ -599,18 +394,10 @@ public final class GameDialog {
     private void markCurrent() {
         // Picking for an editor: the bot's first launcher is not the one being edited.
         if (picked != null) return;
-        Tile tile = tiles.get(LaunchTargetValue.current(services));
-        picks.selectToggle(tile == null ? null : tile.button());
-    }
-
-    /** Hides the shown group's tiles whose name doesn't contain the search; the emulator tile stays. */
-    private void applySearch() {
-        if (shown == null) return;
-        for (Tile tile : shown.tiles()) {
-            boolean match = query.isEmpty() || tile.item().name().toLowerCase(Locale.ROOT).contains(query);
-            tile.button().setVisible(match);
-            tile.button().setManaged(match);
-        }
+        String spec = LaunchTargetValue.current(services);
+        games.mark(spec);
+        android.mark(spec);
+        recent.mark(spec);
     }
 
     /**
@@ -630,15 +417,5 @@ public final class GameDialog {
     private void report(boolean ok, String message) {
         status.setText(message);
         Styles.pick(status, ok ? Styles.MUTED_TEXT : Styles.ERROR_TEXT, Styles.MUTED_TEXT, Styles.ERROR_TEXT);
-    }
-
-    private static String initials(String label) {
-        if (label == null || label.isBlank()) return "?";
-        StringBuilder out = new StringBuilder();
-        for (String word : label.trim().split("\\s+")) {
-            if (!word.isEmpty()) out.append(Character.toUpperCase(word.charAt(0)));
-            if (out.length() >= 3) break;
-        }
-        return out.toString();
     }
 }

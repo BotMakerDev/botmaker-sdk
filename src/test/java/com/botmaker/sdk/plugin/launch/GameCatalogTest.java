@@ -235,6 +235,48 @@ class GameCatalogTest {
         assertEquals(Optional.empty(), GameCatalog.nameOf("steam:1"));
     }
 
+    @Test
+    void aGameInSteamAndHeroicIsOneTileWithTwoLaunchers() {
+        Path cover = Path.of("hades.png");
+        List<GameCatalog.Game> games = GameCatalog.games(List.of(
+                new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Steam", false,
+                        List.of(new GameCatalog.Item("steam:1145350", "Hades II", null))),
+                new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Heroic", false,
+                        List.of(new GameCatalog.Item("heroic:abc", "HADES  II™", cover),
+                                new GameCatalog.Item("heroic:def", "Celeste", null)))), List.of());
+
+        assertEquals(List.of("Celeste", "Hades II"), games.stream().map(GameCatalog.Game::name).toList());
+        GameCatalog.Game hades = games.get(1);
+        assertEquals(List.of("Steam", "Heroic"), hades.launchers());
+        assertEquals(List.of("steam:1145350", "heroic:abc"),
+                hades.ways().stream().map(w -> w.item().spec()).toList());
+        assertEquals(cover, hades.artwork(), "the picture one launcher has serves the tile");
+        assertEquals(Map.of("Heroic", 2, "Steam", 1), GameCatalog.launcherCounts(games));
+    }
+
+    @Test
+    void recentGamesComeFirstAndTheMenusOtherAppsLastWithoutAChipCount() {
+        List<GameCatalog.Game> games = GameCatalog.games(List.of(
+                new GameCatalog.Section(GameCatalog.Kind.LAUNCHER, "Lutris", false,
+                        List.of(new GameCatalog.Item("lutris:1", "Alpha", null),
+                                new GameCatalog.Item("lutris:2", "Zeta", null))),
+                new GameCatalog.Section(GameCatalog.Kind.EMULATOR, "LDPlayer-1", false, false,
+                        List.of(new GameCatalog.Item("emu-app:a.b@LDPlayer-1", "Alpha", null))),
+                new GameCatalog.Section(GameCatalog.Kind.MENU_GAMES, "Games", false,
+                        List.of(new GameCatalog.Item("desktop:kpat", "Patience", null))),
+                new GameCatalog.Section(GameCatalog.Kind.OTHER_APPS, "Other", true,
+                        List.of(new GameCatalog.Item("desktop:alpha", "Alpha", null)))),
+                List.of("lutris:2"));
+
+        assertEquals(List.of("Zeta", "Alpha", "Patience", "Alpha"),
+                games.stream().map(GameCatalog.Game::name).toList());
+        assertEquals(List.of("Lutris"), games.get(1).launchers(), "an emulator's app is the Android tab's");
+        assertTrue(games.get(3).folded(), "an app of the menu is never merged into a game");
+        Map<String, Integer> chips = GameCatalog.launcherCounts(games);
+        assertEquals(List.of("Lutris", GameCatalog.APP_MENU), List.copyOf(chips.keySet()));
+        assertEquals(1, chips.get(GameCatalog.APP_MENU));
+    }
+
     private static List<String> specs(GameCatalog.Section section) {
         return section.items().stream().map(GameCatalog.Item::spec).toList();
     }

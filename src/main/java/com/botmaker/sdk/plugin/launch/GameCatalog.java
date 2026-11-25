@@ -30,15 +30,19 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -161,6 +165,110 @@ public final class GameCatalog {
         public Section(Kind kind, String title, boolean folded, List<Item> items) {
             this(kind, title, folded, false, items);
         }
+    }
+
+    /**
+     * One tile of the Games tab: a game listed once however many launchers have it, each of them a {@link Way} to
+     * start it, the first the one a pick uses unless the strip is told another. A {@code folded} one is an app of the
+     * menu that is no game: the tab shows it under its own chip only.
+     */
+    public record Game(String name, Path artwork, List<Way> ways, boolean folded) {
+
+        public Game {
+            ways = List.copyOf(ways);
+        }
+
+        /** What the launchers that have it are called, in order: the tile's badge and the chips' counts. */
+        public List<String> launchers() {
+            return ways.stream().map(Way::launcher).distinct().toList();
+        }
+    }
+
+    /** One launcher's entry for a game: the launcher's name, as its badge and chip say it, and the target it sets. */
+    public record Way(String launcher, Item item) {}
+
+    /** The chip of the menu's games that no launcher lists, and the badge on them. */
+    public static final String APP_MENU = "App menu";
+
+    /**
+     * The Games tab's tiles from {@code sections}: every launcher's games and the menu's, one tile per game however
+     * many launchers list it (matched by name, whatever its case, spacing or marks), then the menu's other apps
+     * folded, never merged. The targets in {@code recent} come first, in its order; the rest by name. Emulator
+     * sections are the Android tab's. Pure, for the tests.
+     */
+    public static List<Game> games(List<Section> sections, List<String> recent) {
+        Map<String, List<Way>> byName = new LinkedHashMap<>();
+        Map<String, String> names = new HashMap<>();
+        Map<String, Path> art = new HashMap<>();
+        List<Game> folded = new ArrayList<>();
+        for (Section section : sections) {
+            String launcher = switch (section.kind()) {
+                case LAUNCHER -> section.title();
+                case MENU_GAMES, OTHER_APPS -> APP_MENU;
+                case EMULATOR, ANDROID -> null;
+            };
+            if (launcher == null) continue;
+            for (Item item : section.items()) {
+                Way way = new Way(launcher, item);
+                if (section.folded()) {
+                    folded.add(new Game(item.name(), item.artwork(), List.of(way), true));
+                    continue;
+                }
+                String key = matchKey(item.name());
+                if (key.isEmpty()) key = "spec:" + item.spec();
+                byName.computeIfAbsent(key, k -> new ArrayList<>()).add(way);
+                names.putIfAbsent(key, item.name());
+                if (item.artwork() != null) art.putIfAbsent(key, item.artwork());
+            }
+        }
+        List<Game> games = new ArrayList<>();
+        byName.forEach((key, ways) -> games.add(new Game(names.get(key), art.get(key), ways, false)));
+        Comparator<Game> order = Comparator.comparingInt((Game g) -> recency(g, recent))
+                .thenComparing(g -> g.name() == null ? "" : g.name().toLowerCase(Locale.ROOT));
+        games.sort(order);
+        folded.sort(order);
+        games.addAll(folded);
+        return List.copyOf(games);
+    }
+
+    /** Where {@code game}'s first recent target stands in {@code recent}, or past its end when none is there. */
+    private static int recency(Game game, List<String> recent) {
+        int best = recent.size();
+        for (Way way : game.ways()) {
+            int at = recent.indexOf(way.item().spec());
+            if (at >= 0 && at < best) best = at;
+        }
+        return best;
+    }
+
+    /** {@code name} as two launchers' listings of one game both write it: letters and digits only, lower case. */
+    static String matchKey(String name) {
+        if (name == null) return "";
+        // ™ and ® first: decomposed, ™ would be the letters TM.
+        String marks = name.replaceAll("\\p{So}", "");
+        String plain = Normalizer.normalize(marks, Normalizer.Form.NFKD).toLowerCase(Locale.ROOT);
+        StringBuilder out = new StringBuilder();
+        plain.codePoints().filter(Character::isLetterOrDigit).forEach(out::appendCodePoint);
+        return out.toString();
+    }
+
+    /**
+     * The Games tab's chips: each launcher that lists a game, and how many games it has, by name; the app menu after
+     * them, and its other apps never counted (they have a chip of their own). A launcher with no game has no chip.
+     */
+    public static Map<String, Integer> launcherCounts(List<Game> games) {
+        Map<String, Integer> counts = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        int menu = 0;
+        for (Game game : games) {
+            if (game.folded()) continue;
+            for (String launcher : game.launchers()) {
+                if (launcher.equals(APP_MENU)) menu++;
+                else counts.merge(launcher, 1, Integer::sum);
+            }
+        }
+        Map<String, Integer> out = new LinkedHashMap<>(counts);
+        if (menu > 0) out.put(APP_MENU, menu);
+        return out;
     }
 
     /**
