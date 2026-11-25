@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A run that cannot tell which window its launch opened is the game's asks you** (2026-11-25): when two or more
+  new windows are left that only size tells apart (two Wine windows under Lutris), Studio opens *Which window is the
+  game?*, a big still of the selected window beside a list of all of them, the run's guess selected. *Use this
+  window* keeps it for the game on this PC and the run goes on with it at once; with no answer in 30 s the run takes
+  its guess, says so, and keeps nothing, so the next run asks again. A Steam game's own window class, or the window
+  the launched process owns, is never in doubt.
+
 - **The Choose capture source window is reworked like the Game window** (2026-11-25): a top bar says what the bot
   reads, with ▶ Try to grab it now; tabs Automatic, Windows, Emulators & phones, Screens and Game VM (when the bot
   has one), opened on the tab of the current value; a strip under them shows the picked source bigger, how the next

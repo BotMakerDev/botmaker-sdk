@@ -138,6 +138,26 @@ public final class NewWindows {
         return biggest;
     }
 
+    /**
+     * The candidates of {@code ranked} the ranking cannot tell apart (2026-11-25): at least two no launcher owns, the
+     * recommended one first, each as far up as it by the launch's tree, so only size put it on top. Empty when the
+     * recommended one won by its owner or is alone, and when it is of the target's class ({@code gameClass}): every
+     * window of that class is the game's, and the biggest is right, as {@link #refocused} takes it.
+     */
+    public static List<Candidate> doubt(List<Candidate> ranked, String gameClass) {
+        Candidate top = recommended(ranked);
+        if (top == null || ofClass(top, gameClass)) return List.of();
+        List<Candidate> tied = new ArrayList<>();
+        for (Candidate candidate : ranked) {
+            if (!candidate.launcher() && candidate.ofLaunch() == top.ofLaunch()) tied.add(candidate);
+        }
+        return tied.size() < 2 ? List.of() : List.copyOf(tied);
+    }
+
+    private static boolean ofClass(Candidate candidate, String gameClass) {
+        return gameClass != null && candidate.identity().windowClass().equalsIgnoreCase(gameClass);
+    }
+
     /** The recommended window of {@code ranked}, or {@code null} when only launchers opened one. */
     public static Candidate recommended(List<Candidate> ranked) {
         for (Candidate candidate : ranked) if (candidate.recommended()) return candidate;

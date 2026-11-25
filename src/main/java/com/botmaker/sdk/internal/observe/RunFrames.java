@@ -9,6 +9,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A {@link RunEvent} as the bytes the run channel carries, and back: the SDK's own telemetry format, written by the
@@ -28,6 +30,11 @@ public final class RunFrames {
     private static final int REGION = 3;
     private static final int SWIPE = 4;
     private static final int STEP = 5;
+    private static final int WINDOW_DOUBT = 6;
+    private static final int WINDOW_SETTLED = 7;
+
+    /** The most windows a doubt names: a frame claiming more is cut or corrupt. */
+    public static final int MAX_WINDOWS = 64;
 
     private RunFrames() {}
 
@@ -83,6 +90,25 @@ public final class RunFrames {
                     out.writeUTF(s.action());
                     out.writeInt(s.line());
                 }
+                case RunEvent.WindowDoubt d -> {
+                    out.writeByte(WINDOW_DOUBT);
+                    out.writeUTF(d.game());
+                    out.writeInt(d.seconds());
+                    // Never more than a reader takes: a longer list would be refused whole.
+                    List<RunEvent.DoubtfulWindow> named = d.windows().subList(0, Math.min(d.windows().size(),
+                            MAX_WINDOWS));
+                    out.writeInt(named.size());
+                    for (RunEvent.DoubtfulWindow w : named) {
+                        out.writeUTF(w.handle());
+                        out.writeUTF(w.title());
+                        out.writeUTF(w.identity());
+                        target(out, w.bounds());
+                    }
+                }
+                case RunEvent.WindowSettled s -> {
+                    out.writeByte(WINDOW_SETTLED);
+                    out.writeUTF(s.game());
+                }
             }
         } catch (IOException impossible) {
             throw new UncheckedIOException(impossible); // an in-memory stream does not fail
@@ -105,6 +131,18 @@ public final class RunFrames {
                 case SWIPE -> new RunEvent.Swipe(target(in), in.readInt(), in.readInt(), in.readInt(), in.readInt(),
                         in.readLong(), in.readInt());
                 case STEP -> new RunEvent.Step(in.readUTF(), in.readUTF(), in.readInt());
+                case WINDOW_DOUBT -> {
+                    String game = in.readUTF();
+                    int seconds = in.readInt();
+                    int count = in.readInt();
+                    if (count < 0 || count > MAX_WINDOWS) throw new Unreadable(count + " windows in a doubt");
+                    List<RunEvent.DoubtfulWindow> windows = new ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        windows.add(new RunEvent.DoubtfulWindow(in.readUTF(), in.readUTF(), in.readUTF(), target(in)));
+                    }
+                    yield new RunEvent.WindowDoubt(game, seconds, windows);
+                }
+                case WINDOW_SETTLED -> new RunEvent.WindowSettled(in.readUTF());
                 default -> throw new Unreadable("frame type " + type);
             };
         } catch (IOException cut) {

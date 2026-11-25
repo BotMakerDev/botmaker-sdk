@@ -5,6 +5,7 @@ package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.WindowIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Rectangle;
@@ -18,7 +19,6 @@ import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -111,6 +111,31 @@ class LaunchWatchTest {
         @Override
         public void pause(Duration duration) {
             clock.now = clock.now.plus(duration);
+        }
+
+        /** Whether someone is there to answer a doubt. */
+        boolean canAsk;
+        /** What they have picked, by the time since they were asked; null: nothing yet. */
+        Function<Duration, WindowIdentity> picks = since -> null;
+        final List<List<NewWindows.Candidate>> asked = new ArrayList<>();
+        Instant askedAt;
+        int settled;
+
+        @Override
+        public boolean ask(LaunchSpec target, List<NewWindows.Candidate> doubt) {
+            asked.add(doubt);
+            askedAt = clock.now;
+            return canAsk;
+        }
+
+        @Override
+        public WindowIdentity answer(LaunchSpec target) {
+            return askedAt == null ? null : picks.apply(Duration.between(askedAt, clock.now));
+        }
+
+        @Override
+        public void settled(LaunchSpec target) {
+            settled++;
         }
 
         LaunchWatch.Result watch() {
@@ -214,7 +239,7 @@ class LaunchWatchTest {
         FakeDesktop desktop = new FakeDesktop(List.of(game, other), List.of(game, other), false);
         LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
         assertEquals("steam_app_440", picked.identity().spec());
-        assertTrue(picked.refocused());
+        assertEquals(LaunchWatch.Result.How.REFOCUSED, picked.how());
     }
 
     /** A window the launch opens wins over the game's class open before: it is the launch's. */
@@ -225,7 +250,7 @@ class LaunchWatchTest {
         FakeDesktop desktop = new FakeDesktop(List.of(old), List.of(old, fresh), false);
         LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
         assertEquals("tf_launcher", picked.identity().spec());
-        assertFalse(picked.refocused());
+        assertEquals(LaunchWatch.Result.How.OPENED, picked.how());
     }
 
     /** A crashed game's window is left open; the new game's window comes up 8 s after the launch: that one is picked. */
@@ -236,7 +261,101 @@ class LaunchWatchTest {
         FakeDesktop desktop = new FakeDesktop(List.of(left), since -> since.compareTo(Duration.ofSeconds(8)) < 0
                 ? List.of(left) : List.of(left, fresh), false);
         LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
-        assertFalse(picked.refocused());
+        assertEquals(LaunchWatch.Result.How.OPENED, picked.how());
+    }
+
+    /**
+     * Two Wine windows, neither the launch's own: Lutris's case, which only size tells apart. The guess is a little
+     * bigger, so it is the guess whichever order the desktop lists them in.
+     */
+    private static FakeDesktop twoWineWindows() {
+        return new FakeDesktop(List.of(), List.of(window(2, "Balatro", 1300, 8, "wine"),
+                window(3, "Battle.net", 1280, 9, "wine")), false);
+    }
+
+    /** In doubt, the watch asks once and uses the pick written meanwhile, which Studio kept already. */
+    @Test
+    void aDoubtIsAskedAndThePickWrittenMeanwhileIsUsed() {
+        FakeDesktop desktop = twoWineWindows();
+        desktop.canAsk = true;
+        desktop.picks = since -> since.compareTo(Duration.ofSeconds(5)) < 0 ? null
+                : WindowIdentity.of("wine", "Battle.net");
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals(1, desktop.asked.size());
+        assertEquals(List.of("wine|Balatro", "wine|Battle.net"),
+                desktop.asked.getFirst().stream().map(c -> c.identity().spec()).toList(), "the guess first");
+        assertEquals("wine|Battle.net", picked.identity().spec());
+        assertEquals(LaunchWatch.Result.How.BY_YOU, picked.how());
+        assertEquals(1, desktop.settled, "the window is told the question is over");
+    }
+
+    /** Nobody answers: the guess after {@code ASK_FOR}, past the launch's own timeout, and Studio's window closed. */
+    @Test
+    void anUnansweredDoubtTakesTheGuessAfterAskFor() {
+        FakeDesktop desktop = twoWineWindows();
+        desktop.canAsk = true;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("wine|Balatro", picked.identity().spec());
+        assertEquals(LaunchWatch.Result.How.GUESSED, picked.how());
+        assertTrue(Duration.between(desktop.askedAt, desktop.clock.now).compareTo(LaunchWatch.ASK_FOR) >= 0);
+        assertEquals(1, desktop.settled);
+    }
+
+    /**
+     * Nobody to ask (no host started the run): the guess at once, kept as the launch's window as before there was a
+     * question, so a run from the command line does not close and relaunch the game every time.
+     */
+    @Test
+    void aDoubtWithNobodyToAskKeepsTheGuessAtOnce() {
+        FakeDesktop desktop = twoWineWindows();
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("wine|Balatro", picked.identity().spec());
+        assertEquals(LaunchWatch.Result.How.OPENED, picked.how());
+        assertEquals(1, desktop.asked.size());
+        assertTrue(Duration.between(desktop.launchedAt, desktop.clock.now)
+                .compareTo(LaunchWatch.STABLE_FOR.plus(Duration.ofSeconds(1))) < 0, "waited as if asked");
+        assertEquals(0, desktop.settled, "nothing was asked, so nothing is settled");
+    }
+
+    /**
+     * The guess renames itself just as the wait ends, so it is not stable then: still the guess, never NoWindow, which
+     * would stop the run.
+     */
+    @Test
+    void aGuessRenamingAtTheTimeOutIsStillTheGuess() {
+        Duration renames = LaunchWatch.STABLE_FOR.plus(LaunchWatch.ASK_FOR);
+        FakeDesktop desktop = new FakeDesktop(List.of(), since -> List.of(
+                window(2, since.compareTo(renames) < 0 ? "Balatro" : "Balatro (1)", 1300, 8, "wine"),
+                window(3, "Battle.net", 1280, 9, "wine")), false);
+        desktop.canAsk = true;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals(LaunchWatch.Result.How.GUESSED, picked.how());
+        assertEquals(1, desktop.settled);
+    }
+
+    /** One of the two closes while the question is out: the other is picked as the launch's, and the window closed. */
+    @Test
+    void aDoubtThatGoesPicksTheWindowLeft() {
+        GenericWindow balatro = window(2, "Balatro", 1300, 8, "wine");
+        GenericWindow other = window(3, "Battle.net", 1280, 9, "wine");
+        FakeDesktop desktop = new FakeDesktop(List.of(), since -> since.compareTo(Duration.ofSeconds(8)) < 0
+                ? List.of(balatro, other) : List.of(balatro), false);
+        desktop.canAsk = true;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("wine|Balatro", picked.identity().spec());
+        assertEquals(LaunchWatch.Result.How.OPENED, picked.how());
+        assertEquals(1, desktop.settled);
+    }
+
+    /** A Steam game's own class decides: no question. */
+    @Test
+    void theGamesClassLeavesNoDoubt() {
+        FakeDesktop desktop = new FakeDesktop(List.of(), List.of(window(2, "Team Fortress 2", 1280, 8, "steam_app_440"),
+                window(3, "Battle.net", 1920, 9, "wine")), false);
+        desktop.canAsk = true;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("steam_app_440", picked.identity().spec());
+        assertTrue(desktop.asked.isEmpty());
     }
 
     /** A popup the launch opened, then closed: the watch does not fall back to the old window. */

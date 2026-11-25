@@ -172,8 +172,14 @@ final class AutomaticTab {
                 } catch (RuntimeException unreadable) {
                     return Optional.of("this PC's values do not open: " + unreadable.getMessage());
                 }
-                // Nothing kept: nothing to change.
-                if (ctx.isEmpty()) return Optional.empty();
+                if (ctx.isEmpty()) {
+                    // Nothing kept: nothing to forget, and a first pick (the doubt picker's) makes the value first.
+                    if (change.apply(HostWindows.none()).equals(HostWindows.none())) return Optional.empty();
+                    Optional<String> refused = services.hostValues().create(AutoPicks.VALUE);
+                    if (refused.isPresent()) return refused;
+                    ctx = services.hostValues().open(AutoPicks.VALUE);
+                    if (ctx.isEmpty()) return Optional.of("BotMaker could not open its values of this PC.");
+                }
                 HostWindows kept = ctx.get().value(HostWindows.class).orElse(null);
                 if (kept == null) return Optional.of("this PC's picks do not read, so nothing was written over them");
                 HostWindows next = change.apply(kept);

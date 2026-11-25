@@ -108,4 +108,41 @@ class NewWindowsTest {
         assertEquals(1, ranked.size());
         assertEquals("Game", ranked.getFirst().window().getTitle());
     }
+
+    /** Two Wine windows of one size, neither the launch's: only size could decide, so it is a doubt; a launcher is not in it. */
+    @Test
+    void twoWineWindowsOfOneSizeAreADoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Balatro", 1280, 8, "wine"),
+                window(2, "Battle.net", 1280, 9, "wine"), window(3, "Steam", 1600, STEAM, "steam")),
+                pid -> pid == STEAM, pid -> false);
+        List<Candidate> doubt = NewWindows.doubt(ranked, null);
+        assertEquals(2, doubt.size());
+        assertTrue(doubt.getFirst().recommended(), "the guess first");
+        assertTrue(doubt.stream().noneMatch(Candidate::launcher));
+    }
+
+    /** The window the launched process owns wins by its owner, bigger strangers or not: no doubt. */
+    @Test
+    void theLaunchsTreeLeavesNoDoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Game", 1280, LAUNCHED, "wine"),
+                window(2, "Battle.net", 1920, 9, "wine")), pid -> false, pid -> pid == LAUNCHED);
+        assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
+
+    /** A Steam game's own class decides, even beside another window of that class: no doubt. */
+    @Test
+    void theGamesClassLeavesNoDoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Balatro", 1280, 8, "steam_app_2379780"),
+                window(2, "Balatro settings", 1280, 8, "steam_app_2379780"), window(3, "Other", 1280, 9, "wine")),
+                pid -> false, pid -> false, "steam_app_2379780");
+        assertTrue(NewWindows.doubt(ranked, "steam_app_2379780").isEmpty());
+    }
+
+    /** One window alone is no doubt. */
+    @Test
+    void oneWindowIsNoDoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Balatro", 1280, 8, "wine")),
+                pid -> false, pid -> false);
+        assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
 }

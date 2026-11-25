@@ -174,6 +174,8 @@ public final class TelemetrySerializer {
                     s.x1(), s.y1(), s.x2(), s.y2(), s.durationMs());
             case RunEvent.Step s -> throw new IllegalArgumentException(
                     "a step is not an event the pilot draws: " + s.activity());
+            case RunEvent.WindowDoubt _, RunEvent.WindowSettled _ -> throw new IllegalArgumentException(
+                    "a question about the game's window is not an event the pilot draws");
         };
     }
 

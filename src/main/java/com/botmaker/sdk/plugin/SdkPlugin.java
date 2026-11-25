@@ -28,6 +28,7 @@ import com.botmaker.sdk.plugin.run.SdkReportViews;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
 import com.botmaker.sdk.plugin.run.SdkRuns;
 import com.botmaker.sdk.plugin.settings.VmKeeper;
+import com.botmaker.sdk.plugin.source.WindowDoubtPicker;
 import com.botmaker.shared.platform.Os;
 import com.botmaker.sdk.plugin.types.CaptureTypes;
 import com.botmaker.sdk.plugin.types.PlanTypes;
@@ -100,6 +101,9 @@ public final class SdkPlugin extends DeclaredPlugin {
                 .pools(SdkPools.class));
     }
 
+    /** Whether the window-doubt picker listens to this project's runs: in a process with a screen only. */
+    private static volatile boolean doubtPickerBound;
+
     /**
      * The toolbar's game button names what this project launches, so it is told which project that is, and the
      * plugin half's warnings go to its log. A project whose pictures are still at its resources' root is asked about
@@ -120,6 +124,9 @@ public final class SdkPlugin extends DeclaredPlugin {
         if (!services.hasUi()) return;
         UsedBy.remember(services);
         MoveOffer.offer(services);
+        // a run that cannot tell which window its launch opened is the game's asks here
+        WindowDoubtPicker.bind(services);
+        doubtPickerBound = true;
         if (Os.current() == Os.WINDOWS) VmKeeper.start(services);
     }
 
@@ -133,6 +140,9 @@ public final class SdkPlugin extends DeclaredPlugin {
         GameButton.unbind();
         GameReady.unbind();
         VmKeeper.stop();
+        // only where a UI bound it: the picker is JavaFX, which a headless host may not have
+        if (doubtPickerBound) WindowDoubtPicker.unbind();
+        doubtPickerBound = false;
         ScreenMap.letGoAll();
         SdkLog.unbind();
     }

@@ -438,7 +438,7 @@ public final class PilotServer implements AutoCloseable {
 
     private void onTelemetry(RunEvent te) {
         // A step is drawn nowhere on the screen, and its whole-screen target must not move the view.
-        if (te == null || te instanceof RunEvent.Step) return;
+        if (te == null || !te.drawn()) return;
         lastTarget = te.target();
         broadcastText(TelemetrySerializer.telemetryJson(te));
     }

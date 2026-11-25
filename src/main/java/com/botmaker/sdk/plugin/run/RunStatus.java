@@ -33,7 +33,7 @@ record RunStatus(String activity, String screen, String action, int line) {
                     m.found() ? "found (" + percent(m.confidence()) + ")" : "looked, not found", m.line());
             case RunEvent.Click c -> new RunStatus(activity, screen, "clicked", c.line());
             case RunEvent.Swipe s -> new RunStatus(activity, screen, "swiped", s.line());
-            case RunEvent.Region _ -> this;
+            case RunEvent.Region _, RunEvent.WindowDoubt _, RunEvent.WindowSettled _ -> this;
         };
     }
 

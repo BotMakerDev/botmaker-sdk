@@ -32,6 +32,7 @@ public final class SdkRun {
     public static final String SCREEN = "screen";
 
     private static volatile RunChannel channel = RunChannel.console();
+    private static volatile boolean hosted;
     /** The screen the game was last seen on, as the map shows it; null while none is known. */
     private static volatile String screen;
     /** Said once, as the run's JVM ends: the SDK's lines that sum the run up (the time on each screen). */
@@ -44,8 +45,14 @@ public final class SdkRun {
     public static void started(RunChannel given) {
         if (given == null) return;
         channel = given;
+        hosted = true;
         IpcObserver.install();
         hook();
+    }
+
+    /** Whether a host started this run, so the SDK's Studio half may hear its frames and answer them. */
+    public static boolean hosted() {
+        return hosted;
     }
 
     /** The screen the game is on now, as the map shows it ({@code null}: none known); later lines carry it. */
@@ -82,6 +89,7 @@ public final class SdkRun {
     /** Back to {@link RunChannel#console()}, with no observer encoding frames nobody reads. */
     public static void ended() {
         channel = RunChannel.console();
+        hosted = false;
         screen = null;
         IpcObserver.uninstall();
     }

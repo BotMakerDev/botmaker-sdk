@@ -71,9 +71,14 @@ public final class AutoPicks {
 
     /** The window picked for {@code target}; empty when none is, or what is kept does not read as a window. */
     public Optional<CaptureSource> saved(LaunchSpec target) {
+        return picked(target).map(NamedWindow::of);
+    }
+
+    /** The identity of the window picked for {@code target}; empty as {@link #saved} is. */
+    public Optional<WindowIdentity> picked(LaunchSpec target) {
         if (target == null) return Optional.empty();
         try {
-            return read().window(target.spec()).map(WindowIdentity::parse).map(NamedWindow::of);
+            return read().window(target.spec()).map(WindowIdentity::parse);
         } catch (RuntimeException notAWindow) {
             // A row a newer BotMaker or a hand wrote that does not read: as if none, so the launch is watched.
             return Optional.empty();

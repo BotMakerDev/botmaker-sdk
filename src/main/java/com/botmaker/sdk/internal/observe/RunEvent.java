@@ -3,6 +3,8 @@
 
 package com.botmaker.sdk.internal.observe;
 
+import java.util.List;
+
 /**
  * What the SDK tells its own window about a running bot, in its own words: where it matched, clicked or swiped, and
  * which activity and screen it is in. Crosses the run channel as a frame ({@link RunFrames}) the host relays whole
@@ -10,7 +12,8 @@ package com.botmaker.sdk.internal.observe;
  * §7). Lines and questions are not events: they are the host's, through the channel's own members.
  */
 public sealed interface RunEvent
-        permits RunEvent.Match, RunEvent.Click, RunEvent.Region, RunEvent.Swipe, RunEvent.Step {
+        permits RunEvent.Match, RunEvent.Click, RunEvent.Region, RunEvent.Swipe, RunEvent.Step, RunEvent.WindowDoubt,
+                RunEvent.WindowSettled {
 
     /** The whole screen: an event about no window. */
     Target NO_SURFACE = new Target(null, 0, 0, 0, 0);
@@ -26,6 +29,11 @@ public sealed interface RunEvent
 
     /** The 1-based line of the bot's source that led to it, or {@code -1}. */
     int line();
+
+    /** Whether it is drawn on the screen: a step and a question about the game's window are not. */
+    default boolean drawn() {
+        return true;
+    }
 
     /** A picture looked for in {@code region}: found at {@code rect} with {@code confidence}, or not. */
     record Match(Target target, Rect region, Rect rect, double confidence, boolean found, int line)
@@ -75,6 +83,79 @@ public sealed interface RunEvent
         @Override
         public Target target() {
             return NO_SURFACE;
+        }
+
+        @Override
+        public boolean drawn() {
+            return false;
+        }
+    }
+
+    /**
+     * The run cannot tell which of the windows its launch of {@code game} opened is the game's (2026-11-25, spec
+     * {@code 2026-11-25-window-doubt-picker-design.md}): the SDK's Studio half shows them, the first the run's guess,
+     * and writes the one picked to this PC's windows, which the run reads while it waits.
+     *
+     * @param seconds how long the run waits for the pick before it takes its guess
+     */
+    record WindowDoubt(String game, int seconds, List<DoubtfulWindow> windows) implements RunEvent {
+
+        public WindowDoubt {
+            game = game == null ? "" : game;
+            seconds = Math.max(0, seconds);
+            windows = windows == null ? List.of() : List.copyOf(windows);
+        }
+
+        @Override
+        public Target target() {
+            return NO_SURFACE;
+        }
+
+        @Override
+        public int line() {
+            return -1;
+        }
+
+        @Override
+        public boolean drawn() {
+            return false;
+        }
+    }
+
+    /**
+     * One window of a {@link WindowDoubt}: its native handle as text (what finds it again on the same desktop), its
+     * title, the identity a pick of it saves ({@code WindowIdentity.spec}) and where it is on the desktop.
+     */
+    record DoubtfulWindow(String handle, String title, String identity, Target bounds) {
+
+        public DoubtfulWindow {
+            handle = handle == null ? "" : handle;
+            title = title == null ? "" : title;
+            identity = identity == null ? "" : identity;
+            bounds = bounds == null ? NO_SURFACE : bounds;
+        }
+    }
+
+    /** The question about {@code game}'s window is over: the run was answered, took its guess, or the doubt went. */
+    record WindowSettled(String game) implements RunEvent {
+
+        public WindowSettled {
+            game = game == null ? "" : game;
+        }
+
+        @Override
+        public Target target() {
+            return NO_SURFACE;
+        }
+
+        @Override
+        public int line() {
+            return -1;
+        }
+
+        @Override
+        public boolean drawn() {
+            return false;
         }
     }
 }

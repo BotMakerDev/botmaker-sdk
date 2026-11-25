@@ -7,8 +7,11 @@ import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.capture.NewWindows.Candidate;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.internal.trace.Say;
+import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -16,9 +19,12 @@ import com.botmaker.shared.launch.Launcher;
 import com.botmaker.shared.launch.RunningProbe;
 import com.botmaker.shared.launch.WindowIdentity;
 
+import java.awt.Rectangle;
+import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +53,13 @@ public final class LaunchWatch {
      * none: a game {@code isRunning} missed is only refocused, but a game launched anew opens its window by then.
      */
     static final Duration REFOCUS_AFTER = Duration.ofSeconds(10);
+    /**
+     * How long a run in doubt waits for the user's pick ({@link NewWindows#doubt}, spec
+     * {@code 2026-11-25-window-doubt-picker-design.md}) before it takes its guess and keeps nothing.
+     */
+    static final Duration ASK_FOR = Duration.ofSeconds(30);
+    /** How often a question's answer is read while it is out. */
+    private static final Duration ANSWER_POLL = Duration.ofSeconds(1);
 
     /** The desktop as the watch sees it; the host's is {@link #host}. */
     interface Desktop {
@@ -65,6 +78,19 @@ public final class LaunchWatch {
         boolean inTree(long root, long pid);
 
         void pause(Duration duration);
+
+        /** Asks whoever is there which of {@code doubt} is {@code target}'s window: false when nobody can answer. */
+        default boolean ask(LaunchSpec target, List<Candidate> doubt) {
+            return false;
+        }
+
+        /** The window picked for {@code target} since it was {@linkplain #ask asked}, or {@code null}. */
+        default WindowIdentity answer(LaunchSpec target) {
+            return null;
+        }
+
+        /** Tells whoever was asked that the question is over. */
+        default void settled(LaunchSpec target) {}
     }
 
     /**
@@ -72,8 +98,20 @@ public final class LaunchWatch {
      * that runs and could not be closed, whose window would never be a new one.
      */
     sealed interface Result {
-        /** {@code refocused}: no window opened, and the game's own, open before the launch, is the one picked. */
-        record Picked(WindowIdentity identity, String title, boolean refocused) implements Result {}
+        /** The game's window, and how it was found. */
+        record Picked(WindowIdentity identity, String title, How how) implements Result {}
+
+        /** How a window was picked. */
+        enum How {
+            /** The window the launch opened. */
+            OPENED,
+            /** No window opened, and the game's own, open before the launch, is the one picked. */
+            REFOCUSED,
+            /** The watch could not tell, nobody answered: its best guess, kept for no later run. */
+            GUESSED,
+            /** The user picked it in Studio, which kept it already. */
+            BY_YOU
+        }
 
         record NoWindow(List<String> seen) implements Result {}
 
@@ -97,10 +135,18 @@ public final class LaunchWatch {
             case Result.Picked picked -> {
                 NamedWindow window = NamedWindow.of(picked.identity());
                 Source.set(watch.around(window));
-                AutoPicks.run().save(target, picked.identity())
-                        .ifPresent(refused -> Say.warn("the window is not kept for the next runs: " + refused));
-                Say.info("capture: " + AutoCapture.said(window) + (picked.refocused()
-                        ? ", the game's window its launch refocused" : ", the window its launch opened"));
+                String said = "capture: " + AutoCapture.said(window);
+                switch (picked.how()) {
+                    case OPENED, REFOCUSED -> {
+                        AutoPicks.run().save(target, picked.identity())
+                                .ifPresent(refused -> Say.warn("the window is not kept for the next runs: " + refused));
+                        Say.info(said + (picked.how() == Result.How.REFOCUSED
+                                ? ", the game's window its launch refocused" : ", the window its launch opened"));
+                    }
+                    case GUESSED -> Say.warn(said + ", a guess among the windows its launch opened: nobody picked"
+                            + " one, so it is not kept and the next run asks again");
+                    case BY_YOU -> Say.info(said + ", picked by you");
+                }
                 return Optional.empty();
             }
             case Result.NoWindow none -> {
@@ -118,6 +164,11 @@ public final class LaunchWatch {
      * stayed recommended for {@link #STABLE_FOR} under the same {@linkplain WindowIdentity#sameGame game}; it is saved
      * as it is titled then. While no new window is recommended, a window of that class open before the launch is
      * waited on the same way ({@link NewWindows#refocused}): a game {@code isRunning} missed is only refocused.
+     *
+     * <p>A stable pick the ranking cannot tell from other new windows ({@link NewWindows#doubt}) is asked of whoever is
+     * there ({@link Desktop#ask}) once; their pick is used as soon as it is written, and with none within
+     * {@link #ASK_FOR} the watch takes its guess, which is not kept. With nobody to ask the guess is picked as the
+     * launch's window, and kept. A doubt that goes (a window closed) picks as without one.
      */
     static Result watch(LaunchSpec target, Desktop desktop, Duration timeout, Clock clock) {
         if (desktop.running()) {
@@ -137,8 +188,28 @@ public final class LaunchWatch {
         Instant since = null;
         Instant refocusFrom = clock.instant().plus(REFOCUS_AFTER);
         boolean openedOne = false;
-        while (clock.instant().isBefore(deadline)) {
+        boolean asked = false;
+        Instant answerBy = null;
+        Instant nextAnswer = null;
+        Candidate guess = null;
+        while (clock.instant().isBefore(answerBy == null ? deadline : later(deadline, answerBy.plus(POLL)))) {
             desktop.pause(POLL);
+            if (answerBy != null) {
+                // The guess at the time out, stable or not now: a window renaming itself meanwhile is no NoWindow.
+                if (!clock.instant().isBefore(answerBy)) {
+                    desktop.settled(target);
+                    return picked(guess, Result.How.GUESSED);
+                }
+                // Once a second: an answer is this PC's values read again.
+                if (!clock.instant().isBefore(nextAnswer)) {
+                    nextAnswer = clock.instant().plus(ANSWER_POLL);
+                    WindowIdentity answer = desktop.answer(target);
+                    if (answer != null) {
+                        desktop.settled(target);
+                        return new Result.Picked(answer, answer.title(), Result.How.BY_YOU);
+                    }
+                }
+            }
             List<GenericWindow> now = desktop.open();
             List<Candidate> ranked = NewWindows.ranked(before, now, desktop::launcherUi,
                     pid -> launched > 0 && desktop.inTree(launched, pid), gameClass);
@@ -157,10 +228,31 @@ public final class LaunchWatch {
             last = handle;
             lastIdentity = best == null ? null : best.identity();
             if (handle != null && !clock.instant().isBefore(since.plus(STABLE_FOR))) {
-                return new Result.Picked(best.identity(), best.window().getTitle(), refocused);
+                List<Candidate> doubt = refocused ? List.of() : NewWindows.doubt(ranked, gameClass);
+                if (doubt.isEmpty()) {
+                    if (answerBy != null) desktop.settled(target);
+                    return picked(best, refocused ? Result.How.REFOCUSED : Result.How.OPENED);
+                }
+                if (!asked) {
+                    asked = true;
+                    // Nobody to ask (a run no host started): the guess is kept, as before there was a question.
+                    if (!desktop.ask(target, doubt)) return picked(best, Result.How.OPENED);
+                    answerBy = clock.instant().plus(ASK_FOR);
+                    nextAnswer = clock.instant().plus(ANSWER_POLL);
+                }
+                guess = best;
             }
         }
+        if (answerBy != null) desktop.settled(target);
         return new Result.NoWindow(List.copyOf(seen));
+    }
+
+    private static Result.Picked picked(Candidate window, Result.How how) {
+        return new Result.Picked(window.identity(), window.window().getTitle(), how);
+    }
+
+    private static Instant later(Instant a, Instant b) {
+        return a.isAfter(b) ? a : b;
     }
 
     static String stillRunning(LaunchSpec target) {
@@ -224,6 +316,46 @@ public final class LaunchWatch {
                     process = process.get().parent();
                 }
                 return false;
+            }
+
+            @Override
+            public boolean ask(LaunchSpec game, List<Candidate> doubt) {
+                // Only a run a host started has a Studio that may hear its frames and write the pick.
+                if (!SdkRun.hosted()) return false;
+                // A pick kept still is one this launch did not open (the watch runs again over it): forgotten, so a
+                // pick of the same window in Studio is a write the run sees.
+                if (AutoPicks.run().picked(game).isPresent() && AutoPicks.run().forget(game).isPresent()) return false;
+                List<RunEvent.DoubtfulWindow> windows = new ArrayList<>();
+                for (Candidate candidate : doubt.subList(0, Math.min(doubt.size(), RunFrames.MAX_WINDOWS))) {
+                    GenericWindow window = candidate.window();
+                    Rectangle rect = window.getRect();
+                    windows.add(new RunEvent.DoubtfulWindow(String.valueOf(window.getNativeHandle()),
+                            window.getTitle(), candidate.identity().spec(), rect == null ? RunEvent.NO_SURFACE
+                            : new RunEvent.Target(window.getTitle(), rect.x, rect.y, rect.width, rect.height)));
+                }
+                if (!send(new RunEvent.WindowDoubt(game.spec(), (int) ASK_FOR.toSeconds(), windows))) return false;
+                Say.info(doubt.size() + " new windows could be " + game.spec() + "'s: asking in Studio which, for "
+                        + ASK_FOR.toSeconds() + " s at most");
+                return true;
+            }
+
+            @Override
+            public WindowIdentity answer(LaunchSpec game) {
+                return AutoPicks.run().picked(game).orElse(null);
+            }
+
+            @Override
+            public void settled(LaunchSpec game) {
+                send(new RunEvent.WindowSettled(game.spec()));
+            }
+
+            private boolean send(RunEvent event) {
+                try {
+                    SdkRun.channel().frame(RunFrames.encode(event));
+                    return true;
+                } catch (UncheckedIOException tooLong) {
+                    return false;
+                }
             }
 
             @Override
