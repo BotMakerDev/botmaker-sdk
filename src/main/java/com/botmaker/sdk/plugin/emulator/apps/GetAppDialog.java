@@ -19,6 +19,7 @@ import com.botmaker.shared.launch.AndroidInstall;
 import com.botmaker.shared.launch.GameInstall;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.UriLauncher;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -29,16 +30,20 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -50,7 +55,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Get an app, opened from the Emulators window's Instances tab ({@link EmulatorApps}): a package name or a Google Play link, then
+ * Get an app, opened from the Emulators window's Instances tab ({@link EmulatorApps}): a game's name, which lists Google
+ * Play's results to pick from ({@link PlayStoreSearch}), its package name or its Google Play link, then
  * Download it (Google Play's files, APKPure when the user allowed it, the Play app) or an APK file the user has, and
  * the Install on table ({@link InstallOn}). The installs run one device after another; a stopped device is started
  * for its install and stopped after, and one that fails doesn't stop the next. The library keeps one download per
@@ -69,6 +75,12 @@ final class GetAppDialog {
     private final Set<String> picked;
     private final Runnable onDone;
     private final TextField app = new TextField();
+    /** Google Play's results for a name typed in {@link #app}; picking one puts its package in the field. */
+    private final ListView<PlayStoreSearch.StoreApp> found = new ListView<>();
+    /** Waits for the typing to pause before Google Play is searched. */
+    private final PauseTransition searching = new PauseTransition(Duration.millis(400));
+    /** The name the latest search was for; only its results are shown. */
+    private String searchedFor;
     private final RadioButton download = new RadioButton("Download it");
     private final RadioButton file = new RadioButton("An APK file I have…");
     private final Label fileName = Styles.on(new Label(), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
@@ -111,8 +123,26 @@ final class GetAppDialog {
         account.setAlignment(Pos.CENTER_LEFT);
         downloadOptions = new VBox(4, apkPure, account);
         downloadOptions.setPadding(new Insets(0, 0, 0, 24));
-        app.setPromptText("A package name (com.example.game) or a Google Play link");
-        app.textProperty().addListener((o, was, is) -> readVersions());
+        app.setPromptText("A game's name, its package (com.example.game) or a Google Play link");
+        app.textProperty().addListener((o, was, is) -> {
+            readVersions();
+            searchLater();
+        });
+        found.setVisible(false);
+        found.setManaged(false);
+        found.setPrefHeight(160);
+        found.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(PlayStoreSearch.StoreApp hit, boolean empty) {
+                super.updateItem(hit, empty);
+                setText(empty || hit == null ? null : hit.name() + "  ·  " + hit.packageName());
+            }
+        });
+        found.setOnMouseClicked(e -> pickFound());
+        found.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) pickFound();
+        });
+        searching.setOnFinished(e -> search());
         install.setOnAction(e -> install());
     }
 
@@ -140,7 +170,7 @@ final class GetAppDialog {
         HBox bottom = new HBox(8, status, spacer, install, close);
         bottom.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(status, Priority.SOMETIMES);
-        VBox root = new VBox(10, Styles.on(new Label("Get an app"), Styles.DIALOG_HEADING), hint, app, download,
+        VBox root = new VBox(10, Styles.on(new Label("Get an app"), Styles.DIALOG_HEADING), hint, app, found, download,
                 downloadOptions, fileRow, on, table, bottom);
         root.setPadding(new Insets(16));
         stage = Modals.window(services, owner, Modals.Frame.modeless("Get an app", 620, 520, 460, 380), root);
@@ -160,6 +190,7 @@ final class GetAppDialog {
         app.setDisable(!downloading);
         if (!downloading && chosenFile == null) chooseFile();
         readVersions();
+        searchLater();
     }
 
     private void chooseFile() {
@@ -181,6 +212,56 @@ final class GetAppDialog {
     /** The package the dialog installs, or empty while the field names none. */
     private Optional<String> pkg() {
         return PlayStoreSearch.packageIn(app.getText() == null ? "" : app.getText().strip());
+    }
+
+    /** The name to look for on Google Play in {@code text}, or empty when it names a package already or is too short. */
+    static Optional<String> nameIn(String text) {
+        String t = text == null ? "" : text.strip();
+        return t.length() < 2 || PlayStoreSearch.packageIn(t).isPresent() ? Optional.empty() : Optional.of(t);
+    }
+
+    /** Searches Google Play once the typing pauses; a package or a link hides the results. */
+    private void searchLater() {
+        searching.stop();
+        if (download.isSelected() && nameIn(app.getText()).isPresent()) {
+            searching.playFromStart();
+        } else {
+            searchedFor = null;
+            showFound(List.of());
+        }
+    }
+
+    /** Google Play's results for the typed name, off the JavaFX thread; a result for older typing is dropped. */
+    private void search() {
+        String name = nameIn(app.getText()).orElse(null);
+        searchedFor = name;
+        if (name == null) return;
+        say(true, "Looking for “" + name + "” on Google Play…");
+        Async.load("play-search", () -> {
+            try {
+                return PlayStoreSearch.search(name);
+            } catch (IOException e) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
+        }, hits -> {
+            if (!name.equals(searchedFor)) return;
+            showFound(hits);
+            say(true, hits.isEmpty() ? "Google Play lists nothing for “" + name + "”." : "Pick the app.");
+        }, why -> {
+            if (name.equals(searchedFor)) say(false, why);
+        });
+    }
+
+    private void showFound(List<PlayStoreSearch.StoreApp> hits) {
+        found.getItems().setAll(hits);
+        found.setVisible(!hits.isEmpty());
+        found.setManaged(!hits.isEmpty());
+    }
+
+    /** The picked result's package goes in the field, which reads its versions and hides the results. */
+    private void pickFound() {
+        PlayStoreSearch.StoreApp hit = found.getSelectionModel().getSelectedItem();
+        if (hit != null) app.setText(hit.packageName());
     }
 
     /** Reads, off the JavaFX thread, what each running device has of the package; the table shows it. */

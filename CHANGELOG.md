@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Get an app finds a game by its name** (2026-11-25): the Emulators window's Get an app field takes a game's name
+  too; once the typing pauses, Google Play's results (name and package) list under it, and picking one fills in its
+  package. A package or a Play link works as before.
 - **The Game window has tabs** (2026-11-25, spec `2026-11-25-game-window-design.md`): a top bar says what the bot
   plays, with a ▾ of its other targets to prefer or remove, and Launch; a line under it, only when the target's
   emulator would stop a launch, opens the Emulators window. Tabs Games, Android apps, Websites and Recent fill the
