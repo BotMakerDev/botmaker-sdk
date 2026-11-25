@@ -11,6 +11,7 @@ import com.botmaker.sdk.api.screens.Verdict;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Pressed;
 import com.botmaker.sdk.internal.bot.BotConstants.InputName;
 import com.botmaker.sdk.internal.bot.InstalledRun;
 import com.botmaker.sdk.internal.explore.ScreenClock.Spent;
@@ -30,7 +31,10 @@ import com.botmaker.sdk.internal.screens.MapWalk;
 import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
+import com.botmaker.sdk.internal.screens.ParamTyping;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.sdk.internal.screens.ScreenWalk;
+import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
 import com.botmaker.shared.web.FormProbe;
@@ -337,11 +341,11 @@ public final class ExploreLoop {
         }
 
         /**
-         * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: the
-         * screen of the map the game shows then, empty for none.
+         * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: what
+         * came of it and the screen of the map the game shows then, none pressed when its times are 0.
          */
-        default Optional<String> press(String screen, String field, long withinMs) {
-            return Optional.empty();
+        default ScreenWalk.Press press(String screen, String field, long withinMs) {
+            return new ScreenWalk.Press(Pressed.Result.ABSENT, null, 0, "Nothing presses this game.");
         }
 
         /**
@@ -1103,6 +1107,7 @@ public final class ExploreLoop {
         Optional<String> next = chooser.next(screen, to -> !clock.aside(to) && walks(screen, to), this::refused)
                 .or(() -> chooser.next(screen, to -> walks(screen, to), this::refused));
         if (next.isPresent()) return walk(screen, next.get());
+        if (leftPanel(screen)) return true;
         // No screen to leave for, so none to come back from: the ways not seen here are tried, not waited on.
         if (chooser.giveUpNotSeen()) return true;
         if (idleSaid.add(screen)) {
@@ -1541,7 +1546,7 @@ public final class ExploreLoop {
                 elements.put(input.getKey(), button.element());
             }
         }
-        return new ArrayList<>(TreeAnswer.missingInputs(screen, tree, elements, play::refusal,
+        return new ArrayList<>(TreeAnswer.missingInputs(screen, tree, elements, play::refusal, this::unjudged,
                 (field, located) -> play.picture(screen + "." + field, located.node().bounds()).orElse(null)));
     }
 
@@ -1618,26 +1623,51 @@ public final class ExploreLoop {
         lastEdge = null;
         pressing = key;
         long started = nowMs.getAsLong();
-        Optional<String> at = play.press(screen, field, settings.edge().toMillis());
+        ScreenWalk.Press press = play.press(screen, field, settings.edge().toMillis());
         clock.took(nowMs.getAsLong() - started);
         pressing = null;
+        // Absent, locked, disabled or holding nothing to type: nothing was pressed, so nothing says what it does.
+        if (press.times() == 0) {
+            emit(new ExploreEvent.Tried(screen, field, Mode.UNTRIED, Arrival.NOT_NOW, nowMs.getAsLong()));
+            passedCrash(key);
+            if (press.result() == Pressed.Result.NOT_NOW && input instanceof Button typing
+                    && ParamTyping.typesParameter(typing) && !ParamTyping.typeable(typing)) {
+                return stop(StopKind.EMPTY_PARAMETER, screen, key, look, press.why() + " Fill it in in the Parameters "
+                        + "window, then resume", false) != Paused.END;
+            }
+            return true;
+        }
         Effect.State after = play.state().orElse(Effect.State.of(null, ""));
         Effect effect = Effect.judge(before, after, play.stopped());
-        String to = at.orElse(null);
+        String to = press.at();
         Arrival arrival = to == null ? Arrival.UNKNOWN : to.equals(screen) ? Arrival.UNCHANGED : Arrival.AT_TARGET;
         emit(new ExploreEvent.Tried(screen, field, Mode.UNTRIED, arrival, nowMs.getAsLong()));
         passedCrash(key);
-        if (effect.way() && to != null && !to.equals(screen)) {
+        // An app says no path: the screen it shows, or that none matches, is all that tells a page that came.
+        boolean appChanged = effect instanceof Effect.Changes && !website();
+        if ((effect.way() || appChanged) && to != null && !to.equals(screen)) {
             from = screen;
             by = field;
             return settle(StopKind.SETTLED, screen, key, List.of(new TreeAnswer.NewWay(screen, field, to)),
                     field + " leads to " + map.shown(to)) != Paused.END;
         }
         // An overlay over the same page, or a page no screen matches: a screen to add, reached by this input.
-        if (effect instanceof Effect.Opens || effect instanceof Effect.Navigates && to == null) {
+        if (effect instanceof Effect.Opens || effect instanceof Effect.Navigates && to == null
+                || appChanged && to == null && !after.tree().all().isEmpty()
+                && !guards.front(play.around(null)).refused()) {
             from = screen;
             by = field;
             return settleUnknown(after, new InputName(screen, field)) != Paused.END;
+        }
+        // Part of the screen swapped for another page (a tablet's right pane) while its own markers still show.
+        if (appChanged && screen.equals(to) && input instanceof Button pressed && pressed.element() != null) {
+            Optional<TreeAnswer.NewScreen> panel = TreeAnswer.panel(before.tree(), after.tree(), pressed.element(),
+                    screen, shownNames());
+            if (panel.isPresent()) {
+                from = screen;
+                by = field;
+                return settlePanel(panel.get(), before.tree(), after.tree(), screen, field) != Paused.END;
+            }
         }
         notes.add(TreeAnswer.InputNote.of(screen, field, effect));
         // An input that failed before and fails again is the Cartographer's: a verdict, or a press fixed.
@@ -1680,13 +1710,11 @@ public final class ExploreLoop {
         List<TreeAnswer> answers = new ArrayList<>();
         String screen = widened(state, path, answers).orElse(null);
         if (screen == null) {
-            Set<String> taken = new HashSet<>();
-            for (String constant : map.screens().keySet()) taken.add(map.shown(constant));
             TreeAnswer.NewScreen made = TreeAnswer.screen(state.tree(), path, path == null ? List.of() : List.of(path),
-                    taken);
+                    shownNames());
             answers.add(made);
             String named = made.name();
-            answers.addAll(TreeAnswer.inputs(named, state.tree(), Set.of(), Set.of(), play::refusal,
+            answers.addAll(TreeAnswer.inputs(named, state.tree(), Set.of(), Set.of(), play::refusal, this::unjudged,
                     (field, located) -> play.picture(named + "." + field, located.node().bounds()).orElse(null)));
             screen = made.name();
         }
@@ -1701,6 +1729,58 @@ public final class ExploreLoop {
         }
         return paused;
     }
+
+    /** The names the map's screens show: a new screen takes none of them. */
+    private Set<String> shownNames() {
+        Set<String> names = new HashSet<>();
+        for (String constant : map.screens().keySet()) names.add(map.shown(constant));
+        return names;
+    }
+
+    /**
+     * Settles {@code panel}, a page shown inside {@code screen} after {@code field} was pressed, with the inputs {@code
+     * before} did not show. Parked, the app is brought back, as for a page never taken up.
+     */
+    private Paused settlePanel(TreeAnswer.NewScreen panel, UiTree before, UiTree after, String screen, String field) {
+        List<TreeAnswer> answers = new ArrayList<>();
+        answers.add(panel);
+        answers.addAll(TreeAnswer.inputs(panel.name(), after, TreeAnswer.shownIn(before, after), Set.of(),
+                play::refusal, this::unjudged,
+                (name, located) -> play.picture(panel.name() + "." + name, located.node().bounds()).orElse(null)));
+        answers.add(new TreeAnswer.NewWay(screen, field, panel.name()));
+        Paused paused = settle(StopKind.UNKNOWN_SCREEN, null, "page " + screen + "." + field, answers, field
+                + " swaps part of " + map.shown(screen) + ": " + panel.name() + " is written from its tree");
+        if (paused == Paused.PARKED || paused == null) {
+            if (!play.recover()) play.restart();
+        }
+        return paused;
+    }
+
+    /**
+     * Whether the crew says if {@code input} may be pressed, before the run presses it: an app has no guard to keep a
+     * press from changing anything, so a run given a goal leaves each new input of one to the Reader, which reads the
+     * goal ("change no setting"), and a run with none only what toggles.
+     */
+    private boolean unjudged(Locator.Located input) {
+        return !website() && (goal.given()
+                || new UiTree(List.of(input.node())).all().stream().anyMatch(node -> node.has(Trait.CHECKABLE)));
+    }
+
+    /**
+     * Starts the app again from a panel with nothing left to press while another screen has work: an app's panel has no
+     * way back the run presses. Once per panel until something is pressed, so one that restores it is not restarted for
+     * ever.
+     */
+    private boolean leftPanel(String screen) {
+        if (website() || map.panelOf(screen).isEmpty() || !panelsLeft.add(screen + "@" + pressCount)) return false;
+        boolean work = map.screens().keySet().stream().filter(other -> !other.equals(screen))
+                .anyMatch(other -> !chooser.inputsLeft(other).isEmpty() || chooser.untried(other).isPresent());
+        if (work) play.restart();
+        return work;
+    }
+
+    /** The panels the app was started again from, each with the run's presses then. */
+    private final Set<String> panelsLeft = new HashSet<>();
 
     /** The place of a website's page as a stop on it names it: its bare path and overlay; null off a website. */
     private static String pagePlace(Effect.State state) {

@@ -17,17 +17,20 @@ import java.nio.charset.StandardCharsets;
  * and {@code resume}. The text is the resource {@value #RESOURCE}; a wrong map the Evaluator found
  * ({@link StopKind#BAD_MAP}) is {@value #BAD_MAP_RESOURCE}, which redraws a screen's marks and resumes nothing; a run
  * given a goal stuck with nothing to press ({@link StopKind#STUCK}) is {@value #STUCK_RESOURCE}, which adds the
- * frame's presses toward the goal.
+ * frame's presses toward the goal; inputs with no verdict ({@link StopKind#NO_VERDICT}) are
+ * {@value #VERDICTS_RESOURCE}, which judges each against the goal and ranks them.
  */
 final class ReaderPrompt {
 
     static final String RESOURCE = "reader-prompt.md";
     static final String BAD_MAP_RESOURCE = "reader-bad-map-prompt.md";
     static final String STUCK_RESOURCE = "reader-stuck-prompt.md";
+    static final String VERDICTS_RESOURCE = "reader-verdicts-prompt.md";
 
     private static final String TEXT = read(RESOURCE);
     private static final String BAD_MAP_TEXT = read(BAD_MAP_RESOURCE);
     private static final String STUCK_TEXT = read(STUCK_RESOURCE);
+    private static final String VERDICTS_TEXT = read(VERDICTS_RESOURCE);
 
     private ReaderPrompt() {}
 
@@ -38,6 +41,7 @@ final class ReaderPrompt {
         String text = switch (stop.kind()) {
             case BAD_MAP -> BAD_MAP_TEXT;
             case STUCK -> STUCK_TEXT;
+            case NO_VERDICT -> VERDICTS_TEXT;
             default -> TEXT;
         };
         return text.replace("{stop}", stop.id())

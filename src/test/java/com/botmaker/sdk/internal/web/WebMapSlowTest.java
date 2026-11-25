@@ -168,7 +168,7 @@ class WebMapSlowTest {
         ScreenGraph map = map();
         LiveMoves moves = new LiveMoves(map, new RunReach(), web::open);
 
-        Optional<String> at = moves.press("CASES", "footer", 20_000);
+        Optional<String> at = Optional.ofNullable(moves.press("CASES", "footer", 20_000).at());
 
         assertEquals("/", web.path().orElseThrow(), "the footer's link was followed");
         assertEquals(Optional.of("HOME"), at);

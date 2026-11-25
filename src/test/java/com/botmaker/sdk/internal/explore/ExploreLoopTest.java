@@ -10,6 +10,8 @@ import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Condition;
 import com.botmaker.sdk.api.screens.Do;
 import com.botmaker.sdk.api.screens.Input;
+import com.botmaker.sdk.api.screens.Pressed;
+import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.Typing;
 import com.botmaker.sdk.api.screens.Setup;
@@ -24,6 +26,7 @@ import com.botmaker.sdk.internal.screens.MapWalk.Arrival;
 import com.botmaker.sdk.internal.screens.MapWalk.Took;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
+import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.shared.emulator.tree.Trait;
 import com.botmaker.shared.emulator.tree.UiNode;
 import com.botmaker.shared.emulator.tree.UiTree;
@@ -113,13 +116,21 @@ class ExploreLoopTest {
         }
 
         @Override
-        public Optional<String> press(String screen, String field, long withinMs) {
+        public ScreenWalk.Press press(String screen, String field, long withinMs) {
             pressed.add(screen + "." + field);
+            if (notPressed.containsKey(field)) return new ScreenWalk.Press(notPressed.get(field), at, 0, "not pressed");
             Effect.State left = afterPress.get(field);
             if (left != null) state = left;
+            if (leadsTo.containsKey(field)) at = leadsTo.get(field);
             guardStopped = stopsOnPress.getOrDefault(field, List.of());
-            return Optional.ofNullable(at);
+            return new ScreenWalk.Press(Pressed.Result.DONE, at, 1, "");
         }
+
+        /** What a press of a field answers with nothing pressed; a field not here is pressed. */
+        final Map<String, Pressed.Result> notPressed = new HashMap<>();
+        /** The screen a press of a field shows, null for none of the map; a field not here stays. */
+        final Map<String, String> leadsTo = new HashMap<>();
+        int restarts;
 
         /** What the guard stops on a press of a field: a field not here, nothing. */
         final Map<String, List<Guard.Stopped>> stopsOnPress = new HashMap<>();
@@ -258,6 +269,7 @@ class ExploreLoopTest {
 
         @Override
         public void restart() {
+            restarts++;
             at = recoversTo;
         }
     }
@@ -656,6 +668,163 @@ class ExploreLoopTest {
         loop(map, game, same(map), Duration.ofMinutes(12)).run();
 
         assertTrue(stops().stream().noneMatch(s -> s.stop().kind() == StopKind.UNTYPED_FIELD), stops().toString());
+    }
+
+    /** An input that was not there to press is not judged: no note says it does nothing. */
+    @Test
+    void anInputNotPressedIsNotJudged() {
+        Game game = appGame(appPage("Wifi", "Sound", "Display"));
+        game.notPressed.put("wifi", Pressed.Result.ABSENT);
+        ScreenGraph map = appMap();
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        assertEquals(List.of(Arrival.NOT_NOW), events(ExploreEvent.Tried.class).stream()
+                .filter(t -> t.by().equals("wifi")).map(ExploreEvent.Tried::arrival).toList());
+        assertTrue(answers(TreeAnswer.InputNote.class).stream().noneMatch(n -> n.field().equals("wifi")),
+                answers(TreeAnswer.InputNote.class).toString());
+    }
+
+    /** A field whose parameter holds nothing is the user's to fill in, not a press that did nothing. */
+    @Test
+    void anEmptyParameterIsTheUsersStop() {
+        Game game = new Game();
+        Button field = Button.of(new Locator(Role.TEXTBOX, "Email", null, null, null).element()).free()
+                .typing(new Typing(null, ScreenTypes.fact("Login::email"), false, false, false));
+        ScreenGraph map = fieldScreen(field, game, Set.of());
+        game.notPressed.put("email", Pressed.Result.NOT_NOW);
+
+        loop(map, game, same(map), Duration.ofMinutes(12)).run();
+
+        Stop stop = stops().stream().map(ExploreEvent.Stopped::stop)
+                .filter(s -> s.kind() == StopKind.EMPTY_PARAMETER).findFirst().orElseThrow();
+        assertEquals("A.email", stop.place());
+        assertTrue(answers(TreeAnswer.InputNote.class).isEmpty());
+    }
+
+    /** An app has no path: a press after which another screen of the map shows is a way to it. */
+    @Test
+    void anAppsPressToAnotherScreenIsAWay() {
+        Game game = appGame(appPage("Wifi", "Sound", "Display"));
+        game.afterPress.put("wifi", Effect.State.of(appPage("Networks"), ""));
+        game.leadsTo.put("wifi", "B");
+        Map<String, MapScreen> screens = new LinkedHashMap<>(appMap().screens());
+        screens.put("B", screen(Setup.named("B")));
+        ScreenGraph map = ScreenGraph.of(screens);
+
+        loop(map, game, same(map), Duration.ofMinutes(3)).run();
+
+        assertTrue(answers(TreeAnswer.NewWay.class).contains(new TreeAnswer.NewWay("A", "wifi", "B")),
+                answers(TreeAnswer.class).toString());
+    }
+
+    /** A press after which no screen of the map shows opened a page the map lacks: it is written with its way. */
+    @Test
+    void anAppsPressToAnUnknownPageIsSettledWithItsWay() {
+        Game game = appGame(appPage("Wifi", "Sound", "Display"));
+        game.afterPress.put("wifi", Effect.State.of(appPage("Networks"), ""));
+        game.leadsTo.put("wifi", null);
+        ScreenGraph map = appMap();
+
+        loop(map, game, same(map), Duration.ofMinutes(3)).run();
+
+        assertTrue(answers(TreeAnswer.NewWay.class).stream().anyMatch(w -> w.field().equals("wifi")),
+                answers(TreeAnswer.class).toString());
+        assertTrue(answers(TreeAnswer.InputNote.class).stream().noneMatch(n -> n.field().equals("wifi")));
+    }
+
+    /** A pane swapped while the screen's own markers still show is a panel: told by, and holding, only what is new. */
+    @Test
+    void aSwappedPaneIsAPanelOfItsScreen() {
+        Game game = appGame(appPage("Wifi", "Sound", "Display"));
+        game.afterPress.put("wifi", Effect.State.of(new UiTree(List.of(app("Networks", false), app("Display", true),
+                app("Add network", true), app("Saved", true))), ""));
+        ScreenGraph map = appMap();
+
+        loop(map, game, same(map), Duration.ofMinutes(3)).run();
+
+        TreeAnswer.NewScreen panel = answers(TreeAnswer.NewScreen.class).getFirst();
+        assertEquals("A", panel.panelOf());
+        assertEquals("Networks", panel.name());
+        assertEquals(List.of("addNetwork", "saved"), answers(TreeAnswer.NewInput.class).stream()
+                .filter(i -> i.screen().equals("Networks")).map(TreeAnswer.NewInput::field).sorted().toList());
+        assertTrue(answers(TreeAnswer.NewWay.class).contains(new TreeAnswer.NewWay("A", "wifi", "Networks")));
+    }
+
+    /** A panel with nothing left has no way back: the app is started again while its screen has work, once. */
+    @Test
+    void aPanelWithNothingLeftIsLeftByStartingTheAppAgain() {
+        Game game = appGame(new UiTree(List.of(app("Networks", false))));
+        game.at = "P";
+        game.shown = edge -> edge.via() != null;
+        Map<String, MapScreen> screens = new LinkedHashMap<>(appMap().screens());
+        screens.put("P", screen(Setup.named("P").panelOf(BotConstants.screen("A")).from(ref("A", "wifi"))));
+        ScreenGraph map = ScreenGraph.of(screens);
+
+        loop(map, game, same(map), Duration.ofMinutes(3)).run();
+
+        assertEquals(1, game.restarts, journal().events().toString());
+        assertTrue(game.pressed.contains("A.sound"), game.pressed.toString());
+    }
+
+    /** With no goal, only an app's toggles wait for a verdict; with one, every new input does. */
+    @Test
+    void anAppsNewInputsWaitForTheirVerdict() {
+        UiNode toggle = new UiNode("", "Airplane mode", "", "android.widget.Switch", "app", BOX,
+                EnumSet.of(Trait.ENABLED, Trait.CLICKABLE, Trait.CHECKABLE), List.of());
+        Game game = appGame(new UiTree(List.of(app("Title", false), app("Wifi", true), toggle)));
+        game.at = null;
+
+        loop(appMap(), game, same(appMap()), Duration.ofMinutes(3)).run();
+
+        Map<String, Boolean> unjudged = new HashMap<>();
+        answers(TreeAnswer.NewInput.class).forEach(i -> unjudged.put(i.field(), i.unjudged()));
+        assertEquals(Map.of("wifi", false, "airplaneMode", true), unjudged);
+    }
+
+    /** A run given a goal leaves every new input of an app to the crew. */
+    @Test
+    void aGoalRunsNewInputsOfAnAppAllWait() {
+        Game game = appGame(new UiTree(List.of(app("Title", false), app("Wifi", true))));
+        game.at = null;
+
+        loop(appMap(), game, same(appMap()), Duration.ofMinutes(3))
+                .toward(new ExploreGoal("map the settings, changing no setting", null)).run();
+
+        assertTrue(answers(TreeAnswer.NewInput.class).stream().allMatch(TreeAnswer.NewInput::unjudged));
+        assertFalse(answers(TreeAnswer.NewInput.class).isEmpty());
+    }
+
+    private <T extends TreeAnswer> List<T> answers(Class<T> type) {
+        return events(ExploreEvent.Settled.class).stream().flatMap(s -> s.answers().stream())
+                .filter(type::isInstance).map(type::cast).toList();
+    }
+
+    private static Game appGame(UiTree tree) {
+        Game game = new Game();
+        game.state = Effect.State.of(tree, "");
+        return game;
+    }
+
+    private static UiNode app(String text, boolean acted) {
+        return new UiNode("", text, "", "android.widget.TextView", "app", BOX,
+                acted ? EnumSet.of(Trait.ENABLED, Trait.CLICKABLE) : EnumSet.of(Trait.ENABLED), List.of());
+    }
+
+    private static UiTree appPage(String... rows) {
+        return new UiTree(Arrays.stream(rows).map(row -> app(row, true)).toList());
+    }
+
+    /** One start screen A of an app, with its rows Wifi, Sound and Display free. */
+    private static ScreenGraph appMap() {
+        Map<String, Input> inputs = new LinkedHashMap<>();
+        for (Locator.Located row : Locator.inputs(appPage("Wifi", "Sound", "Display"))) {
+            String name = row.node().text();
+            inputs.put(name.toLowerCase(), Button.of(row.locator().element()).free());
+        }
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("A", new MapScreen(Setup.named("A").start(), inputs));
+        return ScreenGraph.of(screens);
     }
 
     /** One start screen A whose input {@code email} sits over an app's EditText with {@code traits} too. */

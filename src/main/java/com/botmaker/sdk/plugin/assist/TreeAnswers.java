@@ -114,6 +114,11 @@ final class TreeAnswers {
                     .map(locator -> kept(locator.element(), known, made, words)).toList();
             Setup setup = Setup.named(screen.name()).elements(markers);
             if (screen.route() != null) setup = setup.route(screen.route()).examples(screen.examples());
+            if (screen.panelOf() != null) {
+                Optional<String> holder = constantOf(graph, newConstants, screen.panelOf());
+                if (holder.isPresent()) setup = setup.panelOf(BotConstants.screen(holder.get()));
+                else skipped.add(screen.name() + ": no screen " + screen.panelOf() + " in the map to be a panel of.");
+            }
             // Its tree showed every element: the run writes each as an input, so the screen is all cut.
             if (screen.allCut()) setup = setup.allCut();
             // A map's first screen is the one the game opens on; an overlay no press opened is the game's own popup.
@@ -152,7 +157,9 @@ final class TreeAnswers {
                         pictures.put(shot, input.picture());
                     }
                     Button button = Button.of(element);
-                    Input pressed = input.never() != null ? button.never(input.never()) : button.free();
+                    // With no verdict the run presses nothing of it until the crew gives one; the guard's own refusal is one.
+                    Input pressed = input.never() != null ? button.never(input.never())
+                            : input.unjudged() ? button : button.free();
                     UnaryOperator<MapScreen> add = s -> s.withInput(s.fieldFor(input.field()), pressed);
                     if (screens.containsKey(constant.get())) screens.compute(constant.get(), (c, s) -> add.apply(s));
                     else changes.add(new Change(constant.get(), add));

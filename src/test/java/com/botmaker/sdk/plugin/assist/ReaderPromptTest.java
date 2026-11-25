@@ -32,4 +32,16 @@ class ReaderPromptTest {
         assertFalse(prompt.equals(ReaderPrompt.of(new Stop("unknown_screen-1", StopKind.UNKNOWN_SCREEN, null, "", "",
                 List.of(), List.of(), Map.of(), List.of(), "a screen the map lacks", 2), "open the accounts settings")));
     }
+
+    /** Inputs with no verdict are judged against the goal, all of them, in one kind of edit. */
+    @Test
+    void aNoVerdictStopsPromptAsksToJudgeAgainstTheGoal() {
+        String prompt = ReaderPrompt.of(new Stop("no_verdict-1", StopKind.NO_VERDICT, null, "map", "", List.of(),
+                List.of(), Map.of(), List.of(), "1 inputs have no verdict: HOME.airplaneMode", 2),
+                "map the settings, changing no setting");
+
+        assertTrue(prompt.contains("set_verdict") && prompt.contains("HOME.airplaneMode"), prompt);
+        assertTrue(prompt.contains("changing no setting") && prompt.contains("rank_presses"), prompt);
+        assertFalse(prompt.matches("(?s).*\\{(stop|kind|on|why|goal)}.*"), "every placeholder filled: " + prompt);
+    }
 }

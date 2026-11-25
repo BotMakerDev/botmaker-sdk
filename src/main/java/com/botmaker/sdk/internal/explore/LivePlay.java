@@ -39,6 +39,7 @@ import com.botmaker.sdk.internal.screens.RunReach;
 import com.botmaker.sdk.internal.screens.ScreenGraph;
 import com.botmaker.sdk.internal.screens.ScreenGraph.Edge;
 import com.botmaker.sdk.internal.screens.ScreenMaps;
+import com.botmaker.sdk.internal.screens.ScreenWalk;
 import com.botmaker.sdk.internal.trace.MissFrames;
 import com.botmaker.sdk.internal.trace.Say;
 
@@ -488,7 +489,7 @@ public final class LivePlay implements ExploreLoop.Play {
     }
 
     @Override
-    public Optional<String> press(String screen, String field, long withinMs) {
+    public ScreenWalk.Press press(String screen, String field, long withinMs) {
         return moves.press(screen, field, withinMs);
     }
 

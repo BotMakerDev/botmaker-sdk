@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Keep exploring judges an app's inputs before pressing them** (2026-11-25): given a goal, a run leaves each new
+  input of an app to the Reader, which gives it a verdict the goal allows (a switch under "change no setting" is never
+  pressed); without one, only what toggles waits. An input that was not there to press, or a field whose parameter
+  holds nothing, is no longer noted as doing nothing: the empty parameter is a stop of yours. An app's press that shows
+  another screen, a page the map lacks, or a swapped pane (a panel of its screen) is written as a way.
 - **Keep exploring asks what a text field types** (2026-11-25): an app's text field mapped as a plain button is no
   longer tapped and judged as doing nothing. The run stops for the Cartographer, who says what it types; resume with
   ignore presses it as a button. `edit_map set_input` takes `typesParameter` (`Login::email`) and `secret` for a

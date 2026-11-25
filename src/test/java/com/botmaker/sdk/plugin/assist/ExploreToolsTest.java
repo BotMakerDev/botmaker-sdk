@@ -136,7 +136,8 @@ class ExploreToolsTest {
                 StopKind.FAILED_INPUT, StopKind.UNTYPED_FIELD, StopKind.LOW_YIELD, StopKind.UNWRITTEN, StopKind.BAD_MAP),
                 byRole.get(StopRole.CARTOGRAPHER));
         assertEquals(EnumSet.of(StopKind.FAULT, StopKind.CRASH), byRole.get(StopRole.MECHANIC));
-        assertEquals(EnumSet.of(StopKind.GUARD, StopKind.STUCK, StopKind.UNKNOWN), byRole.get(StopRole.USER));
+        assertEquals(EnumSet.of(StopKind.GUARD, StopKind.STUCK, StopKind.EMPTY_PARAMETER, StopKind.UNKNOWN),
+                byRole.get(StopRole.USER));
         assertEquals(StopRole.CARTOGRAPHER, StopRole.fromId(" Cartographer "));
         assertEquals(StopRole.UNKNOWN, StopRole.fromId("pilot"));
     }

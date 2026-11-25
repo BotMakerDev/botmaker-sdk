@@ -77,6 +77,35 @@ class TreeAnswersTest {
         assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
     }
 
+    /** An input left to the crew is written with no verdict; the guard's refusal still is one. */
+    @Test
+    void anUnjudgedInputIsWrittenWithNoVerdict() {
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(Map.of()), List.of(
+                new TreeAnswer.NewScreen("Home", null, List.of(), List.of(HEADING), null),
+                new TreeAnswer.NewInput("Home", "toggle", TOGGLE, null, null, true),
+                new TreeAnswer.NewInput("Home", "buyNow", BUY, "a buy", null, true)), Map.of());
+
+        MapScreen home = planned.added().getFirst().screen();
+        assertFalse(home.input("toggle").orElseThrow().verdict() instanceof Verdict.Free);
+        assertEquals(Verdict.never("a buy"), home.input("buyNow").orElseThrow().verdict());
+    }
+
+    /** A pane swapped inside a screen is written as its panel, reached by the press that swapped it. */
+    @Test
+    void aPanelIsWrittenInsideItsScreen() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("HOME", new MapScreen(Setup.named("Home").start(), Map.of("docs",
+                Button.of(DOCS.element()).free())));
+        Planned planned = TreeAnswers.plan(ScreenGraph.of(screens), List.of(
+                new TreeAnswer.NewScreen("Wifi", null, List.of(), List.of(HEADING), null, false, "HOME"),
+                new TreeAnswer.NewWay("HOME", "docs", "Wifi")), Map.of());
+
+        Setup wifi = planned.added().getFirst().screen().setup();
+        assertTrue(wifi.isPanel(), wifi.toString());
+        assertNotNull(wifi.from());
+        assertTrue(planned.skipped().isEmpty(), planned.skipped().toString());
+    }
+
     @Test
     void aRowFoundByTheTextItHoldsKeepsThoseWords() {
         Locator row = new Locator(null, null, null, null, null, "Passwords & accounts");

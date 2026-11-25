@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -50,10 +51,11 @@ public sealed interface TreeAnswer {
     /**
      * A screen to add: {@code name} its class, {@code route} and {@code examples} a website's (null and none in an
      * app), {@code markers} the parts that tell it, {@code overlay} what is open over its page; {@code allCut} when its
-     * tree showed every element it has, so its inputs are all of them (none while a part of it scrolls).
+     * tree showed every element it has, so its inputs are all of them (none while a part of it scrolls);
+     * {@code panelOf} the screen it is shown inside, null for a screen of its own.
      */
     record NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay,
-                     boolean allCut) implements TreeAnswer {
+                     boolean allCut, String panelOf) implements TreeAnswer {
         public NewScreen {
             examples = examples == null ? List.of() : List.copyOf(examples);
             markers = markers == null ? List.of() : List.copyOf(markers);
@@ -63,6 +65,12 @@ public sealed interface TreeAnswer {
         /** A screen whose elements are not said to be all in its tree. */
         public NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay) {
             this(name, route, examples, markers, overlay, false);
+        }
+
+        /** A screen of its own, in no other's panel. */
+        public NewScreen(String name, String route, List<String> examples, List<Locator> markers, Overlay overlay,
+                         boolean allCut) {
+            this(name, route, examples, markers, overlay, allCut, null);
         }
     }
 
@@ -78,12 +86,18 @@ public sealed interface TreeAnswer {
 
     /**
      * An input to add on {@code screen} as its field {@code field}, found by {@code locator}; {@code never} why the
-     * guard refuses it, null when it is free; {@code picture} the file the run rendered it to, null for none.
+     * guard refuses it, null when it is free; {@code picture} the file the run rendered it to, null for none;
+     * {@code unjudged} when it is written with no verdict, the crew's to give before the run presses it.
      */
-    record NewInput(String screen, String field, Locator locator, String never, String picture)
+    record NewInput(String screen, String field, Locator locator, String never, String picture, boolean unjudged)
             implements TreeAnswer {
         public NewInput {
             picture = picture == null || picture.isBlank() ? null : picture;
+        }
+
+        /** An input the run may press. */
+        public NewInput(String screen, String field, Locator locator, String never, String picture) {
+            this(screen, field, locator, never, picture, false);
         }
 
         /** An input with no picture. */
@@ -230,6 +244,14 @@ public sealed interface TreeAnswer {
     static List<NewInput> inputs(String screen, UiTree tree, Set<Locator> known, Set<String> taken,
                                  Function<Locator.Located, Optional<String>> refusal,
                                  BiFunction<String, Locator.Located, String> picture) {
+        return inputs(screen, tree, known, taken, refusal, located -> false, picture);
+    }
+
+    /** As above, those {@code unjudged} says written with no verdict. */
+    static List<NewInput> inputs(String screen, UiTree tree, Set<Locator> known, Set<String> taken,
+                                 Function<Locator.Located, Optional<String>> refusal,
+                                 Predicate<Locator.Located> unjudged,
+                                 BiFunction<String, Locator.Located, String> picture) {
         List<NewInput> inputs = new ArrayList<>();
         Set<String> names = new HashSet<>(taken);
         for (Locator.Located located : Locator.inputs(tree)) {
@@ -237,9 +259,47 @@ public sealed interface TreeAnswer {
             String field = unique(fieldName(said(located.locator())), names);
             names.add(field);
             inputs.add(new NewInput(screen, field, located.locator(), refusal.apply(located).orElse(null),
-                    picture.apply(field, located)));
+                    picture.apply(field, located), unjudged.test(located)));
         }
         return List.copyOf(inputs);
+    }
+
+    /** How many inputs a press must bring and take away for what it did to be a panel swapped, not a part changed. */
+    int PANEL_SWAP = 2;
+
+    /**
+     * The panel of the screen {@code on} that pressing {@code pressed} swapped in, told by what {@code before} did not
+     * show and named after it, never one of {@code taken}. Empty when the press changed only a part of the page: its
+     * own button still shows, or fewer than {@value #PANEL_SWAP} inputs came or went; and when nothing new tells it.
+     */
+    static Optional<NewScreen> panel(UiTree before, UiTree after, Element pressed, String on, Set<String> taken) {
+        ElementMatch.Matcher now = ElementMatch.in(after);
+        if (!now.matches(pressed).isEmpty()) return Optional.empty();
+        long came = Locator.inputs(after).size() - shownIn(before, after).size();
+        long went = Locator.inputs(before).size() - shownIn(after, before).size();
+        if (came < PANEL_SWAP || went < PANEL_SWAP) return Optional.empty();
+        ElementMatch.Matcher then = ElementMatch.in(before);
+        List<Locator> markers = new ArrayList<>();
+        for (UiNode node : now.nodes()) {
+            if (markers.size() >= MARKERS) break;
+            if (Locator.acted(node) || !node.children().isEmpty()) continue;
+            Locator.of(node, now).filter(l -> l.index() == null && then.matches(l.element()).isEmpty()
+                    && !markers.contains(l)).ifPresent(markers::add);
+        }
+        if (markers.isEmpty()) return Optional.empty();
+        boolean scrolls = after.all().stream().anyMatch(node -> node.has(Trait.SCROLLABLE));
+        return Optional.of(new NewScreen(unique(className(said(markers.getFirst())), taken), null, List.of(), markers,
+                Overlay.NONE, !scrolls, on));
+    }
+
+    /** The inputs of {@code after} that {@code before} shows too. */
+    static Set<Locator> shownIn(UiTree before, UiTree after) {
+        ElementMatch.Matcher then = ElementMatch.in(before);
+        Set<Locator> shown = new HashSet<>();
+        for (Locator.Located located : Locator.inputs(after)) {
+            if (!then.matches(located.locator().element()).isEmpty()) shown.add(located.locator());
+        }
+        return shown;
     }
 
     /**
@@ -251,6 +311,14 @@ public sealed interface TreeAnswer {
     public static List<NewInput> missingInputs(String screen, UiTree tree, Map<String, Element> elements,
                                                Function<Locator.Located, Optional<String>> refusal,
                                                BiFunction<String, Locator.Located, String> picture) {
+        return missingInputs(screen, tree, elements, refusal, located -> false, picture);
+    }
+
+    /** As above, those {@code unjudged} says written with no verdict. */
+    public static List<NewInput> missingInputs(String screen, UiTree tree, Map<String, Element> elements,
+                                               Function<Locator.Located, Optional<String>> refusal,
+                                               Predicate<Locator.Located> unjudged,
+                                               BiFunction<String, Locator.Located, String> picture) {
         ElementMatch.Matcher matcher = ElementMatch.in(tree);
         Set<UiNode> mapped = new HashSet<>();
         elements.values().forEach(element -> mapped.addAll(matcher.matches(element)));
@@ -258,7 +326,7 @@ public sealed interface TreeAnswer {
         for (Locator.Located located : Locator.inputs(tree)) {
             if (mapped.contains(located.node())) known.add(located.locator());
         }
-        return inputs(screen, tree, known, elements.keySet(), refusal, picture);
+        return inputs(screen, tree, known, elements.keySet(), refusal, unjudged, picture);
     }
 
     /**

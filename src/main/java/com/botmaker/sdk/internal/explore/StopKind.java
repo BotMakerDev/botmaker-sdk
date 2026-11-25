@@ -43,6 +43,11 @@ public enum StopKind {
      */
     UNTYPED_FIELD("untyped_field", "Field nothing types"),
     /**
+     * A field typing a parameter this run holds no value of, or a secret nothing types (2026-11-25): nothing was
+     * pressed. The bot's user fills the parameter in, then resumes.
+     */
+    EMPTY_PARAMETER("empty_parameter", "Parameter not filled in"),
+    /**
      * What presses of a screen's inputs did, read off its tree: ways to screens the bot has, and notes. The run
      * answers it itself ({@link ExploreEvent.Settled}); Claude never has to.
      */

@@ -91,14 +91,14 @@ public final class LiveMoves implements MapWalk.Moves {
     }
 
     /**
-     * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: the screen of
-     * the map the game shows then, empty for none.
+     * Presses {@code field} of {@code screen}, an input that is no way, waiting at most {@code withinMs}: what came
+     * of it and the screen of the map the game shows then.
      */
-    public Optional<String> press(String screen, String field, long withinMs) {
+    public ScreenWalk.Press press(String screen, String field, long withinMs) {
         ScreenWalk.Press press = walk().by(reach.nowMs() + withinMs).press(screen, field, null);
         if (press.at() == null) ScreenMaps.lost();
         else ScreenMaps.seen(press.at());
-        return Optional.ofNullable(press.at());
+        return press;
     }
 
     /** Long enough for a game's first loader the map lacks ("Initializing…") to end. */
