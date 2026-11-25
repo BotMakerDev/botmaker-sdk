@@ -40,8 +40,8 @@ Which new window is the game's (`NewWindows.ranked`, 2026-11-25):
 - When only size tells two windows apart, a run Studio or the core started asks in the *Which window is the game?*
   picker (`plugin/source/WindowDoubtPicker`) for 30 s, then takes its guess and keeps nothing. A run no host started
   keeps its guess.
-- A hidden window (minimized, or any window of a locked KDE desktop) is not listed, since its pixels cannot be read:
-  a watch behind the lock ends with no window.
+- A hidden window is not listed, since its pixels cannot be read: a minimized one, and on KDE a game's that opened
+  while the displays were off, so that watch ends with no window.
 
 The trace says what was picked and why (`capture: Waydroid, from the game's target`). Studio's views, which never
 launch and never ask which emulators run, read the whole desktop for a WatchLaunch and for an instance a run would
