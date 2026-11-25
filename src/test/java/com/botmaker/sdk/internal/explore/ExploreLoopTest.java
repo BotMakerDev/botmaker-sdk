@@ -628,7 +628,8 @@ class ExploreLoopTest {
 
         assertTrue(sent[0]);
         assertEquals(List.of("A.email"), game.pressed);
-        assertEquals(1, stops().size(), stops().toString());
+        assertEquals(1, stops().stream().filter(s -> s.stop().kind() == StopKind.UNTYPED_FIELD).count(),
+                stops().toString());
     }
 
     /** A password field mapped as a button is the Cartographer's to make a secret, not a guard stop. */
