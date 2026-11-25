@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.screen;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -41,6 +42,8 @@ import java.util.Objects;
  */
 public final class CaptureLabels {
 
+    /** The source the game's launch target decides: {@link AutomaticSource}. */
+    public static final String AUTOMATIC = "Automatic";
     /** The source that follows the project's own: {@link CurrentSource}. */
     public static final String PROJECT_DEFAULT = "Project default";
     /** Every monitor together: {@link CaptureSource#desktop()}. */
@@ -59,7 +62,8 @@ public final class CaptureLabels {
     public static String longLabel(CaptureSource source) {
         CaptureSource whole = whole(source);
         String label;
-        if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
+        if (whole instanceof AutomaticSource) label = AUTOMATIC;
+        else if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
             label = "Window: " + (blank(window.label()) ? "(none picked)" : window.label())
@@ -83,7 +87,8 @@ public final class CaptureLabels {
     public static String shortLabel(CaptureSource source) {
         CaptureSource whole = whole(source);
         String label;
-        if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
+        if (whole instanceof AutomaticSource) label = AUTOMATIC;
+        else if (whole instanceof CurrentSource) label = PROJECT_DEFAULT;
         else if (whole instanceof Monitor monitor) label = "Screen " + (monitor.index() + 1);
         else if (whole instanceof NamedWindow window) {
             label = blank(window.label()) ? "Window" : window.label();

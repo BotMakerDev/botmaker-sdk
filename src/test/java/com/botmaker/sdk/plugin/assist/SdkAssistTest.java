@@ -46,7 +46,10 @@ import com.botmaker.sdk.api.screens.Way;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
+import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.plugin.settings.SettingsValue;
@@ -652,6 +655,22 @@ class SdkAssistTest {
     }
 
     // ── source, settings, emulator, launch ──────────────────────────────────────────────────────────────
+
+    @Test
+    void automaticResolvesForStudioViews() {
+        host.values.put("capture", TestContexts.row(CaptureSource.class, "").withValue(CaptureSource.automatic()));
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
+                .withValue(List.of(Launcher.of("emu-app:com.foo@Main"))));
+        assertEquals("Main", assertInstanceOf(EmulatorSource.class, CaptureValue.current(host)).instanceName(),
+                "Studio's views look where the game's target says");
+        assertEquals(Optional.of("Main"), CaptureValue.follow(host, "emu-app:com.foo@Main"));
+        assertInstanceOf(AutomaticSource.class, host.values.get("capture").value(), "automatic follows by itself");
+        assertEquals(Optional.of("Main"), CaptureValue.followed(host), "the instance automatic follows");
+
+        host.values.put("launch_targets", TestContexts.row(List.class, "List.of()")
+                .withValue(List.of(Launcher.of("steam:570"))));
+        assertNull(CaptureValue.current(host), "a desktop game's window not picked yet: the whole desktop");
+    }
 
     @Test
     void theCaptureSourceIsReadAndPointedAtAWindow() {

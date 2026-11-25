@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
@@ -46,8 +47,12 @@ public final class CaptureTypes implements TypeHolder {
 
     @Override
     public List<ComponentType<?>> components() {
-        return List.of(CURRENT, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
+        return List.of(CURRENT, AUTOMATIC, DESKTOP, MONITOR, WINDOW, EMULATOR, REGION, REGION_CHAIN);
     }
+
+    /** {@code CaptureSource.automatic()}: where the game's launch target says its pixels are (2026-11-25). */
+    public static final DeclaredCall<AutomaticSource> AUTOMATIC = ComponentType.part(AutomaticSource.class)
+            .writtenAs(CaptureSource::automatic);
 
     /**
      * {@code Source.current()}. Built as the ambient source itself rather than by calling the factory, which

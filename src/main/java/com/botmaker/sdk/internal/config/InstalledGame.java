@@ -9,13 +9,12 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.capture.Source;
-import com.botmaker.sdk.api.geometry.Rect;
-import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.SettingParams;
-import com.botmaker.sdk.internal.capture.CurrentSource;
-import com.botmaker.sdk.internal.web.WebSource;
+import com.botmaker.sdk.internal.capture.AutoCapture;
+import com.botmaker.sdk.internal.emulator.EmulatorRef;
+import com.botmaker.sdk.internal.emulator.Emulators;
+import com.botmaker.shared.Diag;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.platform.Os;
@@ -53,6 +52,8 @@ public final class InstalledGame {
     private static volatile ZoneId gameZone = ZoneId.systemDefault();
     /** The instance {@code instance()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
     private static volatile String playsOn = "";
+    /** The desktop game whose launch's window the run reads, or {@code null}: {@link #pendingWatch}. */
+    private static volatile LaunchSpec pendingWatch;
 
     private InstalledGame() {}
 
@@ -63,26 +64,39 @@ public final class InstalledGame {
      */
     public static void install(Class<?>... values) {
         settings(values);
-        String instance = System.getProperty(CAPTURE_EMULATOR);
-        if (instance != null && !instance.isBlank()) {
-            playsOn = "";
-            Source.set(CaptureSource.emulator(instance.strip()));
-            return;
+        playsOn = "";
+        pendingWatch = null;
+        AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR),
+                LaunchSpec.parse(launchTarget()),
+                marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source ? source : null,
+                marked(SdkValue.Id.INSTANCE, values), Optional.empty(), InstalledGame::runningInstances);
+        switch (AutoCapture.decide(inputs)) {
+            case AutoCapture.Decision.Fixed fixed -> {
+                // The game is launched and restarted where the run plays: the dealt instance, not the author's.
+                playsOn = fixed.playsOn();
+                Source.set(fixed.source());
+                if (fixed.why() != null) Diag.info("Capture", fixed.why());
+            }
+            case AutoCapture.Decision.WatchLaunch watch -> {
+                // The whole desktop until the launch's window is up (Bot's start-up step watches for it).
+                pendingWatch = watch.target();
+                Source.set(null);
+            }
+            case AutoCapture.Decision.Fail fail -> throw new IllegalStateException(fail.message());
         }
-        LaunchSpec target = LaunchSpec.parse(launchTarget());
-        if (target != null && target.kind() == LaunchKind.WEB) {
-            // A website is seen and acted on in the run's own browser, whatever the bot captures otherwise.
-            playsOn = "";
-            Source.set(WebSource.over(target.token()));
-            return;
-        }
-        CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source
-                && !(source instanceof CurrentSource) ? source : null;
-        Object dealt = marked(SdkValue.Id.INSTANCE, values);
-        CaptureSource moved = onInstance(capture, dealt);
-        // The game is launched and restarted where the run plays: the dealt instance, not the author's.
-        playsOn = moved != capture && dealt instanceof Instance named ? named.name() : "";
-        Source.set(moved);
+    }
+
+    /**
+     * The launch whose window the run reads once it opens, when the capture is automatic and no window was picked for
+     * this desktop game yet; empty otherwise.
+     */
+    public static Optional<LaunchSpec> pendingWatch() {
+        return Optional.ofNullable(pendingWatch);
+    }
+
+    /** The names of the emulator instances and phones running now. */
+    public static List<String> runningInstances() {
+        return Emulators.listAll().stream().filter(EmulatorRef::running).map(EmulatorRef::name).toList();
     }
 
     /**
@@ -91,12 +105,7 @@ public final class InstalledGame {
      * so this is what keeps two of them off one emulator. Studio's own views look where the run plays through it too.
      */
     public static CaptureSource onInstance(CaptureSource capture, Object instance) {
-        if (!(instance instanceof Instance named) || !named.isNamed() || !SdkValues.onEmulator(capture)) {
-            return capture;
-        }
-        CaptureSource moved = CaptureSource.emulator(named.name());
-        Rect region = capture.subRegion();
-        return region == null ? moved : moved.region(region);
+        return AutoCapture.onInstance(capture, instance);
     }
 
     /**

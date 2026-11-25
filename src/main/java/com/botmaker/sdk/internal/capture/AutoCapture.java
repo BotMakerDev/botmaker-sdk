@@ -1,0 +1,144 @@
+// SPDX-FileCopyrightText: 2026 LiQiyeDev
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+package com.botmaker.sdk.internal.capture;
+
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.internal.web.WebSource;
+import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchSpec;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+/**
+ * Where a run reads its pixels (2026-11-25, spec {@code 2026-11-25-auto-capture-design.md}), from what the run is given:
+ * the first of these that applies.
+ *
+ * <ol>
+ *   <li>The instance a host gave the run ({@code botmaker.capture.emulator}).</li>
+ *   <li>A website target: the run's own browser.</li>
+ *   <li>A capture set by hand, moved onto a dealt instance when it is an emulator's.</li>
+ *   <li>Automatic with an emulator or phone app target: the instance dealt, else the one the target names, else
+ *       the one running.</li>
+ *   <li>Automatic with a desktop game target: the window picked on an earlier run, else the one its launch opens.</li>
+ *   <li>Nothing launched: the whole desktop.</li>
+ * </ol>
+ *
+ * Pure: the running instances are asked only when the target names none and no instance was dealt.
+ */
+public final class AutoCapture {
+
+    /** What the run is given; {@code capture} {@code null} when the bot marks none. */
+    public record Inputs(String emulatorProperty, LaunchSpec target, CaptureSource capture, Object dealt,
+                         Optional<CaptureSource> savedWindow, Supplier<List<String>> runningInstances) {}
+
+    /** The answer: a source to read, a launch to watch for its window, or why the run cannot start. */
+    public sealed interface Decision permits Decision.Fixed, Decision.WatchLaunch, Decision.Fail {
+
+        /**
+         * Read {@code source} ({@code null}: the whole desktop); {@code why} is the trace's line, {@code null} for a
+         * source the run did not choose, and {@code playsOn} the instance an emulator app is launched on, or {@code ""}.
+         */
+        record Fixed(CaptureSource source, String why, String playsOn) implements Decision {}
+
+        /** Launch {@code target} and read the window it opens. */
+        record WatchLaunch(LaunchSpec target) implements Decision {}
+
+        record Fail(String message) implements Decision {}
+    }
+
+    private AutoCapture() {}
+
+    public static Decision decide(Inputs in) {
+        // A region of the automatic source is the region of what it decides (pinned as it is, it would read itself).
+        if (in.capture() instanceof RegionSource region && unwrapped(region) instanceof AmbientSource) {
+            Decision whole = decide(new Inputs(in.emulatorProperty(), in.target(), region.parent(), in.dealt(),
+                    in.savedWindow(), in.runningInstances()));
+            return whole instanceof Decision.Fixed fixed
+                    ? new Decision.Fixed(CaptureSource.region(fixed.source() == null ? CaptureSource.desktop()
+                            : fixed.source(), region.sub()), fixed.why(), fixed.playsOn())
+                    : whole;
+        }
+        if (in.emulatorProperty() != null && !in.emulatorProperty().isBlank()) {
+            return new Decision.Fixed(CaptureSource.emulator(in.emulatorProperty().strip()), null, "");
+        }
+        LaunchSpec target = in.target();
+        if (target != null && target.kind() == LaunchKind.WEB) {
+            return new Decision.Fixed(WebSource.over(target.token()), null, "");
+        }
+        CaptureSource capture = in.capture();
+        if (!isAutomatic(capture, target)) {
+            CaptureSource moved = onInstance(capture, in.dealt());
+            String playsOn = moved != capture && in.dealt() instanceof Instance named ? named.name() : "";
+            return new Decision.Fixed(moved, null, playsOn);
+        }
+        if (target == null || target.kind() == LaunchKind.UNKNOWN) return new Decision.Fixed(null, null, "");
+        if (target.kind() == LaunchKind.EMULATOR_APP) return onDevice(target, in);
+        return in.savedWindow()
+                .<Decision>map(window -> new Decision.Fixed(window, "capture: " + said(window)
+                        + ", picked on an earlier run", ""))
+                .orElseGet(() -> new Decision.WatchLaunch(target));
+    }
+
+    /**
+     * Whether {@code capture} leaves the choice to the game: automatic, the ambient source, none, or the whole desktop
+     * while a game is launched (a whole desktop is never where a launched game is; what the private parameters' move
+     * of 2026-11-21 seeded).
+     */
+    public static boolean isAutomatic(CaptureSource capture, LaunchSpec target) {
+        if (capture == null || capture instanceof AmbientSource) return true;
+        return capture instanceof Desktop && target != null && target.kind() != LaunchKind.UNKNOWN;
+    }
+
+    /**
+     * {@code capture} on the instance {@code instance} names, when the capture is an emulator's (a region of it kept);
+     * else {@code capture} as it is.
+     */
+    public static CaptureSource onInstance(CaptureSource capture, Object instance) {
+        if (!(instance instanceof Instance named) || !named.isNamed() || capture == null
+                || !(capture.base() instanceof EmulatorSource)) {
+            return capture;
+        }
+        CaptureSource moved = CaptureSource.emulator(named.name());
+        Rect region = capture.subRegion();
+        return region == null ? moved : moved.region(region);
+    }
+
+    private static CaptureSource unwrapped(CaptureSource source) {
+        CaptureSource s = source;
+        while (s instanceof RegionSource region) s = region.parent();
+        return s;
+    }
+
+    /** A window as the trace says it: {@code window "Sword x Staff" (class steam_app_1)}. */
+    static String said(CaptureSource window) {
+        if (!(window instanceof NamedWindow named)) return String.valueOf(window);
+        return "window \"" + named.label() + "\" (class " + named.windowClass() + ")";
+    }
+
+    private static Decision onDevice(LaunchSpec target, Inputs in) {
+        String named = target.emulatorInstance();
+        String instance;
+        if (in.dealt() instanceof Instance dealt && dealt.isNamed()) instance = dealt.name();
+        else if (named != null && !named.isBlank()) instance = named;
+        else {
+            List<String> running = in.runningInstances().get();
+            // None up yet (or none asked, as in Studio's views): the whole desktop, and the launch starts what it can.
+            if (running.isEmpty()) {
+                return new Decision.Fixed(null, "capture: the whole desktop, no instance runs and the target names none",
+                        "");
+            }
+            if (running.size() > 1) {
+                return new Decision.Fail("which instance? the target names none and " + running.size() + " run");
+            }
+            instance = running.getFirst();
+        }
+        return new Decision.Fixed(CaptureSource.emulator(instance), "capture: " + instance + ", from the game's target",
+                instance.equals(named) ? "" : instance);
+    }
+}

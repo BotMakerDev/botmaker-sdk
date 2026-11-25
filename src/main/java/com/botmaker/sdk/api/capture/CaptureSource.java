@@ -6,6 +6,7 @@ package com.botmaker.sdk.api.capture;
 import com.botmaker.plugin.api.palette.Hidden;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
+import com.botmaker.sdk.internal.capture.AutomaticSource;
 import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -115,7 +116,16 @@ public interface CaptureSource {
         Mouse.scroll(notches);
     }
 
-    // --- The three canonical sources ---
+    // --- The canonical sources ---
+
+    /**
+     * Where the bot's game is, from its launch target (2026-11-25): an emulator or phone app's device, a website's
+     * own browser, the window a desktop game's launch opens (picked on the first run and kept on this computer), and
+     * the whole desktop when the bot launches nothing. The value a new bot starts with.
+     */
+    static CaptureSource automatic() {
+        return new AutomaticSource();
+    }
 
     /** The whole virtual desktop (all monitors). The ultimate fallback source for every matcher. */
     static CaptureSource desktop() {

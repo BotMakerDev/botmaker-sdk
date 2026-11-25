@@ -189,7 +189,7 @@ class SdkPluginSurfaceTest {
         assertEquals("Running", byId.get(SdkValue.Id.DO_SETUP).holder());
         assertEquals("Game", byId.get(SdkValue.Id.LAUNCH_TARGET).holder());
         assertEquals(CaptureSource.class, capture.type());
-        assertEquals(CaptureSource.desktop().getClass(),
+        assertEquals(CaptureSource.automatic().getClass(),
                 assertInstanceOf(ManagedParam.class, capture).initial().getClass());
         assertEquals("Settings", byId.get(SdkValue.Id.CONFIDENCE).holder(), "a setting is a parameter of its own");
         assertEquals(Double.class, byId.get(SdkValue.Id.CONFIDENCE).type());

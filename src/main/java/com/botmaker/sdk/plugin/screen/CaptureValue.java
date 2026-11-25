@@ -9,10 +9,13 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.capture.AutoCapture;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.capture.AmbientSource;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
+import com.botmaker.sdk.plugin.params.LaunchTargets;
 import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
@@ -52,8 +55,24 @@ public final class CaptureValue {
      */
     public static CaptureSource current(StudioServices services) {
         CaptureSource written = written(services);
-        return SdkValues.onEmulator(written) ? InstalledGame.onInstance(written, read(services, SdkValues.INSTANCE,
-                Instance.class).orElse(null)) : written;
+        Instance dealt = read(services, SdkValues.INSTANCE, Instance.class).orElse(null);
+        LaunchSpec target = LaunchTargets.spec(services);
+        // A website is read in a run's own browser, which Studio's views have not: they keep what the bot writes.
+        if (target != null && target.kind() == LaunchKind.WEB) {
+            return AutoCapture.isAutomatic(written, target) ? null : InstalledGame.onInstance(written, dealt);
+        }
+        return resolved(services, written, dealt);
+    }
+
+    /**
+     * {@code written} as a run of the bot decides it, the instance {@code dealt} included; the whole desktop for a
+     * desktop game's window not picked yet or an instance that cannot be told. Never probes the emulators: Studio's
+     * views ask it on the FX thread at each refresh.
+     */
+    private static CaptureSource resolved(StudioServices services, CaptureSource written, Instance dealt) {
+        AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, LaunchTargets.spec(services),
+                written, dealt, Optional.empty(), List::of));
+        return decision instanceof AutoCapture.Decision.Fixed fixed ? fixed.source() : null;
     }
 
     /**
@@ -128,8 +147,9 @@ public final class CaptureValue {
             return Optional.empty();
         }
         String instance = spec.emulatorInstance();
-        // Already that device, maybe narrowed to a region of it: kept as written.
+        // Already that device, maybe narrowed to a region of it: kept as written; automatic follows it by itself.
         CaptureSource now = written(services);
+        if (now instanceof AmbientSource) return Optional.of(instance);
         if (now != null && now.base() instanceof EmulatorSource already && already.instanceName().equals(instance)) {
             return Optional.of(instance);
         }
@@ -139,7 +159,9 @@ public final class CaptureValue {
 
     /** The emulator instance capture follows, by name; empty when it follows none. */
     public static Optional<String> followed(StudioServices services) {
-        CaptureSource now = written(services);
+        CaptureSource written = written(services);
+        // Automatic follows the target's instance: the one current() reads, before instance() moves it.
+        CaptureSource now = written instanceof AmbientSource ? resolved(services, written, null) : written;
         return now != null && now.base() instanceof EmulatorSource device ? Optional.ofNullable(device.instanceName())
                 : Optional.empty();
     }
@@ -152,7 +174,10 @@ public final class CaptureValue {
      */
     public static Optional<String> renamed(StudioServices services, Map<String, String> moves) {
         CaptureSource now = written(services);
-        if (now == null || !(now.base() instanceof EmulatorSource device)) return Optional.empty();
+        // Automatic names no instance of its own (its base() would be this process's source): nothing to rename.
+        if (now == null || now instanceof AmbientSource || !(now.base() instanceof EmulatorSource device)) {
+            return Optional.empty();
+        }
         String renamed = moves.get(device.instanceName());
         if (renamed == null) return Optional.empty();
         CaptureSource base = new EmulatorSource(renamed);

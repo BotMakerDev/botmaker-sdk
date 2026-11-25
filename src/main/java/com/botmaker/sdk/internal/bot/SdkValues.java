@@ -254,7 +254,7 @@ public final class SdkValues implements ValueHolder {
      */
     public static final ManagedParam<CaptureSource> CAPTURE = ManagedValue.param(SdkValue.Id.CAPTURE)
             .in(SdkValue.Holder.GAME)
-            .startsAs(SdkValues::wholeDesktop)
+            .startsAs(SdkValues::automaticCapture)
             .shown("The game's window: where the bot reads pixels from")
             .because("This is where the bot reads pixels from. Choose it in the Runner or in Project ▸ Parameters.");
 
@@ -516,9 +516,9 @@ public final class SdkValues implements ValueHolder {
         return ZoneId.systemDefault();
     }
 
-    /** {@link #CAPTURE}'s: the whole desktop until the game's window is picked. */
-    private static CaptureSource wholeDesktop() {
-        return CaptureSource.desktop();
+    /** {@link #CAPTURE}'s: where the game's launch target says its pixels are (2026-11-25). */
+    private static CaptureSource automaticCapture() {
+        return CaptureSource.automatic();
     }
 
     /** {@link #INSTANCE}'s: none, so the capture source's own name is used. */
