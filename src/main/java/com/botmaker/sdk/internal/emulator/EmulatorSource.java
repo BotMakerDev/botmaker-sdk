@@ -141,8 +141,13 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
      * whether Android started its activity.
      */
     public boolean bringToFront(String packageName) {
+        return bringToFront(packageName, null);
+    }
+
+    /** {@link #bringToFront(String)}, or {@code page} opened again when the app starts on one (2026-11-25). */
+    public boolean bringToFront(String packageName, String page) {
         Emulator emu = resolve();
-        return emu != null && emu.device().bringToFront(packageName);
+        return emu != null && emu.device().bringToFront(packageName, page);
     }
 
     /**

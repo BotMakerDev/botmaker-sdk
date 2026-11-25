@@ -23,6 +23,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 - **A start page that no longer opens blocks the launch** (2026-11-25): an emulator app target whose page is gone
   is refused with what to pick again, in Studio's readiness check and in `launch_game`.
+- **A launch target keeps its start page** (2026-11-25): `LaunchTarget.EmulatorApp` carries the page of
+  `emu-app:…#<page>`; a run dealt another instance, and an instance renamed, keep it; a run brings the app back by
+  opening that page again, when it fell behind another app or the explore loop asks for it.
 
 - 🔭 A goal field beside ▶ Keep exploring on the Explore page (plan `2026-11-24-explore-drive-fixes` phase 7): type
   what to reach ("the Google sign-in page") and the run goes toward it with its crew; leave it empty for a run over

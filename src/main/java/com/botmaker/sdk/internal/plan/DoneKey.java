@@ -26,7 +26,7 @@ public final class DoneKey {
     }
 
     /**
-     * The game {@code spec} launches: an emulator app's package, whichever instance it names, else the spec as one
+     * The game {@code spec} launches: an emulator app's package, whichever instance and page it names, else the spec as one
      * launcher is written ({@link InstalledGame#canonical}); {@code ""} for none.
      */
     public static String game(String spec) {

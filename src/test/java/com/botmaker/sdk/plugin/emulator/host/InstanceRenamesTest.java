@@ -85,5 +85,7 @@ class InstanceRenamesTest {
                 InstanceRenames.respelled(List.of("emu-app:com.zjcs.android.us@LDPlayer-1",
                         "emu-app:com.zjcs.android.us@MuMu-0", "steam:1145350", "not a spec"), moves));
         assertEquals("", InstanceRenames.respelled("", moves));
+        assertEquals("emu-app:com.android.settings@Farm 1#wifi",
+                InstanceRenames.respelled("emu-app:com.android.settings@LDPlayer-1#wifi", moves), "the page kept");
     }
 }

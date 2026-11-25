@@ -31,7 +31,7 @@ import com.botmaker.shared.launch.Launcher;
  *   url:&lt;a launcher's link&gt;
  *   cli:&lt;command line&gt;
  *   exe:&lt;path&gt;
- *   emu-app:&lt;package&gt;@&lt;instanceName&gt;
+ *   emu-app:&lt;package&gt;@&lt;instanceName&gt;[#&lt;page&gt;]
  * </pre>
  *
  * <p>The spec grammar, the launching and the host-side running probes all live in
@@ -164,11 +164,14 @@ public sealed interface LaunchTarget {
         };
     }
 
-    /** {@code <package>@<instance>} — {@link LaunchSpec} splits on the last {@code @} so package dots survive. */
+    /**
+     * {@code <package>@<instance>[#<page>]} — {@link LaunchSpec} splits off the page first, then on the last
+     * {@code @} so package dots survive.
+     */
     private static LaunchTarget emulatorApp(LaunchSpec parsed) {
         String pkg = parsed.emulatorPackage();
         String instance = parsed.emulatorInstance();
-        return pkg == null || instance == null ? null : new EmulatorApp(pkg, instance);
+        return pkg == null || instance == null ? null : new EmulatorApp(pkg, instance, parsed.emulatorPage());
     }
 
     /** A Steam game, launched by its numeric appId (see {@link Game#launchSteam(String)}). */
@@ -302,11 +305,20 @@ public sealed interface LaunchTarget {
      * instance is running (launching + waiting when it isn't), connects over ADB, and starts the app's launcher
      * activity. The capture side is handled independently by the {@code emulator:<instance>} capture source, so
      * this only has to bring the app to the foreground.
+     *
+     * <p>{@code page}, or {@code null}, is where it starts when not its first screen (2026-11-25): an Android door or
+     * an exported activity ({@code shared.emulator.AndroidPage}), opened by its intent, and opened again to bring the
+     * app back.
      */
-    record EmulatorApp(String packageName, String instance) implements LaunchTarget {
+    record EmulatorApp(String packageName, String instance, String page) implements LaunchTarget {
+        /** An app starting on its first screen. */
+        public EmulatorApp(String packageName, String instance) {
+            this(packageName, instance, null);
+        }
+
         @Override
         public LaunchSpec launchSpec() {
-            return new LaunchSpec(LaunchKind.EMULATOR_APP, packageName + "@" + instance);
+            return LaunchSpec.emulatorApp(packageName, instance, page);
         }
 
         /**

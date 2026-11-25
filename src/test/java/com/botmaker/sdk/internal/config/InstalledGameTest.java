@@ -55,6 +55,9 @@ class InstalledGameTest {
         assertEquals("emu-app:com.example.game@LDPlayer-1",
                 InstalledGame.launchedOn("emu-app:com.example.game@LDPlayer-1", ""), "no instance dealt");
         assertNull(InstalledGame.launchedOn(null, "LDPlayer-3"));
+        assertEquals("emu-app:com.google.android.gms@LDPlayer-3#google-sign-in",
+                InstalledGame.launchedOn("emu-app:com.google.android.gms@LDPlayer-1#google-sign-in", "LDPlayer-3"),
+                "the page goes with it");
     }
 
     /** A bot's {@code Sdk}: the methods are found by mark, whatever they are called. */

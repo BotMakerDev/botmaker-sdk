@@ -166,7 +166,7 @@ public final class InstalledGame {
         if (parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP || instance.equals(parsed.emulatorInstance())) {
             return spec;
         }
-        return LaunchKind.EMULATOR_APP.id() + ":" + parsed.emulatorPackage() + "@" + instance;
+        return parsed.onInstance(instance).spec();
     }
 
     /**

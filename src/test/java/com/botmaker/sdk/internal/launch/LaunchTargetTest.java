@@ -74,6 +74,18 @@ class LaunchTargetTest {
         assertEquals("com.some.game", app.packageName());
         assertEquals("Rvc64", app.instance());
         assertEquals("emu-app:com.some.game@Rvc64", t.spec());
+        assertNull(app.page());
+    }
+
+    @Test
+    void anEmulatorAppKeepsThePageItStartsOn() {
+        String spec = "emu-app:com.google.android.gms@Waydroid#google-sign-in";
+        LaunchTarget.EmulatorApp app = assertInstanceOf(LaunchTarget.EmulatorApp.class, LaunchTarget.parse(spec));
+        assertEquals("com.google.android.gms", app.packageName());
+        assertEquals("Waydroid", app.instance());
+        assertEquals("google-sign-in", app.page());
+        assertEquals(spec, app.spec());
+        assertEquals(spec, LaunchTarget.parse(app.spec()).spec(), "round-trips");
     }
 
     @Test

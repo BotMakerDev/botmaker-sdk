@@ -98,7 +98,7 @@ public final class InstanceRenames {
         String instance = parsed.emulatorInstance();
         String now = instance == null ? null : moves.get(instance);
         if (now == null) return spec;
-        return LaunchKind.EMULATOR_APP.id() + ":" + parsed.emulatorPackage() + "@" + now;
+        return parsed.onInstance(now).spec();
     }
 
     public static List<String> respelled(List<String> specs, Map<String, String> moves) {

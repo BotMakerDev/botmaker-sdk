@@ -33,7 +33,8 @@ final class GameInFront {
      * when it no longer runs.
      */
     static void keep(Emulator emu) {
-        if (!(Target.current() instanceof LaunchTarget.EmulatorApp(String game, String instance)) || !emu.is(instance)) {
+        if (!(Target.current() instanceof LaunchTarget.EmulatorApp(String game, String instance, String page))
+                || !emu.is(instance)) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -46,7 +47,7 @@ final class GameInFront {
             return;
         }
         Debug.log(cover.get() + ", the emulator's own app, is in front of the game: bringing the game back");
-        if (!emu.device().bringToFront(game)) {
+        if (!emu.device().bringToFront(game, page)) {
             Debug.error("Android started no activity of " + game + ": it stays behind " + cover.get());
         }
     }

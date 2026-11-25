@@ -71,7 +71,6 @@ public record Foreground(String inFront, String target, String dialog) {
 
     /** The launch target's package when it is an app in an emulator, else {@code ""}. */
     private static String targetPackage() {
-        return Target.current() instanceof LaunchTarget.EmulatorApp(String packageName, String ignored)
-                ? packageName : "";
+        return Target.current() instanceof LaunchTarget.EmulatorApp app ? app.packageName() : "";
     }
 }
