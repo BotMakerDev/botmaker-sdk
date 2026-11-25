@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.launch;
+package com.botmaker.sdk.plugin.emulator.apps;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
@@ -47,9 +47,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * Get an app (spec {@code 2026-11-25-game-window-design.md}, Get an app): a package name or a Google Play link, then
+ * Get an app, opened from the Emulators window's Instances tab ({@link EmulatorApps}): a package name or a Google Play link, then
  * Download it (Google Play's files, APKPure when the user allowed it, the Play app) or an APK file the user has, and
  * the Install on table ({@link InstallOn}). The installs run one device after another; a stopped device is started
  * for its install and stopped after, and one that fails doesn't stop the next. The library keeps one download per
@@ -64,7 +65,8 @@ final class GetAppDialog {
 
     private final StudioServices services;
     private final List<AndroidDevices.Device> devices;
-    private final String chip;
+    /** The references of the devices ticked at first: the instances picked in the Emulators window. */
+    private final Set<String> picked;
     private final Runnable onDone;
     private final TextField app = new TextField();
     private final RadioButton download = new RadioButton("Download it");
@@ -87,10 +89,11 @@ final class GetAppDialog {
     private Thread signingIn;
     private Thread installing;
 
-    private GetAppDialog(StudioServices services, List<AndroidDevices.Device> devices, String chip, Runnable onDone) {
+    private GetAppDialog(StudioServices services, List<AndroidDevices.Device> devices, Set<String> picked,
+                         Runnable onDone) {
         this.services = services;
         this.devices = List.copyOf(devices);
-        this.chip = chip;
+        this.picked = Set.copyOf(picked);
         this.onDone = onDone;
         ToggleGroup from = new ToggleGroup();
         download.setToggleGroup(from);
@@ -114,9 +117,9 @@ final class GetAppDialog {
     }
 
     /** Opens the dialog over {@code owner}; {@code onDone} runs on the JavaFX thread after the installs. */
-    static void show(StudioServices services, Window owner, List<AndroidDevices.Device> devices, String chip,
+    static void show(StudioServices services, Window owner, List<AndroidDevices.Device> devices, Set<String> picked,
                      Runnable onDone) {
-        new GetAppDialog(services, devices, chip, onDone).open(owner);
+        new GetAppDialog(services, devices, picked, onDone).open(owner);
     }
 
     private void open(Window owner) {
@@ -209,7 +212,7 @@ final class GetAppDialog {
         table.getChildren().clear();
         if (devices.isEmpty()) table.getChildren().add(Styles.on(new Label("No Android device is on this computer."),
                 Styles.DIALOG_HINT));
-        for (InstallOn.Row row : InstallOn.rows(devices, facts, chip)) {
+        for (InstallOn.Row row : InstallOn.rows(devices, facts, picked)) {
             String reference = row.device().instance().reference();
             CheckBox box = new CheckBox((row.device().running() ? "● " : "○ ") + row.text());
             box.setSelected(was.getOrDefault(reference, row.ticked()));

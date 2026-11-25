@@ -94,7 +94,7 @@ public final class GameDialog {
         // A group per tab: each shows the current target's tile picked.
         this.games = new GamesTab(new ToggleGroup(), strip::show, this::openLutris,
                 () -> InstallGame.fromFile(services, stage, this::report, this::installed));
-        this.android = new AndroidTab(services, new ToggleGroup(), strip::show, () -> stage);
+        this.android = new AndroidTab(services, new ToggleGroup(), strip::show);
         this.recent = new RecentTab(new ToggleGroup(), strip::show);
         this.websites = new WebsitesTab(strip::show, this::report);
         Hyperlink emulators = new Hyperlink("Emulators…");

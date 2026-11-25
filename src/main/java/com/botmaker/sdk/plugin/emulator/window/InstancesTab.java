@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.emulator.window;
 import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
+import com.botmaker.sdk.plugin.emulator.apps.EmulatorApps;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorState;
 import com.botmaker.shared.emulator.PlatformId;
@@ -55,6 +56,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -65,7 +67,7 @@ import static com.botmaker.sdk.plugin.emulator.window.Look.muted;
 /**
  * The Instances tab: every instance as a row folded under its emulator, with the columns the user chose (the table's
  * own ☰ button), the filters (the window's Find is their words), saved filters, and on the right the inspector of
- * the rows picked, which holds Start, Stop and Apply. The order and the filtering are the model's
+ * the rows picked, which holds Start, Stop and Apply, and for Android ones Get an app and Downloaded apps. The order and the filtering are the model's
  * ({@link EmulatorsModel.Column#order}, {@link EmulatorsModel.Filter}); what the inspector says is
  * {@link InspectorModel}'s; this draws them.
  */
@@ -657,6 +659,34 @@ final class InstancesTab {
             buttons.getChildren().add(look);
         });
         inspector.getChildren().add(buttons);
+        apps(List.of(row));
+    }
+
+    /**
+     * The Apps section, for the picked instances an app can be installed on: Get an app, with them ticked, and
+     * Downloaded apps. Nothing when none of them takes an app.
+     */
+    private void apps(List<EmulatorsModel.InstanceRow> rows) {
+        List<EmulatorInstance> android = rows.stream().filter(row -> EmulatorApps.takesApps(row.key().platform()))
+                .map(EmulatorsModel.InstanceRow::instance).toList();
+        if (android.isEmpty()) return;
+        inspector.getChildren().add(Look.cap("Apps"));
+        Label said = muted("");
+        said.setVisible(false);
+        said.setManaged(false);
+        Consumer<String> failed = why -> {
+            said.setText("Couldn't read the devices: " + why);
+            said.setVisible(true);
+            said.setManaged(true);
+        };
+        Button getApp = new Button(android.size() == 1 ? "Get an app…" : "Get an app on " + android.size() + "…");
+        getApp.setTooltip(new Tooltip("Download an app or install an APK file you have"));
+        getApp.setOnAction(e -> EmulatorApps.getApp(window.services(), window.stage(), android, window::refresh,
+                failed));
+        Button downloaded = new Button("Downloaded apps…");
+        downloaded.setTooltip(new Tooltip("The app files BotMaker keeps, and deleting them"));
+        downloaded.setOnAction(e -> EmulatorApps.downloaded(window.services(), window.stage(), failed));
+        inspector.getChildren().addAll(buttons(getApp, downloaded), said);
     }
 
     /** Several instances, or a group's: their count and states, and Start, Stop and Apply to all of them. */
@@ -674,6 +704,7 @@ final class InstancesTab {
         apply.setDisable(counted.applicable() == 0);
         apply.setOnAction(e -> window.apply(rows));
         inspector.getChildren().add(buttons(start, stop, apply));
+        apps(rows);
     }
 
     private static FlowPane buttons(Button... buttons) {

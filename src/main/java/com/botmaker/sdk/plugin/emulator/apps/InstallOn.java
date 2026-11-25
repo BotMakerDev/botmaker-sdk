@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.launch;
+package com.botmaker.sdk.plugin.emulator.apps;
 
 import com.botmaker.shared.emulator.AdbDevice;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -9,6 +9,7 @@ import com.botmaker.shared.emulator.PlayStoreSearch;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,11 +42,11 @@ final class InstallOn {
         }
     }
 
-    /** The rows of {@code devices}: {@code facts} by device reference, the one {@code current} names ticked. */
-    static List<Row> rows(List<AndroidDevices.Device> devices, Map<String, Facts> facts, String current) {
+    /** The rows of {@code devices}: {@code facts} by device reference, the ones {@code picked} names ticked. */
+    static List<Row> rows(List<AndroidDevices.Device> devices, Map<String, Facts> facts, Set<String> picked) {
         return devices.stream().map(device -> new Row(device, device.running()
                 ? facts.get(device.instance().reference()) : null,
-                device.instance().reference().equals(current))).toList();
+                picked.contains(device.instance().reference()))).toList();
     }
 
     /** The version a device has: {@code 1.3.0 → updates}, {@code not installed}, or {@code —} when unknown. */

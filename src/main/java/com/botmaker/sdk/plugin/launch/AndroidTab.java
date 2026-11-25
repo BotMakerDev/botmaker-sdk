@@ -6,8 +6,9 @@ package com.botmaker.sdk.plugin.launch;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.apps.AndroidDevices;
+import com.botmaker.sdk.plugin.emulator.apps.EmulatorApps;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
-import com.botmaker.shared.emulator.ApkLibrary;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.geometry.Insets;
@@ -26,38 +27,35 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Window;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
 /**
  * The Game window's Android apps tab (spec {@code 2026-11-25-game-window-design.md}, Android apps): a chip per
  * instance of this computer's emulator and per connected phone ({@link AndroidDevices}), each with a running dot, then
  * + New instance… and System apps; the chip's apps as tiles, dimmed while it is stopped (an action that needs it
- * starts it), and a last tile, + Get an app ({@link GetAppDialog}). The footer opens the Downloaded apps window.
+ * starts it). It only picks an app already on a device: getting or deleting one is the emulator's, in the Emulators
+ * window ({@link EmulatorApps}), which the footer opens on the chip's instance; ↻ reads the devices again.
  */
 final class AndroidTab {
 
     private final StudioServices services;
     private final ToggleGroup tiles;
     private final BiConsumer<AndroidDevices.Device, AndroidDevices.App> onPick;
-    private final Supplier<Window> owner;
     private final ToggleGroup chipGroup = new ToggleGroup();
     private final FlowPane chips = new FlowPane(6, 6);
     private final CheckBox systemApps = new CheckBox("System apps");
     private final Label note = Styles.on(new Label("Looking for Android devices…"), Styles.DIALOG_HINT);
     private final FlowPane grid = new FlowPane(10, 10);
-    private final Button getApp;
-    private final Hyperlink downloaded = new Hyperlink("Downloaded apps…");
+    private final Hyperlink manageApps = new Hyperlink("Get or delete apps: Emulators…");
     private final VBox box;
     private final Map<String, ToggleButton> bySpec = new LinkedHashMap<>();
     /** The desktop's Android entries (Waydroid's), by package: their names and icons win over the cache's. */
-    private Map<String, GameCatalog.Item> menu = Map.of();
+    private Map<String, AndroidDevices.App> menu = Map.of();
     private List<AndroidDevices.Device> devices = List.of();
     /** The chip on, by device reference. */
     private String chip;
@@ -65,31 +63,35 @@ final class AndroidTab {
     private String current;
     private boolean scanning;
 
-    AndroidTab(StudioServices services, ToggleGroup tiles, BiConsumer<AndroidDevices.Device, AndroidDevices.App> onPick,
-               Supplier<Window> owner) {
+    AndroidTab(StudioServices services, ToggleGroup tiles, BiConsumer<AndroidDevices.Device, AndroidDevices.App> onPick) {
         this.services = services;
         this.tiles = tiles;
         this.onPick = onPick;
-        this.owner = owner;
-        getApp = Styles.on(new Button(), Styles.TILE);
-        getApp.setGraphic(Tiles.cover("+ Get an app", null, "+", null));
-        Tiles.fixSize(getApp);
-        getApp.setOnAction(e -> GetAppDialog.show(services, owner.get(), devices, chip, this::rescan));
         systemApps.setTooltip(new Tooltip("Also list the apps that have no icon on the device: they start on a page"));
         systemApps.setOnAction(e -> showChip());
         note.setWrapText(true);
-        downloaded.setOnAction(e -> DownloadedAppsWindow.show(services, owner.get(), devices, this::showSize));
+        // Getting or deleting an app is the emulator's, in the Emulators window; this tab only picks one on a device.
+        manageApps.setTooltip(new Tooltip("Get an app onto a device, or delete downloaded ones, in the Emulators window"));
+        manageApps.setOnAction(e -> openEmulators());
+        Button refresh = new Button("↻");
+        refresh.setTooltip(new Tooltip("Read the devices and their apps again"));
+        refresh.setOnAction(e -> rescan());
         grid.setRowValignment(VPos.TOP);
         VBox listing = new VBox(8, note, grid);
         listing.setPadding(new Insets(4));
         ScrollPane scroll = new ScrollPane(listing);
         scroll.setFitToWidth(true);
         VBox.setVgrow(scroll, Priority.ALWAYS);
-        HBox footer = new HBox(8, downloaded);
+        HBox footer = new HBox(8, manageApps, refresh);
         footer.setAlignment(Pos.CENTER_LEFT);
         box = new VBox(8, chips, scroll, footer);
         box.setPadding(new Insets(8, 0, 0, 0));
-        showSize();
+    }
+
+    /** The Emulators window, on the chip's instance when one is on. */
+    private void openEmulators() {
+        devices.stream().filter(d -> d.instance().reference().equals(chip)).findFirst()
+                .ifPresentOrElse(d -> EmulatorsWindow.open(services, d.instance()), () -> EmulatorsWindow.open(services));
     }
 
     Node node() {
@@ -98,12 +100,13 @@ final class AndroidTab {
 
     /** Takes the desktop's Android entries from {@code scanned}, and reads the devices the first time. */
     void fill(List<GameCatalog.Section> scanned) {
-        Map<String, GameCatalog.Item> entries = new LinkedHashMap<>();
+        Map<String, AndroidDevices.App> entries = new LinkedHashMap<>();
         for (GameCatalog.Section section : scanned) {
             if (section.kind() != GameCatalog.Kind.ANDROID) continue;
             for (GameCatalog.Item item : section.items()) {
                 LaunchSpec spec = LaunchSpec.parse(item.spec());
-                if (spec != null && spec.kind() == LaunchKind.EMULATOR_APP) entries.put(spec.emulatorPackage(), item);
+                if (spec != null && spec.kind() == LaunchKind.EMULATOR_APP) entries.put(spec.emulatorPackage(),
+                        new AndroidDevices.App(spec.emulatorPackage(), item.name(), item.artwork(), true));
             }
         }
         boolean changed = !entries.equals(menu);
@@ -115,7 +118,7 @@ final class AndroidTab {
     void rescan() {
         if (scanning) return;
         scanning = true;
-        Map<String, GameCatalog.Item> entries = menu;
+        Map<String, AndroidDevices.App> entries = menu;
         Async.load("android-devices", () -> AndroidDevices.scan(entries), found -> {
             scanning = false;
             devices = found;
@@ -179,10 +182,9 @@ final class AndroidTab {
             return;
         }
         for (AndroidDevices.App app : device.apps()) nodes.add(tile(device, app));
-        say(device.apps().isEmpty() ? device.running() ? "No app with an icon is on " + device.instance().caption()
-                + " yet. Press + Get an app." : device.instance().caption() + " is stopped and no app was seen on it "
-                + "yet. Get an app starts it." : null);
-        nodes.add(getApp);
+        say(device.apps().isEmpty() ? (device.running() ? "No app with an icon is on " + device.instance().caption()
+                + " yet." : device.instance().caption() + " is stopped and no app was seen on it yet.")
+                + " Get one in the Emulators window, below." : null);
         grid.getChildren().setAll(nodes);
         if (systemApps.isSelected()) showSystemApps(device);
         mark(current);
@@ -196,9 +198,7 @@ final class AndroidTab {
         Async.load("android-system-apps", () -> AndroidDevices.systemApps(device), system -> {
             if (!systemApps.isSelected() || !device.instance().reference().equals(chip)) return;
             List<Node> nodes = new ArrayList<>(grid.getChildren());
-            nodes.remove(getApp);
             for (AndroidDevices.App app : system) nodes.add(tile(device, app));
-            nodes.add(getApp);
             grid.getChildren().setAll(nodes);
             mark(current);
         });
@@ -220,11 +220,5 @@ final class AndroidTab {
         note.setText(text == null ? "" : text);
         note.setVisible(text != null);
         note.setManaged(text != null);
-    }
-
-    /** The footer's link with the library's size, read off the JavaFX thread. */
-    private void showSize() {
-        Async.load("apk-library-size", () -> ApkLibrary.shared().size(),
-                size -> downloaded.setText("Downloaded apps · " + DownloadedApps.size(size) + "…"));
     }
 }

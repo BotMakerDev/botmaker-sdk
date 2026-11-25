@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.launch;
+package com.botmaker.sdk.plugin.emulator.apps;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Async;

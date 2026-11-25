@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.launch;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.apps.AndroidDevices;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

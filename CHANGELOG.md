@@ -33,11 +33,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   window) and System apps, which also lists the apps with no icon. A picked app's strip says where it starts: its
   first screen, a page from a list (the doors that land in it, then the activities it exports), or the page open
   on the device now, read again on ↻; a page no intent reaches turns the line red and Use off. After ▶ Try on a
-  page a small frame shows where it landed. + Get an app takes a package or a Google Play link, downloads it or
-  takes an APK file, and installs it on the devices ticked in its Install on table (Android version, processor,
-  the version on it now); a stopped device is started for its install and stopped after. The footer's Downloaded
-  apps window lists the library's files with their size and where the app is installed, Delete per row, and
-  deletes the ones installed nowhere, all but the newest, or all; deleting a file never uninstalls an app.
+  page a small frame shows where it landed. The tab only picks an app already on a device: its footer's "Get or
+  delete apps: Emulators…" opens the Emulators window on the chip's instance, and ↻ reads the devices again.
+- **An emulator's apps are the Emulators window's** (2026-11-25): the Instances tab's inspector has an Apps section
+  for an Android instance or phone. Get an app… takes a package or a Google Play link, downloads it or takes an APK
+  file, and installs it on the devices ticked in its Install on table (Android version, processor, the version on it
+  now), the selected instances ticked; a stopped device is started for its install and stopped after. Downloaded
+  apps… lists the library's files with their size and where the app is installed, Delete per row, and deletes the
+  ones installed nowhere, all but the newest, or all; deleting a file never uninstalls an app.
 - **A start page that no longer opens blocks the launch** (2026-11-25): an emulator app target whose page is gone
   is refused with what to pick again, in Studio's readiness check and in `launch_game`.
 - **A launch target keeps its start page** (2026-11-25): `LaunchTarget.EmulatorApp` carries the page of
@@ -155,7 +158,7 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **"Choose an emulator" is gone** (2026-11-25): the Game window's Android apps tab does what it did. An
   `@EmulatorName` slot (`Emulators.use("…")`) is a menu of this computer's instances and phones, with
   Emulators…; it no longer points the bot's launch target at an app. The Games tab's Google Play search went with
-  it: + Get an app on the Android apps tab downloads an app.
+  it: Get an app, in the Emulators window's Instances tab, downloads an app.
 
 ### Fixed
 
