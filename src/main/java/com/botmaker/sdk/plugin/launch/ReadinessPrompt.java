@@ -52,6 +52,7 @@ public final class ReadinessPrompt {
                 }
                 case SIGNED_OUT -> refused.accept(false, signIn(services, owner, spec, readiness));
                 case NOT_INSTALLED -> refused.accept(false, install(services, owner, spec, readiness));
+                case PAGE_GONE -> refused.accept(false, readiness.reason());
             }
         }, why -> proceed.run());
     }

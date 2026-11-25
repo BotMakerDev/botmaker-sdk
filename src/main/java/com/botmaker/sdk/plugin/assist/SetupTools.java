@@ -769,6 +769,9 @@ final class SetupTools {
             case SIGNED_OUT -> {
                 return AgentReply.refused(readiness.reason() + " The user signs in; then launch_game again.");
             }
+            case PAGE_GONE -> {
+                return AgentReply.refused(readiness.reason() + " The user picks it in the Game window.");
+            }
             case UPDATING -> {
                 return AgentReply.refused(readiness.reason() + " launch_game again once it is done; setup's readiness "
                         + "says when.");

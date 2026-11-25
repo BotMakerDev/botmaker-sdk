@@ -21,6 +21,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A start page that no longer opens blocks the launch** (2026-11-25): an emulator app target whose page is gone
+  is refused with what to pick again, in Studio's readiness check and in `launch_game`.
+
 - 🔭 A goal field beside ▶ Keep exploring on the Explore page (plan `2026-11-24-explore-drive-fixes` phase 7): type
   what to reach ("the Google sign-in page") and the run goes toward it with its crew; leave it empty for a run over
   the whole map, as before. The field opens on the bot's last goal, kept in the SDK's state folder of the bot

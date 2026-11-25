@@ -55,7 +55,7 @@ public final class GameReady {
         return switch (game.state()) {
             case READY, UNKNOWN -> Readiness.ready(spec.describe() + " starts with the bot");
             case UPDATE_PENDING, UPDATING -> Readiness.waiting(game.reason());
-            case SIGNED_OUT, NOT_INSTALLED -> Readiness.blocked(game.reason());
+            case SIGNED_OUT, NOT_INSTALLED, PAGE_GONE -> Readiness.blocked(game.reason());
         };
     }
 }
