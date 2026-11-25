@@ -152,6 +152,15 @@ class AutoCaptureTest {
     }
 
     @Test
+    void onlyAnAutomaticDesktopGameReadsThePick() {
+        assertTrue(AutoCapture.wantsSavedWindow(CaptureSource.automatic(), STEAM));
+        assertTrue(AutoCapture.wantsSavedWindow(CaptureSource.automatic().region(new Rect(0, 0, 9, 9)), STEAM));
+        assertFalse(AutoCapture.wantsSavedWindow(CaptureSource.automatic(), ON_MAIN));
+        assertFalse(AutoCapture.wantsSavedWindow(CaptureSource.automatic(), null));
+        assertFalse(AutoCapture.wantsSavedWindow(CaptureSource.window("c", ""), STEAM));
+    }
+
+    @Test
     void restartUsesSavedPick() {
         // A restart installs again with the pick the first launch saved: it reads it, it does not watch again.
         CaptureSource saved = CaptureSource.window("steam_app_440", "");

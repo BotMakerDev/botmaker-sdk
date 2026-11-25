@@ -27,6 +27,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   whole desktop), a website's browser, and
   the whole desktop when nothing is launched. A `CaptureSource.desktop()` with a launch target counts as Automatic
   too. A capture set by hand still wins. The trace says what was picked (`capture: Main, from the game's target`).
+  A desktop game's window, once a run picks it, is kept by launch target in the SDK's values of this PC (`Runs.java`,
+  `AutoPicks`), and the next run reads it without watching the launch.
 - **Keep exploring judges an app's inputs before pressing them** (2026-11-25): given a goal, a run leaves each new
   input of an app to the Reader, which gives it a verdict the goal allows (a switch under "change no setting" is never
   pressed); without one, only what toggles waits. An input that was not there to press, or a field whose parameter

@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.source.ManagedClasses;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedOpenSet;
 import com.botmaker.plugin.api.source.ManagedParam;
+import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.GameVm;
@@ -31,8 +32,14 @@ import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.PictureTag;
+import com.botmaker.sdk.internal.capture.AmbientSource;
+import com.botmaker.sdk.internal.capture.AutoCapture;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.screens.ShadeFit;
 import com.botmaker.sdk.internal.vision.BotScreen;
+import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.platform.Os;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -268,12 +275,28 @@ public final class SdkValues implements ValueHolder {
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::noInstance)
             .shown("The emulator instance this run plays on")
-            .when(scope -> scope.value(CAPTURE).map(SdkValues::onEmulator).orElse(false))
+            .when(SdkValues::playsOnEmulator)
             .because("This is the emulator instance the bot plays on. Several runs at once are each given their own.");
 
     /** Whether {@code source} reads an emulator's screen, itself or a region of it. */
     public static boolean onEmulator(CaptureSource source) {
-        return source != null && source.base() instanceof EmulatorSource;
+        return source != null && !(source instanceof AmbientSource) && source.base() instanceof EmulatorSource;
+    }
+
+    /**
+     * Whether the bot's run plays on an emulator instance: its capture is an emulator's, or it is automatic and the
+     * game this computer launches is an emulator or phone app (an automatic source's {@code base()} is the host's own,
+     * so it is never asked).
+     */
+    static boolean playsOnEmulator(ParamScope scope) {
+        CaptureSource capture = scope.value(CAPTURE).orElse(null);
+        if (onEmulator(capture)) return true;
+        List<String> specs = InstalledGame.specs(scope.value(LAUNCH_TARGETS).orElse(null));
+        if (specs == null) return false;
+        String spec = InstalledGame.pick(specs, scope.value(LAUNCH_TARGET).map(LaunchChoice::spec).orElse(""),
+                Os.current());
+        LaunchSpec target = spec == null ? null : LaunchSpec.parse(spec);
+        return target != null && target.kind() == LaunchKind.EMULATOR_APP && AutoCapture.isAutomatic(capture, target);
     }
 
     /**

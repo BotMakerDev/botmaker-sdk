@@ -10,6 +10,8 @@ import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.AutoCapture;
+import com.botmaker.sdk.internal.capture.AutoPicks;
+import com.botmaker.sdk.internal.capture.HostWindows;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.capture.AmbientSource;
 import com.botmaker.sdk.internal.config.InstalledGame;
@@ -61,18 +63,32 @@ public final class CaptureValue {
         if (target != null && target.kind() == LaunchKind.WEB) {
             return AutoCapture.isAutomatic(written, target) ? null : InstalledGame.onInstance(written, dealt);
         }
-        return resolved(services, written, dealt);
+        return resolved(services, target, written, dealt);
     }
 
     /**
-     * {@code written} as a run of the bot decides it, the instance {@code dealt} included; the whole desktop for a
-     * desktop game's window not picked yet or an instance that cannot be told. Never probes the emulators: Studio's
-     * views ask it on the FX thread at each refresh.
+     * {@code written} as a run of the bot decides it, the instance {@code dealt} and the window a run picked for the
+     * game included; the whole desktop for a desktop game's window not picked yet or an instance that cannot be told.
+     * Never probes the emulators: Studio's views ask it on the FX thread at each refresh.
      */
-    private static CaptureSource resolved(StudioServices services, CaptureSource written, Instance dealt) {
-        AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, LaunchTargets.spec(services),
-                written, dealt, Optional.empty(), List::of));
+    private static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
+                                          Instance dealt) {
+        AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, target, written, dealt,
+                savedWindow(services, target, written), List::of));
         return decision instanceof AutoCapture.Decision.Fixed fixed ? fixed.source() : null;
+    }
+
+    /** The window a run picked for {@code target}, read only when an automatic capture of a desktop game asks it. */
+    private static Optional<CaptureSource> savedWindow(StudioServices services, LaunchSpec target,
+                                                       CaptureSource written) {
+        if (services == null || !AutoCapture.wantsSavedWindow(written, target)) return Optional.empty();
+        try {
+            HostWindows kept = services.hostValues().open(AutoPicks.VALUE)
+                    .flatMap(ctx -> ctx.value(HostWindows.class)).orElse(null);
+            return AutoPicks.shown(kept).saved(target);
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -161,7 +177,8 @@ public final class CaptureValue {
     public static Optional<String> followed(StudioServices services) {
         CaptureSource written = written(services);
         // Automatic follows the target's instance: the one current() reads, before instance() moves it.
-        CaptureSource now = written instanceof AmbientSource ? resolved(services, written, null) : written;
+        CaptureSource now = written instanceof AmbientSource
+                ? resolved(services, LaunchTargets.spec(services), written, null) : written;
         return now != null && now.base() instanceof EmulatorSource device ? Optional.ofNullable(device.instanceName())
                 : Optional.empty();
     }

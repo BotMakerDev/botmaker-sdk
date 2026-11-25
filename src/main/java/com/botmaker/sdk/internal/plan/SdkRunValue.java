@@ -31,7 +31,9 @@ public @interface SdkRunValue {
     /** The values, one constant each. */
     enum Id implements ManagedId<Holder> {
         /** When each {@code Do} was last done on an instance's game, and whether its check held. */
-        DONE
+        DONE,
+        /** The window a run picked for each desktop game it launched, by launch target ({@code AutoPicks}). */
+        WINDOWS
     }
 
     /** This PC's class the values live in: {@code Runs.java}. */

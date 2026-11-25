@@ -12,6 +12,7 @@ import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.AutoCapture;
+import com.botmaker.sdk.internal.capture.AutoPicks;
 import com.botmaker.sdk.internal.emulator.EmulatorRef;
 import com.botmaker.sdk.internal.emulator.Emulators;
 import com.botmaker.shared.Diag;
@@ -66,10 +67,12 @@ public final class InstalledGame {
         settings(values);
         playsOn = "";
         pendingWatch = null;
-        AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR),
-                LaunchSpec.parse(launchTarget()),
-                marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source ? source : null,
-                marked(SdkValue.Id.INSTANCE, values), Optional.empty(), InstalledGame::runningInstances);
+        LaunchSpec target = LaunchSpec.parse(launchTarget());
+        CaptureSource capture = marked(SdkValue.Id.CAPTURE, values) instanceof CaptureSource source ? source : null;
+        AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR), target, capture,
+                marked(SdkValue.Id.INSTANCE, values),
+                AutoCapture.wantsSavedWindow(capture, target) ? AutoPicks.run().saved(target) : Optional.empty(),
+                InstalledGame::runningInstances);
         switch (AutoCapture.decide(inputs)) {
             case AutoCapture.Decision.Fixed fixed -> {
                 // The game is launched and restarted where the run plays: the dealt instance, not the author's.

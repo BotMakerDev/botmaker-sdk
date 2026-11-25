@@ -96,6 +96,18 @@ public final class AutoCapture {
     }
 
     /**
+     * Whether {@link #decide} can use a window picked on an earlier run: an automatic capture (a region of it too) of a
+     * desktop game. Else the pick is not read at all.
+     */
+    public static boolean wantsSavedWindow(CaptureSource capture, LaunchSpec target) {
+        if (target == null) return false;
+        LaunchKind kind = target.kind();
+        if (kind == LaunchKind.UNKNOWN || kind == LaunchKind.WEB || kind == LaunchKind.EMULATOR_APP) return false;
+        CaptureSource whole = capture instanceof RegionSource region ? unwrapped(region) : capture;
+        return isAutomatic(whole, target);
+    }
+
+    /**
      * {@code capture} on the instance {@code instance} names, when the capture is an emulator's (a region of it kept);
      * else {@code capture} as it is.
      */
