@@ -25,6 +25,24 @@ decision serves the run (`Bot`, `InstalledGame`) and Studio's views (`plugin/scr
   and the launch watched again. Off the desktop (a private display, a game VM) nothing is watched.
 - **Fail**: the run stops with the reason; Studio's views show nothing.
 
+Which new window is the game's (`NewWindows.ranked`, 2026-11-25):
+
+- A window of a generic class (`WindowIdentity.GENERIC`: Proton's, Wine's, Java's, `ApplicationFrameHost.exe`) is
+  saved with its title. While it is untitled, or titled with its own class, it is a placeholder and no candidate. A
+  window that takes the game's name starts the 3 s again.
+- A launcher's window goes last and is never picked: told by its process, or by its class (`launcherClass`) when the
+  launched process does not own it, so that a store can be the target itself.
+- Among the others, a window of the class the target names goes first (a Steam game's `steam_app_<appid>`), then one
+  the launched process or a child of it owns, then the bigger.
+- Titles are compared without their numbers and white space: `Game - 60 fps` finds `Game - 144 fps`.
+- A launch that opened no window in 10 s only brought the game to the front: the biggest open window of the target's
+  class is picked. Only a Steam target names one.
+- When only size tells two windows apart, a run Studio or the core started asks in the *Which window is the game?*
+  picker (`plugin/source/WindowDoubtPicker`) for 30 s, then takes its guess and keeps nothing. A run no host started
+  keeps its guess.
+- A hidden window (minimized, or any window of a locked KDE desktop) is not listed, since its pixels cannot be read:
+  a watch behind the lock ends with no window.
+
 The trace says what was picked and why (`capture: Waydroid, from the game's target`). Studio's views, which never
 launch and never ask which emulators run, read the whole desktop for a WatchLaunch and for an instance a run would
 have to ask about. The Choose capture source window opens on its Automatic tab, which
