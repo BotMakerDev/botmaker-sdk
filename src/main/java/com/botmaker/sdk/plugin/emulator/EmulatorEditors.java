@@ -4,25 +4,28 @@
 package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.api.slot.ValueContext;
+import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Pills;
-import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Slots;
-import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
+import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
+import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.EmulatorInstances;
-
+import com.botmaker.shared.emulator.Platforms;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The editor for an {@code @EmulatorName} argument — {@code Emulators.use("…")}, {@code named}, {@code launch}
- * and {@code stop} — a pill that opens {@link EmulatorPicker}, so the user chooses a BlueStacks / LDPlayer /
- * MEmu / MuMu instance (or a paired phone) from a list with its brand, a running dot and, for a
- * running instance, its installed apps.
+ * and {@code stop} — a pill whose menu lists every emulator instance and paired phone on this computer, by its
+ * brand and name, read off the JavaFX thread each time it opens, then Emulators…, where one is made or paired.
+ * Which app a device starts is the Game window's (its Android apps tab), not this slot's.
  *
- * <p>The emulator probe, the app cache and the phone-pairing dialog behind it are this plugin's too:
- * {@code botmaker-shared} is published, so scanning for emulator instances is not a host privilege.
+ * <p>The emulator discovery behind it is this plugin's too: {@code botmaker-shared} is published, so scanning for
+ * emulator instances is not a host privilege.
  *
  * <p>Claimed by the parameter's annotation rather than by the type, like the launch editors, because nothing
  * about {@code String} says it holds an emulator instance name. So it is absent from the Parameters window by
@@ -40,17 +43,37 @@ public final class EmulatorEditors {
      * from a name alone: the name comes out of a string literal in the user's own source, so the product
      * behind it is unknown, and a paired phone reached this editor exactly the way an emulator did.
      */
-    public static Node instanceName(ValueContext ctx, ChecksRow.Starter starter) {
-        Button pill = Pills.button(label(ctx), null);
-        pill.setOnAction(e ->
-                EmulatorPicker.show(ctx.services(), Modals.owner(ctx.services()), starter).ifPresent(chosen -> {
+    public static Node instanceName(ValueContext ctx) {
+        MenuButton pill = Pills.bare(label(ctx));
+        MenuItem emulators = Pills.item("Emulators…", () -> EmulatorsWindow.open(ctx.services()));
+        pill.setOnShowing(e -> {
+            MenuItem looking = new MenuItem("Looking for devices…");
+            looking.setDisable(true);
+            pill.getItems().setAll(looking, Pills.separator(), emulators);
+            Async.load("emulator-name-devices", Platforms::discoverAll, found -> {
+                if (!pill.isShowing()) return;
+                List<MenuItem> items = new ArrayList<>();
+                for (EmulatorInstance instance : found) {
                     // A phone by its serial, which stays when its model name appears: EmulatorInstance.reference.
-                    String name = chosen.instance().reference();
-                    if (name == null || name.isBlank()) return;
-                    ctx.set(name);
-                    pill.setText(chosen.instance().caption());
-                    if (chosen.hasApp()) pointProjectAtApp(ctx, name, chosen.appPackage());
-                }));
+                    String name = instance.reference();
+                    if (name == null || name.isBlank()) continue;
+                    items.add(Pills.item(instance.caption(), () -> {
+                        ctx.set(name);
+                        pill.setText(instance.caption());
+                    }));
+                }
+                if (items.isEmpty()) {
+                    MenuItem none = new MenuItem("No emulator or phone was found");
+                    none.setDisable(true);
+                    items.add(none);
+                }
+                items.add(Pills.separator());
+                items.add(emulators);
+                pill.getItems().setAll(items);
+            }, why -> {
+                if (pill.isShowing()) looking.setText("Couldn't look for devices: " + why);
+            });
+        });
         return pill;
     }
 
@@ -64,28 +87,5 @@ public final class EmulatorEditors {
                 .filter(name -> !name.isBlank())
                 .map(EmulatorInstances::captionFor)
                 .orElseGet(() -> ctx.value(String.class).isPresent() ? CHOOSE : Slots.sourceOr(ctx, CHOOSE));
-    }
-
-    /**
-     * Drilling into a specific app inside an emulator also points the whole project at it: the launch target
-     * becomes {@code emu-app:<package>@<instance>} and the default capture target that instance, so
-     * {@code Bot.run} brings the app up and a vision call with no source of its own looks at the right screen.
-     * The status line says so, since both change outside the block the user clicked.
-     *
-     * <p>Best effort — the inline call the user just wrote stands either way, and an editor that threw here
-     * would lose the edit as well as the wiring.
-     *
-     * <p><b>Both halves are the bot's Java.</b> What the bot <em>launches</em> becomes the first of its
-     * {@code launchTargets} ({@link LaunchTargetValue}), which points its {@code Sdk.captureSource} parameter at
-     * the device as every emulator-app pick does.
-     */
-    private static void pointProjectAtApp(ValueContext ctx, String instanceName, String appPackage) {
-        Optional<String> refused = LaunchTargetValue.set(ctx.services(), "emu-app:" + appPackage + "@" + instanceName);
-        if (refused.isPresent()) {
-            ctx.services().status(refused.get());
-            return;
-        }
-        ctx.services().status("This computer now launches " + appPackage + " on " + instanceName
-                + ", and the bot captures from " + instanceName + ".");
     }
 }

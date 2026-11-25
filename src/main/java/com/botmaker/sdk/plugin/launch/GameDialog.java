@@ -9,11 +9,8 @@ import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
 import com.botmaker.sdk.plugin.emulator.ChecksRow;
-import com.botmaker.sdk.plugin.emulator.EmulatorPicker;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
-import com.botmaker.shared.emulator.EmulatorAppCache;
-import com.botmaker.shared.emulator.EmulatorProbe;
 import com.botmaker.shared.emulator.checks.CheckResult;
 import com.botmaker.shared.emulator.checks.EmulatorChecks;
 import com.botmaker.shared.launch.GameLauncher;
@@ -97,7 +94,7 @@ public final class GameDialog {
         // A group per tab: each shows the current target's tile picked.
         this.games = new GamesTab(new ToggleGroup(), strip::show, this::openLutris,
                 () -> InstallGame.fromFile(services, stage, this::report, this::installed));
-        this.android = new AndroidTab(new ToggleGroup(), strip::show, this::otherDevice);
+        this.android = new AndroidTab(services, new ToggleGroup(), strip::show, () -> stage);
         this.recent = new RecentTab(new ToggleGroup(), strip::show);
         this.websites = new WebsitesTab(strip::show, this::report);
         Hyperlink emulators = new Hyperlink("Emulators…");
@@ -237,25 +234,6 @@ public final class GameDialog {
             List<GameCatalog.Section> scanned = lastScan;
             Async.load("game-dialog-emulator-sections", () -> GameCatalog.withEmulatorsReread(scanned),
                     reread -> fillOver(scanned, reread));
-        });
-    }
-
-    /** The Android tab's way to every other emulator and a phone: the emulator picker. */
-    private void otherDevice() {
-        EmulatorPicker.show(services, stage, QuickLaunch::startAndWait).ifPresent(chosen -> {
-            if (!chosen.hasApp()) {
-                report(false, "Pick an app inside " + chosen.instance().name() + ", not only the device.");
-                return;
-            }
-            String spec = new LaunchSpec(LaunchKind.EMULATOR_APP,
-                    chosen.appPackage() + "@" + chosen.instance().reference()).spec();
-            // The app's own name and icon when the picker has seen them, as its tile in the instance's chip has.
-            EmulatorAppCache cache = EmulatorAppCache.shared();
-            String name = cache.packages(chosen.instance()).stream()
-                    .filter(app -> app.packageName().equals(chosen.appPackage()))
-                    .map(EmulatorProbe.InstalledApp::display).findFirst().orElse(chosen.appPackage());
-            strip.show(PickStrip.single(null, new GameCatalog.Item(spec, name,
-                    cache.iconPath(chosen.instance(), chosen.appPackage()))));
         });
     }
 

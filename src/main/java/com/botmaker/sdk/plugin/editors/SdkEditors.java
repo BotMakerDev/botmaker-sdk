@@ -7,7 +7,6 @@ import com.botmaker.plugin.api.EditorHolder;
 import com.botmaker.plugin.api.slot.SlotEditor;
 import com.botmaker.sdk.internal.emulator.EmulatorName;
 import com.botmaker.sdk.plugin.emulator.EmulatorEditors;
-import com.botmaker.sdk.plugin.launch.QuickLaunch;
 import com.botmaker.sdk.plugin.map.ScreenConstantView;
 
 import java.awt.Color;
@@ -46,7 +45,7 @@ public final class SdkEditors implements EditorHolder {
     /** Built once and shared: an editor holds no state, the value lives in the context it is handed. */
     public static final List<SlotEditor> ALL = List.of(
             SlotEditor.when(SettingHints::claims).draw(() -> SettingsEditors::setting),
-            SlotEditor.onParameter(EmulatorName.class).draw(() -> ctx -> EmulatorEditors.instanceName(ctx, QuickLaunch::startAndWait)),
+            SlotEditor.onParameter(EmulatorName.class).draw(() -> ctx -> EmulatorEditors.instanceName(ctx)),
             // The bot's run choice, the plan parameter Bot.run reads: which plan. Only a value with no call site, a
             // parameter's: a Plans constant's own Plan.of(…) is the plan's own shape.
             SlotEditor.when(PlanChoice::isPlanChoice).draw(() -> PlanChoice::plan),
