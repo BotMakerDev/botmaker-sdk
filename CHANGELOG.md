@@ -210,6 +210,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   first, in a run's watch of its launch and in ▶ Launch and pick. Proton's untitled `steam_proton` window is never
   picked, and a window that renames itself is waited on again under its new name. Balatro's launch had picked
   Proton's placeholder, which then read Honkai: Star Rail.
+- A launcher's window is told by its class too (2026-11-25), so Epic's or Battle.net's under Wine, and Ubisoft
+  Connect's or Battle.net's on Windows, is never picked as the game it launches.
 - A Steam game that ran though BotMaker did not see it is no longer a run's NoWindow (2026-11-25): its launch only
   brings the game to the front, and the run picks the game's open `steam_app_<appid>` window, saying it was
   refocused. ▶ Try on a desktop game whose window no run picked yet says it reads the whole desktop.

@@ -8,6 +8,7 @@ import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.WindowMatch;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.RunningProbe;
 import com.botmaker.shared.launch.SteamIds;
 import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.shared.platform.Os;
@@ -27,8 +28,8 @@ import java.util.function.LongPredicate;
  * run with an automatic capture reads once its game's window is up (2026-11-25).
  *
  * <p>A window is new when its handle was not open before the launch. A window of a launcher's own UI
- * ({@code RunningProbe.launcherUi} — Steam's library, a login prompt, Heroic) goes last, since the game is what was
- * launched, even when the launch started the launcher; among the rest a window of the class the target names goes first
+ * ({@code RunningProbe.launcherUi}, or {@code launcherClass} for one the launch does not own — Steam's library, a
+ * login prompt, Heroic) goes last, since the game is what was launched, even when the launch started the launcher; among the rest a window of the class the target names goes first
  * (a Steam game's {@code steam_app_<appid>}, 2026-11-25), then one the launched process or one of its children owns,
  * then the bigger, a splash being smaller than the game. The first window no launcher owns is the recommended one.
  * One row per window identity: a splash and the game under the same class are one pick.
@@ -66,7 +67,7 @@ public final class NewWindows {
 
     /**
      * The windows of {@code now} not in {@code before}, pickable and with a class to save, ranked: those no
-     * {@code launcherUi} owns first, among them one whose owner {@code ofLaunch} accepts, then the bigger. The first a launcher does
+     * launcher ({@code launcherUi}, or a launcher's class) owns first, among them one whose owner {@code ofLaunch} accepts, then the bigger. The first a launcher does
      * not own is {@linkplain Candidate#recommended recommended}. Pure but for {@link #pickable}'s system check.
      */
     public static List<Candidate> ranked(Set<Object> before, List<GenericWindow> now, LongPredicate launcherUi,
@@ -86,8 +87,12 @@ public final class NewWindows {
             WindowIdentity identity = WindowIdentity.of(window);
             if (identity == null) continue;
             // A launch that starts the launcher itself (Steam closed) has the launcher's library in its tree: still last.
-            fresh.add(new Candidate(window, identity, launcherUi.test(window.getPid()), ofLaunch.test(window.getPid()),
-                    false));
+            boolean launched = ofLaunch.test(window.getPid());
+            // The class says it too: under Wine a launcher's process is Wine's, and Windows may not name a process.
+            // Not for a window the launch owns: a target that is the store itself (exe:…\Battle.net.exe) is its game.
+            boolean launcher = launcherUi.test(window.getPid())
+                    || !launched && RunningProbe.launcherClass(identity.windowClass());
+            fresh.add(new Candidate(window, identity, launcher, launched, false));
         }
         fresh.sort(Comparator.comparing(Candidate::launcher)
                 .thenComparing((Candidate c) -> !c.identity().windowClass().equalsIgnoreCase(

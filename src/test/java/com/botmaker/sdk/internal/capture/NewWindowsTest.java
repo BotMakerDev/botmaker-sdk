@@ -138,6 +138,78 @@ class NewWindowsTest {
         assertTrue(NewWindows.doubt(ranked, "steam_app_2379780").isEmpty());
     }
 
+    /**
+     * Windows, Steam closed before: its login and library come up with the game, which Steam starts under its own
+     * program, so neither the launch's tree nor the class of Proton's windows names it.
+     */
+    @Test
+    void windowsSteamGameWinsOverSteam() {
+        List<Candidate> ranked = onWindows("steam:2379780", window(1, "Steam", 1600, 10, "steamwebhelper.exe"),
+                window(2, "Sign in to Steam", 700, 11, "steam.exe"), window(3, "Balatro", 1280, 12, "Balatro.exe"));
+        assertGameFirst("Balatro.exe", ranked, 2);
+    }
+
+    @Test
+    void windowsEpicGameWinsOverEpic() {
+        List<Candidate> ranked = onWindows("epic:Fortnite",
+                window(1, "Epic Games Launcher", 1600, 10, "EpicGamesLauncher.exe"),
+                window(2, "Fortnite", 1280, 12, "FortniteClient-Win64-Shipping.exe"));
+        assertGameFirst("FortniteClient-Win64-Shipping.exe", ranked, 1);
+    }
+
+    /** A link to a store: Ubisoft Connect and Battle.net are bigger than the game and are not it. */
+    @Test
+    void windowsStoreLinksGameWinsOverTheStore() {
+        assertGameFirst("Trackmania.exe", onWindows("url:uplay://launch/5595/0",
+                window(1, "Ubisoft Connect", 1600, 10, "upc.exe"),
+                window(2, "Trackmania", 1280, 12, "Trackmania.exe")), 1);
+        assertGameFirst("Hearthstone.exe", onWindows("url:battlenet://WTCG",
+                window(1, "Battle.net", 1600, 10, "Battle.net.exe"),
+                window(2, "Hearthstone", 1280, 12, "Hearthstone.exe")), 1);
+    }
+
+    /** Every Store app's window is ApplicationFrameHost's: its title says which, and an untitled frame is none. */
+    @Test
+    void windowsStoreAppIsSavedWithItsTitle() {
+        List<Candidate> ranked = onWindows("desktop:Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App",
+                window(1, "", 1600, 10, "ApplicationFrameHost.exe"),
+                window(2, "Solitaire & Casual Games", 1280, 10, "ApplicationFrameHost.exe"));
+        assertGameFirst("ApplicationFrameHost.exe|Solitaire & Casual Games", ranked, 0);
+    }
+
+    /** A plain program is the launched process itself: it wins over a bigger stranger, with no doubt. */
+    @Test
+    void windowsPlainProgramWinsByItsProcess() {
+        List<Candidate> ranked = onWindows("exe:C:\\Games\\Celeste\\Celeste.exe",
+                window(1, "Discord", 1900, 10, "Discord.exe"),
+                window(2, "Celeste", 1280, LAUNCHED, "Celeste.exe"));
+        assertEquals("Celeste.exe", NewWindows.recommended(ranked).identity().spec());
+        assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
+
+    /** A target that is the store itself: its own window, which the launched process owns, is the pick. */
+    @Test
+    void windowsStoreItselfCanBeTheTarget() {
+        List<Candidate> ranked = onWindows("exe:C:\\Battle.net\\Battle.net.exe",
+                window(1, "Battle.net", 1280, LAUNCHED, "Battle.net.exe"));
+        assertEquals("Battle.net.exe", NewWindows.recommended(ranked).identity().spec());
+    }
+
+    /** What a launch of {@code target} opened, its launchers told by class alone: no process of the fixture runs here. */
+    private static List<Candidate> onWindows(String target, GenericWindow... opened) {
+        return NewWindows.ranked(Set.of(), List.of(opened), pid -> false, pid -> pid == LAUNCHED,
+                NewWindows.gameClass(LaunchSpec.parse(target)));
+    }
+
+    /** The game first and in no doubt, and the {@code launchers} windows after it. */
+    private static void assertGameFirst(String identity, List<Candidate> ranked, int launchers) {
+        assertEquals(1 + launchers, ranked.size());
+        assertEquals(identity, NewWindows.recommended(ranked).identity().spec());
+        assertTrue(ranked.getFirst().recommended());
+        assertTrue(ranked.stream().skip(1).allMatch(Candidate::launcher));
+        assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
+
     /** One window alone is no doubt. */
     @Test
     void oneWindowIsNoDoubt() {
