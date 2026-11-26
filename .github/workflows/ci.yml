@@ -16,7 +16,8 @@ name: CI
 # those coordinates to download. Building their main branches here means CI compiles the same pairing a
 # maintainer builds locally.
 #
-# THE LIST BELOW MUST MATCH THE POM'S ${botmaker.*.version} PROPERTIES, and nothing about a local build
+# THE LIST BELOW MUST MATCH THE POM'S UPSTREAMS (its <parent>, its ${botmaker.*.version} properties, and the contract
+# and toolkit the parent pins), and nothing about a local build
 # can tell you when it stops matching: in the umbrella reactor each of the six is a sibling module and
 # resolves for free. That is exactly how the toolkit went missing here for five days. The umbrella's
 # release checks the two against each other (CiDepsGate) before it pushes a tag.
@@ -41,7 +42,7 @@ jobs:
           path: .deps/botmaker-studio-api
 
       # The widget kit this module's slot editors (plugin/editors) are built from — an ordinary
-      # <dependencies> entry at ${botmaker.plugintoolkit.version}, OPTIONAL so it never reaches a bot.
+      # <dependencies> entry at the version botmaker-plugin-parent pins.
       # It went into the pom with phase 12a and this checkout list did not follow, which is a class of
       # break the umbrella reactor CANNOT catch: there the toolkit is a sibling module and resolves for
       # free, so `mvn install` at the root is green while this standalone build has been red on every push

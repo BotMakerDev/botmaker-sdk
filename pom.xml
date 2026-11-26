@@ -4,6 +4,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!--
+      THE PARENT (2026-11-26), as every plugin's. It gives what this pom said for itself until then: the contract's
+      and the toolkit's versions (botmaker.studioapi.version, botmaker.plugintoolkit.version), JavaFX's, Java 25,
+      UTF-8, compiler 3.11.0 with -parameters, flatten 1.4.1 keeping <properties> and <repositories>, the sources
+      jar, and CHANGELOG.md and icon.png copied into the jar. Its version is a pin like the others below (doc 43).
+    -->
+    <parent>
+        <groupId>com.github.BotMakerDev</groupId>
+        <artifactId>botmaker-plugin-parent</artifactId>
+        <version>0.6.3-SNAPSHOT</version>
+        <relativePath>../botmaker-plugin-parent/pom.xml</relativePath>
+    </parent>
+
     <groupId>com.github.BotMakerDev</groupId>
     <artifactId>botmaker-sdk</artifactId>
     <!-- Real: -SNAPSHOT on main, the release version on a tag; only the release moves it (umbrella
@@ -18,13 +31,13 @@
 
     <!-- What Studio shows for this plugin: a plugin's name is its pom's <name> (2026-10-27). -->
     <name>BotMaker SDK</name>
+    <!-- Said here, or the published pom would carry the parent's. -->
+    <description>Plugin #1: the library a BotMaker bot runs on, and what Studio shows to make one.</description>
 
     <properties>
         <!-- The plugin class this jar is: the host reads it off the pom Maven copies into the jar, and this
-             pom's groupId:artifactId is the plugin's identity. Literal, and kept by flatten below. -->
+             pom's groupId:artifactId is the plugin's identity. Literal, and kept by the parent's flatten. -->
         <botmaker.plugin>com.botmaker.sdk.plugin.SdkPlugin</botmaker.plugin>
-        <maven.compiler.release>25</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Stamped into the jar manifest (Build-Time) so a bot/editor can tell which SDK build it loaded;
              crucial for local dev where every rebuild reuses the same -SNAPSHOT jar file name. -->
         <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
@@ -32,7 +45,7 @@
              module in the umbrella reactor / a local install; the release commit sets the released version
              (doc 43), so a tag's pom names what it was built against.
 
-             flatten-maven-plugin below writes the literal version into the published pom. It was what made
+             flatten-maven-plugin (the parent's) writes the literal version into the published pom. It was what made
              the old -D injection reach CONSUMERS: Maven installs and publishes the COMMITTED pom, not the
              effective one, and without flatten the published pom said botmaker-shared:${botmaker.shared.version}
              with the property at 0.0.0-SNAPSHOT, so every released SDK failed to resolve on any machine that
@@ -40,19 +53,8 @@
         <botmaker.shared.version>0.10.2-SNAPSHOT</botmaker.shared.version>
         <!-- botmaker-session version. Same contract as botmaker.shared.version above. -->
         <botmaker.session.version>0.9.2-SNAPSHOT</botmaker.session.version>
-        <!-- botmaker-studio-api version: the Studio plugin contract. Same contract again.
-             This one moves far more slowly than the other two on purpose — see the dependency below. -->
-        <botmaker.studioapi.version>0.20.1-SNAPSHOT</botmaker.studioapi.version>
-        <!-- botmaker-plugin-toolkit version: the widgets this module's slot editors are built from. Same
-             contract as the three above, and the same flatten reason — it IS in
-             <dependencies>, so the published pom must carry a resolvable version.
-
-             NOT optional, and this comment said it was until 2026-09-06, three days after the element
-             below stopped being: `optional` means not transitive, so a host resolving botmaker-sdk got a
-             jar whose SdkPlugin could not resolve its own superclass. See the dependency's own comment. -->
-        <botmaker.plugintoolkit.version>0.17.3-SNAPSHOT</botmaker.plugintoolkit.version>
         <!-- botmaker-plugin-basics version: PLUGIN #2, which owns the JDK value types and their editors.
-             Same contract as the four above and the same
+             Same contract as the two above and the same
              flatten reason — it is an ordinary <dependencies> entry, so the published pom must carry a
              resolvable version, and cutting plugin-basics therefore forces an SDK release. -->
         <botmaker.pluginbasics.version>0.11.3-SNAPSHOT</botmaker.pluginbasics.version>
@@ -62,9 +64,6 @@
         <botmaker.pluginhost.version>0.14.3-SNAPSHOT</botmaker.pluginhost.version>
         <!-- botmaker-java version: the value grammar itself, and JDT with it. Same contract and flatten reason. -->
         <botmaker.java.version>0.4.3-SNAPSHOT</botmaker.java.version>
-        <!-- JavaFX, for the slot editors only. Held in one place because the two artifacts must move
-             together — javafx-controls is compiled against one exact javafx-graphics. -->
-        <javafx.version>27</javafx.version>
         <!-- JGraphT, the screen map's graph algorithms (internal.screens.MapGraph). -->
         <jgrapht.version>1.5.2</jgrapht.version>
 
@@ -152,7 +151,6 @@
         <dependency>
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-studio-api</artifactId>
-            <version>${botmaker.studioapi.version}</version>
         </dependency>
 
         <!-- The plugin toolkit, at plain `compile` and never `optional`: PluginLoader is child-first for it,
@@ -161,7 +159,6 @@
         <dependency>
             <groupId>com.github.BotMakerDev</groupId>
             <artifactId>botmaker-plugin-toolkit</artifactId>
-            <version>${botmaker.plugintoolkit.version}</version>
         </dependency>
 
         <!-- Plugin #2 (the JDK value types and their editors), at `compile`: an ordinary plugin-to-plugin
@@ -175,11 +172,13 @@
         </dependency>
 
         <!-- JavaFX, Javalin and ZXing are `optional`: only the plugin half (Studio-side) links them, and a
-             headless bot must resolve none of them. javafx.* is parent-first, so the host supplies it. -->
+             headless bot must resolve none of them. javafx.* is parent-first, so the host supplies it.
+             The two JavaFX artifacts move together (javafx.version, the parent's). `compile` is said because the
+             parent manages javafx-controls as `provided`, which this pom has never published. -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>${javafx.version}</version>
+            <scope>compile</scope>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -372,13 +371,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <!-- Version and -parameters are the parent's: Studio reads real parameter names from the
+                     resolved SDK jar to label call arguments (findCompare(good, bad), not arg0/arg1). -->
                 <configuration>
-                    <!-- Emit the MethodParameters attribute so real parameter names survive in the
-                         bytecode. Studio (which does NOT depend on the SDK) reads them from the resolved
-                         SDK jar via ClassGraph to label call arguments (e.g. findCompare(good, bad))
-                         instead of arg0/arg1. -->
-                    <parameters>true</parameters>
                     <proc>none</proc>
                 </configuration>
             </plugin>
@@ -475,55 +470,13 @@
                 </executions>
             </plugin>
 
-            <!-- Antrun: TWO executions, unrelated to each other beyond sharing a plugin. `plugin-files`
-                 copies the changelog and the icon into the jar; `stage-linux-ocr-natives` finishes the OCR
-                 native staging the dependency plugin above started. They are one <plugin> because Maven takes
-                 a single declaration per plugin per pom, not because they belong together.
-
-                 plugin-files: what botmaker-plugin-parent does for every plugin that names it, which this pom
-                 does not (2026-10-28; the changelog went in as whats-new.md before): CHANGELOG.md as
-                 META-INF/botmaker/changelog.md, and icon.png, shown beside the plugin's name in Plugins &
-                 Libraries, as META-INF/botmaker/icon.png.
-
-                 Studio's Project > Upgrade SDK... leads with what a release GIVES you, before it lists
-                 what it costs. It reads that out of the target jar it has already downloaded to diff, so
-                 the answer is offline and needs no GitHub API, no release notes and no network at all.
-
-                 The WHOLE file, not the section being upgraded to: a bot may jump several releases at
-                 once, so the jar has to be able to answer every span ending at its own version. A jar
-                 built from a tree with no changelog simply has no entry, and Studio falls back to the API
-                 diff it showed before — the standing rule that every new reader degrades.
-
-                 A copy rather than <resource> on the module root: the root is not a resource directory
-                 and making it one would sweep the pom, the LICENSE and jitpack.yml into the jar too. And
-                 antrun rather than maven-resources-plugin because the file has to be RENAMED — the entry
-                 name is a contract with Studio's reader and must not follow whatever the file is called
-                 in the repo — which copy-resources cannot do (it has no fileMappers on that goal).
-
-                 tolerant of a missing source: `failonerror=false` keeps a tree with no changelog building,
-                 which is what a jar built from an older tag is. -->
+            <!-- Antrun: `stage-linux-ocr-natives` finishes the OCR native staging the dependency plugin above
+                 started. It runs beside the parent's `plugin-files`, which copies the changelog and the icon. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>3.1.0</version>
                 <executions>
-                    <execution>
-                        <id>plugin-files</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <copy file="${project.basedir}/CHANGELOG.md"
-                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/changelog.md"
-                                      failonerror="false" overwrite="true"/>
-                                <copy file="${project.basedir}/icon.png"
-                                      tofile="${project.build.outputDirectory}/META-INF/botmaker/icon.png"
-                                      failonerror="false" overwrite="true"/>
-                            </target>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>stage-linux-ocr-natives</id>
                         <phase>process-resources</phase>
@@ -589,72 +542,6 @@
                 </configuration>
             </plugin>
 
-            <!-- Flatten Plugin: publish a pom whose ${...} are already resolved.
-
-                 This is what makes the botmaker.shared.version / botmaker.session.version contract above
-                 actually work. `mvn install -Dbotmaker.shared.version=v0.0.18` installs the COMMITTED pom
-                 (still carrying the property at 0.0.0-SNAPSHOT), so the injected tag never reached a
-                 consumer: a generated bot pinning a released SDK failed with "Could not find artifact
-                 com.github.LiQiyeDev:botmaker-shared:jar:0.0.0-SNAPSHOT in jitpack.io" on any machine with
-                 no local build in ~/.m2. Flatten substitutes the effective values into
-                 target/.flattened-pom.xml and installs THAT, so the published pom names the real tag.
-
-                 flattenMode=oss keeps dependencies/licenses/scm and drops build+profiles (neither is read
-                 by a consumer here — this module has no profiles; do not copy this to botmaker-shared,
-                 whose OS-activated native profiles a consumer DOES need). It also strips repositories,
-                 hence the explicit keep: the jitpack.io repo declared above is how a consumer reaches the
-                 transitive shared/session at all. The clean execution removes the generated file.
-
-                 It strips properties too, hence their keep: the jar's own META-INF/maven pom is this
-                 flattened one, and botmaker.plugin there is how a host knows the jar is a plugin. -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>flatten-maven-plugin</artifactId>
-                <!-- Held at 1.4.1 for JitPack, NOT stale: 1.5.0 declares a Maven 3.5.4 prerequisite and
-                     1.6.0 declares 3.6.3, and JitPack's build image runs older than 3.6.3 — v0.0.7/v1.0.25
-                     were burned finding that out ("requires Maven version 3.6.3", build failed before it
-                     published anything). 1.4.1 needs only 3.2.5 and supports the same flattenMode and
-                     pomElements config used here. Do not bump without proving JitPack's mvn version. -->
-                <version>1.4.1</version>
-                <configuration>
-                    <flattenMode>oss</flattenMode>
-                    <pomElements>
-                        <repositories>keep</repositories>
-                        <properties>keep</properties>
-                    </pomElements>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>flatten</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>flatten</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>flatten.clean</id>
-                        <phase>clean</phase>
-                        <goals>
-                            <goal>clean</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Source Plugin: attaches source code so consumers get Javadoc/code in their IDE -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.3.0</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.jetbrains.dokka</groupId>
                 <artifactId>dokka-maven-plugin</artifactId>

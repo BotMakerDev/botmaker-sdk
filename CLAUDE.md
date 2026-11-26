@@ -64,7 +64,7 @@ coordinate; a tag's pom carries its release version and `main` a `-SNAPSHOT` (um
 owns the SDK → JitPack publish — don't push or publish the SDK yourself;** releases are cut from the
 umbrella with `sluice`. The whole `CHANGELOG.md` is copied into the jar as
 `META-INF/botmaker/changelog.md` and `icon.png` as `META-INF/botmaker/icon.png`, where Studio reads every
-plugin's (the parent copies them for a plugin that names it; this pom does it itself).
+plugin's (`botmaker-plugin-parent`, which this pom names, copies them).
 
 ### Local dev (test SDK changes without pushing a tag)
 

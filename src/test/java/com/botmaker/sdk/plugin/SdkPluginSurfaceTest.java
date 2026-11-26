@@ -158,8 +158,8 @@ class SdkPluginSurfaceTest {
         assertTrue(pom.contains("<botmaker.plugin>" + SdkPlugin.class.getName() + "</botmaker.plugin>"),
                 "pom.xml's botmaker.plugin must name " + SdkPlugin.class.getName());
         assertTrue(pom.contains("<name>BotMaker SDK</name>"), "pom.xml's <name> is what Studio shows");
-        assertTrue(pom.contains("<properties>keep</properties>"),
-                "flatten must keep properties, or the jar's pom loses botmaker.plugin");
+        assertTrue(pom.contains("<artifactId>botmaker-plugin-parent</artifactId>"),
+                "the parent's flatten keeps properties, without which the jar's pom loses botmaker.plugin");
     }
 
     /**
