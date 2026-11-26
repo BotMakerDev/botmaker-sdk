@@ -217,6 +217,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The Remote Pilot's screen frames no longer ask KDE's screen-share portal (2026-11-26): on Wayland they are cut
+  from shared's screenshot-program grab (`ScreenCapture.captureRegion`) instead of the AWT Robot's.
 - An automatic capture picks a PC game's own window (2026-11-25): a Steam game's `steam_app_<appid>` window ranks
   first, in a run's watch of its launch and in ▶ Launch and pick. Proton's untitled `steam_proton` window is never
   picked, and a window that renames itself is waited on again under its new name. Balatro's launch had picked

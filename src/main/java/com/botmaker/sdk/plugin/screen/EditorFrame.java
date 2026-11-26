@@ -292,12 +292,7 @@ public record EditorFrame(BufferedImage image, String label, Rectangle bounds, b
      */
     public static BufferedImage cropped(BufferedImage desktop, Rectangle bounds) {
         if (desktop == null || bounds == null || bounds.width <= 0 || bounds.height <= 0) return null;
-        Rectangle virtual = ScreenCapture.getVirtualScreenBounds();
-        int x = Math.max(0, Math.min(bounds.x - virtual.x, desktop.getWidth() - 1));
-        int y = Math.max(0, Math.min(bounds.y - virtual.y, desktop.getHeight() - 1));
-        int w = Math.max(1, Math.min(bounds.width, desktop.getWidth() - x));
-        int h = Math.max(1, Math.min(bounds.height, desktop.getHeight() - y));
-        return desktop.getSubimage(x, y, w, h);
+        return ScreenCapture.crop(desktop, bounds);
     }
 
     /**

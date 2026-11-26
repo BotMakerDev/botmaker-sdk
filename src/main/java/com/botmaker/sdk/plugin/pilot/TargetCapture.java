@@ -289,6 +289,13 @@ public final class TargetCapture {
     private Capture captureBounds(Rectangle b) {
         if (b == null) return null;
         try {
+            if (!ScreenCapture.robotReadsScreen()) {
+                // Wayland: the Robot's grab asks the screen-cast portal each time; the screenshot program does not.
+                // A region past the grab's edge is clamped, so only a whole one counts as the frame.
+                BufferedImage img = ScreenCapture.captureRegion(b);
+                return img == null || img.getWidth() != b.width || img.getHeight() != b.height ? null
+                        : new Capture(img, b.x, b.y, b.width, b.height);
+            }
             Robot robot = ROBOTS.get();
             if (robot == null) return null;
             BufferedImage img = RobotCapture.capture(robot, b);
