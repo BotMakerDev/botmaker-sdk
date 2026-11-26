@@ -24,7 +24,8 @@ import java.util.Optional;
  */
 public final class PlaceEditors {
 
-    private static final String OWN = "The capture source's own";
+    /** {@code Place.android("")}, no place picked: the capture source's instance, or where {@code RunIn.where} says. */
+    private static final String OWN = "Where it plays alone";
 
     private PlaceEditors() {}
 

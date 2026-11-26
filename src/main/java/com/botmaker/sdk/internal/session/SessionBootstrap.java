@@ -5,6 +5,7 @@ package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -32,6 +33,7 @@ import com.botmaker.session.display.SessionBackends;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * The bot-runtime producer: the one place that, for an <em>isolated</em> bot, brings up a private nested
@@ -106,15 +108,22 @@ public final class SessionBootstrap {
     }
 
     /**
-     * Where this bot's game runs, highest first: bot code ({@link Session#override()}: off is the desktop; on is a
-     * private display, or on Windows and macOS the settings' VM when they name one), the {@link #WHERE_PROPERTY} run
-     * property, {@link #WHERE_ENV}, the settings.
+     * Where this bot's game runs, highest first: the PC place the run was dealt ({@link InstalledGame#place()}, spec
+     * {@code 2026-11-26-run-places-design.md} §1: a run plays where it was dealt), bot code ({@link Session#override()}:
+     * off is the desktop; on is a private display, or on Windows and macOS the settings' VM when they name one), the
+     * {@link #WHERE_PROPERTY} run property, {@link #WHERE_ENV}, the settings.
      */
     public static BotSettings.Where where() {
-        return where(BotSettings.current().where(), Os.current());
+        return where(BotSettings.current().where(), Os.current(), InstalledGame.place());
     }
 
     static BotSettings.Where where(BotSettings.Where settings, Os os) {
+        return where(settings, os, null);
+    }
+
+    static BotSettings.Where where(BotSettings.Where settings, Os os, Place place) {
+        Optional<BotSettings.Where> dealt = where(place, os);
+        if (dealt.isPresent()) return dealt.get();
         Boolean override = Session.override();
         if (override != null) {
             if (!override) return BotSettings.Where.MY_DESKTOP;
@@ -124,6 +133,23 @@ public final class SessionBootstrap {
         return BotSettings.Where.fromId(System.getProperty(WHERE_PROPERTY))
             .or(() -> BotSettings.Where.fromId(System.getenv(WHERE_ENV)))
             .orElse(settings);
+    }
+
+    /**
+     * Where a PC place puts the game on {@code os}: this desktop, a private display (Linux) or a game VM (where
+     * {@link #hasGameVms} holds). Empty for an Android place, an unknown one, none, or one {@code os} does not have (a
+     * place picked on another PC), which leave it to the run's other sources.
+     */
+    static Optional<BotSettings.Where> where(Place place, Os os) {
+        if (place == null) return Optional.empty();
+        BotSettings.Where where = switch (place.kind()) {
+            case DESKTOP -> BotSettings.Where.MY_DESKTOP;
+            case PRIVATE_DISPLAY -> BotSettings.Where.PRIVATE_DISPLAY;
+            case VM -> BotSettings.Where.VM;
+            case ANDROID, UNKNOWN -> null;
+        };
+        if (where == null || where != BotSettings.Where.MY_DESKTOP && !isolatedOn(where, os)) return Optional.empty();
+        return Optional.of(where);
     }
 
     /**
@@ -504,16 +530,29 @@ public final class SessionBootstrap {
     }
 
     /**
-     * The game VM to run in: {@code -D}{@link #VM_PROPERTY} or {@link #VM_ENV} given by hand, then the bot's
-     * {@code vm} parameter ({@link InstalledGame#vm()}), else the one VM set up on this computer.
+     * The game VM to run in: the VM the run was dealt ({@link InstalledGame#place()}), then {@code -D}{@link
+     * #VM_PROPERTY} or {@link #VM_ENV} given by hand, then the bot's {@code vm} parameter ({@link InstalledGame#vm()}),
+     * else the one VM set up on this computer.
      *
      * @throws IllegalStateException when none is named and there isn't exactly one
      */
     static String vmName() {
+        return vmName(vmNamed(InstalledGame.place(), name -> VmInventory.list().stream()
+                .anyMatch(vm -> vm.name().equals(name) && vm.stage() == VmRecord.Stage.READY)));
+    }
+
+    /**
+     * The VM {@code place} names when it is a game VM that is {@code ready}, then the property, the environment and the
+     * bot's parameter: a place picked for a VM since deleted gives way to them.
+     */
+    static String vmNamed(Place place, Predicate<String> ready) {
+        if (place != null && place.kind() == Place.Kind.VM && !place.name().isEmpty() && ready.test(place.name())) {
+            return place.name();
+        }
         String named = System.getProperty(VM_PROPERTY);
         if (named == null || named.isBlank()) named = System.getenv(VM_ENV);
         if (named == null || named.isBlank()) named = InstalledGame.vm();
-        return vmName(named);
+        return named;
     }
 
     /**

@@ -51,6 +51,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Android's packages are not kept between reads, every instance still counts as never read. This desktop is dealt
   to any number of runs at once (`PluginPool.sharing`), and is listed last, so runs go to the private displays and
   VMs first; every other place goes to one run.
+- **A run plays where it was dealt.** A run dealt this desktop, a private display or a game VM plays there, whatever
+  `RunIn.where` and the `botmaker.session.where` property say; a dealt VM is the one it runs in. One run keeps
+  `RunIn.where`, as its `place()` names no place until the runner picks one. `RunIn.where` now orders the deal: its
+  kind first, so `MY_DESKTOP` puts every run on this desktop, and `PRIVATE_DISPLAY` (the default) or `VM` fills
+  those first and this desktop after them. A bot whose game plays on this PC, not only on Android, now has
+  `place()` too, so its runs are dealt one, unless its capture is a window set by hand, which is read on this
+  desktop. A place this PC lacks (a VM picked on Windows, run on Linux) is ignored, and a VM since deleted gives way
+  to the VM named otherwise.
 
 ### Added
 

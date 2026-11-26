@@ -4,6 +4,7 @@
 package com.botmaker.sdk.internal.session;
 
 import com.botmaker.sdk.api.bot.BotSettings;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.vision.BotScreen;
@@ -136,6 +137,43 @@ class SessionBootstrapTest {
         assertEquals(BotSettings.Where.VM, SessionBootstrap.where(BotSettings.Where.VM, Os.WINDOWS));
         assertEquals(BotSettings.Where.PRIVATE_DISPLAY, SessionBootstrap.where(BotSettings.Where.VM, Os.LINUX),
                 "on Linux, on is a private display whatever the settings say");
+    }
+
+    @Test
+    void aDealtPcPlaceIsWhereTheRunPlaysOverEveryOtherSource() {
+        System.setProperty(SessionBootstrap.WHERE_PROPERTY, "vm");
+        Session.disable();
+        assertEquals(BotSettings.Where.PRIVATE_DISPLAY,
+                SessionBootstrap.where(BotSettings.Where.MY_DESKTOP, Os.LINUX, Place.privateDisplay(2)));
+        assertEquals(BotSettings.Where.MY_DESKTOP,
+                SessionBootstrap.where(BotSettings.Where.PRIVATE_DISPLAY, Os.LINUX, Place.desktop()));
+        assertEquals(BotSettings.Where.VM,
+                SessionBootstrap.where(BotSettings.Where.MY_DESKTOP, Os.WINDOWS, Place.vm("Win11")));
+        assertEquals(BotSettings.Where.MY_DESKTOP,
+                SessionBootstrap.where(BotSettings.Where.PRIVATE_DISPLAY, Os.LINUX, Place.android("Pixel 9")),
+                "an Android place leaves it to bot code, here off");
+        assertEquals(BotSettings.Where.MY_DESKTOP, SessionBootstrap.where(BotSettings.Where.PRIVATE_DISPLAY, Os.LINUX,
+                null));
+    }
+
+    @Test
+    void aPlacePickedOnAnotherPcThisOneLacksLeavesItToTheOtherSources() {
+        assertEquals(BotSettings.Where.MY_DESKTOP,
+                SessionBootstrap.where(BotSettings.Where.MY_DESKTOP, Os.LINUX, Place.vm("Win11")),
+                "Linux has no game VMs");
+        assertEquals(BotSettings.Where.VM,
+                SessionBootstrap.where(BotSettings.Where.VM, Os.WINDOWS, Place.privateDisplay(1)),
+                "Windows has no private displays");
+    }
+
+    @Test
+    void aDealtVmIsTheOneRunInWhileItIsSetUp() {
+        System.setProperty(SessionBootstrap.VM_PROPERTY, "ByHand");
+        assertEquals("Win11", SessionBootstrap.vmNamed(Place.vm("Win11"), name -> true));
+        assertEquals("ByHand", SessionBootstrap.vmNamed(Place.vm("Gone"), name -> false),
+                "a VM since deleted gives way");
+        assertEquals("ByHand", SessionBootstrap.vmNamed(Place.privateDisplay(1), name -> true));
+        assertEquals("ByHand", SessionBootstrap.vmNamed(null, name -> true));
     }
 
     @Test

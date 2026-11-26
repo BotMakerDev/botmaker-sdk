@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.run.PoolOffer;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
@@ -143,6 +144,23 @@ class SdkPoolsTest {
         assertTrue(SdkPools.offers(2, 0, android).isEmpty(), "no room: no offer, and the host says how many are missing");
         assertTrue(SdkPools.offers(2, 5, new SdkPools.Candidates(List.of(), List.of(), false)).isEmpty(),
                 "a game of this PC is offered no instances");
+    }
+
+    @Test
+    void thePcsPlacesAreDealtWithTheRunnersKindFirst() {
+        List<String> vm = List.of("Win11");
+        assertEquals(List.of(Place.privateDisplay(1), Place.vm("Win11"), Place.desktop()),
+                SdkPools.candidates(HostConfig.State.EMPTY, STEAM, pc(BotSettings.Where.PRIVATE_DISPLAY, vm)).places());
+        assertEquals(List.of(Place.vm("Win11"), Place.privateDisplay(1), Place.desktop()),
+                SdkPools.candidates(HostConfig.State.EMPTY, STEAM, pc(BotSettings.Where.VM, vm)).places());
+        assertEquals(List.of(Place.desktop(), Place.privateDisplay(1), Place.vm("Win11")),
+                SdkPools.candidates(HostConfig.State.EMPTY, STEAM, pc(BotSettings.Where.MY_DESKTOP, vm)).places(),
+                "this desktop first: shared by any number of runs, it takes every one");
+    }
+
+    /** A PC with one private display and {@code vms} set up, preferring {@code where}. */
+    private static SdkPools.Pc pc(BotSettings.Where where, List<String> vms) {
+        return new SdkPools.Pc(Os.LINUX, Optional.empty(), 1, vms, Optional.empty(), Map.of(), where);
     }
 
     private static HostConfig.State twoInstances() {

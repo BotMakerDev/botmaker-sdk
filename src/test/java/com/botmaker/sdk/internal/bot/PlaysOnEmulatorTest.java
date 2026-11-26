@@ -8,6 +8,8 @@ import com.botmaker.plugin.api.source.ParamScope;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +51,17 @@ class PlaysOnEmulatorTest {
         assertFalse(SdkValues.playsOnEmulator(scope(CaptureSource.automatic(), "steam:440")));
         assertFalse(SdkValues.playsOnEmulator(scope(CaptureSource.automatic())));
         assertFalse(SdkValues.playsOnEmulator(ParamScope.NONE));
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void aGameOfThisPcIsDealtAPlaceTooAndNoGameIsNot() {
+        assertTrue(SdkValues.playsSomewhere(scope(CaptureSource.automatic(), "steam:440")));
+        assertFalse(SdkValues.playsSomewhere(scope(CaptureSource.window("game", ""), "steam:440")),
+                "a window set by hand is read on this desktop: no other place would show it");
+        assertTrue(SdkValues.playsSomewhere(scope(CaptureSource.automatic(), "emu-app:com.foo")));
+        assertFalse(SdkValues.playsSomewhere(scope(CaptureSource.automatic())));
+        assertFalse(SdkValues.playsSomewhere(ParamScope.NONE));
     }
 
     @Test

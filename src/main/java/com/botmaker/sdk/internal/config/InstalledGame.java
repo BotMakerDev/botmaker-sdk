@@ -10,6 +10,7 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.internal.bot.SettingParams;
 import com.botmaker.sdk.internal.capture.AutoCapture;
@@ -53,6 +54,8 @@ public final class InstalledGame {
     private static volatile String launchChoice = "";
     private static volatile String vm = "";
     private static volatile ZoneId gameZone = ZoneId.systemDefault();
+    /** The bot's {@code place()}, dealt or the runner's, or {@code null} when it marks none: {@link #place()}. */
+    private static volatile Place place;
     /** The instance {@code place()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
     private static volatile String playsOn = "";
     /** The desktop game whose launch's window the run reads, or {@code null}: {@link #pendingWatch}. */
@@ -165,6 +168,7 @@ public final class InstalledGame {
         launchChoice = marked(SdkValue.Id.LAUNCH_TARGET, values) instanceof LaunchChoice choice ? choice.spec() : "";
         vm = marked(SdkValue.Id.VM, values) instanceof GameVm named ? named.name() : "";
         gameZone = zone(marked(SdkValue.Id.GAME_ZONE, values));
+        place = marked(SdkValue.Id.PLACE, values) instanceof Place given ? given : null;
         List<Object> groups = values == null ? List.of() : ParamGroups.groups(values);
         BotSettings.use(SettingParams.from(field -> Optional.ofNullable(ParamGroups.marked(field.id(), groups, values))));
     }
@@ -177,6 +181,15 @@ public final class InstalledGame {
     /** The launch spec the person running the bot picked, or {@code ""} for none. */
     public static String launchChoice() {
         return launchChoice;
+    }
+
+    /**
+     * Where this run plays, the bot's {@code place()}: the place it was dealt among several runs, or the runner's; {@code
+     * null} when the bot marks none. A PC place (this desktop, a private display, a game VM) decides where the game
+     * runs over {@code RunIn.where} ({@code SessionBootstrap.where}); an Android place moves the capture.
+     */
+    public static Place place() {
+        return place;
     }
 
     /** The game VM's name the bot gives, or {@code ""} for the one VM there is. */

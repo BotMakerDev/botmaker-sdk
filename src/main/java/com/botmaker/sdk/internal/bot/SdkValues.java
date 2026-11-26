@@ -267,20 +267,39 @@ public final class SdkValues implements ValueHolder {
 
     /**
      * Where a run plays — {@code public Place place()} (2026-11-26, spec {@code 2026-11-26-run-places-design.md} §1;
-     * it was {@code Instance instance()}), declared only while {@link #CAPTURE} is an emulator. The SDK's pool
-     * ({@code SdkPools}) deals each of several runs one of this PC's places into it; one run uses its value. A run
-     * reads it by its mark ({@code InstalledGame}), over the capture source's own name.
+     * it was {@code Instance instance()}), declared while a run has a place to be dealt ({@link #playsSomewhere}). The
+     * SDK's pool ({@code SdkPools}) deals each of several runs one of this PC's places into it; one run uses its value,
+     * which starts naming none, so it plays where the capture source and {@code RunIn.where} say. A run reads it by its
+     * mark ({@code InstalledGame}): an Android place over the capture source's own name, a PC place over
+     * {@code RunIn.where}.
      */
     public static final ManagedParam<Place> PLACE = ManagedValue.param(SdkValue.Id.PLACE)
             .in(SdkValue.Holder.GAME)
             .startsAs(SdkValues::noPlace)
             .shown("Where this run plays")
-            .when(SdkValues::playsOnEmulator)
+            .when(SdkValues::playsSomewhere)
             .because("This is where the bot plays. Several runs at once are each given their own place.");
 
     /** Whether {@code source} reads an emulator's screen, itself or a region of it. */
     public static boolean onEmulator(CaptureSource source) {
         return source != null && !(source instanceof AmbientSource) && source.base() instanceof EmulatorSource;
+    }
+
+    /**
+     * Whether a run of the bot is dealt a place (spec {@code 2026-11-26-run-places-design.md} §2): it plays on an
+     * emulator instance ({@link #playsOnEmulator}), or it lists a game this computer runs that is no Android app, which
+     * plays on this desktop, a private display or a game VM, and its capture follows that game: a window set by hand
+     * is read on this desktop, so a run dealt another place would not see its game.
+     */
+    static boolean playsSomewhere(ParamScope scope) {
+        if (playsOnEmulator(scope)) return true;
+        List<String> specs = InstalledGame.specs(scope.value(LAUNCH_TARGETS).orElse(null));
+        if (specs == null) return false;
+        CaptureSource capture = scope.value(CAPTURE).orElse(null);
+        Os os = Os.current();
+        return specs.stream().map(LaunchSpec::parse)
+                .anyMatch(spec -> spec != null && spec.kind() != LaunchKind.EMULATOR_APP && spec.runsOn(os)
+                        && AutoCapture.isAutomatic(capture, spec));
     }
 
     /**
