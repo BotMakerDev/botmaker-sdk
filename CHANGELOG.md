@@ -40,6 +40,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `Instance.named(x)` to `Place.android(x)`. A value picked for `instance()` is not carried over: `place()` starts at
   the capture source's own instance. For this release a run claims its instance under both keys, so it sees a run of
   an older SDK; a pooled deal holds only the new key, so a run of an older SDK does not see it.
+- **Several runs are dealt only places that can play the game.** An emulator instance is a candidate only when the
+  bot lists an Android app (`emu-app:`), and this desktop, private displays (Linux, as many as this PC's memory holds
+  at once, at most 8) and game VMs that are set up and can play it only when it lists a game this system runs (the
+  runner's pick first). A Steam-only bot is no longer dealt an emulator instance, and is offered no "Create N
+  instances". A bot that lists no game, or none this system runs, is dealt instances, as before. The place pill
+  lists the same places. For an Android bot, why a place was left out shows in the "Create N instances" offer ("left
+  out: Pixel 9: com.game is not installed"); a bot of this PC is told only how many places are missing. As
+  Android's packages are not kept between reads, every instance still counts as never read. For now this desktop is
+  dealt to one run at a time.
 
 ### Added
 
