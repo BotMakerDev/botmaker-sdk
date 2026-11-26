@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- Remote Pilot sends each phone a heartbeat every 5 s, so the app can tell a dead link from a still picture.
+
 ### Added
 
 - **Phones in the Emulators window's read** (2026-11-26, spec `2026-11-26-phones-in-emulators-design.md`): a phone

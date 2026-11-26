@@ -51,7 +51,7 @@ class TelemetryWireContractTest {
      * The corpus, byte for byte. Update this together with {@code GOLDEN_SHA256} in the pilot repo's
      * {@code wire.test.ts} — and with the copy of the file itself, which must stay byte-identical.
      */
-    private static final String GOLDEN_SHA256 = "b1c12fa89d19fca28a2d414e79d55fd40281d5207e8e7dd7748030eb98f55e29";
+    private static final String GOLDEN_SHA256 = "0b751c506853a217a49ac73b19cefc89f1293f728943f67325c3cfcc4750874c";
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNode CORPUS = corpus();
@@ -174,6 +174,11 @@ class TelemetryWireContractTest {
     void aKeyThatWasNotSentComesBackAsANotice() {
         assertWire("notice.not-focused",
                 TelemetrySerializer.noticeJson(PilotInputService.Typed.NOT_FOCUSED.notice()));
+    }
+
+    @Test
+    void theHeartbeatSaysNothingButItself() {
+        assertWire("ping", TelemetrySerializer.pingJson());
     }
 
     // --- What the corpus cannot express ---

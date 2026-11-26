@@ -63,6 +63,8 @@ public final class TelemetrySerializer {
 
     record Notice(String type, String text) {}
 
+    record Ping(String type) {}
+
     /**
      * One trace line as a phone shows it: when (the bot's clock, ms), how serious ({@code TraceLine.Level}'s
      * id, {@code ""} for one the host did not know), what wrote it, what it said, and how many times.
@@ -153,6 +155,14 @@ public final class TelemetrySerializer {
     /** The {@code notice} message: one sentence the phone shows briefly, such as why a key was not sent. */
     public static String noticeJson(String text) {
         return write(new Notice("notice", text));
+    }
+
+    /**
+     * The heartbeat. A browser cannot see the socket's own pings, and an unchanged picture is not resent, so
+     * without it a phone cannot tell a dead link from a quiet game.
+     */
+    public static String pingJson() {
+        return write(new Ping("ping"));
     }
 
     /** The log drawer's message. The source line, the writer and the region stay on the host. */

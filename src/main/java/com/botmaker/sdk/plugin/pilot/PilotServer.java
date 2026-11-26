@@ -168,6 +168,9 @@ public final class PilotServer implements AutoCloseable {
      */
     private static final int H264_QUEUE = 6;
 
+    /** How often each phone is sent a heartbeat; it gives up on the link after three that did not arrive. */
+    private static final int PING_SECONDS = 5;
+
     private static final String COVERED_NOTICE =
             "Something covers the game on the computer and it could not be brought forward.";
 
@@ -198,6 +201,8 @@ public final class PilotServer implements AutoCloseable {
     private final Object runStateLock = new Object();
     /** Ticks since the host was last asked whether the run is paused. Frame thread only. */
     private int ticksSincePauseCheck;
+    /** When the last heartbeat went, by {@link System#nanoTime}. Frame thread only. */
+    private long pingedAt = System.nanoTime();
     /**
      * How many ticks in a row produced no frame, and whether that has already been said. Both are touched only
      * from the single {@code pilot-frame} thread, so they need no synchronization; {@link #emptyReason} is
@@ -558,6 +563,14 @@ public final class PilotServer implements AutoCloseable {
         refreshPausedState();
     }
 
+    private void heartbeat() {
+        // By the clock, not by ticks: a slow grab stretches a tick far past a frame's length.
+        long now = System.nanoTime();
+        if (clients.isEmpty() || now - pingedAt < TimeUnit.SECONDS.toNanos(PING_SECONDS)) return;
+        pingedAt = now;
+        broadcastText(TelemetrySerializer.pingJson());
+    }
+
     // --- Telemetry + state fan-out (text messages) ---
 
     private void onTelemetry(RunEvent te) {
@@ -816,6 +829,7 @@ public final class PilotServer implements AutoCloseable {
         try {
             input.releaseStale();
             followHostPause();
+            heartbeat();
             pushFrame();
         } catch (Throwable ex) {
             // A frame that threw must not silently end the loop — that is a pilot that goes dark forever.

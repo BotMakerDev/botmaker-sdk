@@ -145,5 +145,8 @@
   "notice.not-focused": {
     "type": "notice",
     "text": "Keys go only to the bot's window. Tap the window first so it has focus."
+  },
+  "ping": {
+    "type": "ping"
   }
 }
