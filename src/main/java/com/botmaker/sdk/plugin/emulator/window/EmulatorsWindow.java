@@ -423,7 +423,7 @@ public final class EmulatorsWindow {
         snapshot = read;
         readAt.setText("Read at " + TIME.format(read.readAt()));
         emulatorsTab.setText("Emulators (" + read.emulators().stream()
-                .filter(EmulatorsModel.EmulatorRow::installed).count() + ")");
+                .filter(row -> row.installed() && !row.phones()).count() + ")");
         instancesTab.setText("Instances (" + read.instances().size() + ", " + read.running() + " running)");
         runningTab.setText("Running (" + read.running() + ")");
         emulators.show(read);

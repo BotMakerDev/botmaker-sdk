@@ -21,6 +21,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Phones in the Emulators window's read** (2026-11-26, spec `2026-11-26-phones-in-emulators-design.md`): a phone
+  is an emulator and an instance at once. The window's snapshot has a Phones row (`EmulatorRow.phones()`, its
+  configuration `—`, *Running* its phones connected) and a row per phone (`InstanceRow.phone()`), on every OS; the
+  Accounts window lists phones too. A phone takes no setting, and nothing makes, clones, starts or stops one. The
+  tabs draw them in the next change.
 - **Point at the game's window** (2026-11-26): *⌖ Point at the game's window*, on the Choose capture source window's
   Automatic tab and in *Which window is the game?*, hides Studio while you click the game's window (Esc cancels),
   then shows what you clicked to keep. Studio's own window is refused, a launcher's or an untitled one warned. KDE,

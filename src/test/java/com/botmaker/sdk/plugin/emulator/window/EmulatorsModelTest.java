@@ -8,6 +8,7 @@ import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel.Column;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel.Filter;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel.InstanceRow;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel.Running;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
@@ -84,6 +85,83 @@ class EmulatorsModelTest {
                             ConfigField.MEMORY, new ConfigValue.Megabytes(instance.equals(FARM) ? 4096 : 2048)),
                     Instant.EPOCH, Optional.empty(), false);
         }
+    }
+
+    private static final EmulatorInstance PIXEL = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 10",
+            new AdbEndpoint.Server("4A1B2C3D"));
+
+    /** One phone; phones are set a screen, which no phone takes, and the phone's layer is {@code own}. */
+    private record Phones(Layer own, boolean connected) implements EmulatorsModel.Source {
+
+        Phones(Layer own) {
+            this(own, true);
+        }
+
+        @Override
+        public Platforms.DiscoveryReport discover() {
+            return new Platforms.DiscoveryReport(List.of(PIXEL),
+                    List.of(new Platforms.PlatformStatus(PlatformId.PHYSICAL, true, 1, null)));
+        }
+
+        @Override
+        public HostConfig.State configuration() {
+            return new HostConfig.State(EmulatorConfig.EMPTY
+                    .withEmulator(PlatformId.PHYSICAL, Layer.EMPTY.with(ConfigField.SCREEN, TALL))
+                    .withInstance(InstanceKey.of(PIXEL), own), Map.of());
+        }
+
+        @Override
+        public boolean running(EmulatorInstance instance) {
+            return connected;
+        }
+
+        @Override
+        public InstanceFacts facts(EmulatorInstance instance, InstanceFacts last) {
+            if (!connected) throw new AssertionError("a phone not connected is not asked");
+            return new InstanceFacts(InstanceKey.of(instance), Map.of(ConfigField.SCREEN, WIDE), Instant.EPOCH,
+                    Optional.empty(), false);
+        }
+    }
+
+    @Test
+    void aPhoneIsAnEmulatorRowAndAnInstanceRow() {
+        EmulatorsModel.Snapshot snapshot = EmulatorsModel.read(new Phones(Layer.EMPTY),
+                EmulatorsModel.Snapshot.EMPTY, Instant.EPOCH);
+        EmulatorsModel.EmulatorRow phones = snapshot.emulators().getFirst();
+        assertTrue(phones.phones());
+        assertEquals(1, phones.instances());
+        assertEquals(1, phones.running());
+        assertEquals("—", phones.configured());
+        InstanceRow pixel = snapshot.instance(InstanceKey.of(PIXEL)).orElseThrow();
+        assertTrue(pixel.phone());
+        assertTrue(pixel.diff().fields().isEmpty(), "the phones' screen is no phone's setting");
+        assertEquals(List.of(), snapshot.applicable(PlatformId.PHYSICAL));
+    }
+
+    @Test
+    void anAccountWantedOnAPhoneIsApplied() {
+        EmulatorsModel.Snapshot snapshot = EmulatorsModel.read(new Phones(Layer.EMPTY
+                .withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "spare@example.com"))),
+                EmulatorsModel.Snapshot.EMPTY, Instant.EPOCH);
+        assertEquals(List.of("Pixel 10"), names(snapshot.applicable(PlatformId.PHYSICAL)));
+        assertEquals(1, snapshot.applicable(PlatformId.PHYSICAL).getFirst().changes());
+    }
+
+    @Test
+    void aPhoneNotConnectedKeepsItsLastReadUnasked() {
+        EmulatorsModel.Snapshot first = EmulatorsModel.read(new Phones(Layer.EMPTY), EmulatorsModel.Snapshot.EMPTY,
+                Instant.EPOCH);
+        EmulatorsModel.Snapshot off = EmulatorsModel.read(new Phones(Layer.EMPTY, false), first, Instant.EPOCH);
+        InstanceRow pixel = off.instance(InstanceKey.of(PIXEL)).orElseThrow();
+        assertFalse(pixel.running());
+        assertEquals(first.instance(InstanceKey.of(PIXEL)).orElseThrow().facts(), pixel.facts());
+        assertEquals(0, off.emulators().getFirst().running());
+    }
+
+    @Test
+    void theWindowsListPhonesOnEveryOs() {
+        assertTrue(EmulatorsModel.listedHere(PlatformId.PHYSICAL));
+        assertFalse(EmulatorsModel.SHOWN.contains(PlatformId.PHYSICAL), "nothing makes or clones a phone");
     }
 
     private static EmulatorsModel.Snapshot read() {

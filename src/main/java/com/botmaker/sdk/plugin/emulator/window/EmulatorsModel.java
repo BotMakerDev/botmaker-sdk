@@ -81,8 +81,8 @@ public final class EmulatorsModel {
         }
 
         /**
-         * This PC as the Emulators and Accounts windows show it: only the {@link #SHOWN} products. The rest is still
-         * read, started and configured where a bot names it; the windows just don't list it.
+         * This PC as the Emulators and Accounts windows show it: only the {@link #SHOWN} products, and phones. The
+         * rest is still read, started and configured where a bot names it; the windows just don't list it.
          */
         static Source shown(StudioServices services) {
             Source live = live(services);
@@ -91,8 +91,8 @@ public final class EmulatorsModel {
                 public Platforms.DiscoveryReport discover() {
                     Platforms.DiscoveryReport all = live.discover();
                     return new Platforms.DiscoveryReport(
-                            all.instances().stream().filter(i -> SHOWN.contains(i.platformId())).toList(),
-                            all.statuses().stream().filter(s -> SHOWN.contains(s.platformId())).toList());
+                            all.instances().stream().filter(i -> listedHere(i.platformId())).toList(),
+                            all.statuses().stream().filter(s -> listedHere(s.platformId())).toList());
                 }
 
                 @Override
@@ -130,12 +130,27 @@ public final class EmulatorsModel {
         };
     }
 
-    /** One product, installed or not. */
+    /**
+     * Whether the windows list {@code platform} here: a {@link #SHOWN} product, or phones, which are an emulator and
+     * an instance at once (2026-11-26, the user's call) on every OS. Making, cloning and starting go by {@link #SHOWN}
+     * and {@link ManageModel}, which leave phones out.
+     */
+    static boolean listedHere(PlatformId platform) {
+        return platform == PlatformId.PHYSICAL || SHOWN.contains(platform);
+    }
+
+    /** One product, installed or not; {@code PHYSICAL} is the Phones row, {@code running} its phones connected. */
     public record EmulatorRow(PlatformId platform, boolean installed, String status, int instances, int running,
                               Layer layer, int differing) {
 
-        /** What its configuration holds, in a few words. */
+        /** Whether this is the Phones row, which BotMaker neither configures nor starts. */
+        public boolean phones() {
+            return platform == PlatformId.PHYSICAL;
+        }
+
+        /** What its configuration holds, in a few words; the Phones row has none. */
         public String configured() {
+            if (phones()) return "—";
             if (layer.isEmpty()) return "Nothing set";
             List<String> parts = new ArrayList<>();
             if (!layer.fields().isEmpty()) parts.add(count(layer.fields().size(), "setting"));
@@ -160,6 +175,11 @@ public final class EmulatorsModel {
 
         public List<String> tags() {
             return wanted.tags();
+        }
+
+        /** Whether this is a phone: it takes accounts and games, and nothing starts, stops or configures it. */
+        public boolean phone() {
+            return key.platform() == PlatformId.PHYSICAL;
         }
 
         public boolean differs() {
@@ -245,19 +265,26 @@ public final class EmulatorsModel {
      */
     public static List<InstanceRow> named(Source source, String reference) {
         HostConfig.State state = source.configuration();
-        return source.discover().instances().stream().filter(EmulatorsModel::configured)
+        return source.discover().instances().stream().filter(EmulatorsModel::listed)
                 .filter(instance -> instance.reference().equals(reference))
                 .map(instance -> row(source, state, instance, null)).toList();
     }
 
-    /** The instances a configuration applies to, read without asking any of them anything. Runs off the UI thread. */
+    /**
+     * The instances a configuration applies to, phones included, read without asking any of them anything. Runs off
+     * the UI thread.
+     */
     public static List<EmulatorInstance> instances(Source source) {
-        return source.discover().instances().stream().filter(EmulatorsModel::configured).toList();
+        return source.discover().instances().stream().filter(EmulatorsModel::listed).toList();
     }
 
-    /** A phone on a cable is no emulator's instance: nothing here starts, stops or configures it. */
-    private static boolean configured(EmulatorInstance instance) {
-        return instance.platformId() != PlatformId.UNKNOWN && instance.platformId() != PlatformId.PHYSICAL;
+    /**
+     * Every instance of a known product, a phone too: it holds accounts and games like any. What a phone can't do is
+     * left out further on: its {@link Wanted} has no setting, {@link ManageModel} manages none, and this PC's
+     * {@link ApplyHost} neither starts nor stops one.
+     */
+    private static boolean listed(EmulatorInstance instance) {
+        return instance.platformId() != PlatformId.UNKNOWN;
     }
 
     private static InstanceRow row(Source source, HostConfig.State state, EmulatorInstance instance,
@@ -268,7 +295,8 @@ public final class EmulatorsModel {
         InstanceFacts facts = null;
         try {
             running = source.running(instance);
-            facts = source.facts(instance, last);
+            // a phone not connected keeps the last read: asking a saved address that is off waits out its timeout
+            facts = running || instance.platformId() != PlatformId.PHYSICAL ? source.facts(instance, last) : last;
         } catch (RuntimeException unread) {
             // the row says "not read"; one instance that fails to answer hides no other
         }
@@ -282,14 +310,14 @@ public final class EmulatorsModel {
         HostConfig.State state = source.configuration();
         List<InstanceRow> instances = new ArrayList<>();
         for (EmulatorInstance instance : report.instances()) {
-            if (!configured(instance)) continue;
+            if (!listed(instance)) continue;
             instances.add(row(source, state, instance,
                     last.instance(InstanceKey.of(instance)).map(InstanceRow::facts).orElse(null)));
         }
         List<EmulatorRow> emulators = new ArrayList<>();
         for (Platforms.PlatformStatus status : report.statuses()) {
             PlatformId platform = status.platformId();
-            if (platform == PlatformId.UNKNOWN || platform == PlatformId.PHYSICAL) continue;
+            if (platform == PlatformId.UNKNOWN) continue;
             List<InstanceRow> own = instances.stream().filter(row -> row.key().platform() == platform).toList();
             emulators.add(new EmulatorRow(platform, status.installed(), status.statusLine(), own.size(),
                     (int) own.stream().filter(InstanceRow::running).count(), state.config().emulator(platform),
