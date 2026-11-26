@@ -161,6 +161,7 @@ public final class WindowDoubtPicker {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox bar = new HBox(8, countdown, spacer, notNow, use);
+        PointAtWindow.ifAvailable(() -> bar.getChildren().add(bar.getChildren().indexOf(notNow), pointButton()));
         bar.setAlignment(Pos.CENTER_LEFT);
 
         VBox root = new VBox(10, heading, sub, body, status, bar);
@@ -261,6 +262,24 @@ public final class WindowDoubtPicker {
             }
         }
         return null;
+    }
+
+    /** Point at the game's window: a window kept that way answers as Use this window does. */
+    private Button pointButton() {
+        return PointAtWindow.button(() -> {
+            LaunchSpec target;
+            try {
+                target = LaunchSpec.parse(doubt.game());
+            } catch (RuntimeException unreadable) {
+                Styles.pick(status, Styles.WARNING_TEXT, Styles.WARNING_TEXT);
+                status.setText("Not kept: the run named a game this Studio cannot read: " + unreadable.getMessage());
+                return;
+            }
+            // Still asked while this question is shown: the run's guess or its end closes it.
+            PointAtWindow.start(services, target, stage, () -> SHOWN.get(doubt.game()) == stage, kept -> {
+                if (kept.isPresent()) stage.close();
+            });
+        });
     }
 
     /** Keeps the selected window as the game's on this PC; the waiting run reads it and says it was picked by you. */

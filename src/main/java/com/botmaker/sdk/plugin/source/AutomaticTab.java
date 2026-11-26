@@ -14,6 +14,7 @@ import com.botmaker.sdk.plugin.params.LaunchTargets;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
+import com.botmaker.shared.launch.WindowIdentity;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -21,6 +22,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.MouseEvent;
+import javafx.stage.Window;
 
 import java.util.Optional;
 import java.util.function.UnaryOperator;
@@ -37,6 +40,12 @@ final class AutomaticTab {
     private final VBox card;
     private final Label picked = Styles.on(new Label(), Styles.SMALL_TEXT);
     private final Button forget = new Button("Forget the pick");
+    private final Button point;
+    private final Label pointHint = Styles.on(new Label(PointAtWindow.HINT), Styles.SMALL_TEXT, Styles.MUTED_TEXT);
+    /** The window kept by pointing in this window, so the line says so while it is still the pick. */
+    private String pointedAt;
+    /** Whether this desktop lets the user point, once probed. */
+    private boolean canPoint;
 
     /**
      * @param onPick runs when the card is clicked; {@code onUse} when it is double-clicked or Use is pressed
@@ -54,17 +63,30 @@ final class AutomaticTab {
             forget();
             onPick.run();
         });
+        point = PointAtWindow.button(() -> PointAtWindow.start(services, target, window(), kept -> {
+            if (kept.isEmpty()) return;
+            pointedAt = kept.get();
+            showPick();
+            onPick.run();
+        }));
+        pointHint.setWrapText(true);
         Button use = Styles.on(new Button("Use"), Styles.PRIMARY_BUTTON);
         use.setOnAction(e -> onUse.run());
-        HBox buttons = new HBox(8, use, forget);
+        HBox buttons = new HBox(8, use, forget, point);
         buttons.setAlignment(Pos.CENTER_LEFT);
-        card = Styles.on(new VBox(8, title, explains, picked, buttons), Styles.TILE);
+        // A button's click is not the card's: a double-click on Point would otherwise also Use and close the window.
+        buttons.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+        card = Styles.on(new VBox(8, title, explains, picked, buttons, pointHint), Styles.TILE);
         card.setMaxWidth(560);
         card.setOnMouseClicked(e -> {
             onPick.run();
             if (e.getClickCount() == 2) onUse.run();
         });
         showPick();
+        PointAtWindow.ifAvailable(() -> {
+            canPoint = true;
+            showPick();
+        });
     }
 
     /** The card, which the window marks picked like a tile. */
@@ -81,16 +103,29 @@ final class AutomaticTab {
     private void showPick() {
         boolean desktopGame = desktopGame(target);
         Optional<CaptureSource> saved = desktopGame ? picks(services).saved(target) : Optional.empty();
-        picked.setText(!desktopGame ? "" : saved.map(window -> "Picked on a run: " + named(window))
+        boolean pointed = pointedAt != null && desktopGame
+                && picks(services).picked(target).map(WindowIdentity::spec).filter(pointedAt::equals).isPresent();
+        String how = pointed ? "Picked by pointing: " : "Picked on a run: ";
+        picked.setText(!desktopGame ? "" : saved.map(window -> how + named(window))
                 .orElse("No window picked yet: the next run watches the game's launch."));
         picked.setVisible(desktopGame);
         picked.setManaged(desktopGame);
         forget.setVisible(desktopGame);
         forget.setManaged(desktopGame);
         forget.setDisable(saved.isEmpty());
+        boolean pointable = desktopGame && canPoint;
+        point.setVisible(pointable);
+        point.setManaged(pointable);
+        pointHint.setVisible(pointable);
+        pointHint.setManaged(pointable);
+    }
+
+    private Window window() {
+        return card.getScene() == null ? null : card.getScene().getWindow();
     }
 
     private void forget() {
+        pointedAt = null;
         Optional<String> refused = picks(services).forget(target);
         services.status(refused.map(why -> "The pick is kept: " + why)
                 .orElse("The pick is forgotten: the next run picks the game's window again."));

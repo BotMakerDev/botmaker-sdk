@@ -21,6 +21,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **Point at the game's window** (2026-11-26): *⌖ Point at the game's window*, on the Choose capture source window's
+  Automatic tab and in *Which window is the game?*, hides Studio while you click the game's window (Esc cancels),
+  then shows what you clicked to keep. Studio's own window is refused, a launcher's or an untitled one warned. KDE,
+  X11, Windows and macOS (with Accessibility); not on GNOME Wayland.
 - **A launch's window is told by what its launcher wrote in the game's process** (2026-11-26): on Linux, a window
   whose process carries the target's game (Steam's `SteamAppId`, Faugus's `FAUGUSID`, Lutris's `GAME_NAME`) goes
   right after one of the target's class and leaves no doubt, so a Lutris or Faugus game outside the launch's own

@@ -56,6 +56,26 @@ launch and never ask which emulators run, read the whole desktop for a WatchLaun
 have to ask about. The Choose capture source window opens on its Automatic tab, which
 says what Automatic reads and offers *Forget the pick* (`plugin/source/AutomaticTab`).
 
+### Point at the window (2026-11-26)
+
+Besides a run's pick and the doubt picker's thumbnails, the user can point at the game's window: *⌖ Point at the
+game's window* on the Automatic tab (a desktop game only) and in the doubt picker's button row
+(`plugin/source/PointAtWindow`, spec `2026-11-26-point-at-window-design.md`). Studio's windows are iconified, shared's
+`WindowPointer` waits up to 60 s for one click, and the windows come back. Esc or the timeout changes nothing.
+
+- **Backends** (shared's `WindowPointer.current()`): KDE Wayland asks KWin (`queryWindowInfo` over `gdbus`, KWin's own
+  crosshair); X11 grabs the pointer; Windows hooks the mouse and keyboard (low-level hooks, the system cursor a
+  crosshair); macOS taps the session's events (needs Accessibility). The click never reaches the game. The clicked
+  window is matched to one BotMaker can capture; a native Wayland window, or the desktop, is refused with why.
+- **GNOME Wayland, or a Wayland session without KWin**: no pointer, so the button is hidden.
+- **The confirm step** (layout A): *Is this the game's window?*, a still of the window, its title, class and size,
+  then **Keep this window**, **Point again** and **Cancel**. Keep saves the window as this PC's pick for the game,
+  the doubt picker's path, so a run reads it like any pick. Studio's own window is refused, and so is a window
+  nothing names (an untitled Proton or Wine window: `WindowIdentity.of` is null). A launcher's class
+  (`RunningProbe.launcherClass`) and an untitled window of its own class are warned, and kept if the user insists.
+  From the doubt picker, a window clicked after the run took its guess is not kept.
+- **Tried live**: X11 under Xephyr only. KDE Wayland, Windows and macOS are not tried live yet.
+
 ### Live frames: a grab kept open (2026-10-22)
 
 `captureWindow` reads one frame and lets go: it finds the window, asks X about it, and allocates a new image, which
