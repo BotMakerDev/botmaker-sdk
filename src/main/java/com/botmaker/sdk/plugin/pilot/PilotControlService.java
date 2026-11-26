@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.pilot;
 import com.botmaker.plugin.api.Runs;
 
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  * Pause/resume for a running bot, used by the remote pilot. Bots are plain OS processes
@@ -36,40 +37,41 @@ public final class PilotControlService {
     }
 
     /**
-     * @return a human-readable result (success or the reason it couldn't).
-     *
-     * <p>Through the host when it pauses runs ({@link Runs#canPause()}), so the pilot and the host's run
+     * Through the host when it pauses runs ({@link Runs#canPause()}), so the pilot and the host's run
      * overlay share one pause; signalled here otherwise, for a host whose contract has no pause.
+     *
+     * @return why the bot could not be paused, or empty when it was
      */
-    public synchronized String pause() {
+    public synchronized Optional<String> pause() {
         if (runs.canPause()) {
             runs.pause();
-            return runs.isPaused() ? "Paused" : "Could not pause the bot.";
+            return runs.isPaused() ? Optional.empty() : Optional.of("Could not pause the bot.");
         }
-        return signal("STOP", true, "Paused");
+        return signal("STOP", true);
     }
 
-    public synchronized String resume() {
+    /** @return why the bot could not be resumed, or empty when it was */
+    public synchronized Optional<String> resume() {
         if (runs.isPaused()) {
             runs.resume();
-            return runs.isPaused() ? "Could not resume the bot." : "Resumed";
+            return runs.isPaused() ? Optional.of("Could not resume the bot.") : Optional.empty();
         }
-        return signal("CONT", false, "Resumed");
+        return signal("CONT", false);
     }
 
-    private String signal(String sig, boolean nextPaused, String okMessage) {
-        if (!isSupported()) return "Pause/resume is not supported on Windows.";
+    private Optional<String> signal(String sig, boolean nextPaused) {
+        if (!isSupported()) return Optional.of("Pause/resume is not supported on Windows.");
         var pid = runs.pid();
-        if (pid.isEmpty()) return "No bot is running.";
+        if (pid.isEmpty()) return Optional.of("No bot is running.");
         try {
             int code = new ProcessBuilder("kill", "-" + sig, Long.toString(pid.getAsLong()))
                     .inheritIO().start().waitFor();
-            if (code != 0) return "kill -" + sig + " exited " + code;
+            if (code != 0) return Optional.of("kill -" + sig + " exited " + code);
             paused = nextPaused;
-            return okMessage;
+            return Optional.empty();
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            return "Could not signal bot: " + e.getMessage();
+            return Optional.of("Could not signal bot: " + e.getMessage());
         }
     }
 

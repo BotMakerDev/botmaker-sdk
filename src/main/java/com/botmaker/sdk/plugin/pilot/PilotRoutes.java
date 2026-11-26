@@ -14,6 +14,7 @@ import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -71,11 +72,25 @@ public final class PilotRoutes implements AutoCloseable {
     private EmulatorSurface surface;
     private String openedFor;
 
+    /** How long an instance that could not be opened is left alone before the scan is run for it again. */
+    static final long MISS_RETRY_MS = 2000;
+
+    private final LongSupplier clock;
+    /** The name that could not be opened, and when; null when the last one asked for opened. */
+    private String missedFor;
+    private long missedAt;
+
     public PilotRoutes(Supplier<DesktopSession> session, Supplier<String> instanceName,
                        Function<String, EmulatorSurface> open) {
+        this(session, instanceName, open, System::currentTimeMillis);
+    }
+
+    PilotRoutes(Supplier<DesktopSession> session, Supplier<String> instanceName,
+                Function<String, EmulatorSurface> open, LongSupplier clock) {
         this.session = session;
         this.instanceName = instanceName;
         this.open = open;
+        this.clock = clock;
     }
 
     /**
@@ -106,8 +121,13 @@ public final class PilotRoutes implements AutoCloseable {
         }
         if (surface == null || !wanted.equals(openedFor)) {
             releaseSurface();
-            surface = open.apply(wanted);
-            openedFor = surface == null ? null : wanted;
+            // Opening runs a discovery of every platform, too dear to repeat on every frame of a stopped emulator.
+            if (!wanted.equals(missedFor) || clock.getAsLong() - missedAt >= MISS_RETRY_MS) {
+                surface = open.apply(wanted);
+                openedFor = surface == null ? null : wanted;
+                missedFor = surface == null ? wanted : null;
+                missedAt = clock.getAsLong();
+            }
         }
         if (surface != null) return new PilotRoute.Emulator(surface);
         return live != null ? new PilotRoute.Session(live)

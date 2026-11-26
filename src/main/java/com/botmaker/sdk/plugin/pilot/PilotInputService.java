@@ -11,7 +11,12 @@ import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.Capability;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.PointerPolicy;
+import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.LongSupplier;
 
 /**
  * Replays the pilot's manual "Interact" gestures onto whichever surface the bot is acting on.
@@ -123,6 +128,18 @@ public final class PilotInputService implements AutoCloseable {
     /** The button a {@code DOWN} pressed and no {@code UP} has released yet, or {@code 0} when none is held. */
     private int heldButton;
 
+    /** Which client holds it: only that one may move or release it. */
+    private Object heldBy;
+
+    /**
+     * Clients whose drag was refused or timed out: the moves and the release they still send belong to no press,
+     * and must neither move the pointer nor tap.
+     */
+    private final Set<Object> cancelled = new HashSet<>();
+
+    /** When the holder last sent a step, for {@link #releaseStale}. */
+    private long heldSeenAt;
+
     /**
      * The route the held button was pressed on — the one it must be released on. A release on "the current
      * route" would leave the button down on the surface that actually has it the moment the route changes
@@ -136,9 +153,43 @@ public final class PilotInputService implements AutoCloseable {
     /** When the current drag started, so an emulator swipe lasts as long as the gesture actually did. */
     private long touchStartedAt;
 
+    /** The most wheel steps one gesture scrolls, either way: the amount is the client's, and each step is an event. */
+    static final int MAX_SCROLL = 10;
+
+    /** The longest swipe an emulator is sent. A longer one would tie up the device for as long as the finger lay. */
+    static final long MAX_SWIPE_MS = 3000;
+
+    /** How long a button stays held without a step from its holder before it is let go. */
+    static final long HOLD_LIMIT_MS = 30_000;
+
+    /** How often, and how many times, {@link #bringForward} looks for the raised window to take focus. */
+    private static final long FOCUS_POLL_MS = 20;
+    private static final int FOCUS_POLLS = 10;
+
+    private final LongSupplier clock;
+
+    public PilotInputService() {
+        this(System::currentTimeMillis);
+    }
+
+    PilotInputService(LongSupplier clock) {
+        this.clock = clock;
+    }
+
+    /** {@link #apply(Object, PilotRoute, Kind, int, int, int, int, Bounds)} for a single client. */
+    boolean apply(PilotRoute route, Kind kind, int x, int y, int button, int amount, Bounds bounds) {
+        return apply(this, route, kind, x, y, button, amount, bounds);
+    }
+
     /**
      * Applies one gesture at the coordinates of {@code route}'s surface, ignoring anything outside
      * {@code bounds}.
+     *
+     * <p>{@code client} owns the button a {@code DOWN} presses: until it comes up, every pointer gesture from
+     * another client is rejected, and so is a second press or a tap from anyone.
+     *
+     * <p>An emulator's gesture is sent outside this object's lock: a swipe blocks for as long as it lasts, and
+     * the state message and the release paths must not wait behind it.
      *
      * <p>The route is passed in rather than read from a holder because it must be the route that produced the
      * frame the user touched — the caller records it beside the bounds when it pushes a frame. Reading "the
@@ -147,28 +198,66 @@ public final class PilotInputService implements AutoCloseable {
      *
      * @return true if the gesture was dispatched, false if it was rejected (out of bounds, no controller)
      */
-    public synchronized boolean apply(PilotRoute route, Kind kind, int x, int y, int button, int amount,
-                                      Bounds bounds) {
+    public boolean apply(Object client, PilotRoute route, Kind kind, int x, int y, int button, int amount,
+                         Bounds bounds) {
         if (bounds == null || kind == Kind.KEY || kind == Kind.TEXT) return false;
-        // A route that changed under a drag ends that drag on the surface that owns the button, now, before
-        // anything is dispatched to the new one.
-        if (heldButton != 0 && !routeOrDesktop(route).equals(heldRoute)) releaseHeld();
-        if (route instanceof PilotRoute.Missing) return false;
-        if (!bounds.contains(x, y)) {
-            // Dropping a mid-drag MOVE/UP is what strands the button; the frame edge is where it belongs.
-            if (heldButton == 0 || (kind != Kind.MOVE && kind != Kind.UP)) return false;
-            x = bounds.clampX(x);
-            y = bounds.clampY(y);
-        }
-        int btn = button <= 0 ? 1 : button;
-        if (route instanceof PilotRoute.Emulator(EmulatorSurface surface)) {
+        Runnable onDevice;
+        synchronized (this) {
+            // A route that changed under a drag ends that drag on the surface that owns the button, now, before
+            // anything is dispatched to the new one.
+            if (heldButton != 0 && !routeOrDesktop(route).equals(heldRoute)) releaseHeld();
+            if (route instanceof PilotRoute.Missing) return false;
+            if (kind == Kind.DOWN) cancelled.remove(client);
+            if ((kind == Kind.MOVE || kind == Kind.UP) && cancelled.contains(client)) {
+                if (kind == Kind.UP) cancelled.remove(client);
+                return false;
+            }
+            if (heldButton != 0 && (!client.equals(heldBy) || kind == Kind.DOWN || kind == Kind.TAP)) {
+                if (kind == Kind.DOWN && !client.equals(heldBy)) cancelled.add(client);
+                return false;
+            }
+            if (!bounds.contains(x, y)) {
+                // Dropping a mid-drag MOVE/UP is what strands the button; the frame edge is where it belongs.
+                if (heldButton == 0 || (kind != Kind.MOVE && kind != Kind.UP)) return false;
+                x = bounds.clampX(x);
+                y = bounds.clampY(y);
+            }
+            int btn = button < 1 || button > 3 ? 1 : button;
+            if (kind == Kind.UP && heldButton != 0) btn = heldButton; // release what was pressed
+            int steps = Math.max(-MAX_SCROLL, Math.min(amount, MAX_SCROLL));
+            if (heldButton != 0) heldSeenAt = clock.getAsLong();
+            if (!(route instanceof PilotRoute.Emulator(EmulatorSurface surface))) {
+                return applyToDisplay(client, route, kind, x, y, btn, steps);
+            }
             // No pointer to strand here, but the same clamp has to apply or the swipe's end is thrown away —
             // so the emulator route takes part in the held-gesture bookkeeping too.
-            if (kind == Kind.DOWN) { heldButton = btn; heldRoute = route; }
-            boolean ok = applyToEmulator(surface, kind, x, y, amount);
-            if (kind == Kind.UP) { heldButton = 0; heldRoute = null; }
-            return ok;
+            if (kind == Kind.DOWN) hold(client, route, btn);
+            onDevice = emulatorStep(surface, kind, x, y, steps);
+            if (kind == Kind.UP) forgetHeld();
         }
+        try {
+            onDevice.run();
+            return true;
+        } catch (Exception e) {
+            SdkLog.warn("Pilot interact " + kind + " on emulator failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void hold(Object client, PilotRoute route, int button) {
+        heldButton = button;
+        heldRoute = route;
+        heldBy = client;
+        heldSeenAt = clock.getAsLong();
+    }
+
+    private void forgetHeld() {
+        heldButton = 0;
+        heldRoute = null;
+        heldBy = null;
+    }
+
+    private boolean applyToDisplay(Object client, PilotRoute route, Kind kind, int x, int y, int btn, int amount) {
         NativeController nc = controller(route);
         if (nc == null) return false;
 
@@ -182,8 +271,7 @@ public final class PilotInputService implements AutoCloseable {
                     dragOrigin = nc.cursorPosition();
                     nc.mouseMove(x, y);
                     nc.mouseButton(btn, true);
-                    heldButton = btn;   // recorded only once the press actually went out
-                    heldRoute = route;
+                    hold(client, route, btn);   // recorded only once the press actually went out
                 }
                 case MOVE -> nc.mouseMove(x, y);
                 case UP -> {
@@ -191,8 +279,7 @@ public final class PilotInputService implements AutoCloseable {
                     nc.mouseButton(btn, false);
                     PointerPolicy.restoreTo(nc, sessionOf(route), dragOrigin);
                     dragOrigin = null;
-                    heldButton = 0;
-                    heldRoute = null;
+                    forgetHeld();
                 }
                 case SCROLL -> { nc.mouseMove(x, y); nc.scroll(amount); }
             }
@@ -216,7 +303,7 @@ public final class PilotInputService implements AutoCloseable {
      * ({@link #focusedIsFrame}); otherwise it is refused and the phone is told to tap the window first. (The
      * maintainer's call.)
      */
-    public synchronized Typed type(PilotRoute route, Kind kind, String keyName, String text, Bounds bounds) {
+    public Typed type(PilotRoute route, Kind kind, String keyName, String text, Bounds bounds) {
         if (bounds == null || route instanceof PilotRoute.Missing) return Typed.FAILED;
         String typed = kind == Kind.TEXT ? printable(text) : "";
         if (kind == Kind.TEXT && typed.isEmpty()) return Typed.SENT;
@@ -241,23 +328,28 @@ public final class PilotInputService implements AutoCloseable {
                 surface.key(code);
                 return Typed.SENT;
             }
-            NativeController nc = controller(route);
-            if (nc == null) return Typed.FAILED;
-            if (sessionOf(route) == null) {
-                GenericWindow focused = nc.getForegroundWindow();
-                if (!focusedIsFrame(focused == null ? null : focused.getRect(), bounds)) return Typed.NOT_FOCUSED;
-            }
-            if (key == null) {
-                nc.typeText(typed);
-            } else {
-                nc.keyDown(key.nativeCode());
-                nc.keyUp(key.nativeCode());
-            }
-            return Typed.SENT;
+            // Locked here only: an emulator's key blocks on ADB, and the frame loop must not wait behind it.
+            return typeOnDisplay(route, key, typed, bounds);
         } catch (Exception e) {
             SdkLog.warn("Pilot interact " + kind + " failed: " + e.getMessage());
             return Typed.FAILED;
         }
+    }
+
+    private synchronized Typed typeOnDisplay(PilotRoute route, Key key, String typed, Bounds bounds) {
+        NativeController nc = controller(route);
+        if (nc == null) return Typed.FAILED;
+        if (sessionOf(route) == null) {
+            GenericWindow focused = nc.getForegroundWindow();
+            if (!focusedIsFrame(focused == null ? null : focused.getRect(), bounds)) return Typed.NOT_FOCUSED;
+        }
+        if (key == null) {
+            nc.typeText(typed);
+        } else {
+            nc.keyDown(key.nativeCode());
+            nc.keyUp(key.nativeCode());
+        }
+        return Typed.SENT;
     }
 
     /**
@@ -296,8 +388,7 @@ public final class PilotInputService implements AutoCloseable {
         PilotRoute route = heldRoute;
         int btn = heldButton;
         java.awt.Point origin = dragOrigin;
-        heldButton = 0;
-        heldRoute = null;
+        forgetHeld();
         dragOrigin = null;
         touchOrigin = null;
         if (btn == 0 || route == null || route instanceof PilotRoute.Emulator) return;
@@ -309,6 +400,62 @@ public final class PilotInputService implements AutoCloseable {
         } catch (Exception e) {
             SdkLog.warn("Pilot interact could not release button " + btn + ": " + e.getMessage());
         }
+    }
+
+    /** {@link #releaseHeld()} only when {@code client} is the holder: one phone leaving must not end another's drag. */
+    public synchronized void releaseHeldBy(Object client) {
+        cancelled.remove(client);
+        if (client.equals(heldBy)) releaseHeld();
+    }
+
+    /** The press of {@code client}'s drag was not sent: ignore the rest of that drag. */
+    public synchronized void cancelGesture(Object client) {
+        cancelled.add(client);
+    }
+
+    /** Lets go of a button its holder has sent nothing about for {@link #HOLD_LIMIT_MS}: its release was lost. */
+    public synchronized void releaseStale() {
+        if (heldButton == 0 || clock.getAsLong() - heldSeenAt <= HOLD_LIMIT_MS) return;
+        cancelled.add(heldBy);
+        releaseHeld();
+    }
+
+    /**
+     * Makes a gesture on the host {@code :0} land on the window the phone is shown rather than on whatever
+     * covers it: {@code window} is raised and focused unless it already has focus.
+     *
+     * @return false when it could not be brought forward, and the gesture must then not be sent. True on any
+     *         other route, and for a frame that is not one window ({@code window} is null)
+     */
+    public boolean bringForward(PilotRoute route, GenericWindow window, Bounds bounds) {
+        if (window == null || bounds == null || !(routeOrDesktop(route) instanceof PilotRoute.Desktop)) return true;
+        NativeController nc;
+        synchronized (this) {
+            nc = controller(route);
+        }
+        if (nc == null) return false;
+        try {
+            if (inFront(nc, window, bounds)) return true;
+            nc.focusWindow(window);
+            for (int i = 0; i < FOCUS_POLLS; i++) {
+                if (inFront(nc, window, bounds)) return true;
+                Thread.sleep(FOCUS_POLL_MS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            SdkLog.warn("Pilot interact could not bring the window forward: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private static boolean inFront(NativeController nc, GenericWindow window, Bounds bounds) {
+        GenericWindow focused = nc.getForegroundWindow();
+        if (focused == null) return false;
+        long wanted = WindowIds.of(window);
+        long had = WindowIds.of(focused);
+        // By id where both have one: two maximised windows share a rect.
+        return wanted != 0 && had != 0 ? wanted == had : focusedIsFrame(focused.getRect(), bounds);
     }
 
     /** Releases any held button. The controller itself is process-wide and sticky, so it is not torn down. */
@@ -333,32 +480,24 @@ public final class PilotInputService implements AutoCloseable {
      * <p>An {@code UP} with no remembered {@code DOWN} (a reconnect mid-gesture) degrades to a tap rather than
      * to a swipe from nowhere.
      */
-    private boolean applyToEmulator(EmulatorSurface surface, Kind kind, int x, int y, int amount) {
-        try {
-            switch (kind) {
-                case TAP -> surface.tap(x, y);
-                case DOWN -> {
-                    touchOrigin = new java.awt.Point(x, y);
-                    touchStartedAt = System.currentTimeMillis();
-                }
-                case MOVE -> { /* nothing to move: a touch screen has no hover */ }
-                case UP -> {
-                    java.awt.Point from = touchOrigin;
-                    touchOrigin = null;
-                    if (from == null) {
-                        surface.tap(x, y);
-                    } else {
-                        surface.drag(from.x, from.y, x, y,
-                                Math.max(1, System.currentTimeMillis() - touchStartedAt));
-                    }
-                }
-                case SCROLL -> surface.scroll(x, y, amount);
+    private Runnable emulatorStep(EmulatorSurface surface, Kind kind, int x, int y, int amount) {
+        switch (kind) {
+            case TAP -> { return () -> surface.tap(x, y); }
+            case DOWN -> {
+                touchOrigin = new java.awt.Point(x, y);
+                touchStartedAt = clock.getAsLong();
             }
-            return true;
-        } catch (Exception e) {
-            SdkLog.warn("Pilot interact " + kind + " on emulator failed: " + e.getMessage());
-            return false;
+            case UP -> {
+                java.awt.Point from = touchOrigin;
+                touchOrigin = null;
+                if (from == null) return () -> surface.tap(x, y);
+                long lasted = Math.max(1, Math.min(clock.getAsLong() - touchStartedAt, MAX_SWIPE_MS));
+                return () -> surface.drag(from.x, from.y, x, y, lasted);
+            }
+            case SCROLL -> { return () -> surface.scroll(x, y, amount); }
+            default -> { /* MOVE: a touch screen has no hover; KEY and TEXT never get here */ }
         }
+        return () -> { };
     }
 
     /**
@@ -383,8 +522,9 @@ public final class PilotInputService implements AutoCloseable {
         if (route instanceof PilotRoute.Emulator || route instanceof PilotRoute.Missing) return true;
         DesktopSession s = sessionOf(route);
         if (s != null) return s.has(Capability.BACKGROUND_CLICK);
-        NativeController nc = controller(route);
-        return nc != null && nc.supportsBackgroundInput();
+        // Asking must not resolve the controller: that switches :0 to real device input, process-wide, for a
+        // phone that may only be watching. Before any gesture the answer is what the first one will make true.
+        return host != null && host.supportsBackgroundInput();
     }
 
     /**

@@ -44,3 +44,6 @@
   `TargetCapture.whyNothing`). The screen is streamed only when the capture source is the desktop or a monitor.
   A Funnel is turned off by a shutdown hook, and `PilotPreferences.funnelOwner` lets the next start clear one
   a crash left.
+- **A phone's input and stream are bounded** (2026-11-26): a held button belongs to the client that pressed it
+  (`PilotInputService`), a tap on a covered `:0` window raises it or is refused, and each client has its own
+  `SendQueue`, so a stalled phone blocks nothing. Asking for the state never switches `:0` to real device input.

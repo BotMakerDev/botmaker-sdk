@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.pilot;
 import com.botmaker.session.DesktopSession;
 import com.botmaker.session.video.VideoPacket;
 import com.botmaker.shared.Diag;
+import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.observe.RunFrames;
 import com.botmaker.plugin.api.Runs;
@@ -23,6 +24,7 @@ import org.eclipse.jetty.websocket.api.WriteCallback;
 import java.awt.Rectangle;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -111,13 +113,20 @@ public final class PilotServer implements AutoCloseable {
     private final ObjectMapper json = new ObjectMapper();
 
     /**
-     * Per-connection state: a "send in flight" latch for frame backpressure, and whether this client has
-     * armed Interact. Both are per-client on purpose — one phone driving the game must not arm a second
-     * viewer, and one slow client must not stall everyone's frames.
+     * Per-connection state: its outgoing {@link SendQueue}, and whether this client has armed Interact. Both are
+     * per-client on purpose — one phone driving the game must not arm a second viewer, and one slow client must
+     * not stall anyone else's messages.
      */
     private static final class Client {
-        final AtomicBoolean frameInFlight = new AtomicBoolean(false);
+        final SendQueue out;
         final AtomicBoolean interact = new AtomicBoolean(false);
+        /** The last JPEG message queued for this client, so an unchanged picture is not sent again. */
+        volatile byte[] lastFrame;
+
+        Client(SendQueue out) {
+            this.out = out;
+        }
+
         /** Whether this client said hello and named H.264 — false for every build that predates {@code hello}. */
         volatile boolean h264;
         /**
@@ -153,6 +162,15 @@ public final class PilotServer implements AutoCloseable {
 
     private static final String BAD_TOKEN_REASON = "pairing token rejected";
 
+    /**
+     * How many H.264 pictures may wait for one client. Dropping one costs a wait for the next keyframe, so a
+     * link that stutters is given a quarter of a second before that.
+     */
+    private static final int H264_QUEUE = 6;
+
+    private static final String COVERED_NOTICE =
+            "Something covers the game on the computer and it could not be brought forward.";
+
     /** Connected, authorized clients. */
     private final Map<WsContext, Client> clients = new ConcurrentHashMap<>();
 
@@ -172,8 +190,14 @@ public final class PilotServer implements AutoCloseable {
      * route resolver would answer by the time it arrives.
      */
     private volatile PilotRoute lastRoute = PilotRoute.DESKTOP;
+    /** The window that frame was of, when it was one window on {@code :0}; a tap raises it first. */
+    private volatile GenericWindow lastWindow;
     private volatile String token;
     private volatile RunState runState = RunState.STOPPED;
+    /** Guards {@link #runState}'s changes; not {@code this}, which {@link #close} holds while ticks finish. */
+    private final Object runStateLock = new Object();
+    /** Ticks since the host was last asked whether the run is paused. Frame thread only. */
+    private int ticksSincePauseCheck;
     /**
      * How many ticks in a row produced no frame, and whether that has already been said. Both are touched only
      * from the single {@code pilot-frame} thread, so they need no synchronization; {@link #emptyReason} is
@@ -233,22 +257,22 @@ public final class PilotServer implements AutoCloseable {
         app.ws("/ws", ws -> {
             ws.onConnect(ctx -> {
                 if (!authorized(ctx)) { ctx.closeSession(BAD_TOKEN, BAD_TOKEN_REASON); return; }
-                clients.put(ctx, new Client());
+                Client client = new Client(new SendQueue(linkTo(ctx)));
+                clients.put(ctx, client);
                 ctx.enableAutomaticPings();
-                ctx.send(stateJson()); // let a fresh client render the current run state immediately
-                ctx.send(TelemetrySerializer.inputJson(PilotInputService.Kind.wireNames()));
+                client.out.text(stateJson()); // let a fresh client render the current run state immediately
+                client.out.text(TelemetrySerializer.inputJson(PilotInputService.Kind.wireNames()));
                 // …and the run's recent trace, so a phone that connects mid-run opens on context, not blank.
-                for (String line : traceBacklog()) ctx.send(line);
+                for (String line : traceBacklog()) client.out.text(line);
             });
             ws.onMessage(ctx -> {
                 Client client = clients.get(ctx);
                 if (client != null) handleCommand(client, ctx);
             });
-            // A phone that vanishes mid-drag never sends its UP, so the release happens here instead. It is
-            // unconditional rather than gated on "was it this client's drag": a drag cut short is a gesture
-            // the user repeats, a button left down is a desktop they can't click until Studio exits.
-            ws.onClose(ctx -> { clients.remove(ctx); input.releaseHeld(); });
-            ws.onError(ctx -> { clients.remove(ctx); input.releaseHeld(); });
+            // A phone that vanishes mid-drag never sends its UP, so the release happens here instead. Only its
+            // own: another client leaving, or one refused for a bad token, must not cut this one's drag.
+            ws.onClose(ctx -> drop(ctx));
+            ws.onError(ctx -> drop(ctx));
         });
         // Reuse the last bound port when it's free so the tailnet-direct URL is stable across Studio restarts
         // (mirrors the persisted token). Fall back to an OS-assigned ephemeral port if it's taken, then persist
@@ -279,6 +303,11 @@ public final class PilotServer implements AutoCloseable {
                     setRunState(RunState.STOPPED);
                 }
             }));
+            // A run already going when the pilot opens announces nothing, so it is asked for.
+            // Under the lock, so a run ending meanwhile writes its STOPPED after this and not before.
+            synchronized (runStateLock) {
+                if (runs.isRunning()) setRunState(control.isPaused() ? RunState.PAUSED : RunState.RUNNING);
+            }
         }
 
         startFrameLoop();
@@ -353,6 +382,35 @@ public final class PilotServer implements AutoCloseable {
         return app != null;
     }
 
+    private void drop(WsContext ctx) {
+        clients.remove(ctx);
+        input.releaseHeldBy(ctx.session);
+    }
+
+    private SendQueue.Link linkTo(WsContext ctx) {
+        return new SendQueue.Link() {
+            @Override
+            public void text(String text, WriteCallback done) {
+                ctx.session.getRemote().sendString(text, done);
+            }
+
+            @Override
+            public void binary(ByteBuffer bytes, WriteCallback done) {
+                ctx.session.getRemote().sendBytes(bytes, done);
+            }
+
+            @Override
+            public void giveUp() {
+                drop(ctx);
+                try {
+                    ctx.closeSession();
+                } catch (Exception ignored) {
+                    // Already gone.
+                }
+            }
+        };
+    }
+
     // --- Auth ---
 
     private boolean authorized(WsContext ctx) {
@@ -406,12 +464,20 @@ public final class PilotServer implements AutoCloseable {
         switch (cmd) {
             case START -> Platform.runLater(runs::start);
             case STOP -> Platform.runLater(runs::stop);
-            case PAUSE -> { control.pause(); refreshPausedState(); }
-            case RESUME -> { control.resume(); refreshPausedState(); }
-            case INTERACT -> client.interact.set(node.path("on").asBoolean(false));
+            case PAUSE -> { control.pause().ifPresent(why -> notice(client, why)); refreshPausedState(); }
+            case RESUME -> { control.resume().ifPresent(why -> notice(client, why)); refreshPausedState(); }
+            case INTERACT -> {
+                boolean on = node.path("on").asBoolean(false);
+                client.interact.set(on);
+                if (!on) input.releaseHeldBy(ctx.session);
+            }
             case INPUT -> handleInput(client, ctx, node);
-            case HELLO -> handleHello(client, ctx, node);
+            case HELLO -> handleHello(client, node);
         }
+    }
+
+    private static void notice(Client client, String text) {
+        client.out.text(TelemetrySerializer.noticeJson(text));
     }
 
     /**
@@ -423,20 +489,21 @@ public final class PilotServer implements AutoCloseable {
      * decoder throws — a hardware decoder can refuse a stream it advertised support for, and the only honest
      * recovery is to stop being an H.264 client. Re-sending hello with an empty {@code accept} is that.
      */
-    private void handleHello(Client client, WsContext ctx, JsonNode node) {
+    private void handleHello(Client client, JsonNode node) {
         boolean wantsH264 = false;
         for (JsonNode codec : node.path("accept")) {
             wantsH264 |= "h264".equals(codec.asText(null));
         }
         client.h264 = wantsH264;
         client.decoding.set(false);
+        client.lastFrame = null; // a phone that gave up on its decoder needs the picture again, changed or not
         if (!wantsH264) {
             return;
         }
         // A client that joins a running stream is told about it now rather than at the next route change,
         // which on a stable session would be never.
         if (video.live()) {
-            sendVideoStart(ctx);
+            sendVideoStart(client);
         }
     }
 
@@ -458,19 +525,37 @@ public final class PilotServer implements AutoCloseable {
         if (kind == PilotInputService.Kind.KEY || kind == PilotInputService.Kind.TEXT) {
             PilotInputService.Typed typed = input.type(lastRoute, kind, node.path("key").asText(""),
                     node.path("text").asText(""), lastBounds);
-            if (typed != PilotInputService.Typed.SENT && ctx.session.isOpen()) {
-                ctx.send(TelemetrySerializer.noticeJson(typed.notice()));
-            }
+            if (typed != PilotInputService.Typed.SENT) notice(client, typed.notice());
             return;
         }
-        input.apply(lastRoute, kind, node.path("x").asInt(), node.path("y").asInt(),
+        boolean landsOnThePointer = kind == PilotInputService.Kind.TAP || kind == PilotInputService.Kind.DOWN
+                || kind == PilotInputService.Kind.SCROLL;
+        if (landsOnThePointer && !input.bringForward(lastRoute, lastWindow, lastBounds)) {
+            if (kind == PilotInputService.Kind.DOWN) input.cancelGesture(ctx.session);
+            notice(client, COVERED_NOTICE);
+            return;
+        }
+        input.apply(ctx.session, lastRoute, kind, node.path("x").asInt(), node.path("y").asInt(),
                 node.path("button").asInt(1), node.path("amount").asInt(0), lastBounds);
     }
 
-    /** After a pause/resume, reflect it in run-state (only meaningful while a run is active). */
+    /**
+     * Brings the run-state in line with whether the run is paused, here or in the host (only meaningful while a
+     * run is active).
+     */
     private void refreshPausedState() {
-        if (runState == RunState.STOPPED) return;
-        setRunState(control.isPaused() ? RunState.PAUSED : RunState.RUNNING);
+        synchronized (runStateLock) {
+            if (runState == RunState.STOPPED) return;
+            RunState now = control.isPaused() ? RunState.PAUSED : RunState.RUNNING;
+            if (now != runState) setRunState(now);
+        }
+    }
+
+    /** The host announces no pause, so it is asked about once a second while somebody watches. */
+    private void followHostPause() {
+        if (clients.isEmpty() || ++ticksSincePauseCheck < FRAME_FPS) return;
+        ticksSincePauseCheck = 0;
+        refreshPausedState();
     }
 
     // --- Telemetry + state fan-out (text messages) ---
@@ -527,8 +612,10 @@ public final class PilotServer implements AutoCloseable {
     }
 
     private void setRunState(RunState state) {
-        runState = state;
-        broadcastText(stateJson());
+        synchronized (runStateLock) {
+            runState = state;
+            broadcastText(stateJson());
+        }
     }
 
     /** Built by {@link TelemetrySerializer}, which owns every text message that leaves here. */
@@ -568,6 +655,8 @@ public final class PilotServer implements AutoCloseable {
                     "The emulator stopped answering over ADB — check that the instance is still running.";
             case PilotRoute.Desktop ignored -> capture.whyNothing();
         };
+        // A phone may blank its picture on the reason, so the frame that comes back is sent even if unchanged.
+        clients.values().forEach(c -> c.lastFrame = null);
         broadcastText(stateJson());
     }
 
@@ -580,6 +669,7 @@ public final class PilotServer implements AutoCloseable {
         if (lastBounds == null) return;
         if (!(lastRoute instanceof PilotRoute.Desktop) && lastRoute.getClass().equals(asked.getClass())) return;
         lastBounds = null;
+        lastWindow = null;
         input.releaseHeld();
     }
 
@@ -618,13 +708,7 @@ public final class PilotServer implements AutoCloseable {
     }
 
     private void broadcastText(String text) {
-        for (WsContext ctx : clients.keySet()) {
-            try {
-                ctx.send(text);
-            } catch (Exception e) {
-                clients.remove(ctx);
-            }
-        }
+        for (Client client : clients.values()) client.out.text(text);
     }
 
     // --- H.264 (the fast path, when both ends can take it) ---
@@ -653,6 +737,7 @@ public final class PilotServer implements AutoCloseable {
         // gesture is clamped to the surface the client was shown and replayed on the route that produced it.
         Rectangle surface = video.rect();
         lastRoute = asked;
+        lastWindow = null;
         lastBounds = new PilotInputService.Bounds(surface.x, surface.y, surface.width, surface.height);
         clearEmptyReport();
         logSurface(asked, surface.x, surface.y, surface.width, surface.height);
@@ -665,35 +750,28 @@ public final class PilotServer implements AutoCloseable {
 
     /** Tells the H.264 clients that a stream started (with its codec and rect) or ended. */
     private void announceVideo(boolean started) {
-        for (Map.Entry<WsContext, Client> e : clients.entrySet()) {
-            if (!e.getValue().h264) continue;
-            e.getValue().decoding.set(false);
+        for (Client client : clients.values()) {
+            if (!client.h264) continue;
+            client.decoding.set(false);
+            client.lastFrame = null;
             if (started) {
-                sendVideoStart(e.getKey());
+                sendVideoStart(client);
             } else {
-                try {
-                    e.getKey().send(TelemetrySerializer.videoStoppedJson());
-                } catch (Exception gone) {
-                    clients.remove(e.getKey());
-                }
+                client.out.text(TelemetrySerializer.videoStoppedJson());
             }
         }
     }
 
-    private void sendVideoStart(WsContext ctx) {
+    private void sendVideoStart(Client client) {
         Rectangle r = video.rect();
-        try {
-            ctx.send(TelemetrySerializer.videoJson(video.codec(), r.x, r.y, r.width, r.height));
-        } catch (Exception gone) {
-            clients.remove(ctx);
-        }
+        client.out.text(TelemetrySerializer.videoJson(video.codec(), r.x, r.y, r.width, r.height));
     }
 
     /**
-     * One encoded picture, on the encoder's reader thread. Sent to each H.264 client that has an entry point,
-     * with the same in-flight backpressure the JPEG path uses — and one extra consequence: a dropped picture
-     * puts that client back to waiting for a keyframe, because a decoder handed a picture whose reference never
-     * arrived produces garbage indefinitely rather than one bad frame.
+     * One encoded picture, on the encoder's reader thread. Queued for each H.264 client that has an entry point,
+     * up to {@link #H264_QUEUE} pictures behind — and past that a dropped picture puts that client back to
+     * waiting for a keyframe, because a decoder handed a picture whose reference never arrived produces garbage
+     * indefinitely rather than one bad frame.
      */
     private void onVideoPacket(VideoPacket packet) {
         if (clients.isEmpty()) return;
@@ -701,28 +779,12 @@ public final class PilotServer implements AutoCloseable {
         payload[0] = packet.keyframe() ? BINARY_H264_KEY : BINARY_H264;
         System.arraycopy(packet.annexB(), 0, payload, 1, packet.annexB().length);
 
-        for (Map.Entry<WsContext, Client> e : clients.entrySet()) {
-            WsContext ctx = e.getKey();
-            Client client = e.getValue();
+        for (Client client : clients.values()) {
             if (!client.h264) continue;
             // A client that has not been given a decodable entry point yet waits for the next keyframe; the
             // encoder's GOP is what bounds that wait.
             if (!client.decoding.get() && !packet.keyframe()) continue;
-            AtomicBoolean inFlight = client.frameInFlight;
-            if (!inFlight.compareAndSet(false, true)) {
-                client.decoding.set(false);
-                continue;
-            }
-            client.decoding.set(true);
-            try {
-                ctx.session.getRemote().sendBytes(ByteBuffer.wrap(payload), new WriteCallback() {
-                    @Override public void writeSuccess() { inFlight.set(false); }
-                    @Override public void writeFailed(Throwable x) { inFlight.set(false); clients.remove(ctx); }
-                });
-            } catch (Exception ex) {
-                inFlight.set(false);
-                clients.remove(ctx);
-            }
+            client.decoding.set(client.out.frame(payload, H264_QUEUE));
         }
     }
 
@@ -752,6 +814,8 @@ public final class PilotServer implements AutoCloseable {
     private void tick() {
         long started = System.nanoTime();
         try {
+            input.releaseStale();
+            followHostPause();
             pushFrame();
         } catch (Throwable ex) {
             // A frame that threw must not silently end the loop — that is a pilot that goes dark forever.
@@ -797,6 +861,7 @@ public final class PilotServer implements AutoCloseable {
         PilotRoute route = resolved.route();
         boolean routeChanged = lastRoute == null || !lastRoute.getClass().equals(route.getClass());
         lastRoute = route;
+        lastWindow = cap.window();
         lastBounds = new PilotInputService.Bounds(cap.sx(), cap.sy(), cap.sw(), cap.sh());
         if (routeChanged) broadcastText(stateJson());
 
@@ -805,25 +870,14 @@ public final class PilotServer implements AutoCloseable {
                 .putInt(cap.sx()).putInt(cap.sy()).putInt(cap.sw()).putInt(cap.sh())
                 .put(jpeg);
 
-        for (Map.Entry<WsContext, Client> e : clients.entrySet()) {
-            WsContext ctx = e.getKey();
-            Client client = e.getValue();
+        for (Client client : clients.values()) {
             // A client being fed H.264 must not also be fed JPEG: it would draw the two interleaved, at two
             // different latencies, which looks exactly like a stutter in the video.
             if (client.h264 && video.live()) continue;
-            AtomicBoolean inFlight = client.frameInFlight;
-            // Drop this frame for any client still flushing the previous one — keeps real-time feel and
-            // stops one slow client from stalling the whole loop.
-            if (!inFlight.compareAndSet(false, true)) continue;
-            try {
-                ctx.session.getRemote().sendBytes(ByteBuffer.wrap(payload), new WriteCallback() {
-                    @Override public void writeSuccess() { inFlight.set(false); }
-                    @Override public void writeFailed(Throwable x) { inFlight.set(false); clients.remove(ctx); }
-                });
-            } catch (Exception ex) {
-                inFlight.set(false);
-                clients.remove(ctx);
-            }
+            if (Arrays.equals(payload, client.lastFrame)) continue;
+            // One frame at a time: a client still flushing the previous one skips this one — keeps the
+            // real-time feel on a slow link.
+            if (client.out.frame(payload, 1)) client.lastFrame = payload;
         }
     }
 }

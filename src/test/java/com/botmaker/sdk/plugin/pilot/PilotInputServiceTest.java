@@ -3,12 +3,15 @@
 
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
 import com.botmaker.session.Capability;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Rectangle;
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -244,6 +247,96 @@ class PilotInputServiceTest {
         assertEquals(java.util.List.of("move 10,10", "button 1 true", "button 1 false", "move 7,9"),
                 hostNc.calls, "the :0 button is released before the session takes over");
         assertEquals(java.util.List.of("move 40,40"), sessionNc.calls);
+    }
+
+    @Test
+    void aHeldButtonBelongsToTheClientThatPressedIt() {
+        PilotFakes.RecordingController nc = new PilotFakes.RecordingController();
+        PilotRoute route = sessionRoute(nc);
+        PilotInputService input = new PilotInputService();
+
+        assertTrue(input.apply("a", route, PilotInputService.Kind.DOWN, 10, 10, 1, 0, BOUNDS));
+        assertFalse(input.apply("b", route, PilotInputService.Kind.UP, 20, 20, 1, 0, BOUNDS));
+        assertFalse(input.apply("b", route, PilotInputService.Kind.TAP, 20, 20, 1, 0, BOUNDS));
+        assertFalse(input.apply("a", route, PilotInputService.Kind.DOWN, 20, 20, 1, 0, BOUNDS), "a second press");
+        input.releaseHeldBy("b");
+        assertEquals(java.util.List.of("move 10,10", "button 1 true"), nc.calls);
+
+        input.releaseHeldBy("a");
+        assertEquals("button 1 false", nc.calls.get(2));
+    }
+
+    @Test
+    void aButtonNothingReleasesIsLetGoAfterTheHoldLimit() {
+        PilotFakes.RecordingController nc = new PilotFakes.RecordingController();
+        AtomicLong now = new AtomicLong();
+        PilotInputService input = new PilotInputService(now::get);
+
+        input.apply(sessionRoute(nc), PilotInputService.Kind.DOWN, 10, 10, 1, 0, BOUNDS);
+        now.set(PilotInputService.HOLD_LIMIT_MS);
+        input.releaseStale();
+        assertEquals(2, nc.calls.size(), "still within the limit");
+
+        now.set(PilotInputService.HOLD_LIMIT_MS + 1);
+        input.releaseStale();
+        assertEquals("button 1 false", nc.calls.get(2));
+
+        assertFalse(input.apply(sessionRoute(nc), PilotInputService.Kind.UP, 50, 50, 1, 0, BOUNDS),
+                "the release of a drag already let go");
+        assertEquals(3, nc.calls.size());
+    }
+
+    /** B's press was refused while A held, so B's release must not tap once A has lifted. */
+    @Test
+    void theReleaseOfARefusedPressDoesNothing() {
+        PilotFakes.RecordingSurface surface = new PilotFakes.RecordingSurface(null);
+        PilotRoute route = new PilotRoute.Emulator(surface);
+        PilotInputService input = new PilotInputService();
+
+        input.apply("a", route, PilotInputService.Kind.DOWN, 10, 10, 1, 0, BOUNDS);
+        input.apply("b", route, PilotInputService.Kind.DOWN, 20, 20, 1, 0, BOUNDS);
+        input.apply("a", route, PilotInputService.Kind.UP, 10, 10, 1, 0, BOUNDS);
+
+        assertFalse(input.apply("b", route, PilotInputService.Kind.UP, 20, 20, 1, 0, BOUNDS));
+        assertEquals(java.util.List.of("drag 10,10->10,10"), surface.calls);
+    }
+
+    @Test
+    void theClientsButtonAndScrollAmountAreClamped() {
+        PilotFakes.RecordingController nc = new PilotFakes.RecordingController();
+        PilotRoute route = sessionRoute(nc);
+        PilotInputService input = new PilotInputService();
+
+        input.apply(route, PilotInputService.Kind.SCROLL, 10, 10, 1, Integer.MIN_VALUE, BOUNDS);
+        input.apply(route, PilotInputService.Kind.TAP, 10, 10, 99, 0, BOUNDS);
+
+        assertEquals("scroll -" + PilotInputService.MAX_SCROLL, nc.calls.get(1));
+        assertTrue(nc.calls.contains("button 1 true"), nc.calls.toString());
+    }
+
+    @Test
+    void askingAboutBackgroundInputDoesNotSwitchTheDesktopToRealInput() {
+        PilotFakes.RecordingController hostNc = new PilotFakes.RecordingController();
+        NativeControllerFactory.setForTesting(hostNc);
+
+        assertFalse(new PilotInputService().supportsBackgroundInput(PilotRoute.DESKTOP));
+        assertFalse(hostNc.reliableCalled);
+    }
+
+    /** A gesture on a covered window raises it first, and is refused when it stays covered. */
+    @Test
+    void aCoveredWindowThatCannotBeRaisedTakesNoGesture() {
+        PilotFakes.RecordingController hostNc = new PilotFakes.RecordingController();
+        NativeControllerFactory.setForTesting(hostNc);
+        PilotInputService input = new PilotInputService();
+        GenericWindow game = new GenericWindow(1L, "Game", new Rectangle(0, 0, 800, 600));
+
+        hostNc.foreground = new GenericWindow(2L, "Terminal", new Rectangle(0, 0, 800, 600));
+        assertFalse(input.bringForward(PilotRoute.DESKTOP, game, BOUNDS));
+
+        hostNc.foreground = game;
+        assertTrue(input.bringForward(PilotRoute.DESKTOP, game, BOUNDS));
+        assertTrue(input.bringForward(PilotRoute.DESKTOP, null, BOUNDS), "a whole-screen frame has nothing to raise");
     }
 
     // --- The emulator route: Android has no pointer, so the gesture shapes differ ---

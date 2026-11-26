@@ -53,8 +53,15 @@ public final class TargetCapture {
      * encodes its own preview in the process that holds the display (see {@link Resolved#jpeg()}), and decoding
      * it here purely to satisfy this field would reinstate the codec pass that change removed. The rect is the
      * half that every consumer needs, and it is present either way.
+     *
+     * <p>{@code window} is set when the frame is one window on {@code :0}, so a gesture can be kept off whatever
+     * covers it; {@code null} for every other surface.
      */
-    public record Capture(BufferedImage img, int sx, int sy, int sw, int sh) {}
+    public record Capture(BufferedImage img, int sx, int sy, int sw, int sh, GenericWindow window) {
+        public Capture(BufferedImage img, int sx, int sy, int sw, int sh) {
+            this(img, sx, sy, sw, sh, null);
+        }
+    }
 
     /**
      * A frame together with <b>the route it was actually taken on</b> — the two halves of one fact, returned as
@@ -292,7 +299,7 @@ public final class TargetCapture {
             BufferedImage img = NativeControllerFactory.get().captureWindow(win); // no focus — non-intrusive
             if (img == null) return null;
             Rectangle b = win.getRect();
-            return new Capture(img, b.x, b.y, b.width, b.height);
+            return new Capture(img, b.x, b.y, b.width, b.height, win);
         } catch (Throwable ex) {
             return null;
         }

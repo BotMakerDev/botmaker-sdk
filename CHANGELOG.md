@@ -242,6 +242,12 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   Studio exits, and one left by a crash is turned off at the next start.
 - Cancelling Remote Pilot while it starts, or leaving the project, now closes the server and the tunnel
   (2026-11-26). A quick tunnel that stops by itself is reported. The status line no longer shows the pairing token.
+- Remote Pilot's touch input (2026-11-26): a drag belongs to the phone that started it and is released when that
+  phone leaves, turns Interact off or goes quiet for 30 s; a second press is ignored. A tap on a covered game
+  window raises it first, and says so when it cannot. Watching no longer switches the computer to real-cursor input.
+- Remote Pilot's stream (2026-11-26): one stalled phone no longer holds up the others, an unchanged picture is not
+  sent again, a stopped emulator is not searched for on every frame, and H.264 keeps up better on a slow link. The
+  phone sees a run that was already going or paused, and why a pause failed.
 - The Game window's Android apps tab tells two products' instances of one name apart (2026-11-26): a device is
   known by its product and ADB address, no longer by its name alone.
 - The Game window's Android apps tab no longer stays on "Looking for Android devices…" (2026-11-26): it lists the
