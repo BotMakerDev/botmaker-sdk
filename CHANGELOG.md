@@ -31,6 +31,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   phones) and Apply, and no Start, Stop, Configure, rename, delete or clone. Start and Stop on several leave the
   phones out. The Configurations tab titles a phone's column by its name and shows its settings as `—`, not
   editable.
+- **Accounts on a phone** (2026-11-26): the Accounts tab has a column per phone, ticked like any instance's, and
+  Apply signs a connected phone in and out with the same sign-in bot, on the phone's own ADB address; a phone not
+  connected fails its item with "Connect … first". The assistant's `setup` `configuration` says a phone as one: its
+  name and connection, "every phone's" for what the phones' shared layer wants, and "not connected" in place of
+  stopped.
 - **Point at the game's window** (2026-11-26): *⌖ Point at the game's window*, on the Choose capture source window's
   Automatic tab and in *Which window is the game?*, hides Studio while you click the game's window (Esc cancels),
   then shows what you clicked to keep. Studio's own window is refused, a launcher's or an untitled one warned. KDE,

@@ -182,6 +182,11 @@ public final class EmulatorsModel {
             return key.platform() == PlatformId.PHYSICAL;
         }
 
+        /** A phone's connection as the Instances tab says it: "connected · USB", "connected · Wi-Fi", "not connected". */
+        public String connection() {
+            return InspectorModel.phoneState(this);
+        }
+
         public boolean differs() {
             return diff != null && diff.differs();
         }
@@ -212,7 +217,7 @@ public final class EmulatorsModel {
         public String said() {
             List<String> names = accounts();
             return "Instance " + instance.name() + " (" + key.platform().displayName() + "): "
-                    + (phone() ? InspectorModel.phoneState(this)
+                    + (phone() ? connection()
                             : facts == null ? "not read" : running ? "running" : "stopped")
                     + " · " + (names.isEmpty() ? "no account" : count(names.size(), "account") + " "
                     + String.join(", ", names))

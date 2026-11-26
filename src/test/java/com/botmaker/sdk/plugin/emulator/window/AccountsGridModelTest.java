@@ -4,6 +4,7 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -144,6 +145,29 @@ class AccountsGridModelTest {
         List<ApplyPlan.Item> mainOnly = AccountsGridModel.toApply(rows, List.of(MAIN));
         assertEquals(1, AccountsGridModel.applyCount(mainOnly), "Farm's row is not shown: its sign-in waits");
         assertEquals("Nothing to apply", AccountsGridModel.pending(List.of()).said());
+    }
+
+    @Test
+    void aPhoneColumnTicksLikeAnInstanceAndItsSignInIsPending() {
+        EmulatorInstance pixel = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 10",
+                new AdbEndpoint.Server("4A1B2C3D"));
+        InstanceKey pixelKey = InstanceKey.of(pixel);
+        List<EmulatorsModel.InstanceRow> shown = List.of(row(CONFIG, LD, null), row(CONFIG, pixel, Set.of()));
+        assertEquals(List.of(LD_KEY, pixelKey), AccountsGridModel.columns(shown, AccountsGridModel.Filter.NONE)
+                .stream().map(EmulatorsModel.InstanceRow::key).toList());
+        assertEquals(List.of(pixelKey), AccountsGridModel.columns(shown,
+                new AccountsGridModel.Filter(PlatformId.PHYSICAL, "", null)).stream()
+                .map(EmulatorsModel.InstanceRow::key).toList(), "Accounts… on a phone shows the phones");
+
+        EmulatorConfig ticked = AccountsGridModel.tick(CONFIG, pixelKey, ALT, true, Optional.of(Set.of()));
+        EmulatorsModel.InstanceRow phone = row(ticked, pixel, Set.of());
+        assertEquals(AccountsGridModel.Cell.TO_SIGN_IN, AccountsGridModel.cell(ticked, phone, ALT));
+        List<ApplyPlan.Item> items = AccountsGridModel.toApply(List.of(phone), List.of(ALT));
+        assertEquals(new AccountsGridModel.Pending(1, 0, 0, 1), AccountsGridModel.pending(items));
+
+        EmulatorsModel.InstanceRow unplugged = row(ticked, pixel, null);
+        assertEquals(AccountsGridModel.Cell.NOT_READ, AccountsGridModel.cell(ticked, unplugged, ALT),
+                "a phone not connected keeps its tick, unread");
     }
 
     @Test

@@ -36,8 +36,10 @@ final class ConfigurationSaid {
 
     static String said(EmulatorsModel.InstanceRow row) {
         List<String> lines = new ArrayList<>();
-        lines.add("\"" + row.instance().reference() + "\" — " + row.key().platform().displayName()
-                + (row.facts() == null ? "" : row.running() ? ", running" : ", stopped") + ". " + verdict(row));
+        String what = row.phone() ? "the phone " + row.instance().name() + ", " + row.connection()
+                : row.key().platform().displayName()
+                + (row.facts() == null ? "" : row.running() ? ", running" : ", stopped");
+        lines.add("\"" + row.instance().reference() + "\" — " + what + ". " + verdict(row));
         ConfigDiff diff = row.diff();
         if (!row.wanted().fields().isEmpty()) {
             lines.add("Settings (wanted, from, now):");
@@ -46,7 +48,7 @@ final class ConfigurationSaid {
                         .filter(one -> one.field() == field).findFirst();
                 String now = state.flatMap(ConfigDiff.FieldState::now)
                         .map(read -> read.value().said() + " (" + origin(read) + ")").orElse("not read");
-                lines.add("• " + field.displayName() + ": " + wanted.value().said() + ", " + from(wanted) + ", now "
+                lines.add("• " + field.displayName() + ": " + wanted.value().said() + ", " + from(row, wanted) + ", now "
                         + now + state.map(one -> " — " + one.status().displayName()).orElse(""));
             });
         }
@@ -60,7 +62,7 @@ final class ConfigurationSaid {
                                 : "not signed in").orElse("not read");
                 boolean first = account.kind() == AccountRecord.Kind.GOOGLE && row.wanted().defaultGoogle().filter(account.name()::equalsIgnoreCase).isPresent();
                 lines.add("• " + account.kind().displayName() + " " + account.name() + (first ? " (offered first)" : "")
-                        + ", " + from(wanted) + " — " + state);
+                        + ", " + from(row, wanted) + " — " + state);
             }
         }
         List<ConfigDiff.AccountChange> removals = diff == null ? List.of() : diff.accounts().stream()
@@ -71,16 +73,17 @@ final class ConfigurationSaid {
                     + change.account().name() + (diff.accountsRead() ? " — signed in" : " —" + diff.signOutCondition())));
         }
         // with no facts, whether it runs was not read either
-        boolean stopped = row.facts() != null && !row.running();
+        boolean stopped = (row.facts() != null || row.phone()) && !row.running();
+        String why = row.phone() ? ", it is not connected." : ", it is stopped.";
         lines.add(held.map(emails -> emails.isEmpty() ? "Signed in to Google now: no account."
                 : "Signed in to Google now: " + String.join(", ", emails) + ".")
-                .orElse("Signed in to Google now: not read" + (stopped ? ", it is stopped." : ".")));
+                .orElse("Signed in to Google now: not read" + (stopped ? why : ".")));
         Optional<Set<String>> installed = android(row).flatMap(AndroidState::packages);
         if (!row.wanted().games().isEmpty()) {
             lines.add("Games wanted:");
             for (Sourced<GameRecord> wanted : row.wanted().games()) {
                 GameRecord game = wanted.value();
-                lines.add("• " + game.label() + " (" + game.packageName() + "), " + from(wanted) + " — "
+                lines.add("• " + game.label() + " (" + game.packageName() + "), " + from(row, wanted) + " — "
                         + installed.map(packages -> packages.contains(game.packageName()) ? "installed"
                                 : "not installed").orElse("not read"));
             }
@@ -91,9 +94,13 @@ final class ConfigurationSaid {
     }
 
     private static String verdict(EmulatorsModel.InstanceRow row) {
-        if (row.facts() == null) return "What it has now could not be read.";
         boolean nothing = row.wanted().fields().isEmpty() && row.wanted().accounts().isEmpty()
                 && row.wanted().games().isEmpty();
+        if (row.phone() && !row.running()) {
+            return nothing ? "Connect it to read what it has; its configuration sets nothing."
+                    : "Connect it to read what it has; Apply, in the Emulators window, signs it in once it is.";
+        }
+        if (row.facts() == null) return "What it has now could not be read.";
         if (nothing) return "Its configuration sets nothing.";
         if (!row.differs()) return "It is as configured, as far as it was read.";
         return row.applicable() ? "It differs: Apply, in the Emulators window, would change " + row.changes() + "."
@@ -106,6 +113,11 @@ final class ConfigurationSaid {
 
     private static String from(Sourced<?> wanted) {
         return wanted.source() == Sourced.Source.INSTANCE ? "its own" : "its emulator's";
+    }
+
+    /** Where a wanted value of {@code row} comes from: a phone's shared layer is every phone's. */
+    private static String from(EmulatorsModel.InstanceRow row, Sourced<?> wanted) {
+        return row.phone() && wanted.source() != Sourced.Source.INSTANCE ? "every phone's" : from(wanted);
     }
 
     private static String origin(InstanceFacts.Read read) {

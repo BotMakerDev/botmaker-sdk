@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
@@ -35,6 +36,10 @@ class ConfigurationSaidTest {
     private static final EmulatorInstance FARM = new EmulatorInstance(PlatformId.LDPLAYER, "Farm", "127.0.0.1", 5555);
     private static final EmulatorInstance TEST = new EmulatorInstance(PlatformId.LDPLAYER, "test", "127.0.0.1", 5557);
     private static final EmulatorInstance MUMU = new EmulatorInstance(PlatformId.MUMU, "Farm", "127.0.0.1", 16384);
+    private static final EmulatorInstance PIXEL = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 10",
+            new AdbEndpoint.Server("4A1B2C3D"));
+    private static final EmulatorInstance UNPLUGGED = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 9",
+            new AdbEndpoint.Server("9Z8Y7X6W"));
     private static final ConfigValue.Screen TALL = new ConfigValue.Screen(1080, 1920, 320);
     private static final ConfigValue.Screen WIDE = new ConfigValue.Screen(1600, 900, 240);
 
@@ -47,7 +52,7 @@ class ConfigurationSaidTest {
 
         @Override
         public Platforms.DiscoveryReport discover() {
-            return new Platforms.DiscoveryReport(List.of(TEST, MUMU, FARM), List.of());
+            return new Platforms.DiscoveryReport(List.of(TEST, MUMU, FARM, PIXEL, UNPLUGGED), List.of());
         }
 
         @Override
@@ -57,19 +62,26 @@ class ConfigurationSaidTest {
                             .withGame(new GameRecord("com.zjcs.android.us", "Sword x Staff")))
                     .withInstance(InstanceKey.of(FARM), Layer.EMPTY.withTags(List.of("farm"))
                             .withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "User@example.com"))
-                            .withAccount(new AccountRecord(AccountRecord.Kind.FACEBOOK, "farm one")));
+                            .withAccount(new AccountRecord(AccountRecord.Kind.FACEBOOK, "farm one")))
+                    .withEmulator(PlatformId.PHYSICAL, Layer.EMPTY
+                            .withAccount(new AccountRecord(AccountRecord.Kind.GOOGLE, "phone@example.com")));
             return new HostConfig.State(config, Map.of(InstanceKey.of(FARM), List.of("SwordXStaff")));
         }
 
         @Override
         public boolean running(EmulatorInstance instance) {
-            return !instance.equals(TEST);
+            return !instance.equals(TEST) && !instance.equals(UNPLUGGED);
         }
 
         @Override
         public InstanceFacts facts(EmulatorInstance instance, InstanceFacts last) {
             read++;
             if (instance.equals(MUMU)) throw new IllegalStateException("its console did not answer");
+            if (instance.platformId() == PlatformId.PHYSICAL) {
+                Optional<AndroidState> phone = instance.equals(PIXEL) ? Optional.of(new AndroidState(Map.of(),
+                        Optional.of(Set.of()), Optional.of(Set.of()), "16", false, Instant.EPOCH)) : Optional.empty();
+                return new InstanceFacts(InstanceKey.of(instance), Map.of(), Instant.EPOCH, phone, phone.isPresent());
+            }
             Optional<AndroidState> android = instance.equals(FARM) ? Optional.of(new AndroidState(Map.of(),
                     Optional.of(Set.of("other@example.com")), Optional.of(Set.of("com.other.app")), "14", false,
                     Instant.EPOCH)) : Optional.empty();
@@ -113,6 +125,22 @@ class ConfigurationSaidTest {
         assertTrue(said.contains("Signed in to Google now: not read, it is stopped."), said);
         assertTrue(said.contains("its emulator's — not read"), said);
         assertFalse(said.contains("Accounts wanted"), said);
+    }
+
+    @Test
+    void aPhoneIsSaidAsAPhone() {
+        String pixel = said("4A1B2C3D");
+        assertTrue(pixel.startsWith("\"4A1B2C3D\" — the phone Pixel 10, connected · USB. It differs: Apply, in the "
+                + "Emulators window, would change 1."), pixel);
+        assertTrue(pixel.contains("• Google phone@example.com (offered first), every phone's — not signed in"), pixel);
+        assertTrue(pixel.contains("Signed in to Google now: no account."), pixel);
+        assertFalse(pixel.contains("Settings"), pixel);
+
+        String unplugged = said("9Z8Y7X6W");
+        assertTrue(unplugged.startsWith("\"9Z8Y7X6W\" — the phone Pixel 9, not connected. Connect it to read what it "
+                + "has; Apply, in the Emulators window, signs it in once it is."), unplugged);
+        assertTrue(unplugged.contains("Signed in to Google now: not read, it is not connected."), unplugged);
+        assertFalse(unplugged.contains("by hand"), unplugged);
     }
 
     @Test
