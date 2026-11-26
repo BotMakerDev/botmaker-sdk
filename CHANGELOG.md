@@ -22,7 +22,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The SDK names what Remote Pilot shows of a run (`views(SdkViews.class)`): the bot's game window, emulator instance,
   monitor or the desktop, and why there is nothing ("The window “Firestone” is not open on the computer."). The first
   step of moving the pilot into botmaker-core; nothing changes for a bot. Its view also turns a telemetry frame into
-  the message the phone draws (`RunView.overlay`).
+  the message the phone draws (`RunView.overlay`). An emulator's address is looked up every 10 s, every 2 s while
+  it is not found, not each time the host asks.
 - The page a browser gets from Remote Pilot is the one a botmaker-pilot release attaches (`web.zip`), pinned in
   this module's pom, instead of a copy rebuilt by hand. The old copy still ships until the first pin.
 - The SDK's pom names `botmaker-plugin-parent`, as every plugin's does. A bot gets the same dependencies; the

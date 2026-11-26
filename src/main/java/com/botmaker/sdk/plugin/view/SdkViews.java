@@ -13,7 +13,7 @@ import com.botmaker.shared.emulator.EmulatorInstances;
 
 import java.util.Optional;
 
-/** What the host's Remote Pilot shows of the bot's runs: {@link SdkRunView}, one for each run. */
+/** What the host's Remote Pilot shows of the bot's runs: a new {@link SdkRunView} each time the host asks. */
 public final class SdkViews implements RunViewHolder {
 
     @Override
@@ -27,7 +27,7 @@ public final class SdkViews implements RunViewHolder {
                         return Optional.empty();
                     }
                 },
-                name -> EmulatorInstances.find(name).map(EmulatorInstance::endpoint)));
+                new EmulatorSerials(name -> EmulatorInstances.find(name).map(EmulatorInstance::endpoint))));
     }
 
     /** The open window as the host names it: its native handle, which the host finds it by, and its title now. */
