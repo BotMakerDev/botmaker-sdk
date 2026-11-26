@@ -34,8 +34,9 @@
   again, its dialogs owned by the Screens window. That window is modeless, so a picture's recapture no longer
   hides it. A new picture is cut from the Screens panel, which opens `CaptureTemplates`; ✂ Capture Templates has no
   toolbar button of its own.
-- **The Remote Pilot is this plugin's feature** (`plugin/pilot`, the web client under
-  `src/main/resources/pilot/`): a toolbar button opens it and the plugin's `onProjectClosing` step releases its port and nested
+- **The Remote Pilot is this plugin's feature** (`plugin/pilot`; the web client it serves is botmaker-pilot's,
+  the `web.zip` of the release the pom pins, `pilot.web.version`, over the old copy under
+  `src/main/resources/pilot/` until the first pin): a toolbar button opens it and the plugin's `onProjectClosing` step releases its port and nested
   display. Telemetry crosses as `TelemetryFrame` bytes (`Runs.onTelemetry`), decoded with the shared codec the
   bot encoded it with — **strings and bytes cross the contract, shapes do not**. It needed nothing added to
   `StudioServices`, which is the test for the next feature that wants to move here.

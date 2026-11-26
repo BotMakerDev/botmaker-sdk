@@ -90,6 +90,16 @@
         <tess4j.version>5.19.0</tess4j.version>
         <bytedeco.tesseract.version>5.5.3-1.5.14</bytedeco.tesseract.version>
         <bytedeco.leptonica.version>1.87.0-1.5.14</bytedeco.leptonica.version>
+        <!-- THE PHONE PAGE (2026-11-26): botmaker-pilot's web build, the web.zip its release attaches, pinned
+             here by version and hash. sluice sets both after a pilot release (sluice.yml, asset-pins); never by
+             hand. The parent's pinned-asset step unpacks it over the jar's pilot/ folder. While the hash is
+             empty, the committed copy in src/main/resources/pilot is what ships. -Ppilot builds the sibling
+             checkout's page over either. -->
+        <pilot.web.version></pilot.web.version>
+        <pilot.web.sha256></pilot.web.sha256>
+        <botmaker.asset.url>https://github.com/BotMakerDev/botmaker-pilot/releases/download/v${pilot.web.version}/web.zip</botmaker.asset.url>
+        <botmaker.asset.sha256>${pilot.web.sha256}</botmaker.asset.sha256>
+        <botmaker.asset.into>pilot</botmaker.asset.into>
         <!-- Tests tagged @Tag("slow") start a real browser (internal/web): left out by default, run by
              -Dgroups=slow -Dsurefire.excludedGroups= -->
         <surefire.excludedGroups>slow</surefire.excludedGroups>

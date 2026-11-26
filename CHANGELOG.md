@@ -19,6 +19,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- The page a browser gets from Remote Pilot is the one a botmaker-pilot release attaches (`web.zip`), pinned in
+  this module's pom, instead of a copy rebuilt by hand. The old copy still ships until the first pin.
 - The SDK's pom names `botmaker-plugin-parent`, as every plugin's does. A bot gets the same dependencies; the
   published pom no longer lists the build's own properties.
 - Remote Pilot sends each phone a heartbeat every 5 s, so the app can tell a dead link from a still picture.
