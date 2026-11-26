@@ -5,6 +5,8 @@ package com.botmaker.sdk.plugin.view;
 
 import com.botmaker.plugin.api.run.ViewTarget;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -54,6 +56,19 @@ class SdkRunViewTest {
     void aMonitorAndTheDesktopAreTargetsOfTheirOwn() {
         assertEquals(Optional.of(new ViewTarget.Monitor(1)), of(CaptureSource.monitor(1), NOTHING_OPEN).target());
         assertEquals(Optional.of(new ViewTarget.Desktop()), of(CaptureSource.desktop(), NOTHING_OPEN).target());
+    }
+
+    @Test
+    void aClickFrameBecomesTheMessageThePhoneDrawsAndAnUnreadableOneNothing() {
+        SdkRunView view = of(CaptureSource.desktop(), NOTHING_OPEN);
+        RunEvent click = new RunEvent.Click(new RunEvent.Target(null, 0, 0, 100, 100), 10, 20, 1);
+
+        Optional<String> message = view.overlay(RunFrames.encode(click));
+
+        assertTrue(message.isPresent());
+        assertTrue(message.get().contains("\"Click\""), message.get());
+        assertTrue(view.overlay(new byte[] {9, 9, 9}).isEmpty());
+        assertTrue(view.overlay(null).isEmpty());
     }
 
     @Test

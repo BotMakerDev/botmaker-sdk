@@ -9,6 +9,9 @@ import com.botmaker.plugin.api.run.ViewTarget;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.observe.RunEvent;
+import com.botmaker.sdk.internal.observe.RunFrames;
+import com.botmaker.sdk.plugin.pilot.TelemetrySerializer;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 
@@ -66,6 +69,19 @@ final class SdkRunView implements RunView {
     @Override
     public Optional<String> reason() {
         return seen().reason();
+    }
+
+    /** The frame the bot's agent wrote, as the message the phone draws; empty for a step, which is drawn nowhere. */
+    @Override
+    public Optional<String> overlay(byte[] frame) {
+        if (frame == null || frame.length == 0) return Optional.empty();
+        try {
+            RunEvent event = RunFrames.decode(frame);
+            return event != null && event.drawn() ? Optional.of(TelemetrySerializer.telemetryJson(event))
+                    : Optional.empty();
+        } catch (RunFrames.Unreadable unreadable) {
+            return Optional.empty();
+        }
     }
 
     private Seen seen() {
