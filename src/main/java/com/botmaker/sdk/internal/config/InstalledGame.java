@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.plugin.api.params.Claims;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.bot.GameVm;
 import com.botmaker.sdk.api.bot.LaunchChoice;
@@ -77,7 +78,10 @@ public final class InstalledGame {
                 ? AutoPicks.run().saved(target) : Optional.empty();
         AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR), target, capture,
                 marked(SdkValue.Id.INSTANCE, values), saved, InstalledGame::runningInstances);
-        switch (AutoCapture.decide(inputs)) {
+        AutoCapture.Decision decision = AutoCapture.decide(inputs);
+        // Before the first click: an instance another run plays is refused here, not fought over.
+        PlaceClaims.toClaim(inputs, decision).ifPresent(instance -> PlaceClaims.claim(instance, Claims::claim));
+        switch (decision) {
             case AutoCapture.Decision.Fixed fixed -> {
                 // The game is launched and restarted where the run plays: the dealt instance, not the author's.
                 playsOn = fixed.playsOn();

@@ -22,6 +22,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - The SDK's pom names `botmaker-plugin-parent`, as every plugin's does. A bot gets the same dependencies; the
   published pom no longer lists the build's own properties.
 - Remote Pilot sends each phone a heartbeat every 5 s, so the app can tell a dead link from a still picture.
+- **A run never shares an emulator instance with another run.** A run that was not dealt its instance (▶ Run,
+  `run_bot`) claims the one it plays on before its first click. When a run of several plays there already, it stops
+  with "Pixel 10 is played by another run, or this PC's runs could not be read; stop it, or run on another instance".
+  A run the host names an instance for (the Emulators window's sign-in) claims nothing: the host holds that instance.
 
 ### Added
 
