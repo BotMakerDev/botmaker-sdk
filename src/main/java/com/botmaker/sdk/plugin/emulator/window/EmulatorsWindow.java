@@ -197,6 +197,12 @@ public final class EmulatorsWindow {
         }
     }
 
+    /** A phone's <i>Accounts…</i>: the Accounts tab, filtered to {@code product}'s columns. */
+    void accountsOf(PlatformId product) {
+        tabs.getSelectionModel().select(accountsTab);
+        accounts.showEmulator(product);
+    }
+
     /** This PC's credential store, the one the Applies remember passwords in: it can block, so never asked on FX. */
     public static PasswordStore passwords() {
         return STORE;
@@ -487,7 +493,8 @@ public final class EmulatorsWindow {
 
     /** Starts the stopped rows, asking first when Windows would not have the memory for them all. */
     void start(List<EmulatorsModel.InstanceRow> rows) {
-        List<EmulatorsModel.InstanceRow> stopped = rows.stream().filter(row -> !row.running()).toList();
+        List<EmulatorsModel.InstanceRow> stopped = InspectorModel.startable(rows).stream()
+                .filter(row -> !row.running()).toList();
         Optional<String> tight = RunningModel.Headroom.of(WindowsEmulatorChecks.availableMb(), snapshot)
                 .warning(stopped);
         if (tight.isPresent()) {
@@ -502,7 +509,7 @@ public final class EmulatorsWindow {
     }
 
     void stop(List<EmulatorsModel.InstanceRow> rows) {
-        for (EmulatorsModel.InstanceRow row : rows) {
+        for (EmulatorsModel.InstanceRow row : InspectorModel.startable(rows)) {
             if (!row.running()) continue;
             submit("Stop " + row.instance().name(), row.instance(), context -> ApplyHost.live().stop(row.instance()));
         }

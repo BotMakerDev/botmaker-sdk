@@ -24,8 +24,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 - **Phones in the Emulators window's read** (2026-11-26, spec `2026-11-26-phones-in-emulators-design.md`): a phone
   is an emulator and an instance at once. The window's snapshot has a Phones row (`EmulatorRow.phones()`, its
   configuration `—`, *Running* its phones connected) and a row per phone (`InstanceRow.phone()`), on every OS; the
-  Accounts window lists phones too. A phone takes no setting, and nothing makes, clones, starts or stops one. The
-  tabs draw them in the next change.
+  Accounts window lists phones too. A phone takes no setting, and nothing makes, clones, starts or stops one.
+- **The Emulators and Instances tabs show phones** (2026-11-26): the Phones row's side panel offers *＋ Connect a
+  phone…* in place of Configure and Apply. A phone's instance row says *Phone*, "connected · USB", "connected ·
+  Wi-Fi" or "not connected", and `—` for its configuration; its inspector has *Accounts…* (the Accounts tab on the
+  phones) and Apply, and no Start, Stop, Configure, rename, delete or clone. Start and Stop on several leave the
+  phones out. The Configurations tab titles a phone's column by its name and shows its settings as `—`, not
+  editable.
 - **Point at the game's window** (2026-11-26): *⌖ Point at the game's window*, on the Choose capture source window's
   Automatic tab and in *Which window is the game?*, hides Studio while you click the game's window (Esc cancels),
   then shows what you clicked to keep. Studio's own window is refused, a launcher's or an untitled one warned. KDE,
@@ -225,6 +230,8 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The Game window's Android apps tab tells two products' instances of one name apart (2026-11-26): a device is
+  known by its product and ADB address, no longer by its name alone.
 - The Game window's Android apps tab no longer stays on "Looking for Android devices…" (2026-11-26): it lists the
   devices and the apps last seen on them at once (`AndroidDevices.listed`), then asks each running device for its
   apps in the background (`refreshed`) and shows its tiles again when it answers. Before, every new app's APK was

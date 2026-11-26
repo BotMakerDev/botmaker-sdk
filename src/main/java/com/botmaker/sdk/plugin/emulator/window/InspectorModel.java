@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.plugin.emulator.window;
 
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.config.Apply;
 import com.botmaker.shared.emulator.config.ConfigDiff;
 import com.botmaker.shared.emulator.config.GameRecord;
@@ -52,6 +53,38 @@ final class InspectorModel {
             facts.add(new Fact(column.displayName(), value == null || value.isBlank() ? "Not read" : value));
         }
         return facts;
+    }
+
+    /**
+     * A phone's state as its State cell says it: "connected · USB", "connected · Wi-Fi" (by its ADB address), or "not
+     * connected".
+     */
+    static String phoneState(EmulatorsModel.InstanceRow row) {
+        if (!row.running()) return "not connected";
+        return "connected · " + (overWifi(row.instance().adb()) ? "Wi-Fi" : "USB");
+    }
+
+    /**
+     * Whether ADB reaches the phone over the network: a host and port, or a server serial that is one (an
+     * {@code adb connect} address, or a paired device's mDNS name).
+     */
+    static boolean overWifi(AdbEndpoint adb) {
+        return switch (adb) {
+            case AdbEndpoint.Tcp _ -> true;
+            case AdbEndpoint.Server server -> server.serial().contains(":")
+                    || server.serial().contains("._adb-tls-connect.");
+        };
+    }
+
+    /** The pill of {@code row}'s State: a phone's connection, or an emulator's running, stopped or not read. */
+    static Look.Pill statePill(EmulatorsModel.InstanceRow row) {
+        if (row.phone()) return new Look.Pill(row.running() ? Look.Tone.OK : Look.Tone.MUTED, phoneState(row));
+        return Look.pill(row.running(), row.facts() != null);
+    }
+
+    /** The rows BotMaker may start or stop: every one but the phones, which BotMaker neither starts nor stops. */
+    static List<EmulatorsModel.InstanceRow> startable(List<EmulatorsModel.InstanceRow> rows) {
+        return rows.stream().filter(row -> !row.phone()).toList();
     }
 
     /**

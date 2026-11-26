@@ -29,6 +29,7 @@ import javafx.scene.layout.VBox;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -48,6 +49,11 @@ final class ConfigDialogs {
 
     /** Asks {@code target}'s value of {@code field} and writes the answer: a value set, or its own one dropped. */
     static void editField(EmulatorsWindow window, ConfigViews.Target target, ConfigField field) {
+        if (ConfigViews.phone(target)) {
+            window.say("BotMaker doesn't set a phone's " + field.displayName().toLowerCase(Locale.ROOT)
+                    + ": a phone takes accounts and games only.");
+            return;
+        }
         EmulatorConfig config = window.snapshot().config();
         value(window, target.title(), field, ConfigViews.current(target, config, field),
                 ConfigViews.dropLabel(target, config, field).orElse(null)).ifPresent(choice -> {

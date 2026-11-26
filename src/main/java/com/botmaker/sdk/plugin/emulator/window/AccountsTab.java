@@ -192,6 +192,16 @@ final class AccountsTab {
         if (visible) readBook();
     }
 
+    /** A phone's <i>Accounts…</i>: the grid over {@code product}'s columns only, every account shown. */
+    void showEmulator(PlatformId product) {
+        filling = true;
+        if (emulator.getItems().contains(Optional.of(product))) emulator.setValue(Optional.of(product));
+        tag.setValue(ANY_TAG);
+        filling = false;
+        account = null;
+        draw();
+    }
+
     /** The Accounts window's <i>N instances</i>: this account's row, over every instance, shown in the inspector. */
     void showAccount(AccountRecord.Key key) {
         filling = true;

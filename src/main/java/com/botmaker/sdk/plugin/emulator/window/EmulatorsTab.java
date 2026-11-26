@@ -5,6 +5,7 @@ package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.plugin.api.StyleClasses;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.plugin.emulator.ConnectPhone;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.GameRecord;
@@ -70,7 +71,7 @@ final class EmulatorsTab {
         table.getItems().setAll(snapshot.emulators());
         table.setPlaceholder(new Label("BotMaker found no emulator it knows on this PC."));
         snapshot.emulators().stream().filter(row -> row.platform() == platform).findFirst()
-                .or(() -> snapshot.emulators().stream().filter(EmulatorsModel.EmulatorRow::installed).findFirst())
+                .or(() -> snapshot.emulators().stream().filter(row -> row.installed() && !row.phones()).findFirst())
                 .ifPresent(table.getSelectionModel()::select);
         side(table.getSelectionModel().getSelectedItem());
     }
@@ -86,6 +87,18 @@ final class EmulatorsTab {
                 StyleClasses.DIALOG_SUBHEADING);
         title.setGraphicTextGap(8);
         side.getChildren().add(title);
+        if (row.phones()) {
+            side.getChildren().add(muted("BotMaker doesn't configure a phone. Connect one and it shows as an"
+                    + " instance."));
+            Button connect = new Button("＋ Connect a phone…");
+            connect.setMinWidth(Region.USE_PREF_SIZE);
+            connect.setOnAction(e -> {
+                ConnectPhone.show(window.services(), window.stage());
+                window.refresh();
+            });
+            side.getChildren().add(connect);
+            return;
+        }
         Layer layer = row.layer();
         if (layer.isEmpty()) {
             side.getChildren().add(muted("Nothing is set for this emulator: each instance keeps what it has, but"

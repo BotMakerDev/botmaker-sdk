@@ -15,6 +15,7 @@ import com.botmaker.sdk.plugin.emulator.window.ConfigViews.GridSection;
 import com.botmaker.sdk.plugin.emulator.window.ConfigViews.SettingRow;
 import com.botmaker.sdk.plugin.emulator.window.ConfigViews.Target;
 import com.botmaker.sdk.plugin.emulator.window.ConfigViews.ViewFilter;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.Platforms;
@@ -414,5 +415,28 @@ class ConfigViewsTest {
         assertTrue(ConfigViews.compare(config, FARM_KEY, ALT_KEY).stream()
                 .noneMatch(d -> d.what().equals(ConfigField.ADB_PORT.displayName())), "ports differ by design");
         assertTrue(ConfigViews.settings(LD, config, null).stream().noneMatch(r -> r.field() == ConfigField.ADB_PORT));
+    }
+
+    @Test
+    void aPhoneColumnIsTitledByItsNameAndTakesNoSetting() {
+        EmulatorInstance pixel = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 10", new AdbEndpoint.Server("4A1B2C3D"));
+        InstanceKey key = InstanceKey.of(pixel);
+        EmulatorConfig config = EmulatorConfig.EMPTY
+                .withEmulator(PlatformId.PHYSICAL, Layer.EMPTY.with(ConfigField.SCREEN, TALL))
+                .withInstance(key, Layer.EMPTY.with(ConfigField.SCREEN, WIDE));
+        EmulatorsModel.InstanceRow row = new EmulatorsModel.InstanceRow(pixel, key, true, config.wanted(key), null,
+                null, List.of());
+        EmulatorsModel.Snapshot snapshot = new EmulatorsModel.Snapshot(List.of(), List.of(row), config, Instant.EPOCH);
+
+        Grid grid = ConfigViews.grid(snapshot, GridFilter.NONE);
+        assertEquals(List.of("Phones", "Pixel 10"), grid.columns().stream().map(ConfigViews.GridColumn::title).toList());
+        GridRow screen = grid.rows().stream().filter(r -> r.field() == ConfigField.SCREEN).findFirst().orElseThrow();
+        for (ConfigViews.Cell cell : screen.cells()) {
+            assertEquals("—", cell.text());
+            assertTrue(cell.placeholder());
+            assertFalse(cell.own());
+        }
+        assertTrue(ConfigViews.phone(new Target.Instance(key)));
+        assertFalse(ConfigViews.phone(FARM_T));
     }
 }

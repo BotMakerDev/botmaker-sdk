@@ -4,6 +4,7 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel.InstanceRow;
+import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -88,5 +89,47 @@ class InspectorModelTest {
         assertEquals("1 running, 1 stopped, 1 not read", counted.states());
         assertEquals("0 running, 0 stopped", InspectorModel.several(List.of()).states());
         assertEquals("1 instance", InspectorModel.several(List.of(row(toApply, null, false))).title());
+    }
+
+    private static InstanceRow phone(AdbEndpoint adb, boolean connected) {
+        EmulatorInstance pixel = new EmulatorInstance(PlatformId.PHYSICAL, "Pixel 10", adb);
+        InstanceKey key = InstanceKey.of(pixel);
+        return new InstanceRow(pixel, key, connected, EmulatorConfig.EMPTY.wanted(key), null, null, List.of());
+    }
+
+    @Test
+    void aPhoneSaysHowItIsConnected() {
+        assertEquals("connected · USB", InspectorModel.phoneState(phone(new AdbEndpoint.Server("4A1B2C3D"), true)));
+        assertEquals("connected · Wi-Fi",
+                InspectorModel.phoneState(phone(new AdbEndpoint.Server("192.168.1.20:41234"), true)));
+        assertEquals("connected · Wi-Fi", InspectorModel.phoneState(
+                phone(new AdbEndpoint.Server("adb-4A1B2C3D-x1y2z3._adb-tls-connect._tcp"), true)));
+        assertEquals("connected · Wi-Fi", InspectorModel.phoneState(phone(new AdbEndpoint.Tcp("192.168.1.20", 5555),
+                true)));
+        assertEquals("not connected", InspectorModel.phoneState(phone(new AdbEndpoint.Server("4A1B2C3D"), false)));
+    }
+
+    @Test
+    void aPhoneRowSaysPhoneAndItsConnection() {
+        InstanceRow usb = phone(new AdbEndpoint.Server("4A1B2C3D"), true);
+        assertEquals("Phone", EmulatorsModel.Column.EMULATOR.text(usb));
+        assertEquals("connected · USB", EmulatorsModel.Column.STATE.text(usb));
+        assertEquals("—", EmulatorsModel.Column.DIFFERS.text(usb));
+        assertEquals(new Look.Pill(Look.Tone.OK, "connected · USB"), InspectorModel.statePill(usb));
+        assertEquals(new Look.Pill(Look.Tone.MUTED, "not connected"),
+                InspectorModel.statePill(phone(new AdbEndpoint.Server("4A1B2C3D"), false)));
+        assertTrue(usb.said().contains("connected · USB"), usb.said());
+        InstanceRow farm = row(wanted(Layer.EMPTY), facts(Optional.empty()), true);
+        assertEquals(PlatformId.LDPLAYER.displayName(), EmulatorsModel.Column.EMULATOR.text(farm));
+        assertEquals("Running", EmulatorsModel.Column.STATE.text(farm));
+        assertEquals(Look.pill(true, true), InspectorModel.statePill(farm));
+    }
+
+    @Test
+    void startAndStopLeaveThePhonesOut() {
+        InstanceRow pixel = phone(new AdbEndpoint.Server("4A1B2C3D"), false);
+        InstanceRow farm = row(wanted(Layer.EMPTY), facts(Optional.empty()), false);
+        assertEquals(List.of(farm), InspectorModel.startable(List.of(pixel, farm)));
+        assertEquals(List.of(), InspectorModel.startable(List.of(pixel)));
     }
 }

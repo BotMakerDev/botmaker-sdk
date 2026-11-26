@@ -67,7 +67,7 @@ public final class ConfigViews {
 
             @Override
             public String title() {
-                return platform.displayName() + " (emulator)";
+                return platform == PlatformId.PHYSICAL ? "Phones" : platform.displayName() + " (emulator)";
             }
         }
 
@@ -587,8 +587,10 @@ public final class ConfigViews {
                     .sorted(Comparator.comparing(row -> row.key().reference(), String.CASE_INSENSITIVE_ORDER))
                     .forEach(row -> {
                         listed.add(row.key());
-                        out.add(new GridColumn(new Target.Instance(row.key()), row.key().reference(), true,
-                                row.tags()));
+                        // a phone's reference is its serial or address; its name is what the user knows it by
+                        String title = row.phone() && row.instance().name() != null ? row.instance().name()
+                                : row.key().reference();
+                        out.add(new GridColumn(new Target.Instance(row.key()), title, true, row.tags()));
                     });
             config.instances().forEach((key, layer) -> {
                 if (key.platform() == platform && !listed.contains(key)) {
@@ -647,7 +649,13 @@ public final class ConfigViews {
         return columns.stream().map(cell).toList();
     }
 
+    /** Whether {@code target} is the phones or one phone: they take no setting ({@code EmulatorConfig.wanted}). */
+    static boolean phone(Target target) {
+        return target.platform() == PlatformId.PHYSICAL;
+    }
+
     private static Cell fieldCell(EmulatorConfig config, Target target, ConfigField field) {
+        if (phone(target)) return new Cell("—", false, true);
         ConfigValue own = target.layer(config).fields().get(field);
         if (own != null) return new Cell(own.said(), true);
         if (target instanceof Target.Instance && !field.emulatorOnly()

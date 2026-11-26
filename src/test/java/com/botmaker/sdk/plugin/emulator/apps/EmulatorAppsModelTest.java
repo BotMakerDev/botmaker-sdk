@@ -110,6 +110,18 @@ class EmulatorAppsModelTest {
     }
 
     @Test
+    void twoProductsInstancesOfOneNameStayApart() {
+        EmulatorInstance ld = new EmulatorInstance(PlatformId.LDPLAYER, "Farm", "127.0.0.1", 5555);
+        EmulatorInstance avd = new EmulatorInstance(PlatformId.AVD, "Farm", "127.0.0.1", 5554);
+        AndroidDevices.Device first = new AndroidDevices.Device(ld, true, List.of());
+        AndroidDevices.Device second = new AndroidDevices.Device(avd, true, List.of());
+        assertFalse(first.key().equals(second.key()));
+        AndroidDevices.Device read = new AndroidDevices.Device(avd, true,
+                List.of(new AndroidDevices.App("com.a", "A", null, true)));
+        assertEquals(List.of(first, read), AndroidDevices.replaced(List.of(first, second), read));
+    }
+
+    @Test
     void aStoppedDeviceIsNotAskedForItsApps() {
         AndroidDevices.Device stopped = new AndroidDevices.Device(LDPLAYER, false, List.of());
         assertSame(stopped, AndroidDevices.refreshed(stopped, Map.of()));

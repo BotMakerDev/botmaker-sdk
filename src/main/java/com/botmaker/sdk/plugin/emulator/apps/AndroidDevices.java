@@ -46,6 +46,14 @@ public final class AndroidDevices {
             apps = List.copyOf(apps);
         }
 
+        /**
+         * What tells it from every other device: its product and ADB address. Its reference alone does not, since
+         * two products' instances may share a name.
+         */
+        public String key() {
+            return instance.identity();
+        }
+
         /** The chip's text: a running dot, the device's caption and its count of apps. */
         public String chip() {
             return (running ? "● " : "○ ") + instance.caption() + " " + apps.size();
@@ -139,10 +147,9 @@ public final class AndroidDevices {
         return device(device.instance(), true, named, cache);
     }
 
-    /** {@code devices} with {@code fresh} in place of the one of its reference; unchanged when none is. */
+    /** {@code devices} with {@code fresh} in place of the one of its key; unchanged when none is. */
     public static List<Device> replaced(List<Device> devices, Device fresh) {
-        String reference = fresh.instance().reference();
-        return devices.stream().map(d -> d.instance().reference().equals(reference) ? fresh : d).toList();
+        return devices.stream().map(d -> d.key().equals(fresh.key()) ? fresh : d).toList();
     }
 
     private static Device device(EmulatorInstance instance, boolean running, Map<String, App> named,

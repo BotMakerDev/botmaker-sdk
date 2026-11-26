@@ -434,9 +434,9 @@ final class InstancesTab {
 
     private ContextMenu rowMenu() {
         MenuItem startOne = new MenuItem("Start");
-        startOne.setOnAction(e -> window.start(picked()));
+        startOne.setOnAction(e -> window.start(InspectorModel.startable(picked())));
         MenuItem stopOne = new MenuItem("Stop");
-        stopOne.setOnAction(e -> window.stop(picked()));
+        stopOne.setOnAction(e -> window.stop(InspectorModel.startable(picked())));
         MenuItem applyOne = new MenuItem("Apply its configuration");
         applyOne.setOnAction(e -> window.apply(picked()));
         MenuItem undo = new MenuItem("Undo the last apply");
@@ -458,16 +458,18 @@ final class InstancesTab {
                 new SeparatorMenuItem(), cloneOne, renameOne, deleteOne, markOne);
         menu.setOnShowing(e -> {
             List<EmulatorsModel.InstanceRow> picked = picked();
-            configure.setDisable(picked.size() != 1);
+            List<EmulatorsModel.InstanceRow> startable = InspectorModel.startable(picked);
+            boolean phone = picked.size() == 1 && picked.getFirst().phone();
+            configure.setDisable(picked.size() != 1 || phone);
             boolean managed = picked.size() == 1 && ManageModel.manageable(picked.getFirst().key().platform());
             cloneOne.setDisable(!managed || picked.getFirst().running());
             renameOne.setDisable(!managed);
             deleteOne.setDisable(!managed);
             // a clone answering with its original's ID shows a clash, not running: its product's word decides
-            markOne.setDisable(picked.size() != 1
+            markOne.setDisable(picked.size() != 1 || phone
                     || picked.getFirst().instance().state() != EmulatorState.RUNNING);
-            startOne.setDisable(picked.stream().allMatch(EmulatorsModel.InstanceRow::running));
-            stopOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::running));
+            startOne.setDisable(startable.stream().allMatch(EmulatorsModel.InstanceRow::running));
+            stopOne.setDisable(startable.stream().noneMatch(EmulatorsModel.InstanceRow::running));
             applyOne.setDisable(picked.stream().noneMatch(EmulatorsModel.InstanceRow::applicable));
             undo.setDisable(picked.isEmpty());
             tags.setDisable(picked.isEmpty());
@@ -612,9 +614,9 @@ final class InstancesTab {
 
     private void one(EmulatorsModel.InstanceRow row) {
         Label title = heading(row.instance().name(), Look.badge(row.key().platform()));
-        HBox pills = new HBox(6, Look.pill(Look.pill(row.running(), row.facts() != null)));
+        HBox pills = new HBox(6, Look.pill(InspectorModel.statePill(row)));
         if (row.differs()) pills.getChildren().add(Look.pill(new Look.Pill(Look.Tone.WARNING, "Differs")));
-        inspector.getChildren().addAll(title, muted(row.key().platform().displayName()), pills);
+        inspector.getChildren().addAll(title, muted(EmulatorsModel.Column.EMULATOR.text(row)), pills);
 
         inspector.getChildren().add(Look.cap("Accounts"));
         if (row.accounts().isEmpty()) {
@@ -641,17 +643,26 @@ final class InstancesTab {
         }
         inspector.getChildren().add(device);
 
-        Button startStop = new Button(row.running() ? "Stop" : "Start");
-        startStop.setOnAction(e -> {
-            if (row.running()) window.stop(List.of(row));
-            else window.start(List.of(row));
-        });
-        Button configure = new Button("Configure…");
-        configure.setOnAction(e -> window.configure(new ConfigViews.Target.Instance(row.key())));
         Button apply = Styles.on(new Button("Apply"), StyleClasses.PRIMARY_BUTTON);
         apply.setDisable(!row.applicable());
         apply.setOnAction(e -> window.apply(List.of(row)));
-        FlowPane buttons = buttons(startStop, configure, apply);
+        FlowPane buttons;
+        if (row.phone()) {
+            // BotMaker neither starts, stops nor configures a phone: its accounts are what it changes
+            Button accounts = new Button("Accounts…");
+            accounts.setTooltip(new Tooltip("The Accounts tab, on the phones' columns"));
+            accounts.setOnAction(e -> window.accountsOf(row.key().platform()));
+            buttons = buttons(accounts, apply);
+        } else {
+            Button startStop = new Button(row.running() ? "Stop" : "Start");
+            startStop.setOnAction(e -> {
+                if (row.running()) window.stop(List.of(row));
+                else window.start(List.of(row));
+            });
+            Button configure = new Button("Configure…");
+            configure.setOnAction(e -> window.configure(new ConfigViews.Target.Instance(row.key())));
+            buttons = buttons(startStop, configure, apply);
+        }
         window.needsYou(row.key()).ifPresent(waiting -> {
             Button look = new Button("Open its screen");
             look.setMinWidth(Region.USE_PREF_SIZE);
@@ -693,12 +704,13 @@ final class InstancesTab {
     private void several(Label title, List<EmulatorsModel.InstanceRow> rows) {
         InspectorModel.Several counted = InspectorModel.several(rows);
         inspector.getChildren().addAll(title, line(counted.title()), muted(counted.states()));
+        List<EmulatorsModel.InstanceRow> startable = InspectorModel.startable(rows);
         Button start = new Button("Start");
-        start.setDisable(rows.stream().allMatch(EmulatorsModel.InstanceRow::running));
-        start.setOnAction(e -> window.start(rows));
+        start.setDisable(startable.stream().allMatch(EmulatorsModel.InstanceRow::running));
+        start.setOnAction(e -> window.start(startable));
         Button stop = new Button("Stop");
-        stop.setDisable(rows.stream().noneMatch(EmulatorsModel.InstanceRow::running));
-        stop.setOnAction(e -> window.stop(rows));
+        stop.setDisable(startable.stream().noneMatch(EmulatorsModel.InstanceRow::running));
+        stop.setOnAction(e -> window.stop(startable));
         Button apply = Styles.on(new Button(counted.applicable() == 0 ? "Apply" : "Apply to " + counted.applicable()),
                 StyleClasses.PRIMARY_BUTTON);
         apply.setDisable(counted.applicable() == 0);
@@ -743,7 +755,8 @@ final class InstancesTab {
                     case GroupLine(EmulatorsModel.Group group) -> {
                         if (column != EmulatorsModel.Column.NAME) return;
                         setText(group.platform().displayName() + " · " + group.rows().size() + " · "
-                                + group.running() + " running");
+                                + group.running() + (group.platform() == PlatformId.PHYSICAL ? " connected"
+                                : " running"));
                         setGraphic(Look.badge(group.platform()));
                         setGraphicTextGap(8);
                     }
@@ -765,7 +778,7 @@ final class InstancesTab {
     private static void cell(TreeTableCell<Line, Line> cell, EmulatorsModel.Column column,
                              EmulatorsModel.InstanceRow row) {
         switch (column) {
-            case STATE -> cell.setGraphic(Look.pill(Look.pill(row.running(), row.facts() != null)));
+            case STATE -> cell.setGraphic(Look.pill(InspectorModel.statePill(row)));
             case DIFFERS -> {
                 if (row.differs()) {
                     cell.setGraphic(Look.pill(new Look.Pill(Look.Tone.WARNING, "Differs")));

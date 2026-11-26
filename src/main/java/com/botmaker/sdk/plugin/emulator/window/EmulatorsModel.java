@@ -212,7 +212,8 @@ public final class EmulatorsModel {
         public String said() {
             List<String> names = accounts();
             return "Instance " + instance.name() + " (" + key.platform().displayName() + "): "
-                    + (facts == null ? "not read" : running ? "running" : "stopped")
+                    + (phone() ? InspectorModel.phoneState(this)
+                            : facts == null ? "not read" : running ? "running" : "stopped")
                     + " · " + (names.isEmpty() ? "no account" : count(names.size(), "account") + " "
                     + String.join(", ", names))
                     + " · " + Column.DIFFERS.text(this);
@@ -384,9 +385,10 @@ public final class EmulatorsModel {
         public String text(InstanceRow row) {
             return switch (this) {
                 case NAME -> row.instance().name();
-                case EMULATOR -> row.key().platform().displayName();
-                case STATE -> row.running() ? "Running" : "Stopped";
-                case DIFFERS -> row.diff() == null ? "Not read"
+                case EMULATOR -> row.phone() ? "Phone" : row.key().platform().displayName();
+                case STATE -> row.phone() ? InspectorModel.phoneState(row) : row.running() ? "Running" : "Stopped";
+                case DIFFERS -> row.phone() && row.changes() == 0 ? "—"
+                        : row.diff() == null ? "Not read"
                         : row.changes() > 0 ? count(row.changes(), "change") + " to apply"
                         : row.differs() ? "Differs, set by hand" : "As configured";
                 case ACCOUNTS -> String.join(", ", row.accounts());

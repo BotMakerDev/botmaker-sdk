@@ -59,7 +59,7 @@ final class AndroidTab {
     /** The desktop's Android entries (Waydroid's), by package: their names and icons win over the cache's. */
     private Map<String, AndroidDevices.App> menu = Map.of();
     private List<AndroidDevices.Device> devices = List.of();
-    /** The chip on, by device reference. */
+    /** The chip on, by {@link AndroidDevices.Device#key()}. */
     private String chip;
     /** The bot's target, whose device's chip is on first and whose tile is picked. */
     private String current;
@@ -67,9 +67,9 @@ final class AndroidTab {
     private boolean scanning;
     /** Whether another scan was asked for while one ran. */
     private boolean rescanAfter;
-    /** The running devices still to answer for their apps, by reference. */
+    /** The running devices still to answer for their apps, by key. */
     private final Set<String> reading = new HashSet<>();
-    /** The chips shown, by device reference. */
+    /** The chips shown, by device key. */
     private final Map<String, ToggleButton> chipButtons = new LinkedHashMap<>();
     /** The system-apps listing whose tiles may land; an older one's are dropped. */
     private int systemListing;
@@ -101,7 +101,7 @@ final class AndroidTab {
 
     /** The Emulators window, on the chip's instance when one is on. */
     private void openEmulators() {
-        devices.stream().filter(d -> d.instance().reference().equals(chip)).findFirst()
+        devices.stream().filter(d -> d.key().equals(chip)).findFirst()
                 .ifPresentOrElse(d -> EmulatorsWindow.open(services, d.instance()), () -> EmulatorsWindow.open(services));
     }
 
@@ -143,7 +143,7 @@ final class AndroidTab {
             devices = found;
             reading.clear();
             List<AndroidDevices.Device> running = found.stream().filter(AndroidDevices.Device::running).toList();
-            running.forEach(d -> reading.add(d.instance().reference()));
+            running.forEach(d -> reading.add(d.key()));
             showChips();
             read(running, 0, entries);
         }, why -> {
@@ -160,7 +160,7 @@ final class AndroidTab {
             return;
         }
         AndroidDevices.Device device = running.get(next);
-        String reference = device.instance().reference();
+        String reference = device.key();
         Async.load("android-device-apps", () -> AndroidDevices.refreshed(device, entries), fresh -> {
             reading.remove(reference);
             devices = AndroidDevices.replaced(devices, fresh);
@@ -182,7 +182,7 @@ final class AndroidTab {
     /** {@code reference}'s apps were read: its chip's count, and its tiles when its chip is on. */
     private void answered(String reference) {
         ToggleButton button = chipButtons.get(reference);
-        devices.stream().filter(d -> d.instance().reference().equals(reference)).findFirst()
+        devices.stream().filter(d -> d.key().equals(reference)).findFirst()
                 .filter(device -> button != null).ifPresent(device -> button.setText(device.chip()));
         if (reference.equals(chip)) showChip();
     }
@@ -197,16 +197,17 @@ final class AndroidTab {
     }
 
     private void showChips() {
-        if (devices.stream().noneMatch(d -> d.instance().reference().equals(chip))) {
+        if (devices.stream().noneMatch(d -> d.key().equals(chip))) {
             LaunchSpec target = current == null ? null : LaunchSpec.parse(current);
             String wanted = target != null && target.kind() == LaunchKind.EMULATOR_APP ? target.emulatorInstance() : null;
-            chip = devices.stream().map(d -> d.instance().reference()).filter(r -> r.equals(wanted)).findFirst()
-                    .orElse(devices.isEmpty() ? null : devices.getFirst().instance().reference());
+            // the target names its device by reference only: the first device of that reference is its
+            chip = devices.stream().filter(d -> d.instance().reference().equals(wanted)).map(AndroidDevices.Device::key)
+                    .findFirst().orElse(devices.isEmpty() ? null : devices.getFirst().key());
         }
         List<Node> nodes = new ArrayList<>();
         chipButtons.clear();
         for (AndroidDevices.Device device : devices) {
-            String reference = device.instance().reference();
+            String reference = device.key();
             ToggleButton button = Styles.on(new ToggleButton(device.chip()), Styles.PILL);
             chipButtons.put(reference, button);
             button.setToggleGroup(chipGroup);
@@ -232,7 +233,7 @@ final class AndroidTab {
 
     private void showChip() {
         bySpec.clear();
-        AndroidDevices.Device device = devices.stream().filter(d -> d.instance().reference().equals(chip))
+        AndroidDevices.Device device = devices.stream().filter(d -> d.key().equals(chip))
                 .findFirst().orElse(null);
         List<Node> nodes = new ArrayList<>();
         if (device == null) {
@@ -242,7 +243,7 @@ final class AndroidTab {
             return;
         }
         for (AndroidDevices.App app : device.apps()) nodes.add(tile(device, app));
-        boolean beingRead = reading.contains(device.instance().reference());
+        boolean beingRead = reading.contains(device.key());
         if (beingRead) {
             say("Reading the apps on " + device.instance().caption() + "… " + (device.apps().isEmpty()
                     ? "None was seen on it yet; get one in the Emulators window, below."
@@ -266,7 +267,7 @@ final class AndroidTab {
         Async.load("android-system-apps", () -> AndroidDevices.systemApps(device), system -> {
             // A grid shown again meanwhile asked for its own listing: this one's tiles would come twice.
             if (listing != systemListing || !systemApps.isSelected()
-                    || !device.instance().reference().equals(chip)) return;
+                    || !device.key().equals(chip)) return;
             List<Node> nodes = new ArrayList<>(grid.getChildren());
             for (AndroidDevices.App app : system) nodes.add(tile(device, app));
             grid.getChildren().setAll(nodes);
