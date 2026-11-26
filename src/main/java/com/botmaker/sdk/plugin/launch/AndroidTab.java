@@ -29,9 +29,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 /**
@@ -61,7 +63,16 @@ final class AndroidTab {
     private String chip;
     /** The bot's target, whose device's chip is on first and whose tile is picked. */
     private String current;
+    /** Whether a scan runs, from the device list to its last device's apps. */
     private boolean scanning;
+    /** Whether another scan was asked for while one ran. */
+    private boolean rescanAfter;
+    /** The running devices still to answer for their apps, by reference. */
+    private final Set<String> reading = new HashSet<>();
+    /** The chips shown, by device reference. */
+    private final Map<String, ToggleButton> chipButtons = new LinkedHashMap<>();
+    /** The system-apps listing whose tiles may land; an older one's are dropped. */
+    private int systemListing;
 
     AndroidTab(StudioServices services, ToggleGroup tiles, BiConsumer<AndroidDevices.Device, AndroidDevices.App> onPick) {
         this.services = services;
@@ -114,19 +125,66 @@ final class AndroidTab {
         if (devices.isEmpty() || changed) rescan();
     }
 
-    /** Reads the devices and their apps again, off the JavaFX thread. */
+    /**
+     * Reads the devices again, off the JavaFX thread: they show at once with the apps last seen on them, then each
+     * running one in turn is asked for its apps, which reads every new app's APK over ADB, and its chip and tiles show
+     * again when it answers. One device at a time, and ↻ waits for the last: two reads of one phone over USB only slow
+     * each other. A scan asked for meanwhile, by ↻ or a changed menu, runs once at the end.
+     */
     void rescan() {
-        if (scanning) return;
+        if (scanning) {
+            rescanAfter = true;
+            return;
+        }
         scanning = true;
+        rescanAfter = false;
         Map<String, AndroidDevices.App> entries = menu;
-        Async.load("android-devices", () -> AndroidDevices.scan(entries), found -> {
-            scanning = false;
+        Async.load("android-devices", () -> AndroidDevices.listed(entries), found -> {
             devices = found;
+            reading.clear();
+            List<AndroidDevices.Device> running = found.stream().filter(AndroidDevices.Device::running).toList();
+            running.forEach(d -> reading.add(d.instance().reference()));
             showChips();
+            read(running, 0, entries);
         }, why -> {
-            scanning = false;
-            note.setText("Couldn't look for Android devices: " + why);
+            reading.clear();
+            say("Couldn't look for Android devices: " + why);
+            scanned();
         });
+    }
+
+    /** Asks {@code running}'s device at {@code next} for its apps, then the one after it. */
+    private void read(List<AndroidDevices.Device> running, int next, Map<String, AndroidDevices.App> entries) {
+        if (next == running.size()) {
+            scanned();
+            return;
+        }
+        AndroidDevices.Device device = running.get(next);
+        String reference = device.instance().reference();
+        Async.load("android-device-apps", () -> AndroidDevices.refreshed(device, entries), fresh -> {
+            reading.remove(reference);
+            devices = AndroidDevices.replaced(devices, fresh);
+            answered(reference);
+            read(running, next + 1, entries);
+        }, why -> {
+            reading.remove(reference);
+            answered(reference);
+            read(running, next + 1, entries);
+        });
+    }
+
+    /** The scan is over: one asked for while it ran starts now. */
+    private void scanned() {
+        scanning = false;
+        if (rescanAfter) rescan();
+    }
+
+    /** {@code reference}'s apps were read: its chip's count, and its tiles when its chip is on. */
+    private void answered(String reference) {
+        ToggleButton button = chipButtons.get(reference);
+        devices.stream().filter(d -> d.instance().reference().equals(reference)).findFirst()
+                .filter(device -> button != null).ifPresent(device -> button.setText(device.chip()));
+        if (reference.equals(chip)) showChip();
     }
 
     /** Selects {@code spec}'s tile, or none when the chip on doesn't show it; its device's chip goes on first. */
@@ -146,9 +204,11 @@ final class AndroidTab {
                     .orElse(devices.isEmpty() ? null : devices.getFirst().instance().reference());
         }
         List<Node> nodes = new ArrayList<>();
+        chipButtons.clear();
         for (AndroidDevices.Device device : devices) {
             String reference = device.instance().reference();
             ToggleButton button = Styles.on(new ToggleButton(device.chip()), Styles.PILL);
+            chipButtons.put(reference, button);
             button.setToggleGroup(chipGroup);
             button.setSelected(reference.equals(chip));
             button.setTooltip(new Tooltip(device.running() ? device.instance().caption() + " is running"
@@ -182,9 +242,16 @@ final class AndroidTab {
             return;
         }
         for (AndroidDevices.App app : device.apps()) nodes.add(tile(device, app));
-        say(device.apps().isEmpty() ? (device.running() ? "No app with an icon is on " + device.instance().caption()
-                + " yet." : device.instance().caption() + " is stopped and no app was seen on it yet.")
-                + " Get one in the Emulators window, below." : null);
+        boolean beingRead = reading.contains(device.instance().reference());
+        if (beingRead) {
+            say("Reading the apps on " + device.instance().caption() + "… " + (device.apps().isEmpty()
+                    ? "None was seen on it yet; get one in the Emulators window, below."
+                    : "These are the ones seen last time."));
+        } else {
+            say(device.apps().isEmpty() ? (device.running() ? "No app with an icon is on " + device.instance().caption()
+                    + " yet." : device.instance().caption() + " is stopped and no app was seen on it yet.")
+                    + " Get one in the Emulators window, below." : null);
+        }
         grid.getChildren().setAll(nodes);
         if (systemApps.isSelected()) showSystemApps(device);
         mark(current);
@@ -195,8 +262,11 @@ final class AndroidTab {
             say("Start " + device.instance().caption() + " to list its system apps.");
             return;
         }
+        int listing = ++systemListing;
         Async.load("android-system-apps", () -> AndroidDevices.systemApps(device), system -> {
-            if (!systemApps.isSelected() || !device.instance().reference().equals(chip)) return;
+            // A grid shown again meanwhile asked for its own listing: this one's tiles would come twice.
+            if (listing != systemListing || !systemApps.isSelected()
+                    || !device.instance().reference().equals(chip)) return;
             List<Node> nodes = new ArrayList<>(grid.getChildren());
             for (AndroidDevices.App app : system) nodes.add(tile(device, app));
             grid.getChildren().setAll(nodes);

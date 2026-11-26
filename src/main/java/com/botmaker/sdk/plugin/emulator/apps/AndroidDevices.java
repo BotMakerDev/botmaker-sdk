@@ -107,20 +107,48 @@ public final class AndroidDevices {
 
     /**
      * Every device offered here and its apps, from discovery and the app cache; a running one is asked for its apps
-     * first. Blocks on discovery and ADB: off the JavaFX thread. {@code named} maps a Waydroid package to its
-     * desktop entry's name and icon.
+     * first. Blocks on discovery and ADB, one connection per app not seen before: off the JavaFX thread. {@code named}
+     * maps a Waydroid package to its desktop entry's name and icon. A window that shows the devices before their
+     * apps are read takes {@link #listed} and then {@link #refreshed} for each running one.
      */
     public static List<Device> scan(Map<String, App> named) {
+        return listed(named).stream().map(device -> refreshed(device, named)).toList();
+    }
+
+    /**
+     * Every device offered here with the apps last seen on it, asking no device for its apps: discovery and each
+     * one's running check only, seconds where {@link #scan} takes minutes on a phone over USB. Off the JavaFX thread.
+     */
+    public static List<Device> listed(Map<String, App> named) {
         EmulatorAppCache cache = EmulatorAppCache.shared();
         List<Device> devices = new ArrayList<>();
         for (EmulatorInstance instance : offered(Platforms.discoverAll(), Os.current())) {
-            boolean running = EmulatorLiveness.running(instance);
-            if (running) EmulatorProbe.refresh(instance, cache);
-            Map<String, App> own = instance.platformId() == PlatformId.WAYDROID ? named : Map.of();
-            devices.add(new Device(instance, running, apps(cache.packages(instance), own,
-                    pkg -> cache.iconPath(instance, pkg))));
+            devices.add(device(instance, EmulatorLiveness.running(instance), named, cache));
         }
         return devices;
+    }
+
+    /**
+     * {@code device} with its apps read off it when it runs, each new app's name and icon from its APK; {@code device}
+     * itself when it is stopped. Blocks on ADB: off the JavaFX thread.
+     */
+    public static Device refreshed(Device device, Map<String, App> named) {
+        if (!device.running()) return device;
+        EmulatorAppCache cache = EmulatorAppCache.shared();
+        EmulatorProbe.refresh(device.instance(), cache);
+        return device(device.instance(), true, named, cache);
+    }
+
+    /** {@code devices} with {@code fresh} in place of the one of its reference; unchanged when none is. */
+    public static List<Device> replaced(List<Device> devices, Device fresh) {
+        String reference = fresh.instance().reference();
+        return devices.stream().map(d -> d.instance().reference().equals(reference) ? fresh : d).toList();
+    }
+
+    private static Device device(EmulatorInstance instance, boolean running, Map<String, App> named,
+                                 EmulatorAppCache cache) {
+        Map<String, App> own = instance.platformId() == PlatformId.WAYDROID ? named : Map.of();
+        return new Device(instance, running, apps(cache.packages(instance), own, pkg -> cache.iconPath(instance, pkg)));
     }
 
     /** {@code device}'s system apps, read off it; empty when it doesn't answer. Blocks on ADB. */

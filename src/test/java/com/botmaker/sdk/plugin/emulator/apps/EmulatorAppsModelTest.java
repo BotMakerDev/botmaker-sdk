@@ -19,6 +19,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** An emulator's apps: the devices offered per OS, their apps, Install on and Downloaded apps. */
@@ -95,6 +96,23 @@ class EmulatorAppsModelTest {
         assertEquals("0 B", DownloadedApps.size(0));
         assertEquals("1.5 KB", DownloadedApps.size(1536));
         assertEquals("140 MB", DownloadedApps.size(140L * 1024 * 1024));
+    }
+
+    @Test
+    void aDeviceReadLaterTakesItsOwnPlaceOnly() {
+        AndroidDevices.Device waydroid = new AndroidDevices.Device(WAYDROID, true, List.of());
+        AndroidDevices.Device phone = new AndroidDevices.Device(PHONE, true, List.of());
+        AndroidDevices.Device read = new AndroidDevices.Device(PHONE, true,
+                List.of(new AndroidDevices.App("com.a", "A", null, true)));
+        assertEquals(List.of(waydroid, read), AndroidDevices.replaced(List.of(waydroid, phone), read));
+        // A device a later scan no longer lists stays gone.
+        assertEquals(List.of(waydroid), AndroidDevices.replaced(List.of(waydroid), read));
+    }
+
+    @Test
+    void aStoppedDeviceIsNotAskedForItsApps() {
+        AndroidDevices.Device stopped = new AndroidDevices.Device(LDPLAYER, false, List.of());
+        assertSame(stopped, AndroidDevices.refreshed(stopped, Map.of()));
     }
 
     private static ApkLibrary.Entry entry(String pkg, long code, CpuAbi abi) {

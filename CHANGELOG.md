@@ -220,6 +220,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- The Game window's Android apps tab no longer stays on "Looking for Android devices…" (2026-11-26): it lists the
+  devices and the apps last seen on them at once (`AndroidDevices.listed`), then asks each running device for its
+  apps in the background (`refreshed`) and shows its tiles again when it answers. Before, every new app's APK was
+  read over ADB, one connection each, before anything showed: minutes on a phone over USB.
 - The Remote Pilot's screen frames no longer ask KDE's screen-share portal (2026-11-26): on Wayland they are cut
   from shared's screenshot-program grab (`ScreenCapture.captureRegion`) instead of the AWT Robot's.
 - An automatic capture picks a PC game's own window (2026-11-25): a Steam game's `steam_app_<appid>` window ranks
