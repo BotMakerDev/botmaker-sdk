@@ -42,10 +42,19 @@ import java.util.TreeSet;
  */
 public final class SdkPools implements PoolHolder {
 
-    /** The bot's {@code place()}, dealt from this PC's places that can play its game. */
+    /**
+     * The bot's {@code place()}, dealt from this PC's places that can play its game: one run each, but this desktop,
+     * which any number of games play on (spec §3); its pointer is a claim of its own.
+     */
     public static final PluginPool<Place> PLACES = PluginPool.fills(SdkValues.PLACE)
             .from(SdkPools::places)
-            .offering((shortfall, services) -> offers(shortfall.missing(), room(), candidates(services)));
+            .offering((shortfall, services) -> offers(shortfall.missing(), room(), candidates(services)))
+            .sharing(SdkPools::runsAt);
+
+    /** How many runs may play at {@code place} at once: any number on this desktop, one anywhere else. */
+    static int runsAt(Place place) {
+        return place.kind() == Place.Kind.DESKTOP ? PluginPool.Sharing.ANY : 1;
+    }
 
     /**
      * What a private display and the game on it are taken to commit (2026-11-26, my call): a desktop game's process
@@ -69,7 +78,7 @@ public final class SdkPools implements PoolHolder {
     /**
      * The places that can play the game, and why each other place was left out.
      *
-     * @param places  in the order to deal: Android places by name, then this desktop, private displays and VMs
+     * @param places  in the order to deal: Android places by name, then private displays, VMs and this desktop
      * @param leftOut a sentence a person reads for each place that cannot play ("Pixel 9: com.game is not installed")
      */
     record Candidates(List<Place> places, List<String> leftOut, boolean android) {
@@ -133,10 +142,11 @@ public final class SdkPools implements PoolHolder {
      *       installed as last read or never read; by name in alphabetical order, an instance named alike under two
      *       emulators being one, as a bot names it (by its name alone, {@code CaptureSource.emulator}), and names that
      *       differ only in case two, as an emulator tells them;</li>
-     *   <li>this desktop, when a target runs on this system and is not an {@code emu-app};</li>
-     *   <li>private displays 1…N for that target, N as many as {@link Pc#displayRoom} and {@link #MOST_DISPLAYS} allow,
-     *       when {@link Pc#displayRefusal} is empty;</li>
-     *   <li>each VM that is set up, for that target, when {@link Pc#vmRefusal} is empty.</li>
+     *   <li>private displays 1…N for a target that runs on this system and is not an {@code emu-app}, N as many as
+     *       {@link Pc#displayRoom} and {@link #MOST_DISPLAYS} allow, when {@link Pc#displayRefusal} is empty;</li>
+     *   <li>each VM that is set up, for that target, when {@link Pc#vmRefusal} is empty;</li>
+     *   <li>this desktop, for that target, last: any number of runs share it ({@link #runsAt}) and the host deals a
+     *       shared candidate in the pool's order, so listed first it would take every run.</li>
      * </ul>
      *
      * The PC's places are asked about the first such target, so a caller puts the one a run launches first. A bot that
@@ -162,7 +172,6 @@ public final class SdkPools implements PoolHolder {
             }
         }
         if (pcGame(specs, pc.os()) != null) {
-            places.add(Place.desktop());
             if (pc.displayRefusal().isEmpty()) {
                 for (int n = 1; n <= Math.min(pc.displayRoom(), MOST_DISPLAYS); n++) places.add(Place.privateDisplay(n));
             } else if (pc.os() == Os.LINUX) {
@@ -173,6 +182,7 @@ public final class SdkPools implements PoolHolder {
             } else if (!pc.vms().isEmpty()) {
                 leftOut.add("Game VMs: " + pc.vmRefusal().get());
             }
+            places.add(Place.desktop());
         }
         return new Candidates(places, leftOut, android);
     }

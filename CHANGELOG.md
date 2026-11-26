@@ -48,8 +48,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   instances". A bot that lists no game, or none this system runs, is dealt instances, as before. The place pill
   lists the same places. For an Android bot, why a place was left out shows in the "Create N instances" offer ("left
   out: Pixel 9: com.game is not installed"); a bot of this PC is told only how many places are missing. As
-  Android's packages are not kept between reads, every instance still counts as never read. For now this desktop is
-  dealt to one run at a time.
+  Android's packages are not kept between reads, every instance still counts as never read. This desktop is dealt
+  to any number of runs at once (`PluginPool.sharing`), and is listed last, so runs go to the private displays and
+  VMs first; every other place goes to one run.
 
 ### Added
 

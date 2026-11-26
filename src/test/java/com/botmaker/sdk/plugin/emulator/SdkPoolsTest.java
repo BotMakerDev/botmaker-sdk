@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.plugin.emulator;
 
+import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.run.PoolOffer;
 import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
@@ -40,10 +41,18 @@ class SdkPoolsTest {
     }
 
     @Test
-    void aSteamOnlyBotGetsThisDesktopAndItsDisplaysAndNoAndroidPlace() {
+    void anyNumberOfRunsPlayOnThisDesktopAndOneOnEveryOtherPlace() {
+        assertEquals(PluginPool.Sharing.ANY, SdkPools.PLACES.sharedBy(Place.desktop()));
+        assertEquals(1, SdkPools.PLACES.sharedBy(Place.privateDisplay(1)));
+        assertEquals(1, SdkPools.PLACES.sharedBy(Place.android("Pixel 9")));
+        assertEquals(1, SdkPools.PLACES.sharedBy(Place.vm("Win11")));
+    }
+
+    @Test
+    void aSteamOnlyBotGetsItsDisplaysThenThisDesktopAndNoAndroidPlace() {
         SdkPools.Candidates got = SdkPools.candidates(twoInstances(), STEAM, LINUX);
 
-        assertEquals(List.of(Place.desktop(), Place.privateDisplay(1), Place.privateDisplay(2)), got.places());
+        assertEquals(List.of(Place.privateDisplay(1), Place.privateDisplay(2), Place.desktop()), got.places());
         assertTrue(got.leftOut().isEmpty(), got.leftOut().toString());
     }
 
@@ -64,7 +73,7 @@ class SdkPoolsTest {
         SdkPools.Pc vms = new SdkPools.Pc(Os.WINDOWS, Optional.of("A private display is Linux's"), 4,
                 List.of("Win11"), Optional.empty(), Map.of());
 
-        assertEquals(List.of(Place.android("Pixel 10"), Place.android("Pixel 9"), Place.desktop(), Place.vm("Win11")),
+        assertEquals(List.of(Place.android("Pixel 10"), Place.android("Pixel 9"), Place.vm("Win11"), Place.desktop()),
                 SdkPools.candidates(twoInstances(), both, vms).places());
     }
 
@@ -116,7 +125,7 @@ class SdkPoolsTest {
 
     @Test
     void theFirstTargetThisSystemRunsIsTheOneThePcPlacesAreAskedAbout() {
-        assertEquals(List.of(Place.desktop(), Place.privateDisplay(1), Place.privateDisplay(2)),
+        assertEquals(List.of(Place.privateDisplay(1), Place.privateDisplay(2), Place.desktop()),
                 SdkPools.candidates(HostConfig.State.EMPTY, List.of("lutris:game", "steam:1145350"), LINUX).places());
     }
 
