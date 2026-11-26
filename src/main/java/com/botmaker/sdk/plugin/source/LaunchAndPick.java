@@ -34,10 +34,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.ToggleGroup;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -47,12 +44,13 @@ import javafx.stage.Window;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.LongPredicate;
 
 /**
- * The source picker's ▶ Launch and pick: starts the game this computer launches — on this desktop, in a private
- * display or in the game VM, as the user chooses here — watches the windows that open, and recommends the one the
- * game opened ({@link WindowWatch}). A pick saves the window by its class, and its title only when the class is one
+ * The source picker's ▶ Launch and pick: starts the game this computer launches — where the bot's "Run the game in"
+ * setting says, a private display by default, or this desktop where that place is refused ({@link #place}) — watches
+ * the windows that open, and recommends the one the game opened ({@link WindowWatch}). A pick saves the window by its class, and its title only when the class is one
  * many programs share, so the next run finds it on this computer whatever its process id (2026-10-19).
  *
  * <p>Only for a game with a window: an emulator or phone app is captured from its device, which its pick already
@@ -79,6 +77,8 @@ final class LaunchAndPick {
     private final Label status = Styles.on(new Label(), Styles.DIALOG_HINT);
     private final VBox rows = new VBox(6);
     private volatile boolean watching;
+    /** A launch where the settings say failed: the next ▶ Launch starts the game on this desktop. FX thread. */
+    private boolean desktopAfterFailure;
     private Stage stage;
     private Outcome outcome;
 
@@ -99,36 +99,25 @@ final class LaunchAndPick {
                 : "Launch " + GameButton.caption(services, target) + " and pick its window"), Styles.DIALOG_HEADING);
         heading.setWrapText(true);
 
-        ToggleGroup where = new ToggleGroup();
-        HBox places = new HBox(12);
-        places.setAlignment(Pos.CENTER_LEFT);
-        BotSettings.Where preferred = SettingsValue.current(services).runIn().where();
-        for (BotSettings.Where place : BotSettings.Where.values()) {
-            RadioButton button = new RadioButton(placeName(place));
-            button.setUserData(place);
-            button.setToggleGroup(where);
-            Optional<String> unavailable = unavailable(spec, place);
-            button.setDisable(unavailable.isPresent());
-            unavailable.ifPresent(why -> button.setTooltip(new Tooltip(why)));
-            if (place == preferred && unavailable.isEmpty()) button.setSelected(true);
-            places.getChildren().add(button);
-        }
-        if (where.getSelectedToggle() == null) where.selectToggle((RadioButton) places.getChildren().get(
-                BotSettings.Where.MY_DESKTOP.ordinal()));
-        Label placesHint = Styles.on(new Label("Only where it starts now: the bot's runs keep \"Run the game in\" "
-                + "from its settings. The window is the same wherever it opens."), Styles.DIALOG_HINT);
-        placesHint.setWrapText(true);
-
         Button launch = Styles.on(new Button("▶ Launch"), Styles.PRIMARY_BUTTON);
         String refusal = refusal(spec);
         launch.setDisable(refusal != null);
-        status.setText(refusal == null ? "Its windows are listed here as they open." : refusal);
+        status.setText(refusal == null ? place(spec).describe() + " Its windows are listed here as they open."
+                : refusal);
         status.setWrapText(true);
         launch.setOnAction(e -> {
             launch.setDisable(true);
             rows.getChildren().clear();
-            // A launch that failed can be tried again, here or elsewhere.
-            start(spec, (BotSettings.Where) where.getSelectedToggle().getUserData(), () -> launch.setDisable(false));
+            // Asked again on each press: an install or a VM made ready meanwhile counts.
+            Place place = desktopAfterFailure ? new Place(BotSettings.Where.MY_DESKTOP, null) : place(spec);
+            start(spec, place.where(), () -> {
+                // A launch that failed elsewhere can be tried again on this desktop, the window being the same.
+                if (place.where() != BotSettings.Where.MY_DESKTOP) {
+                    desktopAfterFailure = true;
+                    launch.setText("▶ Launch on this desktop");
+                }
+                launch.setDisable(false);
+            });
         });
 
         ScrollPane list = new ScrollPane(rows);
@@ -142,7 +131,7 @@ final class LaunchAndPick {
         HBox bar = new HBox(8, launch, spacer, close);
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        VBox root = new VBox(10, heading, places, placesHint, status, list, bar);
+        VBox root = new VBox(10, heading, status, list, bar);
         root.setPadding(new Insets(14));
         stage = Modals.window(services, owner, Modals.Frame.modal("Launch and pick its window", 620, 460, 480, 360),
                 root);
@@ -174,16 +163,39 @@ final class LaunchAndPick {
             SessionBootstrap.vmName(VmChoice.current(services));
             return Optional.empty();
         } catch (RuntimeException noVm) {
-            return Optional.of(noVm.getMessage());
+            return Optional.of(noVm.getMessage() == null ? "No game VM is set up." : noVm.getMessage());
         }
     }
 
-    private static String placeName(BotSettings.Where place) {
-        return switch (place) {
-            case MY_DESKTOP -> "This desktop";
-            case PRIVATE_DISPLAY -> "A private display";
-            case VM -> "The game VM";
-        };
+    /** Where ▶ Launch starts {@code spec} now, from the bot's settings. */
+    private Place place(LaunchSpec spec) {
+        return place(SettingsValue.current(services).runIn().where(), where -> unavailable(spec, where));
+    }
+
+    /**
+     * Where ▶ Launch starts the game, and why it is not where the bot's settings said when it is not: no choice here
+     * (2026-11-26, the user's call), the bot's "Run the game in" setting, this desktop where that place is refused.
+     */
+    record Place(BotSettings.Where where, String refused) {
+        /** The status line's first sentence. */
+        String describe() {
+            String in = "It starts " + switch (where) {
+                case MY_DESKTOP -> "on this desktop";
+                case PRIVATE_DISPLAY -> "in a private display";
+                case VM -> "in the game VM";
+            };
+            return refused == null ? in + ", as the bot's \"Run the game in\" setting says."
+                    : in + " for this pick only: " + refused
+                    + " The bot's runs still start it where that setting says.";
+        }
+    }
+
+    /** {@code preferred} when {@code unavailable} has nothing against it, else this desktop with the reason. */
+    static Place place(BotSettings.Where preferred, Function<BotSettings.Where, Optional<String>> unavailable) {
+        if (preferred == BotSettings.Where.MY_DESKTOP) return new Place(preferred, null);
+        return unavailable.apply(preferred)
+                .map(why -> new Place(BotSettings.Where.MY_DESKTOP, why))
+                .orElseGet(() -> new Place(preferred, null));
     }
 
     /**

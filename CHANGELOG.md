@@ -207,6 +207,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Changed
 
+- **▶ Launch and pick no longer asks where to start the game** (2026-11-26): it starts it where the bot's *Run the
+  game in* setting says, a private display by default, and on this desktop where that place is not available here;
+  the dialog's status line says which, and why.
 - **"Choose an emulator" is gone** (2026-11-25): the Game window's Android apps tab does what it did. An
   `@EmulatorName` slot (`Emulators.use("…")`) is a menu of this computer's instances and phones, with
   Emulators…; it no longer points the bot's launch target at an app. The Games tab's Google Play search went with
