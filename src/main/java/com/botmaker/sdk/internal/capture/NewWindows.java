@@ -6,10 +6,9 @@ package com.botmaker.sdk.internal.capture;
 import com.botmaker.session.display.GamescopeHost;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.WindowMatch;
-import com.botmaker.shared.launch.LaunchKind;
+import com.botmaker.shared.launch.GameMarker;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.RunningProbe;
-import com.botmaker.shared.launch.SteamIds;
 import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.shared.platform.Os;
 
@@ -38,7 +37,7 @@ public final class NewWindows {
 
     /** One window a launch opened, and the identity a pick of it saves. */
     public record Candidate(GenericWindow window, WindowIdentity identity, boolean launcher, boolean ofLaunch,
-                            boolean recommended) {}
+                            boolean marked, boolean recommended) {}
 
     private NewWindows() {}
 
@@ -81,6 +80,16 @@ public final class NewWindows {
      */
     public static List<Candidate> ranked(Set<Object> before, List<GenericWindow> now, LongPredicate launcherUi,
                                          LongPredicate ofLaunch, String gameClass) {
+        return ranked(before, now, launcherUi, ofLaunch, gameClass, pid -> false);
+    }
+
+    /**
+     * {@link #ranked(Set, List, LongPredicate, LongPredicate, String)}, a window whose process {@code marked} accepts
+     * — its launcher named the target's game in it, {@code GameMarker} (2026-11-26) — right after the target's class
+     * and before the launch's tree.
+     */
+    public static List<Candidate> ranked(Set<Object> before, List<GenericWindow> now, LongPredicate launcherUi,
+                                         LongPredicate ofLaunch, String gameClass, LongPredicate marked) {
         List<Candidate> fresh = new ArrayList<>();
         for (GenericWindow window : pickable(now)) {
             if (before.contains(window.getNativeHandle())) continue;
@@ -88,15 +97,18 @@ public final class NewWindows {
             if (identity == null) continue;
             // A launch that starts the launcher itself (Steam closed) has the launcher's library in its tree: still last.
             boolean launched = ofLaunch.test(window.getPid());
+            boolean named = marked.test(window.getPid());
             // The class says it too: under Wine a launcher's process is Wine's, and Windows may not name a process.
-            // Not for a window the launch owns: a target that is the store itself (exe:…\Battle.net.exe) is its game.
+            // Not for a window the launch owns or its launcher named: a target that is the store itself
+            // (exe:…\Battle.net.exe, Lutris's Battle.net) is its game.
             boolean launcher = launcherUi.test(window.getPid())
-                    || !launched && RunningProbe.launcherClass(identity.windowClass());
-            fresh.add(new Candidate(window, identity, launcher, launched, false));
+                    || !launched && !named && RunningProbe.launcherClass(identity.windowClass());
+            fresh.add(new Candidate(window, identity, launcher, launched, named, false));
         }
         fresh.sort(Comparator.comparing(Candidate::launcher)
                 .thenComparing((Candidate c) -> !c.identity().windowClass().equalsIgnoreCase(
                         gameClass == null ? "" : gameClass))
+                .thenComparing((Candidate c) -> !c.marked())
                 .thenComparing((Candidate c) -> !c.ofLaunch())
                 .thenComparing(Comparator.comparingLong((Candidate c) -> area(c.window())).reversed()));
         Map<String, Candidate> once = new LinkedHashMap<>();
@@ -106,19 +118,17 @@ public final class NewWindows {
         for (Candidate c : once.values()) {
             boolean first = !recommended && !c.launcher();
             recommended |= first;
-            ranked.add(new Candidate(c.window(), c.identity(), c.launcher(), c.ofLaunch(), first));
+            ranked.add(new Candidate(c.window(), c.identity(), c.launcher(), c.ofLaunch(), c.marked(), first));
         }
         return ranked;
     }
 
     /**
-     * The window class {@code target}'s game is known to open, or {@code null}: Proton names a Steam game's window
-     * {@code steam_app_<appid>}, the appid Steam's launch carries ({@link SteamIds#appId}).
+     * The window class {@code target}'s game is known to open, or {@code null}: Proton names a window
+     * {@code steam_app_<id>}, a Steam game's appid or umu's id of a Faugus one ({@link GameMarker#windowClass}).
      */
     public static String gameClass(LaunchSpec target) {
-        if (target == null || target.kind() != LaunchKind.STEAM) return null;
-        String appId = SteamIds.appId(target.token());
-        return appId.isEmpty() ? null : "steam_app_" + appId;
+        return GameMarker.windowClass(target);
     }
 
     /**
@@ -137,7 +147,7 @@ public final class NewWindows {
             }
             WindowIdentity identity = WindowIdentity.of(window);
             if (identity != null && (biggest == null || area(window) > area(biggest.window()))) {
-                biggest = new Candidate(window, identity, false, false, true);
+                biggest = new Candidate(window, identity, false, false, false, true);
             }
         }
         return biggest;
@@ -147,14 +157,19 @@ public final class NewWindows {
      * The candidates of {@code ranked} the ranking cannot tell apart (2026-11-25): at least two no launcher owns, the
      * recommended one first, each as far up as it by the launch's tree, so only size put it on top. Empty when the
      * recommended one won by its owner or is alone, and when it is of the target's class ({@code gameClass}): every
-     * window of that class is the game's, and the biggest is right, as {@link #refocused} takes it.
+     * window of that class is the game's, and the biggest is right, as {@link #refocused} takes it. A recommended one
+     * its launcher named ({@link Candidate#marked}) is in doubt only with another named one.
      */
     public static List<Candidate> doubt(List<Candidate> ranked, String gameClass) {
         Candidate top = recommended(ranked);
         if (top == null || ofClass(top, gameClass)) return List.of();
         List<Candidate> tied = new ArrayList<>();
         for (Candidate candidate : ranked) {
-            if (!candidate.launcher() && candidate.ofLaunch() == top.ofLaunch()) tied.add(candidate);
+            // Its launcher named the game in its process: the game's, unless another window is named too (a
+            // pre-launcher, a crash reporter, which inherit the same environment).
+            boolean same = top.marked() ? candidate.marked()
+                    : !candidate.marked() && candidate.ofLaunch() == top.ofLaunch();
+            if (!candidate.launcher() && same) tied.add(candidate);
         }
         return tied.size() < 2 ? List.of() : List.copyOf(tied);
     }

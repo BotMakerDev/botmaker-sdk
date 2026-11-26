@@ -21,6 +21,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Added
 
+- **A launch's window is told by what its launcher wrote in the game's process** (2026-11-26): on Linux, a window
+  whose process carries the target's game (Steam's `SteamAppId`, Faugus's `FAUGUSID`, Lutris's `GAME_NAME`) goes
+  right after one of the target's class and leaves no doubt, so a Lutris or Faugus game outside the launch's own
+  processes is picked without asking. A Faugus target names its window class too, umu's `steam_app_<id>`. Both the
+  run and ▶ Launch and pick read it. Two such windows (a pre-launcher beside the game) are still asked about, and one
+  of a store's class is not taken for the launcher's. A run's launch also sets `BOTMAKER_LAUNCH=<its own id>` on what
+  it starts, so a game that leaves the launch's processes (Wine's `start.exe` gone) still counts as the launch's own.
 - **A run that cannot tell which window its launch opened is the game's asks you** (2026-11-25): when two or more
   new windows are left that only size tells apart (two Wine windows under Lutris), Studio opens *Which window is the
   game?*, a big still of the selected window beside a list of all of them, the run's guess selected. *Use this

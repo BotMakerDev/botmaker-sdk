@@ -32,12 +32,20 @@ Which new window is the game's (`NewWindows.ranked`, 2026-11-25):
   window that takes the game's name starts the 3 s again.
 - A launcher's window goes last and is never picked: told by its process, or by its class (`launcherClass`) when the
   launched process does not own it, so that a store can be the target itself.
-- Among the others, a window of the class the target names goes first (a Steam game's `steam_app_<appid>`), then one
-  the launched process or a child of it owns, then the bigger.
+- Among the others, a window of the class the target names goes first (`steam_app_<id>`: a Steam game's appid, or
+  umu's id of a Faugus game), then one whose process its launcher named the game in (shared's `GameMarker`,
+  2026-11-26: Steam's `SteamAppId`, Faugus's `FAUGUSID`, Lutris's `GAME_NAME`; read from `/proc`, so Linux only),
+  then one of the launch's own: the launched process or a child of it, or a process carrying the launch's
+  `BOTMAKER_LAUNCH` id, which every process the run starts detached gets and a game re-parented out of the tree keeps
+  (Wine's `start.exe` gone, a double fork; lost when the launch is handed to a launcher that runs already, or to
+  Flatpak). Then the bigger. A target whose launcher sets none of these (Heroic, Bottles, a plain program) falls back on
+  the launch's tree and size. A window its launcher named is never a launcher's, whatever its class: Lutris's
+  Battle.net can be the target.
 - Titles are compared without their numbers and white space: `Game - 60 fps` finds `Game - 144 fps`.
 - A launch that opened no window in 10 s only brought the game to the front: the biggest open window of the target's
   class is picked. Only a Steam target names one.
-- When only size tells two windows apart, a run Studio or the core started asks in the *Which window is the game?*
+- When only size tells two windows apart (neither of the target's class, or both named by its launcher: a
+  pre-launcher and the game inherit one environment), a run Studio or the core started asks in the *Which window is the game?*
   picker (`plugin/source/WindowDoubtPicker`) for 30 s, then takes its guess and keeps nothing. A run no host started
   keeps its guess.
 - A hidden window is not listed, since its pixels cannot be read: a minimized one, and on KDE a game's that opened

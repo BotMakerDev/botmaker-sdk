@@ -24,6 +24,7 @@ import com.botmaker.session.launch.BackgroundLauncher;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeController;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.GameMarker;
 import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.RunningProbe;
@@ -46,6 +47,7 @@ import javafx.stage.Window;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.LongPredicate;
 
 /**
  * The source picker's ▶ Launch and pick: starts the game this computer launches — on this desktop, in a private
@@ -195,7 +197,7 @@ final class LaunchAndPick {
                 NativeController desktop = NativeControllerFactory.get();
                 Set<Object> before = WindowWatch.handles(windows(desktop));
                 QuickLaunch.launchOnDesktop(spec, services, (ok, message) -> status.setText(message), launched -> {
-                    if (launched) watch(desktop, before, NewWindows.gameClass(spec));
+                    if (launched) watch(desktop, before, spec);
                     else failed.run();
                 });
             }
@@ -205,7 +207,7 @@ final class LaunchAndPick {
                         ? SessionHandoff.rejoin(services, BackgroundLauncher.forProject(
                         ResourceMove.resourcesRoot(services.resourcesDir()))) : null;
                 // Everything in a display of the game's own is the game's: no window was there before.
-                if (session != null) watch(session.controller(), Set.of(), NewWindows.gameClass(spec));
+                if (session != null) watch(session.controller(), Set.of(), spec);
                 else failed.run();
             });
             case VM -> QuickLaunch.launchInVm(spec, services, (ok, message) -> status.setText(message), launched -> {
@@ -221,16 +223,20 @@ final class LaunchAndPick {
 
     /**
      * Lists {@code controller}'s windows until the dialog closes or {@link #WATCH_MS} passes, showing the new ones, a
-     * window of {@code gameClass} first ({@link NewWindows#gameClass}).
+     * window of {@code spec}'s class first ({@link NewWindows#gameClass}), then one whose process its launcher named
+     * ({@link GameMarker}).
      */
-    private void watch(NativeController controller, Set<Object> before, String gameClass) {
+    private void watch(NativeController controller, Set<Object> before, LaunchSpec spec) {
         watching = true;
         Thread.ofVirtual().name("launch-and-pick").start(() -> {
+            String gameClass = NewWindows.gameClass(spec);
+            GameMarker marker = GameMarker.of(spec);
+            LongPredicate marked = pid -> marker != null && marker.marks(pid);
             long until = System.currentTimeMillis() + WATCH_MS;
             List<Candidate> shown = List.of();
             while (watching && System.currentTimeMillis() < until) {
                 List<Candidate> ranked = WindowWatch.ranked(before, windows(controller),
-                        RunningProbe::launcherUi, gameClass);
+                        RunningProbe::launcherUi, gameClass, marked);
                 if (!WindowWatch.same(shown, ranked)) {
                     shown = ranked;
                     Platform.runLater(() -> render(ranked));

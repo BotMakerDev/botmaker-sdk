@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -208,6 +209,54 @@ class NewWindowsTest {
         assertTrue(ranked.getFirst().recommended());
         assertTrue(ranked.stream().skip(1).allMatch(Candidate::launcher));
         assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
+
+    /**
+     * Lutris's Wine game, which the launch's tree does not own, beside a bigger Wine window: the process its launcher
+     * named (2026-11-26) is the game's, and leaves no doubt.
+     */
+    @Test
+    void theWindowItsProcessNamesWinsAndLeavesNoDoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Battle.net", 1600, 9, "wine"),
+                window(2, "Trackmania", 1280, 8, "wine")), pid -> false, pid -> false, null, pid -> pid == 8);
+        assertEquals("wine|Trackmania", NewWindows.recommended(ranked).identity().spec());
+        assertTrue(ranked.getFirst().marked());
+        assertTrue(NewWindows.doubt(ranked, null).isEmpty());
+    }
+
+    /** The game's class still goes first: a marked window of another class is not preferred to it. */
+    @Test
+    void theGamesClassGoesBeforeAMarkedWindow() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Crash reporter", 1600, 8, "wine"),
+                window(2, "Balatro", 1280, 8, "steam_app_2379780")), pid -> false, pid -> false,
+                "steam_app_2379780", pid -> pid == 8);
+        assertEquals("steam_app_2379780", NewWindows.recommended(ranked).identity().spec());
+    }
+
+    /** Lutris's Battle.net as the target: its window, a store's by class, is the game since its launcher named it. */
+    @Test
+    void aMarkedWindowOfAStoresClassIsTheGame() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Battle.net", 1280, 8, "Battle.net.exe")),
+                pid -> false, pid -> false, null, pid -> pid == 8);
+        assertFalse(ranked.getFirst().launcher());
+        assertEquals("Battle.net.exe", NewWindows.recommended(ranked).identity().spec());
+    }
+
+    /** A pre-launcher and the game inherit one environment: two named windows only size tells apart are a doubt. */
+    @Test
+    void twoMarkedWindowsAreADoubt() {
+        List<Candidate> ranked = NewWindows.ranked(Set.of(), List.of(window(1, "Launcher", 900, 8, "wine"),
+                window(2, "Game", 1280, 9, "wine"), window(3, "Other", 1600, 7, "wine")),
+                pid -> false, pid -> false, null, pid -> pid == 8 || pid == 9);
+        List<Candidate> doubt = NewWindows.doubt(ranked, null);
+        assertEquals(List.of("wine|Game", "wine|Launcher"),
+                doubt.stream().map(c -> c.identity().spec()).toList());
+    }
+
+    /** A Lutris target names no class, since that would read its library: Lutris's CLI may take seconds. */
+    @Test
+    void aLutrisTargetReadsNoLibraryForItsClass() {
+        assertNull(NewWindows.gameClass(LaunchSpec.parse("lutris:3")));
     }
 
     /** One window alone is no doubt. */

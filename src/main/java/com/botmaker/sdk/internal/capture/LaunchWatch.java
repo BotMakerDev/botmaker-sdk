@@ -14,6 +14,7 @@ import com.botmaker.sdk.internal.trace.Say;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.GameMarker;
 import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.shared.launch.Launcher;
 import com.botmaker.shared.launch.RunningProbe;
@@ -91,6 +92,19 @@ public final class LaunchWatch {
 
         /** Tells whoever was asked that the question is over. */
         default void settled(LaunchSpec target) {}
+
+        /** Whether {@code pid}'s launcher named the target's game in it ({@code GameMarker}, 2026-11-26). */
+        default boolean marked(long pid) {
+            return false;
+        }
+
+        /**
+         * Whether {@code pid} carries this launch's own marker ({@code BOTMAKER_LAUNCH}, 2026-11-26): the launch's,
+         * as one of its tree is, though re-parented out of it.
+         */
+        default boolean ofThisLaunch(long pid) {
+            return false;
+        }
     }
 
     /**
@@ -212,7 +226,8 @@ public final class LaunchWatch {
             }
             List<GenericWindow> now = desktop.open();
             List<Candidate> ranked = NewWindows.ranked(before, now, desktop::launcherUi,
-                    pid -> launched > 0 && desktop.inTree(launched, pid), gameClass);
+                    pid -> launched > 0 && desktop.inTree(launched, pid) || desktop.ofThisLaunch(pid), gameClass,
+                    desktop::marked);
             for (Candidate candidate : ranked) seen.add(candidate.window().getTitle());
             Candidate best = NewWindows.recommended(ranked);
             openedOne |= best != null;
@@ -274,7 +289,26 @@ public final class LaunchWatch {
 
     /** This computer's desktop, for {@code target}. */
     static Desktop host(LaunchSpec target) {
+        GameMarker launch = GameMarker.launch();
         return new Desktop() {
+            // Read on the first window, not before the launch: a Lutris target's name may take its CLI seconds.
+            private GameMarker marker;
+            private boolean markerRead;
+
+            @Override
+            public boolean marked(long pid) {
+                if (!markerRead) {
+                    marker = GameMarker.of(target);
+                    markerRead = true;
+                }
+                return marker != null && marker.marks(pid);
+            }
+
+            @Override
+            public boolean ofThisLaunch(long pid) {
+                return launch.marks(pid);
+            }
+
             @Override
             public List<GenericWindow> open() {
                 try {
@@ -299,7 +333,7 @@ public final class LaunchWatch {
             @Override
             public long launch() {
                 SessionBootstrap.requireReady(target);
-                Process process = Launcher.start(target);
+                Process process = launch.during(() -> Launcher.start(target));
                 return process == null ? -1 : process.pid();
             }
 

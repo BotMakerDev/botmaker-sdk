@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.LongPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -111,6 +112,22 @@ class LaunchWatchTest {
         @Override
         public void pause(Duration duration) {
             clock.now = clock.now.plus(duration);
+        }
+
+        /** The processes the target's launcher named; none by default. */
+        LongPredicate marked = pid -> false;
+
+        @Override
+        public boolean marked(long pid) {
+            return marked.test(pid);
+        }
+
+        /** The processes that carry this launch's own marker; none by default. */
+        LongPredicate ofThisLaunch = pid -> false;
+
+        @Override
+        public boolean ofThisLaunch(long pid) {
+            return ofThisLaunch.test(pid);
         }
 
         /** Whether someone is there to answer a doubt. */
@@ -355,6 +372,32 @@ class LaunchWatchTest {
         desktop.canAsk = true;
         LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
         assertEquals("steam_app_440", picked.identity().spec());
+        assertTrue(desktop.asked.isEmpty());
+    }
+
+    /** The window whose process the launcher named is the game's, though smaller: no question. */
+    @Test
+    void theProcessItsLauncherNamedLeavesNoDoubt() {
+        FakeDesktop desktop = twoWineWindows();
+        desktop.canAsk = true;
+        desktop.marked = pid -> pid == 9;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("wine|Battle.net", picked.identity().spec());
+        assertEquals(LaunchWatch.Result.How.OPENED, picked.how());
+        assertTrue(desktop.asked.isEmpty());
+    }
+
+    /**
+     * A launch handed off (no process of its own), whose game kept the launch's marker: that window is the launch's,
+     * as one of its tree is, and leaves no doubt.
+     */
+    @Test
+    void theProcessCarryingTheLaunchsMarkerLeavesNoDoubt() {
+        FakeDesktop desktop = twoWineWindows();
+        desktop.canAsk = true;
+        desktop.ofThisLaunch = pid -> pid == 9;
+        LaunchWatch.Result.Picked picked = assertInstanceOf(LaunchWatch.Result.Picked.class, desktop.watch());
+        assertEquals("wine|Battle.net", picked.identity().spec());
         assertTrue(desktop.asked.isEmpty());
     }
 
