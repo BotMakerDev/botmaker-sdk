@@ -3,6 +3,10 @@
 
 package com.botmaker.sdk.plugin;
 
+import com.botmaker.plugin.api.meta.Migrate;
+import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
+
 /**
  * The SDK's own migration rules: one {@code @Migrate} method per {@code api} element this release keeps as
  * {@code @Deprecated(forRemoval = true)}, written the way a bot's author writes one (the method's name is the old
@@ -23,4 +27,11 @@ package com.botmaker.sdk.plugin;
 final class Migrations {
 
     private Migrations() {}
+
+    /** 2026-11-26: an instance a run played on is the Android place of that name ({@code Instance.named(x)}). */
+    @SuppressWarnings("removal")
+    @Migrate(value = Instance.class, kind = Migrate.Kind.TYPE)
+    static Place instance(String name) {
+        return Place.android(name);
+    }
 }

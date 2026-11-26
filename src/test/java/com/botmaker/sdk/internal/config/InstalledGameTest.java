@@ -8,7 +8,7 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.capture.Source;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
@@ -32,22 +32,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class InstalledGameTest {
 
     @Test
-    void anEmulatorCaptureMovesToTheInstanceItWasDealtAndKeepsItsRegion() {
-        CaptureSource moved = InstalledGame.onInstance(CaptureSource.emulator("LDPlayer-1"),
-                Instance.named("LDPlayer-3"));
+    void anEmulatorCaptureMovesToTheAndroidPlaceItWasDealtAndKeepsItsRegion() {
+        CaptureSource moved = InstalledGame.onPlace(CaptureSource.emulator("LDPlayer-1"),
+                Place.android("LDPlayer-3"));
         assertEquals("LDPlayer-3", assertInstanceOf(EmulatorSource.class, moved).instanceName());
 
         Rect top = new Rect(0, 0, 100, 40);
-        CaptureSource region = InstalledGame.onInstance(CaptureSource.emulator("LDPlayer-1").region(top),
-                Instance.named("LDPlayer-3"));
+        CaptureSource region = InstalledGame.onPlace(CaptureSource.emulator("LDPlayer-1").region(top),
+                Place.android("LDPlayer-3"));
         assertEquals("LDPlayer-3", assertInstanceOf(EmulatorSource.class, region.base()).instanceName());
         assertEquals(top, region.subRegion());
 
         CaptureSource window = CaptureSource.window("game.exe", "");
-        assertSame(window, InstalledGame.onInstance(window, Instance.named("LDPlayer-3")),
+        assertSame(window, InstalledGame.onPlace(window, Place.android("LDPlayer-3")),
                 "a capture that is no emulator's keeps its source");
         CaptureSource own = CaptureSource.emulator("LDPlayer-1");
-        assertSame(own, InstalledGame.onInstance(own, Instance.named("")), "an instance naming none changes nothing");
+        assertSame(own, InstalledGame.onPlace(own, Place.android("")), "a place naming no instance changes nothing");
+        assertSame(own, InstalledGame.onPlace(own, Place.desktop()), "a PC place leaves the capture");
+        assertSame(own, InstalledGame.onPlace(own, Place.vm("LDPlayer-3")), "a VM is no instance, whatever its name");
     }
 
     @Test

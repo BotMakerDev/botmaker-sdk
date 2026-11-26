@@ -9,7 +9,11 @@ package com.botmaker.sdk.api.capture;
  * {@code 2026-11-15-run-claims-design.md} §2). An emulator capture source reads its instance from it, so several runs
  * at once are each dealt one of this PC's instances and never share one. {@code Instance.named("")} names none: the
  * capture source's own name is used.
+ *
+ * @deprecated 2026-11-26: {@link Place} replaces it, {@code Instance.named(x)} becoming {@code Place.android(x)} by the
+ *     SDK's {@code @Migrate} rule; the next release deletes it.
  */
+@Deprecated(forRemoval = true)
 public final class Instance {
 
     private final String name;

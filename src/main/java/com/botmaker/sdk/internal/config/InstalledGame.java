@@ -53,7 +53,7 @@ public final class InstalledGame {
     private static volatile String launchChoice = "";
     private static volatile String vm = "";
     private static volatile ZoneId gameZone = ZoneId.systemDefault();
-    /** The instance {@code instance()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
+    /** The instance {@code place()} moved the capture onto, or {@code ""}: where an emulator app is launched. */
     private static volatile String playsOn = "";
     /** The desktop game whose launch's window the run reads, or {@code null}: {@link #pendingWatch}. */
     private static volatile WatchLaunch pendingWatch;
@@ -77,7 +77,7 @@ public final class InstalledGame {
         Optional<CaptureSource> saved = AutoCapture.wantsSavedWindow(capture, target)
                 ? AutoPicks.run().saved(target) : Optional.empty();
         AutoCapture.Inputs inputs = new AutoCapture.Inputs(System.getProperty(CAPTURE_EMULATOR), target, capture,
-                marked(SdkValue.Id.INSTANCE, values), saved, InstalledGame::runningInstances);
+                marked(SdkValue.Id.PLACE, values), saved, InstalledGame::runningInstances);
         AutoCapture.Decision decision = AutoCapture.decide(inputs);
         // Before the first click: an instance another run plays is refused here, not fought over.
         PlaceClaims.toClaim(inputs, decision).ifPresent(instance -> PlaceClaims.claim(instance, Claims::claim));
@@ -145,12 +145,13 @@ public final class InstalledGame {
     }
 
     /**
-     * {@code capture} on the instance {@code instance} names, when the capture is an emulator's (a region of it kept);
-     * else {@code capture} as it is. Several runs at once are each dealt an instance into the bot's {@code instance()},
-     * so this is what keeps two of them off one emulator. Studio's own views look where the run plays through it too.
+     * {@code capture} on the instance {@code place} names, when it is an Android place and the capture is an
+     * emulator's (a region of it kept); else {@code capture} as it is. Several runs at once are each dealt a place into
+     * the bot's {@code place()}, so this is what keeps two of them off one emulator. Studio's own views look where the
+     * run plays through it too.
      */
-    public static CaptureSource onInstance(CaptureSource capture, Object instance) {
-        return AutoCapture.onInstance(capture, instance);
+    public static CaptureSource onPlace(CaptureSource capture, Object place) {
+        return AutoCapture.onPlace(capture, place);
     }
 
     /**

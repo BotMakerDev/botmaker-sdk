@@ -4,7 +4,7 @@
 package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.plugin.api.run.LiveRuns;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -13,7 +13,7 @@ import com.botmaker.shared.emulator.config.Operation;
 /**
  * Setup holds the instance it works on (spec {@code 2026-11-15-run-claims-design.md} §5, phase 8b): an operation of
  * the Emulators window on an existing instance (Apply, its Google sign-in included, clone, rename, delete) holds it in
- * this PC's live runs while it runs, as the instance {@code instance()} is dealt, so a start of several runs is dealt
+ * this PC's live runs while it runs, as the Android place {@code place()} is dealt, so a start of several runs is dealt
  * another meanwhile; and it ends at once, saying so, on one a live run plays on.
  */
 final class InstanceHolds {
@@ -30,7 +30,7 @@ final class InstanceHolds {
             if (name == null || name.isBlank()) return body.run(context);
             LiveRuns.Held held;
             try {
-                held = runs.hold(SdkValues.INSTANCE, Instance.named(name), HOLDER);
+                held = runs.hold(SdkValues.PLACE, Place.android(name), HOLDER);
             } catch (LiveRuns.Taken e) {
                 return "A bot's run plays on " + instance.name() + ", so it was left alone: " + e.getMessage();
             } catch (RuntimeException e) {

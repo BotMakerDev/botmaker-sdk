@@ -6,7 +6,7 @@ package com.botmaker.sdk.plugin.screen;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.source.ManagedParam;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.AutoCapture;
@@ -71,11 +71,11 @@ public final class CaptureValue {
 
     private static CaptureSource current(StudioServices services, CaptureSource unpicked) {
         CaptureSource written = written(services);
-        Instance dealt = read(services, SdkValues.INSTANCE, Instance.class).orElse(null);
+        Place dealt = read(services, SdkValues.PLACE, Place.class).orElse(null);
         LaunchSpec target = LaunchTargets.spec(services);
         // A website is read in a run's own browser, which Studio's views have not: they keep what the bot writes.
         if (target != null && target.kind() == LaunchKind.WEB) {
-            return AutoCapture.isAutomatic(written, target) ? null : InstalledGame.onInstance(written, dealt);
+            return AutoCapture.isAutomatic(written, target) ? null : InstalledGame.onPlace(written, dealt);
         }
         return resolved(services, target, written, dealt, unpicked);
     }
@@ -87,12 +87,12 @@ public final class CaptureValue {
      * would stop ({@link AutoCapture.Decision.Fail}): a decision of no source is the whole desktop, which a view grabs.
      */
     static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
-                                  Instance dealt) {
+                                  Place dealt) {
         return resolved(services, target, written, dealt, CaptureSource.desktop());
     }
 
     static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
-                                  Instance dealt, CaptureSource unpicked) {
+                                  Place dealt, CaptureSource unpicked) {
         AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, target, written, dealt,
                 savedWindow(services, target, written), List::of));
         return switch (decision) {
@@ -122,7 +122,7 @@ public final class CaptureValue {
     }
 
     /**
-     * The capture source as the bot writes it, before {@code instance()} moves an emulator's onto the instance it
+     * The capture source as the bot writes it, before {@code place()} moves an emulator's onto the instance it
      * names: what a rewrite of the parameter starts from, and what the source picker preselects.
      */
     public static CaptureSource written(StudioServices services) {
@@ -234,13 +234,13 @@ public final class CaptureValue {
         return write(services, region == null ? base : CaptureSource.region(base, region));
     }
 
-    /** The instance the bot's {@code instance()} names, when it names one. */
+    /** The instance the bot's {@code place()} names, when it is an Android place naming one. */
     public static Optional<String> instanceNamed(StudioServices services) {
-        return read(services, SdkValues.INSTANCE, Instance.class).filter(Instance::isNamed).map(Instance::name);
+        return read(services, SdkValues.PLACE, Place.class).filter(Place::namesAndroid).map(Place::name);
     }
 
     /**
-     * Points the bot's {@code instance()} at an instance's new name when it names one renamed ({@code moves}: old
+     * Points the bot's {@code place()} at an instance's new name when it names one renamed ({@code moves}: old
      * name → new). Call it on the JavaFX application thread.
      *
      * @return empty when written or nothing changed, else why nothing was
@@ -248,7 +248,7 @@ public final class CaptureValue {
     public static Optional<String> instanceRenamed(StudioServices services, Map<String, String> moves) {
         String renamed = instanceNamed(services).map(moves::get).orElse(null);
         if (renamed == null) return Optional.empty();
-        return ParamSlot.open(services, SdkValues.INSTANCE).map(ctx -> ctx.write(Instance.named(renamed)))
+        return ParamSlot.open(services, SdkValues.PLACE).map(ctx -> ctx.write(Place.android(renamed)))
                 .orElse(Optional.empty());
     }
 

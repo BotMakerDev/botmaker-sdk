@@ -3,7 +3,9 @@
 
 package com.botmaker.sdk.internal.config;
 
+import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.capture.AutoCapture;
 import com.botmaker.sdk.internal.plan.DoneKey;
@@ -22,10 +24,10 @@ public final class PlaceClaims {
 
     private PlaceClaims() {}
 
-    /** The claim key of {@code instance}, the SDK pool's hold of {@code Instance.named(instance)}. */
+    /** The claim key of {@code instance}, the SDK pool's hold of {@code Place.android(instance)}. */
     public static String key(String instance) {
-        return DoneRecords.GROUP + ":" + DoneRecords.ARTIFACT + "/" + SdkValues.INSTANCE.id() + "/"
-                + Instance.class.getName() + ".named(" + quoted(instance) + ")";
+        return DoneRecords.GROUP + ":" + DoneRecords.ARTIFACT + "/" + SdkValues.PLACE.id() + "/"
+                + Place.class.getName() + ".android(" + quoted(instance) + ")";
     }
 
     /**
@@ -35,19 +37,30 @@ public final class PlaceClaims {
      */
     public static Optional<String> toClaim(AutoCapture.Inputs in, AutoCapture.Decision decision) {
         if (in.emulatorProperty() != null && !in.emulatorProperty().isBlank()) return Optional.empty();
-        if (in.dealt() instanceof Instance dealt && dealt.isNamed()) return Optional.empty();
+        if (!AutoCapture.android(in.dealt()).isEmpty()) return Optional.empty();
         if (!(decision instanceof AutoCapture.Decision.Fixed fixed)) return Optional.empty();
         String instance = DoneKey.instance(fixed.source());
         return instance.isEmpty() ? Optional.empty() : Optional.of(instance);
     }
 
     /**
-     * Claims {@code instance} through {@code claims} ({@code Claims::claim} in a run), or throws the words that stop
-     * the run: another run plays there. The contract's claim says no holder, and answers no too when the live runs
-     * cannot be read, so the words name no holder and say both.
+     * The key a run of the SDK before places holds {@code instance} by ({@code Instance.named(instance)} under
+     * {@code SdkValue.Id.INSTANCE}), claimed beside {@link #key} for one release so a run of either SDK sees the
+     * other's. It goes with {@code Instance}.
+     */
+    @SuppressWarnings("removal")
+    static String oldKey(String instance) {
+        return DoneRecords.GROUP + ":" + DoneRecords.ARTIFACT + "/" + SdkValue.Id.class.getName() + "."
+                + SdkValue.Id.INSTANCE.name() + "/" + Instance.class.getName() + ".named(" + quoted(instance) + ")";
+    }
+
+    /**
+     * Claims {@code instance} through {@code claims} ({@code Claims::claim} in a run), by its key and its key before
+     * places, or throws the words that stop the run: another run plays there. The contract's claim says no holder,
+     * and answers no too when the live runs cannot be read, so the words name no holder and say both.
      */
     public static void claim(String instance, Predicate<String> claims) {
-        if (!claims.test(key(instance))) {
+        if (!claims.test(key(instance)) || !claims.test(oldKey(instance))) {
             throw new IllegalStateException(instance + " is played by another run, or this PC's runs could not be"
                     + " read; stop it, or run on another instance");
         }

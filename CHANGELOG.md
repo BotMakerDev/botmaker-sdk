@@ -28,6 +28,15 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `run_bot`) claims the one it plays on before its first click. When a run of several plays there already, it stops
   with "Pixel 10 is played by another run, or this PC's runs could not be read; stop it, or run on another instance".
   A run the host names an instance for (the Emulators window's sign-in) claims nothing: the host holds that instance.
+- **Breaking: `Place` replaces `Instance`.** Where a run plays is `Sdk.place()`, a `Place`:
+  `Place.android("Pixel 10")`, `Place.desktop()`, `Place.privateDisplay(2)` or `Place.vm("win11")`, each on this PC.
+  Several runs at once are dealt places by the SDK's pool `PLACES` (it was `INSTANCES`); for now it deals only this
+  PC's emulator instances, as before. `Instance` and `SdkValue.Id.INSTANCE` are deprecated for removal: Studio's
+  upgrade removes a bot's old `instance()`, or keeps it unmarked while the bot's own code still names it, and adds
+  `place()`; the SDK's `@Migrate` rule, read when a bot moves on from this release, rewrites a leftover
+  `Instance.named(x)` to `Place.android(x)`. A value picked for `instance()` is not carried over: `place()` starts at
+  the capture source's own instance. For this release a run claims its instance under both keys, so it sees a run of
+  an older SDK; a pooled deal holds only the new key, so a run of an older SDK does not see it.
 
 ### Added
 

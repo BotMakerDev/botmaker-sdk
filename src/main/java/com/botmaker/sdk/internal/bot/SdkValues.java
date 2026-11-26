@@ -18,7 +18,7 @@ import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.bot.Run;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.api.geometry.Size;
 import com.botmaker.sdk.api.plan.Goal;
@@ -266,17 +266,17 @@ public final class SdkValues implements ValueHolder {
             .because("This is where the bot reads pixels from. Choose it in the Runner or in Project ▸ Parameters.");
 
     /**
-     * The emulator instance a run plays on — {@code public Instance instance()}, declared only while {@link #CAPTURE}
-     * is an emulator (2026-11-15, spec {@code 2026-11-15-run-claims-design.md} §2). The SDK's pool
-     * ({@code SdkPools}) deals each of several runs one of this PC's instances into it; one run uses its value. A run
+     * Where a run plays — {@code public Place place()} (2026-11-26, spec {@code 2026-11-26-run-places-design.md} §1;
+     * it was {@code Instance instance()}), declared only while {@link #CAPTURE} is an emulator. The SDK's pool
+     * ({@code SdkPools}) deals each of several runs one of this PC's places into it; one run uses its value. A run
      * reads it by its mark ({@code InstalledGame}), over the capture source's own name.
      */
-    public static final ManagedParam<Instance> INSTANCE = ManagedValue.param(SdkValue.Id.INSTANCE)
+    public static final ManagedParam<Place> PLACE = ManagedValue.param(SdkValue.Id.PLACE)
             .in(SdkValue.Holder.GAME)
-            .startsAs(SdkValues::noInstance)
-            .shown("The emulator instance this run plays on")
+            .startsAs(SdkValues::noPlace)
+            .shown("Where this run plays")
             .when(SdkValues::playsOnEmulator)
-            .because("This is the emulator instance the bot plays on. Several runs at once are each given their own.");
+            .because("This is where the bot plays. Several runs at once are each given their own place.");
 
     /** Whether {@code source} reads an emulator's screen, itself or a region of it. */
     public static boolean onEmulator(CaptureSource source) {
@@ -451,7 +451,7 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(PLANS, GOALS, RUN, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, INSTANCE, VM, GAME_ZONE, GUARD_WORDS,
+                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, PLACE, VM, GAME_ZONE, GUARD_WORDS,
                 FOUND_DELAY, NOT_FOUND_DELAY, RANDOM_CLICKS, CONFIDENCE, COMPARE_MARGIN, MAX_ROUNDS, PATIENCE,
                 FROZEN_AFTER, STUCK_AFTER, RESTART_CAP, RESTARTS_WITHIN, GAME_RUNS_IN, TAKE_OVER, DISPLAY_BACKEND,
                 INPUT_BACKEND);
@@ -544,9 +544,9 @@ public final class SdkValues implements ValueHolder {
         return CaptureSource.automatic();
     }
 
-    /** {@link #INSTANCE}'s: none, so the capture source's own name is used. */
-    private static Instance noInstance() {
-        return Instance.named("");
+    /** {@link #PLACE}'s: an Android place naming none, so the capture source's own instance is used. */
+    private static Place noPlace() {
+        return Place.android("");
     }
 
     /** {@link #LAUNCH_TARGETS}': none, so the bot is run against a game already open. */

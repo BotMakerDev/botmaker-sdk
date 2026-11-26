@@ -7,7 +7,7 @@ import com.botmaker.plugin.api.PoolHolder;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.run.PoolOffer;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
@@ -20,38 +20,39 @@ import java.util.List;
 import java.util.TreeSet;
 
 /**
- * The SDK's pool (spec {@code 2026-11-15-run-claims-design.md} §2, §5): several runs at once are each dealt one of
- * this PC's emulator instances into the bot's {@code instance()}, so no two drive one instance. The candidates are the
- * instances the Emulators window knows (its host values); the offer, when too few are free, opens that window to
- * create more, as many as this PC's memory holds.
+ * The SDK's pool (spec {@code 2026-11-15-run-claims-design.md} §2, §5; {@code 2026-11-26-run-places-design.md} §1):
+ * several runs at once are each dealt one of this PC's places into the bot's {@code place()}, so no two drive one
+ * instance. The candidates are, until phase 3 of the run places plan widens them, the Android places of the instances
+ * the Emulators window knows (its host values); the offer, when too few are free, opens that window to create more, as
+ * many as this PC's memory holds.
  */
 public final class SdkPools implements PoolHolder {
 
-    /** The bot's {@code instance()}, dealt from this PC's instances. */
-    public static final PluginPool<Instance> INSTANCES = PluginPool.fills(SdkValues.INSTANCE)
-            .from(SdkPools::instances)
+    /** The bot's {@code place()}, dealt from this PC's places. */
+    public static final PluginPool<Place> PLACES = PluginPool.fills(SdkValues.PLACE)
+            .from(SdkPools::places)
             .offering((shortfall, services) -> offers(shortfall.missing(), room()));
 
     @Override
     public List<PluginPool<?>> pools() {
-        return List.of(INSTANCES);
+        return List.of(PLACES);
     }
 
-    /** This PC's instances, from the SDK's host values: the pool's candidates and the instance pill's list. */
-    public static List<Instance> instances(StudioServices services) {
-        return instances(HostConfig.load(services));
+    /** This PC's places, from the SDK's host values: the pool's candidates and the place pill's list. */
+    public static List<Place> places(StudioServices services) {
+        return places(HostConfig.load(services));
     }
 
     /**
-     * Every instance {@code state} knows, its own settings or a bot seen launching it, by name in alphabetical order;
-     * an instance named alike under two emulators is one, as a bot names it (by its name alone,
+     * The Android place of every instance {@code state} knows, its own settings or a bot seen launching it, by name in
+     * alphabetical order; an instance named alike under two emulators is one, as a bot names it (by its name alone,
      * {@code CaptureSource.emulator}), and names that differ only in case are two, as an emulator tells them.
      */
-    static List<Instance> instances(HostConfig.State state) {
+    static List<Place> places(HostConfig.State state) {
         TreeSet<String> names = new TreeSet<>();
         state.config().instances().keySet().stream().map(InstanceKey::reference).forEach(names::add);
         state.usedBy().keySet().stream().map(InstanceKey::reference).forEach(names::add);
-        return names.stream().map(Instance::named).toList();
+        return names.stream().map(Place::android).toList();
     }
 
     /**

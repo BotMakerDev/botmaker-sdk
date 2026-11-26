@@ -4,7 +4,7 @@
 package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.web.WebSource;
@@ -93,8 +93,8 @@ public final class AutoCapture {
         }
         CaptureSource capture = in.capture();
         if (!isAutomatic(capture, target)) {
-            CaptureSource moved = onInstance(capture, in.dealt());
-            String playsOn = moved != capture && in.dealt() instanceof Instance named ? named.name() : "";
+            CaptureSource moved = onPlace(capture, in.dealt());
+            String playsOn = moved != capture ? android(in.dealt()) : "";
             return new Decision.Fixed(moved, null, playsOn);
         }
         if (target == null || target.kind() == LaunchKind.UNKNOWN) return new Decision.Fixed(null, null, "");
@@ -132,17 +132,20 @@ public final class AutoCapture {
     }
 
     /**
-     * {@code capture} on the instance {@code instance} names, when the capture is an emulator's (a region of it kept);
-     * else {@code capture} as it is.
+     * {@code capture} on the instance {@code place} names, when the place is an Android one naming an instance and the
+     * capture is an emulator's (a region of it kept); else {@code capture} as it is: a PC place leaves it.
      */
-    public static CaptureSource onInstance(CaptureSource capture, Object instance) {
-        if (!(instance instanceof Instance named) || !named.isNamed() || capture == null
-                || !(capture.base() instanceof EmulatorSource)) {
-            return capture;
-        }
-        CaptureSource moved = CaptureSource.emulator(named.name());
+    public static CaptureSource onPlace(CaptureSource capture, Object place) {
+        String instance = android(place);
+        if (instance.isEmpty() || capture == null || !(capture.base() instanceof EmulatorSource)) return capture;
+        CaptureSource moved = CaptureSource.emulator(instance);
         Rect region = capture.subRegion();
         return region == null ? moved : moved.region(region);
+    }
+
+    /** The instance {@code place} names when it is an Android place naming one; else {@code ""}. */
+    public static String android(Object place) {
+        return place instanceof Place named && named.namesAndroid() ? named.name() : "";
     }
 
     private static CaptureSource unwrapped(CaptureSource source) {
@@ -160,7 +163,7 @@ public final class AutoCapture {
     private static Decision onDevice(LaunchSpec target, Inputs in) {
         String named = target.emulatorInstance();
         String instance;
-        if (in.dealt() instanceof Instance dealt && dealt.isNamed()) instance = dealt.name();
+        if (!android(in.dealt()).isEmpty()) instance = android(in.dealt());
         else if (named != null && !named.isBlank()) instance = named;
         else {
             List<String> running = in.runningInstances().get();

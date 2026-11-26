@@ -14,6 +14,7 @@ import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
 import com.botmaker.sdk.api.capture.CaptureSource;
 import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.geometry.Point;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.api.geometry.Size;
@@ -41,7 +42,7 @@ import com.botmaker.sdk.internal.vision.TemplateNames;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
-import com.botmaker.sdk.plugin.editors.InstanceEditors;
+import com.botmaker.sdk.plugin.editors.PlaceEditors;
 import com.botmaker.sdk.plugin.editors.LauncherEditors;
 import com.botmaker.sdk.plugin.editors.OcrEditors;
 import com.botmaker.sdk.plugin.editors.PrecisionEditors;
@@ -94,7 +95,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
                 KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                GAME_VM, INSTANCE, SECRET, STATE);
+                GAME_VM, INSTANCE, PLACE, SECRET, STATE);
     }
 
     @Override
@@ -102,6 +103,7 @@ public final class SdkTypes implements TypeHolder {
         List<ComponentType<?>> all = new ArrayList<>(List.of(PICTURE_TAG, COMBO_HELD, STEP));
         all.addAll(PRECISION_WITHERS);
         all.addAll(ELEMENT_BY_OTHER_CLUES);
+        all.addAll(PLACE_ELSEWHERE);
         all.add(OCR_CHAIN);
         return all;
     }
@@ -363,14 +365,36 @@ public final class SdkTypes implements TypeHolder {
             .writtenAs(GameVm::of);
 
     /**
-     * The emulator instance a run plays on, {@code Instance.named("LDPlayer-3")} (2026-11-15). A fresh one names none,
-     * so the capture source's own name is used.
+     * The emulator instance a run played on before places, {@code Instance.named("LDPlayer-3")}: still read, so the
+     * SDK's {@code @Migrate} rule can rewrite a bot's leftover value into a {@link #PLACE}. Drawn as its name, read
+     * only: nothing picks an instance any more.
      */
+    @Deprecated(forRemoval = true)
     public static final DeclaredCallType<Instance> INSTANCE = PluginType.value(Instance.class)
             .fresh(() -> Instance.named(""))
-            .editor(() -> InstanceEditors::instance)
-            .preview(() -> InstanceEditors::preview)
+            .editor(() -> PlaceEditors::oldInstance)
             .writtenAs(Instance::named);
+
+    /**
+     * Where a run plays (2026-11-26): {@code Place.android("Pixel 10")} here, the other kinds in
+     * {@link #PLACE_ELSEWHERE}. A fresh one is the Android place naming none, so the capture source's own instance is
+     * used.
+     */
+    public static final DeclaredCallType<Place> PLACE = PluginType.value(Place.class)
+            .fresh(() -> Place.android(""))
+            .editor(() -> PlaceEditors::place)
+            .preview(() -> PlaceEditors::preview)
+            .writtenAs(Place::android);
+
+    /**
+     * {@link #PLACE} on this PC: {@code Place.desktop()}, {@code Place.privateDisplay(2)} or {@code Place.vm("win11")}.
+     * Equality picks the factory; only the private display's says when, as it refuses display 0.
+     */
+    public static final List<DeclaredCall<Place>> PLACE_ELSEWHERE = List.of(
+            ComponentType.part(Place.class).<Place>writtenAs(Place::desktop),
+            ComponentType.part(Place.class).<Integer, Place>writtenAs(Place::privateDisplay)
+                    .when(place -> place.kind() == Place.Kind.PRIVATE_DISPLAY),
+            ComponentType.part(Place.class).<String, Place>writtenAs(Place::vm));
 
     /**
      * A secret this PC keeps, {@code Secret.of("farm password")} (2026-11-17): picked from those kept, or added. A

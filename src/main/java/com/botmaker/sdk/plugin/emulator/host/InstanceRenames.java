@@ -107,7 +107,7 @@ public final class InstanceRenames {
 
     /**
      * Points the open bot at the new names: its launch targets, the runner's pick, the capture source and the
-     * instance it plays on ({@code instance()}), each a
+     * instance it plays on ({@code place()}), each a
      * write of its own that Undo takes back. Call it on the JavaFX application thread.
      *
      * @return what was changed, for the log and the status line; empty when the bot named no old instance

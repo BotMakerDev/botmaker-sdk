@@ -5,7 +5,7 @@ package com.botmaker.sdk.plugin.emulator.window;
 
 import com.botmaker.plugin.api.run.LiveRuns;
 import com.botmaker.plugin.api.source.ManagedParam;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.PlatformId;
@@ -57,13 +57,13 @@ class InstanceHoldsTest {
         }).run(CONTEXT);
 
         assertNull(ended);
-        assertEquals(List.of("hold " + SdkValues.INSTANCE.id() + " " + Instance.named(FARM.reference())
+        assertEquals(List.of("hold " + SdkValues.PLACE.id() + " " + Place.android(FARM.reference())
                 + " by the Emulators window", "work", "close"), runs.events);
     }
 
     @Test
     void anInstanceALiveRunPlaysOnIsLeftAloneWithTheRunsWords() throws Exception {
-        Recorded runs = new Recorded("Instance.named(\"Farm\") is held by a run of farm (r-1)");
+        Recorded runs = new Recorded("Place.android(\"Farm\") is held by a run of farm (r-1)");
         String ended = InstanceHolds.holding(runs, FARM, context -> {
             runs.events.add("work");
             return null;

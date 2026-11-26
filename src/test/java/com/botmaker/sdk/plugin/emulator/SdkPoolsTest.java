@@ -4,7 +4,7 @@
 package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.api.run.PoolOffer;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
@@ -21,15 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SdkPoolsTest {
 
     @Test
-    void theCandidatesAreThisPcsInstancesByNameEachOnce() {
+    void theCandidatesAreThisPcsInstancesAsAndroidPlacesByNameEachOnce() {
         Map<InstanceKey, List<String>> usedBy = new LinkedHashMap<>();
         usedBy.put(new InstanceKey(PlatformId.LDPLAYER, "LDPlayer-2"), List.of("farm"));
         usedBy.put(new InstanceKey(PlatformId.LDPLAYER, "LDPlayer-1"), List.of("farm"));
         usedBy.put(new InstanceKey(PlatformId.MUMU, "LDPlayer-1"), List.of("arena"));
 
-        assertEquals(List.of(Instance.named("LDPlayer-1"), Instance.named("LDPlayer-2")),
-                SdkPools.instances(new HostConfig.State(EmulatorConfig.EMPTY, usedBy)));
-        assertEquals(List.of(), SdkPools.instances(HostConfig.State.EMPTY));
+        assertEquals(List.of(Place.android("LDPlayer-1"), Place.android("LDPlayer-2")),
+                SdkPools.places(new HostConfig.State(EmulatorConfig.EMPTY, usedBy)));
+        assertEquals(List.of(), SdkPools.places(HostConfig.State.EMPTY));
     }
 
     @Test

@@ -5,6 +5,7 @@ package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.managed.ManagedId;
 import com.botmaker.plugin.api.managed.ManagedMarker;
+import com.botmaker.plugin.api.meta.Migrate;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -74,9 +75,17 @@ public @interface SdkValue {
         /** Where pixels are read from: the game's window — the {@code CaptureSource} parameter {@code captureSource}. */
         CAPTURE,
         /**
-         * The emulator instance a run plays on, while the capture source is an emulator — the {@code Instance}
-         * parameter {@code instance}, which several runs at once are each dealt one of.
+         * Where a run plays — the {@code Place} parameter {@code place}, which several runs at once are each dealt one
+         * of (2026-11-26).
          */
+        PLACE,
+        /**
+         * The emulator instance a run played on, before places — the {@code Instance} parameter {@code instance}. No
+         * value is declared on it since 2026-11-26: {@link #PLACE} replaced it, and Studio's upgrade removes a bot's
+         * old method, or keeps it unmarked while the bot names it. The next release deletes it.
+         */
+        @Deprecated(forRemoval = true)
+        @Migrate.Dropped("PLACE replaced it: a run is dealt its place, an instance or this PC")
         INSTANCE,
         /** The pictures the bot looks for — a class of {@code ImageTemplate} constants. */
         PICTURES,

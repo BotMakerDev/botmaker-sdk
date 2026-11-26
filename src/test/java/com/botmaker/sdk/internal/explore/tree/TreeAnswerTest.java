@@ -205,6 +205,42 @@ class TreeAnswerTest {
     }
 
     @Test
+    void aKnownScreenWithOneMappedInputGetsEveryOtherInputOfItsTree() {
+        UiTree page = page(web("main", "", Set.of(), web("link", "Network", PRESSABLE),
+                web("link", "Apps", PRESSABLE), web("link", "Battery", PRESSABLE)));
+        Element mapped = Locator.inputs(page).stream().filter(l -> "Apps".equals(l.locator().name()))
+                .findFirst().orElseThrow().locator().element();
+
+        List<TreeAnswer.NewInput> missing = TreeAnswer.missingInputs("Home", page, Map.of("apps", mapped),
+                input -> Optional.empty(), (field, located) -> null);
+
+        // The mapped input is not written again, and the others never take its field's name.
+        assertEquals(List.of("network", "battery"), missing.stream().map(TreeAnswer.NewInput::field).toList());
+        assertTrue(TreeAnswer.missingInputs("Home", page, Map.of("apps", mapped), input -> Optional.empty(),
+                (field, located) -> null).stream().noneMatch(input -> "Apps".equals(input.locator().name())));
+    }
+
+    @Test
+    void aScreenIsNeverNamedAfterATypeTheScreensFileImports() {
+        // "Screen" is the base class: an untitled page of an app was written as `Home extends Screen` and `Screen`.
+        assertEquals("Page", TreeAnswer.screen(page(web("main", "", Set.of(), web("button", "Go", PRESSABLE))),
+                null, List.of(), Set.of()).name());
+        assertEquals("Page", TreeAnswer.className("Screen"));
+        assertEquals("MarkScreen", TreeAnswer.className("Mark"));
+        assertEquals("Settings", TreeAnswer.className("Settings"));
+    }
+
+    @Test
+    void aKnownScreenWithEveryInputMappedGetsNone() {
+        UiTree page = page(web("main", "", Set.of(), web("link", "Network", PRESSABLE), web("link", "Apps", PRESSABLE)));
+        Map<String, Element> all = new LinkedHashMap<>();
+        Locator.inputs(page).forEach(l -> all.put(l.locator().name().toLowerCase(), l.locator().element()));
+
+        assertTrue(TreeAnswer.missingInputs("Home", page, all, input -> Optional.empty(), (field, located) -> null)
+                .isEmpty());
+    }
+
+    @Test
     void aDialogIsAnOverlayScreenNamedAndMarkedByItself() {
         UiTree page = page(web("main", "", Set.of(), web("heading", "Home", Set.of())),
                 web("dialog", "Talk to us", Set.of(), web("button", "Close", PRESSABLE)));
@@ -243,7 +279,8 @@ class TreeAnswerTest {
         List<TreeAnswer.NewInput> inputs = TreeAnswer.inputs(screen.name(), shop, Set.of(), Set.of(),
                 l -> Optional.empty());
 
-        assertEquals("Screen", screen.name());
+        // Never "Screen": that is the base class every screen of the bot extends.
+        assertEquals("Page", screen.name());
         assertNull(screen.route());
         assertEquals(List.of("#title"), screen.markers().stream().map(Locator::line).toList());
         assertEquals(List.of("#close", "text \"Buy gems\"", "\"Settings\""),

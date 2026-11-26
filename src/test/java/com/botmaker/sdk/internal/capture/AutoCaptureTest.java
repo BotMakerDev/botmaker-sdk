@@ -4,7 +4,7 @@
 package com.botmaker.sdk.internal.capture;
 
 import com.botmaker.sdk.api.capture.CaptureSource;
-import com.botmaker.sdk.api.capture.Instance;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.api.geometry.Rect;
 import com.botmaker.sdk.internal.capture.AutoCapture.Decision;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
@@ -48,7 +48,7 @@ class AutoCaptureTest {
     @Test
     void emulatorPropertyWins() {
         Decision decision = AutoCapture.decide(new AutoCapture.Inputs(" Other ", STEAM, CaptureSource.window("c", "t"),
-                Instance.named("Main"), Optional.empty(), NONE_ASKED));
+                Place.android("Main"), Optional.empty(), NONE_ASKED));
         assertEquals("Other", instanceOf(decision));
     }
 
@@ -89,18 +89,26 @@ class AutoCaptureTest {
     }
 
     @Test
-    void dealtInstanceWinsOverTargetInstance() {
+    void dealtAndroidPlaceWinsOverTargetInstance() {
         Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, ON_MAIN, CaptureSource.automatic(),
-                Instance.named("Second"), Optional.empty(), NONE_ASKED));
+                Place.android("Second"), Optional.empty(), NONE_ASKED));
         assertEquals("Second", instanceOf(decision));
         assertEquals("Second", fixed(decision).playsOn(), "the game is launched on the dealt instance");
     }
 
     @Test
-    void noInstanceUsesInstanceParam() {
+    void noInstanceUsesPlaceParam() {
         Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, NO_INSTANCE, null,
-                Instance.named("Main"), Optional.empty(), NONE_ASKED));
+                Place.android("Main"), Optional.empty(), NONE_ASKED));
         assertEquals("Main", instanceOf(decision));
+    }
+
+    @Test
+    void aPcPlaceDealtLeavesTheTargetInstance() {
+        Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, ON_MAIN, CaptureSource.automatic(),
+                Place.desktop(), Optional.empty(), NONE_ASKED));
+        assertEquals("Main", instanceOf(decision));
+        assertEquals("", fixed(decision).playsOn(), "launched where the target says already");
     }
 
     @Test
