@@ -235,6 +235,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ### Fixed
 
+- Remote Pilot never shows your screen in place of the game (2026-11-26): when the game's window is closed or the
+  emulator cannot be reached, the phone gets no picture and no input, and is sent the reason. The whole screen
+  is shown only when the capture source is the desktop or a monitor, or no game is launched.
+- A Tailscale Funnel that Remote Pilot turned on no longer outlives Studio (2026-11-26): it is turned off when
+  Studio exits, and one left by a crash is turned off at the next start.
+- Cancelling Remote Pilot while it starts, or leaving the project, now closes the server and the tunnel
+  (2026-11-26). A quick tunnel that stops by itself is reported. The status line no longer shows the pairing token.
 - The Game window's Android apps tab tells two products' instances of one name apart (2026-11-26): a device is
   known by its product and ADB address, no longer by its name alone.
 - The Game window's Android apps tab no longer stays on "Looking for Android devices…" (2026-11-26): it lists the

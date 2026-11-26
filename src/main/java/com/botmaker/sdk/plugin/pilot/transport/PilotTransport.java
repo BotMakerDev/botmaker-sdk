@@ -3,6 +3,9 @@
 
 package com.botmaker.sdk.plugin.pilot.transport;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+
 /**
  * One way of making the Remote Pilot's server reachable from a phone.
  *
@@ -29,6 +32,14 @@ public interface PilotTransport extends AutoCloseable {
      * phone opens (scheme, host and port, no path or query), or the reason it could not.
      */
     Opened open(int port);
+
+    /**
+     * Completes when what {@link #open} made stops by itself, and the address no longer answers. Never for a
+     * {@link #close}, and never for a transport with nothing of its own running.
+     */
+    default CompletionStage<Void> lost() {
+        return new CompletableFuture<>();
+    }
 
     /** Undoes {@link #open}: stops a tunnel, turns a Funnel off. Idempotent, and never throws. */
     @Override

@@ -28,6 +28,19 @@ class PilotInputServiceTest {
         NativeControllerFactory.setForTesting(null); // don't leak an injected host controller into other tests
     }
 
+    /** A missing surface drives nothing: not even the user's own screen, whose controller is never asked. */
+    @Test
+    void nothingIsDrivenOnAMissingSurface() {
+        PilotFakes.RecordingController nc = new PilotFakes.RecordingController();
+        NativeControllerFactory.setForTesting(nc);
+        PilotInputService input = new PilotInputService();
+        PilotRoute missing = new PilotRoute.Missing("gone");
+
+        assertFalse(input.apply(missing, PilotInputService.Kind.TAP, 100, 120, 1, 0, BOUNDS));
+        assertTrue(input.supportsBackgroundInput(missing));
+        assertTrue(nc.calls.isEmpty(), nc.calls.toString());
+    }
+
     /** A session route, ready to hand to {@code apply}. */
     private static PilotRoute sessionRoute(PilotFakes.RecordingController nc) {
         return new PilotRoute.Session(

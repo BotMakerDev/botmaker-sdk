@@ -145,6 +145,14 @@ public final class PilotServer implements AutoCloseable {
      */
     private static final byte BINARY_H264_KEY = 3;
 
+    /**
+     * The close code for a socket whose token is wrong or was reset (policy violation), so a phone can tell "scan
+     * again" from a link that dropped.
+     */
+    static final int BAD_TOKEN = 1008;
+
+    private static final String BAD_TOKEN_REASON = "pairing token rejected";
+
     /** Connected, authorized clients. */
     private final Map<WsContext, Client> clients = new ConcurrentHashMap<>();
 
@@ -224,7 +232,7 @@ public final class PilotServer implements AutoCloseable {
         });
         app.ws("/ws", ws -> {
             ws.onConnect(ctx -> {
-                if (!authorized(ctx)) { ctx.closeSession(); return; }
+                if (!authorized(ctx)) { ctx.closeSession(BAD_TOKEN, BAD_TOKEN_REASON); return; }
                 clients.put(ctx, new Client());
                 ctx.enableAutomaticPings();
                 ctx.send(stateJson()); // let a fresh client render the current run state immediately
@@ -265,6 +273,8 @@ public final class PilotServer implements AutoCloseable {
                     clearTraceBacklog();
                     setRunState(RunState.RUNNING);
                 } else {
+                    // The ended run's window title must not keep choosing what is shown: another window may hold it.
+                    lastTarget = null;
                     control.onRunStopped();
                     setRunState(RunState.STOPPED);
                 }
@@ -278,14 +288,47 @@ public final class PilotServer implements AutoCloseable {
     /**
      * Records what fronts this already-started server — a transport that opened a tunnel or a Funnel onto it —
      * so {@link #close()} closes it with the server.
+     *
+     * @return false when the server was closed in the meantime: {@code front} is then closed at once, since
+     *         nothing else would close it
      */
-    public synchronized void attach(AutoCloseable front) {
+    public synchronized boolean attach(AutoCloseable front) {
+        if (app == null) {
+            closeFront(front);
+            return false;
+        }
         this.front = front;
+        return true;
+    }
+
+    private static void closeFront(AutoCloseable front) {
+        try {
+            front.close();
+        } catch (Exception e) {
+            Diag.error("[Pilot] Couldn't close what made the Remote Pilot reachable: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Stops the frame loop and waits for a tick already running: one left going could start an encoder or open
+     * an emulator connection after they were closed, with nothing left to close it.
+     */
+    private void stopFrameLoop() {
+        if (frameExec == null) return;
+        frameExec.shutdownNow();
+        try {
+            if (!frameExec.awaitTermination(5, TimeUnit.SECONDS)) {
+                Diag.error("[Pilot] the frame loop did not stop within 5 s");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        frameExec = null;
     }
 
     @Override
     public synchronized void close() {
-        if (frameExec != null) { frameExec.shutdownNow(); frameExec = null; }
+        stopFrameLoop();
         video.close(); // the ffmpeg is reaped with its session anyway, but not until the session goes
         input.close();  // never hand the desktop back with a mouse button still down
         routes.close(); // drop any held emulator connection with the loop that was using it
@@ -301,11 +344,7 @@ public final class PilotServer implements AutoCloseable {
         subscribed = false;
         if (app != null) { app.stop(); app = null; }
         if (front != null) {
-            try {
-                front.close();
-            } catch (Exception e) {
-                Diag.error("[Pilot] Couldn't close what made the Remote Pilot reachable: " + e.getMessage());
-            }
+            closeFront(front);
             front = null;
         }
     }
@@ -344,7 +383,7 @@ public final class PilotServer implements AutoCloseable {
         for (WsContext ctx : clients.keySet()) {
             clients.remove(ctx);
             try {
-                ctx.closeSession();
+                ctx.closeSession(BAD_TOKEN, BAD_TOKEN_REASON);
             } catch (Exception ignored) {
                 // Already gone; removing it was the part that mattered.
             }
@@ -520,15 +559,28 @@ public final class PilotServer implements AutoCloseable {
         loggedSurface = null;
         Diag.log("[Pilot] no frame for " + emptyFrames + " ticks on " + (route == null ? "the desktop" : route));
         emptyReason = switch (route == null ? PilotRoute.DESKTOP : route) {
+            case PilotRoute.Missing(String why) -> why;
             case PilotRoute.Session ignored ->
                     "The background session is not showing any pixels on its X display. A Wayland-only app "
                             + "(such as Waydroid) renders where an X11 grab cannot see it — point the project's "
                             + "capture source at the emulator instead.";
             case PilotRoute.Emulator ignored ->
                     "The emulator stopped answering over ADB — check that the instance is still running.";
-            case PilotRoute.Desktop ignored -> "The screen could not be captured.";
+            case PilotRoute.Desktop ignored -> capture.whyNothing();
         };
         broadcastText(stateJson());
+    }
+
+    /**
+     * A tick on {@code asked} produced no frame. On the user's own screen, and on a change of route, the last
+     * frame's rect is no longer what a tap would land on, so it is dropped: gestures are refused until a frame
+     * arrives. A session or emulator that merely missed a grab keeps it, since its rect is its own.
+     */
+    private void forgetSurface(PilotRoute asked) {
+        if (lastBounds == null) return;
+        if (!(lastRoute instanceof PilotRoute.Desktop) && lastRoute.getClass().equals(asked.getClass())) return;
+        lastBounds = null;
+        input.releaseHeld();
     }
 
     /** The last surface logged, so {@link #logSurface} can print on change instead of 24 times a second. */
@@ -548,6 +600,7 @@ public final class PilotServer implements AutoCloseable {
             case PilotRoute.Session ignored -> "session";
             case PilotRoute.Emulator ignored -> "emulator";
             case PilotRoute.Desktop ignored -> "desktop";
+            case PilotRoute.Missing ignored -> "nothing";
         } + " " + sw + "x" + sh + "+" + sx + "+" + sy;
         if (line.equals(loggedSurface)) return;
         loggedSurface = line;
@@ -723,18 +776,15 @@ public final class PilotServer implements AutoCloseable {
         PilotRoute asked = routes.current();
         if (followVideo(asked)) return;   // every client is on video; there is no JPEG left to grab one for
         TargetCapture.Resolved resolved = capture.resolve(asked, lastTarget);
-        if (resolved == null) {
+        // Already-encoded on the session route: the agent that holds :N produced these bytes, so nothing here
+        // decoded a PNG only to re-encode it.
+        byte[] jpeg = resolved == null ? null : resolved.bytes();
+        if (jpeg == null) {
+            forgetSurface(asked);
             reportEmpty(asked);
             return;
         }
         TargetCapture.Capture cap = resolved.cap();
-        // Already-encoded on the session route: the agent that holds :N produced these bytes, so nothing here
-        // decoded a PNG only to re-encode it.
-        byte[] jpeg = resolved.bytes();
-        if (jpeg == null) {
-            reportEmpty(asked);
-            return;
-        }
         clearEmptyReport();
         logSurface(resolved.route(), cap.sx(), cap.sy(), cap.sw(), cap.sh());
 

@@ -126,13 +126,15 @@ public final class TailscaleFunnelService {
      * {@code tailscale serve --https=443 off} passes no such gate and returns at once; a handler that is
      * already gone is reported and counts as done. No {@code reset} fallback: this runs as a project closes,
      * where nobody would see that it cleared their other config.
+     *
+     * @return whether nothing of ours is served any more
      */
-    public void disable() {
+    public boolean disable() {
         Exec e = run(OFF, 10);
-        if (!turnedOff(e.exit, e.err + e.out)) {
-            SdkLog.warn("Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
-                    + " — run `" + String.join(" ", command(OFF)) + "` to do it by hand.");
-        }
+        if (turnedOff(e.exit, e.err + e.out)) return true;
+        SdkLog.warn("Could not turn the Remote Pilot's Funnel off: " + (e.err + e.out).trim()
+                + " — run `" + String.join(" ", command(OFF)) + "` to do it by hand.");
+        return false;
     }
 
     /** The port {@code tailscale funnel --bg <port>} serves on when no {@code --https} is given. */

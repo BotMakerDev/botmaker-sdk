@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.awt.Rectangle;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaptureValueTest {
@@ -27,6 +28,18 @@ class CaptureValueTest {
         assertEquals(CaptureSource.monitor(1).toString(),
                 CaptureValue.resolved(null, LaunchSpec.parse("steam:440"), CaptureSource.monitor(1), null).toString(),
                 "a source set by hand is itself");
+    }
+
+    @Test
+    void whatIsShownToSomebodyElseNeverPutsTheDesktopInPlaceOfALaunchedGame() {
+        CaptureSource automatic = CaptureSource.automatic();
+        for (String game : new String[]{"steam:440", "emu-app:com.example.game"}) {
+            assertNull(CaptureValue.resolved(null, LaunchSpec.parse(game), automatic, null, null), game);
+        }
+        assertTrue(CaptureLabels.isDesktop(CaptureValue.resolved(null, null, automatic, null, null)),
+                "no game: the desktop is the source");
+        assertEquals(CaptureSource.monitor(1).toString(), CaptureValue.resolved(null,
+                LaunchSpec.parse("steam:440"), CaptureSource.monitor(1), null, null).toString());
     }
 
     @Test

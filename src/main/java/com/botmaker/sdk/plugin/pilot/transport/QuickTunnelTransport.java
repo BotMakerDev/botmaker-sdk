@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.function.Supplier;
@@ -43,8 +45,9 @@ public final class QuickTunnelTransport implements PilotTransport {
     private final long urlTimeoutMs;
     private final long readyTimeoutMs;
 
-    private Process process;
+    private volatile Process process;
     private Thread shutdownHook;
+    private volatile CompletableFuture<Void> lost = new CompletableFuture<>();
 
     public QuickTunnelTransport() {
         this(() -> List.of(Executables.resolve("cloudflared")), 30_000, 15_000);
@@ -112,7 +115,23 @@ public final class QuickTunnelTransport implements PilotTransport {
         // The address is printed before the edge connection is up; a phone opening it in that gap gets an error
         // page. Waiting for the registration is best-effort: without it the address still works a moment later.
         waitFor(() -> log.indexOf(REGISTERED) >= 0 ? Optional.of(true) : Optional.empty(), readyTimeoutMs);
+        watch(process);
         return Opened.at(url.get());
+    }
+
+    /** Completes {@link #lost} when {@code running} ends without {@link #close} having stopped it. */
+    private void watch(Process running) {
+        CompletableFuture<Void> gone = new CompletableFuture<>();
+        lost = gone;
+        running.onExit().thenRun(() -> {
+            // stopProcess drops the field before it destroys, so a deliberate stop is not a loss.
+            if (process == running) gone.complete(null);
+        });
+    }
+
+    @Override
+    public CompletionStage<Void> lost() {
+        return lost;
     }
 
     @Override

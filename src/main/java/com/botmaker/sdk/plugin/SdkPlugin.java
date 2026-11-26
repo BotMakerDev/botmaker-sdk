@@ -23,6 +23,7 @@ import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.overlay.SdkOverlay;
 import com.botmaker.sdk.plugin.editors.SdkEditors;
 import com.botmaker.sdk.plugin.pictures.MoveOffer;
+import com.botmaker.sdk.plugin.pilot.transport.FunnelTransport;
 import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.run.SdkReportViews;
 import com.botmaker.sdk.plugin.run.SdkRunOverlay;
@@ -122,6 +123,8 @@ public final class SdkPlugin extends DeclaredPlugin {
         // the door every run of this PC types its secrets through, open until the process exits
         SignInDoor.serve(services);
         if (!services.hasUi()) return;
+        // a Remote Pilot Funnel left up by a process that crashed is still serving a port publicly
+        Thread.ofVirtual().name("pilot-funnel-leftover").start(FunnelTransport::clearLeftover);
         UsedBy.remember(services);
         MoveOffer.offer(services);
         // a run that cannot tell which window its launch opened is the game's asks here

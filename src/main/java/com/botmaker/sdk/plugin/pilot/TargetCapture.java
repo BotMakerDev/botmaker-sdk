@@ -13,6 +13,7 @@ import com.botmaker.session.PreviewFrame;
 import com.botmaker.session.remote.WindowIds;
 import com.botmaker.shared.emulator.EmulatorSurface;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
@@ -27,6 +28,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * Resolves and grabs a single non-intrusive frame of "the surface the bot is acting on", plus the JPEG
@@ -36,8 +38,9 @@ import java.util.function.LongSupplier;
  *
  * <p>Target resolution starts with the {@link PilotRoute}: a nested session's {@code :N} screen or an
  * emulator's framebuffer <em>is</em> the surface, and needs no picking. Only on the {@code :0} desktop route is
- * there a choice to make — a live window from telemetry wins; else the project default (window / monitor /
- * whole desktop); else a whole-screen telemetry target; else the primary screen. Window targets use shared JNA
+ * there a choice to make — a live window from telemetry wins; else the project's capture source (window /
+ * monitor / whole desktop). A window that is not there is no frame, never the desktop: the screen is streamed
+ * only when the source <em>is</em> the desktop or a monitor ({@link #whyNothing}). Window targets use shared JNA
  * {@code captureWindow} (no focus, prompt-free on X11/XWayland); screen targets fall back to AWT {@link Robot}
  * (limited on Wayland — see the module ROADMAP).
  */
@@ -80,7 +83,8 @@ public final class TargetCapture {
         }
     }
 
-    private final PilotProject project;
+    /** The project's capture source, read at each frame; {@code null} when there is nothing to show. */
+    private final Supplier<CaptureSource> source;
 
     /** The live session's host window on {@code :0}, or {@code 0} — see {@link #captureWindowTarget}. */
     private final LongSupplier sessionHostWindow;
@@ -91,8 +95,18 @@ public final class TargetCapture {
     }
 
     public TargetCapture(PilotProject project, LongSupplier sessionHostWindow) {
-        this.project = project;
+        this.source = project == null ? () -> null : project::defaultSource;
         this.sessionHostWindow = sessionHostWindow;
+    }
+
+    private TargetCapture(Supplier<CaptureSource> source) {
+        this.source = source;
+        this.sessionHostWindow = () -> 0;
+    }
+
+    /** A capture reading {@code source} as the project's, with no session: for tests. */
+    static TargetCapture reading(Supplier<CaptureSource> source) {
+        return new TargetCapture(source);
     }
 
     /** The production wiring: the host window comes from the project's one {@link BackgroundLauncher}. */
@@ -129,6 +143,9 @@ public final class TargetCapture {
             case PilotRoute.Emulator(EmulatorSurface surface) -> {
                 return wrap(r, captureEmulator(surface));
             }
+            case PilotRoute.Missing ignored -> {
+                return null;
+            }
             case PilotRoute.Desktop ignored -> { /* the :0 resolution below */ }
         }
         return wrap(r, captureDesktop(lastTarget));
@@ -145,17 +162,27 @@ public final class TargetCapture {
             if (c != null) return c;
         }
         CaptureSource def = safeDefault();
+        if (def == null) return null;
         NamedWindow window = CaptureLabels.window(def);
-        if (window != null) {
-            Capture c = captureWindowTarget(named(window));
-            if (c != null) return c;
-        } else if (def instanceof com.botmaker.sdk.internal.capture.Monitor) {
+        if (window != null) return captureWindowTarget(named(window));
+        if (CaptureLabels.whole(def) instanceof Monitor) {
             return captureBounds(screenBounds(CaptureLabels.monitorIndex(def)));
-        } else if (def != null && CaptureLabels.isDesktop(def)) {
-            return captureBounds(virtualBounds());
         }
-        if (t != null) return captureBounds(virtualBounds()); // whole-screen telemetry target
-        return captureBounds(primaryBounds());                // idle, no default → current primary screen
+        // What is left is the desktop, or an emulator, whose pixels are the emulator route's and no screen's.
+        return CaptureLabels.isDesktop(def) ? captureBounds(virtualBounds()) : null;
+    }
+
+    /** The sentence the phone is told while the desktop route has no frame. */
+    String whyNothing() {
+        CaptureSource def = safeDefault();
+        if (def == null) {
+            return "The game's window or device is not known yet. Run the bot once, or pick a capture source.";
+        }
+        NamedWindow window = CaptureLabels.window(def);
+        if (window != null) return "The window “" + window.label() + "” is not open on the computer.";
+        String emulator = CaptureLabels.emulatorName(def);
+        if (emulator != null) return "The emulator “" + emulator + "” is not running or cannot be reached.";
+        return "The screen could not be captured.";
     }
 
     /**
@@ -316,7 +343,7 @@ public final class TargetCapture {
 
     private CaptureSource safeDefault() {
         try {
-            return project != null ? project.defaultSource() : null;
+            return source.get();
         } catch (Exception e) {
             return null;
         }

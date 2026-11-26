@@ -12,6 +12,7 @@ import com.botmaker.sdk.plugin.pilot.NestedSessionLauncher;
 import com.botmaker.sdk.plugin.pilot.PilotControlService;
 import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.sdk.plugin.pilot.PilotServer;
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
@@ -33,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 /**
  * Remote Pilot's state machine: brings the pilot server up, decides how it is exposed, and owns the two
@@ -116,6 +118,9 @@ public final class RemotePilotUi implements AutoCloseable {
     /** FX-thread-only guard: a bring-up is in flight, so a second click must not start a second one. */
     private boolean bringingUp;
 
+    /** Set once by {@link #close}; read by a bring-up still running, which then closes what it opened. */
+    private volatile boolean closed;
+
     public RemotePilotUi(StudioServices services) {
         this.services = services;
         this.project = new PilotProject(services);
@@ -195,6 +200,7 @@ public final class RemotePilotUi implements AutoCloseable {
      */
     @Override
     public void close() {
+        closed = true;
         RemotePilotDialog.closeShowing();
         if (nestedLauncher != null) {
             try {
@@ -247,17 +253,19 @@ public final class RemotePilotUi implements AutoCloseable {
     private void bringUp(boolean forceRestart, TransportKind asked) {
         // A bring-up is already running. Its progress dialog is not modal, so without this a second toolbar
         // click would start a second thread and race two start() calls onto the same server.
-        if (bringingUp) return;
+        if (bringingUp) {
+            services.status("Remote Pilot is still starting or stopping…");
+            return;
+        }
 
         // Already up and we're not deliberately restarting → re-show the same dialog, don't rebind the port.
         if (!forceRestart && pilotServer != null && pilotServer.isRunning() && lastOutcome != null) {
             showDialog(lastOutcome);
             return;
         }
-        if (forceRestart && pilotServer != null) {
-            pilotServer.close();
-            lastOutcome = null;
-        }
+        // A restart closes the server on the bring-up's own thread: stopping a tunnel or a Funnel takes seconds.
+        boolean restart = forceRestart && pilotServer != null;
+        if (restart) lastOutcome = null;
         if (pilotServer == null) {
             PilotControlService control = new PilotControlService(services.runs());
             pilotServer = new PilotServer(services.runs(), project, control);
@@ -274,18 +282,44 @@ public final class RemotePilotUi implements AutoCloseable {
             progress.setResult(ButtonType.CANCEL); // let close() dismiss a button-less alert
             progress.close();
         };
-        Async.load("remote-pilot-start", () -> bringUpWith(asked), outcome -> {
+        PilotServer server = pilotServer;
+        BooleanSupplier unwanted = () -> closed || cancelled.get();
+        Async.load("remote-pilot-start", () -> bringUpWith(server, asked, restart, unwanted), outcome -> {
             settle.run();
+            if (unwanted.getAsBoolean()) {
+                abandon(server);
+                return;
+            }
+            // Its transport stopped between coming up and here: lost() has said so.
+            if (pilotServer != server) return;
             lastOutcome = outcome;
-            services.status("Remote Pilot (" + outcome.kind().displayName() + ") at " + outcome.url());
-            // Cancel can't unbind a server that has already come up, but it can honour what the user
-            // actually asked for: no dialog. The status line above says where it is, and the toolbar
-            // button re-shows the pairing dialog on demand.
-            if (!cancelled.get()) showDialog(outcome);
+            // The address without its token: the status line is on screen for anyone to read.
+            services.status("Remote Pilot (" + outcome.kind().displayName() + ") at " + outcome.baseUrl());
+            showDialog(outcome);
         }, why -> {
             settle.run();
-            services.status("Could not start Remote Pilot: " + why);
+            boolean abandoned = unwanted.getAsBoolean();
+            abandon(server);
+            if (!abandoned) services.status("Could not start Remote Pilot: " + why);
         });
+    }
+
+    /** Drops {@code server} and closes it off the FX thread. */
+    private void abandon(PilotServer server) {
+        if (pilotServer == server) {
+            pilotServer = null;
+            lastOutcome = null;
+        }
+        Thread.ofPlatform().name("remote-pilot-stop").start(server::close);
+        if (!closed) services.status("Remote Pilot stopped.");
+    }
+
+    /** The transport of {@code server} stopped by itself: the paired address is dead. */
+    private void lost(PilotServer server, TransportKind kind) {
+        if (closed || pilotServer != server) return;
+        RemotePilotDialog.closeShowing();
+        abandon(server);
+        services.status("Remote Pilot: " + kind.displayName() + " stopped. Press Pilot to start it again.");
     }
 
     /** Indeterminate spinner shown while the (possibly multi-second) Tailscale bring-up runs off-thread. */
@@ -333,9 +367,14 @@ public final class RemotePilotUi implements AutoCloseable {
      *
      * <p>Blocking (CLI probes, a tunnel's start, the server bind); runs off the FX thread.
      *
-     * @throws IllegalStateException when no transport works at all
+     * @param restart  close what {@code server} is serving first
+     * @param unwanted whether the user cancelled or the project was left; nothing is then left open
+     * @throws IllegalStateException when no transport works at all, or it is no longer wanted
      */
-    private PilotOutcome bringUpWith(TransportKind asked) {
+    private PilotOutcome bringUpWith(PilotServer server, TransportKind asked, boolean restart,
+                                     BooleanSupplier unwanted) {
+        if (restart) server.close();
+        FunnelTransport.clearLeftover();
         Map<TransportKind, PilotTransport> transports = new EnumMap<>(TransportKind.class);
         Map<TransportKind, Availability> options = new EnumMap<>(TransportKind.class);
         for (TransportKind kind : TransportKind.offered()) {
@@ -355,10 +394,19 @@ public final class RemotePilotUi implements AutoCloseable {
                 }
                 continue;
             }
-            PilotServer.Endpoint endpoint = pilotServer.start(transport.bindHost());
+            if (unwanted.getAsBoolean()) throw new IllegalStateException("cancelled");
+            PilotServer.Endpoint endpoint = server.start(transport.bindHost());
             Opened opened = transport.open(endpoint.port());
             if (opened.ok()) {
-                pilotServer.attach(transport);
+                // Asked again after the open, which can take half a minute. attach() closes the transport itself
+                // when the server was closed under us.
+                if (unwanted.getAsBoolean()) {
+                    transport.close();
+                    server.close();
+                    throw new IllegalStateException("cancelled");
+                }
+                if (!server.attach(transport)) throw new IllegalStateException("cancelled");
+                transport.lost().thenRun(() -> Platform.runLater(() -> lost(server, kind)));
                 FunnelTransport.Diag diag =
                         transports.get(TransportKind.FUNNEL) instanceof FunnelTransport f && asked == TransportKind.FUNNEL
                                 ? f.diag() : null;
@@ -370,7 +418,7 @@ public final class RemotePilotUi implements AutoCloseable {
                 fix = null;
             }
             transport.close();
-            pilotServer.close();
+            server.close();
         }
         throw new IllegalStateException(error != null ? error : "this computer has no network the phone can reach");
     }

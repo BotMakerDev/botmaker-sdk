@@ -13,6 +13,7 @@ import com.botmaker.sdk.internal.capture.AutoCapture;
 import com.botmaker.sdk.internal.capture.AutoPicks;
 import com.botmaker.sdk.internal.capture.HostWindows;
 import com.botmaker.sdk.internal.capture.CurrentSource;
+import com.botmaker.sdk.internal.capture.Desktop;
 import com.botmaker.sdk.internal.capture.AmbientSource;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -56,6 +57,19 @@ public final class CaptureValue {
      * Read on every call rather than held: a source changed in another window has to take effect at once.
      */
     public static CaptureSource current(StudioServices services) {
+        return current(services, CaptureSource.desktop());
+    }
+
+    /**
+     * As {@link #current}, but {@code null} where {@code current} answers the whole desktop for a launched game:
+     * its window not picked yet, or its emulator instance not told. What a view that shows the screen to somebody
+     * else reads: the desktop does not stand in for a game there.
+     */
+    public static CaptureSource shown(StudioServices services) {
+        return current(services, null);
+    }
+
+    private static CaptureSource current(StudioServices services, CaptureSource unpicked) {
         CaptureSource written = written(services);
         Instance dealt = read(services, SdkValues.INSTANCE, Instance.class).orElse(null);
         LaunchSpec target = LaunchTargets.spec(services);
@@ -63,7 +77,7 @@ public final class CaptureValue {
         if (target != null && target.kind() == LaunchKind.WEB) {
             return AutoCapture.isAutomatic(written, target) ? null : InstalledGame.onInstance(written, dealt);
         }
-        return resolved(services, target, written, dealt);
+        return resolved(services, target, written, dealt, unpicked);
     }
 
     /**
@@ -74,11 +88,22 @@ public final class CaptureValue {
      */
     static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
                                   Instance dealt) {
+        return resolved(services, target, written, dealt, CaptureSource.desktop());
+    }
+
+    static CaptureSource resolved(StudioServices services, LaunchSpec target, CaptureSource written,
+                                  Instance dealt, CaptureSource unpicked) {
         AutoCapture.Decision decision = AutoCapture.decide(new AutoCapture.Inputs(null, target, written, dealt,
                 savedWindow(services, target, written), List::of));
         return switch (decision) {
-            case AutoCapture.Decision.Fixed fixed -> fixed.source() == null ? CaptureSource.desktop() : fixed.source();
-            case AutoCapture.Decision.WatchLaunch watch -> CaptureSource.desktop();
+            case AutoCapture.Decision.Fixed fixed -> {
+                CaptureSource source = fixed.source() == null ? CaptureSource.desktop() : fixed.source();
+                // A launched game left to the automatic capture is never on "the desktop": it is just not told yet.
+                boolean untold = target != null && target.kind() != LaunchKind.UNKNOWN
+                        && AutoCapture.followsTarget(written, target) && source.base() instanceof Desktop;
+                yield untold ? unpicked : source;
+            }
+            case AutoCapture.Decision.WatchLaunch watch -> unpicked;
             case AutoCapture.Decision.Fail fail -> null;
         };
     }

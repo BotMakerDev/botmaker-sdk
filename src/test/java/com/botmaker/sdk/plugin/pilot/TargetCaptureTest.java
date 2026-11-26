@@ -3,9 +3,13 @@
 
 package com.botmaker.sdk.plugin.pilot;
 
+import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.capture.NamedWindow;
+import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.shared.capture.GenericWindow;
 import com.botmaker.shared.capture.NativeControllerFactory;
+import com.botmaker.shared.launch.WindowIdentity;
 import com.botmaker.session.Capability;
 import com.botmaker.session.PreviewFrame;
 import org.junit.jupiter.api.Test;
@@ -18,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Route capture: the {@link PilotRoute} the frame loop resolved is the surface {@link TargetCapture} grabs —
@@ -200,6 +205,36 @@ class TargetCaptureTest {
         PilotFakes.RecordingSurface surface = new PilotFakes.RecordingSurface(null);
 
         assertNull(new TargetCapture(null).resolve(new PilotRoute.Emulator(surface), null));
+    }
+
+    /**
+     * A game window that is closed, or a source nothing can say yet, is no frame: the desktop holds other
+     * windows, and the pilot may be reachable over a public address.
+     */
+    @Test
+    void aWindowThatIsNotThereIsNothingAndNeverTheDesktop() {
+        PilotFakes.RecordingController nc = new PilotFakes.RecordingController();
+        NativeControllerFactory.setForTesting(nc);
+        try {
+            TargetCapture closed = TargetCapture.reading(() -> NamedWindow.of(
+                    new WindowIdentity("firestone", "Firestone")));
+            assertNull(closed.resolve(PilotRoute.DESKTOP, new RunEvent.Target("Firestone", 0, 0, 640, 480)));
+            assertNull(closed.resolve(PilotRoute.DESKTOP, new RunEvent.Target(null, 0, 0, 1920, 1080)));
+            assertTrue(closed.whyNothing().contains("not open"), closed.whyNothing());
+
+            TargetCapture unknown = TargetCapture.reading(() -> null);
+            assertNull(unknown.resolve(PilotRoute.DESKTOP, null));
+            assertNull(TargetCapture.reading(() -> new EmulatorSource("Waydroid"))
+                    .resolve(PilotRoute.DESKTOP, null));
+        } finally {
+            NativeControllerFactory.setForTesting(null);
+        }
+    }
+
+    @Test
+    void aMissingSurfaceHasNoFrame() {
+        assertNull(TargetCapture.reading(CaptureSource::desktop)
+                .resolve(new PilotRoute.Missing("gone"), null));
     }
 
     /** A window with no session live is an ordinary target. */

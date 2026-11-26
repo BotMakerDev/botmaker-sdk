@@ -39,3 +39,8 @@
   display. Telemetry crosses as `TelemetryFrame` bytes (`Runs.onTelemetry`), decoded with the shared codec the
   bot encoded it with — **strings and bytes cross the contract, shapes do not**. It needed nothing added to
   `StudioServices`, which is the test for the next feature that wants to move here.
+- **The pilot streams and drives only what the project names** (2026-11-26): a window or emulator that is not
+  there is no frame and no input, with the reason sent to the phone (`PilotRoute.Missing`,
+  `TargetCapture.whyNothing`). The screen is streamed only when the capture source is the desktop or a monitor.
+  A Funnel is turned off by a shutdown hook, and `PilotPreferences.funnelOwner` lets the next start clear one
+  a crash left.

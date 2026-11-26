@@ -10,6 +10,7 @@ import org.junit.jupiter.api.condition.OS;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -62,6 +63,31 @@ class TransportsTest {
         PilotTransport.Opened opened = tunnel.open(8123);
         assertFalse(opened.ok());
         assertTrue(opened.error().contains("no network"), opened.error());
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void a_quick_tunnel_whose_process_dies_is_lost_and_one_that_is_closed_is_not() throws Exception {
+        String registered = "echo 'INF |  https://test-tunnel.trycloudflare.com  |';"
+                + " echo 'INF Registered tunnel connection';";
+        QuickTunnelTransport dies = new QuickTunnelTransport(
+                List.of("sh", "-c", registered + " sleep 1", "cloudflared"), 5_000, 5_000);
+        assertTrue(dies.open(8123).ok());
+        dies.lost().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        dies.close();
+
+        QuickTunnelTransport stopped = new QuickTunnelTransport(
+                List.of("sh", "-c", registered + " exec sleep 30", "cloudflared"), 5_000, 5_000);
+        assertTrue(stopped.open(8123).ok());
+        stopped.close();
+        assertFalse(stopped.lost().toCompletableFuture().isDone());
+    }
+
+    @Test
+    void a_funnel_is_left_over_only_when_its_process_is_gone() {
+        assertFalse(FunnelTransport.leftover(0, pid -> false), "none recorded");
+        assertFalse(FunnelTransport.leftover(42, pid -> true), "its process still runs");
+        assertTrue(FunnelTransport.leftover(42, pid -> false));
     }
 
     @Test

@@ -3,9 +3,11 @@
 
 package com.botmaker.sdk.plugin.pilot.transport;
 
+import com.botmaker.sdk.plugin.pilot.PilotPreferences;
 import com.botmaker.sdk.plugin.pilot.TailscaleFunnelService;
 
 import java.util.Locale;
+import java.util.function.LongPredicate;
 
 /**
  * Tailscale Funnel: the server binds loopback and Tailscale serves it publicly as
@@ -25,6 +27,7 @@ public final class FunnelTransport implements PilotTransport {
     private final TailscaleFunnelService funnel = new TailscaleFunnelService();
     private volatile Diag diag = new Diag(false, false, Issue.OTHER);
     private volatile boolean opened;
+    private Thread shutdownHook;
 
     @Override
     public TransportKind kind() {
@@ -61,14 +64,28 @@ public final class FunnelTransport implements PilotTransport {
         return "127.0.0.1";
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>{@code funnel --bg} outlives the CLI and this process, so it is also turned off by a shutdown hook, and
+     * recorded as this process's ({@link PilotPreferences#funnelOwner}) for {@link #clearLeftover} should the
+     * process die without running it.
+     */
     @Override
     public Opened open(int port) {
+        // Recorded before the Funnel goes up: a death in between must not leave an unrecorded one.
+        long before = PilotPreferences.funnelOwner();
+        PilotPreferences.funnelOwner(ProcessHandle.current().pid());
         TailscaleFunnelService.Result result = funnel.enable(port);
         if (result.ok()) {
             opened = true;
+            shutdownHook = new Thread(this::turnOff, "funnel-off");
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
             diag = new Diag(true, true, Issue.NONE);
             return Opened.at(result.publicBase());
         }
+        // A Funnel a dead process left, and that could not be turned off yet, stays recorded.
+        PilotPreferences.funnelOwner(before);
         diag = new Diag(true, true, classify(result.error()));
         return Opened.failed(result.error());
     }
@@ -77,7 +94,35 @@ public final class FunnelTransport implements PilotTransport {
     public void close() {
         if (!opened) return;
         opened = false;
-        funnel.disable();
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // Already shutting down: the hook is running or has run.
+            }
+            shutdownHook = null;
+        }
+        turnOff();
+    }
+
+    private void turnOff() {
+        if (funnel.disable()) PilotPreferences.funnelOwner(0);
+    }
+
+    /**
+     * Turns off a Funnel a process that is gone left up: killed or crashed, it kept serving a port publicly.
+     * Blocking (a CLI call), and nothing when there is none. One at a time: a second caller waits, so it cannot
+     * turn off a Funnel opened after the first one cleared.
+     */
+    public static synchronized void clearLeftover() {
+        if (!leftover(PilotPreferences.funnelOwner(),
+                pid -> ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false))) return;
+        if (new TailscaleFunnelService().disable()) PilotPreferences.funnelOwner(0);
+    }
+
+    /** Whether the Funnel recorded as {@code owner}'s ({@code 0}: none) has nobody left to turn it off. */
+    static boolean leftover(long owner, LongPredicate alive) {
+        return owner > 0 && !alive.test(owner);
     }
 
     /** Maps a {@code tailscale funnel} error to the checklist step to highlight. */

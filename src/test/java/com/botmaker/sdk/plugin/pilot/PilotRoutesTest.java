@@ -172,14 +172,15 @@ class PilotRoutesTest {
         assertEquals(List.of(), opener.opened, "the emulator must not even be opened behind a winning session");
     }
 
-    /** An instance no product reports degrades to the desktop — a stopped emulator must not blank the pilot. */
+    /** An instance no product reports is a missing surface: the user's screen never stands in for it. */
     @Test
-    void anUnresolvableInstanceFallsBackToTheDesktop() {
+    void anUnresolvableInstanceStreamsNothingAndSaysWhich() {
         Opener opener = new Opener();
         opener.unknown = "GhostDroid";
 
-        assertInstanceOf(PilotRoute.Desktop.class,
+        PilotRoute.Missing missing = assertInstanceOf(PilotRoute.Missing.class,
                 routes(noSession(), new String[]{"GhostDroid"}, opener).current());
+        assertTrue(missing.reason().contains("GhostDroid"), missing.reason());
     }
 
     /**

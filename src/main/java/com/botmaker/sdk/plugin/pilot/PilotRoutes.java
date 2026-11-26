@@ -45,8 +45,9 @@ import java.util.function.Supplier;
  * gamescope always does, so every gamescope session lost rung 1 including the X11 games this route is for.
  * {@code x11Capturable()} now counts mapped clients instead — see its javadoc.
  *
- * <p>An emulator that can't be resolved or reached <b>degrades to the desktop</b> rather than to a route that
- * streams nothing: a stopped emulator should leave the pilot showing something and saying so, not freeze it.
+ * <p>An emulator that can't be resolved or reached is {@link PilotRoute.Missing}: nothing is streamed and the
+ * phone is told why. The user's screen never stands in for it, since the pilot may be reachable over a public
+ * address.
  *
  * <p>The resolved surface is <b>cached</b> and only rebuilt when the named instance changes. Resolution runs
  * a full {@code Platforms.discoverAll()} scan (registry reads, console-tool calls) and the caller is a frame
@@ -108,7 +109,9 @@ public final class PilotRoutes implements AutoCloseable {
             surface = open.apply(wanted);
             openedFor = surface == null ? null : wanted;
         }
-        return surface == null ? fallback(live) : new PilotRoute.Emulator(surface);
+        if (surface != null) return new PilotRoute.Emulator(surface);
+        return live != null ? new PilotRoute.Session(live)
+                : new PilotRoute.Missing("The emulator “" + wanted + "” is not running or cannot be reached.");
     }
 
     /**
@@ -162,7 +165,7 @@ public final class PilotRoutes implements AutoCloseable {
         }
     }
 
-    /** The supplier is project I/O; a failing read must degrade to the desktop, not take the frame loop down. */
+    /** The supplier is project I/O; a failing read must not take the frame loop down. */
     private String safeName() {
         try {
             String name = instanceName.get();
@@ -183,8 +186,8 @@ public final class PilotRoutes implements AutoCloseable {
         try {
             return CaptureLabels.emulatorName(project.defaultSource());
         } catch (Exception ignored) {
-            // The project's source can be mid-save (the pilot can be opened at any moment) — the desktop is
-            // the right answer while it cannot be read.
+            // The project's source can be mid-save (the pilot can be opened at any moment): no instance is named,
+            // and the desktop route then streams nothing it cannot read a source for.
             return null;
         }
     }

@@ -24,8 +24,11 @@ import java.util.function.Consumer;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -59,11 +62,13 @@ class PilotServerTest {
 
         // A bad token must be rejected: the server closes the session right after connect.
         CountDownLatch closed = new CountDownLatch(1);
+        AtomicInteger closeCode = new AtomicInteger();
         WebSocket ws = http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .buildAsync(URI.create("ws://127.0.0.1:" + ep.port() + "/ws?token=WRONG"),
                         new WebSocket.Listener() {
                             @Override public CompletionStage<?> onClose(WebSocket w, int code, String reason) {
+                                closeCode.set(code);
                                 closed.countDown();
                                 return null;
                             }
@@ -73,7 +78,20 @@ class PilotServerTest {
                         })
                 .get(5, TimeUnit.SECONDS);
         assertTrue(closed.await(5, TimeUnit.SECONDS), "unauthorized WS should be closed by the server");
+        assertEquals(PilotServer.BAD_TOKEN, closeCode.get(), "the phone must be able to tell it from a lost link");
         ws.abort();
+    }
+
+    /** A tunnel that came up for a server closed meanwhile has nothing else to close it. */
+    @Test
+    void aFrontAttachedAfterTheServerClosedIsClosedAtOnce() {
+        server = new PilotServer(Runs.NONE, null, new PilotControlService(Runs.NONE));
+        server.start("127.0.0.1");
+        server.close();
+
+        AtomicBoolean frontClosed = new AtomicBoolean();
+        assertFalse(server.attach(() -> frontClosed.set(true)));
+        assertTrue(frontClosed.get());
     }
 
     /**

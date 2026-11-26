@@ -153,6 +153,7 @@ public final class PilotInputService implements AutoCloseable {
         // A route that changed under a drag ends that drag on the surface that owns the button, now, before
         // anything is dispatched to the new one.
         if (heldButton != 0 && !routeOrDesktop(route).equals(heldRoute)) releaseHeld();
+        if (route instanceof PilotRoute.Missing) return false;
         if (!bounds.contains(x, y)) {
             // Dropping a mid-drag MOVE/UP is what strands the button; the frame edge is where it belongs.
             if (heldButton == 0 || (kind != Kind.MOVE && kind != Kind.UP)) return false;
@@ -216,7 +217,7 @@ public final class PilotInputService implements AutoCloseable {
      * maintainer's call.)
      */
     public synchronized Typed type(PilotRoute route, Kind kind, String keyName, String text, Bounds bounds) {
-        if (bounds == null) return Typed.FAILED;
+        if (bounds == null || route instanceof PilotRoute.Missing) return Typed.FAILED;
         String typed = kind == Kind.TEXT ? printable(text) : "";
         if (kind == Kind.TEXT && typed.isEmpty()) return Typed.SENT;
         Key key = null;
@@ -378,7 +379,8 @@ public final class PilotInputService implements AutoCloseable {
      * (see {@link NativeController}).
      */
     public synchronized boolean supportsBackgroundInput(PilotRoute route) {
-        if (route instanceof PilotRoute.Emulator) return true;
+        // Nothing is driven on a missing surface, so the user's cursor is not at stake.
+        if (route instanceof PilotRoute.Emulator || route instanceof PilotRoute.Missing) return true;
         DesktopSession s = sessionOf(route);
         if (s != null) return s.has(Capability.BACKGROUND_CLICK);
         NativeController nc = controller(route);

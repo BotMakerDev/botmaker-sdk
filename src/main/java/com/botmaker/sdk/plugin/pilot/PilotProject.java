@@ -49,15 +49,12 @@ public final class PilotProject {
     }
 
     /**
-     * The project's capture source, or {@code null} when its Java names none this can read.
-     *
-     * <p>{@code null} covers the cases the caller treats alike: no {@code Sdk.java}, a body the host will not
-     * read (anything that is not one {@code return}), and an expression the host cannot read because the user
-     * wrote their own. In all of them the honest answer is that the pilot has nothing configured to point at,
-     * and every caller falls back to the whole desktop.
+     * The project's capture source, or {@code null} when there is nothing to show yet: a desktop game whose window
+     * has not been picked, a website read only in a run's own browser, or a source a run would stop on. The pilot
+     * then streams nothing rather than the whole desktop ({@link CaptureValue#shown}).
      */
     public CaptureSource defaultSource() {
-        return CaptureValue.current(services);
+        return CaptureValue.shown(services);
     }
 
     /** What this machine launches for the bot, or {@code null} when none is set. */

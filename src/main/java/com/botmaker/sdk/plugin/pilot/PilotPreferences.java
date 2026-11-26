@@ -8,8 +8,8 @@ import com.botmaker.sdk.plugin.pilot.transport.TransportKind;
 import java.util.prefs.Preferences;
 
 /**
- * The three things the pilot remembers between runs: its pairing token, the port it last bound, and the way
- * the user picked to reach it.
+ * What the pilot remembers between runs: its pairing token, the port it last bound, the way the user picked to
+ * reach it, and which process has a Funnel up.
  *
  * <p>Both are per <em>user</em> and not per project — a phone paired once should stay paired, and a stable
  * port is what makes the tailnet-direct URL survive a restart. They lived in the editor's own preferences
@@ -27,6 +27,7 @@ public final class PilotPreferences {
     private static final String KEY_TOKEN = "token";
     private static final String KEY_PORT = "port";
     private static final String KEY_TRANSPORT = "transport";
+    private static final String KEY_FUNNEL_OWNER = "funnelOwner";
 
     private PilotPreferences() {
     }
@@ -82,6 +83,23 @@ public final class PilotPreferences {
             prefs.flush();
         } catch (Exception ignored) {
             // As above: the next start simply takes another ephemeral port.
+        }
+    }
+
+    /** The process that has the pilot's Funnel up, or {@code 0} when none does. */
+    public static long funnelOwner() {
+        return read().getLong(KEY_FUNNEL_OWNER, 0);
+    }
+
+    /** Records the process that has the Funnel up; {@code 0} when it was turned off. */
+    public static void funnelOwner(long pid) {
+        Preferences prefs = read();
+        try {
+            if (pid <= 0) prefs.remove(KEY_FUNNEL_OWNER);
+            else prefs.putLong(KEY_FUNNEL_OWNER, pid);
+            prefs.flush();
+        } catch (Exception ignored) {
+            // An unwritable store costs the clean-up after a crash; the shutdown hook still runs.
         }
     }
 

@@ -30,6 +30,12 @@ public sealed interface PilotRoute {
     /** Stream and drive an Android emulator over ADB — off the user's desktop entirely. */
     record Emulator(EmulatorSurface surface) implements PilotRoute {}
 
+    /**
+     * The surface the project names is not there. Nothing is streamed and nothing is driven, and {@code reason}
+     * is the sentence the phone is told: the user's own screen never stands in for it.
+     */
+    record Missing(String reason) implements PilotRoute {}
+
     /** The one instance of {@link Desktop} worth allocating. */
     PilotRoute DESKTOP = new Desktop();
 }
