@@ -4,7 +4,9 @@
 package com.botmaker.sdk.plugin.view;
 
 import com.botmaker.plugin.api.run.ViewTarget;
+import com.botmaker.plugin.api.run.ViewedRun;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.observe.RunFrames;
 import org.junit.jupiter.api.Test;
@@ -69,6 +71,27 @@ class SdkRunViewTest {
         assertTrue(message.get().contains("\"Click\""), message.get());
         assertTrue(view.overlay(new byte[] {9, 9, 9}).isEmpty());
         assertTrue(view.overlay(null).isEmpty());
+    }
+
+    @Test
+    void aRunStartedForAnInstanceShowsThatInstanceNotTheProjectsCapture() {
+        SdkRunView view = new SdkRunView(() -> CaptureSource.desktop(), new SdkRunView.Probes(
+                w -> Optional.empty(), name -> Optional.of("serial-of-" + name)));
+
+        view.start(null, new ViewedRun("run-1", "Sign in",
+                java.util.Map.of(InstalledGame.CAPTURE_EMULATOR, " Pixel 10 ")), () -> { });
+
+        assertEquals(Optional.of(new ViewTarget.Emulator("serial-of-Pixel 10")), view.target());
+    }
+
+    @Test
+    void aRunWithNoInstanceShowsWhatTheProjectsCaptureNames() {
+        SdkRunView view = new SdkRunView(() -> null, new SdkRunView.Probes(w -> Optional.empty(), n -> Optional.empty()));
+
+        view.start(null, new ViewedRun("run-1", "Farm"), () -> { });
+
+        // Started as the project's own run is: the capture settings decide, whatever the constructor's source was.
+        assertTrue(view.target().isPresent() && !(view.target().get() instanceof ViewTarget.Emulator));
     }
 
     @Test

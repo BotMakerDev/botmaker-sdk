@@ -6,7 +6,9 @@ package com.botmaker.sdk.plugin.view;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.RunView;
 import com.botmaker.plugin.api.run.ViewTarget;
+import com.botmaker.plugin.api.run.ViewedRun;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.observe.RunEvent;
@@ -58,6 +60,22 @@ final class SdkRunView implements RunView {
     @Override
     public void start(StudioServices services, Runnable changed) {
         source = () -> CaptureValue.shown(services);
+    }
+
+    /**
+     * A run started with an emulator instance named ({@code InstalledGame.CAPTURE_EMULATOR}, as the Google sign-in
+     * is, one per instance) shows that instance, as the run itself reads it; any other run shows what the project's
+     * capture settings name.
+     */
+    @Override
+    public void start(StudioServices services, ViewedRun run, Runnable changed) {
+        String instance = run.properties().get(InstalledGame.CAPTURE_EMULATOR);
+        if (instance != null && !instance.isBlank()) {
+            CaptureSource device = CaptureSource.emulator(instance.strip());
+            source = () -> device;
+            return;
+        }
+        start(services, changed);
     }
 
     @Override
