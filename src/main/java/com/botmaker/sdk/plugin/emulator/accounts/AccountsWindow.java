@@ -9,14 +9,19 @@ import com.botmaker.plugin.api.toolbar.ActionContext;
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Modals;
 import com.botmaker.plugin.toolkit.Styles;
+import com.botmaker.sdk.api.secrets.Secret;
+import com.botmaker.sdk.plugin.emulator.AccountPool;
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.host.HostIds;
+import com.botmaker.sdk.plugin.emulator.host.KeptSecrets;
+import com.botmaker.sdk.plugin.emulator.host.SecretKind;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsModel;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
 import com.botmaker.sdk.plugin.emulator.window.HostUndo;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.sdk.plugin.emulator.window.WindowKeys;
+import com.botmaker.sdk.plugin.params.LaunchTargets;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AccountRecord.Verification;
@@ -48,6 +53,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -104,6 +110,20 @@ public final class AccountsWindow {
     private final Label status = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
     private final TableView<AccountsListModel.Row> table = new TableView<>();
     private final VBox side = new VBox(6);
+    /** The list beside the panel: the table, or the Launch target segment's groups. */
+    private final BorderPane list = new BorderPane();
+    /** The Launch target segment's groups, each with + Add (layout B). */
+    private final VBox groups = new VBox(6);
+    private final ScrollPane groupsPane = new ScrollPane(groups);
+    /** This PC as the deal reads it, for the links' ⚠ and the Plays at pick, as of the last read. */
+    private AccountPool.Pc pc = new AccountPool.Pc(Set.of(), Map.of());
+    private Map<AccountRecord.Key, String> warnings = Map.of();
+    /** The open bot's launch targets, a group each; none without a bot. */
+    private List<String> botTargets = List.of();
+    /** The launch target the side panel adds an account for; null while it shows none. */
+    private String adding;
+    /** What the launch target's panel shows, so a read that changes nothing leaves what the user types. */
+    private List<Object> shownLaunch;
     private AccountRecord.Kind kind;
     private List<AccountsListModel.Row> all = List.of();
     private List<AccountRecord> book = List.of();
@@ -203,6 +223,7 @@ public final class AccountsWindow {
             if (refilling) return;
             // null too when the user deselects, so a later read leaves it so
             picked = now == null ? null : now.account().key();
+            adding = null;
             detail(now);
         });
 
@@ -213,8 +234,10 @@ public final class AccountsWindow {
         panel.setPrefWidth(300);
         panel.setMinWidth(260);
         panel.getStyleClass().add("em-inspector-pane");
-        BorderPane list = new BorderPane(table);
+        list.setCenter(table);
         list.setRight(panel);
+        groups.setPadding(new Insets(8));
+        groupsPane.setFitToWidth(true);
         VBox.setVgrow(list, Priority.ALWAYS);
 
         Label hint = Styles.on(new Label("The accounts this PC knows, for every emulator and every bot. Passwords stay"
@@ -273,6 +296,7 @@ public final class AccountsWindow {
                 return;
             }
             kind = (AccountRecord.Kind) now.getUserData();
+            adding = null;
             filter();
         });
         return bar;
@@ -301,6 +325,15 @@ public final class AccountsWindow {
             if (available) {
                 for (String key : AccountsListModel.keys(known)) if (store.remembered(key)) remembered.add(key);
             }
+            // a launch target's account's password is a secret of its own store, asked whether it is kept only
+            PasswordStore secrets = KeptSecrets.store();
+            if (secrets.available()) {
+                for (Secret secret : AccountsListModel.secrets(known)) {
+                    if (secrets.remembered(secret.key())) remembered.add(secret.key());
+                }
+            }
+            Optional<AccountPool.Pc> pcRead = pcOf(services);
+            AccountPool.Pc here = pcRead.orElse(new AccountPool.Pc(Set.of(), Map.of()));
             // whether a Google account's key is held, never the key: one left after a switch away stays forgettable
             Set<AccountRecord.Key> keys = new HashSet<>();
             for (AccountRecord account : known) {
@@ -309,10 +342,15 @@ public final class AccountsWindow {
                 }
             }
             return new Read(now, known, AccountsListModel.rows(known, HostBook.onInstances(config, now.keys()),
-                    HostBook.held(config), remembered), available, method, Set.copyOf(keys));
+                    HostBook.held(config), remembered), available, method, Set.copyOf(keys), here,
+                    pcRead.map(pc -> AccountsListModel.warnings(known, pc)).orElse(Map.of()),
+                    botTargets(services));
         }, done -> {
             if (read != reads) return;
             found = done.found();
+            pc = done.pc();
+            warnings = done.warnings();
+            botTargets = done.botTargets();
             book = done.book();
             all = done.rows();
             storeAvailable = done.storeAvailable();
@@ -325,7 +363,29 @@ public final class AccountsWindow {
     }
 
     private record Read(Found found, List<AccountRecord> book, List<AccountsListModel.Row> rows,
-                        boolean storeAvailable, Verification byDefault, Set<AccountRecord.Key> keyed) {
+                        boolean storeAvailable, Verification byDefault, Set<AccountRecord.Key> keyed,
+                        AccountPool.Pc pc, Map<AccountRecord.Key, String> warnings, List<String> botTargets) {
+    }
+
+    /**
+     * This PC as the deal reads it; empty when it does not read, and then no account shows ⚠ for that (the Plays at
+     * pick offers what needs no read, and the account's own place). Off FX.
+     */
+    private static Optional<AccountPool.Pc> pcOf(StudioServices services) {
+        try {
+            return Optional.of(AccountPool.pc(services));
+        } catch (RuntimeException unread) {
+            return Optional.empty();
+        }
+    }
+
+    /** The open bot's launch targets; none without a bot, or when they do not read. Off FX. */
+    private static List<String> botTargets(StudioServices services) {
+        try {
+            return LaunchTargets.all(services);
+        } catch (RuntimeException unread) {
+            return List.of();
+        }
     }
 
     /**
@@ -382,6 +442,14 @@ public final class AccountsWindow {
     private void filter() {
         List<AccountsListModel.KindCount> counts = AccountsListModel.counts(all);
         for (int i = 0; i < segments.size(); i++) segments.get(i).setText(counts.get(i).said());
+        if (kind == AccountRecord.Kind.LAUNCH_TARGET) {
+            List<AccountsListModel.Row> rows = AccountsListModel.filtered(all, text.getText(), kind);
+            list.setCenter(groupsPane);
+            drawGroups(rows);
+            detail(rows.stream().filter(row -> row.account().key().equals(picked)).findFirst().orElse(null));
+            return;
+        }
+        list.setCenter(table);
         AccountRecord.Key keep = picked;
         refilling = true;
         try {
@@ -399,6 +467,165 @@ public final class AccountsWindow {
         status.setText(words == null ? "" : words);
     }
 
+    // ---- the Launch target segment (layout B) ----
+
+    /** Each launch target with its accounts under it and + Add, then + Launch target… for one no group names. */
+    private void drawGroups(List<AccountsListModel.Row> rows) {
+        groups.getChildren().clear();
+        List<AccountsListModel.Group> all = AccountsListModel.groups(rows, botTargets);
+        if (all.isEmpty()) {
+            groups.getChildren().add(Look.muted("No launch target's account yet. A bot's launch targets show here"
+                    + " while it is open; + Launch target… names another."));
+        }
+        for (AccountsListModel.Group group : all) {
+            Label title = Styles.on(new Label(group.target()), StyleClasses.DIALOG_SUBHEADING);
+            Region gap = new Region();
+            HBox.setHgrow(gap, Priority.ALWAYS);
+            Button add = button("+ Add", () -> startAdding(group.target()));
+            add.setTooltip(new Tooltip("Keep one more account of " + group.target()));
+            HBox head = new HBox(8, title, gap, add);
+            head.setAlignment(Pos.CENTER_LEFT);
+            head.setPadding(new Insets(6, 0, 0, 0));
+            groups.getChildren().add(head);
+            if (group.rows().isEmpty()) groups.getChildren().add(Look.muted("No account kept for it yet."));
+            group.rows().forEach(row -> groups.getChildren().add(groupRow(row)));
+        }
+        Button other = button("+ Launch target…", this::askTarget);
+        other.setTooltip(new Tooltip("Keep an account of a launch target no group names"));
+        HBox foot = new HBox(other);
+        foot.setPadding(new Insets(8, 0, 0, 0));
+        groups.getChildren().add(foot);
+    }
+
+    /** A launch target's account: its name, what it signs in with and where it plays, and ⚠ with the reason. */
+    private Node groupRow(AccountsListModel.Row row) {
+        AccountRecord account = row.account();
+        Label name = new Label(account.name());
+        name.setMinWidth(Region.USE_PREF_SIZE);
+        HBox line = new HBox(10, Look.avatar(account.name(), account.key().name()), name,
+                Look.muted("signs in with " + AccountsListModel.signsInWithText(account)),
+                Look.muted("plays at " + AccountsListModel.playsAtText(account.playsAt())));
+        String warned = warnings.get(account.key());
+        if (warned != null) {
+            Label mark = Styles.on(new Label("⚠"), "em-warning-text");
+            mark.setTooltip(new Tooltip(warned));
+            line.getChildren().add(mark);
+        }
+        line.setAlignment(Pos.CENTER_LEFT);
+        line.getStyleClass().add("em-account");
+        if (adding == null && account.key().equals(picked)) line.getStyleClass().add("em-picked");
+        line.setOnMouseClicked(e -> {
+            picked = account.key();
+            adding = null;
+            filter();
+        });
+        return line;
+    }
+
+    /** The side panel adds an account of {@code target}. */
+    private void startAdding(String target) {
+        adding = target;
+        picked = null;
+        filter();
+    }
+
+    /** + Launch target…: the target typed, such as {@code emu-app:com.game} or {@code steam:12345}. */
+    private void askTarget() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.initOwner(stage);
+        dialog.setTitle("Accounts");
+        dialog.setHeaderText("Keep an account of which launch target?");
+        dialog.setContentText("Launch target");
+        dialog.getEditor().setPromptText("emu-app:com.game");
+        services.theme().apply(dialog);
+        dialog.showAndWait().map(String::strip).filter(typed -> !typed.isEmpty()).ifPresent(this::startAdding);
+    }
+
+    /**
+     * The side panel of a launch target's account, or of the new one {@link #adding} names; left as it is when the
+     * account, the book and this PC are as it shows them, so a read that changes nothing keeps what the user types.
+     */
+    private void launchTargetDetail(AccountsListModel.Row row) {
+        AccountsListModel.Row of = adding != null ? null : row;
+        List<Object> state = Arrays.asList(of, adding, book, pc, warnings);
+        if (state.equals(shownLaunch)) return;
+        shownLaunch = state;
+        shown = null;
+        notes.getChildren().clear();
+        noteField = null;
+        noteKey = null;
+        rest.getChildren().clear();
+        String target = of == null ? adding : of.account().target();
+        Optional<String> warned = of == null ? Optional.empty() : Optional.ofNullable(warnings.get(of.account().key()));
+        top.getChildren().setAll(LaunchTargetPanel.of(target, of, book, pc, warned, new LaunchTargetPanel.Actions(
+                this::keepLaunchTarget, () -> setSecret(of), () -> forgetSecret(of), () -> remove(of))));
+    }
+
+    /**
+     * Add or Save: the account as the panel has it, as one step, and its password moved with it when its name
+     * changed, so {@code Account.password()} still names it.
+     */
+    private void keepLaunchTarget(LaunchTargetPanel.Edit edit) {
+        AccountRecord next = edit.next();
+        AccountRecord.Key was = edit.was();
+        Async.load("accounts-keep", () -> {
+            io(() -> HostConfig.accounts(services).keep(was, next));
+            if (was == null || was.equals(next.key())) return true;
+            Secret from = AccountsListModel.secret(AccountRecord.ofLaunchTarget(was.target(), was.name(), ""));
+            PasswordStore store = KeptSecrets.store();
+            if (!store.available() || !store.remembered(from.key())) return true;
+            // the account is saved already: a move that fails says so, never "not saved"
+            try {
+                return KeptSecrets.move(KeptSecrets.index(services), store, from, AccountsListModel.secret(next)).kept();
+            } catch (IOException | RuntimeException moveFailed) {
+                return false;
+            }
+        }, moved -> {
+            say(!moved ? next.name() + " is saved, but its password stayed under its old name: set it again."
+                    : was == null ? next.name() + " is added to " + next.target() + "." : next.name() + " is saved.");
+            adding = null;
+            picked = next.key();
+            load();
+        }, failed -> {
+            say("The account was not saved: " + failed);
+            load();
+        });
+    }
+
+    /** Set password…: kept in this PC's credential store as the secret the account's {@code password()} names. */
+    private void setSecret(AccountsListModel.Row row) {
+        AccountRecord account = row.account();
+        char[] password = askHidden("Password", "Keep the password of " + account.name(), "Kept in this PC's credential"
+                + " store as this account's secret: the host types it where the bot asks for it, and neither the run"
+                + " nor an assistant ever sees it.", "Keep");
+        if (password == null) return;
+        Secret secret = AccountsListModel.secret(account);
+        Async.load("accounts-secret", () -> io(() -> KeptSecrets.add(KeptSecrets.index(services), KeptSecrets.store(),
+                new KeptSecrets.Form(secret.name(), SecretKind.PASSWORD, password))), result -> {
+                    say(result.kept() ? "The password of " + account.name() + " is kept on this PC."
+                            : result == KeptSecrets.Result.NO_KEYRING ? "This PC has no credential store: nothing was"
+                            + " kept." : result == KeptSecrets.Result.INVALID_NAME ? "The launch target's name is too"
+                            + " long to name a password: nothing was kept."
+                            : "This PC's credential store refused the password of " + account.name() + ".");
+                    load();
+                }, failed -> say("The password was not kept: " + failed));
+    }
+
+    private void forgetSecret(AccountsListModel.Row row) {
+        AccountRecord account = row.account();
+        if (!confirm("Forget the password of " + account.name() + "?", "A run that types it finds none.", "Forget")) {
+            return;
+        }
+        Secret secret = AccountsListModel.secret(account);
+        Async.load("accounts-secret-forget", () -> io(() -> {
+            KeptSecrets.forget(KeptSecrets.index(services), KeptSecrets.store(), secret);
+            return true;
+        }), done -> {
+            say("The password of " + account.name() + " is forgotten.");
+            load();
+        }, failed -> say("The password was not forgotten: " + failed));
+    }
+
     // ---- the detail panel ----
 
     /**
@@ -407,6 +634,11 @@ public final class AccountsWindow {
      * what they typed.
      */
     private void detail(AccountsListModel.Row row) {
+        if (adding != null || row != null && row.account().kind() == AccountRecord.Kind.LAUNCH_TARGET) {
+            launchTargetDetail(row);
+            return;
+        }
+        shownLaunch = null;
         if (row != null && row.equals(shown) && storeAvailable == shownStore && found == shownFound
                 && byDefault == shownDefault) {
             return;
@@ -822,7 +1054,9 @@ public final class AccountsWindow {
      */
     private void remove(AccountsListModel.Row row) {
         AccountRecord account = row.account();
-        boolean forget = row.password() == AccountsListModel.Password.REMEMBERED;
+        boolean forget = row.password() == AccountsListModel.Password.REMEMBERED
+                || row.password() == AccountsListModel.Password.KEPT;
+        boolean launch = account.kind() == AccountRecord.Kind.LAUNCH_TARGET;
         boolean google = account.kind() == AccountRecord.Kind.GOOGLE;
         boolean keyHeld = google && keyed.contains(account.key());
         if (!confirm("Remove " + account.name() + " from the accounts?", "No configuration lists it."
@@ -835,7 +1069,13 @@ public final class AccountsWindow {
             if (account.keys().stream().anyMatch(held::contains)) {
                 return false;
             }
-            if (forget) {
+            if (forget && launch) {
+                io(() -> {
+                    KeptSecrets.forget(KeptSecrets.index(services), KeptSecrets.store(),
+                            AccountsListModel.secret(account));
+                    return true;
+                });
+            } else if (forget) {
                 account.addresses().forEach(store::forget);
                 if (account.addresses().stream().anyMatch(store::remembered)) {
                     throw new IllegalStateException("this PC's credential store kept its password");
@@ -851,6 +1091,7 @@ public final class AccountsWindow {
             io(() -> HostConfig.accounts(services).remove(account.key()));
             return true;
         }, removed -> {
+            if (removed && launch) picked = null;
             say(removed ? account.name() + " is removed."
                     : "A configuration lists " + account.name() + " now: it stays.");
             load();
@@ -1089,7 +1330,8 @@ public final class AccountsWindow {
                 name.setContentDisplay(ContentDisplay.RIGHT);
             }
             Node words = account.kind() == AccountRecord.Kind.GOOGLE ? name
-                    : new VBox(0, name, Look.muted(account.kind().displayName()));
+                    : new VBox(0, name, Look.muted(account.kind() == AccountRecord.Kind.LAUNCH_TARGET
+                    ? account.kind().displayName() + " · " + account.target() : account.kind().displayName()));
             HBox out = new HBox(8, Look.avatar(account.name(), account.key().name()), words);
             out.setAlignment(Pos.CENTER_LEFT);
             return out;
@@ -1130,20 +1372,24 @@ public final class AccountsWindow {
 
     /** The password, typed here and nowhere else, as characters; null when the user cancelled or typed nothing. */
     private char[] askPassword(String email) {
+        return askHidden("Google password", "Remember the password of " + email, "Kept in this PC's credential"
+                + " store, and typed on an instance by the next Apply that signs this account in, without asking."
+                + " Nothing is signed in now, and no assistant ever sees it.", "Remember");
+    }
+
+    /** A value typed hidden, here and nowhere else, as characters; null when the user cancelled or typed nothing. */
+    private char[] askHidden(String title, String header, String words, String yes) {
         PasswordField field = new PasswordField();
-        Label why = Styles.on(new Label("Kept in this PC's credential store, and typed on an instance by the next Apply"
-                + " that signs this account in, without asking. Nothing is signed in now, and no assistant ever sees"
-                + " it."),
-                StyleClasses.DIALOG_HINT);
+        Label why = Styles.on(new Label(words), StyleClasses.DIALOG_HINT);
         why.setWrapText(true);
         why.setMaxWidth(420);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(stage);
-        dialog.setTitle("Google password");
-        dialog.setHeaderText("Remember the password of " + email);
+        dialog.setTitle(title);
+        dialog.setHeaderText(header);
         dialog.getDialogPane().setContent(new VBox(8, why, field));
-        ButtonType remember = new ButtonType("Remember", ButtonBar.ButtonData.OK_DONE);
+        ButtonType remember = new ButtonType(yes, ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(remember, ButtonType.CANCEL);
         services.theme().apply(dialog);
         Platform.runLater(field::requestFocus);

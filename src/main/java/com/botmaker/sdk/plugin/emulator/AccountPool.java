@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * after its place, and the account follows the place. It reads the book and each instance's last-read Google accounts,
  * never a device.
  */
-final class AccountPool {
+public final class AccountPool {
 
     private AccountPool() {}
 
@@ -49,8 +49,8 @@ final class AccountPool {
      * @param reads     by instance name, the Google accounts Android last said it holds, lower case; an instance never
      *                  read is absent
      */
-    record Pc(Set<String> instances, Set<String> vms, Map<String, Set<String>> reads) {
-        Pc {
+    public record Pc(Set<String> instances, Set<String> vms, Map<String, Set<String>> reads) {
+        public Pc {
             instances = Set.copyOf(instances);
             vms = Set.copyOf(vms);
             Map<String, Set<String>> copy = new HashMap<>();
@@ -60,7 +60,7 @@ final class AccountPool {
         }
 
         /** A PC with no game VM. */
-        Pc(Set<String> instances, Map<String, Set<String>> reads) {
+        public Pc(Set<String> instances, Map<String, Set<String>> reads) {
             this(instances, Set.of(), reads);
         }
     }
@@ -95,7 +95,8 @@ final class AccountPool {
         return account.isNone() ? PluginPool.Sharing.ANY : 1;
     }
 
-    private static Pc pc(StudioServices services) {
+    /** This PC as a deal and the Accounts window read it. Reads its values and lists its VMs, so never on FX. */
+    public static Pc pc(StudioServices services) {
         Set<String> instances = SdkPools.instances(HostConfig.load(services));
         Set<String> vms = VmInventory.list().stream().filter(vm -> vm.stage() == VmRecord.Stage.READY)
                 .map(VmRecord::name).collect(Collectors.toSet());
@@ -134,7 +135,7 @@ final class AccountPool {
      * {@code record}, a launch target's account, as {@code Account}: a {@code playsAt} that does not read, or an
      * instance naming none, is none.
      */
-    static Account account(AccountRecord record) {
+    public static Account account(AccountRecord record) {
         Account account = Account.of(record.target(), record.name()).note(record.note());
         Optional<Account> with = record.signsInWith().map(key -> switch (key.kind()) {
             case GOOGLE -> Account.google(key.name());
@@ -200,7 +201,7 @@ final class AccountPool {
      * account that plays at an instance this PC no longer knows, or one that plays at {@code at} and signs in with a
      * Google account the instance did not hold when last read.
      */
-    static Optional<String> note(Account account, Optional<Place> at, Pc pc) {
+    public static Optional<String> note(Account account, Optional<Place> at, Pc pc) {
         if (account.isNone()) return Optional.empty();
         Optional<Place> link = account.playsAt();
         if (link.isPresent() && playsAt(account, pc).isEmpty()) {

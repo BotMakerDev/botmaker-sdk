@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.secrets;
+package com.botmaker.sdk.plugin.emulator.host;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.api.secrets.Secret;
-import com.botmaker.sdk.plugin.emulator.host.HostConfig;
-import com.botmaker.sdk.plugin.emulator.host.HostSecrets;
 import com.botmaker.shared.emulator.google.KeyringStore;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Totp;
@@ -169,6 +167,40 @@ public final class KeptSecrets {
             if (kept != null) Arrays.fill(kept, '\0');
             before.ifPresent(value -> Arrays.fill(value, '\0'));
         }
+    }
+
+    /**
+     * Moves the value kept as {@code from} to {@code to}, and {@code from} leaves the index: what a renamed account's
+     * password follows (the Accounts window, run-places phase 7d). {@link Result#REFUSED} when the store holds no value
+     * for {@code from}, or holds one for {@code to} already, which a move never overwrites: both are left as they are.
+     */
+    public static Result move(Index index, PasswordStore store, Secret from, Secret to) throws IOException {
+        if (from.equals(to)) return Result.UPDATED;
+        if (store.remembered(to.key()) || listed(index.read(), to)) return Result.REFUSED;
+        Optional<char[]> value = store.read(from.key());
+        if (value.isEmpty()) return Result.REFUSED;
+        try {
+            String kind = index.read().list().stream().filter(row -> Secret.of(row.name()).equals(from))
+                    .map(HostSecrets.Kept::kind).findFirst().orElse(SecretKind.PASSWORD.id());
+            Result added = add(index, store, new Form(to.name(), SecretKind.fromId(kind), value.get()));
+            if (!added.kept()) return added;
+            forget(index, store, from);
+            return added;
+        } finally {
+            Arrays.fill(value.get(), '\0');
+        }
+    }
+
+    /**
+     * Forgets {@code secret}'s value and takes it out of the index; one never kept is left as it is. Throws when the
+     * store still holds the value after, and the index keeps its row, so the secret stays one a list offers to forget.
+     */
+    public static void forget(Index index, PasswordStore store, Secret secret) throws IOException {
+        store.forget(secret.key());
+        if (store.remembered(secret.key())) throw new IOException("this PC's credential store kept " + secret.name());
+        if (!listed(index.read(), secret)) return;
+        index.change("Forget the secret " + secret.name(), was -> new HostSecrets(was.list().stream()
+                .filter(row -> !Secret.of(row.name()).equals(secret)).toList()));
     }
 
     private static boolean listed(HostSecrets index, Secret secret) {

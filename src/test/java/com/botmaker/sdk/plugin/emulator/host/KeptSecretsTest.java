@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.secrets;
+package com.botmaker.sdk.plugin.emulator.host;
 
 import com.botmaker.sdk.api.secrets.Secret;
-import com.botmaker.sdk.plugin.emulator.host.HostSecrets;
-import com.botmaker.sdk.plugin.secrets.KeptSecrets.Form;
-import com.botmaker.sdk.plugin.secrets.KeptSecrets.Result;
+import com.botmaker.sdk.plugin.emulator.host.KeptSecrets.Form;
+import com.botmaker.sdk.plugin.emulator.host.KeptSecrets.Result;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import org.junit.jupiter.api.Test;
 
@@ -88,6 +87,55 @@ class KeptSecretsTest {
         assertArrayEquals("second".toCharArray(), store.read("farm password").orElseThrow());
         assertEquals(List.of(new KeptSecrets.Listed(Secret.of("farm password"), SecretKind.PASSWORD, true)),
                 KeptSecrets.list(index, store));
+    }
+
+    @Test
+    void aMoveTakesTheValueToTheNewNameAndTheOldLeaves() throws Exception {
+        KeptSecrets.add(index, store, new Form("launch-target:emu-app:com.game:main", SecretKind.PASSWORD,
+                "hunter2".toCharArray()));
+        assertEquals(Result.ADDED, KeptSecrets.move(index, store, Secret.of("launch-target:emu-app:com.game:main"),
+                Secret.of("launch-target:emu-app:com.game:farm")));
+        assertEquals(List.of(new KeptSecrets.Listed(Secret.of("launch-target:emu-app:com.game:farm"),
+                SecretKind.PASSWORD, true)), KeptSecrets.list(index, store));
+        assertEquals(Optional.empty(), store.read("launch-target:emu-app:com.game:main"));
+
+        assertEquals(Result.REFUSED, KeptSecrets.move(index, store, Secret.of("none kept"), Secret.of("other")),
+                "nothing kept: nothing moves");
+        assertEquals(1, index.rows.list().size());
+
+        KeptSecrets.add(index, store, new Form("taken", SecretKind.PASSWORD, "mine".toCharArray()));
+        assertEquals(Result.REFUSED, KeptSecrets.move(index, store, Secret.of("launch-target:emu-app:com.game:farm"),
+                Secret.of("taken")), "a move never overwrites a kept value");
+        assertArrayEquals("mine".toCharArray(), store.read("taken").orElseThrow());
+        assertArrayEquals("hunter2".toCharArray(), store.read("launch-target:emu-app:com.game:farm").orElseThrow());
+    }
+
+    @Test
+    void aForgetTheStoreIgnoresThrowsAndKeepsTheRow() throws Exception {
+        KeptSecrets.add(index, store, new Form("pin", SecretKind.PASSWORD, "1".toCharArray()));
+        PasswordStore stuck = new PasswordStore() {
+            @Override
+            public boolean available() {
+                return true;
+            }
+
+            @Override
+            public Optional<char[]> read(String name) {
+                return store.read(name);
+            }
+
+            @Override
+            public boolean remember(String name, char[] value) {
+                return false;
+            }
+
+            @Override
+            public void forget(String name) {}
+        };
+        assertThrows(IOException.class, () -> KeptSecrets.forget(index, stuck, Secret.of("pin")));
+        assertEquals(1, index.rows.list().size(), "still listed, so still forgettable");
+        KeptSecrets.forget(index, store, Secret.of("pin"));
+        assertTrue(index.rows.list().isEmpty());
     }
 
     @Test

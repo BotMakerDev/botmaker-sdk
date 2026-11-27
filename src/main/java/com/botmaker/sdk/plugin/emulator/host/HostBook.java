@@ -175,6 +175,36 @@ public final class HostBook {
         return after;
     }
 
+    /**
+     * The Accounts window's Add or Save of a launch target's account, as one change: {@code next} as given, its name,
+     * note and links, in place of the account {@code was} keys ({@code null} to add one). Refused when another account
+     * of the book has {@code next}'s key, when {@code was} is not in the book, or for a {@code signsInWith} the book does
+     * not hold, unless {@code was} had it already: a link the book lost stays, shown broken, through an unrelated edit.
+     */
+    public List<AccountRecord> keep(AccountRecord.Key was, AccountRecord next) throws IOException {
+        if (next.kind() != AccountRecord.Kind.LAUNCH_TARGET
+                || was != null && was.kind() != AccountRecord.Kind.LAUNCH_TARGET) {
+            throw new IOException(next.name() + " is not a launch target's account.");
+        }
+        AtomicReference<String> refused = new AtomicReference<>();
+        List<AccountRecord> after = change(was == null ? "Add an account" : "Change an account", book -> {
+            boolean linkKept = was != null && book.containsKey(was)
+                    && book.get(was).signsInWith().equals(next.signsInWith());
+            if (was != null && !book.containsKey(was)) {
+                refused.set(was.name() + " is no longer in this PC's account book.");
+            } else if (!next.key().equals(was) && book.containsKey(next.key())) {
+                refused.set(next.target() + " has an account called " + next.name() + " already.");
+            } else if (!linkKept && next.signsInWith().isPresent() && !book.containsKey(next.signsInWith().get())) {
+                refused.set(next.signsInWith().get().name() + " is not in this PC's account book.");
+            } else {
+                if (was != null) book.remove(was);
+                book.put(next.key(), next);
+            }
+        });
+        if (refused.get() != null) throw new IOException(refused.get());
+        return after;
+    }
+
     /** Takes the account out of the book; the caller offers it only for one no configuration lists. */
     public List<AccountRecord> remove(AccountRecord.Key key) throws IOException {
         return change("Remove an account", book -> book.remove(key));

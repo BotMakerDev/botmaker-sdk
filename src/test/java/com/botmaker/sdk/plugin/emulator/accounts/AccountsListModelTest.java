@@ -3,6 +3,7 @@
 
 package com.botmaker.sdk.plugin.emulator.accounts;
 
+import com.botmaker.sdk.plugin.emulator.AccountPool;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -66,10 +67,102 @@ class AccountsListModelTest {
     @Test
     void theKindFilterCountsEveryKindWithAllFirstAndAnEmptyKindAtZero() {
         List<AccountsListModel.KindCount> counts = AccountsListModel.counts(rows());
-        assertEquals(List.of("All 3", "Google 2", "Facebook 1", "Mail 0"),
+        assertEquals(List.of("All 3", "Google 2", "Facebook 1", "Mail 0", "Launch target 0"),
                 counts.stream().map(AccountsListModel.KindCount::said).toList());
-        assertEquals(List.of("All 0", "Google 0", "Facebook 0", "Mail 0"),
+        assertEquals(List.of("All 0", "Google 0", "Facebook 0", "Mail 0", "Launch target 0"),
                 AccountsListModel.counts(List.of()).stream().map(AccountsListModel.KindCount::said).toList());
+        assertFalse(AccountsListModel.kinds().contains(AccountRecord.Kind.LAUNCH_TARGET),
+                "+ Account adds none: its group's + Add does");
+    }
+
+    // ---- launch targets' accounts (run-places phase 7d) ----
+
+    private static final String GAME = "emu-app:com.game";
+    private static final AccountRecord AT_ONE = AccountRecord.ofLaunchTarget(GAME, "first", "")
+            .withSignsInWith(Optional.of(MAIN.key())).withPlaysAt("this-pc/android/MEmu_1");
+    private static final AccountRecord ANYWHERE = AccountRecord.ofLaunchTarget(GAME, "second", "");
+    private static final AccountRecord STEAM = AccountRecord.ofLaunchTarget("steam:12345", "alt", "");
+    private static final AccountPool.Pc PC = new AccountPool.Pc(Set.of("MEmu_1", "MEmu_2"), Set.of("Win11"),
+            Map.of("MEmu_1", Set.of("main@example.com")));
+
+    @Test
+    void theLaunchTargetSegmentGroupsAccountsUnderTheBotsTargetsFirstThenTheOthers() {
+        List<AccountsListModel.Row> rows = AccountsListModel.rows(List.of(MAIN, STEAM, ANYWHERE, AT_ONE), Map.of(),
+                Set.of(), Set.of());
+        List<AccountsListModel.Group> groups = AccountsListModel.groups(rows, List.of("emu-app:com.new", GAME));
+        assertEquals(List.of("emu-app:com.new", GAME, "steam:12345"),
+                groups.stream().map(AccountsListModel.Group::target).toList());
+        assertEquals(List.of(), groups.getFirst().rows(), "a bot's target with none still offers + Add");
+        assertEquals(List.of(AT_ONE, ANYWHERE), groups.get(1).rows().stream().map(AccountsListModel.Row::account)
+                .toList(), "by name, and never the Google account");
+        assertEquals(List.of("steam:12345"), AccountsListModel.groups(rows, List.of()).stream()
+                .map(AccountsListModel.Group::target).filter(t -> t.startsWith("steam")).toList());
+        assertEquals(List.of(STEAM), AccountsListModel.filtered(rows, "steam", AccountRecord.Kind.LAUNCH_TARGET)
+                .stream().map(AccountsListModel.Row::account).toList(), "Find reads the launch target too");
+    }
+
+    @Test
+    void aRowSaysWhatItSignsInWithAndWhereItPlays() {
+        assertEquals("main@example.com", AccountsListModel.signsInWithText(AT_ONE));
+        assertEquals("—", AccountsListModel.signsInWithText(ANYWHERE));
+        assertEquals("MEmu_1", AccountsListModel.playsAtText(AT_ONE.playsAt()));
+        assertEquals("Any free place", AccountsListModel.playsAtText(""));
+        assertEquals("elsewhere/android/x", AccountsListModel.playsAtText("elsewhere/android/x"));
+    }
+
+    @Test
+    void theWarningSaysWhyALinkIsBrokenOrDisagrees() {
+        Set<AccountRecord.Key> book = Set.of(MAIN.key(), AT_ONE.key());
+        assertEquals(Optional.empty(), AccountsListModel.warning(AT_ONE, book, PC), "MEmu_1 holds main");
+        assertEquals(Optional.empty(), AccountsListModel.warning(MAIN, book, PC), "a Google account has no link");
+
+        AccountRecord gone = ANYWHERE.withPlaysAt("this-pc/android/MEmu_9");
+        assertEquals(Optional.of("second plays at MEmu_9, which is gone"), AccountsListModel.warning(gone, book, PC));
+        AccountRecord odd = ANYWHERE.withPlaysAt("elsewhere/android/x");
+        assertEquals(Optional.of("second plays at elsewhere/android/x, which this BotMaker does not read"),
+                AccountsListModel.warning(odd, book, PC));
+        AccountRecord lost = ANYWHERE.withSignsInWith(Optional.of(FARM.key()));
+        assertEquals(Optional.of("second signs in with farm@example.com, which the book no longer has"),
+                AccountsListModel.warning(lost, book, PC));
+        AccountRecord other = AT_ONE.withSignsInWith(Optional.of(FARM.key()));
+        assertEquals(Optional.of("MEmu_1 last read main@example.com; first signs in with farm@example.com"),
+                AccountsListModel.warning(other, Set.of(MAIN.key(), FARM.key()), PC));
+
+        assertEquals(Map.of(gone.key(), "second plays at MEmu_9, which is gone"),
+                AccountsListModel.warnings(List.of(MAIN, AT_ONE, gone), PC));
+    }
+
+    @Test
+    void thePicksListThisPcsPlacesAndTheBooksAccountsAndKeepALinkGone() {
+        assertEquals(List.of("", "this-pc/android/MEmu_1", "this-pc/android/MEmu_2", "this-pc/desktop",
+                "this-pc/vm/Win11"), AccountsListModel.placeChoices(PC, "this-pc/android/MEmu_1"));
+        assertEquals("this-pc/android/MEmu_9",
+                AccountsListModel.placeChoices(PC, "this-pc/android/MEmu_9").getLast(), "shown as it is");
+
+        Optional<AccountRecord.Key> gone = Optional.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "x@y.z"));
+        assertEquals(List.of(Optional.empty(), Optional.of(MAIN.key()), Optional.of(FB.key()), gone),
+                AccountsListModel.signInChoices(List.of(MAIN, AT_ONE, FB), gone), "never a launch target's");
+    }
+
+    @Test
+    void aNameIsRefusedBlankOrTakenWithinItsLaunchTarget() {
+        List<AccountRecord> book = List.of(AT_ONE, ANYWHERE, STEAM);
+        assertEquals(Optional.of("An account has a name."), AccountsListModel.nameRefused(GAME, " ", null, book));
+        assertEquals(Optional.of(GAME + " has an account called Second already."),
+                AccountsListModel.nameRefused(GAME, "Second", AT_ONE.key(), book));
+        assertEquals(Optional.empty(), AccountsListModel.nameRefused(GAME, "First", AT_ONE.key(), book),
+                "its own name, in another case");
+        assertEquals(Optional.empty(), AccountsListModel.nameRefused(GAME, "alt", null, book), "steam's alt");
+    }
+
+    @Test
+    void aLaunchTargetsPasswordIsTheSecretItsAccountNames() {
+        assertEquals("launch-target:emu-app:com.game:second", AccountsListModel.secret(ANYWHERE).key());
+        List<AccountsListModel.Row> rows = AccountsListModel.rows(List.of(ANYWHERE, AT_ONE), Map.of(), Set.of(),
+                Set.of("launch-target:emu-app:com.game:second"));
+        assertEquals(List.of(AccountsListModel.Password.NOT_KEPT, AccountsListModel.Password.KEPT),
+                rows.stream().map(AccountsListModel.Row::password).toList());
+        assertEquals(2, AccountsListModel.secrets(List.of(MAIN, ANYWHERE, AT_ONE)).size());
     }
 
     @Test

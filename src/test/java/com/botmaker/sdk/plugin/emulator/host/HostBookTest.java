@@ -562,6 +562,48 @@ class HostBookTest {
     }
 
     @Test
+    void keepAddsOrReplacesALaunchTargetsAccountAsOneStep() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        AccountRecord added = GAME_MAIN.withSignsInWith(Optional.of(FARM.key())).withPlaysAt("this-pc/desktop");
+        book.keep(null, added);
+        assertEquals("Add an account", host.steps.getLast());
+        assertEquals(added, book.known(EmulatorConfig.EMPTY).get(1));
+
+        AccountRecord renamed = AccountRecord.ofLaunchTarget("emu-app:com.game", "alt", "farm")
+                .withPlaysAt("this-pc/desktop");
+        book.keep(GAME_MAIN.key(), renamed);
+        assertEquals("Change an account", host.steps.getLast());
+        assertEquals(List.of("farm@example.com", "alt"), names(book.known(EmulatorConfig.EMPTY)),
+                "the old name is gone, the new one kept with its links");
+
+        book.keep(null, GAME_MAIN);
+        IOException taken = assertThrows(IOException.class, () -> book.keep(renamed.key(),
+                AccountRecord.ofLaunchTarget("emu-app:com.game", "Main", "")));
+        assertEquals("emu-app:com.game has an account called Main already.", taken.getMessage());
+        assertThrows(IOException.class, () -> book.keep(GAME_MAIN.key(), GAME_MAIN.withSignsInWith(
+                Optional.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "nobody@example.com")))));
+        assertThrows(IOException.class, () -> book.keep(null, FARM), "only a launch target's account");
+        assertThrows(IOException.class, () -> book.keep(FARM.key(), GAME_MAIN), "never in place of a Google one");
+    }
+
+    @Test
+    void aLinkTheBookLostStaysThroughAnUnrelatedEdit() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        AccountRecord linked = AccountRecord.ofLaunchTarget("emu-app:com.game", "alt", "")
+                .withSignsInWith(Optional.of(FARM.key()));
+        book.keep(null, linked);
+        book.remove(FARM.key());
+        AccountRecord noted = AccountRecord.ofLaunchTarget("emu-app:com.game", "alt", "farm")
+                .withSignsInWith(Optional.of(FARM.key()));
+        book.keep(linked.key(), noted);
+        assertEquals(List.of(noted), book.known(EmulatorConfig.EMPTY));
+        assertThrows(IOException.class, () -> book.keep(noted.key(), noted.withSignsInWith(Optional.of(
+                new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "nobody@example.com")))), "a new pick must be there");
+    }
+
+    @Test
     void aLaunchTargetRowWithNoTargetOrALinkThatDoesNotReadIsReadAsBestItCan() throws IOException {
         host.values.put(SdkHostValues.BOOK.id(), HostKnown.of(
                 new HostKnown.Entry("launch-target", "lost", "", "", "", "", "", ""),

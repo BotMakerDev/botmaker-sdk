@@ -3,6 +3,11 @@
 
 package com.botmaker.sdk.plugin.emulator.accounts;
 
+import com.botmaker.sdk.api.capture.Place;
+import com.botmaker.sdk.api.secrets.Secret;
+import com.botmaker.sdk.api.signin.Account;
+import com.botmaker.sdk.internal.config.PlaceKeys;
+import com.botmaker.sdk.plugin.emulator.AccountPool;
 import com.botmaker.sdk.plugin.emulator.host.HostBook;
 import com.botmaker.sdk.plugin.emulator.window.Look;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -14,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,7 +42,12 @@ final class AccountsListModel {
         REMEMBERED("Remembered", Look.Tone.OK, "Remembered on this PC: the next Apply that signs it in types it"),
         ASKED("Asked", Look.Tone.MUTED, "Not remembered: the first Apply that signs it in asks it"),
         /** A kind BotMaker signs nothing in for: a record, with no password at all. */
-        NONE("None", Look.Tone.OUTLINED, "No password: a record only, BotMaker signs nothing in for it");
+        NONE("None", Look.Tone.OUTLINED, "No password: a record only, BotMaker signs nothing in for it"),
+        /** A launch target's account whose password this PC keeps as the secret {@code Account.password()} names. */
+        KEPT("Kept", Look.Tone.OK, "Kept in this PC's credential store: the host types it, a run never sees it"),
+        /** A launch target's account whose password this PC does not keep. */
+        NOT_KEPT("Not kept", Look.Tone.MUTED, "No password kept: Set password… keeps one in this PC's credential"
+                + " store");
 
         private final String displayName;
         private final Look.Tone tone;
@@ -113,6 +124,10 @@ final class AccountsListModel {
                     List<AccountRecord.Key> keys = account.keys();
                     List<InstanceKey> on = keys.stream().flatMap(key -> onInstances.getOrDefault(key, List.of())
                             .stream()).distinct().toList();
+                    if (account.kind() == AccountRecord.Kind.LAUNCH_TARGET) {
+                        return new Row(account, on, remembered.contains(secret(account).key()) ? Password.KEPT
+                                : Password.NOT_KEPT, keys.stream().noneMatch(held::contains));
+                    }
                     return new Row(account, on, !account.kind().signedInByBotMaker() ? Password.NONE
                             : remembered(account, remembered) ? Password.REMEMBERED : Password.ASKED,
                             keys.stream().noneMatch(held::contains));
@@ -170,23 +185,152 @@ final class AccountsListModel {
         }
     }
 
-    /** The kind filter's segments: All first, then each kind an account can be, a kind with none at 0. */
+    /**
+     * The kind filter's segments: All first, then each kind an account can be, Launch target last, a kind with none at
+     * 0.
+     */
     static List<KindCount> counts(List<Row> rows) {
         List<KindCount> out = new ArrayList<>();
         out.add(new KindCount(null, rows.size()));
-        for (AccountRecord.Kind kind : kinds()) {
+        List<AccountRecord.Kind> segments = new ArrayList<>(kinds());
+        segments.add(AccountRecord.Kind.LAUNCH_TARGET);
+        for (AccountRecord.Kind kind : segments) {
             out.add(new KindCount(kind, (int) rows.stream().filter(row -> row.account().kind() == kind).count()));
         }
         return out;
     }
 
     /**
-     * The kinds an account can be: every one but UNKNOWN, and but a launch target's, which needs its launch target and
-     * gets its own segment with the run-places plan's phase 7d.
+     * The kinds <i>+ Account</i> and <i>Paste list…</i> add: every one but UNKNOWN, and but a launch target's, which
+     * needs its launch target and is added by its group's <i>+ Add</i>.
      */
     static List<AccountRecord.Kind> kinds() {
         return Arrays.stream(AccountRecord.Kind.values())
                 .filter(one -> one != AccountRecord.Kind.UNKNOWN && one != AccountRecord.Kind.LAUNCH_TARGET).toList();
+    }
+
+    // ---- launch targets' accounts (run-places phase 7d, layout B) ----
+
+    /** The secret a launch target's account's password is kept as: what {@code Account.password()} names. */
+    static Secret secret(AccountRecord account) {
+        return AccountPool.account(account).password();
+    }
+
+    /** The secrets a launch target's accounts' passwords are kept as, asked of the secrets' store. */
+    static Set<Secret> secrets(List<AccountRecord> book) {
+        return book.stream().filter(account -> account.kind() == AccountRecord.Kind.LAUNCH_TARGET)
+                .map(AccountsListModel::secret).collect(Collectors.toSet());
+    }
+
+    /** A launch target and its accounts' rows, by name; a group with none still offers <i>+ Add</i>. */
+    record Group(String target, List<Row> rows) {
+
+        Group {
+            rows = List.copyOf(rows);
+        }
+    }
+
+    /**
+     * The Launch target segment's groups: the open bot's launch targets first, in its order, each with its accounts or
+     * none, then every other target the book keeps accounts for, by name.
+     */
+    static List<Group> groups(List<Row> rows, List<String> botTargets) {
+        Map<String, List<Row>> by = new LinkedHashMap<>();
+        for (String target : botTargets) {
+            if (!target.isBlank()) by.putIfAbsent(target.strip(), new ArrayList<>());
+        }
+        List<Row> launch = rows.stream().filter(row -> row.account().kind() == AccountRecord.Kind.LAUNCH_TARGET)
+                .toList();
+        launch.stream().map(row -> row.account().target())
+                .filter(target -> !by.containsKey(target)).sorted(String.CASE_INSENSITIVE_ORDER).distinct()
+                .forEach(target -> by.put(target, new ArrayList<>()));
+        launch.forEach(row -> by.get(row.account().target()).add(row));
+        return by.entrySet().stream().map(each -> new Group(each.getKey(), each.getValue())).toList();
+    }
+
+    /** What a launch target's account's row says it signs in with: the account's name, or "—" for none. */
+    static String signsInWithText(AccountRecord account) {
+        return account.signsInWith().map(AccountRecord.Key::name).orElse("—");
+    }
+
+    /** What a row says it plays at: a place for a person, "Any free place" for none, the key as written otherwise. */
+    static String playsAtText(String key) {
+        if (key == null || key.isBlank()) return "Any free place";
+        return PlaceKeys.parse(key).filter(place -> place.kind() != Place.Kind.ANDROID || place.namesAndroid())
+                .map(PlaceKeys::said).orElse(key.strip());
+    }
+
+    /**
+     * Why a launch target's account's links want a look, or empty (spec § The Accounts window): a {@code playsAt} that
+     * does not read, a {@code signsInWith} the book no longer holds, then what the deal notes (a place gone, or an
+     * instance that last read another Google account).
+     */
+    static Optional<String> warning(AccountRecord account, Set<AccountRecord.Key> book, AccountPool.Pc pc) {
+        if (account.kind() != AccountRecord.Kind.LAUNCH_TARGET) return Optional.empty();
+        if (!account.playsAt().isEmpty() && AccountPool.account(account).playsAt().isEmpty()) {
+            return Optional.of(account.name() + " plays at " + account.playsAt() + ", which this BotMaker does not"
+                    + " read");
+        }
+        Optional<AccountRecord.Key> with = account.signsInWith();
+        if (with.isPresent() && !book.contains(with.get())) {
+            return Optional.of(account.name() + " signs in with " + with.get().name() + ", which the book no longer"
+                    + " has");
+        }
+        Account read = AccountPool.account(account);
+        return AccountPool.note(read, read.playsAt(), pc);
+    }
+
+    /** Each launch target's account's warning ({@link #warning}), by key; one with none is absent. */
+    static Map<AccountRecord.Key, String> warnings(List<AccountRecord> book, AccountPool.Pc pc) {
+        Set<AccountRecord.Key> keys = book.stream().map(AccountRecord::key).collect(Collectors.toSet());
+        Map<AccountRecord.Key, String> out = new LinkedHashMap<>();
+        book.forEach(account -> warning(account, keys, pc).ifPresent(words -> out.put(account.key(), words)));
+        return Map.copyOf(out);
+    }
+
+    /**
+     * The side panel's <i>Plays at</i> choices, by place key: any free place ({@code ""}) first, then this PC's
+     * instances, its desktop and its game VMs, and {@code current} last when it is none of them, so a link gone shows
+     * as it is until the user picks another.
+     */
+    static List<String> placeChoices(AccountPool.Pc pc, String current) {
+        List<String> out = new ArrayList<>();
+        out.add("");
+        pc.instances().stream().sorted(String.CASE_INSENSITIVE_ORDER).map(name -> Place.android(name).toString())
+                .forEach(out::add);
+        out.add(Place.desktop().toString());
+        pc.vms().stream().sorted(String.CASE_INSENSITIVE_ORDER).map(name -> Place.vm(name).toString())
+                .forEach(out::add);
+        String kept = current == null ? "" : current.strip();
+        if (!out.contains(kept)) out.add(kept);
+        return List.copyOf(out);
+    }
+
+    /**
+     * The side panel's <i>Signs in with</i> choices: none first, then the book's Google, Facebook and mail accounts in
+     * its order, and {@code current} last when the book no longer has it.
+     */
+    static List<Optional<AccountRecord.Key>> signInChoices(List<AccountRecord> book,
+                                                           Optional<AccountRecord.Key> current) {
+        List<Optional<AccountRecord.Key>> out = new ArrayList<>();
+        out.add(Optional.empty());
+        book.stream().filter(account -> kinds().contains(account.kind())).map(account -> Optional.of(account.key()))
+                .forEach(out::add);
+        if (current.isPresent() && !out.contains(current)) out.add(current);
+        return List.copyOf(out);
+    }
+
+    /**
+     * Why {@code name} cannot be the name of {@code target}'s account that was {@code was} ({@code null} for a new
+     * one), or empty when it can.
+     */
+    static Optional<String> nameRefused(String target, String name, AccountRecord.Key was, List<AccountRecord> book) {
+        if (name == null || name.isBlank()) return Optional.of("An account has a name.");
+        AccountRecord.Key key = new AccountRecord.Key(AccountRecord.Kind.LAUNCH_TARGET, target, name);
+        if (!key.equals(was) && book.stream().anyMatch(account -> account.key().equals(key))) {
+            return Optional.of(target.strip() + " has an account called " + name.strip() + " already.");
+        }
+        return Optional.empty();
     }
 
     /** The keys the store is asked about: every address of the accounts BotMaker signs in. */
@@ -293,7 +437,8 @@ final class AccountsListModel {
                 .filter(row -> kind == null || row.account().kind() == kind)
                 .filter(row -> words.isEmpty()
                         || row.account().addresses().stream().anyMatch(a -> a.toLowerCase(Locale.ROOT).contains(words))
-                        || row.account().note().toLowerCase(Locale.ROOT).contains(words))
+                        || row.account().note().toLowerCase(Locale.ROOT).contains(words)
+                        || row.account().target().toLowerCase(Locale.ROOT).contains(words))
                 .toList();
     }
 }

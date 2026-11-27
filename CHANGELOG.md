@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The Accounts window keeps a launch target's accounts** (2026-11-27, run places phase 7d, layout B): a Launch
+  target segment beside All, Google, Facebook and Mail lists the accounts under each launch target, the open bot's
+  first, each with **+ Add**, and **+ Launch target…** for another. A row shows the account's name, what it signs in
+  with and where it plays, and ⚠ with the reason when a link is broken (a place gone or not read, an account the book
+  no longer has) or disagrees (the instance last read another Google account). Its side panel edits the name, *Signs
+  in with* (a pick of the book's Google, Facebook and mail accounts), *Plays at* (a pick of this PC's instances, its
+  desktop and its game VMs), the note and the password, kept in this PC's credential store as the secret
+  `Account.password()` names; a rename moves the password with it, and a removal forgets it.
 - **Several runs are each dealt a game account, after their place** (2026-11-27, run places phase 7c): a bot that is
   dealt a place gets the parameter `Account account()` in its `Game` group (`api.signin.Account`: a launch target's
   account, `Account.of("emu-app:com.game", "main")`, with `.signsInWith(Account.google(…))`, `.playsAt(Place.android(…))`

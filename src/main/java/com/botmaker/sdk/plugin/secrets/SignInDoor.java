@@ -11,6 +11,8 @@ import com.botmaker.sdk.internal.signin.DoorLines;
 import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.sdk.plugin.SdkLog;
 import com.botmaker.sdk.plugin.emulator.host.HostSecrets;
+import com.botmaker.sdk.plugin.emulator.host.KeptSecrets;
+import com.botmaker.sdk.plugin.emulator.host.SecretKind;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.google.AccountDevice;

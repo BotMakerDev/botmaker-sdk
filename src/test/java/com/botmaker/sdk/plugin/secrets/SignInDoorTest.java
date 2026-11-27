@@ -8,6 +8,7 @@ import com.botmaker.sdk.api.secrets.Secret;
 import com.botmaker.sdk.api.signin.Typed;
 import com.botmaker.sdk.internal.signin.SignInClient;
 import com.botmaker.sdk.plugin.emulator.host.HostSecrets;
+import com.botmaker.sdk.plugin.emulator.host.KeptSecrets;
 import com.botmaker.shared.emulator.google.AccountDevice;
 import com.botmaker.shared.emulator.google.PasswordStore;
 import com.botmaker.shared.emulator.google.Totp;
