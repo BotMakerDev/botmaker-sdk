@@ -39,11 +39,12 @@
   `RunView`), turning a telemetry frame into the phone's message with `plugin/view/TelemetrySerializer`. Telemetry
   crosses as `TelemetryFrame` bytes (`Runs.onTelemetry`), decoded with the shared codec the bot encoded it with —
   **strings and bytes cross the contract, shapes do not**.
-- **The pilot streams and drives only what the project names** (2026-11-26): a window or emulator that is not
+- **The pilot streams and drives only what the project names** (2026-11-26; these classes are `botmaker-core`'s
+  `pilot/` since 2026-11-27): a window or emulator that is not
   there is no frame and no input, with the reason sent to the phone (`PilotRoute.Missing`,
   `TargetCapture.whyNothing`). The screen is streamed only when the capture source is the desktop or a monitor.
   A Funnel is turned off by a shutdown hook, and `PilotPreferences.funnelOwner` lets the next start clear one
   a crash left.
-- **A phone's input and stream are bounded** (2026-11-26): a held button belongs to the client that pressed it
+- **A phone's input and stream are bounded** (2026-11-26, in `botmaker-core` since 2026-11-27): a held button belongs to the client that pressed it
   (`PilotInputService`), a tap on a covered `:0` window raises it or is refused, and each client has its own
   `SendQueue`, so a stalled phone blocks nothing. Asking for the state never switches `:0` to real device input.

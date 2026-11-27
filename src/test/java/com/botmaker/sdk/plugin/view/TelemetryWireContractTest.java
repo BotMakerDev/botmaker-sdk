@@ -30,27 +30,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The Studio half of the pilot wire contract. {@code types.ts} names every field of every message; this
- * side writes records, and without this test the only thing claiming the two agree would be a javadoc sentence.
+ * The plugin's part of the pilot wire contract: the {@code telemetry.} messages its view draws over the
+ * picture, which the phone's {@code types.ts} names field for field.
  *
- * <p>Both halves read the <em>same</em> corpus — {@code pilot-wire/wire-golden.json} here,
- * {@code web/src/wire-golden.json} in the pilot repo — and both assert its SHA-256. Neither test can see
- * the other's repo, but the digest means neither copy can move alone: change the wire on one side and the
- * other side goes red until it is changed too. That, not the javadoc, is what keeps the clone honest.
+ * <p>{@code pilot-wire/wire-golden.json} here holds those cases, and still some of the server's messages, which
+ * {@code TelemetrySerializer} can also write. The whole corpus is the core's, byte-identical in the pilot repo
+ * ({@code web/src/wire-golden.json}); this copy keeps its own digest, so a {@code telemetry.} case changed here
+ * must be changed there too.
  */
 class TelemetryWireContractTest {
 
-    /**
-     * Deliberately not under {@code /pilot} — that classpath directory belongs to the served BotPilot dist in
-     * {@code src/main/resources}, and Surefire puts {@code target/test-classes} ahead of {@code target/classes},
-     * so a test resource of the same name shadows the whole dist and every static path 404s (B19).
-     */
     private static final String GOLDEN = "/pilot-wire/wire-golden.json";
 
-    /**
-     * The corpus, byte for byte. Update this together with {@code GOLDEN_SHA256} in the pilot repo's
-     * {@code wire.test.ts} — and with the copy of the file itself, which must stay byte-identical.
-     */
+    /** This copy, byte for byte. */
     private static final String GOLDEN_SHA256 = "0b751c506853a217a49ac73b19cefc89f1293f728943f67325c3cfcc4750874c";
 
     private static final ObjectMapper JSON = new ObjectMapper();

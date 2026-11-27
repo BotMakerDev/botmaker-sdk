@@ -8,9 +8,9 @@
   (2026-10-28), which implements the step's holder interface and lists what it gives (`SdkTypes.types()`,
   `SdkEditors.editors()`, `SdkToolbarItems.toolbar()`, `SdkAssistant.tools()`, …); the host builds it only when it
   asks, so constructing the plugin links nothing (`SdkPluginHeadlessTest`: a headless host constructs it too, and
-  `javafx-controls`, the toolkit, Javalin and ZXing are `optional` here). `onProjectOpened`/`onProjectClosing`
+  `javafx-controls`, the toolkit and ZXing are `optional` here). `onProjectOpened`/`onProjectClosing`
   bind the game button, readiness, the VM keeper and `SdkLog` (the plugin half's warnings, to
-  `StudioServices.log()`) to the open project, and release the Remote Pilot. `SdkPluginSurfaceTest` runs the
+  `StudioServices.log()`) to the open project. `SdkPluginSurfaceTest` runs the
   toolkit's `PluginTests.assertDeclared` and `assertListsEveryField` over every holder.
 - **The overlay editor's part is `plugin/overlay/SdkOverlay`.**
   - It declares no targets since 2026-11-09: they were activity bodies, gone with flows.
@@ -34,11 +34,12 @@
   It is not to be proposed for removal again without new facts. (The second, `FlowTypes`' activity body
   written as the text `Collect::body`, went with flows on 2026-11-09.)
 - **Toolbar buttons are `SdkToolbarItems`**: one `ToolbarItem.id(…)` constant per button, each pressing its
-  feature's own `open(ActionContext)` (`RemotePilotUi.open`, `ScreenMap.open`, `SourcePicker.choose`,
+  feature's own `open(ActionContext)` (`ScreenMap.open`, `SourcePicker.choose`,
   `CaptureValue.pointHere`, …). Nothing holds a project in a static: a feature takes `StudioServices` from
-  the context it is handed. The bar holds three, the game button, 🗺 Screens and 🎮 Pilot (`onBar(10)`, `60`, `90`;
-  one flat order since 2026-10-28, when toolbar groups went: Studio gives the plugin a tab of its own); the
-  overlay's two, ⌖ Point bot here and ✂ Picture of this, are `inOverlay`. 🎯 Goals, 🖼 Manage Pictures and ✂ Capture
+  the context it is handed. The bar holds six: the game button, 📱 Emulators, 👤 Accounts, 🗺 Screens,
+  ⌖ Point bot at… and ✂ Cut picture (`onBar(10)`, `20`, `30`, `60`, `100`, `110`; the last two were the
+  overlay's until 2026-11-13; 🎮 Pilot is Studio's own button since 2026-11-27; one flat order since
+  2026-10-28, when toolbar groups went: Studio gives the plugin a tab of its own). 🎯 Goals, 🖼 Manage Pictures and ✂ Capture
   Templates left the bar on 2026-11-09 (spec `2026-11-09-screens-rail-design.md`): Goals and Pictures are views of
   the Screens window's left rail (`plugin/map/ScreensRail`, each built by its class's `view(…)`), and Screens cuts
   pictures from its panel.

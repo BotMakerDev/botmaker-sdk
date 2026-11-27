@@ -551,8 +551,8 @@ Coordinator, a restart with edits queued, done without a witness, a destructive 
   umbrella) is the window's left edge: 🗺 Map, 🎯 Goals, 🔭 Explore and 🖼 Pictures, one view in the centre at a
   time. Each view is built on its first press and kept (`ScreenMap.showView`); a press on the view shown keeps it.
   Goals (`GoalsView.view`) and Pictures were toolbar windows before; a Goals row's double click comes back to the
-  map with its screen's tab in front (`ScreenMap.openScreen`). The toolbar keeps the game button, 🗺 Screens and
-  🎮 Pilot.
+  map with its screen's tab in front (`ScreenMap.openScreen`). The toolbar keeps the game button and 🗺 Screens
+  (beside 📱 Emulators, 👤 Accounts, ⌖ Point bot at… and ✂ Cut picture).
 - **🔭 Explore** (`ExploreView`, 2026-11-09; continuous-explore spec §7, layout A) starts and watches a run
   exploring the game. Both explore runs are `SdkRuns` entries off the bar (`RunEntry.offBar`): ▶ Keep exploring
   starts the long one, its ▾ *Explore map* the single pass, through `services.runs().start(entry)`; ■ Stop is the

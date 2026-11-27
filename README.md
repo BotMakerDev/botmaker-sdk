@@ -5,8 +5,7 @@ The **BotMaker SDK** is one jar with two jobs:
 - **the runtime** a bot compiles against — find a picture on the screen, read text, click, type, wait, and
   run a plan: walk the game's screens and press what serves the goals that matter most;
 - **plugin #1** of [BotMaker Studio](https://github.com/BotMakerDev/botmaker-studio) — the 🗺 Screens window
-  with its rail of views (the map, 🎯 Goals, 🖼 Pictures), the picture tools, the capture source and launch target, the run overlay and the Remote
-  Pilot.
+  with its rail of views (the map, 🎯 Goals, 🖼 Pictures), the picture tools, the capture source and launch target and the run overlay.
 
 Studio bundles no plugin and never depends on this jar. A project that declares the SDK in its `pom.xml`
 gets both halves: its bot runs on the first, and Studio loads the second from that project's classpath.
@@ -90,8 +89,8 @@ method is a compile error, never a button that silently does nothing.
 |---|---|
 | 🗺 **Screens** | the game's screens, their buttons and the ways between them, live over the game — `Screens.java`; its left rail shows 🎯 **Goals** (the plans' tiers, each goal and the actions that serve it — `Goals.java` and `Plans.java`) and 🖼 **Pictures** (rename, retag, replace, delete, import and export pictures; a rename moves every use) |
 | the game button | which game this bot plays on this computer — from Steam, Heroic, Faugus, Lutris, Waydroid or the app menu — and start it without running the bot |
-| 🎮 **Pilot** | stream the run to a phone or browser, start and stop it, take over the input |
-| ⌖ **Point bot here**, ✂ **Picture of this** | on the overlay editor's row: make the window under the overlay the capture source, or cut a picture out of it |
+| 📱 **Emulators**, 👤 **Accounts** | this computer's Android emulators and their instances, and the accounts it knows for them; both open without a project |
+| ⌖ **Point bot at…**, ✂ **Cut picture** | pick the window, emulator or screen the bot reads, or cut a picture out of it |
 
 It also declares the editors for its own types (pictures, points, regions, keys, colours by eyedropper, OCR
 options), the run overlay (the goal being served and the last match, over the game), tools for Studio's

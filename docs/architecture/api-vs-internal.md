@@ -46,8 +46,8 @@
   enforced by `plugin/PluginLayersTest`). `api` and `internal` are what a bot links: no JavaFX, no toolkit, no
   `com.botmaker.sdk.plugin` name. `plugin/` is the Studio half: `SdkPlugin` (the declaration),
   `SdkToolbarItems`, `types/` (`SdkTypes`, `RunTypes`, `ScreenTypes`, `PlanTypes`, `CaptureTypes`, `SettingsTypes`),
-  `editors/`, and one package per feature — `map`, `plan`, `pictures`, `screen`, `source`, `settings`, `pilot`
-  (+ `pilot/ui`), `emulator`, `launch`, `setup`. **No class under `plugin/` reads or writes Java text**: an
+  `editors/`, and one package per feature — `map`, `plan`, `pictures`, `screen`, `source`, `settings`, `view`
+  (what Remote Pilot shows of a run), `emulator`, `launch`, `setup`. **No class under `plugin/` reads or writes Java text**: an
   editor reads the value the host hands it and hands one back.
 
 - **`api.*` breaks freely (2026-10-01, the maintainer's ruling).** Studio's refactor-safe upgrade drops a

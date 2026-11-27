@@ -31,7 +31,7 @@ Graph algorithms over the screen map (paths, costs, presence, followers, traps) 
 | `Sdk.java`, `Pictures.java`, `SdkValues` | `plugin-values.md` |
 | `SdkPlugin`, `SdkTypes`, `RunTypes`, `PlanTypes`, `CaptureTypes`, `SdkToolbarItems` | `declaration.md` |
 | `plugin/editors`, a slot editor, a screen pick | `editors.md` |
-| `EditorFrame`, `ScreenOverlay`, `OverlayStage`, `TemplateLibrary`, the Remote Pilot | `pixels-windows-pictures.md` |
+| `EditorFrame`, `ScreenOverlay`, `OverlayStage`, `TemplateLibrary`, `plugin/view` (what Remote Pilot shows of a run) | `pixels-windows-pictures.md` |
 | an `org.opencv` type, `ImageTemplate`, matching | `opencv.md` |
 | `api.capture`, desktop capture, `Mouse.click` under Wayland | `screen-capture.md`, `../docs/display-pipeline.md` |
 | `internal.emulator` (`Emulator`, `Emulators`) | `emulator.md` |
