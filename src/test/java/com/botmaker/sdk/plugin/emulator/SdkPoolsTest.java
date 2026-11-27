@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.run.PoolOffer;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.Place;
+import com.botmaker.sdk.internal.config.PointerClaims;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.EmulatorConfig;
@@ -128,6 +129,17 @@ class SdkPoolsTest {
     void theFirstTargetThisSystemRunsIsTheOneThePcPlacesAreAskedAbout() {
         assertEquals(List.of(Place.privateDisplay(1), Place.privateDisplay(2), Place.desktop()),
                 SdkPools.candidates(HostConfig.State.EMPTY, List.of("lutris:game", "steam:1145350"), LINUX).places());
+    }
+
+    @Test
+    void aRunThatTakesOverThisDesktopHoldsItsPointerAndNoOtherPlaceHoldsOne() {
+        assertEquals(List.of("pointer:this-pc/desktop"), PointerClaims.heldWith(Place.desktop(), true));
+        assertEquals(PointerClaims.KEY, PointerClaims.heldWith(Place.desktop(), true).getFirst());
+        assertEquals(List.of(), PointerClaims.heldWith(Place.desktop(), false), "posted input shares this desktop");
+        assertEquals(List.of(), PointerClaims.heldWith(Place.privateDisplay(1), true),
+                "a display's pointer is its own");
+        assertEquals(List.of(), PointerClaims.heldWith(Place.vm("Win11"), true));
+        assertEquals(List.of(), PointerClaims.heldWith(Place.android("Pixel 9"), true));
     }
 
     @Test

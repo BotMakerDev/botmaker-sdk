@@ -4,6 +4,7 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.Runs;
+import com.botmaker.sdk.internal.bot.Session;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.core.RecordingNativeController;
 import com.botmaker.sdk.api.console.Debug;
@@ -13,11 +14,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * {@link BotSettings} is the bot's {@code @SdkValue(SETTINGS)} value (2026-09-27): what it declares is in force
@@ -29,11 +34,12 @@ class BotSettingsTest {
     /** Records only the one call that matters here; the rest of the surface comes from the shared test double. */
     private static final class RecordingInput extends RecordingNativeController {
         private int escalations;
+        private boolean available = true;
 
         @Override
         public boolean useReliableInput() {
             escalations++;
-            return true;
+            return available;
         }
     }
 
@@ -131,6 +137,56 @@ class BotSettingsTest {
         BotSettings.use(BotSettings.current().confidence(0.9));
         assertEquals(1, input.escalations, "an unrelated change does not escalate again");
         assertTrue(BotSettings.current().takeOver());
+    }
+
+    @Test
+    void aTakeOverClaimsTheDesktopPointerAndStopsWithWordsWhenAnotherRunHoldsIt() {
+        RecordingInput input = new RecordingInput();
+        NativeControllerFactory.setForTesting(input);
+        List<String> asked = new ArrayList<>();
+        BotSettings.claimPointerWithForTesting(key -> asked.add(key) && false, key -> fail("nothing was claimed"));
+
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> BotSettings.use(onDesktop(true)));
+        assertEquals(List.of("pointer:this-pc/desktop"), asked);
+        assertTrue(refused.getMessage().startsWith("This run now needs the mouse and keyboard, which another run"
+                + " holds"), refused.getMessage());
+        assertTrue(refused.getMessage().endsWith("give it a private display or run it alone"));
+        assertEquals(0, input.escalations, "nothing is taken over");
+        assertFalse(BotSettings.current().takeOver(), "the settings stay as they were");
+
+        BotSettings.claimPointerWithForTesting(key -> asked.add(key), key -> fail("it took over: the pointer is kept"));
+        BotSettings.use(onDesktop(true));
+        assertEquals(1, input.escalations, "granted, it takes over");
+        BotSettings.use(BotSettings.current().confidence(0.9));
+        assertEquals(2, asked.size(), "claimed once, before the one swap");
+    }
+
+    @Test
+    void aSwapThatFindsNoRealInputGivesThePointerBack() {
+        RecordingInput input = new RecordingInput();
+        input.available = false;
+        NativeControllerFactory.setForTesting(input);
+        List<String> released = new ArrayList<>();
+        BotSettings.claimPointerWithForTesting(key -> true, released::add);
+
+        BotSettings.use(onDesktop(true));
+
+        assertEquals(List.of("pointer:this-pc/desktop"), released, "it still posts its input: another run may take over");
+    }
+
+    @Test
+    void aRefusedMoveToTheDesktopLeavesTheBotWhereItWas() {
+        NativeControllerFactory.setForTesting(new RecordingInput());
+        BotSettings.use(onDesktop(true).where(BotSettings.Where.PRIVATE_DISPLAY));
+        Session.set(true);
+        BotSettings.claimPointerWithForTesting(key -> false, key -> {});
+        try {
+            assertThrows(IllegalStateException.class, () -> Session.set(false));
+            assertEquals(Boolean.TRUE, Session.override(), "still isolated: it cannot drive this desktop's mouse");
+        } finally {
+            Session.clearOverrides();
+        }
     }
 
     @Test

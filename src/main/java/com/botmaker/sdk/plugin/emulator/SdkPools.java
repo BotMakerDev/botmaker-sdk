@@ -10,6 +10,7 @@ import com.botmaker.plugin.api.run.PoolOffer;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.config.PointerClaims;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.sdk.plugin.emulator.host.HostConfig;
 import com.botmaker.sdk.plugin.emulator.window.EmulatorsWindow;
@@ -46,12 +47,24 @@ public final class SdkPools implements PoolHolder {
 
     /**
      * The bot's {@code place()}, dealt from this PC's places that can play its game: one run each, but this desktop,
-     * which any number of games play on (spec §3); its pointer is a claim of its own.
+     * which any number of games play on (spec §3); its pointer is a claim of its own, held by the one run that takes
+     * it over (spec §3, phase 5).
      */
     public static final PluginPool<Place> PLACES = PluginPool.fills(SdkValues.PLACE)
             .from(SdkPools::places)
             .offering((shortfall, services) -> offers(shortfall.missing(), room(), candidates(services)))
-            .sharing(SdkPools::runsAt);
+            .sharing(SdkPools::runsAt)
+            .claiming(SdkPools::heldWith);
+
+    /**
+     * What a run dealt {@code place} holds alone: this desktop's pointer when the bot takes over the mouse and keyboard
+     * ({@code RunIn.takeOver}, read from its settings group), so a second such run is no row, and nothing else. A run
+     * whose code turns take-over on later claims the pointer then, in {@code BotSettings.use}, and stops when it is
+     * held: the deal reads what the bot declares, not what its code may do.
+     */
+    static List<String> heldWith(Place place, StudioServices services) {
+        return PointerClaims.heldWith(place, SettingsValue.current(services).takeOver());
+    }
 
     /** How many runs may play at {@code place} at once: any number on this desktop, one anywhere else. */
     static int runsAt(Place place) {
@@ -244,9 +257,9 @@ public final class SdkPools implements PoolHolder {
      * The offer for {@code missing} more places when {@code room} more instances fit in this PC's memory: create as
      * many as both allow, in the Emulators window, where the user picks the emulator and starts it, for a bot that
      * plays on Android. None when none fits, or the game is no Android app: the host then says how many are missing.
-     * A game of this PC is never short, as this desktop takes any number of runs, so it is offered no private display
-     * or game VM. The title says which places {@code candidates} left out, so the Runs window says why they are not
-     * counted.
+     * A game of this PC is short only when it takes over the mouse and this desktop's pointer is held; it is offered
+     * no private display (the candidates count as many as memory holds) and, for now, no game VM. The title says which
+     * places {@code candidates} left out, so the Runs window says why they are not counted.
      */
     static List<PoolOffer> offers(int missing, int room, Candidates candidates) {
         int creatable = Math.min(missing, room);

@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- One run at a time takes over this desktop's mouse and keyboard (2026-11-27). Several runs at once may still share
+  this desktop while they send their input in the background, but a second run whose `takeOver()` is true is not
+  dealt it: it goes to a private display, or the Runs window says the pointer is held. A run that turns to take-over
+  while it runs (`BotSettings.use`) claims the pointer first, and stops with "This run now needs the mouse and
+  keyboard, which another run holds…" when another run has it.
 - The SDK names what Remote Pilot shows of a run (`views(SdkViews.class)`): the bot's game window, emulator instance,
   monitor or the desktop, and why there is nothing ("The window “Firestone” is not open on the computer."). The first
   step of moving the pilot into botmaker-core; nothing changes for a bot. Its view also turns a telemetry frame into

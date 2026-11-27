@@ -93,9 +93,16 @@ public final class Session {
 
     /** Turns isolation on or off, outranking the system property, environment and project setting. */
     public static void set(boolean isolated) {
+        Boolean was = isolatedOverride;
         isolatedOverride = isolated;
         // A bot moved to the desktop after its settings were installed takes over now, if they say so.
-        BotSettings.use(BotSettings.current());
+        try {
+            BotSettings.use(BotSettings.current());
+        } catch (IllegalStateException refused) {
+            // Another run holds this desktop's mouse: the bot stays where it was, not on a desktop it cannot drive.
+            isolatedOverride = was;
+            throw refused;
+        }
     }
 
     /**

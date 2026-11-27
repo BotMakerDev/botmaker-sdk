@@ -4,14 +4,18 @@
 package com.botmaker.sdk.api.bot;
 
 import com.botmaker.plugin.api.Runs;
+import com.botmaker.plugin.api.params.Claims;
 import com.botmaker.plugin.api.value.Link;
 import com.botmaker.sdk.api.console.Debug;
+import com.botmaker.sdk.internal.config.PointerClaims;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
 import com.botmaker.shared.capture.NativeControllerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * The bot's runtime tuning — how long it pauses around a match, how sure it has to be, and where the game runs:
@@ -353,21 +357,39 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
      * private display drives that display alone; escalating the desktop anyway was the old real-input tick's
      * bug. Where the bot runs is the resolved answer ({@code -Dbotmaker.session.where} included), not only
      * these settings'.
+     *
+     * <p><b>One run at a time takes over this desktop</b> (2026-11-27). Before the swap the run claims the desktop's
+     * mouse and keyboard; a run dealt this desktop to take over holds them already. When another run holds them, this
+     * throws and nothing changes: the run stops rather than fight for the pointer.
+     *
+     * @throws IllegalStateException when the take-over is refused: another run holds this desktop's mouse
      */
     public static void use(BotSettings settings) {
         BotSettings next = settings == null ? DEFAULTS : settings;
         synchronized (BotSettings.class) {
             BotSettings was = current;
             current = next;
+            // Read after the new settings are in force: where the bot runs is theirs.
+            boolean escalate = next.runIn.takeOver && onTheDesktop();
+            if (escalate && !takenOver) {
+                // The mouse and keyboard go to one run on this desktop: claimed first, or the run stops unchanged.
+                try {
+                    PointerClaims.claim(pointerClaims);
+                } catch (IllegalStateException refused) {
+                    current = was;
+                    throw refused;
+                }
+            }
             if (next.runIn.inputBackend != InputBackend.AUTO && System.getProperty(LINUX_INPUT) == null) {
                 System.setProperty(LINUX_INPUT, next.runIn.inputBackend.id());
             }
-            boolean escalate = next.runIn.takeOver && onTheDesktop();
             if (escalate && !takenOver) {
                 takenOver = true;
                 boolean ok = NativeControllerFactory.get().useReliableInput();
                 Debug.log("[Input] taking over the mouse and keyboard: "
                         + (ok ? "active" : "UNAVAILABLE — clicks may not register"));
+                // Nothing was taken over: the run still posts its input, so another run may take the mouse.
+                if (!ok) pointerReleases.accept(PointerClaims.KEY);
             } else if (takenOver && !next.runIn.takeOver) {
                 // Kept on: the backend it swapped in cannot be swapped back, and saying otherwise would lie.
                 current = next.takeOver(true);
@@ -382,6 +404,12 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
 
     /** Whether this process has swapped in the take-over backend — once, for good. Guarded by the class lock. */
     private static boolean takenOver;
+
+    /** What claims this desktop's pointer before a take-over: the run's claims, which a test stands in for. */
+    private static Predicate<String> pointerClaims = Claims::claim;
+
+    /** What gives the pointer back when the swap found no real input to use. */
+    private static Consumer<String> pointerReleases = Claims::release;
 
     /**
      * Whether the game runs on the user's desktop: unless the bot's resolved choice is a private display on
@@ -399,6 +427,14 @@ public record BotSettings(Clicks clicks, Vision vision, Loops loops, RunIn runIn
     static synchronized void resetForTesting() {
         current = DEFAULTS;
         takenOver = false;
+        pointerClaims = Claims::claim;
+        pointerReleases = Claims::release;
+    }
+
+    /** Test seam: {@code claims} answers this run's claim of the desktop pointer; {@code releases} hears it go back. */
+    static synchronized void claimPointerWithForTesting(Predicate<String> claims, Consumer<String> releases) {
+        pointerClaims = claims;
+        pointerReleases = releases;
     }
 
     // --- reading one setting ---
