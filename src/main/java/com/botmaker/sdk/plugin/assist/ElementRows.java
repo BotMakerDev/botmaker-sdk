@@ -39,8 +39,8 @@ public final class ElementRows {
     private ElementRows() {}
 
     /**
-     * One row: its {@code kind}, its {@code words} (its text, else its label, else the text it holds; blank for a list
-     * with none), the {@code node} of the frozen tree, and the {@code named} clues that find it, words plain.
+     * One row: its {@code kind}, its {@code words} (its text, else its label, else the text it holds, else for a toggle
+     * its row's title; blank for a list with none), the {@code node} of the frozen tree, and the {@code named} clues that find it, words plain.
      */
     public record Row(ElementKind kind, String words, UiNode node, Named named) {
 
@@ -62,7 +62,7 @@ public final class ElementRows {
             Optional<ElementKind> kind = ElementKind.of(node);
             if (kind.isEmpty() || labels(node, tree)) continue;
             ElementNames.name(node, tree, Words::of)
-                    .ifPresent(named -> rows.add(new Row(kind.get(), words(node), node, named)));
+                    .ifPresent(named -> rows.add(new Row(kind.get(), said(kind.get(), node, tree), node, named)));
         }
         rows.sort(Comparator.<Row>comparingInt(ElementRows::group)
                 .thenComparingInt(row -> row.node().bounds().y)
@@ -174,6 +174,37 @@ public final class ElementRows {
             if (ElementKind.tappable(up)) return words(up).equals(node.text());
         }
         return false;
+    }
+
+    /**
+     * The words a row of {@code kind} shows: {@link #words}, and for a toggle with none (Settings' shared
+     * {@code switch_widget}s, hand walk 2026-11-27) its row's title, the first text of its nearest ancestor that holds
+     * one, never in or past a list, whose first text is another row's.
+     */
+    private static String said(ElementKind kind, UiNode node, UiTree tree) {
+        String own = words(node);
+        if (!own.isEmpty() || kind != ElementKind.TOGGLE) return own;
+        for (UiNode up = tree.parentOf(node); up != null; up = tree.parentOf(up)) {
+            if (isList(up)) return "";
+            String title = textOutsideLists(up);
+            if (!title.isEmpty()) return title;
+        }
+        return "";
+    }
+
+    /** The first text in {@code node}, its lists' texts skipped. */
+    private static String textOutsideLists(UiNode node) {
+        if (!node.text().isEmpty()) return node.text();
+        for (UiNode child : node.children()) {
+            if (isList(child)) continue;
+            String held = textOutsideLists(child);
+            if (!held.isEmpty()) return held;
+        }
+        return "";
+    }
+
+    private static boolean isList(UiNode node) {
+        return ElementKind.of(node).orElse(null) == ElementKind.LIST;
     }
 
     /** {@code node}'s text, else its label, else the first text inside it; blank for none. */

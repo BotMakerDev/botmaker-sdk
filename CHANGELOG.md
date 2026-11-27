@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A toggle named by its row** (2026-11-27): a toggle, checkbox or switch with no words of its own (Android
+  Settings' shared `switch_widget`) is listed by its row's title, `Toggle "Airplane mode"`, instead of a bare
+  `Toggle`; one in no row stays bare rather than borrow a list's first text.
 - **Back and Home on an emulator by hand** (2026-11-27): the assistant's `key` tool presses Android's own keys on an
   emulator instead of refusing: Escape is Back, Home is Home, and Enter, Tab, the arrows, letters and digits are
   Android's keys of the same name.

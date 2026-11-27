@@ -104,6 +104,19 @@ class ElementRowsTest {
         assertTrue(ElementRows.details(removes.get(1)).contains("repeated input"));
     }
 
+    /**
+     * A toggle with no words of its own is said by its row's title (hand walk 2026-11-27: Settings' switches all read
+     * "Toggle"); one in no row stays wordless rather than borrow a list's first text.
+     */
+    @Test
+    void wordlessToggleSaysItsRowsTitle() {
+        UiTree toggles = tree("settings-toggle-rows.xml", "com.example.settings");
+        List<Row> rows = ElementRows.of(toggles);
+        assertEquals(ElementKind.TOGGLE, row(rows, "Toggle \"Airplane mode\"").kind());
+        assertEquals(ElementKind.TOGGLE, row(rows, "Toggle \"Automatically sync app data\"").kind());
+        assertEquals(1, rows.stream().filter(r -> r.said().equals("Toggle")).count(), "the loose switch");
+    }
+
     /** With no tree, or nothing in it, the list sends to ✂ Cut. */
     @Test
     void noTreeSaysCutInstead() {

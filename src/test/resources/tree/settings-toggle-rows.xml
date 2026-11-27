@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Synthetic, after Android Settings' preference rows (hand walk 2026-11-27): each row is a tappable LinearLayout
+     holding its title and summary, and a Switch of one shared id with no words of its own in its widget frame. -->
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,1920]">
+    <node index="0" text="" resource-id="com.example.settings:id/recycler_view" class="androidx.recyclerview.widget.RecyclerView" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="true" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,100][1080,1920]">
+      <node index="0" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,100][1080,250]">
+        <node index="0" text="" resource-id="" class="android.widget.RelativeLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,120][900,230]">
+          <node index="0" text="Airplane mode" resource-id="android:id/title" class="android.widget.TextView" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,120][400,170]" />
+        </node>
+        <node index="1" text="" resource-id="android:id/widget_frame" class="android.widget.LinearLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[900,120][1040,230]">
+          <node index="0" text="" resource-id="android:id/switch_widget" class="android.widget.Switch" package="com.example.settings" content-desc="" checkable="true" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[920,150][1020,200]" />
+        </node>
+      </node>
+      <node index="1" text="" resource-id="" class="android.widget.LinearLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,250][1080,420]">
+        <node index="0" text="" resource-id="" class="android.widget.RelativeLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,270][900,400]">
+          <node index="0" text="Automatically sync app data" resource-id="android:id/title" class="android.widget.TextView" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,270][700,320]" />
+          <node index="1" text="Let apps refresh data automatically" resource-id="android:id/summary" class="android.widget.TextView" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,330][860,380]" />
+        </node>
+        <node index="1" text="" resource-id="android:id/widget_frame" class="android.widget.LinearLayout" package="com.example.settings" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[900,270][1040,400]">
+          <node index="0" text="" resource-id="android:id/switch_widget" class="android.widget.Switch" package="com.example.settings" content-desc="" checkable="true" checked="true" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[920,310][1020,360]" />
+        </node>
+      </node>
+    </node>
+    <node index="1" text="" resource-id="com.example.settings:id/loose_switch" class="android.widget.Switch" package="com.example.settings" content-desc="" checkable="true" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[920,40][1020,90]" />
+  </node>
+</hierarchy>
