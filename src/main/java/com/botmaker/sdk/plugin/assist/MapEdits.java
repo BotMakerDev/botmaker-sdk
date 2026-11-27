@@ -16,6 +16,7 @@ import com.botmaker.sdk.api.screens.Area;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.ButtonState;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -244,8 +245,11 @@ final class MapEdits {
                     @Describe(value = "", optional = true) String value) implements Edit {
     }
 
-    @Describe("a marker (all show), or absent (never shows); refused if another shot shows the set")
-    record AddMarker(String screen, @Describe("a picture the bot has") String picture,
+    @Describe("a marker (all show), or absent (never shows); refused if another shot shows the set. On an app with a "
+            + "tree, mark by element: a density change loses a picture")
+    record AddMarker(String screen,
+                     @Describe(value = "a picture the bot has; or element", optional = true) String picture,
+                     @Describe(value = "an element the bot has, Elements.X or X", optional = true) String element,
                      @Describe(value = "", optional = true) Boolean absent) implements Edit {
     }
 
@@ -612,6 +616,17 @@ final class MapEdits {
         String screen = found.get();
         if (edit instanceof RemoveMarker remove) return said(ScreenEdits.removeMarker(services, screen, remove.picture()));
         AddMarker add = (AddMarker) edit;
+        if (has(add.element())) {
+            if (has(add.picture())) return AgentReply.refused("Give a picture or an element, not both.");
+            String name = elementName(add.element());
+            Element element = FxCall.call(() -> ElementSaves.elements(services.pluginValues())).get(name);
+            if (element == null) {
+                return AgentReply.refused("The bot has no Elements." + name + ": save_element saves one from the "
+                        + "app's tree. Nothing was written.");
+            }
+            return said(ScreenEdits.addElementMarker(services, screen, name, element,
+                    Boolean.TRUE.equals(add.absent())));
+        }
         String picture = has(add.picture()) ? add.picture().strip() : "";
         if (!ActTools.exists(context, picture)) return AgentReply.refused(Frames.noPicture(picture));
         boolean absent = Boolean.TRUE.equals(add.absent());
@@ -621,6 +636,12 @@ final class MapEdits {
         }
         return said(ScreenEdits.addMarker(services, screen, FxCall.call(() -> ScreenBook.picture(services, picture)),
                 absent));
+    }
+
+    /** An element's constant name as typed, {@code Elements.WIFI} or {@code WIFI}. */
+    static String elementName(String typed) {
+        String name = typed.strip();
+        return name.startsWith("Elements.") ? name.substring("Elements.".length()).strip() : name;
     }
 
     /**

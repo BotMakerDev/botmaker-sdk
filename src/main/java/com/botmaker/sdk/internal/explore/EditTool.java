@@ -17,6 +17,11 @@ public enum EditTool {
     EDIT_MAP("edit_map", "Edit the map"),
     /** Pictures cut from the stop's frame: {@code crop_pictures}' arguments, with its boxes. */
     CROP_PICTURES("crop_pictures", "Cut pictures"),
+    /**
+     * A row of the stop's tree saved to the bot's Elements and put on its screen: {@code save_element}'s arguments. An
+     * app's screen marked so survives a density change, which loses a picture (2026-11-27).
+     */
+    SAVE_ELEMENT("save_element", "Save an element"),
     /** A tool no worker writes by. */
     UNKNOWN("unknown", "Unknown");
 
@@ -39,13 +44,13 @@ public enum EditTool {
 
     /**
      * Whether {@code edit}, this tool's arguments as JSON, gives {@code screen} something new once applied: every map
-     * edit, and a cut that names {@code screen} as the one its pictures are on (each noted there as an untried input).
-     * A cut alone, or onto another screen, adds nothing to press there.
+     * edit, and a cut or a saved element that names {@code screen} as the one it is put on (a cut noted there as an
+     * untried input). A cut alone, or onto another screen, adds nothing to press there.
      */
     public boolean changesMap(String edit, String screen) {
         return switch (this) {
             case EDIT_MAP -> true;
-            case CROP_PICTURES -> {
+            case CROP_PICTURES, SAVE_ELEMENT -> {
                 try {
                     JsonNode on = JSON.readTree(edit == null || edit.isBlank() ? "{}" : edit).path("screen");
                     yield screen != null && !screen.isBlank() && on.isTextual() && on.asText().strip().equals(screen);
@@ -55,6 +60,11 @@ public enum EditTool {
             }
             case UNKNOWN -> false;
         };
+    }
+
+    /** Whether an edit by this tool draws a screen the map lacked: a map edit, or an element saved onto it. */
+    public boolean draws() {
+        return this == EDIT_MAP || this == SAVE_ELEMENT;
     }
 
     private static final ObjectMapper JSON = new ObjectMapper();

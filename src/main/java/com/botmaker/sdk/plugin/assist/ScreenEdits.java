@@ -17,6 +17,7 @@ import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Custom;
+import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Gesture;
 import com.botmaker.sdk.api.screens.Grid;
 import com.botmaker.sdk.api.screens.Hotkey;
@@ -1176,6 +1177,37 @@ public final class ScreenEdits {
         Markers now = absent ? was.withPictures(was.shown(), plus(was.absent(), picture))
                 : was.withPictures(plus(was.shown(), picture), was.absent());
         return toldBy(services, constant, now);
+    }
+
+    /**
+     * Adds {@code element}, the bot's {@code Elements.<name>}, to what tells {@code constant} apart: one more element
+     * its tree holds, or one it never holds ({@code absent}). An app's screen told so survives a density change, which
+     * loses a picture (2026-11-27). Refused as {@link #addMarker} is. Off the FX thread.
+     */
+    public static String addElementMarker(StudioServices services, String constant, String name, Element element,
+                                          boolean absent) {
+        MapScreen screen = FxCall.call(() -> ScreenBook.read(services)).screens().get(constant);
+        if (screen == null) return NOT_WRITTEN + "no screen " + constant + " in the map.";
+        Marked marked = withElement(Markers.of(screen), name, element, absent);
+        return marked.now() == null ? marked.said() : toldBy(services, constant, marked.now());
+    }
+
+    /** A set with an element added, or, {@code now} null, why it is not: refused, or held already. */
+    record Marked(Markers now, String said) {}
+
+    /** {@code was} with {@code element} (the bot's {@code Elements.<name>}) held, or never held when {@code absent}. */
+    static Marked withElement(Markers was, String name, Element element, boolean absent) {
+        if ((absent ? was.elements() : was.absentElements()).contains(element)) {
+            return new Marked(null, NOT_WRITTEN + "Elements." + name + " is " + (absent ? "one of its markers"
+                    : "an element it never holds") + ": remove it from there first.");
+        }
+        if ((absent ? was.absentElements() : was.elements()).contains(element)) {
+            return new Marked(null, "It is told by " + was.said() + " already.");
+        }
+        List<Element> more = new ArrayList<>(absent ? was.absentElements() : was.elements());
+        more.add(element);
+        return new Marked(absent ? was.withElements(was.elements(), more) : was.withElements(more,
+                was.absentElements()), null);
     }
 
     /**

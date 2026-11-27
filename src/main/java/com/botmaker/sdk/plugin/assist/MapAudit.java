@@ -771,6 +771,27 @@ public final class MapAudit {
         }
     }
 
+    /**
+     * Each screen of an app with a tree ({@code only}, or every one) told by pictures alone, one line each
+     * (2026-11-27): the app lays itself out by density, and a density change moves and resizes every picture, so the
+     * run loses the screen. Words, an element or a route tell it too and are left alone.
+     */
+    public static List<String> picturesOnly(ScreenGraph graph, String only) {
+        List<String> said = new ArrayList<>();
+        for (String constant : graph.screens().keySet()) {
+            if (only != null && !only.equals(constant)) continue;
+            Markers set = graph.markers(constant);
+            boolean pictures = !set.shown().isEmpty() || !set.either().isEmpty();
+            boolean other = !set.texts().isEmpty() || !set.elements().isEmpty() || !set.picked().isEmpty()
+                    || set.route() != null;
+            if (pictures && !other) {
+                said.add(graph.shown(constant) + " is marked by pictures only: a density change loses it; mark it by "
+                        + "an element.");
+            }
+        }
+        return said;
+    }
+
     /** {@link #planWarnings(Map, Map, ScreenGraph)} over the bot's {@code Plans} and {@code Goals}; none without them. */
     public static List<String> planWarnings(StudioServices services, ScreenGraph map) {
         PluginValues values = services.pluginValues();

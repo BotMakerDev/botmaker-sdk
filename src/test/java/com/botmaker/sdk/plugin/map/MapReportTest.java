@@ -262,4 +262,19 @@ class MapReportTest {
                 + "bring it into view: link them, then try_input scroll over a node."),
                 MapReport.problems(graph, id -> true, id -> true, "RESEARCH"));
     }
+
+    /**
+     * An app is one whose map finds something by an element; a picture-only game on an emulator, whose tree is empty,
+     * is never told to mark by elements (2026-11-27).
+     */
+    @Test
+    void anAppIsAMapThatFindsSomethingByAnElement() {
+        ScreenGraph game = ScreenGraph.of(Map.of("HOME", screen(Setup.named("Home").markers(marks("home")),
+                Button.of(picture("play")))));
+        ScreenGraph app = ScreenGraph.of(Map.of("HOME", screen(Setup.named("Home").markers(marks("home")))
+                .withInput("wifi", Button.of(Element.byId("wifi")))));
+
+        assertFalse(MapReport.usesTree(game));
+        assertTrue(MapReport.usesTree(app));
+    }
 }

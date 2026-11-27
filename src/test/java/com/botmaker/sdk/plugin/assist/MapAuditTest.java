@@ -349,6 +349,21 @@ class MapAuditTest {
         assertFalse(audit.showsMarker());
     }
 
+    /** An app's screen told by pictures alone is said; one told by an element too, or by an element only, is not. */
+    @Test
+    void anAppsScreenMarkedByPicturesOnlyIsSaid() {
+        Map<String, MapScreen> screens = new LinkedHashMap<>();
+        screens.put("WIFI", MapFixtures.screen(Setup.named("Wi-Fi").markers(marks("wifi_title"))));
+        screens.put("BLUETOOTH", MapFixtures.screen(Setup.named("Bluetooth").markers(marks("bt_title"))
+                .elements(List.of(Element.byId("bt_header")))));
+        screens.put("DISPLAY", MapFixtures.screen(Setup.named("Display").elements(List.of(Element.byId("display")))));
+        ScreenGraph graph = ScreenGraph.of(screens);
+
+        assertEquals(List.of("Wi-Fi is marked by pictures only: a density change loses it; mark it by an element."),
+                MapAudit.picturesOnly(graph, null));
+        assertEquals(List.of(), MapAudit.picturesOnly(graph, "DISPLAY"), "only the screen asked");
+    }
+
     @Test
     void aScreenWithNoShotHasNoAudit() {
         assertTrue(MapAudit.of(resources, 0.9, Map.of(), "HOME", screen()).isEmpty());

@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.explore.EditTool;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.Journal;
 import com.botmaker.sdk.internal.explore.JournalView;
+import com.botmaker.sdk.internal.explore.Stop;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.LongSupplier;
@@ -66,17 +68,20 @@ final class EditWriter {
         for (ExploreEvent.EditQueued edit : queued) {
             Optional<BufferedImage> frame = frames.computeIfAbsent(edit.stopId(),
                     id -> view.stopOf(id).flatMap(stop -> frame(journal, stop.framePath())));
-            journal.append(write(edit, apply, frame, clock.getAsLong()));
+            List<String> elements = view.stopOf(edit.stopId()).map(Stop::elements).orElse(List.of());
+            journal.append(write(edit, apply, frame, elements, clock.getAsLong()));
         }
         return queued.size();
     }
 
     /**
      * Carries {@code edit} out with {@code frame}, its stop's saved frame, as the shown screenshot: a box of a cut or of
-     * an added text is in that frame's pixels, never the live screen's, which may have moved on since.
+     * an added text is in that frame's pixels, never the live screen's, which may have moved on since. An element is
+     * saved only when {@code elements}, the stop's tree as it read, holds its words: the tree is read live, and a game
+     * that moved on gives another screen's rows.
      */
-    private static ExploreEvent.EditApplied write(ExploreEvent.EditQueued edit, Apply apply,
-                                                  Optional<BufferedImage> frame, long at) {
+    static ExploreEvent.EditApplied write(ExploreEvent.EditQueued edit, Apply apply, Optional<BufferedImage> frame,
+                                          List<String> elements, long at) {
         EditTool tool = EditTool.fromId(edit.tool());
         if (tool == EditTool.UNKNOWN) {
             return new ExploreEvent.EditApplied(edit.editId(), false, "no worker writes by " + edit.tool(), at);
@@ -86,6 +91,17 @@ final class EditWriter {
         }
         Optional<Map<String, Object>> arguments = arguments(edit.edit());
         if (arguments.isEmpty()) return new ExploreEvent.EditApplied(edit.editId(), false, "the edit is not JSON", at);
+        if (tool == EditTool.SAVE_ELEMENT) {
+            Object words = arguments.get().get("words");
+            if (elements.isEmpty()) {
+                return new ExploreEvent.EditApplied(edit.editId(), false,
+                        "the stop read no tree: mark it by a picture", at);
+            }
+            if (!(words instanceof String typed) || !inTree(elements, typed)) {
+                return new ExploreEvent.EditApplied(edit.editId(), false, "no row \"" + words
+                        + "\" among the stop's elements: give one as look says it", at);
+            }
+        }
         AgentReply reply;
         try {
             // Bound even when empty: a box of a stop with no frame is refused, never measured on another screenshot.
@@ -107,6 +123,21 @@ final class EditWriter {
         } catch (IOException unread) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Whether {@code elements}, a stop's tree as its lines read ({@code "Wi-Fi" tappable (0,80 540x60)}), holds a row
+     * of {@code words}, any case: its whole words, or their start, as list_elements shortens a long row.
+     */
+    static boolean inTree(List<String> elements, String words) {
+        String typed = words.strip().toLowerCase(Locale.ROOT);
+        if (typed.isEmpty()) return false;
+        for (String line : elements) {
+            int end = line.startsWith("\"") ? line.indexOf('"', 1) : -1;
+            String read = (end > 0 ? line.substring(1, end) : line).strip().toLowerCase(Locale.ROOT);
+            if (read.equals(typed) || read.startsWith(typed)) return true;
+        }
+        return false;
     }
 
     /** {@code json} as a tool's arguments: an object; empty when it is not one. */

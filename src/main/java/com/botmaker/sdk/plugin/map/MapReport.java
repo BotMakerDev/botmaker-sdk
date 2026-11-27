@@ -10,6 +10,7 @@ import com.botmaker.plugin.api.assist.AssistantTool;
 import com.botmaker.plugin.api.assist.Describe;
 import com.botmaker.sdk.api.screens.Beside;
 import com.botmaker.sdk.api.screens.Button;
+import com.botmaker.sdk.api.screens.Readout;
 import com.botmaker.sdk.api.screens.Caption;
 import com.botmaker.sdk.api.screens.Custom;
 import com.botmaker.sdk.api.screens.Element;
@@ -119,6 +120,11 @@ public final class MapReport {
         Optional<Size> bot = FxCall.call(() -> ScreenSize.read(services));
         String one = only;
         bot.ifPresent(size -> clashes.addAll(ScreenShots.offSize(resources, read.graph(), one, size)));
+        // An app's tree survives a density change; its pictures do not. Any emulator gives a tree, a game's an empty
+        // one, so the app is one whose map already finds something by an element.
+        if (usesTree(read.graph())) {
+            clashes.addAll(MapAudit.picturesOnly(read.graph(), only));
+        }
         // The goals and plans are the whole bot's: said with the whole map, never with one screen.
         if (only == null) {
             clashes.addAll(read.plan());
@@ -131,6 +137,20 @@ public final class MapReport {
         if (!Boolean.TRUE.equals(ask.show())) return said;
         BufferedImage drawn = FxCall.call(() -> MapDrawing.of(services, read.graph(), read.stages()));
         return said.and(AgentReply.image(drawn));
+    }
+
+    /**
+     * Whether any screen of {@code graph} is told by an element, or finds a button or a readout by one: the bot's app
+     * has a tree worth reading. A picture-only game on an emulator has none, and its pictures are kept at the density
+     * they were cut at.
+     */
+    static boolean usesTree(ScreenGraph graph) {
+        return graph.screens().entrySet().stream().anyMatch(e -> {
+            Markers set = graph.markers(e.getKey());
+            return !set.elements().isEmpty() || !set.picked().isEmpty() || e.getValue().parts().values().stream()
+                    .anyMatch(part -> part instanceof Button b && b.isElement()
+                            || part instanceof Readout r && r.element() != null);
+        });
     }
 
     /** The screen {@link #next} names, ▶▶'s too. */

@@ -8,12 +8,16 @@ the explore tool. The run's goal: {goal}.
 3. Write what is missing, through `explore` action `apply_edit`: stop `{stop}`, an `editId` of your own
    (`{stop}-1`, `{stop}-2`, …), `tool` and `edit` the call's arguments as one JSON object. Every box is in the
    pixels of the frame `look` gave you: the writer carries each edit out on that frame, never on the live screen.
+   - Mark by an element whenever the stop has elements (`look` lists them: an app's tree): `tool` `save_element`,
+     `edit` `{"screen":"<the screen>","words":"<a row's words, as look gives them>","as":"marker"}`, with `kind`
+     when the words repeat. Pick what only this screen shows (its title, its own heading). An element survives a
+     density change; a picture does not. Mark by a picture only when the stop has no elements.
    - Cut a picture: `tool` `crop_pictures`, `edit` `{"boxes":[{"name":"...","x":..,"y":..,"width":..,"height":..}]}`.
      Cut what only this screen shows (its title, its own heading), never a part other screens share.
-   - A screen the map lacks: cut its marker first (its title or heading). Then `tool` `edit_map`, `edit`
-     `{"action":"new_screen","screen":"<the screen it was reached from>","name":"<NEW_NAME>","picture":"<that
-     screen's input that opened it>"}` (`look`'s place says which), and `{"action":"add_marker","screen":
-     "<NEW_NAME>","picture":"<the marker you cut>"}`.
+   - A screen the map lacks: `tool` `edit_map`, `edit` `{"action":"new_screen","screen":"<the screen it was reached
+     from>","name":"<NEW_NAME>","picture":"<that screen's input that opened it>"}` (`look`'s place says which). Then
+     mark it: by `save_element` as above, `screen` `<NEW_NAME>`; with no elements, cut its marker (its title or
+     heading) and `{"action":"add_marker","screen":"<NEW_NAME>","picture":"<the marker you cut>"}`.
    - A text beside a picture: `edit_map` `add_text` with `anchor` (a picture the map holds, `read_map` names
      them) and `box`, the text's area on the frame.
    Send one edit per call, in order, and read each answer: a refused one says why; fix it under a new id.

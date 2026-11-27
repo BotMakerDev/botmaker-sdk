@@ -192,6 +192,11 @@ public record Markers(List<ImageTemplate> shown, List<ImageTemplate> absent, Lis
     }
 
     /** This set with {@code texts} as its words, the rest as it is. */
+    /** This set with {@code elements} the tree holds and {@code absentElements} it may not hold instead of its own. */
+    public Markers withElements(List<Element> elements, List<Element> absentElements) {
+        return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements, route);
+    }
+
     public Markers withTexts(List<Caption> texts) {
         return new Markers(shown, absent, texts, elements, picked, either, absentTexts, absentElements, route);
     }

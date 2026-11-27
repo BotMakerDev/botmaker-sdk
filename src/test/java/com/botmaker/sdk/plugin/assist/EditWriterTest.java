@@ -4,6 +4,7 @@
 package com.botmaker.sdk.plugin.assist;
 
 import com.botmaker.plugin.api.assist.AgentReply;
+import com.botmaker.sdk.internal.explore.EditTool;
 import com.botmaker.sdk.internal.explore.ExploreEvent;
 import com.botmaker.sdk.internal.explore.ExploreLoop;
 import com.botmaker.sdk.internal.explore.Journal;
@@ -222,6 +223,50 @@ class EditWriterTest {
         assertTrue(ExploreTools.applyEdit(journal, "unknown_screen-1", "e-2", "crop_pictures", "{\"screen\":\"X\"}",
                 Duration.ofSeconds(1)).isRefused());
         assertTrue(journal.events().stream().noneMatch(ExploreEvent.EditQueued.class::isInstance));
+    }
+
+    /**
+     * An element is saved by save_element only when the stop's tree held its row, any case or shortened: the tree is
+     * read live, and a game that moved on gives another screen's rows. A stop with no tree is marked by a picture.
+     */
+    @Test
+    void anElementIsSavedOnlyFromARowOfTheStopsTree() throws Exception {
+        Journal journal = new Journal(folder);
+        journal.append(new ExploreEvent.Began(false, "", 1));
+        journal.append(new ExploreEvent.Stopped(new Stop("unknown_screen-1", StopKind.UNKNOWN_SCREEN, null, "", "",
+                List.of(), List.of("\"Network & internet\" tappable (0,80 540x60)", "\"Connected devices\" (0,140 "
+                + "540x60)"), Map.of(), List.of(), "a screen the map lacks", 2), false, 2));
+        journal.append(new ExploreEvent.Stopped(new Stop("unknown_screen-2", StopKind.UNKNOWN_SCREEN, null, "", "",
+                List.of(), List.of(), Map.of(), List.of(), "a screen the map lacks", 3), false, 3));
+        String row = "{\"screen\":\"SETTINGS\",\"words\":\"network & INTERNET\",\"as\":\"marker\"}";
+        journal.append(new ExploreEvent.EditQueued("e-1", "unknown_screen-1", "save_element", row, 4));
+        journal.append(new ExploreEvent.EditQueued("e-2", "unknown_screen-1", "save_element",
+                "{\"screen\":\"SETTINGS\",\"words\":\"Battery\"}", 4));
+        journal.append(new ExploreEvent.EditQueued("e-3", "unknown_screen-2", "save_element", row, 4));
+
+        EditWriter.drain(journal, JournalView.of(journal), apply, () -> 9);
+
+        assertEquals(1, written.size(), written.toString());
+        assertEquals("SETTINGS", written.getFirst().get("screen"));
+        List<ExploreEvent.EditApplied> said = applied(journal);
+        assertTrue(said.get(0).ok());
+        assertTrue(said.get(1).said().startsWith("no row \"Battery\""), said.get(1).said());
+        assertTrue(said.get(2).said().contains("mark it by a picture"), said.get(2).said());
+        assertTrue(EditWriter.inTree(List.of("\"Connected devices and more\" (0,0 1x1)"), "Connected devices"),
+                "a long row as list_elements shortens it");
+        assertTrue(EditTool.SAVE_ELEMENT.draws() && !EditTool.CROP_PICTURES.draws());
+    }
+
+    @Test
+    void applyEditTakesASavedElementWithItsScreenAndWords() throws Exception {
+        Journal journal = journalOnFrame(10);
+
+        assertTrue(ExploreTools.applyEdit(journal, "unknown_screen-1", "e-1", "save_element", "{\"words\":\"Wi-Fi\"}",
+                Duration.ofSeconds(1)).isRefused(), "no screen");
+        assertTrue(journal.events().stream().noneMatch(ExploreEvent.EditQueued.class::isInstance));
+        assertFalse(ExploreTools.applyEdit(journal, "unknown_screen-1", "e-2", "save_element",
+                "{\"screen\":\"SETTINGS\",\"words\":\"Wi-Fi\"}", Duration.ofMillis(50)).isRefused(),
+                "queued, waiting for the writer");
     }
 
     /** A Reader that drew nothing may not ignore a screen the map lacks: the run would stop on it again (F1's loop). */

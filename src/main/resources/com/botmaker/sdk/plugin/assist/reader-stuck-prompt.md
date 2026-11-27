@@ -10,7 +10,9 @@ You add it alone: nobody reads your reply, only what you write through the explo
 3. Add them, through `explore` action `apply_edit`: stop `{stop}`, an `editId` of your own (`{stop}-1`, `{stop}-2`,
    …), `tool` and `edit` the call's arguments as one JSON object. Every box is in the pixels of the frame `look` gave
    you: the writer carries each edit out on that frame, never on the live screen.
-   - Cut each press as an input of the screen: `tool` `crop_pictures`, `edit` `{"screen":"<the screen>","boxes":
+   - When `look` lists the stop's elements (an app's tree), save each press as a button instead: `tool`
+     `save_element`, `edit` `{"screen":"<the screen>","words":"<the row's words>","as":"button"}`.
+   - With no elements, cut each press as an input of the screen: `tool` `crop_pictures`, `edit` `{"screen":"<the screen>","boxes":
      [{"name":"...","x":..,"y":..,"width":..,"height":..}]}`. Cut its own words or icon, tight, never a part every
      row shares. The screen notes each as an untried input: the run presses it next.
    Add the two or three likeliest, not every row. Send one edit per call, in order, and read each answer: a refused

@@ -140,9 +140,11 @@ final class ExploreTools {
     record ApplyEdit(@Describe("the stop's id the edit is for") String stop,
                      @Describe("an id of your own for this edit, unique in the run: the same id is written once")
                      String editId,
-                     @Describe("the call's arguments as a JSON object: edit_map's with its action, or crop_pictures' "
-                             + "boxes in the stop frame's pixels") String edit,
-                     @Describe(value = "edit_map (the default) or crop_pictures", optional = true) String tool)
+                     @Describe("the call's arguments as a JSON object: edit_map's with its action, crop_pictures' "
+                             + "boxes in the stop frame's pixels, or save_element's row of the stop's elements")
+                     String edit,
+                     @Describe(value = "edit_map (the default), crop_pictures or save_element", optional = true)
+                     String tool)
             implements Action {
     }
 
@@ -610,7 +612,7 @@ final class ExploreTools {
             // A screen is drawn by a map edit; a stuck run is given a press by one, or by a cut noted on its screen.
             if (event instanceof ExploreEvent.EditQueued queued && queued.stopId().equals(id)
                     && (stuck ? EditTool.fromId(queued.tool()).changesMap(queued.edit(), stuckOn)
-                    : EditTool.fromId(queued.tool()) == EditTool.EDIT_MAP)) {
+                    : EditTool.fromId(queued.tool()).draws())) {
                 drawing.add(queued.editId());
             }
         }
@@ -849,7 +851,13 @@ final class ExploreTools {
                 return AgentReply.refused("No stop " + stopId.strip() + " is open or parked. " + ids(view));
             }
             if (by == EditTool.UNKNOWN) {
-                return AgentReply.refused("No worker writes by " + tool.strip() + ": tool is edit_map or crop_pictures.");
+                return AgentReply.refused("No worker writes by " + tool.strip()
+                        + ": tool is edit_map, crop_pictures or save_element.");
+            }
+            if (by == EditTool.SAVE_ELEMENT && (edit == null || EditWriter.arguments(edit)
+                    .filter(a -> a.get("words") instanceof String && a.get("screen") instanceof String).isEmpty())) {
+                return AgentReply.refused("The edit is save_element's arguments as a JSON object: screen and words, a "
+                        + "row of the stop's elements, with kind and as when needed.");
             }
             if (by == EditTool.EDIT_MAP && (edit == null
                     || EditWriter.arguments(edit).filter(a -> a.containsKey(AssistantTool.ACTION)).isEmpty())) {

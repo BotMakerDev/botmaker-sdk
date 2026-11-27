@@ -8,6 +8,9 @@ nobody reads your reply, only what you write through the explore tool. The run's
    this screen does not show on the frame.
 3. Redraw, through `explore` action `apply_edit`: stop `{stop}`, an `editId` of your own (`{stop}-1`, `{stop}-2`, …),
    `tool` and `edit` the call's arguments as one JSON object. Every box is in the pixels of the frame `look` gave you.
+   - When `look` lists the stop's elements (an app's tree), mark by one instead of a picture: `tool` `save_element`,
+     `edit` `{"screen":"<the screen>","words":"<a row only this screen shows>","as":"marker"}`; it survives a density
+     change, a picture does not. Then take the wrong marker off as below.
    - Cut a new marker: `tool` `crop_pictures`, `edit` `{"boxes":[{"name":"...","x":..,"y":..,"width":..,"height":..}]}`.
      Cut what only this screen shows (its title, its own heading), never a part other screens share.
    - Mark the screen by it: `tool` `edit_map`, `edit` `{"action":"add_marker","screen":"<the screen>","picture":"<the

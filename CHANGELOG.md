@@ -19,6 +19,14 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **An app's screens are marked by elements first** (2026-11-27): an app lays itself out by density, and a density
+  change moves every picture, so a screen told by pictures alone is lost. `edit_map add_marker` takes `element`, one
+  of the bot's `Elements` (`Elements.WIFI_TITLE` or `WIFI_TITLE`), beside or instead of a picture, `absent` too. The
+  explore crew's `apply_edit` takes `tool` `save_element`, a row of the stop's tree saved as a marker, a button or a
+  readout; the writer saves it only when the stop's tree held that row, and refuses a stop that read no tree. The
+  Reader's prompts mark by element whenever the stop lists elements, by picture only when it has none. `read_map`
+  says of each screen of an app with a tree told by pictures alone: "marked by pictures only: a density change loses
+  it; mark it by an element".
 - **The tools see the bot's own size and density** (2026-11-27): the look and act tools, 🗺's board and the explore
   crew bring an emulator to the bot's screen size and its scaled density before they read or press, as a run does,
   so a picture-only game is read at the density its pictures were cut at. The `wm` commands are said once per
