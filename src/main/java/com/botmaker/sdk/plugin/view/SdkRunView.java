@@ -4,10 +4,17 @@
 package com.botmaker.sdk.plugin.view;
 
 import com.botmaker.plugin.api.StudioServices;
+import com.botmaker.plugin.api.run.BackgroundLaunch;
 import com.botmaker.plugin.api.run.RunView;
 import com.botmaker.plugin.api.run.ViewTarget;
 import com.botmaker.plugin.api.run.ViewedRun;
+import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.internal.session.SessionBootstrap;
+import com.botmaker.sdk.plugin.launch.QuickLaunch;
+import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
+import com.botmaker.sdk.plugin.settings.SettingsValue;
+import com.botmaker.shared.launch.LaunchSpec;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
@@ -46,6 +53,7 @@ final class SdkRunView implements RunView {
 
     private final Probes probes;
     private volatile Supplier<CaptureSource> source = () -> null;
+    private volatile StudioServices services;
 
     SdkRunView(Probes probes) {
         this.probes = probes;
@@ -59,7 +67,25 @@ final class SdkRunView implements RunView {
 
     @Override
     public void start(StudioServices services, Runnable changed) {
+        this.services = services;
         source = () -> CaptureValue.shown(services);
+    }
+
+    /**
+     * The bot's launch target for a private display, when its settings put the game in one and the target can run
+     * there: what the host's Background mode starts. The same test ▶ Launch makes ({@code QuickLaunch}).
+     */
+    @Override
+    public Optional<BackgroundLaunch> background() {
+        StudioServices open = services;
+        if (open == null) return Optional.empty();
+        BotSettings settings = SettingsValue.current(open);
+        LaunchSpec spec = LaunchTargetValue.spec(open);
+        if (!QuickLaunch.usesBackgroundSession(spec, SessionBootstrap.wantsPrivateDisplay(settings))) {
+            return Optional.empty();
+        }
+        return Optional.of(new BackgroundLaunch(spec.spec(),
+                SessionBootstrap.backendFor(spec, settings.runIn().displayBackend()).id()));
     }
 
     /**

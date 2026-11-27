@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The SDK's run view offers Background mode to the host's Remote Pilot** (2026-11-27, pilot in core phase 5a): when
+  the bot's settings run the game in a private display and its launch target can, `SdkRunView.background()` names the
+  target and the display backend; core starts and stops the session.
 - **The Remote Pilot shows each sign-in run's own emulator** (2026-11-27, pilot in core phase 4b-2): a run started for
   an emulator instance (`botmaker.capture.emulator`, as the Google sign-in is) is shown that instance, not the open
   project's capture.
