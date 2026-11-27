@@ -10,6 +10,7 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameReady;
 import com.botmaker.sdk.api.bot.Bot;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.internal.emulator.EmulatorSize;
 import com.botmaker.sdk.internal.trace.SdkRun;
 import com.botmaker.sdk.plugin.assist.SdkAssist;
 import com.botmaker.sdk.plugin.assist.SdkCompanions;
@@ -140,6 +141,8 @@ public final class SdkPlugin extends DeclaredPlugin {
         if (doubtPickerBound) WindowDoubtPicker.unbind();
         doubtPickerBound = false;
         ScreenMap.letGoAll();
+        // the emulator sizes the look and act tools set go back to the user's
+        EmulatorSize.releaseAll();
         SdkLog.unbind();
     }
 }

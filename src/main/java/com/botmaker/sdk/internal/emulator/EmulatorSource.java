@@ -283,6 +283,24 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
      * The live emulator, or {@code null} while it isn't reachable yet. Reuses a healthy cached connection;
      * otherwise looks the instance up, connects if it's running, or dispatches a one-time launch if it isn't.
      */
+    /**
+     * The emulator, connected now when it runs; null when it is down. Never launches one: {@link EmulatorSize#holdAt}
+     * runs on tool calls that only ask where the look tools read, which a launch would answer wrongly.
+     */
+    Emulator reachedIfUp() {
+        Emulator cached = connected();
+        if (cached != null) return cached;
+        Optional<EmulatorRef> ref = findRef(RECENT);
+        if (ref.isEmpty() || !ref.get().running()) return null;
+        try {
+            Emulator emu = ref.get().connect();
+            connected = emu;
+            return emu;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private Emulator resolve() {
         Emulator cached = connected;
         if (cached != null && cached.isPresent()) {

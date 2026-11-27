@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The tools see the bot's own size and density** (2026-11-27): the look and act tools, 🗺's board and the explore
+  crew bring an emulator to the bot's screen size and its scaled density before they read or press, as a run does,
+  so a picture-only game is read at the density its pictures were cut at. The `wm` commands are said once per
+  emulator and size; closing the project puts back what the user had. A run that starts meanwhile finds the size
+  already set.
 - **A toggle named by its row** (2026-11-27): a toggle, checkbox or switch with no words of its own (Android
   Settings' shared `switch_widget`) is listed by its row's title, `Toggle "Airplane mode"`, instead of a bare
   `Toggle`; one in no row stays bare rather than borrow a list's first text.

@@ -18,11 +18,14 @@ import com.botmaker.sdk.api.vision.ImageTemplate;
 import com.botmaker.sdk.api.vision.MatchResult;
 import com.botmaker.sdk.internal.capture.StillSource;
 import com.botmaker.sdk.internal.bot.SdkValues;
+import com.botmaker.sdk.api.geometry.Size;
+import com.botmaker.sdk.internal.emulator.EmulatorSize;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.sdk.internal.emulator.ReadableSource;
 import com.botmaker.sdk.internal.vision.Images;
 import com.botmaker.sdk.plugin.pictures.FrameCut;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
+import com.botmaker.sdk.plugin.pictures.ScreenSize;
 import com.botmaker.sdk.plugin.pictures.TemplateLibrary;
 import com.botmaker.sdk.plugin.pictures.TemplateUses;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
@@ -275,10 +278,19 @@ final class Frames {
                         BackgroundLauncher.forProject(ResourceMove.resourcesRoot(resources)));
     }
 
-    /** The capture source when it names an emulator, or null. */
+    /**
+     * The capture source when it names an emulator, or null; its display brought to the bot's screen size and density
+     * first, as a run's is, so a picture is read at the density it was cut at (2026-11-27). The {@code wm} commands are
+     * said once per emulator and size; the project's close puts the user's back.
+     */
     static CaptureSource emulator(AgentContext context) {
-        CaptureSource source = FxCall.call(() -> CaptureValue.current(context.services()));
-        return source != null && source.base() instanceof EmulatorSource ? source : null;
+        record Read(CaptureSource source, Size size) {}
+        Read read = FxCall.call(() -> new Read(CaptureValue.current(context.services()),
+                ScreenSize.read(context.services()).orElse(null)));
+        CaptureSource source = read.source();
+        if (source == null || !(source.base() instanceof EmulatorSource)) return null;
+        EmulatorSize.holdAt(source, read.size());
+        return source;
     }
 
     /** The tree {@code emulator} (null: none) gives its app's screen by; empty for a target that shows none. */
