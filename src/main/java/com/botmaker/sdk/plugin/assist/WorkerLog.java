@@ -121,6 +121,36 @@ public final class WorkerLog {
         }
     }
 
+    /**
+     * Until when, epoch milliseconds, the user's usage limit refused the session written to {@code log} from the byte
+     * {@code from} on: the {@code resetsAt} of its last {@code rate_limit_event} whose status is {@code rejected}; 0 when
+     * none refused it (or nothing is written).
+     */
+    static long limitedUntil(Path log, long from) {
+        if (!Files.isRegularFile(log)) return 0;
+        try (RandomAccessFile file = new RandomAccessFile(log.toFile(), "r")) {
+            if (file.length() <= from) return 0;
+            byte[] bytes = new byte[(int) Math.min(file.length() - from, WINDOW)];
+            file.seek(from);
+            file.readFully(bytes);
+            long until = 0;
+            for (String raw : new String(bytes, StandardCharsets.UTF_8).split("\n")) {
+                if (!raw.contains("\"rate_limit_event\"")) continue;
+                try {
+                    JsonNode info = JSON.readTree(raw).path("rate_limit_info");
+                    if ("rejected".equals(info.path("status").asText())) {
+                        until = Math.max(until, info.path("resetsAt").asLong() * 1000);
+                    }
+                } catch (IOException notJson) {
+                    // a line cut by a kill: not the limit's
+                }
+            }
+            return until;
+        } catch (IOException unread) {
+            return 0;
+        }
+    }
+
     private static int lastNewline(byte[] bytes) {
         for (int i = bytes.length - 1; i >= 0; i--) if (bytes[i] == '\n') return i;
         return -1;

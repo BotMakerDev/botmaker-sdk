@@ -233,6 +233,18 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
                 .mapToInt(e -> ((ExploreEvent.Leased) e).attempt()).max().orElse(0);
     }
 
+    /** How many of {@code stopId}'s tries the usage limit refused: they spend none of its tries. */
+    public int limitedTries(String stopId) {
+        return (int) events.stream()
+                .filter(e -> e instanceof ExploreEvent.Limited limited && limited.stopId().equals(stopId)).count();
+    }
+
+    /** Until when, epoch milliseconds, the latest run's last refused session said the usage limit holds; 0 for none. */
+    public long limitedUntil() {
+        return events.stream().filter(ExploreEvent.Limited.class::isInstance)
+                .mapToLong(e -> ((ExploreEvent.Limited) e).until()).max().orElse(0);
+    }
+
     /**
      * The latest run's stops leased to {@code role}, each once, in the order first leased: the stops whose worker logs
      * ({@code Journal.workerLog}) that role's sessions wrote.
@@ -757,6 +769,7 @@ public record JournalView(List<ExploreEvent> all, List<ExploreEvent> events, Lis
             case ExploreEvent.Witnessed e -> Agent.EXPLORER;
             case ExploreEvent.Leased e -> Agent.COORDINATOR;
             case ExploreEvent.Released e -> Agent.COORDINATOR;
+            case ExploreEvent.Limited e -> Agent.COORDINATOR;
             case ExploreEvent.Finding e -> Agent.EVALUATOR;
             case ExploreEvent.MapFlagged e -> Agent.EVALUATOR;
             case ExploreEvent.Summary e -> Agent.EVALUATOR;

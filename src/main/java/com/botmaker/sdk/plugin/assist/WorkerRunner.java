@@ -45,8 +45,15 @@ public final class WorkerRunner {
     /** The worker-only MCP config's resource, copied into the run's folder. */
     static final String MCP_CONFIG = "worker-mcp.json";
 
-    /** How a worker's try ended: {@code ok} when it exited cleanly, else {@code why} in a word or two. */
-    public record Result(boolean ok, String why) {}
+    /**
+     * How a worker's try ended: {@code ok} when it exited cleanly, else {@code why} in a word or two; {@code limitedUntil}
+     * (epoch milliseconds) when the user's usage limit refused it, 0 otherwise.
+     */
+    public record Result(boolean ok, String why, long limitedUntil) {
+        public Result(boolean ok, String why) {
+            this(ok, why, 0);
+        }
+    }
 
     /** The run's folder: the worker's working directory, and where its MCP config and its log are. */
     private final Path folder;
@@ -93,10 +100,12 @@ public final class WorkerRunner {
     Result run(List<String> command, String stopId, Duration limit, Path in, Consumer<Map<String, String>> scrub) {
         Process process;
         Thread writer;
+        Path log = new Journal(folder).workerLog(stopId);
+        long from;
         try {
-            Path log = new Journal(folder).workerLog(stopId);
             Files.createDirectories(log.getParent());
             endLine(log);
+            from = Files.isRegularFile(log) ? Files.size(log) : 0;
             ProcessBuilder builder = new ProcessBuilder(command).directory(in.toFile()).redirectErrorStream(true);
             scrub.accept(builder.environment());
             process = builder.start();
@@ -126,7 +135,9 @@ public final class WorkerRunner {
         } catch (InterruptedException stopped) {
             Thread.currentThread().interrupt();
         }
-        return result;
+        // A session the usage limit refused exits cleanly having done nothing: it is no try of the stop's.
+        long limited = WorkerLog.limitedUntil(log, from);
+        return limited > 0 ? new Result(false, "usage limit", limited) : result;
     }
 
     /**

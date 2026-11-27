@@ -261,7 +261,13 @@ public final class CoordinatorHost implements RunCompanion {
         }
         long now = clock.getAsLong();
         if (now >= evaluate.expiresAt() || result.why().equals("timeout") || result.why().equals("stopped")) return;
-        journal.append(new ExploreEvent.Released(evaluate.id(), 1, result.ok(), result.why(), now));
+        released(journal, evaluate.id(), 1, result, now);
+    }
+
+    /** {@code stopId}'s {@code attempt}th try released with {@code result}, the usage limit it met said first. */
+    private static void released(Journal journal, String stopId, int attempt, WorkerRunner.Result result, long now) {
+        if (result.limitedUntil() > 0) journal.append(new ExploreEvent.Limited(stopId, result.limitedUntil(), now));
+        journal.append(new ExploreEvent.Released(stopId, attempt, result.ok(), result.why(), now));
     }
 
     private void coordinate(Supplier<Optional<Journal>> latest, Function<JournalView, Coordinator> coordinators,
@@ -442,7 +448,7 @@ public final class CoordinatorHost implements RunCompanion {
         // (the process started a little after the lease did); a stopped one belongs to a run that is ending.
         long now = clock.getAsLong();
         if (now >= lease.expiresAt() || result.why().equals("timeout") || result.why().equals("stopped")) return;
-        journal.append(new ExploreEvent.Released(lease.stopId(), lease.attempt(), result.ok(), result.why(), now));
+        released(journal, lease.stopId(), lease.attempt(), result, now);
     }
 
     /**

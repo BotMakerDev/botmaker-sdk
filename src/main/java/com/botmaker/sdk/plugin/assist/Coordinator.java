@@ -126,7 +126,7 @@ public final class Coordinator {
             if (held.isPresent()) {
                 // A late evaluation is taken back, not tried again: the next one is due by the presses since.
                 if (held.get().expired(nowMs)) actions.add(new Action.Requeue(held.get().stopId(), held.get().attempt()));
-            } else {
+            } else if (!limited(view, nowMs)) {
                 EvaluatorTrigger.due(view, evaluations).ifPresent(why -> actions.add(new Action.Evaluate(
                         EvaluatorTrigger.nextId(view), why, nowMs + settings.lease().toMillis())));
             }
@@ -179,7 +179,10 @@ public final class Coordinator {
                 continue;
             }
             if (!crew.present().contains(role)) continue;
-            int tries = view.attempts(id);
+            // A worker started before the usage limit resets would be refused at once: the stop waits, nothing spent.
+            if (role != StopRole.SETTLER && limited(view, nowMs)) continue;
+            // A try the limit refused spends none of the stop's.
+            int tries = view.attempts(id) - view.limitedTries(id);
             // The Settler tries once: a write that may have partly landed is never written again. So does the Mechanic,
             // whose branch is there already, and the Reader on a wrong map, which the Evaluator says again if it stays.
             int cap = role == StopRole.SETTLER || role == StopRole.MECHANIC || stop.kind() == StopKind.BAD_MAP ? 1
@@ -200,7 +203,7 @@ public final class Coordinator {
                 mechanicBusy = true;
             }
             Duration lease = role == StopRole.MECHANIC ? MECHANIC_LEASE : settings.lease();
-            actions.add(new Action.Lease(id, role, tries + 1, nowMs + lease.toMillis()));
+            actions.add(new Action.Lease(id, role, view.attempts(id) + 1, nowMs + lease.toMillis()));
         }
         return actions;
     }
@@ -217,6 +220,8 @@ public final class Coordinator {
 
     /** Whether the running journal said nothing but heartbeats for {@link Settings#quiet}, no lease being worked. */
     private boolean quiet(JournalView view, long nowMs) {
+        // The crew waits out the user's usage limit: hours, maybe, with nothing written meanwhile.
+        if (limited(view, nowMs)) return false;
         // A held fault waits for the Mechanic, on it or on one before it, however long nothing else is written.
         if (view.open().filter(view::held).isPresent() && mechanicWorks(view, nowMs)) return false;
         List<ExploreEvent> events = view.events();
@@ -228,9 +233,15 @@ public final class Coordinator {
                     && leased.role() != StopRole.MECHANIC && view.leaseOf(leased.stopId()).isPresent()) {
                 return false;
             }
-            return nowMs - event.at() >= settings.quiet().toMillis();
+            // A limit that reset is the run's last news: the crew starts again from then.
+            return nowMs - Math.max(event.at(), view.limitedUntil()) >= settings.quiet().toMillis();
         }
         return false;
+    }
+
+    /** Whether the user's usage limit, as the last refused session said, still holds at {@code nowMs}. */
+    private static boolean limited(JournalView view, long nowMs) {
+        return nowMs < view.limitedUntil();
     }
 
     /** Whether a Mechanic has a try of some stop now, its stop waiting still or not. */

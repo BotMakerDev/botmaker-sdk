@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The explore crew waits out your usage limit** (2026-11-27): a Reader or Evaluator session that Claude's usage
+  limit refuses no longer spends one of the stop's three tries. The Coordinator leases nothing until the limit resets,
+  the run is not ended as stuck meanwhile, and 🔭 Explore says "⏳ usage limit until 14:30".
 - **A game that logs in with Google needs no second account** (2026-11-27): in the Accounts window's Launch target
   segment, pick the Google, Facebook or mail account it signs in with and leave the name blank: the account is that
   one's. Its password stays the sign-in account's, so the panel offers none, and the row says "signs in with Google"

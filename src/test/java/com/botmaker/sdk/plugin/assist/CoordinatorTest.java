@@ -76,6 +76,26 @@ class CoordinatorTest {
                 leasesAndMore(coordinator(CARTOGRAPHERS).step(JournalView.of(journal), 50, false)));
     }
 
+    /**
+     * Drive 2026-11-24 23:19: a usage limit burnt a stop's three tries in ten seconds. A refused try spends nothing, and
+     * nothing is leased, nor the run ended as quiet, until the limit resets.
+     */
+    @Test
+    void aUsageLimitIsWaitedOutWithoutSpendingTries(@TempDir Path folder) {
+        Journal journal = running(folder, stop("unknown-1", StopKind.UNKNOWN_SCREEN));
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            journal.append(new ExploreEvent.Leased("unknown-1", StopRole.CARTOGRAPHER, attempt, 10L * attempt, 5));
+            journal.append(new ExploreEvent.Limited("unknown-1", 10_000, 10L * attempt));
+            journal.append(new ExploreEvent.Released("unknown-1", attempt, false, "usage limit", 10L * attempt));
+        }
+        Coordinator coordinator = coordinator(CARTOGRAPHERS);
+
+        assertEquals(List.of(), leasesAndMore(coordinator.step(JournalView.of(journal), 9_999, false)),
+                "nothing leased, parked or ended before it resets");
+        assertEquals(List.of(new Coordinator.Action.Lease("unknown-1", StopRole.CARTOGRAPHER, 4, 10_100)),
+                leasesAndMore(coordinator.step(JournalView.of(journal), 10_000, false)), "three tries left");
+    }
+
     /** Device drive 2026-11-24, F3: a wrong map is leased to the Reader once, beside the run, and never parked. */
     @Test
     void aWrongMapIsLeasedToTheReaderOnce(@TempDir Path folder) {

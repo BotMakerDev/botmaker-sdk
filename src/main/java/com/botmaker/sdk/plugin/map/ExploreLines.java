@@ -56,6 +56,9 @@ final class ExploreLines {
     private static String waiting(JournalView read, Stop stop, long nowMs) {
         OptionalLong press = read.lastPress();
         String ago = press.isPresent() ? "last press " + Math.max(0, (nowMs - press.getAsLong()) / 1000) + " s ago · " : "";
+        if (read.crewed() && nowMs < read.limitedUntil()) {
+            return ago + "⏳ usage limit until " + clock(read.limitedUntil());
+        }
         return ago + "⏸ waiting on " + waitingOn(read, stop);
     }
 
@@ -139,6 +142,7 @@ final class ExploreLines {
             case ExploreEvent.Leased e -> "⇢ " + e.stopId() + " to " + e.role().displayName()
                     + (e.attempt() > 1 ? " (try " + e.attempt() + ")" : "");
             case ExploreEvent.Released e -> e.ok() ? null : "↺ " + e.stopId() + " taken back: " + e.why();
+            case ExploreEvent.Limited e -> "⏳ Usage limit: the crew waits until " + clock(e.until());
             case ExploreEvent.Heartbeat e -> null;
             case ExploreEvent.Finding e -> "⚑ " + e.kind().displayName() + ": " + e.why();
             // Its finding is said just before it; the Reader's lease on it is the line that follows.

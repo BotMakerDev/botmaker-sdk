@@ -61,6 +61,20 @@ class WorkerLogTest {
         assertEquals(List.of(), WorkerLog.read(log, read.next()).lines(), "nothing new, nothing read");
     }
 
+    /** The line claude printed in the drive of 2026-11-24 23:19 when the five-hour limit refused the session. */
+    @Test
+    void aRefusedRateLimitSaysWhenTheLimitResets() throws IOException {
+        Path log = folder.resolve("s1.log");
+        Files.writeString(log, text(List.of(
+                "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"allowed\",\"resetsAt\":1795576800}}",
+                "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"rejected\",\"resetsAt\":1795570200,"
+                        + "\"rateLimitType\":\"five_hour\"}}")));
+
+        assertEquals(1_795_570_200_000L, WorkerLog.limitedUntil(log, 0));
+        assertEquals(0, WorkerLog.limitedUntil(log, Files.size(log)), "a later session's part says nothing");
+        assertEquals(0, WorkerLog.limitedUntil(folder.resolve("none.log"), 0));
+    }
+
     @Test
     void aHalfWrittenLastLineIsLeftForTheNextRead() throws IOException {
         Path log = folder.resolve("s1.log");

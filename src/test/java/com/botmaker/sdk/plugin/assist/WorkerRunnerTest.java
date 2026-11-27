@@ -50,6 +50,17 @@ class WorkerRunnerTest {
     }
 
     @Test
+    void aSessionTheUsageLimitRefusedSaysUntilWhen() throws IOException {
+        String refused = "{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"status\":\"rejected\",\"resetsAt\":1795570200}}";
+        WorkerRunner runner = new WorkerRunner(folder);
+
+        assertEquals(new WorkerRunner.Result(false, "usage limit", 1_795_570_200_000L),
+                runner.run(worker("echo '" + refused + "'; exit 0"), "s1", Duration.ofSeconds(10)));
+        assertEquals(new WorkerRunner.Result(true, ""), runner.run(worker("exit 0"), "s1", Duration.ofSeconds(10)),
+                "the next session of the stop reads only its own lines");
+    }
+
+    @Test
     void aHangIsKilledAtItsLimit() throws IOException {
         long start = System.nanoTime();
 

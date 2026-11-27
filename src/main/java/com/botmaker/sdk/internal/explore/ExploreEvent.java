@@ -42,6 +42,7 @@ public sealed interface ExploreEvent {
             case SetAside ignored -> "set_aside";
             case Leased ignored -> "leased";
             case Released ignored -> "released";
+            case Limited ignored -> "limited";
             case Heartbeat ignored -> "heartbeat";
             case Finding ignored -> "finding";
             case MapFlagged ignored -> "map_flagged";
@@ -79,6 +80,7 @@ public sealed interface ExploreEvent {
             case "set_aside" -> SetAside.class;
             case "leased" -> Leased.class;
             case "released" -> Released.class;
+            case "limited" -> Limited.class;
             case "heartbeat" -> Heartbeat.class;
             case "finding" -> Finding.class;
             case "map_flagged" -> MapFlagged.class;
@@ -266,6 +268,13 @@ public sealed interface ExploreEvent {
             why = why == null ? "" : why;
         }
     }
+
+    /**
+     * The user's usage limit refused the session working {@code stopId} (an evaluation's id too) until {@code until}
+     * (epoch milliseconds): that try spends none of the stop's, and nothing is leased before then. Written just before
+     * the try's {@link Released}.
+     */
+    record Limited(String stopId, long until, long at) implements ExploreEvent {}
 
     /**
      * The Coordinator is alive, and a run whose last is too old has nobody coordinating it. Written at most every few
