@@ -334,14 +334,14 @@ class SdkPluginSurfaceTest {
     void the_toolbar_contributes_seven_items_in_their_places_and_orders() {
         List<ToolbarItem> items = plugin.toolbarItems();
 
-        assertEquals(List.of("game", "emulators", "accounts", "screen-map", "pilot", "point-here", "picture-here"),
+        assertEquals(List.of("game", "emulators", "accounts", "screen-map", "point-here", "picture-here"),
                 items.stream().map(ToolbarItem::id).toList());
 
         ToolbarItem.Place bar = ToolbarItem.Place.BAR;
-        assertEquals(List.of(bar, bar, bar, bar, bar, bar, bar),
+        assertEquals(List.of(bar, bar, bar, bar, bar, bar),
                 items.stream().map(ToolbarItem::place).toList());
 
-        assertEquals(List.of(10, 20, 30, 60, 90, 100, 110),
+        assertEquals(List.of(10, 20, 30, 60, 100, 110),
                 items.stream().map(ToolbarItem::order).toList());
 
         for (ToolbarItem item : items) {

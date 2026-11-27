@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Removed:** the Remote Pilot's server, tunnels, token and window (2026-11-27, pilot in core phase 2c). The
+  🎮 Pilot toolbar button, the Background-mode box and `-Ppilot` are gone, with Javalin and the `web.zip` pin; the
+  core serves the pilot (`botmaker core pilot`), and Studio's own window returns in a later phase. A phone pairs
+  again once.
 - One run at a time takes over this desktop's mouse and keyboard (2026-11-27). Several runs at once may still share
   this desktop while they send their input in the background, but a second run whose `takeOver()` is true is not
   dealt it: it goes to a private display, or the Runs window says the pointer is held. A run that turns to take-over

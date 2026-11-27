@@ -11,7 +11,6 @@ import com.botmaker.sdk.internal.capture.Monitor;
 import com.botmaker.sdk.internal.capture.NamedWindow;
 import com.botmaker.sdk.internal.observe.RunEvent;
 import com.botmaker.sdk.internal.observe.RunFrames;
-import com.botmaker.sdk.plugin.pilot.TelemetrySerializer;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
 

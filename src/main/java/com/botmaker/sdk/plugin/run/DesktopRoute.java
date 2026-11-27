@@ -5,8 +5,8 @@ package com.botmaker.sdk.plugin.run;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.plugin.pictures.ResourceMove;
-import com.botmaker.sdk.plugin.pilot.PilotProject;
 import com.botmaker.sdk.plugin.screen.CaptureLabels;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.session.launch.BackgroundLauncher;
 
 import java.util.function.BooleanSupplier;
@@ -26,13 +26,12 @@ final class DesktopRoute {
      * read once, at opening; the private session is asked each time, since the bot may start one mid-run.
      */
     static BooleanSupplier of(StudioServices services) {
-        PilotProject project = new PilotProject(services);
         try {
-            if (CaptureLabels.emulatorName(project.defaultSource()) != null) return () -> false;
+            if (CaptureLabels.emulatorName(CaptureValue.shown(services)) != null) return () -> false;
         } catch (RuntimeException unreadable) {
             // the source is mid-save: the desktop, as the pilot assumes
         }
-        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(project.resourcesDir()));
+        BackgroundLauncher launcher = BackgroundLauncher.forProject(ResourceMove.resourcesRoot(services.resourcesDir()));
         return () -> {
             try {
                 return launcher.session() == null;

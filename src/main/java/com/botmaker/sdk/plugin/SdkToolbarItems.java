@@ -12,7 +12,6 @@ import com.botmaker.sdk.plugin.launch.GameButton;
 import com.botmaker.sdk.plugin.launch.GameDialog;
 import com.botmaker.sdk.plugin.map.ScreenMap;
 import com.botmaker.sdk.plugin.pictures.CaptureTemplates;
-import com.botmaker.sdk.plugin.pilot.ui.RemotePilotUi;
 import com.botmaker.sdk.plugin.source.SourcePicker;
 
 import java.util.List;
@@ -40,7 +39,6 @@ public final class SdkToolbarItems implements ToolbarHolder {
     public static final String EMULATORS_ID = "emulators";
     public static final String ACCOUNTS_ID = "accounts";
     public static final String SCREEN_MAP_ID = "screen-map";
-    public static final String PILOT_ID = "pilot";
     public static final String POINT_HERE_ID = "point-here";
     public static final String PICTURE_HERE_ID = "picture-here";
 
@@ -88,13 +86,6 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onBar(60)
             .onPress(() -> ScreenMap::open);
 
-    /** Streams what the bot sees to a phone; the pilot is kept per project, see {@link RemotePilotUi#open}. */
-    public static final ToolbarItem PILOT = ToolbarItem.id(PILOT_ID).label("🎮 Pilot")
-            .tooltip("Stream what the bot sees to your phone or browser — watch it, start/stop it, "
-                    + "or turn on Interact to click and drag in the game yourself")
-            .onBar(90)
-            .onPress(() -> RemotePilotUi::open);
-
     /**
      * Picks what the bot reads pixels from ({@link SourcePicker}). It was the overlay's <i>⌖ Point bot here</i>,
      * pointing at the window the HUD was drawn over, until 2026-11-13, when the overlay was hidden outside dev mode;
@@ -116,8 +107,7 @@ public final class SdkToolbarItems implements ToolbarHolder {
             .onPress(() -> CaptureTemplates::pictureHere);
 
     /** Every item, in the bar's reading order; the host sorts on each item's order. */
-    public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, ACCOUNTS, SCREEN_MAP, PILOT, POINT_HERE,
-            PICTURE_HERE);
+    public static final List<ToolbarItem> ALL = List.of(GAME, EMULATORS, ACCOUNTS, SCREEN_MAP, POINT_HERE, PICTURE_HERE);
 
     private SdkToolbarItems() {}
 

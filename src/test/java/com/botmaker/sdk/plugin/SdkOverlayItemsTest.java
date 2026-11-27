@@ -42,7 +42,7 @@ class SdkOverlayItemsTest {
                 .map(ToolbarItem::id)
                 .toList();
 
-        assertEquals(List.of("pilot", "point-here", "picture-here"), bar.subList(bar.size() - 3, bar.size()));
+        assertEquals(List.of("screen-map", "point-here", "picture-here"), bar.subList(bar.size() - 3, bar.size()));
         assertTrue(new SdkPlugin().toolbarItems().stream().noneMatch(i -> i.place() == ToolbarItem.Place.OVERLAY));
     }
 }

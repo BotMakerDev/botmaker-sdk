@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.pilot;
+package com.botmaker.sdk.plugin.view;
 
 import com.botmaker.plugin.api.TraceLine;
 import com.botmaker.sdk.internal.observe.RunEvent;
-import com.botmaker.sdk.plugin.pilot.TelemetrySerializer.RunState;
+import com.botmaker.sdk.plugin.view.TelemetrySerializer.RunState;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -165,18 +165,6 @@ class TelemetryWireContractTest {
     }
 
     @Test
-    void onConnectTheHostSaysWhichInputKindsItTakes() {
-        // A phone draws its keyboard only when "key" is here, so an SDK that never sends this has none.
-        assertWire("input.kinds", TelemetrySerializer.inputJson(PilotInputService.Kind.wireNames()));
-    }
-
-    @Test
-    void aKeyThatWasNotSentComesBackAsANotice() {
-        assertWire("notice.not-focused",
-                TelemetrySerializer.noticeJson(PilotInputService.Typed.NOT_FOCUSED.notice()));
-    }
-
-    @Test
     void theHeartbeatSaysNothingButItself() {
         assertWire("ping", TelemetrySerializer.pingJson());
     }
@@ -248,9 +236,10 @@ class TelemetryWireContractTest {
         Set<String> uncovered = new TreeSet<>();
         for (Iterator<String> it = CORPUS.fieldNames(); it.hasNext(); ) {
             String name = it.next();
-            if (!name.startsWith("_") && !COVERED.contains(name)) uncovered.add(name);
+            // The rest of the corpus is the core's (its own TelemetryWireContractTest): the pilot moved there.
+            if (name.startsWith("telemetry.") && !COVERED.contains(name)) uncovered.add(name);
         }
-        assertEquals(Set.of(), uncovered, "corpus cases with no Studio-side assertion");
+        assertEquals(Set.of(), uncovered, "telemetry cases with no SDK-side assertion");
     }
 
     // --- Helpers ---

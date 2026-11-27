@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 LiQiyeDev
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
-package com.botmaker.sdk.plugin.pilot.ui;
+package com.botmaker.sdk.plugin.emulator;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -15,8 +15,8 @@ import javafx.scene.image.WritableImage;
 import java.util.Map;
 
 /**
- * Renders text (a URL) as a QR code {@link Image} for the Remote Pilot dialog — a phone scans it to open the
- * pilot over HTTPS or to download the APK. Encodes ZXing's {@link BitMatrix} straight into a JavaFX
+ * Renders text (a URL) as a QR code {@link Image} for the connect-a-phone window — a phone scans it to
+ * pair. Encodes ZXing's {@link BitMatrix} straight into a JavaFX
  * {@link WritableImage} (no AWT / zxing-javase), so it stays dependency-light and works headless.
  */
 public final class QrCodes {

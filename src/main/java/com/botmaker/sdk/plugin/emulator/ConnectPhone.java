@@ -5,9 +5,7 @@ package com.botmaker.sdk.plugin.emulator;
 
 import com.botmaker.plugin.toolkit.Async;
 import com.botmaker.plugin.toolkit.Styles;
-import com.botmaker.sdk.plugin.pilot.ui.QrCodes;
 import com.botmaker.shared.device.ScrcpyServer;
-import com.botmaker.shared.emulator.AdbEndpoint;
 import com.botmaker.shared.emulator.AdbTools;
 import com.botmaker.shared.emulator.SavedDevices;
 import com.botmaker.shared.tools.Downloads;

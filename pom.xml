@@ -90,16 +90,6 @@
         <tess4j.version>5.19.0</tess4j.version>
         <bytedeco.tesseract.version>5.5.3-1.5.14</bytedeco.tesseract.version>
         <bytedeco.leptonica.version>1.87.0-1.5.14</bytedeco.leptonica.version>
-        <!-- THE PHONE PAGE (2026-11-26): botmaker-pilot's web build, the web.zip its release attaches, pinned
-             here by version and hash. sluice sets both after a pilot release (sluice.yml, asset-pins); never by
-             hand. The parent's pinned-asset step unpacks it over the jar's pilot/ folder. While the hash is
-             empty, the committed copy in src/main/resources/pilot is what ships. -Ppilot builds the sibling
-             checkout's page over either. -->
-        <pilot.web.version></pilot.web.version>
-        <pilot.web.sha256></pilot.web.sha256>
-        <botmaker.asset.url>https://github.com/BotMakerDev/botmaker-pilot/releases/download/v${pilot.web.version}/web.zip</botmaker.asset.url>
-        <botmaker.asset.sha256>${pilot.web.sha256}</botmaker.asset.sha256>
-        <botmaker.asset.into>pilot</botmaker.asset.into>
         <!-- Tests tagged @Tag("slow") start a real browser (internal/web): left out by default, run by
              -Dgroups=slow -Dsurefire.excludedGroups= -->
         <surefire.excludedGroups>slow</surefire.excludedGroups>
@@ -198,15 +188,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Javalin: the Remote Pilot's server (static client, routes, WebSocket). -->
-        <dependency>
-            <groupId>io.javalin</groupId>
-            <artifactId>javalin</artifactId>
-            <version>6.7.0</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- ZXing core: the pilot's pairing QR codes, drawn straight into a JavaFX WritableImage. -->
+        <!-- ZXing core: the connect-a-phone window's QR codes, drawn straight into a JavaFX WritableImage. -->
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>core</artifactId>
@@ -579,95 +561,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <!-- The never-delete `api-gate` profile (japicmp over com.botmaker.sdk.api.**) went on 2026-10-01:
-             api.* breaks freely, because Studio's upgrade drops a statement whose method is gone. -->
-        <!--
-          `pilot` profile: rebuild the BotPilot web client (Vite + React + TS in the sibling
-          `botmaker-pilot` repository) from source and stage its `dist` as the assets this jar serves.
-
-            mvn -Ppilot package
-
-          The normal build needs no Node: a prebuilt `dist` is committed under src/main/resources/pilot/ and
-          served as-is by plugin/pilot/PilotServer. This profile refreshes those assets from source
-          — it downloads a project-local Node/npm (nothing installed system-wide), runs `npm ci` +
-          `npm run build`, then overwrites target/classes/pilot with the fresh dist (after the default
-          resource copy, so the fresh build wins).
-
-          It arrived here with the pilot on 2026-08-30. The client is served by the module that owns the
-          server, which is this one: the pilot is a plugin's feature, and a plugin ships what its feature
-          needs. Activated by id only, so an ordinary build — including JitPack's — never runs Node.
-        -->
-        <profile>
-            <id>pilot</id>
-            <properties>
-                <pilot.web.dir>${project.basedir}/../botmaker-pilot/web</pilot.web.dir>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>com.github.eirslett</groupId>
-                        <artifactId>frontend-maven-plugin</artifactId>
-                        <version>1.15.1</version>
-                        <configuration>
-                            <workingDirectory>${pilot.web.dir}</workingDirectory>
-                            <installDirectory>${project.build.directory}/node</installDirectory>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>install-node-npm</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>install-node-and-npm</goal></goals>
-                                <configuration>
-                                    <nodeVersion>v24.18.0</nodeVersion>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-ci</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>npm</goal></goals>
-                                <configuration>
-                                    <arguments>ci</arguments>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-build</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>npm</goal></goals>
-                                <configuration>
-                                    <arguments>run build</arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- Copy the freshly-built dist over the default-copied (committed) pilot assets in
-                         target/classes, so a -Ppilot build serves the current source. -->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-resources-plugin</artifactId>
-                        <version>3.3.1</version>
-                        <executions>
-                            <execution>
-                                <id>copy-pilot-dist</id>
-                                <phase>process-classes</phase>
-                                <goals><goal>copy-resources</goal></goals>
-                                <configuration>
-                                    <outputDirectory>${project.build.outputDirectory}/pilot</outputDirectory>
-                                    <overwrite>true</overwrite>
-                                    <resources>
-                                        <resource>
-                                            <directory>${pilot.web.dir}/dist</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>
