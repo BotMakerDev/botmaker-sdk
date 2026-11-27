@@ -60,6 +60,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
   `place()` too, so its runs are dealt one, unless its capture is a window set by hand, which is read on this
   desktop. A place this PC lacks (a VM picked on Windows, run on Linux) is ignored, and a VM since deleted gives way
   to the VM named otherwise.
+- **An Android game's target names no instance.** 🎮 Game writes `emu-app:<package>` and makes the instance it was
+  picked on the bot's `place()` on this computer; picking it again replaces the `@<instance>` an older bot wrote.
+  A run plays on its place, else on the instance an older target names, else on the device a capture set by hand
+  reads, else on the one instance running, else on this computer's only instance. Renaming an instance in the
+  Emulators window drops the old name from the targets and moves `place()` to the new one; a target on a second
+  renamed instance keeps that instance's new name, and `place()` is written first, so a refused write drops nothing. Checks, Launch, the
+  Emulators window's *Used by* and the assistant's tools read the instance the same way.
 
 ### Added
 

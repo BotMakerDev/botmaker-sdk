@@ -67,6 +67,17 @@ class AutoCaptureTest {
     }
 
     @Test
+    void anAppNamingNoInstanceIsLaunchedOnTheDeviceTheRunReads() {
+        assertEquals("Pixel", fixed(decide(NO_INSTANCE, CaptureSource.emulator("Pixel"))).playsOn(),
+                "a capture set by hand on a device");
+        assertEquals("Other", fixed(AutoCapture.decide(new AutoCapture.Inputs("Other", NO_INSTANCE, null, null,
+                Optional.empty(), NONE_ASKED))).playsOn(), "the device a side run is given");
+        assertEquals("", fixed(decide(ON_MAIN, CaptureSource.emulator("Pixel"))).playsOn(),
+                "a target naming its instance is launched there, as before");
+        assertEquals("", fixed(decide(NO_INSTANCE, CaptureSource.window("game", ""))).playsOn(), "no device read");
+    }
+
+    @Test
     void desktopWithTargetIsAutomatic() {
         assertInstanceOf(Decision.WatchLaunch.class, decide(STEAM, CaptureSource.desktop()));
         assertTrue(AutoCapture.isAutomatic(CaptureSource.automatic(), null));

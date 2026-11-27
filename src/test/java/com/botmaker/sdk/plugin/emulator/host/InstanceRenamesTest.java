@@ -78,14 +78,26 @@ class InstanceRenamesTest {
     }
 
     @Test
-    void onlyAnEmulatorAppOnAnOldInstanceIsRespelled() {
+    void onlyAnEmulatorAppOnARenamedInstanceLosesItsNameAndKeepsItsPage() {
         Map<String, String> moves = Map.of("LDPlayer-1", "Farm 1");
-        assertEquals(List.of("emu-app:com.zjcs.android.us@Farm 1", "emu-app:com.zjcs.android.us@MuMu-0",
-                        "steam:1145350", "not a spec"),
+        assertEquals(List.of("emu-app:com.zjcs.android.us", "emu-app:com.zjcs.android.us@MuMu-0",
+                        "emu-app:com.game", "steam:1145350", "not a spec"),
                 InstanceRenames.respelled(List.of("emu-app:com.zjcs.android.us@LDPlayer-1",
-                        "emu-app:com.zjcs.android.us@MuMu-0", "steam:1145350", "not a spec"), moves));
-        assertEquals("", InstanceRenames.respelled("", moves));
-        assertEquals("emu-app:com.android.settings@Farm 1#wifi",
-                InstanceRenames.respelled("emu-app:com.android.settings@LDPlayer-1#wifi", moves), "the page kept");
+                        "emu-app:com.zjcs.android.us@MuMu-0", "emu-app:com.game", "steam:1145350", "not a spec"),
+                        moves, "Farm 1"));
+        assertEquals("", InstanceRenames.respelled("", moves, "Farm 1"));
+        assertEquals("emu-app:com.android.settings#wifi",
+                InstanceRenames.respelled("emu-app:com.android.settings@LDPlayer-1#wifi", moves, "Farm 1"),
+                "the page kept");
+    }
+
+    @Test
+    void aRenamedInstanceThePlaceDoesNotNameKeepsItsNewName() {
+        Map<String, String> moves = Map.of("LDPlayer-1", "Farm 1", "LDPlayer-2", "Farm 2");
+        assertEquals(List.of("emu-app:com.game", "emu-app:com.other@Farm 2"),
+                InstanceRenames.respelled(List.of("emu-app:com.game@LDPlayer-1", "emu-app:com.other@LDPlayer-2"),
+                        moves, "Farm 1"), "two instances renamed: only the place's drops its name");
+        assertEquals("emu-app:com.game@Farm 1",
+                InstanceRenames.respelled("emu-app:com.game@LDPlayer-1", moves, null), "no place: the new name");
     }
 }

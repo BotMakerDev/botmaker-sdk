@@ -230,16 +230,10 @@ public final class SdkPools implements PoolHolder {
                 .findFirst().orElse(null);
     }
 
-    /**
-     * The package an {@code emu-app} target starts, with or without its {@code @<instance>}, which
-     * {@link LaunchSpec#emulatorPackage} needs; {@code ""} for none.
-     */
+    /** The package an {@code emu-app} target starts, with or without its {@code @<instance>}; {@code ""} for none. */
     private static String androidPackage(LaunchSpec spec) {
         String pkg = spec.emulatorPackage();
-        if (pkg != null) return pkg;
-        String token = spec.token();
-        int hash = token.indexOf('#');
-        return (hash < 0 ? token : token.substring(0, hash)).strip();
+        return pkg == null ? "" : pkg;
     }
 
     private static List<LaunchSpec> specs(List<String> targets) {

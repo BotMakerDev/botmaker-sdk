@@ -5,10 +5,12 @@ package com.botmaker.sdk.plugin.emulator.host;
 
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.sdk.plugin.SdkLog;
+import com.botmaker.sdk.plugin.screen.CaptureValue;
 import com.botmaker.sdk.plugin.settings.LaunchTargetValue;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.config.InstanceKey;
+import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 import javafx.application.Platform;
 
@@ -39,6 +41,7 @@ public final class UsedBy {
         if (project == null || project.getFileName() == null) return;
         String bot = project.getFileName().toString();
         List<String> specs = LaunchTargetValue.all(services);
+        String placed = CaptureValue.instanceNamed(services).orElse(null);
         Thread thread = new Thread(() -> {
             try {
                 HostLabels renames = HostConfig.renames(services);
@@ -46,11 +49,13 @@ public final class UsedBy {
                 List<EmulatorInstance> known = renames.list().isEmpty() ? Platforms.recent(Duration.ofMinutes(1))
                         : Platforms.discoverAll();
                 Map<String, String> moves = InstanceRenames.moves(renames, InstanceRenames.names(known));
-                List<String> launched = InstanceRenames.respelled(specs, moves);
+                String place = placed == null ? null : moves.getOrDefault(placed, placed);
+                // with no place yet, a renamed target keeps its instance under the new name: still that instance
+                List<String> launched = InstanceRenames.respelled(specs, moves, place);
                 if (!moves.isEmpty()) {
                     Platform.runLater(() -> InstanceRenames.handOff(services, moves).ifPresent(services::status));
                 }
-                Optional<String> refused = HostConfig.seen(services, bot, targets(launched, known), keys(known));
+                Optional<String> refused = HostConfig.seen(services, bot, targets(launched, place, known), keys(known));
                 refused.ifPresent(why -> SdkLog.warn("The bot was not noted beside its emulator instances: " + why));
             } catch (RuntimeException failed) {
                 SdkLog.warn("The bot was not noted beside its emulator instances: " + failed.getMessage());
@@ -76,14 +81,17 @@ public final class UsedBy {
     }
 
     /**
-     * The instances of {@code known} that the launch specs name; a target naming none of them is left out. A target
-     * names an instance by its name alone, so two products' instances of one name are both the bot's.
+     * The instances of {@code known} that the launch specs play on: the one an emulator app names, else, as targets
+     * are written since 2026-11-27, the one the bot's {@code place()} names ({@code placed}, or {@code null}); a
+     * target playing on none of them is left out. An instance is named by its name alone, so two products' instances
+     * of one name are both the bot's.
      */
-    static Set<InstanceKey> targets(List<String> specs, List<EmulatorInstance> known) {
+    static Set<InstanceKey> targets(List<String> specs, String placed, List<EmulatorInstance> known) {
         Set<InstanceKey> out = new LinkedHashSet<>();
         for (String spec : specs) {
             LaunchSpec parsed = LaunchSpec.parse(spec);
-            String reference = parsed == null ? null : parsed.emulatorInstance();
+            if (parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP) continue;
+            String reference = parsed.emulatorInstance() != null ? parsed.emulatorInstance() : placed;
             if (reference == null || reference.isBlank()) continue;
             for (EmulatorInstance instance : known) {
                 if (reference.equals(instance.reference())) key(instance).ifPresent(out::add);

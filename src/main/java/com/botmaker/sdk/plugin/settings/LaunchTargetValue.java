@@ -8,11 +8,13 @@ import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.Launcher;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.plugin.params.LaunchTargets;
 import com.botmaker.sdk.plugin.params.ParamSlot;
 import com.botmaker.sdk.plugin.screen.CaptureValue;
+import com.botmaker.shared.launch.LaunchKind;
 import com.botmaker.shared.launch.LaunchSpec;
 
 import java.util.ArrayList;
@@ -61,6 +63,11 @@ public final class LaunchTargetValue {
         return LaunchTargets.current(services);
     }
 
+    /** {@link LaunchTargets#played}. */
+    public static String played(StudioServices services) {
+        return LaunchTargets.played(services);
+    }
+
     /** {@link LaunchTargets#spec}. */
     public static LaunchSpec spec(StudioServices services) {
         return LaunchTargets.spec(services);
@@ -70,16 +77,29 @@ public final class LaunchTargetValue {
      * The author's pick: makes {@code spec} the bot's preferred launcher — first in its list, held once — or, for
      * {@code null}, takes the one this computer launches out of the list. A runner's pick of another launcher is
      * dropped, so this computer launches what was just picked. A bot lacking the parameter has it written first.
-     * Either way the run property a computer kept before is cleared. An emulator or phone app this computer now
-     * launches points capture at its device too ({@link CaptureValue#follow}).
+     * Either way the run property a computer kept before is cleared. An emulator or phone app is written naming no
+     * instance (2026-11-27): the instance it was picked on becomes the bot's {@code place()} on this computer, where a
+     * run alone plays, and capture follows its device ({@link CaptureValue#follow}).
      *
      * @return empty when written, else why nothing was
      */
     public static Optional<String> set(StudioServices services, String spec) {
         if (spec == null || spec.isBlank()) return remove(services, current(services));
-        Optional<String> refused = write(services, InstalledGame.canonical(spec), true);
-        if (refused.isEmpty()) CaptureValue.follow(services, current(services));
+        LaunchSpec parsed = LaunchSpec.parse(spec);
+        String instance = parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP ? null : parsed.emulatorInstance();
+        // The place first: refused, the list keeps the target as it was, instance and all.
+        Optional<String> refused = instance == null ? Optional.empty() : placeOn(services, instance);
+        if (refused.isEmpty()) refused = write(services, bare(spec), true);
+        if (refused.isEmpty()) CaptureValue.follow(services, played(services));
         return refused;
+    }
+
+    /** Makes {@code instance} the bot's {@code place()}, written first when the bot lacks it; kept when it is already. */
+    public static Optional<String> placeOn(StudioServices services, String instance) {
+        Place place = Place.android(instance);
+        if (LaunchTargets.placeInstance(services).filter(instance::equals).isPresent()) return Optional.empty();
+        ParamSlot.Opened opened = ParamSlot.openOrCreate(services, SdkValues.PLACE, "Sdk.place");
+        return opened.ctx().isEmpty() ? Optional.of(opened.refused()) : opened.ctx().get().write(place);
     }
 
     /**
@@ -142,7 +162,8 @@ public final class LaunchTargetValue {
     /** The bot's list {@code was} with canonical {@code spec} first ({@code adding}) or gone, collapsed. Pure. */
     static List<String> next(List<String> was, String spec, boolean adding) {
         List<String> next = new ArrayList<>(was);
-        next.removeIf(each -> InstalledGame.canonical(each).equals(spec));
+        // An emulator app an older bot wrote on an instance is the same launcher as the app naming none.
+        next.removeIf(each -> bare(each).equals(bare(spec)));
         if (adding) next.addFirst(spec);
         return collapsed(next);
     }
@@ -152,8 +173,14 @@ public final class LaunchTargetValue {
      * would hide what the author just picked — or removed — it names {@code spec}. Pure.
      */
     static boolean staleChoice(String chosen, String spec, boolean adding) {
-        String picked = InstalledGame.canonical(chosen);
-        return adding ? !picked.isEmpty() && !picked.equals(spec) : picked.equals(spec);
+        String picked = bare(chosen);
+        return adding ? !picked.isEmpty() && !picked.equals(bare(spec)) : picked.equals(bare(spec));
+    }
+
+    /** {@code spec} as {@link InstalledGame#canonical} writes it, an emulator app naming no instance. Pure. */
+    static String bare(String spec) {
+        LaunchSpec parsed = spec == null ? null : LaunchSpec.parse(spec);
+        return parsed == null ? InstalledGame.canonical(spec) : parsed.withoutInstance().spec();
     }
 
     /** {@code specs} with every launcher once, in its first place, as {@link InstalledGame#canonical} writes it. */

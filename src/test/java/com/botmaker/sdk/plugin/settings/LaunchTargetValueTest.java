@@ -38,4 +38,16 @@ class LaunchTargetValueTest {
         assertTrue(LaunchTargetValue.staleChoice("steam:570", "steam:570", false));
         assertFalse(LaunchTargetValue.staleChoice("lutris:3", "steam:570", false));
     }
+
+    @Test
+    void anAndroidAppIsWrittenNamingNoInstanceAndReplacesTheOneAnOlderBotWrote() {
+        assertEquals("emu-app:com.game#wifi", LaunchTargetValue.bare("emu-app:com.game@LDPlayer-1#wifi"));
+        assertEquals("steam:570", LaunchTargetValue.bare("steam: 570"));
+        assertEquals(List.of("emu-app:com.game", "steam:570"),
+                LaunchTargetValue.next(List.of("steam:570", "emu-app:com.game@LDPlayer-1"), "emu-app:com.game", true));
+        assertEquals(List.of("steam:570"),
+                LaunchTargetValue.next(List.of("emu-app:com.game@LDPlayer-1", "steam:570"), "emu-app:com.game", false));
+        assertFalse(LaunchTargetValue.staleChoice("emu-app:com.game@LDPlayer-1", "emu-app:com.game", true),
+                "the runner's pick of that app on an instance is the same game");
+    }
 }

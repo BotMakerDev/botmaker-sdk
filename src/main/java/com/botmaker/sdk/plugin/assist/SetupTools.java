@@ -467,7 +467,7 @@ final class SetupTools {
             + "setup's set_launch_target pick what it starts.";
 
     private static LaunchSpec launchSpec(AgentContext context) {
-        String current = FxCall.call(() -> LaunchTargetValue.current(context.services()));
+        String current = FxCall.call(() -> LaunchTargetValue.played(context.services()));
         return current == null ? null : LaunchSpec.parse(current);
     }
 
@@ -738,7 +738,7 @@ final class SetupTools {
 
     static AgentReply launchGame(Launch launch, AgentContext context) {
         StudioServices services = context.services();
-        String current = FxCall.call(() -> LaunchTargetValue.current(services));
+        String current = FxCall.call(() -> LaunchTargetValue.played(services));
         if (current == null) {
             return AgentReply.refused("The bot launches nothing on this computer. list_games and setup's "
                     + "set_launch_target pick what it starts.");
@@ -935,8 +935,8 @@ final class SetupTools {
                 return "\"" + pkg + "\" is not an app's package, like com.example.game.";
             }
             // The name may hold spaces ("Pixel 7"), so it is held to what the scan found, not to a pattern: a
-            // reference (a phone's serial) or a name.
-            if (instance == null || new EmulatorInstanceScanner().scan().instances().stream()
+            // reference (a phone's serial) or a name. None named plays where the run is placed (2026-11-27).
+            if (instance != null && new EmulatorInstanceScanner().scan().instances().stream()
                     .noneMatch(i -> instance.equals(i.reference()) || instance.equals(i.name()))) {
                 return "\"" + instance + "\" is not an emulator set up here; list_emulators names them.";
             }

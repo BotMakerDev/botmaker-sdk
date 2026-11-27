@@ -93,7 +93,7 @@ final class LaunchAndPick {
     }
 
     private Optional<Outcome> showAndWait() {
-        String target = LaunchTargetValue.current(services);
+        String target = LaunchTargetValue.played(services);
         LaunchSpec spec = target == null ? null : LaunchSpec.parse(target);
         Label heading = Styles.on(new Label(spec == null ? "No game to launch"
                 : "Launch " + GameButton.caption(services, target) + " and pick its window"), Styles.DIALOG_HEADING);

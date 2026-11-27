@@ -6,6 +6,7 @@ package com.botmaker.sdk.plugin.params;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.run.RunProperty;
 import com.botmaker.sdk.api.bot.LaunchChoice;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.shared.launch.LaunchSpec;
@@ -51,10 +52,30 @@ public final class LaunchTargets {
         return InstalledGame.pick(all(services), chosen(services), Os.current());
     }
 
-    /** The parsed spec, or {@code null} when there is none or it does not parse. */
+    /**
+     * {@link #current} as a run plays it: an emulator app on the instance the bot's {@code place()} names
+     * ({@link InstalledGame#launchedOn}), which wins over an {@code @<instance>} an older bot wrote. What a check, a
+     * launch from Studio or a view of the device reads; {@link #current} is the spec as the bot holds it.
+     */
+    public static String played(StudioServices services) {
+        return InstalledGame.launchedOn(current(services), placeInstance(services).orElse(null));
+    }
+
+    /** {@link #played}, parsed, or {@code null} when there is none or it does not parse. */
     public static LaunchSpec spec(StudioServices services) {
-        String spec = current(services);
+        String spec = played(services);
         return spec == null ? null : LaunchSpec.parse(spec);
+    }
+
+    /** The instance the bot's {@code place()} names, or empty when it names none or no Android place. */
+    public static Optional<String> placeInstance(StudioServices services) {
+        return ParamSlot.open(services, SdkValues.PLACE).flatMap(ctx -> {
+            try {
+                return ctx.value(Place.class);
+            } catch (RuntimeException unreadable) {
+                return Optional.empty();
+            }
+        }).filter(Place::namesAndroid).map(Place::name);
     }
 
     /** The run property {@link #current} reads first, which a launch target's first write clears. */

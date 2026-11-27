@@ -198,8 +198,8 @@ class HostConfigTest {
         EmulatorInstance ld = new EmulatorInstance(PlatformId.LDPLAYER, "LDPlayer-1", "127.0.0.1", 5555);
         EmulatorInstance mumu = new EmulatorInstance(PlatformId.MUMU, "MuMu-0", "127.0.0.1", 16384);
         assertEquals(Set.of(FARM), UsedBy.targets(List.of("emu-app:com.zjcs.android.us@LDPlayer-1", "steam:1145350",
-                "emu-app:com.zjcs.android.us@Gone", "not a spec"), List.of(ld, mumu)));
-        assertEquals(Set.of(), UsedBy.targets(List.of(), List.of(ld)));
+                "emu-app:com.zjcs.android.us@Gone", "not a spec"), null, List.of(ld, mumu)));
+        assertEquals(Set.of(), UsedBy.targets(List.of(), "LDPlayer-1", List.of(ld)));
     }
 
     /** The host writes these by the declarations: each takes its value apart and builds it back equal. */

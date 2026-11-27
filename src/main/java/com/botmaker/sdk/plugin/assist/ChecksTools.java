@@ -82,7 +82,7 @@ final class ChecksTools {
 
     /** The bot's target, or null when it has none it reads. */
     private static LaunchSpec target(AgentContext context) {
-        String current = FxCall.call(() -> LaunchTargetValue.current(context.services()));
+        String current = FxCall.call(() -> LaunchTargetValue.played(context.services()));
         return current == null ? null : LaunchSpec.parse(current);
     }
 

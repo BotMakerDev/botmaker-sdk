@@ -84,17 +84,18 @@ public final class AutoCapture {
                 case Decision.Fail fail -> fail;
             };
         }
-        if (in.emulatorProperty() != null && !in.emulatorProperty().isBlank()) {
-            return new Decision.Fixed(CaptureSource.emulator(in.emulatorProperty().strip()), null, "");
-        }
         LaunchSpec target = in.target();
+        if (in.emulatorProperty() != null && !in.emulatorProperty().isBlank()) {
+            CaptureSource device = CaptureSource.emulator(in.emulatorProperty().strip());
+            return new Decision.Fixed(device, null, deviceOf(target, device));
+        }
         if (target != null && target.kind() == LaunchKind.WEB) {
             return new Decision.Fixed(WebSource.over(target.token()), null, "");
         }
         CaptureSource capture = in.capture();
         if (!isAutomatic(capture, target)) {
             CaptureSource moved = onPlace(capture, in.dealt());
-            String playsOn = moved != capture ? android(in.dealt()) : "";
+            String playsOn = moved != capture ? android(in.dealt()) : deviceOf(target, moved);
             return new Decision.Fixed(moved, null, playsOn);
         }
         if (target == null || target.kind() == LaunchKind.UNKNOWN) return new Decision.Fixed(null, null, "");
@@ -158,6 +159,16 @@ public final class AutoCapture {
     public static String said(CaptureSource window) {
         if (!(window instanceof NamedWindow named)) return String.valueOf(window);
         return "window \"" + named.label() + "\" (class " + named.windowClass() + ")";
+    }
+
+    /**
+     * The instance an emulator app naming none (as targets are written since 2026-11-27) is launched on when the run
+     * reads {@code source}: its device; {@code ""} when the target names one, is another kind, or the source is no
+     * device's.
+     */
+    private static String deviceOf(LaunchSpec target, CaptureSource source) {
+        if (target == null || target.kind() != LaunchKind.EMULATOR_APP || target.emulatorInstance() != null) return "";
+        return source != null && source.base() instanceof EmulatorSource device ? device.instanceName() : "";
     }
 
     private static Decision onDevice(LaunchSpec target, Inputs in) {

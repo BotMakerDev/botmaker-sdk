@@ -120,7 +120,7 @@ public final class ChecksRow {
 
     /** The rows for this machine's Waydroid, whichever game the bot has. FX thread. */
     public void showWaydroid() {
-        String target = LaunchTargetValue.current(services);
+        String target = LaunchTargetValue.played(services);
         LaunchSpec current = target == null ? null : LaunchSpec.parse(target);
         spec = isWaydroid(current) ? current : ANY_WAYDROID_APP;
         reload();

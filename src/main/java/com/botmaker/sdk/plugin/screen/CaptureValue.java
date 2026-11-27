@@ -236,7 +236,7 @@ public final class CaptureValue {
 
     /** The instance the bot's {@code place()} names, when it is an Android place naming one. */
     public static Optional<String> instanceNamed(StudioServices services) {
-        return read(services, SdkValues.PLACE, Place.class).filter(Place::namesAndroid).map(Place::name);
+        return LaunchTargets.placeInstance(services);
     }
 
     /**

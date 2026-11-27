@@ -285,7 +285,7 @@ public final class GameDialog {
         QuickLaunch.bind(launch, services, this::report);
         if (picked == null) {
             refreshSupported(spec);
-            refreshWarning(spec);
+            refreshWarning(LaunchTargetValue.played(services));
         }
     }
 
@@ -325,7 +325,7 @@ public final class GameDialog {
         Async.load("game-dialog-checks", () -> EmulatorChecks.stoppingLaunch(ChecksRow.read(parsed, null).results()),
                 stopping -> {
                     // A pick made meanwhile has its own read.
-                    if (!spec.equals(LaunchTargetValue.current(services))) return;
+                    if (!spec.equals(LaunchTargetValue.played(services))) return;
                     warning.setText(stopping.map(failed -> warningOf(parsed, failed)).orElse(""));
                     warningRow.setVisible(stopping.isPresent());
                     warningRow.setManaged(stopping.isPresent());
@@ -372,7 +372,8 @@ public final class GameDialog {
     private void markCurrent() {
         // Picking for an editor: the bot's first launcher is not the one being edited.
         if (picked != null) return;
-        String spec = LaunchTargetValue.current(services);
+        // As this computer plays it: an Android tile is the app on the instance the bot's place() names.
+        String spec = LaunchTargetValue.played(services);
         games.mark(spec);
         android.mark(spec);
         recent.mark(spec);

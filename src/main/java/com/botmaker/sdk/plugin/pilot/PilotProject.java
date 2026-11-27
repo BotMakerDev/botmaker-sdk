@@ -59,7 +59,7 @@ public final class PilotProject {
 
     /** What this machine launches for the bot, or {@code null} when none is set. */
     public String launchTarget() {
-        return LaunchTargetValue.current(services);
+        return LaunchTargetValue.played(services);
     }
 
     /** The bot's settings as its Java says them, {@link BotSettings#DEFAULTS} when it says none or no project. */

@@ -142,9 +142,14 @@ public final class InstalledGame {
         return Optional.ofNullable(rewatch);
     }
 
-    /** The names of the emulator instances and phones running now. */
+    /**
+     * The names of the emulator instances and phones running now, else, when none runs, of this computer's one
+     * instance: an emulator app's target names no instance since 2026-11-27, so a run placed nowhere plays there.
+     */
     public static List<String> runningInstances() {
-        return Emulators.listAll().stream().filter(EmulatorRef::running).map(EmulatorRef::name).toList();
+        List<EmulatorRef> all = Emulators.listAll();
+        List<String> running = all.stream().filter(EmulatorRef::running).map(EmulatorRef::name).toList();
+        return running.isEmpty() && all.size() == 1 ? List.of(all.getFirst().name()) : running;
     }
 
     /**
@@ -243,10 +248,13 @@ public final class InstalledGame {
      */
     public static String pick(List<String> specs, String chosen, Os os) {
         String wanted = canonical(chosen);
-        if (!wanted.isEmpty()) {
+        LaunchSpec wantedSpec = wanted.isEmpty() ? null : LaunchSpec.parse(wanted);
+        if (wantedSpec != null) {
+            // An older pick names its instance (pkg@X); a target written since 2026-11-27 names none: one game.
+            String bare = wantedSpec.withoutInstance().spec();
             for (String each : specs) {
                 LaunchSpec spec = LaunchSpec.parse(each);
-                if (spec != null && spec.runsOn(os) && spec.spec().equals(wanted)) return each;
+                if (spec != null && spec.runsOn(os) && spec.withoutInstance().spec().equals(bare)) return each;
             }
         }
         return firstRunnable(specs, os);

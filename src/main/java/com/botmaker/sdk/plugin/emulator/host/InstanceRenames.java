@@ -91,18 +91,23 @@ public final class InstanceRenames {
         return moves;
     }
 
-    /** {@code spec} naming the new instance when it is an emulator app's on an old one, else as it was. */
-    public static String respelled(String spec, Map<String, String> moves) {
+    /**
+     * {@code spec} as it reads once its instance was renamed: an emulator app's on a renamed instance names none when
+     * the new name is {@code placed}, the instance the bot's {@code place()} names after the rename (a target names
+     * no instance since 2026-11-27, and the run plays on its place), else the new name, so a second renamed
+     * instance stays named. Anything else as it was.
+     */
+    public static String respelled(String spec, Map<String, String> moves, String placed) {
         LaunchSpec parsed = spec == null ? null : LaunchSpec.parse(spec);
         if (parsed == null || parsed.kind() != LaunchKind.EMULATOR_APP) return spec;
         String instance = parsed.emulatorInstance();
-        String now = instance == null ? null : moves.get(instance);
-        if (now == null) return spec;
-        return parsed.onInstance(now).spec();
+        if (instance == null || !moves.containsKey(instance)) return spec;
+        String renamed = moves.get(instance);
+        return (renamed.equals(placed) ? parsed.withoutInstance() : parsed.onInstance(renamed)).spec();
     }
 
-    public static List<String> respelled(List<String> specs, Map<String, String> moves) {
-        return specs.stream().map(spec -> respelled(spec, moves)).toList();
+    public static List<String> respelled(List<String> specs, Map<String, String> moves, String placed) {
+        return specs.stream().map(spec -> respelled(spec, moves, placed)).toList();
     }
 
     /**
@@ -124,10 +129,17 @@ public final class InstanceRenames {
                     : parsed.emulatorInstance();
             if (instance != null && moves.containsKey(instance)) named.put(instance, moves.get(instance));
         }
+        // The instance a target named, which place() takes when it names none: the target's name is dropped below.
+        String targetMoved = named.values().stream().findFirst().orElse(null);
         CaptureValue.followed(services).filter(moves::containsKey).ifPresent(old -> named.put(old, moves.get(old)));
         CaptureValue.instanceNamed(services).filter(moves::containsKey).ifPresent(old -> named.put(old, moves.get(old)));
         if (named.isEmpty()) return Optional.empty();
-        Optional<String> refused = LaunchTargetValue.respell(services, spec -> respelled(spec, moves));
+        // place() first, so a target drops its instance's name only once place() holds it; refused, nothing is dropped
+        Optional<String> place = CaptureValue.instanceNamed(services);
+        Optional<String> refused = place.isEmpty() && targetMoved != null
+                ? LaunchTargetValue.placeOn(services, targetMoved) : Optional.empty();
+        String placed = place.map(name -> moves.getOrDefault(name, name)).orElse(targetMoved);
+        if (refused.isEmpty()) refused = LaunchTargetValue.respell(services, spec -> respelled(spec, moves, placed));
         if (refused.isEmpty()) refused = CaptureValue.renamed(services, moves);
         if (refused.isEmpty()) refused = CaptureValue.instanceRenamed(services, moves);
         List<String> pairs = new ArrayList<>();
