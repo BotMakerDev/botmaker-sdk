@@ -19,6 +19,9 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Back and Home on an emulator by hand** (2026-11-27): the assistant's `key` tool presses Android's own keys on an
+  emulator instead of refusing: Escape is Back, Home is Home, and Enter, Tab, the arrows, letters and digits are
+  Android's keys of the same name.
 - **The explore crew waits out your usage limit** (2026-11-27): a Reader or Evaluator session that Claude's usage
   limit refuses no longer spends one of the stop's three tries. The Coordinator leases nothing until the limit resets,
   the run is not ended as stuck meanwhile, and 🔭 Explore says "⏳ usage limit until 14:30".

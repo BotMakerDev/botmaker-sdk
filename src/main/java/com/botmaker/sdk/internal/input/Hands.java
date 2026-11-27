@@ -9,6 +9,7 @@ import com.botmaker.sdk.api.input.Combo;
 import com.botmaker.sdk.api.input.Key;
 import com.botmaker.sdk.api.input.MouseButton;
 import com.botmaker.sdk.api.screens.Gesture;
+import com.botmaker.sdk.internal.emulator.AndroidKeys;
 import com.botmaker.sdk.internal.emulator.EmulatorSource;
 import com.botmaker.session.PointerPolicy;
 import com.botmaker.session.PrivateSession;
@@ -169,9 +170,19 @@ public sealed interface Hands permits Hands.InSession, Hands.OnEmulator, Hands.O
             }
         }
 
+        /** One key as Android's key event (Escape its Back, Home its Home); a held combo has no Android form. */
         @Override
         public void keys(Combo combo) {
-            throw new UnsupportedOperationException("The emulator takes clicks here; a key needs try_statement.");
+            if (!(emulator.base() instanceof EmulatorSource device)) {
+                throw new UnsupportedOperationException("This emulator takes no key here; a key needs a run.");
+            }
+            if (combo.keys().size() != 1) {
+                throw new UnsupportedOperationException("An emulator takes one key at a time, not " + combo + ".");
+            }
+            Key key = combo.keys().getFirst();
+            int code = AndroidKeys.of(key).orElseThrow(() -> new UnsupportedOperationException(
+                    "Android has no key for " + key.label() + "; Escape is its Back, Home its Home."));
+            device.key(code);
         }
 
         @Override
