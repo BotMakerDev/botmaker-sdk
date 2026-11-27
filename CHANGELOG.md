@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Several runs of one game on your desktop each play in their own window** (2026-11-27, run places phase 6): a
+  run claims the window it picks (`window:this-pc/<id>`), keeps it while it stays open, and passes a window another
+  run claimed for the next one the bot's window identity names. A private display's or a game VM's windows are the
+  run's own and claim nothing.
 - **Removed:** the Remote Pilot's server, tunnels, token and window (2026-11-27, pilot in core phase 2c). The
   🎮 Pilot toolbar button, the Background-mode box and `-Ppilot` are gone, with Javalin and the `web.zip` pin; the
   core serves the pilot (`botmaker core pilot`), and Studio's own window returns in a later phase. A phone pairs

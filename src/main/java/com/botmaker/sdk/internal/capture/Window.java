@@ -87,7 +87,12 @@ public class Window implements CaptureSource {
      * BotMaker's own windows never answer ({@link GameWindows#named}).
      */
     public static Optional<Window> named(WindowIdentity game) {
-        Optional<Window> hit = GameWindows.named(game, controller().getAllWindows()).map(Window::new);
+        DesktopSession session = BotSession.get();
+        boolean ownDisplay = session != null && session.x11Capturable();
+        List<GenericWindow> windows = controller().getAllWindows();
+        // This desktop's windows are shared by the runs on it, so each claims its own; a display's are the run's.
+        Optional<Window> hit = (ownDisplay || game == null ? GameWindows.named(game, windows)
+                : WindowClaims.pick(game, windows)).map(Window::new);
         String found = hit.map(Window::title).orElse("not open");
         // Resolved on every capture: said when the answer changes, not once per look. Remembered only while it is
         // said, so turning debug output on says the current answer.
