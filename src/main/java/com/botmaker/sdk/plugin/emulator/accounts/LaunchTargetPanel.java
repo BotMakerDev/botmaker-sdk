@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The Accounts window's side panel for a launch target's account (run-places phase 7d, layout B): its name, what it
@@ -61,7 +62,6 @@ final class LaunchTargetPanel {
 
         TextField name = new TextField(account == null ? "" : account.name());
         name.setId("lt-name");
-        name.setPromptText("The name it logs in as");
         Label refused = Styles.on(new Label(), StyleClasses.MUTED_TEXT);
         refused.setWrapText(true);
 
@@ -89,23 +89,36 @@ final class LaunchTargetPanel {
         Button save = new Button(account == null ? "Add" : "Save");
         save.setId("lt-save");
         save.setDefaultButton(true);
+        Supplier<Optional<AccountRecord.Key>> picked = () ->
+                signsInWith.getValue() == null ? Optional.empty() : signsInWith.getValue();
+        Supplier<String> saidName = () -> AccountsListModel.name(name.getText(), picked.get());
+        VBox passwordPart = new VBox(6);
+        passwordPart.setId("lt-password-part");
+        boolean kept = row != null && row.password() == AccountsListModel.Password.KEPT;
         Runnable check = () -> {
-            Optional<String> why = AccountsListModel.nameRefused(target, name.getText(), was, book);
+            Optional<String> why = AccountsListModel.nameRefused(target, saidName.get(), was, book);
             refused.setText(why.orElse(""));
             save.setDisable(why.isPresent());
+            name.setPromptText(picked.get().map(signIn -> "Blank: " + signIn.name()).orElse("The name it logs in as"));
+            // a game that logs in with Google has no password of its own; one kept already stays to forget
+            boolean own = picked.get().isEmpty() || kept;
+            passwordPart.setVisible(own);
+            passwordPart.setManaged(own);
         };
         name.textProperty().addListener((o, before, now) -> check.run());
+        signsInWith.valueProperty().addListener((o, before, now) -> check.run());
         check.run();
         save.setOnAction(e -> {
-            if (AccountsListModel.nameRefused(target, name.getText(), was, book).isPresent()) return;
-            actions.save().accept(new Edit(was, AccountRecord.ofLaunchTarget(target, name.getText(), note.getText())
-                    .withSignsInWith(signsInWith.getValue() == null ? Optional.empty() : signsInWith.getValue())
+            if (AccountsListModel.nameRefused(target, saidName.get(), was, book).isPresent()) return;
+            actions.save().accept(new Edit(was, AccountRecord.ofLaunchTarget(target, saidName.get(), note.getText())
+                    .withSignsInWith(picked.get())
                     .withPlaysAt(playsAt.getValue() == null ? "" : playsAt.getValue())));
         });
 
         panel.getChildren().addAll(Look.cap("Name"), name, refused,
                 Look.cap("Signs in with"), signsInWith,
-                Look.muted("The Google, Facebook or mail account of the book it signs in to the game with."),
+                Look.muted("The Google, Facebook or mail account of the book it signs in to the game with; a blank"
+                        + " name is that account's."),
                 Look.cap("Plays at"), playsAt,
                 Look.muted("Several runs at once deal it to a run at this place; any free place for none."),
                 Look.cap("Note"), note);
@@ -122,7 +135,8 @@ final class LaunchTargetPanel {
                 forget.setOnAction(e -> actions.forgetPassword().run());
                 password.getChildren().add(forget);
             }
-            panel.getChildren().addAll(Look.cap("Password"), password, Look.muted(row.password().words(true)));
+            passwordPart.getChildren().addAll(Look.cap("Password"), password, Look.muted(row.password().words(true)));
+            panel.getChildren().add(passwordPart);
         }
 
         HBox buttons = new HBox(6, save);

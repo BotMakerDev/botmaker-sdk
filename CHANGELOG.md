@@ -19,6 +19,10 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **A game that logs in with Google needs no second account** (2026-11-27): in the Accounts window's Launch target
+  segment, pick the Google, Facebook or mail account it signs in with and leave the name blank: the account is that
+  one's. Its password stays the sign-in account's, so the panel offers none, and the row says "signs in with Google"
+  rather than the address twice.
 - **An account follows its instance's rename** (2026-11-27, run places phase 7e): renaming an instance in the
   Emulators window moves each launch target's account that plays at it to the new name, and its last Google read with
   it, in the same undo step. An

@@ -248,9 +248,23 @@ final class AccountsListModel {
         return by.entrySet().stream().map(each -> new Group(each.getKey(), each.getValue())).toList();
     }
 
-    /** What a launch target's account's row says it signs in with: the account's name, or "—" for none. */
+    /**
+     * What a launch target's account's row says it signs in with: the account's name, its kind when that is the row's
+     * own name too (said once), or "—" for none.
+     */
     static String signsInWithText(AccountRecord account) {
-        return account.signsInWith().map(AccountRecord.Key::name).orElse("—");
+        return account.signsInWith()
+                .map(with -> with.name().equals(account.name()) ? with.kind().displayName() : with.name())
+                .orElse("—");
+    }
+
+    /**
+     * The name a launch target's account is saved under: the one typed, or, left blank, the name of the account it
+     * signs in with (a game that logs in with Google has no name of its own).
+     */
+    static String name(String typed, Optional<AccountRecord.Key> signsInWith) {
+        if (typed != null && !typed.isBlank()) return typed;
+        return signsInWith.map(AccountRecord.Key::name).orElse("");
     }
 
     /** What a row says it plays at: a place for a person, "Any free place" for none, the key as written otherwise. */
@@ -325,7 +339,9 @@ final class AccountsListModel {
      * one), or empty when it can.
      */
     static Optional<String> nameRefused(String target, String name, AccountRecord.Key was, List<AccountRecord> book) {
-        if (name == null || name.isBlank()) return Optional.of("An account has a name.");
+        if (name == null || name.isBlank()) {
+            return Optional.of("An account has a name, or signs in with one of the book's.");
+        }
         AccountRecord.Key key = new AccountRecord.Key(AccountRecord.Kind.LAUNCH_TARGET, target, name);
         if (!key.equals(was) && book.stream().anyMatch(account -> account.key().equals(key))) {
             return Optional.of(target.strip() + " has an account called " + name.strip() + " already.");

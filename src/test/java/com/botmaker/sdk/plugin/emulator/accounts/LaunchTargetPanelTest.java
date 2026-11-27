@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,6 +81,27 @@ class LaunchTargetPanelTest extends ApplicationTest {
     }
 
     @Test
+    void anAccountThatSignsInWithGoogleNeedsNoNameAndNoPassword() {
+        show(null);
+        ComboBox<Optional<AccountRecord.Key>> signsInWith = lookup("#lt-signs-in-with").query();
+        interact(() -> signsInWith.setValue(Optional.of(GOOGLE.key())));
+        Button add = lookup("#lt-save").queryButton();
+        assertFalse(add.isDisabled(), "the Google account names it");
+        clickOn(add);
+        assertEquals(new AccountRecord.Key(AccountRecord.Kind.LAUNCH_TARGET, GAME, "main@gmail.com"),
+                saved.getFirst().next().key());
+
+        AccountRecord linked = AccountRecord.ofLaunchTarget(GAME, "main@gmail.com", "")
+                .withSignsInWith(Optional.of(GOOGLE.key()));
+        show(AccountsListModel.rows(List.of(GOOGLE, linked), Map.of(), Set.of(), Set.of()).stream()
+                .filter(row -> row.account().equals(linked)).findFirst().orElseThrow());
+        assertFalse(lookup("#lt-password-part").query().isVisible(), "Google holds its password");
+        interact(() -> lookup("#lt-signs-in-with").<ComboBox<Optional<AccountRecord.Key>>>query()
+                .setValue(Optional.empty()));
+        assertTrue(lookup("#lt-password-part").query().isVisible(), "its own login has one");
+    }
+
+    @Test
     void saveKeepsTheEditOfAnAccountInPlaceOfItsKey() {
         show(AccountsListModel.rows(BOOK, Map.of(), Set.of(), Set.of()).stream()
                 .filter(row -> row.account().equals(MAIN)).findFirst().orElseThrow());
@@ -95,7 +117,10 @@ class LaunchTargetPanelTest extends ApplicationTest {
         assertEquals("farm", saved.getFirst().next().note(), "the note kept");
         assertEquals(Optional.of(GOOGLE.key()), saved.getFirst().next().signsInWith());
 
-        interact(() -> name.setText(""));
-        assertTrue(lookup("#lt-save").queryButton().isDisabled(), "a blank name is refused");
+        interact(() -> {
+            signsInWith.setValue(Optional.empty());
+            name.setText("");
+        });
+        assertTrue(lookup("#lt-save").queryButton().isDisabled(), "blank, with nothing to sign in with");
     }
 }

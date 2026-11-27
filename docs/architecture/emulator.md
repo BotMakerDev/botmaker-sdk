@@ -75,4 +75,5 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `â€
   target (`HostKnown`: what it signs in with, the place it plays at), and its words reach the Runs window with âš 
   (`PluginPool.noting`). The instance's Google accounts it read last are `GoogleReads` in `Runs.java`. The Accounts
   window's Launch target segment (`LaunchTargetPanel`) keeps the entries; a password is a secret of the entry's key,
-  never a value.
+  never a value. An entry that signs in with one of the book's accounts may leave its name blank: it is saved under
+  that account's name (`AccountsListModel.name`), and offers no password of its own.

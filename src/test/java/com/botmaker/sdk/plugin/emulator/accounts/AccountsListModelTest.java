@@ -147,12 +147,23 @@ class AccountsListModelTest {
     @Test
     void aNameIsRefusedBlankOrTakenWithinItsLaunchTarget() {
         List<AccountRecord> book = List.of(AT_ONE, ANYWHERE, STEAM);
-        assertEquals(Optional.of("An account has a name."), AccountsListModel.nameRefused(GAME, " ", null, book));
+        assertEquals(Optional.of("An account has a name, or signs in with one of the book's."),
+                AccountsListModel.nameRefused(GAME, " ", null, book));
         assertEquals(Optional.of(GAME + " has an account called Second already."),
                 AccountsListModel.nameRefused(GAME, "Second", AT_ONE.key(), book));
         assertEquals(Optional.empty(), AccountsListModel.nameRefused(GAME, "First", AT_ONE.key(), book),
                 "its own name, in another case");
         assertEquals(Optional.empty(), AccountsListModel.nameRefused(GAME, "alt", null, book), "steam's alt");
+    }
+
+    @Test
+    void aBlankNameIsTheNameOfTheAccountItSignsInWith() {
+        Optional<AccountRecord.Key> google = Optional.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "x@gmail.com"));
+        assertEquals("x@gmail.com", AccountsListModel.name(" ", google));
+        assertEquals("alt", AccountsListModel.name("alt", google));
+        assertEquals("", AccountsListModel.name("", Optional.empty()));
+        AccountRecord same = AccountRecord.ofLaunchTarget(GAME, "x@gmail.com", "").withSignsInWith(google);
+        assertEquals("Google", AccountsListModel.signsInWithText(same), "the address said once");
     }
 
     @Test
