@@ -53,7 +53,10 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `�
   old name to a new one only while no instance on this PC still has the old name, and only when it leads one way.
   `UsedBy.remember` applies the map on every bind with a screen, and the window right after a rename:
   `InstanceRenames.handOff` rewrites `launchTargets`, the runner's `launchTarget` and an `EmulatorSource` capture
-  (its region kept), each a plugin write Undo takes back, and logs it. The picker's *Manage…* opens the window
+  (its region kept), each a plugin write Undo takes back, and logs it. The rename also moves, in the same undo step,
+  each account of the book that plays at the old name (`HostConfig.movedPlaysAt`) and the instance's last Google read
+  (`HostConfig.movedRead`); an instance renamed or deleted outside BotMaker leaves the link as written, which the
+  Accounts window shows with ⚠ and the deal treats as none. The picker's *Manage…* opens the window
   filtered to its row (`EmulatorsWindow.open(services, instance)`).
 - **Two instances per emulator, each with one account** (2026-11-15, spec
   `../docs/superpowers/specs/2026-11-14-end-to-end-instances-design.md`): the windows show LDPlayer alone
@@ -63,3 +66,13 @@ Spec `../docs/superpowers/specs/2026-11-12-emulators-window-design.md`, plan `�
   instances, § Pacing). Each Instances row says itself (`InstanceRow.said`, `Group.said`) as its accessible text, so a
   screen reader and Studio's `ui` tool read the tree table by rows. `EndToEndLiveTest` drives the whole path live when
   `BOTMAKER_LIVE_GOOGLE` lists the accounts.
+- **A run's place and its account** (2026-11-27, specs `../docs/superpowers/specs/2026-11-26-run-places-design.md` and
+  `2026-11-27-claimed-accounts-design.md`): a run plays at a place, `api.capture.Place` (this PC, or an Android
+  instance on it named by its name only; key `this-pc/android/<name>`, read by `internal.config.PlaceKeys`), which
+  the SDK's first pool (`SdkPools.PLACES`) deals into `place()`; the PC is a place too and may hold several runs
+  (`PluginPool.sharing`), an Android instance one. Its game account, `api.signin.Account`, is the second pool's
+  (`SdkPools.ACCOUNTS`, `plugin.emulator.AccountPool`), dealt after the place from the book's entries of kind Launch
+  target (`HostKnown`: what it signs in with, the place it plays at), and its words reach the Runs window with ⚠
+  (`PluginPool.noting`). The instance's Google accounts it read last are `GoogleReads` in `Runs.java`. The Accounts
+  window's Launch target segment (`LaunchTargetPanel`) keeps the entries; a password is a secret of the entry's key,
+  never a value.

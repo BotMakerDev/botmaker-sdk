@@ -16,7 +16,7 @@ decision serves the run (`Bot`, `InstalledGame`) and Studio's views (`plugin/scr
 - **Fixed**: an emulator or phone app reads its instance (the one the host gave the run,
   `botmaker.capture.emulator`, else the Android place `place()` deals, else the target's, else the one running; several
   running and none named fails), a website its run's browser, no target the whole desktop, a source set by hand
-  itself (an emulator's moved onto the dealt instance). `desktop()` with a launch target counts as Automatic
+  itself (an emulator's moved onto the dealt Android place's instance). `desktop()` with a launch target counts as Automatic
   (`AutoCapture.isAutomatic`).
 - **WatchLaunch**: a desktop game with no window kept. The run closes the game when it runs, launches it and
   `LaunchWatch` reads the window the launch opened once it stayed the one for 3 s, the launched process's own first.
