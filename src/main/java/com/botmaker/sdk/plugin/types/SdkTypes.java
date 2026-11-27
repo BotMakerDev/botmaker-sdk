@@ -28,6 +28,7 @@ import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Role;
 import com.botmaker.sdk.api.screens.State;
 import com.botmaker.sdk.api.secrets.Secret;
+import com.botmaker.sdk.api.signin.Account;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.text.OcrOptions;
@@ -39,6 +40,7 @@ import com.botmaker.sdk.api.vision.Precision;
 import com.botmaker.sdk.internal.capture.CurrentSource;
 import com.botmaker.sdk.internal.bot.BotConstants;
 import com.botmaker.sdk.internal.vision.TemplateNames;
+import com.botmaker.sdk.plugin.editors.AccountEditors;
 import com.botmaker.sdk.plugin.editors.CaptureSourceEditors;
 import com.botmaker.sdk.plugin.editors.GeometryEditors;
 import com.botmaker.sdk.plugin.editors.InputEditors;
@@ -95,7 +97,7 @@ public final class SdkTypes implements TypeHolder {
     public List<PluginType<?>> types() {
         return List.of(IMAGE_TEMPLATE, PRECISION, OCR_OPTIONS, DIGIT_SET, WORDS, ELEMENT, POINT, RECT, SIZE, AREA,
                 KEY, MOUSE_BUTTON, COMBO, KEY_SEQUENCE, CAPTURE_SOURCE, IMAGE_TEMPLATE_GROUP, LAUNCHER, LAUNCH_CHOICE,
-                GAME_VM, INSTANCE, PLACE, SECRET, STATE);
+                GAME_VM, INSTANCE, PLACE, ACCOUNT, SECRET, STATE);
     }
 
     @Override
@@ -104,6 +106,7 @@ public final class SdkTypes implements TypeHolder {
         all.addAll(PRECISION_WITHERS);
         all.addAll(ELEMENT_BY_OTHER_CLUES);
         all.addAll(PLACE_ELSEWHERE);
+        all.addAll(ACCOUNT_OTHERS);
         all.add(OCR_CHAIN);
         return all;
     }
@@ -395,6 +398,30 @@ public final class SdkTypes implements TypeHolder {
             ComponentType.part(Place.class).<Integer, Place>writtenAs(Place::privateDisplay)
                     .when(place -> place.kind() == Place.Kind.PRIVATE_DISPLAY),
             ComponentType.part(Place.class).<String, Place>writtenAs(Place::vm));
+
+    /**
+     * A game account of this PC's book (2026-11-27): {@code Account.of("emu-app:com.game", "main")}, then
+     * {@code .signsInWith(Account.google(…))} and {@code .playsAt(Place.android(…))} when it has those links, and
+     * {@code .note(…)}. The Google, Facebook and mail accounts it signs in with are {@link #ACCOUNT_OTHERS}. A fresh one
+     * names none.
+     */
+    public static final DeclaredCallType<Account> ACCOUNT = PluginType.value(Account.class)
+            .fresh(Account::none)
+            .editor(() -> AccountEditors::account)
+            .preview(() -> AccountEditors::preview)
+            .<String, String, Account>writtenAs(Account::of)
+            .with(Account::signsInWith, account -> account.signsInWith().orElse(null))
+            .with(Account::playsAt, account -> account.playsAt().orElse(null))
+            .when(account -> account.kind() == Account.Kind.LAUNCH_TARGET);
+
+    /** {@link #ACCOUNT} of another kind: {@code Account.google("a@gmail.com")}, {@code .facebook(…)}, {@code .mail(…)}. */
+    public static final List<DeclaredCall<Account>> ACCOUNT_OTHERS = List.of(
+            ComponentType.part(Account.class).<String, Account>writtenAs(Account::google)
+                    .when(account -> account.kind() == Account.Kind.GOOGLE),
+            ComponentType.part(Account.class).<String, Account>writtenAs(Account::facebook)
+                    .when(account -> account.kind() == Account.Kind.FACEBOOK),
+            ComponentType.part(Account.class).<String, Account>writtenAs(Account::mail)
+                    .when(account -> account.kind() == Account.Kind.MAIL));
 
     /**
      * A secret this PC keeps, {@code Secret.of("farm password")} (2026-11-17): picked from those kept, or added. A

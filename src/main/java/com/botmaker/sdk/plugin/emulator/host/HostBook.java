@@ -104,6 +104,15 @@ public final class HostBook {
     }
 
     /**
+     * The book as written, nothing added and nothing written: what a deal reads (claimed accounts, run-places phase
+     * 7c). None without the host's values, or before the book is started.
+     */
+    public List<AccountRecord> kept() throws IOException {
+        if (services == null) return List.of();
+        return List.copyOf(understood(current().orElse(HostKnown.none()).list()).values());
+    }
+
+    /**
      * Whether the step {@code label} names started the book: taking it back would leave no book, and the
      * {@code accounts.json} it moved in is deleted, so ↶ stops there.
      */

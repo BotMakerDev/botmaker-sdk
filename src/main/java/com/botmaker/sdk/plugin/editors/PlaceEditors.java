@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.toolkit.Pills;
 import com.botmaker.sdk.api.capture.Instance;
 import com.botmaker.sdk.api.capture.Place;
+import com.botmaker.sdk.internal.config.PlaceKeys;
 import com.botmaker.sdk.plugin.emulator.SdkPools;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -65,12 +66,7 @@ public final class PlaceEditors {
 
     /** A place for a person: an instance by its name, the desktop, a private display by its number, a VM by name. */
     static String label(Place place) {
-        if (place == null) return OWN;
-        return switch (place.kind()) {
-            case ANDROID -> place.name().isEmpty() ? OWN : place.name();
-            case DESKTOP -> place.kind().displayName();
-            case PRIVATE_DISPLAY -> place.kind().displayName() + " " + place.display();
-            case VM, UNKNOWN -> (place.kind().displayName() + " " + place.name()).strip();
-        };
+        if (place == null || place.kind() == Place.Kind.ANDROID && place.name().isEmpty()) return OWN;
+        return PlaceKeys.said(place);
     }
 }

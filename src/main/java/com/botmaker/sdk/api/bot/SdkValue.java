@@ -80,6 +80,11 @@ public @interface SdkValue {
          */
         PLACE,
         /**
+         * The game account a run plays — the {@code Account} parameter {@code account}, which several runs at once are
+         * each dealt one of this PC's account book's, following their place (2026-11-27).
+         */
+        ACCOUNT,
+        /**
          * The emulator instance a run played on, before places — the {@code Instance} parameter {@code instance}. No
          * value is declared on it since 2026-11-26: {@link #PLACE} replaced it, and Studio's upgrade removes a bot's
          * old method, or keeps it unmarked while the bot names it. The next release deletes it.

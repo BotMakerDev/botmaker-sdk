@@ -28,6 +28,7 @@ import com.botmaker.sdk.api.screens.Element;
 import com.botmaker.sdk.api.screens.Screen;
 import com.botmaker.sdk.api.screens.ScreenPart;
 import com.botmaker.sdk.api.screens.Shades;
+import com.botmaker.sdk.api.signin.Account;
 import com.botmaker.sdk.api.text.DigitSet;
 import com.botmaker.sdk.api.text.Words;
 import com.botmaker.sdk.api.vision.ImageTemplate;
@@ -280,6 +281,21 @@ public final class SdkValues implements ValueHolder {
             .when(SdkValues::playsSomewhere)
             .because("This is where the bot plays. Several runs at once are each given their own place.");
 
+    /**
+     * The game account a run plays — {@code public Account account()} (2026-11-27, spec
+     * {@code 2026-11-27-claimed-accounts-design.md}), declared while a run has a place to be dealt
+     * ({@link #playsSomewhere}): an account follows its place. The SDK's second pool ({@code SdkPools.ACCOUNTS}) deals
+     * each of several runs one of this PC's account book's accounts for the bot's launch targets; one run uses its
+     * value, which starts naming none.
+     */
+    public static final ManagedParam<Account> ACCOUNT = ManagedValue.param(SdkValue.Id.ACCOUNT)
+            .in(SdkValue.Holder.GAME)
+            .startsAs(Account::none)
+            .shown("The game account this run plays")
+            .when(SdkValues::playsSomewhere)
+            .because("This is the account the bot plays the game as. Several runs at once are each given one of this"
+                    + " PC's accounts, kept in the Emulators window's Accounts.");
+
     /** Whether {@code source} reads an emulator's screen, itself or a region of it. */
     public static boolean onEmulator(CaptureSource source) {
         return source != null && !(source instanceof AmbientSource) && source.base() instanceof EmulatorSource;
@@ -470,7 +486,8 @@ public final class SdkValues implements ValueHolder {
     @Override
     public List<ManagedValue<?>> values() {
         return List.of(PLANS, GOALS, RUN, PICTURES, TAGS, DIGITS, TEXTS, ELEMENTS, STATES, SCREEN_MAP,
-                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, PLACE, VM, GAME_ZONE, GUARD_WORDS,
+                SCREEN, SHADES, PLAN, DO_SETUP, LAUNCH_TARGETS, LAUNCH_TARGET, CAPTURE, PLACE, ACCOUNT, VM, GAME_ZONE,
+                GUARD_WORDS,
                 FOUND_DELAY, NOT_FOUND_DELAY, RANDOM_CLICKS, CONFIDENCE, COMPARE_MARGIN, MAX_ROUNDS, PATIENCE,
                 FROZEN_AFTER, STUCK_AFTER, RESTART_CAP, RESTARTS_WITHIN, GAME_RUNS_IN, TAKE_OVER, DISPLAY_BACKEND,
                 INPUT_BACKEND);

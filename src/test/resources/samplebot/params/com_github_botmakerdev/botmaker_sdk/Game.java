@@ -4,6 +4,8 @@ import com.botmaker.plugin.api.params.Param;
 import com.botmaker.sdk.api.bot.LaunchChoice;
 import com.botmaker.sdk.api.bot.SdkValue;
 import com.botmaker.sdk.api.capture.CaptureSource;
+import com.botmaker.sdk.api.capture.Place;
+import com.botmaker.sdk.api.signin.Account;
 
 import java.time.ZoneId;
 
@@ -21,6 +23,14 @@ public class Game {
     @Param.Shown(description = "The game's window: where the bot reads pixels from")
     public CaptureSource captureSource() {
         return CaptureSource.desktop();
+    }
+
+    @SdkValue(SdkValue.Id.ACCOUNT)
+    @Param.Shown(description = "The game account this run plays")
+    public Account account() {
+        return Account.of("emu-app:com.game", "main")
+                .signsInWith(Account.google("main@gmail.com"))
+                .playsAt(Place.android("MEmu_1"));
     }
 
     @SdkValue(SdkValue.Id.GAME_ZONE)

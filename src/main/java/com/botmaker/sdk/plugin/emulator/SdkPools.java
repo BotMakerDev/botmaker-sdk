@@ -9,6 +9,7 @@ import com.botmaker.plugin.api.run.PluginPool;
 import com.botmaker.plugin.api.run.PoolOffer;
 import com.botmaker.sdk.api.bot.BotSettings;
 import com.botmaker.sdk.api.capture.Place;
+import com.botmaker.sdk.api.signin.Account;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.config.PointerClaims;
 import com.botmaker.sdk.internal.session.SessionBootstrap;
@@ -57,6 +58,18 @@ public final class SdkPools implements PoolHolder {
             .claiming(SdkPools::heldWith);
 
     /**
+     * The bot's {@code account()}, dealt after its place (spec {@code 2026-11-27-claimed-accounts-design.md}): this PC's
+     * book's accounts for the bot's games, each one run's, the account that plays at the row's place first, then one
+     * that signs in with a Google account the instance last read, then one of no place. A bot with none kept is dealt
+     * no account, which every run shares. The row says with ⚠ when an account's links disagree or name a place gone.
+     */
+    public static final PluginPool<Account> ACCOUNTS = PluginPool.fills(SdkValues.ACCOUNT)
+            .from(AccountPool::candidates)
+            .narrowedBy(AccountPool::left)
+            .sharing(AccountPool::runsOf)
+            .noting(AccountPool::note);
+
+    /**
      * What a run dealt {@code place} holds alone: this desktop's pointer when the bot takes over the mouse and keyboard
      * ({@code RunIn.takeOver}, read from its settings group), so a second such run is no row, and nothing else. A run
      * whose code turns take-over on later claims the pointer then, in {@code BotSettings.use}, and stops when it is
@@ -82,12 +95,17 @@ public final class SdkPools implements PoolHolder {
 
     @Override
     public List<PluginPool<?>> pools() {
-        return List.of(PLACES);
+        return List.of(PLACES, ACCOUNTS);
     }
 
     /** This PC's places that can play the bot's game: the pool's candidates and the place pill's list. */
     public static List<Place> places(StudioServices services) {
         return candidates(services).places();
+    }
+
+    /** This PC's book's accounts for the bot's games, in the book's order: the account pill's list. */
+    public static List<Account> accounts(StudioServices services) {
+        return AccountPool.candidates(services).stream().filter(account -> !account.isNone()).toList();
     }
 
     /**
@@ -230,7 +248,7 @@ public final class SdkPools implements PoolHolder {
     }
 
     /** The instances {@code state} knows, its own settings or a bot seen launching one, by name. */
-    private static TreeSet<String> instances(HostConfig.State state) {
+    static TreeSet<String> instances(HostConfig.State state) {
         TreeSet<String> names = new TreeSet<>();
         state.config().instances().keySet().stream().map(InstanceKey::reference).forEach(names::add);
         state.usedBy().keySet().stream().map(InstanceKey::reference).forEach(names::add);

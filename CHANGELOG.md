@@ -19,6 +19,16 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **Several runs are each dealt a game account, after their place** (2026-11-27, run places phase 7c): a bot that is
+  dealt a place gets the parameter `Account account()` in its `Game` group (`api.signin.Account`: a launch target's
+  account, `Account.of("emu-app:com.game", "main")`, with `.signsInWith(Account.google(…))`, `.playsAt(Place.android(…))`
+  and `.note(…)` when it has them; `password()` names the secret this PC keeps for it). The SDK's second pool,
+  `SdkPools.ACCOUNTS`, deals this PC's book's accounts for the bot's launch targets: to each row the account that plays
+  at its place, then one that signs in with a Google account the instance last read, then one of no place; one that
+  plays at another place is left out, and one that plays at an instance or game VM gone is dealt as of no place. An
+  account kept for `emu-app:com.game@MEmu_1` counts for the game on any instance. The Runs window marks with ⚠ a row
+  whose account plays at an instance that last read another Google account, or at a place gone. A bot
+  with no account kept for its games is dealt no account, which every run shares, as before.
 - **The account book keeps a launch target's accounts, and each instance's last-read Google accounts** (2026-11-27,
   run places phase 7b): a book entry of kind `launch-target` carries its launch target, the entry it signs in with and
   the place it plays at (`HostKnown.Entry`'s eight parts; a Google entry is still written as before), set by

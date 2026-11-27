@@ -180,6 +180,11 @@ public final class HostConfig {
         });
     }
 
+    /** Each instance's last-read Google accounts ({@link GoogleReads}); none when unread. */
+    public static HostGoogleReads googleReads(StudioServices services) {
+        return read(services, GoogleReads.VALUE, HostGoogleReads.class, HostGoogleReads.none());
+    }
+
     /**
      * Notes the Google accounts each instance of {@code read} listed, by its name ({@link GoogleReads}); one step ↶
      * stops at, as it follows what Android said. Nothing is written when every row says so already.
