@@ -19,6 +19,13 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **The account book keeps a launch target's accounts, and each instance's last-read Google accounts** (2026-11-27,
+  run places phase 7b): a book entry of kind `launch-target` carries its launch target, the entry it signs in with and
+  the place it plays at (`HostKnown.Entry`'s eight parts; a Google entry is still written as before), set by
+  `HostBook.link`. A new value of this PC, `GoogleReads` in `Runs.java`, keeps the Google accounts each instance last
+  listed and since when: the Emulators window's reads, a Google sign-in's end and a run's cold start on an instance
+  write it, only when the accounts changed. Nothing deals these yet; the Accounts window lists no Launch target
+  segment until phase 7d.
 - **The SDK's run view offers Background mode to the host's Remote Pilot** (2026-11-27, pilot in core phase 5a): when
   the bot's settings run the game in a private display and its launch target can, `SdkRunView.background()` names the
   target and the display backend; core starts and stops the session.

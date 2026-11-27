@@ -33,6 +33,15 @@ class AccountsListModelTest {
     }
 
     @Test
+    void aLaunchTargetsAccountIsHeldAndWantedUnderItsTarget() {
+        AccountRecord game = AccountRecord.ofLaunchTarget("emu-app:com.game", "main", "");
+        AccountsListModel.Row row = AccountsListModel.rows(List.of(game), Map.of(game.key(), List.of(MEMU)),
+                Set.of(game.key()), Set.of()).getFirst();
+        assertEquals(1, row.instances());
+        assertFalse(row.removable(), "a configuration lists it");
+    }
+
+    @Test
     void theRowsGoByNameAndCountTheInstancesThatWantEachAccount() {
         List<AccountsListModel.Row> rows = rows();
         assertEquals(List.of(FB, FARM, MAIN), rows.stream().map(AccountsListModel.Row::account).toList());

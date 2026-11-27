@@ -10,6 +10,8 @@ import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.Theme;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.value.ComponentType;
+import com.botmaker.sdk.internal.config.GoogleReads;
+import com.botmaker.sdk.internal.config.HostGoogleReads;
 import com.botmaker.sdk.plugin.SdkPlugin;
 import com.botmaker.sdk.plugin.types.HostTypes;
 import com.botmaker.shared.emulator.EmulatorInstance;
@@ -254,6 +256,34 @@ class HostConfigTest {
         assertEquals(rows.tags(), grammar.read(HostLabels.class,
                 qualified(grammar.write(HostLabels.class, rows.tags()).orElseThrow().source())).orElseThrow());
         assertEquals("HostLabels.of()", grammar.write(HostLabels.class, HostLabels.none()).orElseThrow().source());
+    }
+
+    /**
+     * The book's three shapes of entry, each written by the shortest call that rebuilds it, so a book of Google entries
+     * reads as before, and the last-read Google accounts, written by the real grammar and read back.
+     */
+    @Test
+    void aLaunchTargetsEntryAndTheGoogleReadsAreJavaTheGrammarWritesAndReads() {
+        ValueGrammar grammar = ValueGrammar.of(List.of(), List.of(HostTypes.KNOWN, HostTypes.KNOWN_PLAIN,
+                HostTypes.KNOWN_ALIASED, HostTypes.KNOWN_ENTRY, HostTypes.GOOGLE_READS, HostTypes.GOOGLE_READ));
+        HostKnown book = HostKnown.of(new HostKnown.Entry("google", "main@example.com", "the main one"),
+                new HostKnown.Entry("google", "alt@example.com", "", "a.lt@example.com", "code"),
+                new HostKnown.Entry("launch-target", "main", "", "", "", "emu-app:com.game", "google:main@example.com",
+                        "this-pc/android/MEmu_1"));
+        String java = grammar.write(HostKnown.class, book).orElseThrow().source();
+        assertEquals("HostKnown.of(new HostKnown.Entry(\"google\", \"main@example.com\", \"the main one\"), "
+                + "new HostKnown.Entry(\"google\", \"alt@example.com\", \"\", \"a.lt@example.com\", \"code\"), "
+                + "new HostKnown.Entry(\"launch-target\", \"main\", \"\", \"\", \"\", \"emu-app:com.game\", "
+                + "\"google:main@example.com\", \"this-pc/android/MEmu_1\"))", java);
+        assertEquals(book, grammar.read(HostKnown.class, qualified(java)).orElseThrow());
+
+        HostGoogleReads reads = HostGoogleReads.of(new HostGoogleReads.Row("MEmu_1", "a@example.com b@example.com",
+                "2026-11-27T10:00:00Z"));
+        String readsJava = grammar.write(HostGoogleReads.class, reads).orElseThrow().source();
+        assertEquals(reads, grammar.read(HostGoogleReads.class, readsJava
+                .replaceAll("\\bHostGoogleReads\\b", HostGoogleReads.class.getName())).orElseThrow());
+        assertTrue(new SdkPlugin().managedValues().contains(GoogleReads.VALUE));
+        assertTrue(GoogleReads.VALUE.onHost());
     }
 
     /** {@code java} with the host types named in full, as a file names them by its imports. */

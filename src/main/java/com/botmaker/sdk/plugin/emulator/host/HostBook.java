@@ -40,8 +40,8 @@ import java.util.function.Supplier;
  * Every account this PC knows, for every emulator and every bot: the {@link SdkHostValues#BOOK} value of the SDK's
  * project of this PC (spec {@code 2026-11-13-host-projects-design.md}). The Accounts window lists it, and an instance's
  * configuration picks from it and names its entries. An entry is kind, name, note, aliases and the verification its
- * sign-in follows, never a password, which only the OS credential store holds. Each change is one step of this PC's
- * undo.
+ * sign-in follows, and a launch target's account its launch target and links (signs in with, plays at, 2026-11-27);
+ * never a password, which only the OS credential store holds. Each change is one step of this PC's undo.
  *
  * <p>The book is started on its first use: from the {@code accounts.json} an older SDK kept in the window's
  * {@code state/} folder, as one commit "Account book moved in", after which that file is deleted; else with the PC's
@@ -137,6 +137,35 @@ public final class HostBook {
         });
     }
 
+    /**
+     * Sets a launch target's account's links: the book entry it signs in with, or none, and the key of the place it
+     * plays at, or {@code ""} for any free place. Refused for an account the book lacks, one of another kind, or a
+     * {@code signsInWith} the book does not hold or that is another launch target's account.
+     */
+    public List<AccountRecord> link(AccountRecord.Key key, Optional<AccountRecord.Key> signsInWith, String playsAt)
+            throws IOException {
+        AtomicReference<String> refused = new AtomicReference<>();
+        List<AccountRecord> after = change("Change an account's links", book -> {
+            AccountRecord account = book.get(key);
+            if (account == null || account.kind() != AccountRecord.Kind.LAUNCH_TARGET) {
+                refused.set(key.name() + " is not a launch target's account in this PC's account book.");
+                return;
+            }
+            Optional<AccountRecord.Key> with = signsInWith == null ? Optional.empty() : signsInWith;
+            if (with.isPresent() && !book.containsKey(with.get())) {
+                refused.set(with.get().name() + " is not in this PC's account book.");
+                return;
+            }
+            if (with.isPresent() && with.get().kind() == AccountRecord.Kind.LAUNCH_TARGET) {
+                refused.set(key.name() + " cannot sign in with another launch target's account.");
+                return;
+            }
+            book.put(key, account.withSignsInWith(with).withPlaysAt(playsAt));
+        });
+        if (refused.get() != null) throw new IOException(refused.get());
+        return after;
+    }
+
     /** Takes the account out of the book; the caller offers it only for one no configuration lists. */
     public List<AccountRecord> remove(AccountRecord.Key key) throws IOException {
         return change("Remove an account", book -> book.remove(key));
@@ -180,11 +209,12 @@ public final class HostBook {
     public List<AccountRecord> recordAlias(AccountRecord.Key of, String address) throws IOException {
         if (address == null || address.isBlank()) throw new IOException("An alias is an address.");
         String wanted = address.strip().toLowerCase(Locale.ROOT);
-        AccountRecord.Key own = new AccountRecord.Key(of.kind(), wanted);
+        AccountRecord.Key own = new AccountRecord.Key(of.kind(), of.target(), wanted);
         AtomicReference<String> refused = new AtomicReference<>();
         List<AccountRecord> after = change("Record " + wanted + " as an alias of " + of.name(), book -> {
             Optional<AccountRecord> found = Optional.ofNullable(book.get(of)).or(() -> book.values().stream()
-                    .filter(one -> one.kind() == of.kind() && one.answersTo(of.name())).findFirst());
+                    .filter(one -> one.kind() == of.kind() && one.target().equals(of.target())
+                            && one.answersTo(of.name())).findFirst());
             if (found.isEmpty()) {
                 refused.set(of.name() + " is not in this PC's account book.");
                 return;
@@ -203,10 +233,11 @@ public final class HostBook {
         return after;
     }
 
-    /** Another entry of {@code key}'s kind that has {@code address} among its aliases. */
+    /** Another entry of {@code key}'s kind, and launch target, that has {@code address} among its aliases. */
     private static Optional<AccountRecord> aliasHolder(Map<AccountRecord.Key, AccountRecord> book,
                                                        AccountRecord.Key key, String address) {
-        return book.values().stream().filter(other -> !other.key().equals(key) && other.kind() == key.kind())
+        return book.values().stream().filter(other -> !other.key().equals(key) && other.kind() == key.kind()
+                        && other.target().equals(key.target()))
                 .filter(other -> other.aliases().contains(address)).findFirst();
     }
 
@@ -247,7 +278,9 @@ public final class HostBook {
                 : into.note() + " · " + from.note();
         Verification verify = into.verify() == Verification.DEFAULT && from.verify().isMethod() ? from.verify()
                 : into.verify();
-        return new AccountRecord(into.kind(), into.name(), note, aliases, verify);
+        AccountRecord out = into.withNote(note).withAliases(aliases).withVerify(verify);
+        if (out.signsInWith().isEmpty()) out = out.withSignsInWith(from.signsInWith());
+        return out.playsAt().isEmpty() ? out.withPlaysAt(from.playsAt()) : out;
     }
 
     /** The verification the book's accounts follow unless one picks its own; Phone prompt until the user sets one. */
@@ -342,25 +375,32 @@ public final class HostBook {
      */
     public List<AccountRecord> importFrom(Path source) throws IOException {
         Map<AccountRecord.Key, AccountRecord> given = understood(entries(readJson(source)));
-        return change("Import accounts", book -> given.forEach((key, account) -> {
-            AccountRecord was = book.get(key);
-            List<String> free = account.aliases().stream()
-                    .filter(alias -> aliasHolder(book, key, alias).isEmpty()).toList();
-            if (was == null) {
-                book.put(key, account.withAliases(free));
-                return;
-            }
-            List<String> aliases = new ArrayList<>(was.aliases());
-            aliases.addAll(free);
-            book.put(key, new AccountRecord(was.kind(), was.name(), was.note().isEmpty() ? account.note() : was.note(),
-                    aliases, was.verify() == Verification.DEFAULT ? account.verify() : was.verify()));
-        }));
+        return change("Import accounts", book -> {
+            given.forEach((key, account) -> {
+                AccountRecord was = book.get(key);
+                List<String> free = account.aliases().stream()
+                        .filter(alias -> aliasHolder(book, key, alias).isEmpty()).toList();
+                if (was == null) {
+                    book.put(key, account.withAliases(free));
+                    return;
+                }
+                List<String> aliases = new ArrayList<>(was.aliases());
+                aliases.addAll(free);
+                AccountRecord merged = was.withNote(was.note().isEmpty() ? account.note() : was.note())
+                        .withAliases(aliases).withVerify(was.verify() == Verification.DEFAULT ? account.verify() : was.verify());
+                book.put(key, merged.signsInWith().isEmpty() ? merged.withSignsInWith(account.signsInWith()) : merged);
+            });
+            // A link the file brought to an entry neither it nor the book holds is dropped, as link() refuses one.
+            given.keySet().forEach(key -> book.computeIfPresent(key, (k, account) -> account.signsInWith()
+                    .filter(with -> !book.containsKey(with)).isPresent()
+                    ? account.withSignsInWith(Optional.empty()) : account));
+        });
     }
 
     /**
      * Writes {@code accounts} to {@code target} for another PC: {@code kind}, {@code name}, {@code note},
-     * {@code aliases} and {@code verify} per account, and nothing else, so no password or instance ever leaves this
-     * PC this way.
+     * {@code aliases} and {@code verify} per account, and a launch target's {@code target} and {@code signsInWith},
+     * and nothing else, so no password, instance or place ever leaves this PC this way.
      */
     public static void export(List<AccountRecord> accounts, Path target) throws IOException {
         ObjectNode root = JSON.createObjectNode();
@@ -374,6 +414,10 @@ public final class HostBook {
             ArrayNode aliases = entry.putArray("aliases");
             account.aliases().forEach(aliases::add);
             entry.put("verify", account.verify().id());
+            if (account.kind() == AccountRecord.Kind.LAUNCH_TARGET) {
+                entry.put("target", account.target());
+                account.signsInWith().ifPresent(with -> entry.put("signsInWith", with.text()));
+            }
         }
         Files.writeString(target, JSON.writeValueAsString(root), StandardCharsets.UTF_8);
     }
@@ -551,14 +595,20 @@ public final class HostBook {
             default -> account.verify().id();
         };
         return new HostKnown.Entry(account.kind().id(), account.name(), account.note(),
-                String.join(" ", account.aliases()), verify);
+                String.join(" ", account.aliases()), verify, account.target(),
+                account.signsInWith().map(AccountRecord.Key::text).orElse(""), account.playsAt());
     }
 
-    /** The row as an account, or null for one of a kind this build does not know or with no name. */
+    /**
+     * The row as an account, or null for one of a kind this build does not know, with no name, or a launch target's
+     * with no launch target. A link that does not read is no link.
+     */
     private static AccountRecord record(HostKnown.Entry row) {
         AccountRecord.Kind kind = AccountRecord.Kind.fromId(row.kind());
-        return kind == AccountRecord.Kind.UNKNOWN || row.name().isBlank() ? null
-                : new AccountRecord(kind, row.name(), row.note(), row.aliasList(), Verification.fromId(row.verify()));
+        if (kind == AccountRecord.Kind.UNKNOWN || row.name().isBlank()) return null;
+        if (kind == AccountRecord.Kind.LAUNCH_TARGET && row.target().isBlank()) return null;
+        return new AccountRecord(kind, row.name(), row.note(), row.aliasList(), Verification.fromId(row.verify()),
+                row.target(), AccountRecord.Key.parse(row.signsInWith()), row.playsAt());
     }
 
     private static Map<AccountRecord.Key, AccountRecord> understood(List<HostKnown.Entry> rows) {
@@ -591,7 +641,8 @@ public final class HostBook {
             String verify = Verification.fromId(entry.path("verify").asText("")) == Verification.DEFAULT ? ""
                     : entry.path("verify").asText("");
             HostKnown.Entry row = new HostKnown.Entry(entry.path("kind").asText(""), entry.path("name").asText(""),
-                    entry.path("note").asText(""), aliases.apply(entry), verify);
+                    entry.path("note").asText(""), aliases.apply(entry), verify, entry.path("target").asText(""),
+                    entry.path("signsInWith").asText(""), "");
             if (!row.name().isBlank()) out.add(row);
         }
         return out;

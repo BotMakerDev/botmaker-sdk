@@ -167,7 +167,7 @@ final class AccountsGridModel {
                 .flatMap(keys -> keys).filter(k -> answers(account, k)).findFirst()
                 .or(() -> held.flatMap(names -> account.addresses().stream()
                                 .filter(a -> names.contains(a.toLowerCase(Locale.ROOT))).findFirst())
-                        .map(address -> new AccountRecord.Key(account.kind(), address)))
+                        .map(address -> new AccountRecord.Key(account.kind(), account.target(), address)))
                 .orElse(account.key());
     }
 

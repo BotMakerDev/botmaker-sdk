@@ -110,7 +110,7 @@ final class AccountsListModel {
                 .sorted(Comparator.comparing(AccountRecord::name, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(account -> account.kind().ordinal()))
                 .map(account -> {
-                    List<AccountRecord.Key> keys = keys(account);
+                    List<AccountRecord.Key> keys = account.keys();
                     List<InstanceKey> on = keys.stream().flatMap(key -> onInstances.getOrDefault(key, List.of())
                             .stream()).distinct().toList();
                     return new Row(account, on, !account.kind().signedInByBotMaker() ? Password.NONE
@@ -118,11 +118,6 @@ final class AccountsListModel {
                             keys.stream().noneMatch(held::contains));
                 })
                 .toList();
-    }
-
-    /** The account's key under each of its addresses, its own first. */
-    private static List<AccountRecord.Key> keys(AccountRecord account) {
-        return account.addresses().stream().map(address -> new AccountRecord.Key(account.kind(), address)).toList();
     }
 
     /** Whether the store keeps a password under any of the account's addresses. */
@@ -185,9 +180,13 @@ final class AccountsListModel {
         return out;
     }
 
-    /** The kinds an account can be: every one but UNKNOWN. */
+    /**
+     * The kinds an account can be: every one but UNKNOWN, and but a launch target's, which needs its launch target and
+     * gets its own segment with the run-places plan's phase 7d.
+     */
     static List<AccountRecord.Kind> kinds() {
-        return Arrays.stream(AccountRecord.Kind.values()).filter(one -> one != AccountRecord.Kind.UNKNOWN).toList();
+        return Arrays.stream(AccountRecord.Kind.values())
+                .filter(one -> one != AccountRecord.Kind.UNKNOWN && one != AccountRecord.Kind.LAUNCH_TARGET).toList();
     }
 
     /** The keys the store is asked about: every address of the accounts BotMaker signs in. */

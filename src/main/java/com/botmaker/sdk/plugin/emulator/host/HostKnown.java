@@ -33,15 +33,28 @@ public record HostKnown(List<Entry> list) {
      * @param name    the email, or the account's name
      * @param note    the user's own words, or empty
      * @param aliases the account's other addresses, separated by spaces, or empty
-     * @param verify  the verification's id ({@code phone}, {@code code}…), empty for the book's default
+     * @param verify      the verification's id ({@code phone}, {@code code}…), empty for the book's default
+     * @param target      a {@code launch-target} account's launch target ({@code emu-app:com.game}), else empty
+     * @param signsInWith the entry a launch target's account signs in with, {@code google:main@gmail.com}, or empty
+     * @param playsAt     the key of the place a launch target's account plays at, {@code this-pc/android/MEmu_1}, or
+     *                    empty for any free place
      */
-    public record Entry(String kind, String name, String note, String aliases, String verify) {
+    public record Entry(String kind, String name, String note, String aliases, String verify, String target,
+                        String signsInWith, String playsAt) {
         public Entry {
             kind = kind == null ? "" : kind.strip();
             name = name == null ? "" : name.strip();
             note = note == null ? "" : note.strip();
             aliases = aliases == null ? "" : String.join(" ", aliases.strip().split("\\s+"));
             verify = verify == null ? "" : verify.strip();
+            target = target == null ? "" : target.strip();
+            signsInWith = signsInWith == null ? "" : signsInWith.strip();
+            playsAt = playsAt == null ? "" : playsAt.strip();
+        }
+
+        /** A Google, Facebook or mail entry, as the book was written before 2026-11-27. */
+        public Entry(String kind, String name, String note, String aliases, String verify) {
+            this(kind, name, note, aliases, verify, "", "", "");
         }
 
         /** An entry with no alias and the default verification, as the book was written before 2026-11-14. */

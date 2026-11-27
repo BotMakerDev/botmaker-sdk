@@ -8,6 +8,7 @@ import com.botmaker.plugin.api.value.ComponentType;
 import com.botmaker.plugin.api.value.DeclaredCall;
 import com.botmaker.plugin.api.value.PluginType;
 import com.botmaker.sdk.internal.capture.HostWindows;
+import com.botmaker.sdk.internal.config.HostGoogleReads;
 import com.botmaker.sdk.internal.plan.HostDone;
 import com.botmaker.sdk.plugin.emulator.host.HostAccounts;
 import com.botmaker.sdk.plugin.emulator.host.HostGames;
@@ -36,7 +37,7 @@ public final class HostTypes implements TypeHolder {
     @Override
     public List<ComponentType<?>> components() {
         return List.of(SETTINGS, SETTING, GAMES, GAME, ACCOUNTS, ACCOUNT, LABELS, LABEL, KNOWN, KNOWN_PLAIN,
-                KNOWN_ENTRY, SECRETS, SECRET, DONE, DONE_ROW, WINDOWS, WINDOW);
+                KNOWN_ALIASED, KNOWN_ENTRY, SECRETS, SECRET, DONE, DONE_ROW, WINDOWS, WINDOW, GOOGLE_READS, GOOGLE_READ);
     }
 
     /** The windows the runs picked for their games, which a run writes ({@code AutoPicks}). */
@@ -44,6 +45,13 @@ public final class HostTypes implements TypeHolder {
             .writtenAsEach(HostWindows::of, HostWindows::list);
 
     public static final DeclaredCall<HostWindows.Row> WINDOW = ComponentType.part(HostWindows.Row.class)
+            .writtenAsRecord();
+
+    /** Each instance's last-read Google accounts, which a run and the Emulators window write ({@code GoogleReads}). */
+    public static final DeclaredCall<HostGoogleReads> GOOGLE_READS = ComponentType.part(HostGoogleReads.class)
+            .writtenAsEach(HostGoogleReads::of, HostGoogleReads::list);
+
+    public static final DeclaredCall<HostGoogleReads.Row> GOOGLE_READ = ComponentType.part(HostGoogleReads.Row.class)
             .writtenAsRecord();
 
     /** The secrets this PC keeps, by name and kind ({@code KeptSecrets}). */
@@ -94,7 +102,15 @@ public final class HostTypes implements TypeHolder {
     public static final DeclaredCall<HostKnown.Entry> KNOWN_PLAIN = ComponentType.part(HostKnown.Entry.class)
             .writtenAs(HostKnown.Entry::new, HostKnown.Entry::kind, HostKnown.Entry::name, HostKnown.Entry::note);
 
-    /** An entry with its aliases or its own verification. */
+    /**
+     * {@code new HostKnown.Entry(kind, name, note, aliases, verify)}: a Google, Facebook or mail entry with its aliases
+     * or its own verification, the form a book written before 2026-11-27 holds.
+     */
+    public static final DeclaredCall<HostKnown.Entry> KNOWN_ALIASED = ComponentType.part(HostKnown.Entry.class)
+            .writtenAs(HostKnown.Entry::new, HostKnown.Entry::kind, HostKnown.Entry::name, HostKnown.Entry::note,
+                    HostKnown.Entry::aliases, HostKnown.Entry::verify);
+
+    /** An entry with a launch target and its links. */
     public static final DeclaredCall<HostKnown.Entry> KNOWN_ENTRY = ComponentType.part(HostKnown.Entry.class)
             .writtenAsRecord();
 }

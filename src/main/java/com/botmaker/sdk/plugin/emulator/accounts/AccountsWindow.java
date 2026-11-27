@@ -832,7 +832,7 @@ public final class AccountsWindow {
         AuthenticatorKeys keys = EmulatorsWindow.authenticatorKeys();
         Async.load("accounts-remove", () -> {
             Set<AccountRecord.Key> held = HostBook.held(HostConfig.load(services).config());
-            if (account.addresses().stream().anyMatch(a -> held.contains(new AccountRecord.Key(account.kind(), a)))) {
+            if (account.keys().stream().anyMatch(held::contains)) {
                 return false;
             }
             if (forget) {

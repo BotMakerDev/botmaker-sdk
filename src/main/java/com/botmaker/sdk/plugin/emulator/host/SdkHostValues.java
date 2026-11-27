@@ -7,6 +7,7 @@ import com.botmaker.plugin.api.ValueHolder;
 import com.botmaker.plugin.api.source.ManagedMethod;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.sdk.internal.capture.AutoPicks;
+import com.botmaker.sdk.internal.config.GoogleReads;
 import com.botmaker.sdk.internal.plan.DoneRecords;
 import com.botmaker.shared.emulator.config.AccountRecord;
 
@@ -96,6 +97,6 @@ public final class SdkHostValues implements ValueHolder {
     public List<ManagedValue<?>> values() {
         return List.of(EMULATOR_SETTINGS, EMULATOR_GAMES, INSTANCE_SETTINGS, INSTANCE_GAMES, INSTANCE_TAGS,
                 INSTANCE_USED_BY, INSTANCE_RENAMES, ACCOUNTS, BOOK, DEFAULT_VERIFICATION, SECRETS, DoneRecords.VALUE,
-                AutoPicks.VALUE);
+                AutoPicks.VALUE, GoogleReads.VALUE);
     }
 }

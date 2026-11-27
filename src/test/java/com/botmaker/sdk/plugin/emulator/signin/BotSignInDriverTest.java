@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +77,21 @@ class BotSignInDriverTest {
 
         assertEquals(End.SIGNED_IN, attempt.result().end());
         assertEquals("other@example.com", attempt.result().listedAs());
+    }
+
+    @Test
+    void whatAndroidListsOnceTheSignInEndedIsNotedSignedInOrNot() throws Exception {
+        Map<String, Set<String>> noted = new HashMap<>();
+        FakeRuns runs = new FakeRuns(client -> device.accounts.add(EMAIL));
+        new BotSignInDriver(() -> runs, () -> BOT, (instance, accounts) -> noted.put(instance.reference(), accounts),
+                clock::get, Duration.ZERO).signIn(INSTANCE, device, EMAIL, PASSWORD, ASK, context);
+        assertEquals(Map.of(INSTANCE.reference(), Set.of(EMAIL)), noted);
+
+        noted.clear();
+        FakeRuns refused = new FakeRuns(client -> client.refused(Refusal.WRONG_PASSWORD));
+        new BotSignInDriver(() -> refused, () -> BOT, (instance, accounts) -> noted.put(instance.reference(), accounts),
+                clock::get, Duration.ZERO).signIn(INSTANCE, device, "other@example.com", PASSWORD, ASK, context);
+        assertEquals(Map.of(INSTANCE.reference(), Set.of(EMAIL)), noted, "a refused sign-in still notes the read");
     }
 
     @Test

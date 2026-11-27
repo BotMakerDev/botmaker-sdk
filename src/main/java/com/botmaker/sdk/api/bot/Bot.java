@@ -17,6 +17,7 @@ import com.botmaker.sdk.internal.bot.RestartCap;
 import com.botmaker.sdk.internal.bot.RunDetails;
 import com.botmaker.sdk.internal.bot.SdkValues;
 import com.botmaker.sdk.internal.bot.Watchdog;
+import com.botmaker.sdk.internal.config.GoogleReads;
 import com.botmaker.sdk.internal.config.InstalledGame;
 import com.botmaker.sdk.internal.capture.AutoCapture.Decision.WatchLaunch;
 import com.botmaker.sdk.internal.capture.AutoPicks;
@@ -325,6 +326,13 @@ public class Bot {
         if (Source.current() instanceof EmulatorSource emulator
                 && Target.current() instanceof LaunchTarget.EmulatorApp app) {
             emulator.quiet(app.packageName());
+        }
+        // What a deal of a launch target's accounts reads: the instance's Google accounts as the run found them. On the
+        // run's thread, one shell command, so the note is written while the run still has its values of this PC.
+        if (mode == StartMode.COLD && Source.current() instanceof EmulatorSource emulator) {
+            emulator.googleAccounts()
+                    .flatMap(accounts -> GoogleReads.noteFromRun(emulator.instanceName(), accounts))
+                    .ifPresent(refused -> Debug.log("the instance's Google accounts are not noted: " + refused));
         }
     }
 

@@ -7,6 +7,8 @@ import com.botmaker.plugin.api.PluginState;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.sdk.internal.config.GoogleReads;
+import com.botmaker.sdk.internal.config.HostGoogleReads;
 import com.botmaker.shared.emulator.GoogleAccount;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -20,6 +22,7 @@ import com.botmaker.shared.tools.UserDirs;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -177,6 +180,22 @@ public final class HostConfig {
         });
     }
 
+    /**
+     * Notes the Google accounts each instance of {@code read} listed, by its name ({@link GoogleReads}); one step ↶
+     * stops at, as it follows what Android said. Nothing is written when every row says so already.
+     */
+    public static Optional<String> notedGoogle(StudioServices services, Map<String, Set<String>> read, Instant at) {
+        if (services == null || read.isEmpty()) return Optional.empty();
+        return step(services, GOOGLE_READ, () -> {
+            HostGoogleReads before = read(services, GoogleReads.VALUE, HostGoogleReads.class, null);
+            HostGoogleReads next = before == null ? HostGoogleReads.none() : before;
+            for (Map.Entry<String, Set<String>> one : read.entrySet()) {
+                next = GoogleReads.noted(next, one.getKey(), one.getValue(), at);
+            }
+            return write(services, GoogleReads.VALUE, HostGoogleReads.class, before, next);
+        });
+    }
+
     /** The instances' settings rows as written, with those this build does not understand ({@link HostIds}). */
     static HostSettings instanceRows(StudioServices services) {
         return read(services, SdkHostValues.INSTANCE_SETTINGS, HostSettings.class, HostSettings.none());
@@ -209,6 +228,7 @@ public final class HostConfig {
     private static final String FORGOTTEN = "Forget an instance";
     private static final String SEEN = "Note the instances ";
     private static final String IDENTIFIED = "Give an instance its BotMaker ID";
+    private static final String GOOGLE_READ = "Note the Google accounts the instances hold";
 
     /**
      * Whether the step {@code label} names followed what happened to an emulator (an instance renamed or deleted, a bot
@@ -216,7 +236,7 @@ public final class HostConfig {
      */
     public static boolean followsTheEmulator(String label) {
         return label != null && (label.equals(RENAMED) || label.equals(FORGOTTEN) || label.equals(IDENTIFIED)
-                || label.startsWith(SEEN));
+                || label.equals(GOOGLE_READ) || label.startsWith(SEEN));
     }
 
     /**

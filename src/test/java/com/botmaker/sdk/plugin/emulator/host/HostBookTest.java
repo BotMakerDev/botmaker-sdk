@@ -11,6 +11,8 @@ import com.botmaker.plugin.api.slot.TypeRef;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedValue;
 import com.botmaker.plugin.api.source.PluginValues;
+import com.botmaker.sdk.internal.config.GoogleReads;
+import com.botmaker.sdk.internal.config.HostGoogleReads;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
 import com.botmaker.shared.emulator.config.AccountRecord.Verification;
@@ -26,6 +28,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -511,5 +514,128 @@ class HostBookTest {
         assertEquals(List.of("a@example.com", "b@example.com"), after.aliases());
         assertEquals(Verification.ASK, after.verify(), "the file's verification over the default");
         assertEquals("farm", after.note());
+    }
+
+    private static final AccountRecord GAME_MAIN = AccountRecord.ofLaunchTarget("emu-app:com.game", "main", "farm");
+
+    @Test
+    void aLaunchTargetsAccountIsWrittenWithItsLinksAndReadBack() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        book.add(GAME_MAIN);
+        book.add(AccountRecord.ofLaunchTarget("steam:12345", "main", ""));
+        assertEquals(3, book.known(EmulatorConfig.EMPTY).size(), "farm, and one main per launch target");
+
+        book.link(GAME_MAIN.key(), Optional.of(FARM.key()), "this-pc/android/MEmu_1");
+        HostKnown written = (HostKnown) host.values.get(SdkHostValues.BOOK.id());
+        assertEquals(new HostKnown.Entry("launch-target", "main", "farm", "", "", "emu-app:com.game",
+                "google:farm@example.com", "this-pc/android/MEmu_1"), written.list().get(1));
+        assertEquals(new HostKnown.Entry("google", "farm@example.com", "farm"), written.list().getFirst(),
+                "a Google entry is written as before");
+
+        AccountRecord read = book.known(EmulatorConfig.EMPTY).get(1);
+        assertEquals(GAME_MAIN.key(), read.key());
+        assertEquals(Optional.of(FARM.key()), read.signsInWith());
+        assertEquals("this-pc/android/MEmu_1", read.playsAt());
+        assertEquals("Change an account's links", host.steps.getLast());
+
+        book.put(read.withNote("renoted"));
+        AccountRecord renoted = book.known(EmulatorConfig.EMPTY).get(1);
+        assertEquals("renoted", renoted.note());
+        assertEquals("this-pc/android/MEmu_1", renoted.playsAt(), "a note's edit keeps the links");
+
+        book.link(GAME_MAIN.key(), Optional.empty(), "");
+        AccountRecord unlinked = book.known(EmulatorConfig.EMPTY).get(1);
+        assertTrue(unlinked.signsInWith().isEmpty());
+        assertEquals("", unlinked.playsAt());
+    }
+
+    @Test
+    void aLinkIsRefusedToAnEntryTheBookLacksAndOnAnAccountOfAnotherKind() throws IOException {
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        book.add(GAME_MAIN);
+        IOException gone = assertThrows(IOException.class, () -> book.link(GAME_MAIN.key(),
+                Optional.of(new AccountRecord.Key(AccountRecord.Kind.GOOGLE, "nobody@example.com")), ""));
+        assertEquals("nobody@example.com is not in this PC's account book.", gone.getMessage());
+        assertThrows(IOException.class, () -> book.link(FARM.key(), Optional.empty(), "this-pc/desktop"));
+    }
+
+    @Test
+    void aLaunchTargetRowWithNoTargetOrALinkThatDoesNotReadIsReadAsBestItCan() throws IOException {
+        host.values.put(SdkHostValues.BOOK.id(), HostKnown.of(
+                new HostKnown.Entry("launch-target", "lost", "", "", "", "", "", ""),
+                new HostKnown.Entry("launch-target", "main", "", "", "", "emu-app:com.game", "newer:x", "")));
+        List<AccountRecord> known = book(Optional.empty()).known(EmulatorConfig.EMPTY);
+        assertEquals(List.of("main"), names(known), "no launch target: kept as written, not read");
+        assertTrue(known.getFirst().signsInWith().isEmpty(), "a link that does not read is none");
+        book(Optional.empty()).add(FARM);
+        assertEquals("lost", ((HostKnown) host.values.get(SdkHostValues.BOOK.id())).list().getLast().name(),
+                "the row this build does not read is kept");
+    }
+
+    @Test
+    void theExportCarriesALaunchTargetsTargetAndSignInButNeverItsPlace(@TempDir Path dir) throws IOException {
+        Path exported = dir.resolve("export.json");
+        HostBook.export(List.of(FARM, GAME_MAIN.withSignsInWith(Optional.of(FARM.key()))
+                .withPlaysAt("this-pc/android/MEmu_1")), exported);
+        JsonNode game = new ObjectMapper().readTree(Files.readString(exported, StandardCharsets.UTF_8))
+                .path("accounts").get(1);
+        assertEquals("emu-app:com.game", game.path("target").asText());
+        assertEquals("google:farm@example.com", game.path("signsInWith").asText());
+        assertTrue(game.path("playsAt").isMissingNode(), "a place is this PC's");
+
+        HostBook book = book(Optional.empty());
+        book.add(FARM);
+        AccountRecord imported = book.importFrom(exported).getLast();
+        assertEquals(GAME_MAIN.key(), imported.key());
+        assertEquals(Optional.of(FARM.key()), imported.signsInWith());
+        assertEquals("", imported.playsAt());
+    }
+
+    @Test
+    void anImportedLinkToAnEntryNeitherTheFileNorTheBookHoldsIsDropped(@TempDir Path dir) throws IOException {
+        Path exported = dir.resolve("export.json");
+        HostBook.export(List.of(GAME_MAIN.withSignsInWith(Optional.of(FARM.key()))), exported);
+        AccountRecord imported = book(Optional.empty()).importFrom(exported).getLast();
+        assertEquals(GAME_MAIN.key(), imported.key());
+        assertEquals(Optional.empty(), imported.signsInWith());
+    }
+
+    @Test
+    void aLaunchTargetsAccountSignsInWithNoOtherLaunchTargetsAccount() throws IOException {
+        HostBook book = book(Optional.empty());
+        AccountRecord other = AccountRecord.ofLaunchTarget("steam:12345", "main", "");
+        book.add(GAME_MAIN);
+        book.add(other);
+        IOException refused = assertThrows(IOException.class,
+                () -> book.link(GAME_MAIN.key(), Optional.of(other.key()), ""));
+        assertEquals("main cannot sign in with another launch target's account.", refused.getMessage());
+    }
+
+    @Test
+    void eachInstancesGoogleReadIsNotedOnlyWhenItChangedAsOneStepUndoStopsAt() {
+        StudioServices services = host.services();
+        Instant first = Instant.parse("2026-11-27T10:00:00Z");
+        assertEquals(Optional.empty(), HostConfig.notedGoogle(services,
+                Map.of("MEmu_1", Set.of("Farm@Example.com"), "MEmu_2", Set.of()), first));
+        HostGoogleReads kept = (HostGoogleReads) host.values.get(GoogleReads.VALUE.id());
+        assertEquals(new GoogleReads.Read(Set.of("farm@example.com"), first),
+                GoogleReads.last(kept, "MEmu_1").orElseThrow());
+        assertEquals(Set.of(), GoogleReads.last(kept, "MEmu_2").orElseThrow().accounts());
+        String label = host.steps.getLast();
+        assertTrue(HostConfig.followsTheEmulator(label), label);
+
+        int steps = host.steps.size();
+        int writes = host.writes;
+        HostConfig.notedGoogle(services, Map.of("MEmu_1", Set.of("farm@example.com")), first.plusSeconds(60));
+        assertEquals(writes, host.writes, "the same accounts read again write nothing");
+        assertEquals(first, GoogleReads.last((HostGoogleReads) host.values.get(GoogleReads.VALUE.id()), "MEmu_1")
+                .orElseThrow().at(), "the time is when Android first listed them so");
+
+        HostConfig.notedGoogle(services, Map.of("MEmu_1", Set.of("other@example.com")), first.plusSeconds(120));
+        assertEquals(steps + 2, host.steps.size());
+        assertEquals(Set.of("other@example.com"), GoogleReads.last(
+                (HostGoogleReads) host.values.get(GoogleReads.VALUE.id()), "MEmu_1").orElseThrow().accounts());
     }
 }

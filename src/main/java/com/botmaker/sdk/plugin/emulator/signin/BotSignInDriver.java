@@ -21,6 +21,8 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -54,20 +56,28 @@ public final class BotSignInDriver implements SignInDriver {
 
     private final Supplier<SideRuns> runs;
     private final BotFolder bot;
+    private final BiConsumer<EmulatorInstance, Set<String>> noted;
     private final LongSupplier clock;
     private final Duration poll;
 
     /**
-     * @param runs where the sign-in bot is started, asked at each sign-in ({@code StudioServices::sideRuns})
-     * @param bot  where the sign-in bot's folder is
+     * @param runs  where the sign-in bot is started, asked at each sign-in ({@code StudioServices::sideRuns})
+     * @param bot   where the sign-in bot's folder is
+     * @param noted told the Google accounts Android lists once a sign-in ended, whatever its end ({@code GoogleReads})
      */
-    public BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot) {
-        this(runs, bot, System::currentTimeMillis, POLL);
+    public BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot, BiConsumer<EmulatorInstance, Set<String>> noted) {
+        this(runs, bot, noted, System::currentTimeMillis, POLL);
     }
 
     BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot, LongSupplier clock, Duration poll) {
+        this(runs, bot, (instance, accounts) -> {}, clock, poll);
+    }
+
+    BotSignInDriver(Supplier<SideRuns> runs, BotFolder bot, BiConsumer<EmulatorInstance, Set<String>> noted,
+                    LongSupplier clock, Duration poll) {
         this.runs = runs;
         this.bot = bot;
+        this.noted = noted;
         this.clock = clock;
         this.poll = poll;
     }
@@ -104,6 +114,8 @@ public final class BotSignInDriver implements SignInDriver {
                 // signed in, the password was good (or not asked); else only if Google asked a step after it
                 return new Attempt(result, result.signedIn() || host.passwordAccepted());
             } finally {
+                // whatever the end, a cancel included: Google may have added the account before it
+                note(instance, device);
                 home(device);
             }
         }
@@ -134,6 +146,20 @@ public final class BotSignInDriver implements SignInDriver {
                 }
             }
         }
+    }
+
+    /**
+     * Tells {@link #noted} what Android lists now; an instance that does not answer is noted nothing. {@link #noted}
+     * says itself why a note was not kept.
+     */
+    private void note(EmulatorInstance instance, AccountDevice device) {
+        Set<String> now;
+        try {
+            now = device.accounts();
+        } catch (RuntimeException | Error gone) {
+            return; // dadb surfaces a gone instance as either: its next read notes it
+        }
+        if (now != null) noted.accept(instance, now);
     }
 
     /** Leaves the instance on its home screen, so no half-typed page is left up for what comes next. */

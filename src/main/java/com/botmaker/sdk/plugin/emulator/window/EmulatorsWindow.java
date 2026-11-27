@@ -418,7 +418,20 @@ public final class EmulatorsWindow {
         reading = true;
         refresh.setDisable(true);
         EmulatorsModel.Snapshot last = snapshot;
-        Async.load("emulators-read", () -> EmulatorsModel.read(EmulatorsModel.Source.shown(services), last, Instant.now()),
+        Async.load("emulators-read", () -> {
+                    EmulatorsModel.Snapshot read = EmulatorsModel.read(EmulatorsModel.Source.shown(services), last,
+                            Instant.now());
+                    // what a deal of a launch target's accounts reads: each instance's Google accounts, as just read
+                    try {
+                        HostConfig.notedGoogle(services, EmulatorsModel.googleRead(read), read.readAt())
+                                .ifPresent(refused -> services.log().warn(
+                                        "The instances' Google accounts were not noted: " + refused));
+                    } catch (RuntimeException unwritten) {
+                        // the read stands: only the note of it is lost, until the next read
+                        services.log().warn("The instances' Google accounts were not noted: " + unwritten);
+                    }
+                    return read;
+                },
                 this::show, failed -> {
                     readEnded();
                     say("This PC's emulators could not be read: " + failed);
@@ -591,7 +604,16 @@ public final class EmulatorsWindow {
         };
         Applies log = applies();
         // the Google sign-in bot, run once per account, its folder asked again each time
-        SignInDriver signIns = new BotSignInDriver(services::sideRuns, SignInBots.of(services::sideRuns));
+        SignInDriver signIns = new BotSignInDriver(services::sideRuns, SignInBots.of(services::sideRuns),
+                (instance, accounts) -> {
+                    try {
+                        HostConfig.notedGoogle(services, Map.of(instance.reference(), accounts), Instant.now())
+                                .ifPresent(refused -> services.log().warn(
+                                        "The instance's Google accounts were not noted: " + refused));
+                    } catch (RuntimeException unwritten) {
+                        services.log().warn("The instance's Google accounts were not noted: " + unwritten);
+                    }
+                });
         // every id is in the batch before any operation can end, so the passwords are cleared exactly once
         synchronized (batch) {
             OPERATIONS.addListener(ended);

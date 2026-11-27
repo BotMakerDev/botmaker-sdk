@@ -33,7 +33,9 @@ public @interface SdkRunValue {
         /** When each {@code Do} was last done on an instance's game, and whether its check held. */
         DONE,
         /** The window a run picked for each desktop game it launched, by launch target ({@code AutoPicks}). */
-        WINDOWS
+        WINDOWS,
+        /** The Google accounts each emulator instance last said it holds, and since when ({@code GoogleReads}). */
+        GOOGLE_READS
     }
 
     /** This PC's class the values live in: {@code Runs.java}. */

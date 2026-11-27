@@ -11,6 +11,7 @@ import com.botmaker.sdk.internal.bot.Watchdog;
 import com.botmaker.shared.emulator.EmulatorInstance;
 import com.botmaker.shared.emulator.Platforms;
 import com.botmaker.shared.emulator.QuietRun;
+import com.botmaker.shared.emulator.config.AndroidState;
 import com.botmaker.shared.emulator.tree.TreeReader;
 import com.botmaker.shared.emulator.tree.TreeReaders;
 import com.botmaker.shared.emulator.tree.UiTree;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -190,6 +192,22 @@ public final class EmulatorSource implements CaptureSource, ReadableSource {
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> {
             if (emu.isPresent()) QuietRun.end(emu.device(), was);
         }));
+    }
+
+    /**
+     * The Google accounts Android lists on the instance now, lower case; empty when it is not connected or does not
+     * answer. What a run notes when it starts there ({@code GoogleReads}).
+     */
+    @Hidden("what a run notes of its instance; a bot never reads the accounts")
+    public Optional<Set<String>> googleAccounts() {
+        try {
+            Emulator emu = resolve();
+            if (emu == null) return Optional.empty();
+            return Optional.ofNullable(AndroidState.googleAccounts(emu.device().shell(AndroidState.ACCOUNTS)));
+        } catch (RuntimeException | Error unread) {
+            // dadb surfaces a gone instance as either
+            return Optional.empty();
+        }
     }
 
     /** Do Not Disturb as each instance had it before this run quieted it. */

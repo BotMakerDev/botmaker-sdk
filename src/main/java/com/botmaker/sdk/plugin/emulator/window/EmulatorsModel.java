@@ -310,6 +310,20 @@ public final class EmulatorsModel {
                 facts == null ? null : ConfigDiff.of(wanted, facts), state.usedBy(key));
     }
 
+    /**
+     * The Google accounts each instance of {@code read} listed, by its name ({@code GoogleReads}): only the instances
+     * Android answered for this time, so a stopped one's kept answer is not read again as new.
+     */
+    public static Map<String, Set<String>> googleRead(Snapshot read) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        for (InstanceRow row : read.instances()) {
+            if (!row.running()) continue;
+            row.android().flatMap(AndroidState::googleAccounts)
+                    .ifPresent(accounts -> out.put(row.instance().reference(), accounts));
+        }
+        return out;
+    }
+
     /** Reads this PC; {@code last} gives each stopped instance its Android answer back. Runs off the UI thread. */
     public static Snapshot read(Source source, Snapshot last, Instant now) {
         Platforms.DiscoveryReport report = source.discover();
