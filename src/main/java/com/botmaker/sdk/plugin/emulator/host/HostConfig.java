@@ -7,8 +7,10 @@ import com.botmaker.plugin.api.PluginState;
 import com.botmaker.plugin.api.StudioServices;
 import com.botmaker.plugin.api.slot.ValueContext;
 import com.botmaker.plugin.api.source.ManagedMethod;
+import com.botmaker.sdk.api.capture.Place;
 import com.botmaker.sdk.internal.config.GoogleReads;
 import com.botmaker.sdk.internal.config.HostGoogleReads;
+import com.botmaker.sdk.internal.config.PlaceKeys;
 import com.botmaker.shared.emulator.GoogleAccount;
 import com.botmaker.shared.emulator.PlatformId;
 import com.botmaker.shared.emulator.config.AccountRecord;
@@ -152,7 +154,8 @@ public final class HostConfig {
     /**
      * Moves an instance's rows to its new name after the instance was renamed: its settings, games, accounts, tags
      * and the bots seen launching it, with the rows this build does not understand. Rows the new name had are
-     * replaced.
+     * replaced. Then each account of the book that plays at it plays at the new name ({@link #movedPlaysAt}), and its
+     * last Google read is the new name's ({@link #movedRead}); either refused leaves the rename recorded.
      */
     public static Optional<String> rename(StudioServices services, InstanceKey from, InstanceKey to) {
         return step(services, RENAMED,() -> {
@@ -160,9 +163,32 @@ public final class HostConfig {
             Optional<String> refused = write(services, before, renamed(before, from, to));
             if (refused.isPresent()) return refused;
             HostLabels renames = renames(services);
-            return write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
+            refused = write(services, SdkHostValues.INSTANCE_RENAMES, HostLabels.class, renames,
                     InstanceRenames.recorded(renames, from, to));
+            if (refused.isPresent()) return refused;
+            HostKnown book = read(services, SdkHostValues.BOOK, HostKnown.class, null);
+            if (book != null) {
+                refused = write(services, SdkHostValues.BOOK, HostKnown.class, book, movedPlaysAt(book, from, to));
+                if (refused.isPresent()) return refused;
+            }
+            HostGoogleReads reads = read(services, GoogleReads.VALUE, HostGoogleReads.class, null);
+            return reads == null ? Optional.empty()
+                    : write(services, GoogleReads.VALUE, HostGoogleReads.class, reads, movedRead(reads, from, to));
         });
+    }
+
+    /**
+     * {@code reads} with the row of the instance {@code from} names under {@code to}'s name, replacing the row that
+     * name had: the instance holds what it held before its rename.
+     */
+    static HostGoogleReads movedRead(HostGoogleReads reads, InstanceKey from, InstanceKey to) {
+        String old = from.reference();
+        String now = to.reference();
+        if (old.equals(now) || reads.list().stream().noneMatch(row -> row.instance().equals(old))) return reads;
+        return new HostGoogleReads(reads.list().stream()
+                .filter(row -> !row.instance().equals(now))
+                .map(row -> row.instance().equals(old) ? new HostGoogleReads.Row(now, row.accounts(), row.at()) : row)
+                .toList());
     }
 
     /**
@@ -502,6 +528,22 @@ public final class HostConfig {
                 new HostAccounts(moved(rows.accounts().list(), HostAccounts.Account::of, old, now,
                         row -> new HostAccounts.Account(now, row.kind(), row.name(), row.note(), row.removed(),
                                 row.first()))));
+    }
+
+    /**
+     * {@code book} with each account that plays at the instance {@code from} names playing at {@code to}'s name
+     * instead: a place names an instance by its name, so a rename made in BotMaker takes the link with it. One renamed
+     * or deleted elsewhere is never seen here: its accounts keep the old name, which the Accounts window shows broken.
+     */
+    static HostKnown movedPlaysAt(HostKnown book, InstanceKey from, InstanceKey to) {
+        Place old = Place.android(from.reference());
+        Place now = Place.android(to.reference());
+        if (old.equals(now)) return book;
+        return new HostKnown(book.list().stream()
+                .map(entry -> PlaceKeys.parse(entry.playsAt()).filter(old::equals).isEmpty() ? entry
+                        : new HostKnown.Entry(entry.kind(), entry.name(), entry.note(), entry.aliases(),
+                                entry.verify(), entry.target(), entry.signsInWith(), now.toString()))
+                .toList());
     }
 
     /** {@code rows} with every row of {@code key} gone. */

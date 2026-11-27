@@ -235,7 +235,7 @@ final class ManageActions {
         Optional.ofNullable(SignInReady.renamed(from, to)).ifPresent(this::said);
         Optional<String> refused = HostConfig.rename(services, from, to);
         if (refused.isPresent()) {
-            said("It is renamed, but BotMaker could not move its configuration or note the rename for its bots: "
+            said("It is renamed, but BotMaker could not move its configuration and accounts, or note the rename for its bots: "
                     + refused.get());
             return;
         }

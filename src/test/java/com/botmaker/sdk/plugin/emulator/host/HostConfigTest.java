@@ -181,6 +181,34 @@ class HostConfigTest {
     }
 
     @Test
+    void aRenameTakesEachAccountThatPlaysAtTheInstanceWithIt() {
+        HostKnown.Entry atFarm = new HostKnown.Entry("launch-target", "main", "", "", "", "emu-app:com.game", "",
+                "this-pc/android/LDPlayer-1");
+        HostKnown.Entry elsewhere = new HostKnown.Entry("launch-target", "farm", "", "", "", "emu-app:com.game", "",
+                "this-pc/android/MuMu-0");
+        HostKnown.Entry google = new HostKnown.Entry("google", "main@gmail.com", "");
+        HostKnown book = HostKnown.of(atFarm, elsewhere, google);
+        HostKnown after = HostConfig.movedPlaysAt(book, FARM, new InstanceKey(PlatformId.LDPLAYER, "Farm 1"));
+        assertEquals("this-pc/android/Farm 1", after.list().getFirst().playsAt());
+        assertEquals(List.of(elsewhere, google), after.list().subList(1, 3), "the others stay as they are");
+        assertEquals(book, HostConfig.movedPlaysAt(book, FARM, FARM));
+    }
+
+    @Test
+    void aRenameTakesTheInstancesLastGoogleReadWithIt() {
+        InstanceKey renamed = new InstanceKey(PlatformId.LDPLAYER, "Farm 1");
+        HostGoogleReads.Row read = new HostGoogleReads.Row("LDPlayer-1", "main@gmail.com", "2026-11-27T10:00:00Z");
+        HostGoogleReads.Row stale = new HostGoogleReads.Row("Farm 1", "old@gmail.com", "2026-11-01T10:00:00Z");
+        HostGoogleReads.Row other = new HostGoogleReads.Row("MuMu-0", "", "2026-11-27T10:00:00Z");
+        assertEquals(HostGoogleReads.of(new HostGoogleReads.Row("Farm 1", "main@gmail.com", "2026-11-27T10:00:00Z"),
+                        other),
+                HostConfig.movedRead(HostGoogleReads.of(read, stale, other), FARM, renamed),
+                "the row the new name had goes");
+        HostGoogleReads unread = HostGoogleReads.of(stale, other);
+        assertEquals(unread, HostConfig.movedRead(unread, FARM, renamed), "nothing read: nothing moves");
+    }
+
+    @Test
     void aDeletedInstanceLeavesNoRows() {
         HostConfig.Rows before = HostConfig.rows(full(), new HostConfig.Rows(HostSettings.none(), HostGames.none(),
                 HostSettings.of(new HostSettings.Setting("ldplayer/LDPlayer-1", "gpu_mode", "vulkan")),

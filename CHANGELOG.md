@@ -19,6 +19,11 @@ Sections are `## [x.y.z] — YYYY-MM-DD`, newest first. Versions absent from thi
 
 ## [Unreleased]
 
+- **An account follows its instance's rename** (2026-11-27, run places phase 7e): renaming an instance in the
+  Emulators window moves each launch target's account that plays at it to the new name, and its last Google read with
+  it, in the same undo step. An
+  instance renamed or deleted outside BotMaker keeps its accounts' link as written: the Accounts window shows it with
+  ⚠ ("plays at MEmu_9, which is gone"), and the deal takes such an account as playing anywhere.
 - **The Accounts window keeps a launch target's accounts** (2026-11-27, run places phase 7d, layout B): a Launch
   target segment beside All, Google, Facebook and Mail lists the accounts under each launch target, the open bot's
   first, each with **+ Add**, and **+ Launch target…** for another. A row shows the account's name, what it signs in
